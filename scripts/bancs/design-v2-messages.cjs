@@ -174,7 +174,11 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
     const r = (e) => e && e.getBoundingClientRect(); const hr = r(h), cr = r(c);
     return { titre: !!h, cloche: !!c, memeLigne: !!(hr && cr && Math.abs((hr.top + hr.bottom) / 2 - (cr.top + cr.bottom) / 2) < 24), segs: document.querySelectorAll('.vrm-main .v2-seg').length, anciens: document.querySelectorAll('.vrm-main .vrm-messages-sections, .vrm-main .vrm-fav-zones, .vrm-main .vrm-msg-bar').length,
       premiere: (() => { const x = document.querySelector('[data-v2-conv]'); return x ? Math.round(x.getBoundingClientRect().top) : null; })() }; });
-  if (W !== 1512) dit(tete.titre && tete.cloche && tete.memeLigne, `${nom} : le grand titre et la cloche sur une ligne`, tete);
+  // (19 nov., intégration — « VRM natif ») La coque native n'a plus de cloche dans la tête d'écran : la ligne du haut porte
+  // Messages et la photo du profil (« Plus » → Notifications), le grand titre est dessous (contrat NATIF.md). Jugé : le titre, et
+  // la ligne d'actions de la coque au-dessus de lui ; l'ancienne tête (cloche à côté du titre) reste acceptée.
+  const coqueNat = await pg.evaluate(() => { const h = document.querySelector('[data-v2-msg-titre] h1'), a = document.querySelector('[data-n-coque-plus]'); if (!h || !a) return null; return { actionsAuDessus: a.getBoundingClientRect().bottom <= h.getBoundingClientRect().top + 2 }; });
+  if (W !== 1512) dit(tete.titre && ((tete.cloche && tete.memeLigne) || !!(coqueNat && coqueNat.actionsAuDessus)), `${nom} : le grand titre, avec la cloche sur sa ligne ou les actions de la coque native au-dessus`, { ...tete, coqueNat });
   const segM = await pg.evaluate(() => { const g = document.querySelector('.v2m-tete .v2-seg'); if (!g) return null; const cs = getComputedStyle(g); return { deborde: g.scrollWidth > g.clientWidth + 1, fondu: /gradient/.test(cs.maskImage || cs.webkitMaskImage || '') }; });
   dit(segM && (!segM.deborde || segM.fondu), `${nom} : le segmenté tient dans la largeur, ou défile avec un fondu`, segM);
   dit(tete.segs === 1 && tete.anciens === 0, `${nom} : UN segmenté (Conversations · Offres · Favoris), plus les rangées d’hier`, tete);
@@ -190,7 +194,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
     const fil = await pg.evaluate(() => ({ bulles: document.querySelectorAll('.vrm-bulle').length, moi: (() => { const x = document.querySelector('.vrm-bulle-moi .vrm-bulle'); return x ? getComputedStyle(x).backgroundColor : ''; })(), champ: !!document.querySelector('.vrm-chat-panel textarea, .vrm-chat-panel input[type="text"]') || [...document.querySelectorAll('.vrm-chat-panel a, .vrm-chat-panel button')].some((x) => /Répondre sur Vinted/.test(x.textContent || '')) }));
     const tf = await pg.evaluate(() => { const e = document.querySelector('.vrm-chat-head-s'); if (!e) return null; const cs = getComputedStyle(e); return { coupe: e.scrollHeight > e.clientHeight + 1, ellipse: [...e.querySelectorAll('*'), e].some((x) => getComputedStyle(x).textOverflow === 'ellipsis' && x.scrollWidth > x.clientWidth + 1), lignes: Math.round(e.clientHeight / parseFloat(cs.lineHeight)) }; });
     dit(tf && !tf.coupe && !tf.ellipse, `${nom} : la tête du fil (paire · compte) n’est pas coupée`, tf);
-    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
+    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255|0, 104, 214|64, 156, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
     await pg.screenshot({ path: path.join(SHOTS, `fil-${nom}.png`) });
   }
   dit(!erreurs.length, `${nom} : aucune erreur de page`, erreurs.slice(0, 3));
