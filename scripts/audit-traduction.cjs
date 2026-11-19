@@ -102,6 +102,8 @@ const MIGRES = [
   ['src/composants/ChampRecherche.jsx', ['*']],
   ['src/LitigesEnCours.jsx', ['*']],
   ['src/LigneFraicheur.jsx', ['*']],
+  // (19 nov., lot completer-infos) L'atelier « Compléter ».
+  ['src/completer/Completer.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;

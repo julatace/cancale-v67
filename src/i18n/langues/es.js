@@ -24,6 +24,7 @@ import ecran_serie_selection from './es/serieSelection.js';   // (16 nov.) la ba
 import ecran_scan_retrouver from './es/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './es/liaison.js';   // (15 nov.) La liaison achat ⇄ article
+import ecran_completer from './es/completer.js';   // (19 nov.) L'atelier « Compléter »
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './es/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
@@ -75,6 +76,7 @@ import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './es/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
+import ecran_natif from './es/natif.js';   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -2325,6 +2327,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_completer,
   ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
@@ -2342,4 +2345,5 @@ export default {
   ...ecran_securite_ventes,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
+  ...ecran_natif,
 };
