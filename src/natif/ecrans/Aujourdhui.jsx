@@ -60,23 +60,26 @@ function Chiffres({ chiffres }) {
   const ouvrir = ouvrirPeriode ? () => ouvrirPeriode(p) : null;
   const note = (x) => (!x ? '' : NOTE[x.note] ? tr(NOTE[x.note]) : (x.note || ''));
   const B = S ? S.benefice : null;
-  const detailB = !B ? '' : B.valeur == null ? note(B) : B.couverture ? tr('v2.stats.auMoinsSur', { c: B.couverture.replace('/', ' / ') }) : '';
+  const detailB = !B ? '' : B.valeur == null ? note(B) : B.couverture ? tr('v2.stats.auMoinsSur', { c: B.couverture }) : '';
   // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
   const resume = !stats || etat !== 'lu' ? '' : JSON.stringify(Object.fromEntries(PERIODES.map((k) => { const x = stats[k]; return [k, {
-    vendu: cents(x.vendu.valeur), vp: x.vendu.partiel ? 1 : 0, ventes: x.ventes.valeur == null ? '' : String(x.ventes.valeur), benefice: cents(x.benefice.valeur),
+    vendu: cents(x.vendu.valeur), vp: x.vendu.partiel ? 1 : 0, ventes: x.ventes.valeur == null ? '' : String(x.ventes.valeur), np: x.ventes.partiel ? 1 : 0, benefice: cents(x.benefice.valeur),
     bp: x.benefice.partiel ? 1 : 0, couverture: x.benefice.couverture || '', panier: cents(x.panier.valeur), ecart: x.ecart == null ? '' : String(x.ecart) }]; })));
   const nul = (x) => (x == null ? null : x);
+  // La MÊME hauteur en lecture, lu, pas su, et d'une période à l'autre : la ligne de l'écart et le détail de chaque fait
+  // sont toujours là (une espace insécable quand il n'y a rien à dire) — rien ne saute quand le chiffre arrive.
+  const place = (t) => t || '\u00a0';
   return (<>
     <Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>
     <Groupe attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined,
       'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
-      <Affiche valeur={n} unite={u} libelle={libelle} ecart={ecart}/>
+      <Affiche valeur={n} unite={u} libelle={libelle} ecart={place(ecart)}/>
       <Faits colonnes={3}>
-        <Fait libelle={B && B.brut ? tr('v2.stats.beneficeBrut') : tr('v2.stats.benefice')} valeur={B && B.valeur != null ? montant(B.valeur) : null} detail={detailB} onModifier={ouvrir}
+        <Fait libelle={B && B.brut ? tr('v2.stats.beneficeBrut') : tr('v2.stats.benefice')} valeur={B && B.valeur != null ? montant(B.valeur) : null} detail={place(detailB)} onModifier={ouvrir}
           attrs={{ 'data-v2-stat': 'benefice' }}/>
-        <Fait libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null} detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onModifier={ouvrir}
+        <Fait libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null} detail={place(S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : ''))} onModifier={ouvrir}
           attrs={{ 'data-v2-stat': 'ventes' }}/>
-        <Fait libelle={tr('v2.stats.panier')} valeur={S && S.panier.valeur != null ? montant(S.panier.valeur) : nul(null)} detail={S && S.panier.valeur == null ? note(S.panier) : ''} onModifier={ouvrir}
+        <Fait libelle={tr('v2.stats.panier')} valeur={S && S.panier.valeur != null ? montant(S.panier.valeur) : nul(null)} detail={place(S && S.panier.valeur == null ? note(S.panier) : '')} onModifier={ouvrir}
           attrs={{ 'data-v2-stat': 'panier' }}/>
       </Faits>
     </Groupe>

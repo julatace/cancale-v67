@@ -95,7 +95,7 @@ async function unEcran(nav, port, base, W, sombre) {
         let s1 = await lireS();
         dit(s1.seg === 3 && s1.p === 'jour' && s1.grand === '102' && /\+85 %/.test(s1.ecart) && s1.ventes === '2' && /51/.test(s1.panier || ''), `S ${ou} : Jour — 102 € vendus, « +85 % » nommé, 2 ventes, panier 51 €`, s1);
         await toucherS('.n-segmente [role="radio"]:nth-of-type(2)'); await pg.waitForTimeout(300); s1 = await lireS();
-        dit(s1.p === 'semaine' && s1.grand === '497' && /−12 %/.test(s1.ecart) && /au moins/.test(s1.detB) && /8 \/ 10/.test(s1.detB), `S ${ou} : Semaine — 497 €, « −12 % », bénéfice « au moins · prix d’achat 8 / 10 »`, s1);
+        dit(s1.p === 'semaine' && s1.grand === '497' && /−12 %/.test(s1.ecart) && /au moins/.test(s1.detB) && /8\/10/.test(s1.detB), `S ${ou} : Semaine — 497 €, « −12 % », bénéfice « au moins · 8/10 prix d’achat »`, s1);
         await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-semaine-${W}-${th}.png`) });
         await toucherS('[data-v2-stat="benefice"]'); await pg.waitForTimeout(200);
         dit(await pg.evaluate(() => document.documentElement.getAttribute('data-banc-argent')) === 'semaine', `S ${ou} : toucher le bénéfice ouvre Argent sur la semaine`);

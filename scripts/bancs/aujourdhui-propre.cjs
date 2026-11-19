@@ -256,7 +256,7 @@ async function muter(pg) {
 // 0 € — il rend la période « au moins », ou « — » si rien d'autre n'y est lu).
 function attenduJours(ventes) {
   const m0 = minuit(); const jours = [6, 5, 4, 3, 2, 1, 0].map((k) => { const d = new Date(m0); d.setDate(d.getDate() - k); const f = new Date(d); f.setDate(f.getDate() + 1); return [d.getTime(), f.getTime()]; });
-  const sur = (de, a) => { const l = ventes.filter((v) => !v.annulee && v.ts >= de && v.ts < a); const lus = l.filter((v) => v.eur != null); const cents = Math.round(lus.reduce((t, v) => t + v.eur * 100, 0)); return { cents, partiel: lus.length < l.length, n: l.length }; };
+  const sur = (de, a) => { const l = ventes.filter((v) => !v.annulee && v.ts >= de && v.ts < a); const lus = l.filter((v) => v.eur != null); const cents = Math.round(lus.reduce((t, v) => t + v.eur * 100, 0)); return { cents, partiel: lus.length < l.length, n: l.length, nLus: lus.length }; };
   const d = new Date(); const de = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), a = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
   // (19 nov.) La semaine du calendrier (lundi 0 h → lundi suivant), comme la carte des chiffres et Argent.
   const lundi = new Date(m0); lundi.setDate(lundi.getDate() - ((lundi.getDay() + 6) % 7)); const lundiApres = new Date(lundi); lundiApres.setDate(lundiApres.getDate() + 7);
@@ -295,8 +295,10 @@ async function unEcran(nav, nomBase, b, W, sombre) {
         for (const [k, x] of [['jour', X.jours[6]], ['semaine', X.semaine], ['mois', X.mois]]) {
           const v = S[k] || {};
           const venduAttendu = x.cents === 0 && x.partiel ? '' : String(x.cents);
-          dit(w.etat === 'lu' && v.vendu === venduAttendu && !!v.vp === x.partiel && v.ventes === String(x.n), `F4 ${ou} : ${k} — vendu ${x.cents / 100} € en ${x.n} ventes${x.partiel ? ' (« au moins »)' : ''} = les ventes semées`, { vu: v, attendu: x });
-          const panier = x.partiel || !x.n ? '' : String(Math.round(Math.round((x.cents / 100 / x.n) * 100)));
+          // Une vente au prix illisible n'est pas une ligne de « Vendu » (`ventesFaites` la range à part) : le nombre est alors
+          // celui des ventes lues, dit « au moins » — la règle du propriétaire, celle de l'écran Argent.
+          dit(w.etat === 'lu' && v.vendu === venduAttendu && !!v.vp === x.partiel && v.ventes === String(x.nLus) && !!v.np === x.partiel, `F4 ${ou} : ${k} — vendu ${x.cents / 100} € en ${x.partiel ? 'au moins ' : ''}${x.nLus} ventes = les ventes semées`, { vu: v, attendu: x });
+          const panier = x.partiel || !x.nLus ? '' : String(Math.round(Math.round((x.cents / 100 / x.nLus) * 100)));
           dit(v.panier === panier, `F4 ${ou} : ${k} — panier moyen ${panier ? Number(panier) / 100 + ' €' : '« — » (pas tout lu ou aucune vente)'}`, { vu: v.panier, attendu: panier });
         }
         dit(X.mois.partiel === true && !!S.mois && S.mois.vp === 1, `F4 ${ou} : le mois dit « au moins » (${A.illisibles} ventes au prix pas lu — jamais comptées 0 €)`, S.mois);
