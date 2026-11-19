@@ -363,10 +363,11 @@ html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px 
 html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 /* L'aide : le numéro d'une étape — une pastille pleine, blanc dessus (à l'encre sur le bleu : 3,55:1 ; les suivantes étaient grises). */
 html body .vrm-aide-etape-n { background: var(--ap-plein) !important; color: var(--ap-sur-plein) !important; }
-/* Le Stock, « comment ranger » : le numéro d'une étape à venir, à l'encre seconde (2,77:1 mesuré). */
-html body .vrm-sx-etape > b { color: var(--ap-gris) !important; opacity: 1 !important; }
-/* La feuille « Plateformes » : le logo d'un site sans compte reste une icône lisible (2,88:1 mesuré). */
-html body .v2-feuille-corps .vrm-filtres > button[data-site][aria-pressed="false"] :is(svg, img) { opacity: 1 !important; color: var(--ap-gris) !important; }
+/* Le Stock, « comment ranger » : le numéro d'une étape, à l'encre (le film baisse l'étape à venir à .7 : à l'encre seconde
+   sur sa pastille grise, 2,77:1 mesuré). */
+html body .vrm-sx-etape > b { color: var(--n-encre, #111114) !important; }
+/* La feuille « Plateformes » : le logo d'un site sans compte relié était à 45 % (2,02:1 mesuré) — il reste lisible, à l'encre seconde ; « aucun compte relié » est dit dans son titre. */
+html body .vrm-sel-sites > button[data-sans-compte][aria-pressed="false"] .vrm-ss-in { opacity: 1 !important; color: var(--ap-gris) !important; }
 /* Cibles au doigt : « À compléter » de la feuille des outils (34 px de haut), « Tout » des périodes (43 px de large). */
 html body .v2-outils-feuille .vrm-outils-vers { min-height: 44px !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
