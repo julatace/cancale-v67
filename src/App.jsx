@@ -20217,7 +20217,7 @@ function Toaster() {
   // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
   // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
   const zoneFiche = useZoneMessages();
-  const dansFiche = !!zoneFiche && !enHaut;
+  const dansFiche = !!zoneFiche;   // (la fiche elle-même compte comme une feuille ouverte : `enHaut` y est toujours vrai)
   const pile = (
     <div className="vrm-toasts" data-toasts-place={dansFiche ? 'fiche' : enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{...(dansFiche ? {position:'relative'} : {position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px))'}),zIndex:Z_MESSAGES}),
       display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:dansFiche ? 0 : '0 14px',pointerEvents:'none'}}

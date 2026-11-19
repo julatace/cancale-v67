@@ -127,7 +127,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </div>
       {A ? <span className="nf-plaque" data-fiche-grand-num=""><Plaque numero={A.num} doublon={A.double} grand/></span>
         : sansNumero ? <span className="nf-plaque" data-fiche-grand-num="" data-fiche-sans-num="">{sansNumero}</span> : null}
-      {photos.length > 1 ? <div className="nf-points" role="tablist" aria-label={T.voirPhotos(photos.length)} data-nf-points="">
+      {photos.length > 1 ? <div className="nf-points" role="group" aria-label={T.voirPhotos(photos.length)} data-nf-points="">
         {photos.map((s, i) => <button key={s + i} type="button" className="nf-point" data-nf-actif={i === vue ? '1' : undefined} aria-label={T.photoN(i + 1, photos.length)} onClick={() => allerPhoto(i)}/>)}
       </div> : null}
       {photos.length > 1 && ordi ? <div className="nf-miniatures">{photos.map((s, i) => <button key={s + i} type="button" className="nf-miniature" data-nf-actif={i === vue ? '1' : undefined} aria-label={T.photoN(i + 1, photos.length)} onClick={() => allerPhoto(i)}>{rendre.photo(s)}</button>)}</div> : null}
@@ -138,7 +138,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
   return (
     <PagePoussee ouverte titre={titreBarre} libelleRetour={libelleRetour} onRetour={onRetour} className="n-fiche" attrs={attrs}>
       <div className="nf-messages" ref={zone} data-fiche-messages=""/>
-      <div className="nf" data-nf-ordi={ordi ? '1' : undefined}>
+      <div className="nf" data-nf-ordi={ordi ? '1' : undefined} data-nf-titre-long={typeof titre === 'string' && titre.length > 70 ? '1' : undefined}>
         {A || sans ? galerie : null}
         <div className="nf-infos">
           {A || sans ? <header className="nf-tete">

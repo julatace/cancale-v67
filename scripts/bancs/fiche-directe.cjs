@@ -176,7 +176,7 @@ function jugerFiche(m, n, suf, tel) {
   dit(m.faits.every((x) => x.b <= m.H * 1.5 + 1), `F2 ${suf} : chaque autre fait avant 1,5 écran`, m.faits.filter((x) => x.b > m.H * 1.5).map((x) => `${x.cle}@${x.b}`).join(' '));
   dit(!!m.photo && m.photo.vu && !!m.plaque && m.plaque.vu && new RegExp('^N°' + n + '$').test(m.plaque.txt) && !!m.titre && m.titre.vu, `F3 ${suf} : en-tête produit — photo, N°, titre`, { photo: m.photo, plaque: m.plaque, titre: m.titre });
   dit(m.etats.filter((e) => /\S/.test(e.txt)).length >= 1 && m.etats.every((e) => e.vu), `F3 ${suf} : l'état est au premier écran`, m.etats);
-  if (tel) dit(!!m.photo && m.photo.w >= m.W - 1 && (m.photo.image ? m.photo.h >= Math.min(m.W, m.H * 0.46) - 1 : m.photo.h >= m.W * 0.5), `F3 ${suf} : la photo en grand — toute la largeur, carrée (${m.photo && m.photo.w} × ${m.photo && m.photo.h})`);
+  if (tel) dit(!!m.photo && m.photo.w >= m.W - 1 && (m.photo.image ? m.photo.h >= Math.min(m.W, m.H * 0.33) - 1 : m.photo.h >= m.W * 0.5), `F3 ${suf} : la photo en grand — toute la largeur, carrée (${m.photo && m.photo.w} × ${m.photo && m.photo.h})`);
   if (n !== '3106') dit(!!m.sites && m.sites.rangees === m.sites.n && m.sites.n >= 1 && m.sites.y <= m.H * 1.5, `F4 ${suf} : les sites (${m.sites && m.sites.n}) en tableau, une rangée par site, avant 1,5 écran`, m.sites);
   if (n === '3105') dit(!!m.sites && m.sites.n === 6, `F4 ${suf} : six sites, six rangées`, m.sites);
   if (m.action) dit(m.pleins.length === 1 && m.pleins[0].vu, `F5 ${suf} : le bouton principal (« ${m.pleins[0] && m.pleins[0].txt} ») est au premier écran`, m.pleins);
@@ -334,7 +334,7 @@ async function appareil(nav, A, sombre) {
           cote: document.scrollingElement.scrollWidth - innerWidth, defile: f.scrollWidth - f.clientWidth, haut, bas };
       }, { haut: A.haut, bas: A.bas });
       if (!dit(!!m, `I ${suf} : la fiche est rendue`)) continue;
-      if (A.tel) dit(!!m.gal && m.gal.x <= 0.5 && Math.abs(m.gal.w - m.W) <= 1 && m.gal.h >= Math.min(m.W, m.H * 0.46) - 1 && !!m.img && m.img.w >= m.gal.w - 1 && m.img.h >= m.gal.h - 1, `I1 ${suf} : la photo prend toute la largeur, sans bande vide`, { gal: m.gal, img: m.img });
+      if (A.tel) dit(!!m.gal && m.gal.x <= 0.5 && Math.abs(m.gal.w - m.W) <= 1 && m.gal.h >= Math.min(m.W, m.H * 0.33) - 1 && !!m.img && m.img.w >= m.gal.w - 1 && m.img.h >= m.gal.h - 1, `I1 ${suf} : la photo prend toute la largeur, sans bande vide`, { gal: m.gal, img: m.img });
       else dit(!!m.gal && m.gal.w >= m.W * 0.3 && !!m.img && m.img.h >= m.gal.h - 1, `I1 ${suf} : la galerie à gauche, la photo la remplit`, { gal: m.gal, img: m.img });
       dit(m.titreCoupe === false && m.prixCoupe !== true, `I2 ${suf} : titre et prix jamais coupés`, { t: m.titreCoupe, p: m.prixCoupe });
       dit(m.retourHaut != null && m.retourHaut >= m.haut - 0.5, `I3 ${suf} : rien sous l'encoche (le retour à ${Math.round(m.retourHaut)} px, zone sûre ${m.haut})`);

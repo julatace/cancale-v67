@@ -24,6 +24,8 @@
   /* (iPhone, onglet Safari : 664 px utiles) la photo garde toute la largeur mais ne passe pas 46 % de la hauteur : le prix et le plein restent au premier écran. */
   .nf-defile::-webkit-scrollbar { display: none; }
   .nf-galerie[data-nf-sans] .nf-defile { aspect-ratio: 16 / 9; }
+  /* Un titre très long (jamais coupé) prend ses lignes : la photo cède un peu de hauteur, le prix et le plein restent au premier écran. */
+  .nf[data-nf-titre-long] .nf-defile { max-height: 34svh; }
   .nf-photo {
     appearance: none; -webkit-appearance: none; flex: 0 0 100%; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; background: var(--n-carte);
     scroll-snap-align: start; cursor: zoom-in; touch-action: pan-x pan-y; -webkit-tap-highlight-color: transparent; overflow: hidden;
