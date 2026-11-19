@@ -7,6 +7,7 @@ import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Ac
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_emails_mail from './en/emailsMail.js';   // (19 nov.) E-mails comme Mail, « Relier ma boîte » accompagné
 import ecran_design_v2 from './en/designV2.js';   // (17 nov.) le nouveau design, en essai
 import ecran_argent_v2 from './en/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
 import ecran_v2_ventes from './en/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
@@ -2316,6 +2317,7 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_emails_mail,
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,

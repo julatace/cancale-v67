@@ -216,7 +216,9 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     // parcours unique (src/AdresseReception.jsx) ; l'ancienne scène animée ne revient que si l'adresse VRM
     // n'est pas ouverte — jamais deux pas-à-pas à l'écran.
     const boite = lu('src/BoiteEmails.jsx');
-    dit((boite.match(/<ParcoursAdresseVrm\b/g) || []).length === 1 && /uid=\{compteOuvert\}/.test(boite) && !/<RelierCompte\b/.test(boite) && (lu('src/RelierCompte.jsx').match(/<RelierBoite\b/g) || []).length === 0, 'R6 un compte choisi ouvre LE parcours (une fois), sur ce compte');
+    // (19 nov., lot emails-mail) LE parcours de l'écran E-mails est désormais « Relier ma boîte » accompagné
+    // (src/RelierMaBoite.jsx, une étape par écran, même route, même `Verification` du compte) — une fois, sur ce compte.
+    dit((boite.match(/<RelierMaBoite\b/g) || []).length === 1 && !/<ParcoursAdresseVrm\b/.test(boite) && /<Verification\b/.test(lu('src/RelierMaBoite.jsx')) && !/<RelierBoite\b/.test(lu('src/RelierMaBoite.jsx')) && /uid=\{compteOuvert\}/.test(boite) && !/<RelierCompte\b/.test(boite) && (lu('src/RelierCompte.jsx').match(/<RelierBoite\b/g) || []).length === 0, 'R6 un compte choisi ouvre LE parcours (une fois), sur ce compte');
     dit(/\{pret === false && <section className="vrm-boite-guide"/.test(boite) && (boite.match(/<RelierBoite\b/g) || []).length === 1, 'R6 l’ancienne scène seulement quand l’adresse VRM n’est pas ouverte (jamais deux pas-à-pas)');
   });
 
