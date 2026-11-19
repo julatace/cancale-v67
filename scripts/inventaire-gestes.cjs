@@ -195,12 +195,21 @@ async function toucher(pg, cle, tel) {
 async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) {
   const tel = W < 600, base = tel ? tTel : tOrdi;
   const lignes = [];
-  let o = null, clics = 0, recharges = 0, rates = 0, depot = null;
+  let o = null, clics = 0, recharges = 0, rates = 0, depot = null, tombee = false, chutes = 0;
   const noter = (els, chemin, parent) => { for (const x of els) lignes.push({ ecran: id, nomEcran: nom, largeur: W, chemin, touchers: base + chemin.length + 1, sorte: sorteDe(x), nom: x.nom, zone: x.zone, tag: x.tag, role: x.role, type: x.type, etat: x.etat, n: x.n, repete: x.repete, inactif: x.inactif, sansDefiler: x.sansDefiler, h: x.h, data: x.data, href: x.href, cle: x.cle, parent: parent || '' }); };
   const ouvrirEcran = async () => {
+    // Une page tombée (mémoire de la machine partagée) : son contexte est fermé, on en rouvre UN.
+    if (o && (tombee || o.pg.isClosed())) { await o.ctx.close().catch(() => {}); o = null; tombee = false; }
     if (!o) {
-      o = await P.ouvrir(nav, { W, sombre: false, b: BASE || (BASE = V.baseVolume()), url, api: V.apiVolume });
+      // Machine chargée : l'ouverture peut dépasser les 30 s de Playwright. Trois essais, chacun dans SON contexte
+      // (celui d'un essai raté est fermé avant le suivant : jamais deux pages à la fois).
+      for (let essai = 1; !o; essai++) {
+        const avant = new Set(nav.contexts());
+        try { o = await P.ouvrir(nav, { W, sombre: false, b: BASE || (BASE = V.baseVolume()), url, api: V.apiVolume }); }
+        catch (e) { for (const c of nav.contexts()) if (!avant.has(c)) await c.close().catch(() => {}); if (essai >= 3) throw e; }
+      }
       o.pg.on('dialog', (d) => d.dismiss().catch(() => {}));
+      o.pg.on('crash', () => { tombee = true; });
       await o.pg.addInitScript(INIT);
       await P.pret(o.pg);
       // L'état rangé sur l'appareil au départ : un filtre touché (site, vue) s'y enregistre — on le REPOSE à chaque
@@ -229,7 +238,10 @@ async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) 
   const etat = () => o.pg.evaluate(relever).catch(() => ({ tab: '', elements: [], feuilles: 0 }));
   try {
     await ouvrirEcran();
-    const e0 = await etat();
+    // Le départ se relève quand l'écran a FINI d'arriver : deux relevés de suite identiques (à 700 ms), 20 s au plus —
+    // un relevé pris pendant « lecture… » ferait passer tout ce qui arrive ensuite pour l'effet du premier toucher.
+    let e0 = await etat();
+    for (let i = 0, stable = 0; i < 28 && stable < 2; i++) { await o.pg.waitForTimeout(700); const e = await etat(); stable = e.elements.length === e0.elements.length && e.elements.every((x, k) => x.cle === e0.elements[k].cle) ? stable + 1 : 0; e0 = e; }
     const cles0 = new Set(e0.elements.map((x) => x.cle));
     // « Neuf » après un toucher : un NOM (chiffres neutralisés) ou une liste que l'écran de départ ne portait pas,
     // dans l'écran ou une feuille — un élément de l'en-tête ou de la barre qui change de libellé n'est pas neuf.
@@ -243,13 +255,14 @@ async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) 
     // une heure ou un compteur qui bouge ne compte pas pour un autre état).
     const memeEtat = async () => { const e = await etat(); const la = new Set(e.elements.map(idDe)); let n = 0; for (const k of ids0) if (la.has(k)) n++; return e.tab === e0.tab && e.feuilles === e0.feuilles && n >= ids0.size * 0.92; };
     const revenir = async () => {
-      for (let i = 0; i < 2; i++) { await o.pg.keyboard.press('Escape').catch(() => {}); await o.pg.waitForTimeout(220); if (await memeEtat()) { await etat(); return; } }
+      if (!tombee && !o.pg.isClosed()) for (let i = 0; i < 2; i++) { await o.pg.keyboard.press('Escape').catch(() => {}); await o.pg.waitForTimeout(220); if (await memeEtat()) { await etat(); return; } }
       recharges++; await ouvrirEcran();
       // L'écran rechargé est « de retour » quand il porte de nouveau ce que le départ portait (au plus 8 s).
       for (let i = 0; i < 12; i++) { if (await memeEtat()) break; await o.pg.waitForTimeout(300); }
     };
     if (PROFONDEUR >= 1) for (const c of (depart.length ? depart : e0.elements).filter(touchable)) {
       if (clics >= MAX_CLICS) break;
+      if (tombee || o.pg.isClosed()) { chutes++; if (chutes > 3) break; await revenir(); }
       const T0 = Date.now();
       await etat();   // repose `__inv` sur l'état de départ
       if (!(await toucher(o.pg, c.cle, tel))) { rates++; continue; }
@@ -285,7 +298,7 @@ async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) 
       }
       await revenir();
     }
-    console.log(`  ${String(W).padStart(4)} · ${id.padEnd(15)} ${String(lignes.length).padStart(4)} éléments · ${clics} touchers · ${recharges} rechargements${rates ? ' · ' + rates + ' introuvables après rechargement' : ''}` + (o.erreurs.length ? ' · erreurs JS : ' + o.erreurs.slice(0, 1).join(' | ') : ''));
+    console.log(`  ${String(W).padStart(4)} · ${id.padEnd(15)} ${String(lignes.length).padStart(4)} éléments · ${clics} touchers · ${recharges} rechargements${rates ? ' · ' + rates + ' introuvables après rechargement' : ''}${chutes ? ' · page tombée ' + chutes + ' fois' : ''}` + (o.erreurs.length ? ' · erreurs JS : ' + o.erreurs.slice(0, 1).join(' | ') : ''));
   } catch (e) { console.log(`  ${W} · ${id} : ÉCHEC ${String(e.message || e).slice(0, 160)}`); }
   finally { if (o) await o.ctx.close().catch(() => {}); }
   return lignes.map(({ cle, parent, ...l }) => l);
