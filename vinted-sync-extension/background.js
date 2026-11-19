@@ -3983,6 +3983,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       capteLotPourOnglet(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
+    // 5.409 : répondre depuis le volet Messages du panneau — SEULEMENT depuis la carte de l'onglet vinted.fr.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'repondreCarte') {
+      repondreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     // 5.377 : Favoris · Annonces · Ventes du compte de l'onglet (lecture seule ; autres comptes floutés).
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'carteListes') {
       carteListes(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
@@ -20557,6 +20562,63 @@ async function capteLotVu(url, tabId, lotId) {
 //   · « Tous les comptes » : les autres comptes, 4 lignes chacun, rendus en LECTURE
 //     SEULE (`lectureSeule`) — la carte les floute, `inert`, sans aucune commande.
 // Aucune écriture, aucune requête Vinted (hors la relecture bornée ci-dessus).
+const CARTE_TOUTES_MAX = 300;
+const TRANSPORTEURS_CARTE = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', colissimo: 'Colissimo', dpd: 'DPD', shop2shop: 'Shop2Shop', vinted: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS' };
+// 5.409 — l'état des automatisations, LU : offres auto (`vinted_offres_auto`, prix mini posés), messages aux favoris
+// (ses réglages `vrm_favoris_reglages_{uid}` : versions, rythme ; le mode auto dans la file `favoris_file_*`), baisse
+// automatique (pas encore livrée : `null`, dit). `null` = pas su.
+// 5.409 — RÉPONDRE DEPUIS LE PANNEAU (sur SON toucher, `confirme`). Le MÊME chemin que la réponse depuis l'app
+// (`executerPourAppCoeur`, `POST /api/v2/conversations/{id}/replies`, liste blanche `ENDPOINTS_APP`) : la garde stricte
+// (compte de l'onglet = celui de la conversation, sécurité du compte, 50/h, réserve, pause 429/403), la page vinted.fr,
+// le journal. En plus : la conversation doit être dans la boîte RANGÉE du compte de l'onglet (identité), texte 1–1 000.
+async function repondreCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine', raison: 'La réponse part seulement de l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Envoyer ».' };
+  const conv = String(msg.conv || ''), texte = String(msg.texte == null ? '' : msg.texte).trim();
+  if (!/^[1-9]\d{0,19}$/.test(conv) || !texte || texte.length > 1000) return { ok: false, code: 'invalide', raison: 'Écris un message (1 000 caractères au plus).' };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid) return { ok: false, code: 'vinted-absent', raison: 'Aucun compte Vinted connecté dans cet onglet : rien n’est parti.' };
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=${idxCarte('c', 'data->payload->conversations', CARTE_LISTE_MAX).replace(/(c\d+:data->payload->conversations->\d+)/g, '$1->>id')}`);
+  if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu : rien n’est parti.' };
+  const r0 = (rows && rows[0]) || {};
+  if (!Object.values(r0).some((v) => String(v) === conv)) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas dans la boîte de ce compte : rien n’est parti.' };
+  const r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/conversations/${conv}/replies`, body: corpsReponseVinted(texte), __carte: true });
+  if (r && r.ok && (!r.json || r.json.code == null || Number(r.json.code) === 0)) return { ok: true };
+  return { ok: false, code: (r && r.code) || 'refus', raison: (r && (r.error || (r.json && r.json.message))) || 'Vinted n’a pas accepté le message : rien n’est confirmé.' };
+}
+async function automatisationsCarte(u, owner) {
+  const of = await offreAutoReglages().catch(() => null);
+  const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme`);
+  let auto = null;
+  try {
+    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(u))))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    if (/^[0-9a-f-]{36}$/.test(String(owner || ''))) {
+      const f = await sbGet(`app_data?id=eq.favoris_file_${h}&select=a:data->groupes->${owner}->auto->reglages`);
+      if (Array.isArray(f)) { const a = f[0] && f[0].a; auto = a && typeof a === 'object' ? { actif: a.actif === true, attenteMin: Number(a.attenteMin) || null, attenteMax: Number(a.attenteMax) || null, parJour: Number(a.parJour) || null, parHeure: Number(a.parHeure) || null, heureDebut: Number.isFinite(Number(a.heureDebut)) ? Number(a.heureDebut) : null, heureFin: Number.isFinite(Number(a.heureFin)) ? Number(a.heureFin) : null } : { actif: false }; }
+    }
+  } catch (_) { auto = null; }
+  const r0 = Array.isArray(rg) ? (rg[0] || null) : undefined;
+  return {
+    offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus } : null,
+    favoris: r0 === undefined ? null : { regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    baisse: null,
+  };
+}
+async function notificationsCarte(u) {
+  const rows = await sbGet('app_data?id=like.capte_journal_*&select=e:data->e');
+  if (!Array.isArray(rows)) return null;
+  const lim = Date.now() - 7 * 864e5, vus = new Map();
+  for (const r of rows) for (const x of Array.isArray(r && r.e) ? r.e : []) {
+    const e = entreeCapteJournal(x); if (!e || e.t < lim) continue;
+    if (e.p === 'vinted' && e.c !== u) continue;   // le compte de l'onglet seulement (Vinted)
+    const k = e.p + '|' + e.c + '|' + e.s + '|' + e.id; const a = vus.get(k); if (!a || e.t < a.t) vus.set(k, e);
+  }
+  const m = await lireMain(['vrm_capte_vu']).catch(() => null);
+  const vu = m && m.vrm_capte_vu && Number(m.vrm_capte_vu.at) > 0 ? Number(m.vrm_capte_vu.at) : null;
+  return { vu, liste: [...vus.values()].sort((a, b) => b.t - a.t).slice(0, 200) };
+}
 const CARTE_LISTE_MAX = 40, CARTE_AUTRES_MAX = 6, CARTE_AUTRES_LIGNES = 4, CARTE_RELIRE_MS = 3600000;
 function prixCarte(p) {
   const v = p && typeof p === 'object' ? p.amount : p;
@@ -20626,6 +20688,18 @@ async function carteListes(msg, sender) {
         description: txt(it.description, 600), photos, mini: Number(inf.mini) > 0 ? Number(inf.mini) : null, achat: achat > 0 && achat < 1e6 ? achat : null }; };
     const lignes = liste.map(ligne).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
     annonces = { lu: isFinite(capL) ? capL : null, aConfirmer, total: lignes.length, liste: lignes.slice(0, CARTE_LISTE_MAX) };
+    // 5.409 (le grand panneau, filtre « Statut » à compteurs) : TOUTES les annonces du dressing RANGÉ, chacune avec son
+    // statut LU dans la réponse de Vinted (`is_draft`, `is_closed` / `item_closing_action`, `is_hidden`, `is_reserved`) ;
+    // « en vente » seulement si la règle `<enligne-regle>` la dit en ligne, sinon « à confirmer » (jamais deviné).
+    const enLigneIds = new Set(r.enLigne.map((it) => String(it.id)));
+    const statutDe = (it) => (it.is_draft === true ? 'brouillon' : (it.is_closed === true || it.item_closing_action === 'sold') ? 'vendu' : it.is_hidden === true ? 'masque' : it.is_reserved === true ? 'reserve' : enLigneIds.has(String(it.id)) ? 'en_vente' : 'a_confirmer');
+    const tousIds = items.map((it) => String(it.id));
+    const infosTous = infosDuCompte(d, u, tousIds);
+    for (const k of Object.keys(infosTous)) if (!infos[k]) infos[k] = infosTous[k];
+    const toutes = items.map((it) => Object.assign(ligne(it), { statut: statutDe(it) })).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
+    const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 };
+    for (const x of toutes) statuts[x.statut]++;
+    annonces.toutes = toutes.slice(0, CARTE_TOUTES_MAX); annonces.statuts = statuts; annonces.nTous = toutes.length;
     // Lue il y a plus d'une heure ⇒ relue, dans le budget de LECTURE, depuis l'onglet.
     if (!o.fenetre && (!isFinite(capL) || maintenant - capL > CARTE_RELIRE_MS)) { annonces.relecture = true; retourSurVinted(sender).catch(() => {}); }
   }
@@ -20645,6 +20719,23 @@ async function carteListes(msg, sender) {
         vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
+    // 5.409 : le TRANSPORTEUR de chaque vente, par identité : le bordereau reçu par e-mail porte le n° de transaction
+    // et le n° de suivi (`email_bord_*`), le suivi du transporteur porte le transporteur (`email_track_*`). Rien relié ⇒
+    // pas de transporteur (jamais « inconnu », jamais deviné). Projections scalaires, aucune requête Vinted.
+    try {
+      const txs = lignes.map((x) => x.tx).filter((x) => /^\d{1,20}$/.test(x));
+      if (txs.length) {
+        const bs = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi`);
+        const parSuivi = new Map();
+        for (const b of Array.isArray(bs) ? bs : []) { const sv = String((b && b.suivi) || '').replace(/[^\w-]/g, ''); if (sv && b.tx) parSuivi.set(sv, String(b.tx)); }
+        if (parSuivi.size) {
+          const ts = await sbGet(`app_data?id=like.email_track_*&meta->>suivi=in.(${[...parSuivi.keys()].join(',')})&select=suivi:meta->>suivi,carrier:meta->>carrier`);
+          const parTx = new Map();
+          for (const t of Array.isArray(ts) ? ts : []) { const c = String((t && t.carrier) || ''); const tx = parSuivi.get(String((t && t.suivi) || '')); if (tx && TRANSPORTEURS_CARTE[c] && !parTx.has(tx)) parTx.set(tx, TRANSPORTEURS_CARTE[c]); }
+          for (const x of lignes) if (parTx.has(x.tx)) x.transporteur = parTx.get(x.tx);
+        }
+      }
+    } catch (_) {}
   }
   // ── 5.409 : les messages du compte de l'onglet (la boîte RANGÉE `harvest_{uid}_inbox`, ses 40 plus récentes
   //    conversations ; jamais un autre compte). Pas su ⇒ `null` (« — », dit) ; aucune requête Vinted pour ça.
@@ -20672,7 +20763,11 @@ async function carteListes(msg, sender) {
       }
     }
   }
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, autres, fenetre: o.fenetre };
+  // ── 5.409 : AUTOMATISATIONS — l'état LU des vrais réglages (jamais écrit d'ici : ils se changent dans VRM).
+  const automatisations = await automatisationsCarte(u, s.user_id).catch(() => null);
+  // ── 5.409 : NOTIFICATIONS — le journal capté (`capte_journal_*`, toutes les lignes de ce compte VRM), 7 jours.
+  const notifications = await notificationsCarte(u).catch(() => null);
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
