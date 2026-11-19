@@ -201,9 +201,11 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           await b.locator(`[data-boite-email="${id(1)}"]`).waitFor();
         } else {
           await pg.locator('[data-v2-mail-plus]').click();
-          const dansFeuille = await pg.locator('[data-v2-mail-compte-feuille] select').count();
+          const dansFeuille = await pg.locator('[data-v2-mail-compte-feuille] select').waitFor({ timeout: 4000 }).then(() => 1).catch(() => 0);
           dit(dansFeuille === 1, `${nom} : le compte se choisit dans « ⋯ » au téléphone`);
-          await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
+          await pg.keyboard.press('Escape');
+          await pg.locator('[data-v2-mail-feuille]').waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
+          await pg.waitForTimeout(300);
         }
         // La lecture : sur le clic, un e-mail à la fois ; sujet, expéditeur, date ; corps en TEXTE (aucune balise, aucun script).
         const nl = journal(appels).filter((a) => a.q.lire).length;

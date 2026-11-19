@@ -72,7 +72,7 @@ export default {
   "relier.relaisApple": "Questo indirizzo è un relay «Nascondi la mia email» di Apple: scegli il servizio della casella a cui Apple inoltra.",
   "relier.adresse.titre": "Il tuo indirizzo VRM",
   "relier.adresse.phrase": "{nom} inoltrerà qui le tue e-mail. Copialo: lo incollerai al passo successivo.",
-  "relier.adresse.off": "Il tuo indirizzo è disattivato: non si archivia nulla. Riattivalo in Impostazioni → Le mie e-mail.",
+  "relier.adresse.off": "Il tuo indirizzo è disattivato: non si archivia nulla. Riattivalo in «Impostazioni dell’indirizzo», più sotto.",
   "relier.copierAdresse": "Copia il mio indirizzo VRM",
   "relier.copierVinted": "Copia «vinted»",
   "relier.copie": "Copiato",

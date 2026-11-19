@@ -72,7 +72,7 @@ export default {
   "relier.relaisApple": "Cette adresse est un relais « Masquer mon adresse » d’Apple : choisis la messagerie de la boîte vers laquelle Apple fait suivre.",
   "relier.adresse.titre": "Ton adresse VRM",
   "relier.adresse.phrase": "{nom} fera suivre tes e-mails ici. Copie-la : tu la colleras à l’étape suivante.",
-  "relier.adresse.off": "Ton adresse est désactivée : rien n’est rangé. Réactive-la dans Paramètres → Mes e-mails.",
+  "relier.adresse.off": "Ton adresse est désactivée : rien n’est rangé. Réactive-la dans « Réglages de l’adresse », plus bas.",
   "relier.copierAdresse": "Copier mon adresse VRM",
   "relier.copierVinted": "Copier « vinted »",
   "relier.copie": "Copié",

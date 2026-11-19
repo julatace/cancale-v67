@@ -72,7 +72,7 @@ export default {
   "relier.relaisApple": "Esta dirección es un relé «Ocultar mi correo» de Apple: elige el servicio de la bandeja a la que Apple reenvía.",
   "relier.adresse.titre": "Tu dirección VRM",
   "relier.adresse.phrase": "{nom} reenviará tus correos aquí. Cópiala: la pegarás en el siguiente paso.",
-  "relier.adresse.off": "Tu dirección está desactivada: no se archiva nada. Reactívala en Ajustes → Mis correos.",
+  "relier.adresse.off": "Tu dirección está desactivada: no se archiva nada. Reactívala en «Ajustes de la dirección», más abajo.",
   "relier.copierAdresse": "Copiar mi dirección VRM",
   "relier.copierVinted": "Copiar «vinted»",
   "relier.copie": "Copiado",

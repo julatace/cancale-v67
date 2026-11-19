@@ -72,7 +72,7 @@ export default {
   "relier.relaisApple": "Diese Adresse ist ein Apple-Relay „E-Mail-Adresse verbergen“: Wähle den Dienst des Postfachs, an das Apple weiterleitet.",
   "relier.adresse.titre": "Deine VRM-Adresse",
   "relier.adresse.phrase": "{nom} leitet deine E-Mails hierher weiter. Kopiere sie: Du fügst sie im nächsten Schritt ein.",
-  "relier.adresse.off": "Deine Adresse ist deaktiviert: Nichts wird abgelegt. Aktiviere sie unter Einstellungen → Meine E-Mails.",
+  "relier.adresse.off": "Deine Adresse ist deaktiviert: Nichts wird abgelegt. Aktiviere sie unten unter „Adresseinstellungen“.",
   "relier.copierAdresse": "Meine VRM-Adresse kopieren",
   "relier.copierVinted": "„vinted“ kopieren",
   "relier.copie": "Kopiert",

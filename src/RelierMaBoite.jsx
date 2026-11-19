@@ -285,7 +285,7 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
     const [local, domaine] = [adresse.slice(0, adresse.indexOf('@')), adresse.slice(adresse.indexOf('@'))];
     contenu = <>
       <h2 className="n-relier-titre">{tr('relier.adresse.titre')}</h2>
-      <p className="n-relier-phrase">{tr('relier.adresse.phrase', { nom: nomM })}</p>
+      <p className="n-relier-phrase">{(() => { const t = tr('relier.adresse.phrase', { nom: nomM }); return t.charAt(0).toLocaleUpperCase() + t.slice(1); })()}</p>
       <div className="n-relier-adresse-carte">
         <p className="n-relier-adresse" data-adresse-reception={adresse} translate="no"><span>{local}</span><wbr/><span className="n-relier-domaine">{domaine}</span></p>
         <Copier texte={adresse} libelle={tr('relier.copierAdresse')} attrs={{ 'data-copier-adresse': '' }}/>

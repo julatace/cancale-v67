@@ -72,7 +72,7 @@ export default {
   "relier.relaisApple": "This address is an Apple “Hide My Email” relay: choose the service of the inbox Apple forwards to.",
   "relier.adresse.titre": "Your VRM address",
   "relier.adresse.phrase": "{nom} will forward your e-mails here. Copy it: you will paste it in the next step.",
-  "relier.adresse.off": "Your address is turned off: nothing is filed. Turn it back on in Settings → My e-mails.",
+  "relier.adresse.off": "Your address is turned off: nothing is filed. Turn it back on in “Address settings” below.",
   "relier.copierAdresse": "Copy my VRM address",
   "relier.copierVinted": "Copy “vinted”",
   "relier.copie": "Copied",
