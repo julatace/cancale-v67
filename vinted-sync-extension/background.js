@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.408.0';
+const CODE_VERSION = '5.409.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -20668,7 +20668,55 @@ async function etatPourApp() {
     { fileReseau: vueFileReseau(await avecDelai(lireFileReseau(), 300, []).catch(() => [])), rapport: true, origine: origineInstallation() },
     // 5.377 : « Dire ce que l'extension capte » (présent = cette extension sait le dire ; `coupe` null = pas su).
     { capte: { coupe: await avecDelai(capteCoupe(), 300, null).catch(() => null) } },
-    repub ? { repub } : {});
+    repub ? { repub } : {},
+    // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
+    { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) });
+}
+// ══ CE NAVIGATEUR, POUR LA PAGE « EXTENSION » DE L'APP (5.409, 19 nov., demande H) ════════
+// Julien : « on ne sait pas quand ton compte Vinted est ouvert, quelles actions on peut faire […] des
+// fois c'est marqué trop d'onglets / de comptes ouverts, vraiment pas clair ». L'app disait les refus
+// APRÈS le clic (« Un autre compte vient d'agir dans ce navigateur : VRM attend 4 min ») ; elle les dit
+// maintenant AVANT, sur une seule page. Ce bloc ne fait que LIRE ce que les garde-fous ont déjà posé :
+//   · `appareil`      l'identifiant de ce navigateur (le même que `ext_appareil_{id}`) : l'app ne se compte pas deux fois ;
+//   · `onglets`       combien d'onglets vinted.* / leboncoin.fr / vestiairecollective.com sont ouverts ici ;
+//   · `comptesOnglets` les comptes Vinted des domaines ouverts (cookie de chaque domaine) : deux comptes
+//                     différents ⇒ l'app dit « garde un seul compte par navigateur » (VRM n'agit que pour
+//                     celui de vinted.fr, `garde` / `gardeStricte` inchangés) ;
+//   · `vus`           les comptes que CE navigateur a lus (48 h, `vrmComptesVus`, déjà publié dans sa ligne) ;
+//   · `verrou`        un AUTRE compte vient d'agir ici (`porteDiscretion`) : jusqu'à quand ;
+//   · `ouverture`     Vinted vient d'être ouvert sur ce compte : VRM attend jusqu'à quand avant d'agir seul.
+// Aucune requête Vinted, aucune écriture, rien dans le plafond ni dans le budget de lecture. Aucun
+// garde-fou n'est retiré ni assoupli : ils décident toujours au moment du geste.
+async function etatIciPourApp(uid) {
+  const u = String(uid || '');
+  const t = Date.now();
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.be/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.es/*', 'https://*.vinted.de/*', 'https://*.vinted.nl/*', 'https://*.vinted.pt/*', 'https://*.vinted.co.uk/*', 'https://*.leboncoin.fr/*', 'https://leboncoin.fr/*', 'https://*.vestiairecollective.com/*', 'https://vestiairecollective.com/*'] }); } catch (_) { tabs = null; }
+  let onglets = null; const hotesVinted = new Set();
+  if (Array.isArray(tabs)) {
+    onglets = { vinted: 0, leboncoin: 0, vestiaire: 0 };
+    for (const tb of tabs) {
+      let h = ''; try { h = new URL(String(tb.url || '')).hostname; } catch (_) { continue; }
+      if (/(^|\.)vinted\.[a-z.]+$/.test(h)) { onglets.vinted++; hotesVinted.add(h); }
+      else if (/(^|\.)leboncoin\.fr$/.test(h)) onglets.leboncoin++;
+      else if (/(^|\.)vestiairecollective\.com$/.test(h)) onglets.vestiaire++;
+    }
+  }
+  const comptesOnglets = [];
+  for (const h of [...hotesVinted].slice(0, 4)) {
+    const id = await avecDelai(compteConnecte(h), 250, null).catch(() => null);
+    if (id && !comptesOnglets.includes(String(id))) comptesOnglets.push(String(id));
+  }
+  let vus = {}; try { vus = (await chrome.storage.local.get(COMPTES_VUS_STORE))[COMPTES_VUS_STORE] || {}; } catch (_) { vus = null; }
+  let verrou = null, ouverture = null;
+  if (u && cleDiscretionOk(u)) {
+    const v = await lireLocal(cleVerrouCompte(u));
+    if (v && v.uid && String(v.uid) !== u && Number(v.jusqua) > t) verrou = { uid: String(v.uid), jusqua: Number(v.jusqua) };
+    const o = (await lireLocal('vrmOuverture'))[u];
+    if (o && Number(o.depuis) + Number(o.attente || 0) > t) ouverture = { uid: u, jusqua: Number(o.depuis) + Number(o.attente || 0) };
+  }
+  let appareil = ''; try { appareil = (await avecDelai(idAppareil(), 300, null)) || ''; } catch (_) {}
+  return { v: 1, appareil, onglets, comptesOnglets, vus, verrou, ouverture };
 }
 // `remplace` : l'API manque, un autre chemin garde la fonction (rien à faire).
 // `indispo` : rien ne la remplace ICI, aujourd'hui — l'app le dit, une fois.
