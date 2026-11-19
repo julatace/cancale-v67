@@ -6,7 +6,7 @@
 .v2r-haut { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 16px 0; margin: 0;
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 /* Les anciennes couches peignent tout « button » (fond clair, ombre) : la ligne garde la carte. */
-html body .v2-passe .v2r-haut { background: transparent !important; box-shadow: none !important; border: 0 !important; color: inherit !important; border-radius: 0 !important; min-height: 64px !important; }
+html body .v2-passe[data-v2-passe] .v2r-haut[data-v2-en-grand], html body .v2-passe .v2r-haut { background: transparent !important; box-shadow: none !important; border: 0 !important; color: inherit !important; border-radius: 0 !important; min-height: 64px !important; }
 [role="button"].v2r-haut:active { opacity: .7; }
 .v2-passe .v2r-ligne .v2r-photo { flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
   background: rgb(127 127 127 / .14); }
@@ -23,4 +23,4 @@ html body .v2-passe .v2r-haut { background: transparent !important; box-shadow: 
   font: inherit; font-size: 15px; font-weight: 600; color: inherit; cursor: pointer; position: relative; }
 @media (max-width: 359px) { .v2r-code { font-size: 22px; } }
 .v2r-dedans { font-size: 13px; line-height: 18px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html body .v2-passe button.v2r-retire { min-height: 44px !important; }
+html body .v2-passe[data-v2-passe] button.v2r-retire[data-v2-retire], html body .v2-passe button.v2r-retire { min-height: 44px !important; }
