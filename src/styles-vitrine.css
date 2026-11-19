@@ -71,46 +71,7 @@ html .vrm-app-shell { --vrm-mobile-paper: var(--vrm-bg); --studio-paper: var(--v
 /* ── 2. LA NAVIGATION SUR ORDINATEUR : une colonne blanche, avec ses libellés */
 /* La barre bleu nuit du 16 octobre redéfinissait l'encre et les filets SUR la
    barre (styles-mineral) : ils reprennent ceux de la page. */
-:root[data-theme] .vrm-app-shell .vrm-sidebar {
-  --vrm-ink: inherit; --vrm-muted: inherit; --vrm-line: inherit; --vrm-surface: inherit;
-}
-html .vrm-app-shell .vrm-atelier-rail {
-  background: var(--vrm-bg) !important; background-image: none !important;
-  border-right: 1px solid var(--vrm-line) !important; color: var(--vrm-ink) !important;
-  padding: 24px 12px 14px; --vrm-brand-filter: inherit;
-}
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand {
-  flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 10px 24px;
-}
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand img.vrm-logo { width: 34px !important; height: 34px !important; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-entreprise { text-align: left; font-size: 13px; opacity: 1; color: var(--vrm-muted); }
-html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management, .vrm-rail-bottom) { align-items: stretch; gap: 2px; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-management-group { align-items: stretch; border-top: 0; margin-top: 22px; padding-top: 0; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-section-label {
-  text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 400;
-  color: var(--vrm-muted); opacity: 1; padding: 0 12px 6px;
-}
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button {
-  width: 100%; min-height: 44px; justify-content: flex-start; gap: 10px; padding: 4px 12px;
-  border: 0; border-radius: 12px; background: transparent; color: var(--vrm-muted);
-  font-size: 15px; font-weight: 600; letter-spacing: -.005em; text-align: left;
-}
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button > :first-child { flex-shrink: 0; width: 22px; display: flex; justify-content: center; }
 /* Un nom long (« Vestiaire Collective ») passe sur deux lignes plutôt que d'être coupé. */
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-lib { flex: 1; min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:is([aria-current="page"], [data-active], [aria-expanded="true"]) {
-  background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; font-weight: 600;
-}
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button::before { display: none !important; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: 1px; }
-@media (hover: hover) and (pointer: fine) {
-  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:not([aria-current="page"]):hover {
-    background: var(--vrm-surface); color: var(--vrm-ink); border-color: transparent; filter: none;
-  }
-}
-@media (max-height: 720px) {
-  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 36px; }
-}
 
 /* ── 3. LA COQUE DU TÉLÉPHONE ────────────────────────────────────────────── */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
@@ -126,22 +87,6 @@ html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button:focus-visible { outline: 
 
   /* La barre du bas : blanche, un filet au-dessus ; l'onglet actif = icône
      cobalt et libellé en encre grasse. Cibles de 44 px au moins, zone sûre. */
-  html .vrm-app-shell .vrm-tabbar {
-    background: var(--vrm-bg) !important; background-image: none !important;
-    border-top: 1px solid var(--vrm-line) !important; border-radius: 0 !important; box-shadow: none !important;
-    -webkit-backdrop-filter: none; backdrop-filter: none;
-    padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
-  }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--vrm-muted); border-radius: 0; min-height: 52px; background: transparent !important; box-shadow: none !important; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 12px; font-weight: 400; letter-spacing: 0; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--vrm-ink); }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic { color: var(--vrm-accent-texte, var(--vrm-accent)); }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"]::before { display: none !important; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab:focus-visible { outline: 2px solid var(--vrm-accent); outline-offset: -4px; }
-  html .vrm-app-shell .vrm-tabbar .vrm-brand-icon { filter: var(--vrm-brand-filter, none); opacity: .72; }
-  html .vrm-app-shell .vrm-tabbar [aria-current="page"] .vrm-brand-icon { opacity: 1; }
-  html .vrm-app-shell .vrm-tab[aria-current="page"] .vrm-tab-ic { animation: none !important; }
 
   /* Ma journée : le bonjour EST le titre de l'écran, 34 px, sur le blanc — plus
      de bandeau pétrole arrondi ni de halo flou derrière lui. */
@@ -592,7 +537,6 @@ html .vrm-app-shell .vrm-nav-badge-n { min-width: 18px; height: 18px; padding: 0
 html .vrm-app-shell .vrm-nav-badge-point { width: 8px; height: 8px; border-radius: 50%; background: var(--vrm-warn); }
 html .vrm-app-shell .vrm-nav-badge-barre { position: absolute; top: -6px; left: calc(100% - 6px); }
 html .vrm-app-shell .vrm-nav-badge-barre.vrm-nav-badge-point { top: -1px; left: calc(100% - 3px); box-shadow: 0 0 0 2px var(--vrm-nav-bg, var(--vrm-bg)); }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button .vrm-nav-badge-rail { margin-left: auto; }
 html .vrm-app-shell .vrm-sheet-row .vrm-nav-badge-feuille { margin-right: 4px; }
 html .vrm-app-shell .vrm-sheet-lib .vrm-sheet-desc { display: block; font-size: 12px; font-weight: 400; color: var(--vrm-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html .vrm-app-shell .vrm-tache .vrm-tache-tete { padding: 18px 16px 6px; }
@@ -611,17 +555,6 @@ html .vrm-app-shell .vrm-main .vrm-filtre-site > button[aria-pressed="true"] { b
    38 px (souris, pas de doigt), les groupes à un souffle les uns des autres,
    la pastille ambre (contour + chiffre, « comme le 10 ») au bout de la ligne : 17 entrées et 6
    groupes tiennent sans défiler dans 900 px de haut. */
-html .vrm-app-shell .vrm-atelier-rail { padding: 18px 12px 10px; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 12px 12px; gap: 10px; align-items: baseline; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-sidebar-mot { font-family: var(--vrm-police); font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1; color: var(--vrm-ink); }
-html .vrm-app-shell .vrm-atelier-rail :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 0; padding-top: 0; }
-html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 38px; font-size: 15px; padding-top: 2px; padding-bottom: 2px; border-radius: 12px; }
-html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 9px; }
-html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe] .vrm-rail-section-label { font-size: 12px; line-height: 16px; padding: 0 12px 5px; }
-@media (max-height: 820px) {
-  html .vrm-app-shell .vrm-atelier-rail .vrm-rail-button { min-height: 34px; }
-  html .vrm-app-shell .vrm-atelier-rail [data-nav-groupe].vrm-rail-management-group { margin-top: 8px; }
-}
 
 /* ── (2 nov., soir) VESTIAIRE : la photo ENTIÈRE ──────────────────────────────
    Julien : « c'est beaucoup zoomé sur le produit ». Vestiaire pose ses produits

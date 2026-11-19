@@ -72,6 +72,7 @@
     --n-h-barre: 44px;
     --n-h-onglets: 49px;
     --n-l-laterale: 240px;
+    --n-l-liste: clamp(380px, 36vw, 520px);   /* la colonne de liste, à l'ordinateur en trois volets */
     --n-haut-sur: env(safe-area-inset-top, 0px);
     --n-bas-sur: env(safe-area-inset-bottom, 0px);
 

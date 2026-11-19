@@ -25,7 +25,7 @@ const bornes = (sc) => {
   let haut = r.top, bas = r.bottom;
   // les barres fixes du haut et du bas couvrent la zone : le bord utile est sous elles
   const h = document.querySelector('.vrm-app-header'); if (h) { const q = h.getBoundingClientRect(); if (q.bottom > haut && q.top <= haut + 4) haut = q.bottom; }
-  const n = document.querySelector('.vrm-mobile-nav'); if (n) { const q = n.getBoundingClientRect(); if (q.height && q.top < bas && q.bottom >= bas - 4) bas = q.top; }
+  const n = document.querySelector('[data-n-onglets], .vrm-mobile-nav'); if (n) { const q = n.getBoundingClientRect(); if (q.height && q.top < bas && q.bottom >= bas - 4) bas = q.top; }
   return { haut, bas };
 };
 
