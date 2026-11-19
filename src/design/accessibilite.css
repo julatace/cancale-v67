@@ -39,6 +39,9 @@
      l'anneau se pose sur l'habillage. */
   label:has(> input[type="file"]:focus-visible) { outline: 2px solid #0C1D30 !important; outline-offset: 1px !important; box-shadow: 0 0 0 5px #FFFFFF !important; }
   label > input[type="file"] { min-height: 0 !important; }
+  /* Le champ du prix de « Changer le prix » (src/PrixPartout.jsx) : l'anneau est sur SA carte (`.pp-champ:focus-within`,
+     2 px d'accent), pas une seconde boîte autour de la zone de saisie (19 nov.). */
+  .pp-champ input[data-prix-champ]:focus-visible { outline: none !important; box-shadow: none !important; }
 
   /* ── 2. RIEN À L'ENCRE SOMBRE POSÉ SUR LE BLEU (1.4.3) ───────────────────────
      Achats → Meilleures sources : « 3 ventes sans achat relié » (1,57:1) et « Comment c'est

@@ -2,7 +2,7 @@
 // Fond --n-fond ; l'entrée active = une pastille --n-teinte + texte --n-sur-teinte (l'accent, tenu à 4,5:1).
 // Props :
 //   tete       nœud en haut (la marque, le compte)
-//   groupes    [{ titre, entrees: [{ cle, libelle, icone, pastille, libellePastille }] }]
+//   groupes    [{ titre, entrees: [{ cle, libelle, icone, pastille, libellePastille, attrs }] }]
 //              icone : nœud (icône de l'app, taille 20)
 //   actif      la `cle` de l'entrée courante
 //   onChoisir  (cle) => …
@@ -18,7 +18,7 @@ import { tr } from '../i18n/index.js';
 import { cx } from './outils.js';
 import { Pastille } from './Pastille.jsx';
 
-export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir, pied = null, libelle = '', className = '' }) {
+export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir, pied = null, libelle = '', className = '', attrs = null }) {
   const clavier = (e) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     const toutes = [...e.currentTarget.querySelectorAll('.n-laterale-entree')];
@@ -27,7 +27,7 @@ export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir
     if (s) { e.preventDefault(); s.focus(); }
   };
   return (
-    <nav className={cx('n-laterale', className)} aria-label={libelle || tr('natif.nav.nom')} data-n-laterale="" onKeyDown={clavier}>
+    <nav className={cx('n-laterale', className)} aria-label={libelle || tr('natif.nav.nom')} data-n-laterale="" onKeyDown={clavier} {...(attrs || {})}>
       {tete ? <div className="n-laterale-tete">{tete}</div> : null}
       <div className="n-laterale-liste">
         {groupes.map((g, i) => (
@@ -41,10 +41,11 @@ export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir
                 data-n-entree={o.cle}
                 aria-current={o.cle === actif ? 'page' : undefined}
                 onClick={() => { if (o.onChoisir) o.onChoisir(o.cle); else if (onChoisir) onChoisir(o.cle); }}
+                {...(o.attrs || {})}
               >
                 {o.icone ? <span className="n-laterale-icone" aria-hidden="true">{o.icone}</span> : null}
                 <span className="n-laterale-libelle">{o.libelle}</span>
-                {o.pastille ? <Pastille ton="ambre-plein" libelle={o.libellePastille || ''}>{o.pastille}</Pastille> : null}
+                {o.pastille === true ? <span className="n-laterale-point" aria-hidden="true"/> : o.pastille ? <Pastille ton="ambre-plein" libelle={o.libellePastille || ''}>{o.pastille}</Pastille> : null}
               </button>
             ))}
           </div>

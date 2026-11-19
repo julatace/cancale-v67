@@ -71,7 +71,7 @@ function mesurer() {
   // C. Les boutons principaux visibles (le plein de la v2 et d'hier).
   const principaux = [...document.querySelectorAll('button.v2b-principal, .vrm-b.vrm-b-primaire')].filter(vis).filter((x) => !x.closest('[role="dialog"], .vrm-fs'));
   // D. Les cibles de la v2 et de la barre d'onglets (le système qu'on habille).
-  const petites = [...document.querySelectorAll('button.v2b, button.v2-rangee, button.v2-seg-btn, .vrm-tabbar > .vrm-tab, .vrm-ios-switch, [data-style]')].filter(vis)
+  const petites = [...document.querySelectorAll('button.v2b, button.v2-rangee, button.v2-seg-btn, .vrm-tabbar > .vrm-tab, [data-n-onglets] > .n-onglet, .vrm-ios-switch, [data-style]')].filter(vis)
     .map((x) => { const r = x.getBoundingClientRect(); return { t: (x.textContent || x.getAttribute('aria-label') || '').trim().slice(0, 24), h: Math.round(r.height), w: Math.round(r.width) }; })
     .filter((x) => x.h < 44 || x.w < 44);
   return { jugés, faibles: faibles.slice(0, 12), nFaibles: faibles.length, degrades, principaux: principaux.map((x) => x.textContent.trim().slice(0, 30)), petites: petites.slice(0, 10), attr: document.documentElement.getAttribute('data-theme-style') };

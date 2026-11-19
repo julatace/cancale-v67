@@ -38,6 +38,12 @@ export const NOUVEAUTES = Object.freeze([
   // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
   { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ») src/PrixPartout.jsx, src/prixAttente.js, extension 5.409.
+  // (19 nov., décisions de Julien « 1 oui, 3 oui ») src/reglesAuto.js, background.js regleBaisseTick / masquerAilleursTick, extension 5.409.
+  { id: 'regles-auto', date: '2026-11-19', titre: 'Baisse automatique, et vendue ailleurs masquée', phrase: 'Changer le prix → « Baisser seul ». Vendue ailleurs : masquée sur Vinted.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'prix-sans-manuel', date: '2026-11-19', titre: 'Changer un prix : un seul geste', phrase: 'Tape le prix, « Appliquer » : l’extension baisse, ou ça part dès que possible.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/passation/2026-11-19-natif-fondation.md
+  { id: 'coque-native', date: '2026-11-19', titre: 'Une nouvelle barre, comme sur iPhone', phrase: 'Cinq onglets en bas ; le reste derrière ta photo.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'interface-vrm-bleu-nuit', date: '2026-11-18', titre: 'VRM adopte le design de l’aperçu', phrase: 'Bleu nuit, nouveaux boutons, photos des colis et factures visibles.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil
   { id: 'style-apple', date: '2026-11-18', titre: 'Essaie le style Apple', phrase: 'Paramètres → Apparence → Style : fond gris clair, cartes blanches.', tab: 'settings', pour: 'tous', mode: 'tous' },

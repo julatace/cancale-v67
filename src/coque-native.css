@@ -1,0 +1,15 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE PONT ENTRE LA COQUE NATIVE ET LES STYLES D'AVANT (19 nov., « VRM natif », docs/design/NATIF.md).
+   La bibliothèque (src/natif/) vit dans UNE couche (`@layer vrm-natif`). Une règle d'avant SANS couche gagne toujours
+   sur une couche, quelle que soit sa spécificité : `button, a.vrm-btn { font-size:13px; font-weight:600 }` et
+   `:where(.vrm-app-shell) button { background: var(--fu-remplir) }` (fusion.css, styles-coque.css…) repeignaient les
+   onglets, les boutons de la barre de titre et les rangées de « Plus » (pavés gris, texte 13/600 — mesuré au banc
+   natif-coque, CDP getMatchedStylesForNode).
+   Ce fichier, SANS couche, ne pose AUCUNE valeur : `all: revert-layer` renvoie chaque propriété des contrôles DANS les
+   pièces natives à ce que disent les couches (donc `vrm-natif`, la dernière). Seules exceptions : les boutons d'avant
+   qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
+   Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
+   ════════════════════════════════════════════════════════════════════════════ */
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
+  all: revert-layer;
+}
