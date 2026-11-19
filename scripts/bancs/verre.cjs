@@ -1,5 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  BANC « VERRE DÉPOLI » (15 nov., Julien : « J'aime la 9 ») — src/design/studio-verre.css
+//  BANC « VERRE DÉPOLI » (15 nov.) — ⚠️ le 19 nov. (« VRM natif », docs/design/NATIF.md) le dégradé bleu et le verre
+//  ont DISPARU : V1 et V2 jugent désormais leur absence (aplat, aucun panneau translucide) ; le reste est inchangé.
+//  À l'origine : « J'aime la 9 » — src/design/studio-verre.css
 //  Récit : docs/passation/2026-11-15-verre-depoli.md
 //
 //  Sur une base INVENTÉE (1 000 paires, 1 000 conversations, 1 000 e-mails : _base-messages-stock.cjs),
@@ -291,11 +293,11 @@ if (require.main === module) (async () => {
         await o.pg.screenshot({ path: path.join(SHOTS, suf + '.png') });
         const m = await o.pg.evaluate(mesurer);
         const f = m.fond;
-        dit(!!f && f.contenu && f.position === 'fixed' && f.inset === '0px 0px 0px 0px' && f.z === '-1' && f.degrade && f.jetons && f.etrangeres === 0 && f.profond && f.caches.length === 0,
-          `V1 ${suf} : le fond est le dégradé bleu profond, posé une fois`, f ? `${f.contenu ? '' : 'PAS DE ::before · '}${f.position} · inset ${f.inset} · z ${f.z} · dégradé ${f.degrade} · ${f.n} couleurs, ${f.etrangeres} hors jetons · profond ${f.profond}${f.caches.length ? ' · CACHÉ par ' + f.caches.join(', ') : ''}` : 'pas de coque');
-        const verreOk = m.verre.panneaux > 0 && m.verre.alpha > 0 && m.verre.alpha < 1;
-        const surDisque = e === 'disque' || e === 'loupe' || e === 'fiche';
-        dit(surDisque || verreOk, `V2 ${suf} : des panneaux de verre`, `${m.verre.panneaux} panneau(x) à --sv-verre (alpha ${m.verre.alpha})`);
+        // (19 nov., « VRM natif », docs/design/NATIF.md) Plus de dégradé bleu ni de verre : V1 et V2 jugent leur ABSENCE.
+        // Le fond est l'aplat de la page (`--n-fond`), aucun panneau n'est translucide. V3–V9 (contraste, flou borné,
+        // débordement…) restent ; le contraste de TOUS les écrans se lit désormais sur les pixels : lisible-partout.cjs.
+        dit(!!f && !f.degrade, `V1 ${suf} : le fond est un aplat (aucun dégradé sur la coque)`, f ? `dégradé ${f.degrade} · ${f.n} couleurs · fond de la coque ${f.coqueFond}` : 'pas de coque');
+        dit(m.verre.panneaux === 0, `V2 ${suf} : aucun panneau de verre (translucide)`, `${m.verre.panneaux} panneau(x) à --sv-verre (alpha ${m.verre.alpha})`);
         dit(m.opaques.length === 0, `V2 ${suf} : feuilles et champs opaques`, m.opaques.slice(0, DETAIL).join(' | '));
         dit(m.contraste.length === 0, `V3 ${suf} : contraste AA sur le fond réel (${m.textes} textes)`,
           m.contraste.length ? `${m.contraste.length} sous le seuil : ` + m.contraste.slice(0, DETAIL).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | ') : '');

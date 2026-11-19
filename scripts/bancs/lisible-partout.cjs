@@ -22,6 +22,9 @@
 //    D  DÉBORDEMENT — rien ne dépasse à l'horizontale (page, contenu, élément hors de l'écran).
 //    T  TEXTE COUPÉ — aucun texte rogné par son cadre (hors « … » d'une rangée de liste et hors `line-clamp`).
 //    B  BARRE DU BAS (téléphone) — en bas de page, aucun contenu ne reste sous la barre d'onglets.
+//    G  DÉGRADÉ BLEU — plus aucun (19 nov., « VRM natif ») : ni le fond, ni le ::before de la coque, ni une surface
+//       de plus de 40 × 40 (repris du banc theme-apple, retiré avec le réglage « Style »).
+//    F  FLOU — `backdrop-filter` sur la barre d'onglets et la barre de titre seulement (contrat §1) : aucun dans le contenu.
 //    Z  CIBLES (téléphone) — tout élément interactif fait 44 × 44 (zone étendue ::before/::after comptée ; un
 //       lien dans une phrase est exempté, WCAG 2.5.5).
 //  Il RAPPORTE (il ne meurt pas) : une ligne par défaut — écran, habillage, largeur, thème, règle, sélecteur,
@@ -42,7 +45,7 @@
 //
 //  Sous-ensembles : `ECRANS=annonces,param*` (id ou groupe, `*` en fin) · `LARGEURS=390,1512,1280` ·
 //  `THEMES=clair,sombre` · `BASES=volume,vide` · `HABILLAGES=natif` · `PAGES=2` (écrans de défilement lus par état) ·
-//  `DETAIL=4` (exemples par état sur la console) · `SHOTS=<dossier>` · `CAPTURES=jpg|png|non` ·
+//  `DETAIL=4` (exemples par état sur la console) · `SHOTS=<dossier>` · `CAPTURES=jpg|png|non` · `CAPTURES_TOUTES=1` ·
 //  `BANC_DIST=<dist>` (juger un autre arbre : celui d'avant doit être ROUGE) · `SOUSPAGES=non` (sans les
 //  sous-pages de Paramètres).
 //  Preuve par mutation : `MUTATION=blanc` remet un blanc en dur sur les titres de la page ⇒ C rouge.
@@ -97,7 +100,7 @@ const ECRANS = [
   { id: 'annonces-dorment', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="sleeping"]' }], preuve: '[data-v2-seg="sleeping"][aria-selected="true"]' },
   { id: 'annonces-a-publier', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="brouillons"]' }], preuve: '[data-v2-seg="brouillons"][aria-selected="true"]' },
   { id: 'annonces-menu', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '.vrm-annbar-bouton[aria-expanded]' }], preuve: '.vrm-annbar-bouton[aria-expanded="true"], [role="dialog"], .vrm-fs' },
-  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-vue-selection]', ou: [{ clic: '.vrm-annbar-bouton[aria-expanded]' }, { clic: '[data-vue-selection], [data-v2-outil="selection"]' }] }], preuve: '[data-vue-selection][aria-pressed="true"], [data-selection-barre], .vrm-sel-barre, [data-serie-barre]' },
+  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-vue-selection]', ou: [{ clic: '.vrm-annbar-bouton[aria-expanded]' }, { clic: '[role="dialog"] button:has-text("Sélectionner"), .v2-feuille button:has-text("Sélectionner")' }] }], preuve: '.vrm-sel, [data-sel-consigne], [data-vue-selection][aria-pressed="true"]' },
   { id: 'annonces-plateformes', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-menu="annonces"]' }], preuve: '[data-v2-menu="annonces"][aria-expanded="true"], [role="dialog"]' },
   { id: 'annonces-republier', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&vue=republier' }], preuve: '.vrm-main' },
   { id: 'annonces-leboncoin', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=leboncoin' }], preuve: '.vrm-main' },
@@ -107,7 +110,6 @@ const ECRANS = [
   { id: 'ventes', groupe: 'Ventes', etapes: [{ aller: '?tab=ventes' }], preuve: '[data-v2v-seg], [data-ventes-seg-choix]' },
   { id: 'ventes-en-route', groupe: 'Ventes', etapes: [{ aller: '?tab=ventes' }, { clic: '[data-v2v-seg="envoyes"], [data-ventes-seg-choix="envoyes"]' }], preuve: '[data-v2v-seg="envoyes"][aria-selected="true"], [data-ventes-seg-choix="envoyes"][aria-pressed="true"]' },
   { id: 'ventes-toutes', groupe: 'Ventes', etapes: [{ aller: '?tab=ventes' }, { clic: '[data-v2v-seg="toutes"], [data-ventes-seg-choix="toutes"]' }], preuve: '[data-v2v-seg="toutes"][aria-selected="true"], [data-ventes-seg-choix="toutes"][aria-pressed="true"]' },
-  { id: 'ventes-menu', groupe: 'Ventes', etapes: [{ aller: '?tab=ventes' }, { clic: '[data-v2v-plus], [data-colis-outils-bascule]' }], preuve: '[role="dialog"], .vrm-fs, [data-colis-outils-bascule][aria-expanded="true"]' },
   { id: 'ventes-litiges', groupe: 'Ventes', etapes: [{ aller: '?tab=litiges' }], preuve: '.vrm-main' },
   // ── Achats ──
   { id: 'achats', groupe: 'Achats', etapes: [{ aller: '?tab=achats' }], preuve: '.vrm-main' },
@@ -149,7 +151,6 @@ const ECRANS = [
   { id: 'coque-cloche', groupe: 'Coque', etapes: [{ aller: '?tab=journee' }, { clic: '[data-centre-notifs-cloche]' }], preuve: '[data-centre-notifs], [data-centre-notifs-panneau], .vrm-cn-panneau, [role="dialog"]' },
   { id: 'coque-loupe', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '5' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
   { id: 'coque-loupe-numero', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '3102' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
-  { id: 'coque-menu-ecrans', groupe: 'Coque', si: (c) => c.tel, etapes: [{ aller: '?tab=achats' }, { clic: '[data-menu-ecrans]' }], preuve: '[data-menu-ecrans][aria-expanded="true"], [role="dialog"]' },
   { id: 'coque-profil', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-profil-tete], [data-nav-compte]' }], preuve: '[role="dialog"], [role="menu"], .vrm-profil-menu, [data-profil-menu]' },
   { id: 'coque-etat-extension', groupe: 'Coque', si: (c) => !c.tel, etapes: [{ aller: '?tab=achats' }, { clic: '[data-etat-actions]' }], preuve: '[data-etat-actions][aria-expanded="true"]' },
   { id: 'coque-aide', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-aide-ouvrir]' }], preuve: '[role="dialog"], .vrm-aide-feuille, [data-aide-feuille]' },
@@ -158,7 +159,8 @@ const ECRANS = [
 ];
 // La connexion : un contexte SANS session.
 const ECRANS_SANS_SESSION = [
-  { id: 'connexion', groupe: 'Connexion', etapes: [], preuve: 'input[type="email"], input[type="password"], form' },
+  { id: 'connexion', groupe: 'Connexion', url: '/?connexion', etapes: [], preuve: 'input[type="email"], input[type="password"]' },
+  { id: 'inscription', groupe: 'Connexion', url: '/?inscription', etapes: [], preuve: 'input[type="email"], input[type="password"]' },
 ];
 
 const veut = (e) => !VOULUS.length || VOULUS.some((v) => v.endsWith('*') ? (e.id.startsWith(v.slice(0, -1)) || e.groupe.toLowerCase().startsWith(v.slice(0, -1).toLowerCase())) : (e.id === v || e.groupe.toLowerCase() === v.toLowerCase()));
@@ -262,7 +264,7 @@ function collecter(o) {
     const px = parseFloat(c.fontSize), gr = parseInt(c.fontWeight, 10) || 400;
     const lettres = /[\p{L}\p{N}]/u.test(texte);
     // un glyphe seul (« × », « ⋯ », « › ») dans un contrôle : c'est une icône, 3:1
-    const glyphe = !lettres; if (glyphe && !e.closest(SEL_INTER)) continue;
+    const glyphe = !lettres; if (glyphe) { const ct = e.closest(SEL_INTER); if (!ct || /[\p{L}\p{N}]/u.test(ct.textContent || '')) continue; }
     out.textes.push({ sel: nom(e), texte: texte.slice(0, 50), rgb: col.slice(0, 3), a: col[3] * Math.min(1, op), c: c.color, seuil: glyphe || px >= 24 || (px >= 18.66 && gr >= 700) ? 3 : 4.5, px, filtre: filtre(e), lignes });
   }
   // Les champs : la valeur saisie, sinon l'invite (placeholder).
@@ -334,6 +336,21 @@ function collecter(o) {
     if (pire) out.geo.push({ regle: 'sous-barre', sel: nom(pire.e), texte: (pire.e.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40), note: `en bas de page, texte jusqu’à ${Math.round(pire.b)} px sous la barre (${Math.round(rb.top)} px)` });
   }
 
+  // ── G — plus aucun dégradé bleu (au premier relevé) ──
+  if (o.premier) {
+    const bleu = (img) => (String(img).match(/rgba?\([^)]*\)|#[0-9a-f]{6}\b/gi) || []).some((x) => { const p = parse(x.startsWith('#') ? 'rgb(' + [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16)).join(', ') + ')' : x); return p && p[3] > 0.2 && p[2] > p[0] + 40 && p[2] > p[1] + 10; });
+    const coque = document.querySelector('.vrm-app-shell');
+    const lieux = [['html', cs(document.documentElement).backgroundImage], ['body', cs(document.body).backgroundImage]];
+    if (coque) lieux.push(['.vrm-app-shell::before', getComputedStyle(coque, '::before').backgroundImage], ['.vrm-app-shell', cs(coque).backgroundImage]);
+    for (const [ou, img] of lieux) if (/gradient/.test(img) && bleu(img)) out.geo.push({ regle: 'degrade', sel: ou, texte: '', note: 'dégradé bleu : ' + img.slice(0, 90) });
+    let n = 0;
+    for (const e of document.querySelectorAll('.vrm-main *')) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 40 || r.bottom < 0 || r.top > H) continue; const img = cs(e).backgroundImage; if (!/gradient/.test(img) || !bleu(img) || cs(e).visibility === 'hidden') continue; out.geo.push({ regle: 'degrade', sel: nom(e), texte: '', note: 'dégradé bleu : ' + img.slice(0, 90) }); if (++n >= 4) break; }
+  }
+  // ── F — aucun flou dans le contenu (au premier relevé, ce qui est à l'écran) ──
+  if (o.premier) {
+    let n = 0;
+    for (const e of document.querySelectorAll('.vrm-main *, .vrm-fs *, [role="dialog"] *')) { const r = e.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > H) continue; const c = cs(e); const f = c.backdropFilter || c.webkitBackdropFilter; if (!f || f === 'none' || c.visibility === 'hidden' || c.display === 'none') continue; out.geo.push({ regle: 'flou', sel: nom(e), texte: '', note: f.slice(0, 50) }); if (++n >= 4) break; }
+  }
   // ── D — le débordement horizontal (au premier relevé seulement) ──
   if (o.premier) {
     const se = document.scrollingElement; const main = document.querySelector('.vrm-main');
@@ -502,6 +519,7 @@ async function mesurerEtat(o, ecran) {
   await pg.waitForTimeout(120);
   const vus = new Map(); let nT = 0, nI = 0;
   const ranger = (l) => { for (const d of l) { const cle = d.regle + '|' + d.sel + '|' + d.texte; if (!vus.has(cle)) vus.set(cle, d); } };
+  const garder = (x, suf) => { if (process.env.CAPTURES_TOUTES && CAPTURES !== 'non') { const dossier = path.join(SHOTS, c.hab, `${c.W}-${c.th}`); fs.mkdirSync(dossier, { recursive: true }); fs.writeFileSync(path.join(dossier, `${ecran.id}-${suf}.png`), x.a); } };
   let r = await relever(o, { premier: true, bas: false });
   nT += r.col.n.textes; nI += r.col.n.inter; ranger(r.col.geo); ranger(r.jug);
   if (CAPTURES !== 'non') {
@@ -511,8 +529,8 @@ async function mesurerEtat(o, ecran) {
   }
   // les écrans suivants du défilement, puis le bas de page (la barre du bas se juge là)
   let d = { fait: false, reste: 0 };
-  for (let p = 1; p < PAGES; p++) { d = await pg.evaluate(defiler, 'suite').catch(() => ({ fait: false, reste: 0 })); if (!d.fait) break; await pg.waitForTimeout(160); r = await relever(o, { premier: false, bas: d.reste <= 4 }); nT += r.col.n.textes; nI += r.col.n.inter; ranger(r.col.geo); ranger(r.jug); if (d.reste <= 4) break; }
-  if (d.reste > 4 || (!d.fait && PAGES === 1)) { const b = await pg.evaluate(defiler, 'bas').catch(() => ({ fait: false })); if (b.fait) { await pg.waitForTimeout(260); await calme(pg, 200, 1500); r = await relever(o, { premier: false, bas: true }); nT += r.col.n.textes; nI += r.col.n.inter; ranger(r.col.geo); ranger(r.jug); } }
+  for (let p = 1; p < PAGES; p++) { d = await pg.evaluate(defiler, 'suite').catch(() => ({ fait: false, reste: 0 })); if (!d.fait) break; await pg.waitForTimeout(160); r = await relever(o, { premier: false, bas: d.reste <= 4 }); garder(r, 'p' + (p + 1)); nT += r.col.n.textes; nI += r.col.n.inter; ranger(r.col.geo); ranger(r.jug); if (d.reste <= 4) break; }
+  if (d.reste > 4 || (!d.fait && PAGES === 1)) { const b = await pg.evaluate(defiler, 'bas').catch(() => ({ fait: false })); if (b.fait) { await pg.waitForTimeout(260); await calme(pg, 200, 1500); r = await relever(o, { premier: false, bas: true }); garder(r, 'bas'); nT += r.col.n.textes; nI += r.col.n.inter; ranger(r.col.geo); ranger(r.jug); } }
   else if (!d.fait) { // une page qui tient dans l'écran : le bas, c'est ici
     const col = await pg.evaluate(collecter, { tel: o.tel, premier: false, bas: true }).catch(() => null); if (col) ranger(col.geo.filter((x) => x.regle === 'sous-barre')); }
   await pg.evaluate(defiler, 'haut').catch(() => {});
@@ -536,13 +554,13 @@ async function remettre(o) {
   await pg.goto(`http://localhost:${P.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await P.pret(pg);
 }
 
-async function ouvrirConfig(nav, c, b, sansSession) {
+async function ouvrirConfig(nav, c, b, sansSession, url) {
   const o = await P.ouvrir(nav, { W: c.W < 600 ? 390 : 1512, sombre: c.th === 'sombre', b, url: '/manifest.webmanifest', api: c.base === 'vide' ? apiVide : B.apiVolume, sansSession });
   if (c.W >= 600 && c.W !== 1512) await o.pg.setViewportSize({ width: c.W, height: c.W <= 1280 ? 800 : 950 });
   o.pg.on('dialog', (d) => d.dismiss().catch(() => {}));
   // `natif` (le seul design depuis le 19 nov.) : aucun réglage posé. Les trois habillages d'avant ne servent qu'à juger un arbre d'avant (BANC_DIST).
   await o.pg.evaluate(([hab]) => { try { sessionStorage.setItem('banc_defaut_v2', '1'); if (hab === 'natif') { localStorage.removeItem('vrm_design_v2'); localStorage.removeItem('vrm_style'); return; } localStorage.setItem('vrm_design_v2', hab === 'ancien' ? '0' : '1'); if (hab === 'apple') localStorage.setItem('vrm_style', 'apple'); else localStorage.removeItem('vrm_style'); } catch (_) {} }, [c.hab0]);
-  await o.pg.goto(`http://localhost:${P.PORT}/${sansSession ? '' : '?tab=journee'}`, { waitUntil: 'domcontentloaded' });
+  await o.pg.goto(`http://localhost:${P.PORT}${sansSession ? (url || '/') : '/?tab=journee'}`, { waitUntil: 'domcontentloaded' });
   if (sansSession) await o.pg.waitForTimeout(3500); else { await P.pret(o.pg); await o.pg.waitForTimeout(1800); }
   // (dans la couche `n-anciens`, la première nommée : hors couche, la mutation perdrait contre ses `!important` et ne prouverait rien)
   if (MUT === 'blanc') await o.pg.addStyleTag({ content: '@layer n-anciens { html body #root :is(.vrm-main, .vrm-app-header) :is(h1, h2, .v2-titre, .vrm-set-h1, .vrm-screen-titre) { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important } }' });
@@ -607,7 +625,7 @@ async function genererParametres(o) {
       // la connexion, sans session
       for (const ecran of ECRANS_SANS_SESSION.filter(veut)) {
         let s = null;
-        try { s = await ouvrirConfig(nav, c, b, true); const la = await s.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false);
+        try { s = await ouvrirConfig(nav, c, b, true, ecran.url); const la = await s.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false);
           if (!la) { injoignables.push({ ecran: ecran.id, hab, W, th, note: 'preuve absente' }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : pas joignable`); } else await mesurerEtat(s, ecran);
         } catch (err) { injoignables.push({ ecran: ecran.id, hab, W, th, note: String(err.message || err).slice(0, 160) }); }
         finally { if (s) await s.ctx.close().catch(() => {}); }
@@ -621,13 +639,15 @@ async function genererParametres(o) {
   const txt = [];
   for (const d of defauts) txt.push(`${d.chantier ? '[' + d.chantier + '] ' : ''}${d.groupe} · ${d.ecran} · ${d.hab} · ${d.W} · ${d.th} · ${ligne(d)}`);
   fs.writeFileSync(path.join(SHOTS, 'rapport.txt'), txt.join('\n') + '\n');
-  fs.writeFileSync(path.join(SHOTS, 'rapport.json'), JSON.stringify({ quand: new Date().toISOString(), dist: process.env.BANC_DIST || 'dist', largeurs: LARGEURS, themes: THEMES, habillages: HABILLAGES, bases: BASES, etats, defauts, injoignables }));
+  fs.writeFileSync(path.join(SHOTS, 'rapport.json'), JSON.stringify({ quand: new Date().toISOString(), dist: process.env.BANC_DIST || 'dist', largeurs: LARGEURS, themes: THEMES, habillages: HABILLAGES, bases: BASES, resume: (() => { const r = {}; for (const e of etats) { const x = r[e.groupe] || (r[e.groupe] = { etats: 0, lot: 0, autres: 0 }); x.etats++; x.lot += e.n; x.autres += e.autres; } return r; })(), etats, defauts, injoignables }));
   const groupes = [...new Set(etats.map((e) => e.groupe))];
-  const REGLES = ['contraste', 'icone', 'vide', 'deborde', 'coupe', 'sous-barre', 'cible'];
+  const REGLES = ['contraste', 'icone', 'vide', 'degrade', 'flou', 'deborde', 'coupe', 'sous-barre', 'cible'];
   console.log('\n══ PAR ÉCRAN (défauts de ce lot · à d’autres chantiers) ══');
   console.log('écran'.padEnd(14) + 'états'.padStart(6) + REGLES.map((r) => r.padStart(11)).join('') + '      total   (autres)');
+  const resume = {};
   for (const g of groupes) {
     const m = miens.filter((d) => d.groupe === g), a = autres.filter((d) => d.groupe === g);
+    resume[g] = { etats: etats.filter((e) => e.groupe === g).length, lot: m.length, autres: a.length };
     console.log(g.padEnd(14) + String(etats.filter((e) => e.groupe === g).length).padStart(6) + REGLES.map((r) => String(m.filter((d) => d.regle === r).length).padStart(11)).join('') + String(m.length).padStart(11) + String(a.length).padStart(11));
   }
   console.log('TOTAL'.padEnd(14) + String(etats.length).padStart(6) + REGLES.map((r) => String(miens.filter((d) => d.regle === r).length).padStart(11)).join('') + String(miens.length).padStart(11) + String(autres.length).padStart(11));

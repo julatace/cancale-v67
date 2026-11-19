@@ -157,18 +157,15 @@ async function telephone(nav, sombre, b, sigs) {
     const ap = pg.locator('[data-sous-ouvrir="apparence"]').first();
     await ap.waitFor({ timeout: 30000 }).catch(() => {});
     if (await ap.count()) { await ap.click().catch(() => {}); await pg.waitForTimeout(900); }
-    const bt = pg.locator('[data-design-v2-bouton]').first();
-    const vu = await bt.count();
-    if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
-    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Ancien design » décoché : le nouveau design (${th})`, { vu, ...etat });
-    // « Ancien design » coché : retour à l'apparence d'avant, tout de suite, et après un rechargement.
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const ancien = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
+    // (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : « Ancien design » et « Style » ne sont plus des réglages.
+    // R juge leur ABSENCE, et qu'un « 0 » rangé hier sur l'appareil ne ramène plus l'apparence d'avant.
+    const vu = await pg.locator('[data-design-v2-bouton], [data-style]').count();
+    dit(vu === 0, `R Paramètres → Apparence : plus de réglage « Ancien design » ni « Style » (${th})`, { vu });
+    await pg.evaluate(() => { localStorage.setItem('vrm_design_v2', '0'); localStorage.removeItem('vrm_banc_dom_ancien'); sessionStorage.setItem('banc_defaut_v2', '1'); });
+    const lu = await pg.evaluate(() => { const v = localStorage.getItem('vrm_design_v2'); localStorage.removeItem('vrm_design_v2'); return v; });
     await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
     const apres = await pg.evaluate(() => document.documentElement.getAttribute('data-design'));
-    dit(ancien.ls === '0' && ancien.attr === null && apres === null, `R « Ancien design » coché : l’apparence d’avant, gardée après rechargement (${th})`, { ...ancien, apres });
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(400); }
+    dit(lu === '0' && apres === 'v2', `R un « Ancien design » rangé hier ne compte plus : le design unique (${th})`, { lu, apres });
   }
   await ctx.close();
   // LE DÉFAUT : sans aucun choix posé, le nouveau design est ALLUMÉ (Julien, 17 nov. soir : « publie le design »).

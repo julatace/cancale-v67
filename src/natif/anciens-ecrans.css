@@ -28,7 +28,9 @@ html {
   --ap-remplir: rgb(118 118 128 / .12);              /* le remplissage d'iOS (piste d'un segmenté, champ) : pas de jeton natif */
   --ap-filet: var(--n-trait, rgb(60 60 67 / .18));
   --ap-encre: var(--n-encre, #111114);
-  --ap-gris: var(--n-encre-2, #6C6C70);              /* ≥ 4,5:1 sur carte ET sur fond */
+  /* L'encre seconde du natif tient 4,5:1 sur la carte et sur le fond ; les anciens écrans la posent AUSSI sur un remplissage
+     gris (champ de recherche, puce, repli : #E3E3E8) où elle tombait à 4,09:1 (banc lisible-partout). Ici, 15 % d'encre en plus. */
+  --ap-gris: color-mix(in srgb, var(--n-encre-2, #6C6C70) 85%, var(--n-encre, #111114));
   --ap-muet: var(--n-encre-3, #8E8E93);              /* jamais du texte : chevrons, icônes muettes */
   --ap-bleu: var(--n-accent, #0068D6);
   --ap-bleu-vif: #007AFF;                            /* ce qui n'est pas du texte : interrupteur, coche */
@@ -53,7 +55,7 @@ html[data-theme="dark"] {
   --ap-remplir: rgb(118 118 128 / .24);
   --ap-filet: var(--n-trait, rgb(84 84 88 / .60));
   --ap-encre: var(--n-encre, #FFFFFF);
-  --ap-gris: var(--n-encre-2, #98989F);
+  --ap-gris: color-mix(in srgb, var(--n-encre-2, #98989F) 85%, var(--n-encre, #FFFFFF));
   --ap-muet: var(--n-encre-3, #636366);
   --ap-bleu: var(--n-accent, #409CFF);
   --ap-bleu-vif: #0A84FF;
@@ -163,8 +165,9 @@ html[data-theme="dark"] :is(.vrm-fs, .sb-feuille, .vrm-fs-cadre, [role="dialog"]
 
 /* ══ 2. LE FOND : plat, aucun dégradé (le banc l'exige) ══════════════════════ */
 html, html body { background: var(--ap-fond) !important; background-image: none !important; }
-html body .vrm-app-shell[data-espace]::before { background: var(--ap-fond) !important; background-image: none !important; }
 html body .vrm-app-shell, html body .vrm-main, html body .sj-journee { background-image: none !important; }
+/* La conversation en plein écran repeignait la lumière du studio (un halo) : l'aplat de la page. */
+html body .vrm-chat-panel { background: var(--ap-fond) !important; background-image: none !important; }
 
 /* ══ 3. LA POLICE DU SYSTÈME, l'échelle d'Apple ══════════════════════════════ */
 html body, html body :where(*):not(code, pre, kbd, samp, svg, svg *) { font-family: var(--ap-police) !important; }
@@ -337,4 +340,27 @@ html[data-theme="dark"] body .sj-journee .vrm-jv2-barre { background: #48484A !i
 html body .sj-journee :is(.vrm-fu-jour[data-choisi] .vrm-jv2-barre, .vrm-jv2-jour[aria-pressed="true"] .vrm-jv2-barre) { background: var(--ap-bleu-vif) !important; }
 /* Les rayons d'hier (cartes 20–22 px) : 12, comme une liste groupée d'iOS. */
 html:root { --d-r-carte: 12px !important; --d-r-tuile: 12px !important; }
+
+/* ══ 19. CE QUE LE BANC A NOMMÉ (19 nov., scripts/bancs/lisible-partout.cjs) : des encres écrites pour le verre ══ */
+/* L'invite d'un champ (placeholder) : l'encre seconde, jamais plus pâle. */
+html body :is(input, textarea)::placeholder { color: var(--ap-gris) !important; opacity: 1 !important; }
+/* Le nombre d'un segment (« Colis 429 ») : estompé à 80 %, ou BLANC sur le pouce blanc du segment choisi. */
+html body :is(.v2-seg-n, .vrm-boite button.v2-seg-btn.is-on .v2-seg-n) { color: var(--ap-gris) !important; opacity: 1 !important; }
+/* Le Stock : « Cases · Places » (segmenté écrit à la main) — la piste grise, l'encre, le pouce blanc. */
+html body .sr-seg { background: var(--ap-remplir) !important; border-radius: 9px !important; box-shadow: none !important; }
+html body .sr-seg-btn { color: var(--ap-encre) !important; background: transparent !important; }
+html body .sr-seg-btn :is(span, b, small) { color: inherit !important; }
+html body .sr-seg-btn:is([aria-pressed="true"], [aria-selected="true"], .is-on) { background: var(--ap-carte) !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme="dark"] body .sr-seg-btn:is([aria-pressed="true"], [aria-selected="true"], .is-on) { background: #636366 !important; }
+/* L'heure d'une bulle : sur MA bulle (bleue) elle est blanche, sur l'autre à l'encre seconde (le verre l'écrivait #3F5468 partout). */
+html body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: var(--ap-gris) !important; opacity: 1 !important; }
+html body .vrm-chat-panel .vrm-bulle-moi .vrm-bulle .vrm-bulle-h { color: #FFFFFF !important; }
+/* Un bouton discret posé sur un remplissage gris : le bleu du texte teinté (≥ 4,5:1). */
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled) { color: var(--ap-bleu-teinte) !important; }
+/* La feuille « Plateformes » : chaque site fait 44 px au doigt. */
+html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px !important; min-width: 44px !important; }
+/* Un champ de recherche d'écran : le remplissage d'iOS, sans ombre ni verre (il flottait avec une ombre portée). */
+html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* L'aide : le numéro d'une étape est posé sur le bleu plein — blanc (il était à l'encre : 3,55:1). */
+html body .vrm-aide-etape-n { color: var(--ap-sur-plein) !important; }
 }
