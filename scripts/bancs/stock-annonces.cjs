@@ -225,10 +225,10 @@ const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel);
         const ar = await pg.evaluate(() => [...document.querySelectorAll('[data-a-ranger]')].map((el) => el.getAttribute('data-a-ranger')).sort().join(','));
         dit(ar === '2,31,41,9', `${t} : C/V1 — « À ranger » = les paires en ligne sans case, Vestiaire compris (jamais la vieille fiche N°3)`, ar);
         // D — vendue.
-        dit(await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue' && !!(await pg.$('[data-stock-vendues-sortir] [data-stock-rangee="7"]')), `${t} : D — N°7 (rangée puis vendue) : case allumée, dans « Vendues à sortir »`, await attr(pg, '[data-case-num="7"]', 'data-case-etat'));
+        // (16 nov., lot retirer-case-compact) Plus de bloc « Vendues à sortir » : la case allumée est le seul signe.
+        dit(await attr(pg, '[data-case-num="7"]', 'data-case-etat') === 'vendue' && !(await pg.$('[data-stock-vendues-sortir], [data-stock-rangee="7"]')), `${t} : D — N°7 (rangée puis vendue) : case allumée, et aucun bloc « Vendues à sortir »`, await attr(pg, '[data-case-num="7"]', 'data-case-etat'));
         // E — plus en ligne.
-        // (15 nov., étagère v4) Le signal est sur le carton (son anneau ambre) et sa ligne dit « Plus en ligne ».
-        const e8 = await pg.evaluate(() => { const el = document.querySelector('[data-case-num="8"]'); if (!el) return null; const b = el.querySelector('.vrm-b4, .vrm-lab4'); const sh = [getComputedStyle(el).boxShadow, b ? getComputedStyle(b, '::after').boxShadow : 'none', b ? getComputedStyle(b).boxShadow : 'none'].filter((x) => x && x !== 'none'); const l = el.querySelector('[data-case-ligne]'); return { etat: el.getAttribute('data-case-etat'), ombre: sh.length ? sh.join(' | ') : 'none', ligne: l ? l.getAttribute('data-case-ligne') : null }; });
+        const e8 = await pg.evaluate(() => { const el = document.querySelector('[data-case-num="8"]'); return el ? { etat: el.getAttribute('data-case-etat'), ombre: getComputedStyle(el).boxShadow } : null; });
         dit(!!e8 && e8.etat === 'plusenligne' && e8.ombre !== 'none' && !!(await pg.$('[data-stock-plus-en-ligne] [data-stock-rangee="8"]')), `${t} : E — N°8 (rangée, plus en ligne) : sa case reste, signalée, dans « Plus en ligne »`, JSON.stringify(e8));
         dit(await attr(pg, '[data-case-num="1"]', 'data-case-etat') === 'occupee' && await attr(pg, '[data-case-num="21"]', 'data-case-etat') === 'occupee', `${t} : E — une case d'annonce actuelle (N°1, N°21 à confirmer) reste neutre`);
         await shot(pg, nomShot + '-complet');

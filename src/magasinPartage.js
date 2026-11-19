@@ -21,8 +21,26 @@
 //                             rejointe au lieu d'être relancée ; finie, elle est oubliée.
 // ════════════════════════════════════════════════════════════════════════════
 
+// (18 nov., lot rendus-groupes) LES ABONNÉS SONT PRÉVENUS ENSEMBLE. `poser` change la valeur tout de suite (`lire` la
+// rend), mais les abonnés de TOUTES les clés posées dans la même fenêtre (`grouper`, par défaut la tâche suivante) sont
+// prévenus en UNE passe : React rend les moteurs une fois pour les ventes, les achats, les versements et les suivis arrivés
+// ensemble, au lieu d'une fois par clé (`useSyncExternalStore` rend à chaque prévenance). `grouper: null` : tout de suite.
 export function creerMagasinPartage(options = {}) {
   const planifier = options.planifier || ((f) => setTimeout(f, 0));
+  const grouper = options.grouper === undefined ? ((f) => setTimeout(f, 0)) : options.grouper;
+  const aPrevenir = new Set();
+  let prevuGroupe = false;
+  const prevenir = (e) => {
+    if (!grouper) { for (const f of [...e.abonnes]) { try { f(); } catch (_) { /* un abonné ne casse pas les autres */ } } return; }
+    aPrevenir.add(e);
+    if (prevuGroupe) return;
+    prevuGroupe = true;
+    grouper(() => {
+      prevuGroupe = false;
+      const l = [...aPrevenir]; aPrevenir.clear();
+      for (const x of l) for (const f of [...x.abonnes]) { try { f(); } catch (_) { /* un abonné ne casse pas les autres */ } }
+    });
+  };
   const entrees = new Map();
   const entree = (cle, init) => {
     let e = entrees.get(cle);
@@ -40,7 +58,7 @@ export function creerMagasinPartage(options = {}) {
       const v = typeof suite === 'function' ? suite(e.v) : suite;
       if (Object.is(v, e.v)) return;
       e.v = v;
-      for (const f of [...e.abonnes]) { try { f(); } catch (_) { /* un abonné ne casse pas les autres */ } }
+      prevenir(e);
     },
     abonner(cle, f, init) {
       const e = entree(cle, init);

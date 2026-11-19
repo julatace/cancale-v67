@@ -69,7 +69,7 @@ const lire = (f) => { try { return sansCommentaires(fs.readFileSync(path.join(R,
   dit(!!etat && etat({ totp: [] }) === 'inactive' && etat({ totp: ['f1'] }) === 'active' && etat({}) === null && etat(null) === null, 'M1 trois états : inactive · active · pas su');
   dit(/etatDoubleVerif\(AUTH\.session\) !== 'inactive'\) return null/.test(carte), 'M1 montrée seulement si LUE inactive (pas su ⇒ rien)');
   dit(/<CarteDoubleVerif\/>/.test(reg) && !/CarteDoubleVerif/.test(lire('src/App.jsx')) && !/CarteDoubleVerif/.test(lire('src/main.jsx')), 'M2 seulement dans Paramètres, jamais au démarrage');
-  dit(/Plus tard/.test(carte) && /setItem\(CLE_CARTE_MFA, '1'\)/.test(carte) && /DEMANDE_REGLAGE_SOUS\.id = 'double'/.test(carte), 'M2 « Plus tard » la range ; « Activer » ouvre le panneau existant');
+  dit(/Plus tard/.test(carte) && /save\(CLE_CARTE_MFA, 1\)/.test(carte) && /DEMANDE_REGLAGE_SOUS\.id = 'double'/.test(carte), 'M2 « Plus tard » la range ; « Activer » ouvre le panneau existant');
 
   console.log(ko ? `\n❌ ${ko} rouge(s), ${ok} vert(s)` : `\n✅ ${ok} verts, 0 rouge`);
   if (process.argv.includes('--prouve') && !ko) prouver();

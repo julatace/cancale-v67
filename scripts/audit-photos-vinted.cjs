@@ -159,7 +159,6 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'PhotoVinted :: *': 'la règle elle-même (no-referrer, secours, pictogramme)',
       'PhotoVc :: url': 'photo d’une annonce VESTIAIRE (1er nov., 5.296) : `url` n’est posée que pour https://*.vestiairecollective.com, sans identifiants — jamais une adresse Vinted ; repli « — » si elle ne charge pas',
       'Photo :: url': 'AnnoncesLeboncoin (catalogue, 22 oct., main) : `ad.images[0]` d’une annonce LEBONCOIN lue par l’extension (CDN de Leboncoin) — jamais une adresse Vinted ; https seulement, repli « — » si elle ne charge pas',
-      'OsmMap :: tileUrl(t.x, t.y)': 'tuiles de carte OpenStreetMap',
       'AbonnementRequis :: "/vrm-logo-96.png"': 'logo de l’app (fichier du site, logo officiel)',
       'BoutonPhotoCarton :: apercu': 'photo du carton prise par le vendeur, compressée en data:image par compresserPhotoCarton (src/photoCarton.js) ; aucune URL distante',
       'AideInstallation :: "/vrm-icon-v5-192.png"': 'icône officielle de l’app (fichier du site) dans l’aide « Installer VRM », aucune URL distante',
@@ -225,6 +224,13 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
       'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
+      // (16 nov., parcours-vert) cinq <img> arrivés après la liste (14–15 nov.), lus un à un ; deux autres (FilsTous,
+      // RangeeJ) affichaient une photo d'annonce Vinted en <img> nu : passés par PhotoVinted, pas ajoutés ici.
+      'AuthScreen :: "/accueil/journee-clair.webp"': 'capture de l’app en MODE EXEMPLE (public/accueil/, scripts/accueil-captures.cjs) sur l’écran de connexion, fichier du site — jamais une photo Vinted',
+      'PhotoStockHl :: a': 'adressePhotoHl (src/stockHorsLigne.js) : /hl-photo?u=… de l’origine de l’app seulement, servi par le service worker (public/sw.js, fetch no-referrer, credentials omit) ; adresse hors liste ⇒ null, repli pictogramme',
+      'PhotosPaire :: p.detoure || p.img': 'photos du STUDIO de la paire (studio_photos_{N°}, src/studioPhoto.js) : la même source que StudioPhoto :: ph.img / ph.detoure — data:image fabriquée par le canvas, jamais une adresse Vinted',
+      'EtapePhotos :: p.detoure || p.img': 'photos du STUDIO sous CE N° (coque.lireStudio → studio_photos_{N°}) : la même source que StudioPhoto — data:image du canvas, jamais une adresse Vinted',
+      'RechercheCouleur :: e.src': '<img> rendu SEULEMENT si e.src est une data:image (test /^data:image\// juste avant) ; toute autre adresse passe par Photo (PhotoVinted)',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];

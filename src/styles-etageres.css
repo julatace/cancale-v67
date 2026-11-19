@@ -128,7 +128,7 @@
 }
 /* La plaque du N° dans une case : lisible sur toute photo — les jetons du studio (porcelaine, encre, ombre posée),
    redéfinis la nuit et par le style « Verre dépoli » (studio-verre.css) : aucune couleur codée ici. */
-.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee):not(.vrm-n4):not(.vrm-pq4) { background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 94%, transparent); color: var(--sb-encre, #0C1D30); box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); font-size: 12px; letter-spacing: -.01em; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 94%, transparent); color: var(--sb-encre, #0C1D30); box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); font-size: 12px; letter-spacing: -.01em; }
 /* Sans photo : un carton dessiné, discret, jamais une lettre. */
 .vrm-s2d-sansphoto[data-sans-photo] { color: color-mix(in srgb, var(--vrm-muted, #8E8E93) 70%, transparent); }
 /* À l'ordinateur, la barre de recherche de l'app (`.vrm-barre-haut`, 74 px) est collée en haut de `.vrm-main` :

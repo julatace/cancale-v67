@@ -140,10 +140,18 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.locator('[data-aso-relier="9100004"]').click();
   await pg.locator('[data-aso-relier-numero="5"]').waitFor({ timeout: 5000 }).catch(() => {});
   const libres = await pg.$$eval('[data-aso-relier-numero]', (els) => els.map((e) => e.getAttribute('data-aso-relier-numero')));
-  dit(libres.join() === '7,5', `${nom} · seuls les N° sans achat relié sont proposés (ni N°6, relié à un achat hors plateforme)`, JSON.stringify(libres));
+  // (16 nov., parcours-vert) L'attendu se DÉDUIT des fiches de la page (la même règle, refaite ici à côté) au lieu
+  // d'une liste écrite « 7,5 » : le N°7 venait d'un N° neuf donné à une lecture PARTIELLE du dressing — plus permis
+  // depuis le 15 nov. (numeros-nouvelles : un N° neuf seulement sur une lecture complète). La règle jugée reste :
+  // une fiche avec un N°, sans achat relié (Vinted, en gros, ni hors plateforme) est proposée, aucune autre.
+  const attendus = await pg.evaluate((hors) => { let f = {}; try { f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}') || {}; } catch (_) {}
+    const h = new Set(hors.map((b) => String(b.numero)));
+    return Object.values(f).filter((e) => e && String(e.numero || '').trim() && !e.buyFromId && !(e.buyGros && e.buyGros.id) && !h.has(String(e.numero).trim())).map((e) => String(e.numero).trim()).sort((a, b) => Number(b) - Number(a)); }, HORS);
+  dit(libres.join() === attendus.join() && libres.includes('5') && !libres.includes('6'), `${nom} · seuls les N° sans achat relié sont proposés (ni N°6, relié à un achat hors plateforme)`, JSON.stringify({ libres, attendus }));
   await capture(pg, `${nom}-relier`);
   await pg.locator('[data-aso-relier-numero="5"]').click();
-  await pg.waitForTimeout(600);
+  // Attendre l'écriture elle-même (§6.5 : jamais un délai fixe) — 600 ms ne suffisaient pas toujours à 1512 sombre.
+  await pg.waitForFunction(() => { try { return !!((JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}') || {}).pa5 || {}).buyFromId; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
   const pa5 = await pg.evaluate(() => { try { return (JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}') || {}).pa5 || null; } catch (_) { return null; } });
   dit(pa5 && pa5.buyFromId === '9100004' && pa5.buyPrice === '35,00', `${nom} · son tap écrit le lien et le prix payé`, JSON.stringify(pa5));
   const apres = await pg.$$eval('[data-aso-pel="9100004"]', (els) => els.map((e) => e.dataset.asoRelie));
@@ -186,9 +194,11 @@ async function passe(b, nom, ctxOpts, sombre) {
   const relu = await pg.$$eval('[data-aso-saisie]', (els) => els.map((e) => e.value));
   dit(relu.join('|') === '50,00|40,00', `${nom} · la feuille rouverte montre SES parts`, relu.join('|'));
   await pg.locator('[data-aso-annuler-repartition]').click();
-  await pg.waitForTimeout(300);
+  // (16 nov., parcours-vert) Attendre la confirmation, puis l'effacement lui-même (§6.5), plus deux délais fixes.
+  await pg.waitForFunction(() => [...document.querySelectorAll('button')].filter((b) => /^Annuler la répartition$/.test(b.textContent.trim())).length >= 2, null, { timeout: 5000 }).catch(() => {});
   await pg.locator('button', { hasText: /^Annuler la répartition$/ }).last().click().catch(() => {});
-  await pg.waitForTimeout(700);
+  await pg.waitForFunction(() => { try { return !JSON.parse(localStorage.getItem('vrm_repartitions_lots') || '{}')['9100003']; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
+  await pg.waitForTimeout(150);
   const rendu = await pg.evaluate(() => { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); const j = JSON.parse(localStorage.getItem('vrm_repartitions_lots') || '{}'); return { a: f.pa3 && f.pa3.buyPrice, b: f.pa4 && f.pa4.buyPrice, j: !!j['9100003'] }; });
   dit(rendu.a === '' && rendu.b === '12' && !rendu.j, `${nom} · « Annuler » rend l'état d'avant (N°3 vide, N°4 12 €)`, JSON.stringify(rendu));
   const deborde2 = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);

@@ -196,7 +196,8 @@
    1re : le chiffre du jour et sa semaine, « À sortir en premier » (photo à gauche, mini-plan, « Je l'ai sortie »,
    « Ensuite, dans l'ordre »), le mois ; 2e : « À envoyer » en rangées (photo, plaque N°, site, compte, la date et la place
    dans le Stock, le prix) puis les pastilles ; 3e : « À retirer », « Messages », « À faire ». (`BentoJournee colonnes`) */
-@media (min-width: 744px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille.sj-grille-colonnes {
     display: grid !important; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .95fr) !important; grid-auto-rows: auto !important; gap: 16px !important; align-items: start !important;
   }
@@ -245,6 +246,10 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t-envoyer { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; grid-template-areas: "lib lien" "face face" "plein plein" !important; align-items: center !important; padding: 6px 16px 14px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > :not(.sj-v-lignes) { display: none !important; }
+  /* (16 nov., personnalisation-simple) Cachée par lui mais revenue parce qu'urgente : « Affichée car urgent » reste dite
+     à l'ordinateur aussi (elle se taisait avec le reste de la face — banc journee-perso U 1512). */
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) { display: block !important; margin-top: 8px !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) > :not([data-jp-urgent]) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-lignes { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne + .sj-v-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
@@ -267,11 +272,14 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) .sj-face .sj-sous { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) .sj-face .sj-n { font: 750 15.5px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
 }
-@media (min-width: 744px) and (max-width: 1399px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+@media (max-width: 1399px) {
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand) { font-size: 52px !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] :is(.vrm-so-site, .vrm-so-rang) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-carte:not(.vrm-so-d):not(.vrm-so-fin) { grid-template-columns: 110px minmax(0, 1fr) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { width: 110px !important; height: 110px !important; }
+}
 }
 
 /* ══ 5. « LA PAIRE À SORTIR EN PREMIER » (`e-sortir.cjs`) ═══════════════════════════════════════ */
@@ -367,7 +375,8 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin { padding: 14px !important; margin-top: 10px !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin b { display: block !important; font: 750 16px/1.25 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin > div > span { display: block !important; font: 550 13px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 2px !important; }
-@media (min-width: 744px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   :root:root:root:root:root:root body .sj-journee .vrm-so { max-width: 560px !important; }
   :root:root:root:root:root:root body .sj-journee .vrm-so-carte .vrm-so-ph { height: 200px !important; }
 }
@@ -408,4 +417,32 @@
 :root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-note { font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: normal !important; }
 :root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-action { flex: none !important; margin-left: auto !important; }
 
+/* (16 nov., lot personnalisation-simple — Julien : la grande photo et le bloc pointillé prenaient tout l'écran à 390 px)
+   « La paire à sortir » AU TÉLÉPHONE : compacte (vignette 72 px à gauche, N°, site, rang, date à côté ; le lieu ou
+   « VRM ne sait pas où » en petit ; « Je l'ai sortie » reste le plein). src/PaireASortir.jsx (`compact`). */
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact { padding: 10px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-tete { display: flex !important; gap: 12px !important; align-items: flex-start !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ph { flex: none !important; width: 72px !important; height: 72px !important; border-radius: 14px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-m { flex: 1 1 auto !important; min-width: 0 !important; padding: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-m > b { font: 700 15px/1.3 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; margin-top: 4px !important; overflow: hidden !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-l1 { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 6px !important; font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-site { display: inline-flex !important; align-items: center !important; gap: 4px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-rang { font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou { margin-top: 10px !important; padding: 8px 10px !important; gap: 12px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou-t > b { font: 700 15px/1.25 Inter, system-ui, sans-serif !important; margin-top: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou-t > em { font: normal 600 13px/1.3 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc { margin-top: 10px !important; padding: 8px 10px !important; border-width: 1px !important; gap: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc b { font: 600 13px/1.3 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc span { font: 400 12px/1.35 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-plein { margin-top: 10px !important; }
 } /* fin de @layer vrm-verre */
+
+/* (17 nov., chasse-bugs) Dans la couche `vrm-verre`, comme le reste du fichier : hors couche, un `!important` perd contre la couche. */
+@layer vrm-verre {
+/* (17 nov., chasse-bugs) Au téléphone, le crayon « Modifier » (44 px, en haut à droite de la carte du mois) se posait
+   SUR « Bénéfice · mois » (banc journee-coherence E6, capture 390). La dernière case lui laisse sa place ; rien d'autre
+   ne bouge (mêmes colonnes, même crayon, mêmes 44 px). */
+@media (max-width: 743px) {
+  :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases { margin-right: 40px !important; }   /* la grille entière (la case de droite dépend de `order`) */
+}
+}

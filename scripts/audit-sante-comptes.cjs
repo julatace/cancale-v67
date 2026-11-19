@@ -23,6 +23,8 @@ const MUTATIONS = {
   'ordre': ["export const ORDRE = Object.freeze(['moderation', 'retards', 'annulees', 'avisBas', 'note', 'delai']);", "export const ORDRE = Object.freeze(['delai', 'note', 'avisBas', 'annulees', 'retards', 'moderation']);"],
   'fenetre': ['export const FENETRE_J = 30;', 'export const FENETRE_J = 3000;'],
   'forme-vide': ["(lus >= SEUILS.minLus && (ind.note.lu || ind.delai.lu)) ? 'forme' : 'passu'", "'forme'"],
+  'avis-dates': ["avisBas: indicAvisBas(c, avisArrivesDe(avisArrives, uid, maintenant)),", "avisBas: indicAvisBas(c, null),"],
+  'avis-fenetre': ["maintenant - t <= ALERTE_MAX_MS);", "true);"],
 };
 if (args.includes('--prouve')) {
   let rates = 0;
@@ -109,6 +111,25 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
     dit(I('5', 'avisBas').tendance && I('5', 'avisBas').tendance.avant === 0 && I('5', 'avisBas').tendance.sens === 'hausse', 'avis bas : tendance = les 10 récents (2) contre les 10 d’avant (0) — Vinted ne date pas les avis');
     dit(I('5', 'note').valeur === 4.3 && I('5', 'note').alerte === true, 'note 0,86 ⇒ 4,3/5 : sous 4,5 ⇒ passe le seuil');
     dit(C('5').raison && C('5').raison.k === 'avisBas' && C('5').alertes.join() === 'avisBas,note', 'avis bas avant la note dans l’ordre des raisons', JSON.stringify(C('5').alertes));
+    // (16 nov., lot extension-restes) `vrm_avis_bas` branché : les avis bas DATÉS par leur arrivée (le serveur).
+    {
+      const al = [
+        { uid: '1', id: 'a1', note: 2, at: iso(2) }, { uid: '1', id: 'a2', note: 3, at: iso(5) },   // 2 arrivés ces 14 j ⇒ seuil
+        { uid: '1', id: 'a3', note: 1, at: iso(20) },                                               // trop vieux
+        { uid: '1', id: 'a4', note: 4, at: iso(1) },                                                // 4★ : pas « bas »
+        { uid: '6', id: 'b1', note: 2, at: iso(1) },                                                // un seul ⇒ dit, pas d'alerte
+        { uid: 'x', id: 'z', note: 1, at: iso(1) },                                                 // forme inconnue ⇒ ignoré
+      ];
+      const R2 = M.santeComptes({ comptes, profils, etats, moderation: null, envois: { lignes }, ventes, estAnnulee, maintenant, avisArrives: al });
+      const I2 = (u, k) => ((R2.comptes.find((x) => x.uid === u) || {}).indicateurs || {})[k] || {};
+      const C2 = (u) => R2.comptes.find((x) => x.uid === u) || {};
+      dit(I2('1', 'avisBas').arrives === 2 && I2('1', 'avisBas').arriveLe === maintenant - 2 * J && I2('1', 'avisBas').alerte === true && C2('1').raison && C2('1').raison.k === 'avisBas',
+        'avis bas datés : 2 avis de 3★ ou moins ARRIVÉS ces 14 jours (vrm_avis_bas) ⇒ passe le seuil, même si la page des 10 derniers n’en montre aucun', JSON.stringify(I2('1', 'avisBas')));
+      dit(I2('6', 'avisBas').arrives === 1 && I2('6', 'avisBas').alerte === false, 'avis bas datés : un seul arrivé ⇒ dit, sous le seuil', JSON.stringify(I2('6', 'avisBas')));
+      const R3 = M.santeComptes({ comptes, profils, etats, moderation: null, envois: { lignes }, ventes, estAnnulee, maintenant, avisArrives: null });
+      const a3 = ((R3.comptes.find((x) => x.uid === '1') || {}).indicateurs || {}).avisBas || {};
+      dit(a3.arrives === null && a3.alerte === false && I('1', 'avisBas').arrives === null, 'avis bas datés : lecture ratée ou absente ⇒ `null` (pas su), jamais 0, rien compté', JSON.stringify(a3));
+    }
     dit(I('5', 'fraicheur').ancienne === true && I('5', 'fraicheur').alerte === false, 'profil lu il y a 3 j : « à relire », jamais une alerte');
     dit(I('5', 'delai').lu === false && I('5', 'delai').raison === 'aucunColis', 'aucun envoi publié pour ce compte ⇒ « — » + raison');
     // Limite estimée
@@ -141,7 +162,9 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
   const app = sansCommentaires(lire('src/App.jsx')), reg = sansCommentaires(lire('src/ecrans/Reglages.jsx')), stats = sansCommentaires(lire('src/ecrans/Stats.jsx'));
   dit(/<SanteComptes variante="reglages"/.test(reg) && /id:'santecomptes'/.test(reg), 'placement : Paramètres → Mes comptes');
   dit(/<SanteComptes variante="stats"\/>/.test(stats), 'placement : une carte dans Statistiques');
-  dit(/'sante-comptes': santeSurv\.length \? \[carteSanteComptes\(\)\] : \[\]/.test(app) && /className="vrm-day-task-note is-urgent" data-sous-ligne="sante-comptes"/.test(app), 'placement : Ma journée, seulement quand un compte glisse (ambre `is-urgent`)');
+  // (16 nov.) Décision du 15 nov. (refonte-journee, récit §5) : la carte quitte la liste pour la feuille « Tout va bien ? »
+  // de Ma journée (`tvbCartes`, la même carte, ambre) — toujours seulement quand un compte glisse (`santeSurv`).
+  dit((/'sante-comptes': santeSurv\.length \? \[carteSanteComptes\(\)\] : \[\]/.test(app) || /const tvbCartes = \[[\s\S]{0,800}?\.\.\.\(santeSurv\.length \? \[carteSanteComptes\(\)\] : \[\]\),/.test(app)) && /className="vrm-day-task-note is-urgent" data-sous-ligne="sante-comptes"/.test(app), 'placement : Ma journée, seulement quand un compte glisse (ambre `is-urgent`)');
   dit(!/method:\s*['"](POST|PATCH|PUT|DELETE)/i.test(jsx) && !/withOwner|modifierDonnee|save\(/.test(jsx), 'l’écran n’écrit rien en base');
   dit(!/api\/push|Notification\(|showNotification/.test(jsx), 'aucune nouvelle notification');
   dit(!/select=data(&|$|')/.test(jsx), 'jamais `select=data` (projections seulement)');

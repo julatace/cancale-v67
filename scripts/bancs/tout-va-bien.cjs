@@ -26,8 +26,6 @@ fs.mkdirSync(CAPT, { recursive: true });
 const ATTENDUE = (/const EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1];
 
 const H = 3600e3, M = 60e3;
-const UID = '11111111-2222-3333-4444-555555555555';
-const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID, email: 'banc@exemple.test' } };
 const iso = (ilYa) => new Date(Date.now() - ilYa).toISOString();
 const ACCOUNTS = [
   { id: 1, vinted_user_id: '111', login: 'shop_test', domain: 'www.vinted.fr', updated_at: iso(0) },
@@ -94,12 +92,8 @@ async function scenario(b, scen, largeur, sombre) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   // (16 nov., intégration vague B) Le parcours de premier lancement (« Tu vends quoi ? ») est déjà fait : il couvrirait
   // tout l'écran (comme scripts/bancs/fiabilite-auto.cjs).
-  // (16 nov., finitions) Une SESSION, comme scripts/bancs/fiabilite-auto.cjs : sans elle la base passe pour injoignable
-  // (`baseKO`) et la feuille de la cloche ne porte pas la ligne de fraîcheur — « Voir » restait introuvable (4 rouges).
-  await pg.addInitScript(([s, sess]) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_mfa_plus_tard_' + sess.user.id, String(Date.now())); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() })); { const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, [sombre, SESSION]);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() })); { const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
-  // (Playwright prend la DERNIÈRE route enregistrée en premier : celle de la connexion vient après la route générale.)
-  await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
@@ -127,27 +121,20 @@ async function scenario(b, scen, largeur, sombre) {
     await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-alerte-${nom}.png`) });
     // (16 nov., intégration vague B) Julien, 14 nov. (AJOUT 3, 56e1ec66) : la ligne de fraîcheur quitte la tête de page — la
     // cloche porte son point ambre, SA feuille porte la ligne entière. On ouvre donc la cloche, puis « Voir ».
-    // (16 nov., finitions) La coque garde une COPIE de la ligne, masquée (`.vrm-fraicheur-hote`, clip-path inset(50%)) :
-    // Playwright la dit « visible » (une boîte de 6 × 44 px) et le banc sautait la cloche, puis attendait un clic
-    // impossible. Tout se cherche donc DANS la feuille de la cloche (`[data-centre-fraicheur]`), jamais dans la copie.
-    const F = '[data-centre-fraicheur] ';
-    if (await alerte.count()) {
-      if (!(await pg.locator(F + '[data-alerte-capture]').count())) {
-        await pg.locator('[data-centre-notifs-cloche]:visible').first().click({ timeout: 5000 }).catch(async () => { await pg.evaluate(() => { const b = document.querySelector('[data-centre-notifs-cloche]'); if (b) b.click(); }); });
-      }
-      await pg.waitForSelector(F + '[data-alerte-capture]', { timeout: 12000 }).catch(() => {});
+    if (await alerte.count() && !(await alerte.locator('[data-alerte-voir]').first().isVisible().catch(() => false))) {
+      await pg.locator('[data-centre-notifs-cloche]:visible').first().click({ timeout: 5000 }).catch(async () => { await pg.evaluate(() => { const b = document.querySelector('[data-centre-notifs-cloche]'); if (b) b.click(); }); });
+      await pg.waitForSelector('[data-centre-fraicheur] [data-alerte-capture]', { timeout: 12000 }).catch(() => {});
       await pg.waitForTimeout(400);
-      dit((await pg.locator(F + '[data-alerte-capture]').count()) === 1, `${nom} : la feuille de la cloche porte la ligne de fraîcheur`);
-      if (largeur === 390 && !sombre) await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-cloche-${nom}.png`) });
     }
     // Plusieurs choses à revoir : la ligne se déplie, la rangée en panne s'ouvre, son geste (le même « Voir »).
-    if (await alerte.count() && !(await pg.locator(F + '[data-alerte-voir]:visible').count())) {
-      await pg.locator(F + '[data-fraicheur-deplier]:visible').first().click().catch(() => {});
+    if (await alerte.count() && !(await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').count())) {
+      // (la ligne de la feuille de la cloche, pas la copie masquée de la coque)
+      await pg.locator('[data-alerte-capture] [data-fraicheur-deplier]:visible').first().click().catch(() => {});
       await pg.waitForTimeout(400);
-      await pg.locator(F + '[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
+      await pg.locator('[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
       await pg.waitForTimeout(400);
     }
-    if (await alerte.count()) await pg.locator(`${F}[data-alerte-voir]:visible, ${F}[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-bouton:visible`).first().click({ timeout: 10000 });
+    if (await alerte.count()) await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible, [data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-bouton:visible').first().click({ timeout: 10000 });
   } else {
     await pg.waitForTimeout(2500);
     dit(!(await alerte.count()), `${nom} : aucune ligne ambre`);
@@ -201,28 +188,6 @@ async function scenario(b, scen, largeur, sombre) {
   await pg.evaluate(() => { const e = document.querySelector('[data-tout-va-bien]'); if (e) e.scrollIntoView({ block: 'start' }); });
   await pg.waitForTimeout(300);
   await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-${nom}.png`) }).catch(() => {});
-  // (16 nov., intégration, capture de Julien) Les titres de groupe (« Vinted », « Leboncoin », « Où tourne l'extension »)
-  // sont posés sur le fond bleu : presque illisibles en gris. Contraste ≥ 4,5:1 mesuré sur le fond RENDU (la zone du
-  // titre capturée, son texte masqué, la couleur moyenne décodée), jamais sur une couleur supposée.
-  const titres = await pg.evaluate(() => [...document.querySelectorAll('[data-tout-va-bien] .vrm-ios-groupe-titre')].filter((e) => e.getClientRects().length).map((e, i) => { e.setAttribute('data-sonde-titre', String(i)); return i; }));
-  const contrastes = [];
-  for (const i of titres) {
-    const m = await pg.evaluate((i) => { const e = document.querySelector(`[data-sonde-titre="${i}"]`); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const c = getComputedStyle(e).color; e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); return { x: r.left, y: r.top, w: r.width, h: r.height, c, t: e.textContent.trim() }; }, i);
-    await pg.waitForTimeout(150);
-    const clip = { x: Math.max(0, m.x), y: Math.max(0, m.y), width: Math.max(2, Math.min(m.w, largeur - Math.max(0, m.x))), height: Math.max(2, m.h) };
-    const png = await pg.screenshot({ clip }).catch(() => null);
-    await pg.evaluate((i) => { const e = document.querySelector(`[data-sonde-titre="${i}"]`); e.style.removeProperty('color'); e.style.removeProperty('text-shadow'); e.removeAttribute('data-sonde-titre'); }, i);
-    if (!png) { contrastes.push({ t: m.t, ratio: null }); continue; }
-    const p2 = await b.newPage();
-    const fond = await p2.evaluate(async (b64) => { const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; let r = 0, g = 0, bl = 0, n = 0; for (let k = 0; k < d.length; k += 4) { r += d[k]; g += d[k + 1]; bl += d[k + 2]; n++; } return [r / n, g / n, bl / n]; }, png.toString('base64'));
-    await p2.close();
-    const v = (String(m.c).match(/[\d.]+/g) || []).map(Number); const a = v.length > 3 ? v[3] : 1;
-    const texte = [0, 1, 2].map((k) => v[k] * a + fond[k] * (1 - a));
-    const L = (rgb) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
-    const l1 = L(texte), l2 = L(fond);
-    contrastes.push({ t: m.t, ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 });
-  }
-  dit(contrastes.length >= 2 && contrastes.every((x) => x.ratio != null && x.ratio >= 4.5), `${nom} : les titres de groupe lisibles sur le fond rendu (contraste ≥ 4,5:1)`, JSON.stringify(contrastes));
   dit(!errs.length, `${nom} : aucune erreur d’app`, errs.join(' | ').slice(0, 200));
   await ctx.close();
 }

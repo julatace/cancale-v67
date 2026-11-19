@@ -107,25 +107,24 @@ const res = (pg) => pg.evaluate(() => ({
         const ec = await r.pg.evaluate(() => { const e = document.querySelector('[data-stock-ecartes]'); return e ? e.getAttribute('data-stock-ecartes') : null; });
         dit(x.rien && !x.nums.includes('88') && ec === '1', `${t} : la paire d'un compte supprimé n'est pas montrée, et c'est dit une fois`, JSON.stringify({ x, ec }));
         await inp.fill('');
-        // (15 nov., étagère v4) La taille des cases n'est plus un choix de l'appareil (« De loin / De près ») : c'est la
-        // DENSITÉ du meuble (« Personnaliser », banc stock-etageres W). Un meuble d'hier : des cartons confortables.
-        const carton = await r.pg.evaluate(() => { const c = document.querySelector('[data-meuble="mA"] [data-case-num="12"] .vrm-b4-face'); if (!c) return null; const q = c.getBoundingClientRect(); return { w: Math.round(q.width), h: Math.round(q.height) }; });
-        dit(!!carton && carton.h >= 70 && carton.w >= 44 && carton.w <= 100, `${t} : la case est un carton de l'étagère (confortable : face ≥ 70 px, 44 à 100 px de large)`, JSON.stringify(carton));
-        // Repères : les rangées à gauche (les colonnes ne sont numérotées qu'en « Plan »).
-        const regle = await r.pg.evaluate(() => ({ r: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-rang]')].map((x) => x.innerText).join(',') }));
-        dit(regle.r === '1,2,3', `${t} : le meuble porte ses repères (rangées 1-3)`, JSON.stringify(regle));
+        // De loin par défaut ; « De près » agrandit les cases.
+        const larg = () => r.pg.evaluate(() => { const c = document.querySelector('[data-meuble="mA"] [data-case-num="12"]'); return c ? Math.round(c.getBoundingClientRect().width) : 0; });
+        const l1 = await larg();
+        await r.pg.click('[data-zoom-choix="pres"]'); await r.pg.waitForTimeout(250);
+        const l2 = await larg();
+        await r.pg.click('[data-zoom-choix="loin"]'); await r.pg.waitForTimeout(250);
+        dit(l1 > 0 && l1 <= 66 && l2 > l1 + 10, `${t} : vue de loin par défaut (cases ≤ 64 px), « De près » les agrandit`, `${l1} → ${l2}`);
+        // Règles : colonnes au-dessus, rangées à gauche.
+        const regle = await r.pg.evaluate(() => ({ c: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-col]')].map((x) => x.innerText).join(','), r: [...document.querySelectorAll('[data-meuble="mA"] [data-regle-rang]')].map((x) => x.innerText).join(',') }));
+        dit(regle.c === '1,2,3,4' && regle.r === '1,2,3', `${t} : le meuble porte ses repères (colonnes 1-4, rangées 1-3)`, JSON.stringify(regle));
         // Dit à voix : « numéro 12 ».
         await inp.fill('numéro 12');
         x = await res(r.pg);
         dit(JSON.stringify(x.nums) === '["12"]', `${t} : « numéro 12 » (à la voix) rend la N°12`, JSON.stringify(x.nums));
         // Pendant une recherche, le meuble sans résultat se replie et le dit.
         await inp.fill('puma');
-        await r.pg.waitForTimeout(400);
-        // (15 nov., v4) À l'ordinateur, un seul meuble au centre : celui où la recherche trouve quelque chose vient au centre.
-        const bureau = await r.pg.evaluate(() => !!document.querySelector('[data-stock-volets]'));
-        const pl = await r.pg.evaluate(() => { const a = document.querySelector('[data-meuble="mA"]'), b = document.querySelector('[data-meuble="mB"]'); return { a: a ? a.getAttribute('data-meuble-ici') : null, ag: !!document.querySelector('[data-meuble="mA"] [data-meuble-grille]'), b: b ? b.getAttribute('data-meuble-ici') : null }; });
-        if (bureau) dit(pl.a === null && pl.b === '1', `${t} : « puma » : les bacs (où elle est) viennent au centre et disent « 1 ici »`, JSON.stringify(pl));
-        else dit(pl.a === '0' && !pl.ag && pl.b === '1', `${t} : « puma » : l'étagère se replie (rien ici), les bacs disent « 1 ici »`, JSON.stringify(pl));
+        const pl = await r.pg.evaluate(() => ({ a: document.querySelector('[data-meuble="mA"]').getAttribute('data-meuble-ici'), ag: !!document.querySelector('[data-meuble="mA"] [data-meuble-grille]'), b: document.querySelector('[data-meuble="mB"]').getAttribute('data-meuble-ici') }));
+        dit(pl.a === '0' && !pl.ag && pl.b === '1', `${t} : « puma » : l'étagère se replie (rien ici), les bacs disent « 1 ici »`, JSON.stringify(pl));
         // Plusieurs résultats : « les montrer toutes » — triées dans l'ordre du chemin.
         // (6 nov., finitions) La liste « à aller chercher » porte SON attribut (`data-aller-chercher`) :
         // `data-cible` est le crochet des notifications (src/cibleNotif.js), un autre sens.
@@ -135,6 +134,9 @@ const res = (pg) => pg.evaluate(() => ({
         const ci = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));
         dit(ci === '12,7', `${t} : les Nike montrées ensemble, dans l'ordre du meuble (N°12 rangée 2 puis N°7 rangée 3)`, ci);
         // « 2 vendues à sortir — où sont-elles ? »
+        // (16 nov., lot retirer-case-compact) Le bloc « Vendues à sortir » n'est plus posé : « À faire » désigne leurs cases.
+        await r.pg.evaluate(() => { const l = document.querySelector('button[data-stock-afaire]'); if (l && !document.querySelector('[data-vendues-chercher]')) l.click(); });
+        await r.pg.waitForSelector('[data-vendues-chercher]', { timeout: 5000 }).catch(() => {});
         await r.pg.click('[data-vendues-chercher]');
         await r.pg.waitForTimeout(300);
         const ve = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));
@@ -142,15 +144,16 @@ const res = (pg) => pg.evaluate(() => ({
         dit(ve === '128,7', `${t} : les vendues à sortir listées avec leur place, dans l'ordre du chemin`, ve);
         await inp.fill('nike 42');
         await r.pg.click('[data-stock-res="12"]');
-        await r.pg.waitForTimeout(1200);
+        // (16 nov., bancs-rouges-a) Le défilement est DOUX : sous charge il dépassait 1,2 s (case encore à y = 1 233 / 950).
+        // On attend l'ÉTAT (la case dans l'écran, 8 s au plus, §6.5) ; une app qui ne l'amène jamais reste rouge.
+        await r.pg.waitForFunction(() => { const el = document.querySelector('[data-case-num="12"]'); if (!el) return false; const q = el.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }, null, { timeout: 8000 }).catch(() => {});
+        await r.pg.waitForTimeout(300);
         const flash = await r.pg.evaluate(() => { const el = document.querySelector('[data-case-num="12"]'); if (!el) return null; const rc = el.getBoundingClientRect(); const c = document.querySelector('[data-stock-cibles]'); return { cls: el.className, r: [Math.round(rc.top), Math.round(rc.bottom), innerHeight], vu: rc.top >= 0 && rc.bottom <= innerHeight, liste: !!document.querySelector('[data-stock-resultats]'), cible: c ? c.innerText : '' }; });
         dit(flash && /vrm-case-flash/.test(flash.cls) && flash.vu, `${t} : toucher le résultat montre SA case, à l'écran, qui clignote`, JSON.stringify(flash));
         dit(flash && !flash.liste && /N°12/.test(flash.cible) && /rangée 2, colonne 3/.test(flash.cible), `${t} : la liste se referme, la place reste écrite`, JSON.stringify(flash));
         await inp.fill('');
         await r.pg.click('[data-case-num="12"]');
         await r.pg.waitForTimeout(400);
-        // (v4) À l'ordinateur, la case se montre dans le volet de droite ; « Fiche » ouvre la fiche complète.
-        if (await r.pg.evaluate(() => !!document.querySelector('[data-stock-volets]'))) { await r.pg.click('[data-cote-fiche="12"]', { timeout: 20000 }).catch(() => {}); await r.pg.waitForSelector('[data-fiche-place]', { timeout: 20000 }).catch(() => {}); }
         const fiche = await r.pg.evaluate(() => (document.querySelector('[data-fiche-place]') || {}).innerText || '');
         dit(/Rangée 2/.test(fiche) && /colonne 3/.test(fiche), `${t} : la fiche dit rangée 2, colonne 3`, fiche);
         await r.pg.keyboard.press('Escape').catch(() => {});

@@ -19,6 +19,7 @@
 import React from 'react';
 import { tr, date as dateLangue } from './i18n/index.js';
 import { montant } from './format.js';
+import { jourParis } from './dateParis.js';   // (16 nov.) le jour PRÉVU à l'heure de Paris
 import { ETAPES_A_VENIR, friseAVenir } from './argentAVenir.js';
 import MarquePlateforme from './plateformes/Marque.jsx';
 import './styles-avenir.css';
@@ -62,7 +63,7 @@ function ListeVentes({ lignes, attr, parentMontre = true }) {
   return (
     <ul className="vrm-av-ventes" data-av-ventes={attr} data-n={lignes.length}>
       {lignes.map((l) => (
-        <li key={l.id} className="vrm-av-vente" data-av-vente={l.id} data-eur={cts(l.eur)} data-etape={l.etape || ''} data-prevu={l.prevu != null ? new Date(l.prevu).toISOString().slice(0, 10) : ''}>
+        <li key={l.id} className="vrm-av-vente" data-av-vente={l.id} data-eur={cts(l.eur)} data-etape={l.etape || ''} data-prevu={l.prevu != null ? jourParis(l.prevu) : ''}>
           <span className="vrm-av-vente-txt">
             <span className="vrm-av-vente-titre">{l.titre || tr('avenir.sansTitre')}</span>
             <span className="vrm-av-vente-meta">{l.plateforme}{l.compte ? <span className="vrm-sensible"> · {l.compte}</span> : null}{l.prevu != null ? ` · ${jourCourt(l.prevu)}` : ''}{l.estime ? ` · ${tr('avenir.fraisEbay')}` : ''}{l.raison ? ` · ${tr('avenir.raison.' + l.raison)}` : ''}</span>
@@ -113,7 +114,7 @@ export function Groupe({ id, pastille, titre, date, eur, lignes, numDe, attrs = 
         {vues.map((l) => {
           const num = numDe ? numDe(l) : null;
           return (
-            <li key={l.id} className="vrm-av-vente vg-av-vente" data-av-vente={l.id} data-eur={cts(l.eur)} data-etape={l.etape || ''} data-num={num || undefined} data-prevu={l.prevu != null ? new Date(l.prevu).toISOString().slice(0, 10) : ''}>
+            <li key={l.id} className="vrm-av-vente vg-av-vente" data-av-vente={l.id} data-eur={cts(l.eur)} data-etape={l.etape || ''} data-num={num || undefined} data-prevu={l.prevu != null ? jourParis(l.prevu) : ''}>
               {num ? <span className="sb-plaque vg-av-plaque"><small>N°</small>{num}</span> : <span className="vg-av-plaque is-vide" aria-hidden="true"/>}
               <span className="vrm-av-vente-txt">
                 <span className="vrm-av-vente-titre">{l.titre || tr('avenir.sansTitre')}</span>
@@ -185,7 +186,7 @@ export function ArgentAVenirEcran({ A, porteMonnaie = null, recu = null, Feuille
                   pastille={<span className={'vrm-av-pastille is-' + g.etape}/>} titre={tr('avenir.etape.' + g.etape)}
                   date={<span className={d.sure || d.texte !== dateCommune ? 'vg-av-date' : 'vg-sr'} data-av-date={d.sure ? 'sure' : 'passu'}>{d.texte}</span>}
                   eur={g.eur} sansMontant={parEtape.length === 1}
-                  attrs={{ 'data-av-etape': g.etape, 'data-eur': cts(g.eur), 'data-n': g.n, 'data-prevu': g.prevu != null ? new Date(g.prevu).toISOString().slice(0, 10) : '' }}/>
+                  attrs={{ 'data-av-etape': g.etape, 'data-eur': cts(g.eur), 'data-n': g.n, 'data-prevu': g.prevu != null ? jourParis(g.prevu) : '' }}/>
               );
             })}
             {A.bloquees && A.bloquees.n > 0 ? (

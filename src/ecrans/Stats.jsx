@@ -1,5 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov., phase 2)
+import { BoutonV2 } from '../designV2/BoutonV2.jsx';
 import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
@@ -9,7 +11,7 @@ import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix,
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
-import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
+import { caAutresParJour, sommePlage, resumeFinaliseVestiaire } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
 import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
@@ -257,18 +259,16 @@ function nomAffichePlat(n) { return n === 'Vestiaire Collective' ? 'Vestiaire Co
 // versée/terminée) ; un montant pas sûr ⇒ « — » et la raison, jamais un total
 // partiel. Leboncoin : un prix inconnu n'est plus compté 0 €, il est dit.
 const caVestiaireFinalise = (ventesVc) => {
-  if (ventesVc === undefined) return { ca: null, note: 'lecture en cours' };
-  if (!Array.isArray(ventesVc)) return { ca: null, note: 'ventes Vestiaire pas lues' };
-  let ca = 0, n = 0, pasSur = 0;
-  for (const v of ventesVc) {
-    if (!v || vcVenteAnnulee(v)) continue;
-    const et = etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
-    const r = montantRecuVc(v);
-    if (r.eur == null) { pasSur++; continue; }
-    ca += r.eur; n++;
-  }
-  if (pasSur) return { ca: null, note: `${pasSur} vente${pasSur > 1 ? 's' : ''} finalisée${pasSur > 1 ? 's' : ''} au montant pas sûr` };
-  return n ? { ca: Math.round(ca * 100) / 100, note: 'ventes finalisées (montant versé)' } : { ca: null, note: 'pas encore de vente finalisée' };
+  // (16 nov., lot plateformes-restes) LA règle commune avec « CA entre deux dates »
+  // (`resumeFinaliseVestiaire`, src/caAutresParJour.js) : les sûres sont sommées, les
+  // pas sûres NOMMÉES (« au moins »), plus jamais « — » pour tout dès qu'une manque.
+  const r = resumeFinaliseVestiaire(ventesVc, { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc });
+  if (r.etat === 'lecture') return { ca: null, note: tr('stats.vcFin.lecture') };
+  if (r.etat === 'pas-lu') return { ca: null, note: tr('stats.vcFin.pasLu') };
+  if (r.etat === 'aucune') return { ca: null, note: tr('stats.vcFin.aucune') };
+  if (r.etat === 'pas-sur') return { ca: null, note: tr('stats.vcFin.pasSur', { n: r.pasSur }) };
+  if (r.etat === 'au-moins') return { ca: r.ca, auMoins: true, note: tr('stats.vcFin.auMoins', { n: r.pasSur }) };
+  return { ca: r.ca, note: tr('stats.vcFin.lu') };
 };
 // (11 nov., parité) `excluAutre` : le prédicat des comptes écartés (Paramètres → Comptes liés,
 // et l'offre Solo) — le MÊME que `ventesFaites`/`ventesDeclarables`. Avant, cette carte
@@ -296,7 +296,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc, 
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:lbcSansPrix?`${lbcSansPrix} vente${lbcSansPrix>1?'s':''} finalisée${lbcSansPrix>1?'s':''} au prix inconnu`:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note: caEbay != null ? NOTE_CA_EBAY.lu : NOTE_CA_EBAY[etatCaEbay(ebayCommandes)] },
-    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note },
+    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note, auMoins:!!vc.auMoins },
   ];
 }
 // ⟦← App.jsx #13⟧
@@ -323,7 +323,8 @@ function RepliStats({ id, titre, phrase, children, ouvertDefaut = false }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
+  const designV2 = useDesignV2();   // (17 nov., phase 2) un seul segmenté : la période en menu compact, « Prix qui marche » en lien
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -674,7 +675,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+        <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
+          <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <Icon name="chevron" size={14}/></label>
+        {versPrix ? <BoutonV2 role="texte" onClick={versPrix} attrs={{ 'data-v2-stats-prix': '' }}>{tr('v2.st.prix')}</BoutonV2> : null}
+      </div> : null}</div> : null} right={designV2 ? null : <Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
@@ -896,12 +903,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.finalisePlateforme')}</div>
-              {plateformes.map(p => <Ligne key={p.nom} label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
+              {plateformes.map(p => <div key={p.nom} data-stats-plat={p.nom} data-stats-plat-cents={p.ca==null?'':String(Math.round(p.ca*100))} data-stats-plat-au-moins={p.auMoins?'1':'0'}><Ligne label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/></div>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
-              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <div data-stats-total-au-moins={nz.some(p=>p.auMoins)?'1':'0'}><Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} note={nz.some(p=>p.auMoins) ? tr('stats.totalAuMoins') : null} fort/></div> : null; })()}
             </div>
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.caVintedCompte')}</div>
@@ -1156,12 +1163,14 @@ const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->
 const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
 const lireOffresStats = async () => {
   const owner = AUTH.user?.id;
-  if (!owner) return { convs: null, lectures: null, txn: null };
+  if (!owner) return { convs: null, lectures: null, txn: null, journal: null };
   if (_offresCache?.owner === owner && Date.now() - _offresCache.at < 10 * 60 * 1000) return _offresCache;
-  const [rc, rl, rt] = await Promise.all([
+  const [rc, rl, rt, rj] = await Promise.all([
     lireTout(OFFRES_STATS_CONV, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_LECTURES, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
+    // (16 nov.) Le journal des gestes ACCEPTÉS par Vinted (extension 5.337, `journal_vrm_{uid}_{nav}`, projeté sur `e`).
+    lireTout('id=like.journal_vrm_*&select=id,e:data->e', { strict: true }).catch(() => null),
   ]);
   const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
   const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, tx: r.tx == null ? '' : String(r.tx), messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
@@ -1172,8 +1181,8 @@ const lireOffresStats = async () => {
   }
   let txn = null;
   if (Array.isArray(rt)) { txn = {}; for (const r of rt) if (r && r.tx) txn[String(r.tx)] = { sys: r.sys, op: r.op, oc: r.oc, ic: r.ic, ip: r.ip, icur: r.icur }; }
-  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null };
-  _offresCache = { owner, at: Date.now(), convs, lectures, txn };
+  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null, journal: null };
+  _offresCache = { owner, at: Date.now(), convs, lectures, txn, journal: Array.isArray(rj) ? rj : null };
   return _offresCache;
 };
 // ⟦← App.jsx #15⟧
@@ -1744,7 +1753,10 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     : (<>
       <GraphiqueVenduRecu VR={VR} lib={lib} titre={tr('stats.venduRecu', { noteBarres: String(noteBarres) })}/>
       <div className="vrm-sv-note" data-sp-vr-note={VR.raison || ''}>
-        {tr('stats.venduDateVente')}{!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? tr('stats.recuToutLu') : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
+        {/* (16 nov., bancs-rouges-b) Le manque reste DIT à l'écran (§5) ; la définition Vendu / Reçu, toujours la même,
+            passe sous « Pourquoi ? » (textes courts : plus de paragraphe de 130 caractères). */}
+        {[!VR.recuLu ? (RAISON_RECU[VR.raison] || 'reçu pas lu') : !VR.recuComplet ? tr('stats.recuToutLu').replace(/^\s*·\s*/, '') : '', aDater > 0 ? `${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''].filter(Boolean).join(' · ')}
+        {' '}<Pourquoi>{tr('stats.venduDateVente')}</Pourquoi>
       </div>
     </>);
   // ── Les 10 meilleures ventes ──

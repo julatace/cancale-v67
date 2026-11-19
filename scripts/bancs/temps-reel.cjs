@@ -89,6 +89,13 @@ async function passe(b, { nom, largeur, hauteur, mobile, sombre }) {
   {
     const TITRE = `Vente NEUVE ${nom} 4242`;
     const o = await ouvrir('ventes');
+    // (16 nov., vitesse-lectures) Ventes s'ouvre sur « À envoyer » depuis la refonte (g1, VentesVerre) :
+    // la vente écrite plus bas (copie d'une vente déjà finie) est dans « Toutes ». Le banc y va d'abord.
+    for (let i = 0; i < 4; i++) {
+      await o.pg.click('[data-ventes-seg-choix="toutes"]', { timeout: 10000 }).catch(() => {});
+      if (await o.pg.waitForFunction(() => { const s = document.querySelector('[data-ventes-seg]'); return !!s && s.getAttribute('data-ventes-seg') === 'toutes'; }, null, { timeout: 4000 }).then(() => true, () => false)) break;
+    }
+    juge(await o.pg.evaluate(() => { const s = document.querySelector('[data-ventes-seg]'); return !s || s.getAttribute('data-ventes-seg') === 'toutes'; }), `[${nom}] V : la liste « Toutes » est ouverte`);
     juge(!(await texte(o.pg)).includes(TITRE), `[${nom}] V : la vente n'est pas là avant l'écriture`);
     // Au calme : la veille ne lit que des versions.
     const tCalme = Date.now(); await o.pg.waitForTimeout(28000); const calme = bilan(o.reqs, tCalme);
@@ -147,6 +154,38 @@ async function passe(b, { nom, largeur, hauteur, mobile, sombre }) {
     const vu = (await texte(o.pg)).includes(TITRE);
     console.log(`  [${nom}] J : la vente ${vu ? 'est montrée' : "n'est pas listée par Ma journée (l'écran montre des compteurs)"}`);
     await o.pg.screenshot({ path: path.join(CAPT, `temps-reel-${nom}-journee.png`) });
+    await o.pg.close();
+  }
+
+  // ── F : les familles ajoutées le 16 nov. (lot vitesse-lectures) ──────────
+  // Messages (la boîte Vinted d'UN compte), Leboncoin, Vestiaire, e-mails : écrites SANS aucun signal
+  // de l'extension dans la page. Attendu : la boîte du seul compte touché relue (Ma journée compte les
+  // non-lus), le signal Leboncoin rejoué UNE fois pour ses écrans (`source:'veille'`), Vestiaire idem,
+  // et l'e-mail prévenu (`vrm:neuf` · emails) sans aucune lecture de la route des e-mails.
+  {
+    const o = await ouvrir('journee');
+    await o.pg.evaluate(() => { window.__f = { ext: [], neuf: [] }; window.addEventListener('vrm:ext', (e) => window.__f.ext.push(e.detail || {})); window.addEventListener('vrm:neuf', (e) => window.__f.neuf.push(((e.detail || {}).quoi || []).map((q) => q.quoi))); });
+    const t1 = Date.now(); const now = new Date().toISOString();
+    ecrireLigne(`harvest_${UID_V}_inbox`, (d) => ({ ...d, payload: { ...d.payload, conversations: [{ ...(d.payload.conversations[0] || {}), id: 99099999, unread: true, updated_at: now }, ...(d.payload.conversations || [])] } }));
+    base.rows.push({ id: 'lbc_ventes', updated_at: now, data: { capturedAt: now, ventes: {} } });
+    base.rows.push({ id: 'vc_ventes', updated_at: now, data: { capturedAt: now, ventes: {} } });
+    base.rows.push({ id: 'email_reception_0123456789abcdef0123', updated_at: now, data: { at: now, etat: 'integre' } });
+    let f = null;
+    while (Date.now() - t1 < MAX_MS + 5000) {
+      f = await o.pg.evaluate(() => window.__f).catch(() => null);
+      const inbox = bilan(o.reqs, t1).lourdes.some((r) => /_inbox/.test(dec(r.u)));
+      if (f && inbox && f.ext.some((x) => x.quoi === 'lbc') && f.ext.some((x) => x.quoi === 'vestiaire') && f.neuf.some((q) => q.includes('emails'))) break;
+      await attendre(250);
+    }
+    const apres = bilan(o.reqs, t1);
+    const boites = apres.lourdes.filter((r) => /_inbox/.test(dec(r.u)));
+    const idsBoites = [...new Set(boites.flatMap((r) => idsDe(r.u)))];
+    juge(boites.length > 0 && idsBoites.every((i) => i.includes(UID_V)), `[${nom}] F : la boîte Vinted du seul compte touché est relue`, `${boites.length} lecture(s) : ${idsBoites.join(',') || '—'}`);
+    const lbc = (f && f.ext || []).filter((x) => x.quoi === 'lbc'), vc = (f && f.ext || []).filter((x) => x.quoi === 'vestiaire');
+    juge(lbc.length === 1 && lbc[0].source === 'veille', `[${nom}] F : Leboncoin — le signal de ses écrans rejoué une fois, par la veille`, JSON.stringify(lbc));
+    juge(vc.length === 1 && vc[0].source === 'veille', `[${nom}] F : Vestiaire — le signal de ses écrans rejoué une fois, par la veille`, JSON.stringify(vc));
+    juge(!!f && f.neuf.some((q) => q.includes('emails')), `[${nom}] F : un e-mail rangé est signalé (« Actualiser » de la boîte)`, JSON.stringify(f && f.neuf));
+    juge(!o.reqs.some((r) => r.t >= t1 && r.m !== 'GET'), `[${nom}] F : aucune écriture`);
     await o.pg.close();
   }
   await ctx.close();

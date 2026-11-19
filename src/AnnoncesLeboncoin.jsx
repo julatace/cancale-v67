@@ -7,7 +7,9 @@ import './annonces-leboncoin.css';
 import {STYLE_FLOU} from './flouCompte.js';
 import {ListeParCompte} from './GroupesComptes.jsx'; // (11 nov.) annonces des autres comptes regroupées, repliées
 import {montant} from './format.js';
+import {tr} from './i18n/index.js';
 import {BarreOutils,Filtres} from './ui/index.js';   // (14 nov.) les briques communes des listes
+import {attrsAvantSite,clicAvantSite,PaireAvantSiteHote} from './paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
 // (6 nov., v36-visuel-2) La règle unique des euros (`montant`) : « 90 € », jamais « 90,00 € ».
 const euros = n => n != null && n !== '' && /^\d+(\.\d+)?$/.test(String(n)) && Number.isFinite(Number(n)) ? montant(Number(n)) : '—';
 function Photo({src}) {
@@ -41,7 +43,7 @@ export function chiffresAnnonceLbc(ad) {
 // (6 nov.) `aConfirmerDe(ad)` : la règle « en ligne » de Leboncoin
 // (src/enLigneLbc.js) ; `confirmer` : la raison et le geste (rendus par l'écran,
 // qui sait l'état de l'extension), dits UNE fois en tête de la liste (§7).
-export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null,compteOuvert=''}) {
+export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lectureKO=false,numeroDe=null,owner='',sortieDe=null,onSupprimer=null,enVol=null,floute=null,aConfirmerDe=null,confirmer=null,compteOuvert='',achatDe=null,lienVintedDe=null,retraitDe=null,onRelierVinted=null}) {
  // (31 oct.) `floute(ad)` : l'annonce d'un AUTRE compte que le compte Leboncoin
  // ouvert reste visible, estompée (le même STYLE_FLOU que Vinted, §11).
  const estFloute=ad=>typeof floute==='function'&&!!floute(ad);
@@ -69,24 +71,34 @@ export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lec
   {lectureKO?<p role="status" className="vrm-pf-note">Impossible de relire tes annonces. L’historique reste conservé.</p>:<>
    {confirmer&&lignes.some(l=>l.etat==='aconfirmer')&&<p className="vrm-lbc-catalog-confirmer vrm-pf-note" data-lbc-confirmer-phrase="">{confirmer}</p>}
    <div className="vrm-pf-collant" data-pf-outils="leboncoin">
-    <BarreOutils valeur={recherche} onChange={setRecherche} placeholder="Rechercher un article, un compte…" label="Rechercher une annonce Leboncoin">{outils}</BarreOutils>
+    <BarreOutils valeur={recherche} onChange={setRecherche} placeholder={tr('plateformes.lbc.chercher')} label="Rechercher une annonce Leboncoin">{outils}</BarreOutils>
     <Filtres label="État des annonces Leboncoin" valeur={filtre} onChange={setFiltre}
      options={choix.filter(([id])=>(id!=='aconfirmer'||lignes.some(l=>l.etat==='aconfirmer'))&&(id==='toutes'||id===filtre||nDe(id)>0)).map(([id,nom])=>({v:id,l:nom,n:nDe(id)}))}/>
    </div>
    {!visibles.length?<p className="vrm-lbc-catalog-vide vrm-pf-vide">{lignes.length?'Aucune annonce dans cette sélection.':'Aucune annonce'}</p>:
-    <ul className="vrm-pf-rangees"><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Leboncoin" lignes={visibles} ouvert={compteOuvert} floute={(l)=>estFloute(l.ad)} compteDe={(l)=>idCompteAnn(l.ad)} nomDe={nomCompte} rendre={({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);const ch=chiffresAnnonceLbc(ad);const depuis=etat==='active'&&dateCourte(ad.publieeLe);
+    <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Leboncoin" lignes={visibles} ouvert={compteOuvert} floute={(l)=>estFloute(l.ad)} compteDe={(l)=>idCompteAnn(l.ad)} nomDe={nomCompte} rendre={({ad,num,etat,label,livraison,suivi})=>{const lien=lienAnnonceLeboncoin(ad);const lieVinted=!!lienVintedDe?.(ad);const retrait=retraitDe?.(ad);const achat=num ? achatDe?.(num) : null;const ch=chiffresAnnonceLbc(ad);const depuis=etat==='active'&&dateCourte(ad.publieeLe);
      // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° de CETTE annonce : lien posé, référence) ; « Gérer » et « Supprimer » y sont rendus (`DansFiche`).
      const fl=attrsFicheLigne({contexte:'annonce',site:'leboncoin',cle:'l'+ad.id,nums:num?[String(num)]:[],photo:ad.images?.[0]||'',titre:ad.subject||ad.title||'',prix:euros(ad.price)!=='—'?euros(ad.price):''});
-     return <li key={ad.id} {...fl} className="vrm-ui-ligne vrm-pf-rangee" data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
+     // (16 nov.) Au téléphone, la rangée touchée MONTE à sa place (la même carte qu'Annonces · Vinted) : prix, jours en ligne,
+     // favoris lus par Leboncoin, et le prix d'achat saisi de SON N° ; « ⋯ » ouvre la fiche (src/paires/PaireAvantSite.jsx).
+     const jours=etat==='active'&&Number.isFinite(Date.parse(String(ad.publieeLe||'')))?Math.max(0,Math.floor((Date.now()-Date.parse(String(ad.publieeLe)))/86400000)):null;
+     const av=attrsAvantSite({site:'leboncoin',id:ad.id,prix:euros(ad.price),jours,favoris:Number.isFinite(ad?.stats?.favoris)?ad.stats.favoris:null,num,lien});
+     return <li key={ad.id} {...fl} {...av} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-lbc-catalog-id={ad.id} data-lbc-catalog-etat={etat} data-flou={estFloute(ad)?'1':'0'} style={estFloute(ad)?STYLE_FLOU:undefined}>
      <span className="vrm-ui-ligne-photo" aria-hidden="true"><Photo key={ad.images?.[0]||ad.id} src={ad.images?.[0]}/></span>
      <span className="vrm-ui-ligne-textes vrm-pf-textes">
       <strong className="vrm-ui-ligne-titre">{num?<span className="vrm-pf-num" data-lbc-catalog-num={num}>{`N°${num}`}</span>:null}<span>{ad.subject||ad.title||'Annonce sans titre'}</span></strong>
       <span className="vrm-ui-ligne-sous"><span data-etat={etat}>{label}</span>{` · ${ad.accountName||'Compte sans nom'}`}{depuis?<span data-lbc-catalog-depuis="">{` · en ligne depuis le ${depuis}`}</span>:''}{suivi?<span>{` · ${livraison?'Livraison':'Vente'} · ${suivi}`}</span>:null}{ch?<span data-lbc-catalog-chiffres="">{` · ${ch}`}</span>:null}</span>
+      {retrait ? <span className="vrm-lbc-lien-retrait">{tr('plateformes.lbc.retraitAilleurs', { plateforme: retrait })}</span>
+        : num ? <span className="vrm-lbc-lien-etat">{lieVinted ? tr('plateformes.lbc.lieeVinted') + ' · ' : ''}{achat == null ? tr('plateformes.lbc.achatNonRenseigne') : tr('plateformes.lbc.prixAchat', { prix: montant(achat) })}</span>
+        : etat === 'active' && onRelierVinted ? <button type="button" className="vrm-lbc-lien-action" data-lbc-relier-vinted={ad.id}
+          onClick={(e) => { e.stopPropagation(); onRelierVinted(ad); }}>{tr('plateformes.lbc.relierVinted')}</button> : null}
      </span>
      <b className="vrm-ui-ligne-valeur">{euros(ad.price)}</b>
      <DansFiche cle={fl['data-fiche-ligne']}><span className="vrm-pf-gestes">{lien&&<a href={lien} target="_blank" rel="noreferrer" aria-label={`Gérer l’annonce : ${ad.subject||ad.title||ad.id}`} title="Gérer sur Leboncoin"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17 17 7M7 7h10v10"/></svg></a>}
      {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</span></DansFiche>
+     <span className="sb-avant-place" data-sb-avant-place=""/>
     </li>;}}/></ul>}
+   <PaireAvantSiteHote site="leboncoin" achatDe={achatDe}/>
    <div className="vrm-pf-pied"><span>{`${lignes.length} reçue${lignes.length>1?'s':''}`}</span><details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details></div>
   </>}
   <BilanSynchronisation owner={owner} sources={bilan}/>

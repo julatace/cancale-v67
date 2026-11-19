@@ -99,7 +99,8 @@ function juger(depot) {
   const tous = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
   // (16 nov., intégration vague A) Les feuilles d'écran du VERRE (`verre-*.css`, `ventes-verre.css`, `fiche-d.css`, toutes
   // dans la couche `vrm-verre`) sont de la même famille : par-dessus la fondation, jamais avant ses polices.
-  let fin = tous.length; while (fin > 0 && /^\.\/design\/(?:studio-(?!polices)[a-z-]+|verre-[a-z-]+|ventes-verre|fiche-d)\.css$/.test(tous[fin - 1])) fin--;
+  // (17 nov., accessibilité) `accessibilite.css` vit dans SA couche (`vrm-a11y`, nommée la première) : sa place dans les imports ne change rien.
+  let fin = tous.length; while (fin > 0 && /^\.\/design\/(?:studio-(?!polices)[a-z-]+|verre-[a-z-]+|ventes-verre|fiche-d|accessibilite)\.css$/.test(tous[fin - 1])) fin--;
   const imports = tous.slice(0, fin);
   dit(imports[imports.length - 1] === './design/studio.css', 'S3 studio.css est la DERNIÈRE feuille importée par App.jsx', imports.slice(-3).join(' · '));
   dit(imports.indexOf('./design/studio-polices.css') === imports.length - 2, 'S3 ses polices juste avant lui');
@@ -148,7 +149,10 @@ function juger(depot) {
   dit(/v\.lot = r\.partent/.test(app) && /colisPrets\.lot\)\?colisPrets\.lot:undefined/.test(app), 'S7 Imprimer N lit `vrm_colis_prets.lot` (le nombre de « Tout imprimer (N) »), undefined sinon');
   const de = lire('src/design/DisqueEventail.jsx');
   dit(/connu && nImprimer > 0 \? tr\('studio\.imprimerN'/.test(de) && /: tr\('studio\.imprimer'\)/.test(de), 'S7 pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné)');
-  dit(/<DisqueEventail gestes=\{gestes\}/.test(app) && /gestes=\{gestesDisque\}/.test(app), 'S7 la barre du bas porte le disque');
+  // (17 nov., Julien : « Le + dégueulasse ») Le disque a quitté la barre ; ses gestes ont chacun leur place, à un toucher.
+  dit(!/<DisqueEventail\b/.test(app), 'S7 plus de disque dans la barre du bas');
+  dit(/data-recherche-scanner=""[^\n]*ouvrirRetrouver\('loupe'\)/.test(app) && /<BoutonScanRecherche\/>/.test(app), 'S7 Scanner = une icône DANS le champ de recherche (le même scanner pour retrouver)');
+  dit(/data-geste-disque="publier"/.test(app) && /data-v2-principal': 'publier'/.test(app), 'S7 Publier = la ligne du titre d’Annonces (éteint et allumé)');
   return rouges;
 }
 

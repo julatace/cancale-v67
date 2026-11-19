@@ -15,7 +15,7 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
+import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { LogoSite } from '../SelecteurSites.jsx';
@@ -210,11 +210,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
   // La signature des conversations Vinted (la liste peut être complétée SUR PLACE — sa paire arrive après) :
   // le regroupement se refait dès qu'une conversation, son aperçu ou sa paire change.
-  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p].join("§"); }).join('¶') : String(vinted);
+  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p, x.dernier ? `${x.dernier.deMoi}|${x.dernier.texte}` : ''].join("§"); }).join('¶') : String(vinted);
   const { parCle, fils, propositions } = React.useMemo(() => {
     const parCle = new Map();
     const entrees = [];
-    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
+    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire, undefined, x.dernier); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
     for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
@@ -358,7 +358,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
                             onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
-                            <span className="vg-fil-ph" aria-hidden="true">{photo ? <img src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>
+                            <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">
                                 <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>

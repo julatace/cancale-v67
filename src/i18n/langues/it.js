@@ -1,17 +1,26 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
+import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
+import ecran_suivi_vente from './it/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_perso from './it/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './it/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_design_v2 from './it/designV2.js';   // (17 nov.) le nouveau design, en essai
+import ecran_argent_v2 from './it/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
+import ecran_v2_ventes from './it/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './it/avenir.js';
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './it/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './it/fiched.js';
+import ecran_ecrans_restes from './it/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './it/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './it/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './it/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_serie_selection from './it/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './it/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './it/liaison.js';   // (15 nov.) La liaison achat ⇄ article
@@ -44,17 +53,20 @@ import ecran_plus from './it/plus.js';
 import ecran_plateformes from './it/plateformes.js';
 import ecran_colisplus from './it/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_studioventes from './it/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
-import ecran_impression from './it/impression.js';   // (14 nov., impression-simple)
+import ecran_impression from './it/impression.js';
+import ecran_tampons from './it/tampons.js';   // (16 nov., lot tampons-parametres)   // (14 nov., impression-simple)
 import ecran_accueilReste from './it/accueilReste.js';
 import ecran_fraiscarte from './it/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './it/atelier.js';
 import ecran_accompagnement from './it/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_partenaires from './it/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './it/argentprix.js';   // (14 nov., argent-prix)
+import ecran_argentMieux from './it/argentMieux.js';   // (16 nov., argent-mieux)
 import ecran_argentPlus from './it/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './it/rechliste.js';
 import ecran_studio_paires from './it/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
-import ecran_republier_guide from './it/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_republier_guide from './it/republierGuide.js';
+import ecran_republication from './it/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './it/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './it/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './it/deuxComptes.js';   // (15 nov., lot deux-comptes)
@@ -62,13 +74,16 @@ import ecran_favorisSites from './it/favorisSites.js';   // (15 nov., lot favori
 import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './it/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
-import ecran_etageres_v4 from './it/etageres-v4.js';   // (15 nov.) l'étagère v4
+import ecran_stock_rangement from './it/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
+  ...ecran_accessibilite,
+  ...ecran_groupes,
+  ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_republication,
   ...ecran_etageres,
-  ...ecran_etageres_v4,
   ...ecran_journee_verre,
   ...ecran_arrivee,
   ...ecran_accueilReste,
@@ -85,6 +100,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_argentMieux,
   ...ecran_argentPlus,
   ...ecran_partenaires,
   ...ecran_plateformes,
@@ -94,6 +110,7 @@ export default {
   ...ecran_colisplus,
   ...ecran_studioventes,
   ...ecran_impression,
+  ...ecran_tampons,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -820,6 +837,7 @@ export default {
   "favoris.sousTitreCompte": "Account {compte} · scrivi a chi ama i tuoi annunci.",
   "favoris.actualiser": "Aggiorna",
   "favoris.outils": "Altri strumenti",
+  "versions.uneSeule": "Una versione: se è appena partita, cambia solo il saluto (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -1201,6 +1219,7 @@ export default {
   "sante.i.fraicheur": "Ultima lettura",
   "sante.v.note": {one: "{note}/5 · {n} recensione", other: "{note}/5 · {n} recensioni"},
   "sante.v.avisBas": "{n} delle ultime {sur}",
+  "sante.v.avisArrives": {one: "{n} arrivata {quand}", other: "{n} arrivate negli ultimi 14 giorni, l’ultima {quand}"},
   "sante.v.delai": {one: "{duree} · su {n} pacco", other: "{duree} · su {n} pacchi"},
   "sante.v.retards": "{n} su {sur} pacchi",
   "sante.v.enRetard": {one: "{n} ancora da spedire", other: "{n} ancora da spedire"},
@@ -1219,6 +1238,7 @@ export default {
   "sante.r.enRetard": {one: "{n} pacco da spedire oltre la scadenza", other: "{n} pacchi da spedire oltre la scadenza"},
   "sante.r.annulees": {one: "{n} vendita annullata (30 g)", other: "{n} vendite annullate (30 g)"},
   "sante.r.avisBas": {one: "{n} recensione da 3★ o meno tra le ultime 10", other: "{n} recensioni da 3★ o meno tra le ultime 10"},
+  "sante.r.avisArrives": {one: "{n} recensione da 3★ o meno negli ultimi 14 giorni", other: "{n} recensioni da 3★ o meno negli ultimi 14 giorni"},
   "sante.r.note": "Valutazione Vinted {note}/5",
   "sante.r.delai": "Spedizione in {duree} (mediana, 30 g)",
   "sante.journee.un": "{nom} da tenere d’occhio",
@@ -1637,7 +1657,7 @@ export default {
   "impression.tampon.num": "Solo N.",
   "impression.tampon.num_titre": "N. + titolo",
   "impression.tampon.num_titre_taille": "N. + titolo + taglia",
-  "impression.tampon.rien": "Niente",
+  "impression.tampon.rien": "Senza N° (la dicitura resta)",
   "impression.tampon.pourquoi": "Il titolo è nascosto di default: l’etichetta va sul pacco, il corriere lo vedrebbe.",
   "impression.tampon.jamais": "Mai su un codice a barre, un QR o un indirizzo.",
   "impression.fiche": "Scheda di preparazione",
@@ -2154,6 +2174,7 @@ export default {
   "creerVinted.photo.retirer": "Rimuovi la foto {n}",
   "creerVinted.photo.lecture": "Lettura…",
   "creerVinted.photo.ajouter": "Aggiungi foto",
+  "creerVinted.photo.studio": {one: "{n} foto del tuo studio ripresa: toglila o aggiungine altre.", other: "{n} foto del tuo studio riprese: toglile o aggiungine altre."},
   "creerVinted.fait": "Bozza pronta su Vinted ✓",
   "creerVinted.ouvrir": "Apri su Vinted",
   "creerVinted.aFinir": "Da scegliere su Vinted: {liste}",
@@ -2291,6 +2312,9 @@ export default {
   "instantane.arret.panne": "Non riletto: la base non risponde. Queste cifre sono quelle della tua ultima visita.",
   ...ecran_confort,
   ...ecran_studio,
+  ...ecran_design_v2,
+  ...ecran_argent_v2,
+  ...ecran_v2_ventes,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
@@ -2301,17 +2325,21 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
   ...ecran_scan_retrouver,
+  ...ecran_serie_selection,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
   ...ecran_parcours_nouveau,
+  ...ecran_stock_rangement,
 };

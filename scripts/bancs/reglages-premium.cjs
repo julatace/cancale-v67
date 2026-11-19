@@ -27,7 +27,7 @@ const path = require('path'), http = require('http'), fs = require('fs');
 let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (16 nov.) BANC_DIST : un autre build (preuve §6.1)
 const PORT = Number(process.env.BANC_PORT) || 5233;
 const SHOTS = process.env.SHOTS || '';
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
@@ -135,13 +135,22 @@ async function interrupteurs(pg, T) {
     if (!(await s.isVisible())) continue;
     vus++;
     const nom = (await s.getAttribute('aria-label')) || `n°${i}`;
-    await s.scrollIntoViewIfNeeded();
-    const libre = await s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
+    // (16 nov.) Le changement de thème (« Mode sombre ») redessine la liste : l'élément peut être remplacé PENDANT le
+    // défilement (« not attached ») — le localisateur le retrouve au second essai.
+    for (let k = 0; k < 3; k++) { try { await s.scrollIntoViewIfNeeded({ timeout: 10000 }); break; } catch (e) { if (k === 2) throw e; await pg.waitForTimeout(500); } }
+    // (16 nov., bancs-rouges-a) MESURÉ : l'interrupteur d'avant (« Visite des écrans ») redessine son groupe ; mesuré tout
+    // de suite, le point tombait parfois sur le bouton VOISIN (span d'un `vrm-ar-switch`) pendant la mise en page. On
+    // laisse la mise en page se poser (1,5 s au plus) : un interrupteur vraiment recouvert reste rouge.
+    const libreIci = () => s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
+    let libre = await libreIci();
+    for (let k = 0; k < 10 && !libre; k++) { await pg.waitForTimeout(150); await s.scrollIntoViewIfNeeded().catch(() => {}); libre = await libreIci(); }
     // (15 nov., rouges-connus) Ce qui recouvre, NOMMÉ (le rapport dit quoi corriger) : classe et position.
-    const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
+    const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} « ${String(h.textContent || '').trim().slice(0, 40)} » dans ${[h.parentElement, h.parentElement && h.parentElement.parentElement].filter(Boolean).map((p) => p.tagName.toLowerCase() + '.' + String(p.className || '').split(' ')[0] + [...p.attributes].filter((a) => a.name.startsWith('data-')).map((a) => '[' + a.name + ']').join('')).join(' < ')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
     const avant = await s.getAttribute('aria-checked');
-    await s.click({ timeout: 4000 });
+    // (16 nov.) 15 s : après « Mode sombre », toute la page change de thème (transitions) — sous charge, l'interrupteur
+    // suivant n'était pas « stable » en 4 s. La règle jugée reste : cliquable, rien dessus, et son état change.
+    await s.click({ timeout: 15000 });
     // (9 nov.) Pas un délai fixe (§6.5) : on attend que l'état change, 3 s au plus (sous charge,
     // 450 ms ne suffisaient pas toujours à un réglage synchronisé, « Ce que le stream cache »).
     const s2 = pg.locator('.vrm-set [role="switch"]').nth(i);
@@ -162,7 +171,8 @@ async function interrupteurs(pg, T) {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const mobile = vp.width < 600;
       // (15 nov.) Téléphone : chaque catégorie (src/parametres/categories.js) ; ordinateur : la page entière, deux fois.
-      const VUES = mobile ? ['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide', 'donnees', 'compte'] : ['reglages', 'compte'];
+      const VUES = (mobile ? ['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide', 'donnees', 'compte'] : ['reglages', 'compte'])
+        .filter((v) => !process.env.RP_VUES || process.env.RP_VUES.split(',').includes(v));   // (16 nov.) RP_VUES=aide : une vue seulement
       for (const vue of VUES) {
         const T = `${vp.width} px · ${vue === 'compte' ? 'Mon compte' : vue === 'reglages' ? 'Réglages' : vue}`;
         console.log(`\n── ${T}`);
@@ -170,10 +180,10 @@ async function interrupteurs(pg, T) {
           const { ctx, pg, erreurs } = await ouvrir(nav, vp, vue);
           const m = await mesurer(pg, mobile);
           if (SHOTS) {
-            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-ecran.png`) });
+            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-ecran.png`), timeout: 120000 });
             const haut = await pg.evaluate(() => Math.ceil((document.querySelector('.vrm-set') || document.body).getBoundingClientRect().height + 300));
             await pg.setViewportSize({ width: vp.width, height: Math.min(Math.max(haut, vp.height), 9000) }); await pg.waitForTimeout(400);
-            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}.png`) });
+            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}.png`), timeout: 120000 });
             await pg.setViewportSize(vp); await pg.waitForTimeout(300);
           }
           dit(!m.tombe && erreurs.length === 0, `${T} : l’écran s’affiche, sans erreur d’app`, erreurs.join(' | ').slice(0, 160));
@@ -235,7 +245,7 @@ async function interrupteurs(pg, T) {
               if (SHOTS) {
                 const haut = await pg.evaluate(() => Math.ceil((document.querySelector('.vrm-set') || document.body).getBoundingClientRect().height + 300));
                 await pg.setViewportSize({ width: vp.width, height: Math.min(Math.max(haut, vp.height), 6000) }); await pg.waitForTimeout(300);
-                await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-sous-${id}.png`) });
+                await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-sous-${id}.png`), timeout: 120000 });
                 await pg.setViewportSize(vp); await pg.waitForTimeout(200);
               }
               dit(!s.tombe && s.deb <= 1 && s.panneauxVisibles === 1 && !!titre, `${T} › « ${titre} » : un seul panneau, sans débordement`, `déb ${s.deb} · ${s.panneauxVisibles} panneau(x)`);

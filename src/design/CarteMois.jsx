@@ -64,6 +64,11 @@ export function ajusterChiffre(el, plancher = 22) {
     const largeur = el.clientWidth;
     if (largeur === derniere) return;
     derniere = largeur;
+    // (16 nov., stabilite-iphone) LE CAS COURANT SANS RIEN ÉCRIRE : jamais ajusté et il tient déjà ⇒ on ne touche à
+    // aucun style. Avant, chaque appel retirait les styles puis relisait la taille calculée et la largeur : deux mises en
+    // page de TOUT l'écran forcées par chiffre, à chaque nouvelle valeur (profil de l'ouverture de Ventes, base de 1 000
+    // paires : 2,9 s de temps propre ici, la première cause des longues tâches à l'arrivée des données).
+    if (!el.style.fontSize && !el.style.whiteSpace && !el.hasAttribute('data-chiffre-replie') && !(el.scrollWidth > largeur + 0.5)) return;
     el.style.removeProperty('font-size');
     el.style.removeProperty('white-space');
     el.style.removeProperty('overflow-wrap');
@@ -93,9 +98,13 @@ export function ajusterChiffre(el, plancher = 22) {
   };
   ajuste();
   if (typeof ResizeObserver === 'undefined') return undefined;
-  const ro = new ResizeObserver(() => ajuste());
+  // (16 nov., stabilite-iphone) L'ajustement change la taille du chiffre, donc parfois celle de son parent observé :
+  // fait DANS le rappel, il relançait l'observateur dans la même image — sous WebKit, « ResizeObserver loop completed
+  // with undelivered notifications » à chaque ouverture de Ma journée (banc stabilite-iphone S1). À l'image suivante.
+  let image = 0;
+  const ro = new ResizeObserver(() => { if (image) return; image = requestAnimationFrame(() => { image = 0; ajuste(); }); });
   ro.observe(el.parentElement || el);
-  return () => ro.disconnect();
+  return () => { ro.disconnect(); if (image) cancelAnimationFrame(image); };
 }
 
 // Le même ajustement pour un grand chiffre posé hors de `CarteMois` (Ma journée).

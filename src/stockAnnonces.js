@@ -223,31 +223,6 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
     auMoins: su && (manque.length > 0 || sansNumero.ebay > 0 || sansNumero.leboncoin > 0 || sansNumero.vestiaire > 0 || vcNonJugees.length > 0) };
 }
 
-// ── LES SITES D'UN N°, POUR LA FICHE (16 nov., finitions — Julien : « la fiche ouverte depuis le Stock ne montre pas les
-// mêmes sites que le Stock ») ─────────────────────────────────────────────────────────────────────────────────────
-// La fiche lisait ses sites ailleurs (`sitesDuNumero`, la règle de « Prix partout ») : une paire en ligne sur Vinted ET
-// Leboncoin n'y montrait que « Leboncoin », sans compte. Désormais UNE source par identité : l'article du Stock
-// (`annoncesActuelles`, ci-dessus) qui porte ce N° — ou l'un de ses N° (`aussi`) — et SES sites (site, pseudo du compte,
-// état, prix, date). Et ce qui n'a PAS été lu est rendu à part (`manque`) : « pas su » n'est jamais « pas en ligne ».
-//   aa : le résultat d'`annoncesActuelles` ; null/undefined ⇒ null (pas su : rien n'est dit).
-// Rend { sites: [{ plat, pseudo, etat, prix, depuis }], ids, manque: [{ plateforme, nom, raison }] }.
-export function sitesStockDuNumero(aa, numero, cle = cleDefaut) {
-  if (!aa || typeof aa !== 'object' || !aa.su) return null;
-  const k = cle(numero);
-  if (!k) return null;
-  const art = arr(aa.articles).find((a) => a && (a.cle === k || arr(a.aussi).some((n) => cle(n) === k))) || null;
-  const vus = new Set();
-  const manque = [];
-  for (const m of arr(aa.manque)) {
-    if (!m || !m.plateforme) continue;
-    const c = m.plateforme + '|' + (m.nom || '') + '|' + (m.raison || '');
-    if (vus.has(c)) continue;
-    vus.add(c);
-    manque.push({ plateforme: String(m.plateforme), nom: String(m.nom || ''), raison: String(m.raison || '') });
-  }
-  return { sites: art ? arr(art.sites).map((x) => ({ ...x })) : [], ids: art ? arr(art.ids).slice() : [], manque };
-}
-
 // ⚠️⚠️ (11 nov., lot DJ4 — Julien : « Dans Stock je veux que ce soit que les paires en ligne,
 // une seule si elle est présente sur tous les sites, mais là tu me proposes de vieilles
 // annonces ».) Mesuré sur sa base (lecture seule) : les « vieilles annonces » étaient les

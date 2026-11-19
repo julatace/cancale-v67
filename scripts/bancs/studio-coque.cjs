@@ -9,7 +9,7 @@ require('./_porte-banc.cjs');
 //       (`data-espace` sur la coque, <main> et la racine de l'écran gardé) ;
 //    B  (390) la barre du bas en VERRE dépoli (flou + fond translucide), flottante (rayon ≥ 20, à
 //       ≥ 8 px des bords), le contenu passe DESSOUS ; l'onglet actif porte la pastille ENFONCÉE
-//       (46 × 30) et sa diode ; quatre onglets + le disque au centre ;
+//       (46 × 30) et sa diode ; cinq onglets + le disque (16 nov., Achats dans la barre) ;
 //    E  (390) le disque ⇒ l'éventail : quatre gestes, UN seul plein (« Imprimer N », N = le nombre de
 //       « Tout imprimer (N) » de Ventes, jamais deviné), tous dans l'écran ; puis chaque geste RÉEL :
 //       Chercher ⇒ le champ de la loupe ; Scanner ⇒ le scanner de bordereau de Ventes ; Publier ⇒
@@ -79,7 +79,9 @@ async function telephone(nav, sombre, b) {
   dit(/blur/.test(barre.flou) && /rgba|\/ 0\./.test(barre.fond), 'B la barre du bas est en verre (flou + fond translucide)', barre);
   dit(barre.rayon >= 20 && barre.g >= 8 && barre.d >= 8 && barre.bas >= 8, 'B la barre flotte (rayon ≥ 20, ≥ 8 px des bords)', barre);
   dit(barre.dessous, 'B le contenu passe SOUS la barre (elle ne prend pas de bande à elle)');
-  dit(barre.onglets === 4 && barre.disque, 'B quatre onglets et le disque au centre', barre);
+  // (16 nov., barre-achats) Achats a rejoint la barre : cinq onglets (Aujourd'hui · Annonces · Achats · Ventes · Argent) et le disque.
+  // (17 nov., Julien : « Le + dégueulasse ») Plus de disque : cinq onglets, rien entre eux.
+  dit(barre.onglets === 5 && !barre.disque, 'B cinq onglets, aucun disque « + »', barre);
   dit(barre.pastille && barre.pastille.w === 46 && barre.pastille.h === 30 && barre.ic && Math.abs(barre.pastille.cx - barre.ic.cx) <= 1 && Math.abs(barre.pastille.cy - barre.ic.cy) <= 1 && /inset/.test(barre.pastille.ombre) && barre.pastille.op !== '0',
     'B la pastille ENFONCÉE (46 × 30, ombre intérieure) est sur l’icône de l’espace actif', barre.pastille && barre.ic ? [barre.pastille, barre.ic] : barre);
   dit(!!barre.diode, 'B sa diode est allumée', barre.diode);
@@ -88,7 +90,7 @@ async function telephone(nav, sombre, b) {
     const f = K.sur(verre, bas); const lab = [...document.querySelectorAll('.vrm-tabbar .vrm-nav-label')].map((l) => K.ratio(K.rgba(getComputedStyle(l).color), f));
     const titre = document.querySelector('.vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, h1)'); const haut = K.jeton('--sb-haut');
     return { lab: lab.map((x) => Math.round(x * 100) / 100), titre: titre ? Math.round(K.ratio(K.rgba(getComputedStyle(titre).color), haut) * 100) / 100 : null }; }, CONTRASTE);
-  dit(cBarre.lab.length === 4 && cBarre.lab.every((x) => x >= 4.5), `C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas (${cBarre.lab.join(' · ')})`, cBarre.lab);
+  dit(cBarre.lab.length === 5 && cBarre.lab.every((x) => x >= 4.5), `C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas (${cBarre.lab.join(' · ')})`, cBarre.lab);
   dit(cBarre.titre == null || cBarre.titre >= 4.5, `C le titre d’écran ≥ 4,5:1 sur le haut de la lumière (${cBarre.titre})`, cBarre.titre);
   dit(nLot != null, 'E Ventes dit combien « Tout imprimer (N) » ferait partir', nLot);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-390-${th}.png`) });
@@ -98,81 +100,21 @@ async function telephone(nav, sombre, b) {
   // P — un seul plein par écran.
   dit(await visible(pg, '.sb-btn-plein') <= 1, 'P au plus un .sb-btn-plein sur Ventes');
 
-  // E — l'éventail, depuis Ma journée.
-  await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForSelector('.vrm-main[data-ecran="journee"]'); await pg.waitForTimeout(2500);
-  const ondes = await pg.evaluate(() => document.querySelectorAll('[data-sb-onde]').length);
-  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(500);
-  // Les lames finissent leur entrée (300 ms + décalage) avant d'être mesurées.
-  await pg.waitForFunction(() => document.getAnimations().filter((a) => a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('[data-sb-eventail]')).every((a) => a.playState !== 'running'), null, { timeout: 8000 }).catch(() => {});
-  const ev = await pg.evaluate((src) => { const K = eval(src); const lames = [...document.querySelectorAll('[data-sb-lame]')];
-    const voile = document.querySelector('[data-sb-voile]'); const fv = voile ? K.sur(K.rgba(getComputedStyle(voile).backgroundColor), K.jeton('--sb-aplat')) : null;
-    const plein = document.querySelector('[data-sb-lame] .sb-btn-plein'); const pc = plein && getComputedStyle(plein);
-    const cs = (e) => getComputedStyle(e);
-    return { n: lames.length, ids: lames.map((l) => l.getAttribute('data-sb-lame')), pleins: document.querySelectorAll('[data-sb-lame] .sb-btn-plein').length,   // (version studio) DANS l'éventail : `data-sb-eventail` est posé sur <html>, il comptait aussi le plein de l'écran derrière (Ma journée en Bento)
-     
-      dedans: lames.every((l) => { const r = l.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; }),
-      places: lames.map((l) => { const r = l.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; }),
-      nImprimer: (lames.find((l) => l.getAttribute('data-sb-lame') === 'imprimer') || { getAttribute: () => null }).getAttribute('data-sb-n'),
-      recul: document.documentElement.hasAttribute('data-sb-eventail'), expanded: document.querySelector('[data-sb-disque]').getAttribute('aria-expanded'),
-      contrastes: fv ? lames.map((l) => Math.round(K.ratio(K.rgba(cs(l.querySelector('.sb-lame-mot')).color), fv) * 100) / 100) : [],
-      plein: pc ? Math.round(K.ratio(K.rgba(pc.color), K.jeton('--sb-encre')) * 100) / 100 : null }; }, CONTRASTE);
-  dit(ev.n === 4 && ev.ids.join() === 'chercher,scanner,publier,imprimer', 'E le disque ouvre l’éventail : Chercher · Scanner · Publier · Imprimer', ev.ids);
-  dit(ev.pleins === 1, 'E UN seul plein dans l’éventail (Imprimer)', ev.pleins);
-  dit(ev.dedans, 'D toutes les lames sont dans l’écran', ev.places);
-  dit(ev.recul && ev.expanded === 'true', 'E l’écran recule sous le voile, le disque est enfoncé (aria-expanded)');
-  dit(String(ev.nImprimer) === String(nLot), 'E « Imprimer N » redit le nombre de « Tout imprimer (N) » de Ventes', { lame: ev.nImprimer, ventes: nLot });
-  dit(ev.contrastes.length === 4 && ev.contrastes.every((x) => x >= 4.5), `C les mots de l’éventail ≥ 4,5:1 sur le voile (${ev.contrastes.join(' · ')})`, ev.contrastes);
-  dit(ev.plein == null || ev.plein >= 4.5, `C le mot du plein ≥ 4,5:1 sur l’encre (${ev.plein})`, ev.plein);
-  await pg.screenshot({ path: path.join(SHOTS, `eventail-390-${th}.png`) });
-  // Le voile referme.
-  await pg.mouse.click(195, 140); await pg.waitForTimeout(400);
-  dit(await visible(pg, '[data-sb-lame]') === 0 && !(await pg.evaluate(() => document.documentElement.hasAttribute('data-sb-eventail'))), 'E toucher le voile referme l’éventail');
-  // Chercher (toucher).
-  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
-  await toucher(pg, '[data-sb-lame="chercher"]'); await pg.waitForTimeout(700);
-  dit(await visible(pg, '[data-recherche-champ]') >= 1, 'E Chercher ⇒ le champ de la loupe');
-  await pg.keyboard.press('Escape').catch(() => {}); await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
-  // Chercher (GLISSER du disque vers la lame, relâcher).
-  {
-    const d = await pg.locator('[data-sb-disque]').boundingBox();
-    await pg.evaluate(({ x, y }) => { const el = document.querySelector('[data-sb-disque]'); const ev = (t, X, Y) => el.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: X, clientY: Y, button: 0 })); ev('pointerdown', x, y); }, { x: d.x + d.width / 2, y: d.y + d.height / 2 });
-    await pg.waitForTimeout(400);
-    const c = await pg.locator('[data-sb-lame="chercher"]').boundingBox();
-    await pg.evaluate(({ x0, y0, x, y }) => { const el = document.querySelector('[data-sb-disque]'); const ev = (t, X, Y) => el.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: X, clientY: Y, button: 0 }));
-      for (let i = 1; i <= 6; i++) ev('pointermove', x0 + (x - x0) * i / 6, y0 + (y - y0) * i / 6); ev('pointerup', x, y); }, { x0: d.x + d.width / 2, y0: d.y + d.height / 2, x: c.x + c.width / 2, y: c.y + 20 });
-    await pg.waitForTimeout(700);
-    dit(await visible(pg, '[data-recherche-champ]') >= 1, 'E GLISSER du disque vers Chercher, relâcher ⇒ la loupe');
-    await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
-  }
-  // L — la loupe de l'en-tête s'ouvre toujours au toucher.
-  await toucher(pg, 'button[data-recherche-loupe]'); await pg.waitForTimeout(600);
-  dit(await visible(pg, '[data-recherche-champ]') >= 1, 'L la loupe de l’en-tête s’ouvre au toucher');
-  await pg.locator('.vrm-hdr-recherche-fermer').first().tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400);
-  // Publier.
-  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
-  await toucher(pg, '[data-sb-lame="publier"]'); await pg.waitForTimeout(1500);
-  dit(await pg.evaluate(() => !!document.querySelector('[class*="vrm-pa"], [data-pa-site], [data-publier-ailleurs]')), 'E Publier ⇒ « Publier ailleurs »');
-  await pg.keyboard.press('Escape').catch(() => {}); await pg.goBack().catch(() => {}); await pg.waitForTimeout(600);
   await ctx.close();
-
-  // Imprimer et Scanner : chacun sur une page neuve (Ma journée).
-  ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=ventes' })); await pret(pg); await pg.waitForTimeout(1200);
-  await pg.locator('.vrm-tabbar [data-nav-entree="journee"]').click(); await pg.waitForTimeout(1200);
-  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
-  await toucher(pg, '[data-sb-lame="imprimer"]');
-  await pg.waitForFunction(() => document.querySelector('.vrm-main[data-ecran="ventes"]') && document.querySelector('.vrm-fs, [role="dialog"]'), null, { timeout: 12000 }).catch(() => {});
-  const impr = await pg.evaluate(() => ({ ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), feuille: !!document.querySelector('.vrm-fs, [role="dialog"]') }));
-  dit(impr.ecran === 'ventes' && impr.feuille, 'E Imprimer ⇒ Ventes et sa feuille « Tout imprimer » (rien n’est imprimé avant son clic)', impr);
-  await pg.screenshot({ path: path.join(SHOTS, `imprimer-390-${th}.png`) });
-  await ctx.close();
+  // E — (17 nov.) LES GESTES DU DISQUE D'HIER, CHACUN À SA PLACE (le disque a quitté la barre).
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);
-  await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
-  await toucher(pg, '[data-sb-lame="scanner"]');
-  // (16 nov., intégration de claude/scanner-colis) Le disque « + » ⇒ Scanner ouvre désormais le scanner
-  // POUR RETROUVER (`ouvrirRetrouver('disque')`, docs/passation/2026-11-15-scanner-colis.md §1) ; le
-  // scanner de dépôt reste sur le bouton « Scanner » de Ventes → À envoyer.
+  dit(await visible(pg, '[data-sb-disque], [data-sb-lame]') === 0, 'E aucun disque, aucun éventail');
+  await toucher(pg, 'button[data-recherche-loupe]'); await pg.waitForTimeout(600);
+  dit(await visible(pg, '[data-recherche-champ]') >= 1, 'E Chercher = la loupe de l’en-tête');
+  dit(await visible(pg, '[data-recherche-scanner]') >= 1, 'E Scanner = l’icône DANS le champ de recherche');
+  await toucher(pg, '[data-recherche-scanner]');
   await pg.waitForSelector('[data-scan-r]', { timeout: 12000 }).catch(() => {});
-  dit(await visible(pg, '[data-scan-r]') >= 1, 'E Scanner ⇒ le scanner pour retrouver un colis (sa vente, son achat)');
+  dit(await visible(pg, '[data-scan-r]') >= 1, 'E Scanner ⇒ le scanner pour retrouver un colis');
+  await ctx.close();
+  ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=annonces' })); await pret(pg);
+  dit(await visible(pg, '[data-geste-disque="publier"] button, [data-v2-principal="publier"]') >= 1, 'E Publier = la ligne du titre d’Annonces');
+  await pg.locator('[data-geste-disque="publier"] button, [data-v2-principal="publier"]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(1500);
+  dit(await pg.evaluate(() => !!document.querySelector('[class*="vrm-pa"], [data-pa-site], [data-publier-ailleurs]')), 'E Publier ⇒ « Publier ailleurs »');
   await ctx.close();
   // O — l'ondulation (et pas en mouvement réduit). Écrans comptés : chaque onglet rend son écran.
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);
@@ -182,8 +124,10 @@ async function telephone(nav, sombre, b) {
     // (l'anneau ne vit que 560 ms, l'entrée 320 ms).
     await pg.evaluate(() => { const v = window.__sbVu = { onde: 0, entree: false }; const main = document.querySelector('.vrm-main');
       if (window.__sbObs) window.__sbObs.disconnect();
-      window.__sbObs = new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.target === main && main.hasAttribute('data-sb-entree')) v.entree = true; } });
-      window.__sbObs.observe(document.body, { childList: true }); window.__sbObs.observe(main, { attributes: true, attributeFilter: ['data-sb-entree'] }); });
+      // (17 nov., vitesse-cache) L'anneau est posé une fois puis REJOUÉ (src/design/ondulation.js) : son compteur
+      // `data-sb-onde` qui avance compte comme une ondulation, au même titre qu'un anneau inséré.
+      window.__sbObs = new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.attributeName === 'data-sb-onde' && m.target.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.target === main && main.hasAttribute('data-sb-entree')) v.entree = true; } });
+      window.__sbObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-sb-onde'] }); window.__sbObs.observe(main, { attributes: true, attributeFilter: ['data-sb-entree'] }); });
     await pg.locator(`.vrm-tabbar [data-nav-entree="${id}"]`).click(); await pg.waitForTimeout(120);
     const o = await pg.evaluate(() => ({ ...window.__sbVu }));
     await pg.waitForTimeout(1400);
@@ -197,7 +141,7 @@ async function telephone(nav, sombre, b) {
   {
     const x = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' }); await pret(x.pg);
     await x.pg.emulateMedia({ reducedMotion: 'reduce' });
-    await x.pg.evaluate(() => { const v = window.__sbVu = { onde: 0 }; new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; }).observe(document.body, { childList: true }); });
+    await x.pg.evaluate(() => { const v = window.__sbVu = { onde: 0 }; new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.attributeName === 'data-sb-onde') v.onde++; } }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-sb-onde'] }); });
     await x.pg.locator('.vrm-tabbar [data-nav-entree="ventes"]').click(); await x.pg.waitForTimeout(400);
     const vu = await x.pg.evaluate(() => ({ onde: window.__sbVu.onde, ecran: document.querySelector('.vrm-main').getAttribute('data-ecran') }));
     dit(vu.onde === 0 && vu.ecran === 'ventes', 'O mouvement réduit : aucun anneau (un fondu seul), l’écran change', vu);

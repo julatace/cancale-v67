@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,RefusFavoris} from './favoris-file.js';
+import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,reprendreFile,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -283,6 +283,8 @@ export async function routeFavoris(req,res){
         const r=await tourAuto(req,{owner,uid,cle,maintenant,extension});
         if(r.nouvelleDemande)await notifierDemandeAuto(owner,r.nouvelleDemande).catch(()=>{});
         return res.status(200).json({ok:true,uid,...r,serveur:maintenant});
+      }else if(c.action==='reprendre'){
+        decision=d=>reprendreFile(d,{owner,maintenant});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
@@ -290,7 +292,7 @@ export async function routeFavoris(req,res){
         // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est
         // celle de l'app (traduireResultatFavori), une seule règle, faite ici.
         const t=c.brut&&typeof c.brut==='object'&&!Array.isArray(c.brut)?traduireResultatFavori(c.brut):{resultat:c.resultat,raison:c.raison,ecrits:c.ecrits,variante:c.variante};
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');

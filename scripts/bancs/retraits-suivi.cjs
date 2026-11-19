@@ -9,7 +9,7 @@
 //   R2  la ligne d'e-mail réécrite « retiré » (arrivée gardée) ⇒ dite sortie (source e-mail)
 //   R3  achat Vinted « déposé » dont le n° est retiré chez Vinted Go ⇒ dit sorti (achat)
 //   R4  un n° de SES bordereaux que le transporteur dit « disponible » ⇒ JAMAIS à retirer
-//   R5  Colissimo (sans clé La Poste) ⇒ à retirer, « Colissimo : suivi lu par e-mail seulement » + le geste
+//   R5  Colissimo (sans clé La Poste) ⇒ à retirer, « Colissimo : suivi lu par Vinted et les e-mails » + le geste
 //   R6  e-mail rangé « vinted » (expéditeur par défaut) à n° de 8 chiffres ⇒ Mondial Relay nommé, « pas encore lu »
 //   R7  deux lignes `transp_` (Vinted Go jamais lue servie d'abord, Chronopost lue) ⇒ la carte dit Chronopost lu
 //   R8  Chronopost abandonné (introuvable 3 fois) ⇒ « VRM ne le relit plus » + le geste
@@ -158,13 +158,22 @@ const detail = async (pg, sousCle) => {
   const l = pg.locator(`.vrm-rpf [data-cc-carte*="${sousCle}"]`).first();
   if (!(await l.count())) return null;
   const ouvert = await l.getAttribute('data-ouvert');
-  if (!ouvert) await l.locator('.vrm-rpf-ouvrir').first().click({ timeout: 5000 }).catch(() => {});
+  // (16 nov., lot achats-qr) toucher le code ouvre le comptoir : le TITRE ouvre la fiche.
+  if (!ouvert) await l.locator('[data-rp-titre]').first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(250);
-  return l.evaluate((e) => { const d = e.querySelector('[data-rp-detail]') || e;
-    const tr = d.querySelector('[data-transp]'); const lim = d.querySelector('[data-colis-limite]');
+  // (17 nov., chasse-bugs) Proposition 62 (14 nov.) : le détail d'une ligne s'ouvre dans SA FICHE (DansFiche, une feuille),
+  // plus sous la ligne — on le lit là où il est montré (le détail visible), jamais la ligne repliée.
+  await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
+  const r = await l.evaluate((e) => { const d = [...document.querySelectorAll('[data-rp-detail]')].find((x) => x.getClientRects().length) || e.querySelector('[data-rp-detail]') || e;
+    const q = (sel) => d.querySelector(sel) || e.querySelector(sel);
+    const tr = q('[data-transp]'); const lim = q('[data-colis-limite]');
     return { transp: tr ? tr.getAttribute('data-transp') : null, transpEtat: tr ? tr.getAttribute('data-transp-etat') : null, transpTexte: tr ? tr.textContent : '', limite: lim ? lim.getAttribute('data-colis-limite') : null, estimee: lim ? lim.getAttribute('data-colis-limite-estimee') : null, limTexte: lim ? lim.textContent : '',
-      pasLu: (d.querySelector('[data-transp-pas-lu]') || { getAttribute: () => null }).getAttribute('data-transp-pas-lu'), pasLuTexte: ((d.querySelector('[data-transp-pas-lu]') || {}).textContent || ''),
-      codeSms: (d.querySelector('[data-colis-code-sms]') || { getAttribute: () => null }).getAttribute('data-colis-code-sms'), texte: d.innerText.replace(/\s+/g, ' ').slice(0, 600) }; });
+      pasLu: (q('[data-transp-pas-lu]') || { getAttribute: () => null }).getAttribute('data-transp-pas-lu'), pasLuTexte: ((q('[data-transp-pas-lu]') || {}).textContent || ''),
+      codeSms: (q('[data-colis-code-sms]') || { getAttribute: () => null }).getAttribute('data-colis-code-sms'), texte: d.innerText.replace(/\s+/g, ' ').slice(0, 600) }; });
+  // Refermer la fiche avant la ligne suivante.
+  await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click().catch(() => {});
+  await pg.waitForTimeout(250);
+  return r;
 };
 
 (async () => {
@@ -205,7 +214,7 @@ const detail = async (pg, sousCle) => {
         if (SHOTS) { await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-${nom}.png`) });
           await pg.evaluate(() => { const e = document.querySelector('[data-retraits-sortis]'); if (e) e.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300);
           await pg.screenshot({ path: path.join(SHOTS, `retraits-suivi-sortis-${nom}.png`) }); }
-        { const d = await detail(pg, '6A20000000005'); dit(!!d && d.pasLu === 'non-lu' && /Colissimo/.test(d.pasLuTexte) && /site/.test(d.pasLuTexte), 'R5 Colissimo ⇒ « suivi lu par e-mail seulement » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte })); }
+        { const d = await detail(pg, '6A20000000005'); dit(!!d && d.pasLu === 'non-lu' && /Colissimo/.test(d.pasLuTexte) && /site/.test(d.pasLuTexte), 'R5 Colissimo ⇒ « suivi lu par Vinted et les e-mails » + le geste', J(d && { pasLu: d.pasLu, t: d.pasLuTexte })); }
         { const d = await detail(pg, '82000006'); // (12 nov., finitions) « pas encore lu — VRM le lit tant que l'app est ouverte » ne demande rien à Julien : la ligne ne
         // l'écrit plus (seules les raisons qui ont un geste restent, `RaisonPasLu`).
         dit(!!d && d.pasLu == null, 'R6 n° de 8 chiffres d’un e-mail « vinted » : « pas encore lu » (rien à faire) n’est plus écrit sur la ligne', J(d && { pasLu: d.pasLu, t: d.pasLuTexte, tr: d.transp }));

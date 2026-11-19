@@ -123,12 +123,11 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         // I — une seule vue.
         const vues = await pg.evaluate(() => ({ nav: !!document.querySelector('[data-stock-vues]'), boutons: document.querySelectorAll('[data-stock-vue]').length, meuble: !!document.querySelector('[data-meuble="mA"]'), canvas: document.querySelectorAll('canvas').length }));
         dit(!vues.nav && vues.boutons === 0 && vues.meuble && vues.canvas === 0, `${t} : I — une seule vue (les étagères 2D), même si la pièce 3D était mémorisée`, JSON.stringify(vues));
-        // II — vendue : « À sortir », à l'ambre, jamais rouge. (15 nov., étagère v4 — maquettes validées : le carton avance,
-        // cerclé d'ambre, son étiquette ambre dit « À sortir » ; l'ancienne case qui « respirait » à l'accent est remplacée.)
-        const v = await pg.evaluate(() => { const el = document.querySelector('[data-case-num="3"]'); if (!el) return null; const b = el.querySelector('.vrm-b4'); const e = el.querySelector('.vrm-eti4'); const l = el.querySelector('[data-case-ligne]'); return { etat: el.getAttribute('data-case-etat'), cls: el.className, anneau: b ? getComputedStyle(b, '::after').boxShadow : 'none', fond: e ? getComputedStyle(e).backgroundColor : '', ligne: l ? l.getAttribute('data-case-ligne') + ':' + l.textContent : '', ombres: [el, ...el.querySelectorAll('*')].map((x) => getComputedStyle(x).boxShadow + ' ' + getComputedStyle(x).color).join(' ') }; });
-        const rouge = v && /rgb\(2[0-9]{2}, (?:[0-9]|[1-5][0-9]), (?:[0-9]|[1-5][0-9])\)/.test(v.ombres);
-        dit(!!v && v.etat === 'vendue' && /is-vendue/.test(v.cls) && /^sortir:/.test(v.ligne) && /rgb\(240, 164, 60\)/.test(v.anneau) && !rouge, `${t} : II — la case de N°3 (rangée puis vendue) dit « À sortir », cerclée d'ambre, sans rouge`, v && `${v.etat} · ${v.ligne} · ${v.anneau.slice(0, 60)}`);
-        dit(!!v && /rgb\(255, 231, 196\)/.test(v.fond), `${t} : II — son étiquette passe à l'ambre (la maquette v4)`, v && v.fond);
+        // II — vendue : allumée à l'accent, pas rouge.
+        const v = await pg.evaluate(() => { const el = document.querySelector('[data-case-num="3"]'); if (!el) return null; const cs = getComputedStyle(el); const acc = getComputedStyle(document.documentElement).getPropertyValue('--vrm-accent').trim(); return { etat: el.getAttribute('data-case-etat'), cls: el.className, ombre: cs.boxShadow, anim: cs.animationName, acc }; });
+        const rouge = v && /rgb\(2[0-9]{2}, (?:[0-9]|[1-9][0-9]), (?:[0-9]|[1-9][0-9])\)/.test(v.ombre);
+        dit(!!v && v.etat === 'vendue' && /is-vendue/.test(v.cls) && v.ombre !== 'none' && !rouge, `${t} : II — la case de N°3 (rangée puis vendue) est allumée, sans rouge`, v && `${v.etat} · ${v.ombre.slice(0, 80)}`);
+        dit(!!v && v.anim === 'vrm-s2d-vendue', `${t} : II — elle respire doucement (animation CSS)`, v && v.anim);
         const n1 = await pg.evaluate(() => { const el = document.querySelector('[data-case-num="1"]'); return el ? el.getAttribute('data-case-etat') : null; });
         dit(n1 === 'occupee', `${t} : II — une case pleine pas vendue reste neutre`, n1);
         // III — À ranger.
@@ -177,7 +176,9 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         await pg.fill('[data-stock-recherche] input', '2');
         await pg.waitForTimeout(300);
         await pg.click('[data-stock-res="2"]');
-        await pg.waitForTimeout(400);
+        // (16 nov.) La place du Stock arrive dans la fiche en transition (`startTransition`) : on attend qu'elle soit LÀ (10 s au plus).
+        await pg.waitForSelector('[data-fiche-ancienne-place]', { state: 'attached', timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(200);
         const anc = await pg.evaluate(() => { const el = document.querySelector('[data-fiche-ancienne-place]'); return el ? el.innerText.replace(/\s+/g, ' ') : null; });
         dit(!!anc && /Garage/.test(anc) && /Pile du fond/.test(anc), `${t} : VIII — la fiche dit l'ancienne place dans la pièce 3D`, anc);
         dit(r.ecrits.room === 0, `${t} : VIII — la pièce 3D n'est jamais réécrite`, String(r.ecrits.room));
@@ -190,12 +191,14 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         await fermerFiche(); await pg.waitForTimeout(300);
         // VII — l'état de N°1, dans la fiche ouverte par sa case.
         await pg.click('[data-case-num="1"]');
-        // (15 nov., v4) À l'ordinateur, la case se montre d'abord dans le volet de droite ; « La fiche » ouvre la fiche.
-        if (await pg.$('[data-stock-volets]')) await pg.click('[data-cote-fiche="1"]', { timeout: 15000 }).catch(() => {});
         await pg.waitForSelector('[data-fiche-paire="1"] [data-fiche-etat-article]', { timeout: 15000 }).catch(() => {});
         const ve = await pg.$('[data-fiche-paire="1"] [data-fiche-etat-article]');
         dit(!!ve, `${t} : VII — la fiche ouverte par la case porte « L'état de cet article »`);
         if (ve) {
+          // (16 nov.) Fiche D (15 nov.) : le prix d'achat (`data-etat-ligne="prix-achat"`) vit dans la vue « Argent » — une
+          // paire en vente s'ouvre sur « Sites ». On l'ouvre comme lui.
+          const seg = pg.locator('[data-fiche-paire="1"] [data-fd-seg="argent"][aria-selected="false"]').first();
+          if (await seg.count()) await seg.click().catch(() => {});
           await pg.waitForFunction(() => { const el = document.querySelector('[data-etat-ligne="reception-en-ligne"] b'); return el && el.textContent !== '…'; }, null, { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(500);
           const et = await pg.evaluate(() => { const o = {}; document.querySelectorAll('[data-etat-ligne]').forEach((el) => { o[el.getAttribute('data-etat-ligne')] = { val: el.getAttribute('data-etat-val'), borne: el.getAttribute('data-etat-borne') || '', src: el.getAttribute('data-etat-source') || '', txt: el.innerText.replace(/\s+/g, ' ') }; }); return o; });
@@ -207,8 +210,9 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
           const honnete = (l) => (l.val !== '' && l.val != null) || (/—/.test(l.txt) && l.txt.replace(/.*—/, '').trim().length > 3);
           dit(honnete(av) && honnete(lv), `${t} : VII — achat → vente et mise en ligne → vente : un nombre, ou « — » avec sa raison`, `${av.txt} | ${lv.txt}`);
           if (lv.val !== '' && lv.val != null) dit(/au-moins/.test(lv.borne) && /au moins/.test(lv.txt), `${t} : VII — mise en ligne → vente est « au moins » (origine sans date)`, lv.borne);
-          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] .vrm-fp-tuiles, [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40\s€/g) || []).length; });
-          dit(deux === 1, `${t} : VII — le prix d'achat n'est écrit qu'une fois entre les tuiles et « L'état » (§7)`, String(deux));
+          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] [data-fd-vue-argent], [data-fiche-paire] [data-fd-etat], [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40\s€/g) || []).length; });
+          // (16 nov.) fiche « D » (15 nov.) : plus de tuiles — la vue Argent et la ligne d'état les remplacent.
+          dit(deux === 1, `${t} : VII — le prix d'achat n'est écrit qu'une fois entre la vue Argent et « L'état » (§7)`, String(deux));
           await shot(pg, (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-etat');
         }
         // IX

@@ -34,6 +34,7 @@
 //                  de retrait, la raison est dite.
 
 import { FRAIS_MS } from './retirerAilleurs.js';
+import { cleNum } from '../api/_lib/numerotation.js';   // (16 nov.) l'identité d'un N° (§5)
 
 const arr = (a) => (Array.isArray(a) ? a : []);
 const fini = (x) => typeof x === 'number' && Number.isFinite(x);
@@ -97,7 +98,7 @@ export function etatSite(site, ctx = {}) {
 export function listeARetirer(plan, ctx = {}, numero = null) {
   const articles = arr(plan && plan.articles)
     // Un lot « 12+15 » répond à 12 ET à 15 (le N° du plan est déjà une clé `cleNum`).
-    .filter((a) => numero == null || String(a.numero) === String(numero) || String(a.numero).split('+').includes(String(numero)))
+    .filter((a) => numero == null || cleNum(a.numero) === cleNum(numero) || String(a.numero).split('+').map(cleNum).includes(cleNum(numero)))
     .map((a) => {
       const sites = arr(a.sites).map((s) => ({ ...s, ...etatSite(s, ctx) }));
       return { ...a, douteuse: !!a.douteuse, sites };

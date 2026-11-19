@@ -803,6 +803,10 @@ function familleConnue(subject, from) {
   if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  // (17 nov.) Le lien de preuve d'adresse de VRM dans une autre langue (renvoyé vers la boîte).
+  // Une regex littérale (la fonction est relue seule par audit-lbc-suppression) ; audit-emails-beaux
+  // vérifie qu'elle reconnaît les cinq sujets de `SUJETS_PREUVE` (api/_lib/mail-textes.js).
+  if (/Confirm your VRM receiving address|Confirma tu dirección de recepción VRM|Conferma il tuo indirizzo di ricezione VRM|Bestätige deine VRM-Empfangsadresse/.test(s)) return 'email de compte Vinted';
   // (6 nov.) Leboncoin « Suppression de vos annonces » (api/_lib/lbc-suppression.js) :
   // la même famille côté app (`familleEmail`) pour les e-mails déjà gardés.
   if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
@@ -2114,7 +2118,7 @@ async function titreAchatDuColis(track) {
     const suivi = String((track && track.suivi) || ''), code = codeColisNorm(track && track.code);
     if (!suivi && !code) return '';
     const [sv, sm, rel] = await Promise.all([
-      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi') : [],
+      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sv:meta->>suivisVinted,sl:meta->>suivisLusAt') : [],
       suivi ? lireLignes('id=like.colis_suivi_*&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid') : [],
       code ? supabaseLireRow('panel_colis_relais') : { lu: true, data: {} },
     ]);
@@ -2201,7 +2205,7 @@ export async function modeScript(mode, req, res) {
       k = resa.valeur || 0;
     }
     const envois = pretes.slice(0, k)
-      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien) }; });
+      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien, l.data.langue) }; });
     res.status(200).json({ ok: true, envois, ...(pretes.length > k ? { plafond: true, enAttente: pretes.length - k } : {}) });
     return;
   }

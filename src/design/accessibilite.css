@@ -1,0 +1,82 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — ACCESSIBILITÉ (17 nov. 2026, audit WCAG 2.1 AA, décision de Julien : « Corrige tout
+   ce que l'audit trouve »). Récit : docs/passation/2026-11-17-accessibilite.md.
+   Banc : scripts/bancs/accessibilite.cjs partie E (contraste mesuré sur les PIXELS, 44 px,
+   noms lus, focus visible, la fiche garde le focus).
+
+   OÙ ELLE VIT DANS LA CASCADE : la couche `vrm-a11y`, nommée AVANT `vrm-verre` dans index.html.
+   Pour une déclaration `!important`, la couche nommée la première gagne (CSS Cascade 5) : ces
+   règles, toutes `!important` et volontairement étroites, ont le dernier mot sur le verre.
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun geste ne change ici. Le look « Studio »
+   reste : l'accent bleu rare, l'ambre pour un geste, le rouge au seul doublon de N°.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-a11y {
+
+  /* ── 1. LE FOCUS SE VOIT PARTOUT (2.4.7, 1.4.11) ─────────────────────────────
+     L'anneau `#0060CC` seul tombait à 2,36:1 sur le dégradé bleu (en-tête) et 2,75:1 sur le
+     verre sombre. Un anneau DOUBLE et NEUTRE (aucun accent de plus) : un filet d'encre + un liseré blanc (sur le
+     bleu et la nuit, l'inverse) — l'un des deux tient ≥ 3:1 sur tout fond (banc accessibilite-clavier K2). Encre FIXE :
+     `--sb-encre` passe au clair sur toute la coque dans la couche verre (1,1:1 mesuré avec elle).
+     Seulement au clavier (`:focus-visible`), jamais au toucher. */
+  :focus-visible {
+    outline: 2px solid #0C1D30 !important;
+    outline-offset: 1px !important;
+    box-shadow: 0 0 0 5px #FFFFFF !important;
+    transition: none !important;   /* l'anneau est là tout de suite (une transition d'ombre le faisait partir transparent) */
+  }
+  /* Posé sur le BLEU (la tête, la barre d'Achats, les liens sous le titre) et la nuit : l'inverse — filet blanc, liseré d'encre. */
+  :root[data-theme="dark"] :focus-visible,
+  .vrm-app-header .vrm-header-actions :focus-visible,
+  button.vrm-seg-btn[data-achats-onglet]:focus-visible,
+  [data-compta-pas-calcule] .vrm-b:focus-visible {
+    outline-color: #FFFFFF !important; box-shadow: 0 0 0 5px #0C1D30 !important;
+  }
+  /* Une ZONE qui remplit sa carte ou une rangée de liste (le parent coupe ce qui dépasse) : l'anneau se pose DEDANS. */
+  :is(.sj-zone, .vrm-toutes-ligne, .vrm-day-task, .vrm-av-resume, .vrm-ap-ligne, .vrm-set-ligne, .sb-rangee, .vrm-fu-case, .vrm-recherche-ligne, .vrm-buy-row, .vrm-lit-entree, .vg-carte):focus-visible {
+    outline-offset: -3px !important; box-shadow: inset 0 0 0 6px #FFFFFF !important;
+  }
+  /* Un contrôle natif TRANSPARENT posé sur son habillage (le champ de photo de profil, à opacité 0) :
+     l'anneau se pose sur l'habillage. */
+  label:has(> input[type="file"]:focus-visible) { outline: 2px solid #0C1D30 !important; outline-offset: 1px !important; box-shadow: 0 0 0 5px #FFFFFF !important; }
+  label > input[type="file"] { min-height: 0 !important; }
+
+  /* ── 2. RIEN À L'ENCRE SOMBRE POSÉ SUR LE BLEU (1.4.3) ───────────────────────
+     Achats → Meilleures sources : « 3 ventes sans achat relié » (1,57:1) et « Comment c'est
+     calculé » (1,43:1) sont posés sur le fond, sous la carte ; Annonces : la ligne « 4 en ligne
+     sur Vinted · 222 € de valeur » (1,45:1). L'encre CLAIRE du verre, celle des titres d'écran. */
+  .vrm-achats-sources :is(.vrm-ms-hors, .vrm-ms-calcul > ul, .vrm-ms-calcul > ul *),
+  .vrm-main [data-ann-resume], .vrm-main [data-ann-resume] :is(span, small) {
+    color: var(--sv-clair-2, #EDF4FC) !important;
+  }
+  .vrm-main [data-ann-resume] b { color: var(--sv-clair, #FFFFFF) !important; }
+  .vrm-achats-sources .vrm-ms-calcul > summary { color: var(--sv-clair-lien, #FFFFFF) !important; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ── 3. NUIT : « Relier un achat » (2,57:1) ─────────────────────────────────
+     La pastille claire du jour (blanc à 55 %) restait la nuit, sous un texte clair. */
+  :root[data-theme="dark"] body [data-espace="paires"] button.vrm-ann-relier {
+    background: rgb(255 255 255 / .10) !important; border-color: rgb(255 255 255 / .22) !important; color: var(--sv-clair, #F2F7FD) !important;
+  }
+
+  /* ── 4. 44 PX AU DOIGT (2.5.5) ──────────────────────────────────────────────
+     Le N° éditable d'une annonce (35–40 × 22) : la zone de toucher s'étend sans changer le dessin. */
+  button.vrm-cible-44 { position: relative !important; }
+  button.vrm-cible-44::before {
+    content: "" !important; position: absolute !important; top: -11px !important; bottom: -11px !important; left: -6px !important; right: -6px !important;
+  }
+  /* Le choix du site (Vinted, Leboncoin, Vestiaire en logo : 22–28 px de large) et les ronds de l'en-tête (38 px). */
+  .vrm-sel-sites > button { min-width: 44px !important; }
+  .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, button.vrm-cn-cloche) { min-width: 44px !important; min-height: 44px !important; }
+}
+
+/* ── 5. LE LIEN D'ÉVITEMENT (2.4.1) : caché hors du clavier, une touche d'encre quand il a le focus. */
+@layer vrm-a11y {
+  .vrm-aller-contenu {
+    position: fixed !important; left: 12px !important; top: 8px !important; z-index: 2147483000 !important;
+    transform: translateY(-160%) !important; min-height: 44px !important; padding: 0 16px !important;
+    display: inline-flex !important; align-items: center !important; border-radius: 13px !important;
+    background: var(--sb-porcelaine, #FFFFFF) !important; color: var(--sb-encre, #0C1D30) !important;
+    font: 600 15px/1 var(--sb-police-texte, system-ui) !important; text-decoration: none !important;
+  }
+  .vrm-aller-contenu:focus, .vrm-aller-contenu:focus-visible { transform: none !important; }
+  main#vrm-contenu:focus { outline: none !important; box-shadow: none !important; }
+}

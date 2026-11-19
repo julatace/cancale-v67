@@ -1,0 +1,54 @@
+name: iPhone sous WebKit (à la demande)
+# (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) Le banc scripts/bancs/stabilite-iphone.cjs sous
+# WebKit (le moteur de Safari), appareil « iPhone 15 », base INVENTÉE : erreurs, garde-fou, contraste (styles et
+# pixels), débordements, barres qui se chevauchent, rien sous la barre du bas, défilement, longues tâches, et le
+# défilement avec / sans le verre. À LA DEMANDE seulement (Actions → « Run workflow », ou
+# `gh api repos/<dépôt>/actions/workflows/iphone-webkit.yml/dispatches -f ref=main`) : les conteneurs de travail
+# ne peuvent pas télécharger WebKit. Aucun secret, rien n'est écrit en production. Récit :
+# docs/passation/2026-11-16-stabilite-iphone.md.
+on:
+  workflow_dispatch:
+    inputs:
+      ecrans:
+        description: 'Écrans (vide = tous), ex. ventes,ventes_ebay,argent'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  iphone:
+    name: Banc iPhone (WebKit)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Installer WebKit
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
+          for essai in 1 2 3 4; do npx playwright install --with-deps webkit && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+      - name: Le banc sous WebKit
+        env:
+          NAVIGATEUR: webkit
+          ECRANS: ${{ inputs.ecrans }}
+          SHOTS: banc-iphone
+        run: node scripts/bancs/stabilite-iphone.cjs
+      # (17 nov., lot relier-tout-achat — « Ici ça bug de ouf quand je swipe ») « Relier achats et ventes » au doigt :
+      # un seul défilement, défiler ne relie rien, appui long + glisser, deux touchers, aucune bande vide.
+      - name: Relier achats et ventes sous WebKit
+        if: always()
+        env:
+          NAVIGATEUR: webkit
+          SHOTS: banc-iphone
+        run: node scripts/bancs/relier-glisser-iphone.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: banc-iphone
+          path: banc-iphone
+          retention-days: 7

@@ -48,7 +48,8 @@ const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'à confirmer (lecture
 // rn : le résultat de `toutSurLeNumero` · d : { fiches, saleOv, buyByNum,
 //   stats ({ [idAnnonce]: { vues, favoris } } ou null = pas lu), versements
 //   ({ [tx]: iso } ou null = pas lu), nomCompte(uid) }
-// o : { etapeVente(vente) → { label, step }, venteAnnulee(vente), montantRecuEbay(c)
+// o : { etapeVente(vente) → { label, step }, venteAnnulee(vente), montantRecuEbay(c),
+//   limiteEnvoi(vente, bordereau) → { texte, code, ambre, estimee } | null (la règle de Colis)
 //   → { eur, raison }, commandeEbayEngagee(c), lbcAnnulee(v), lbcFinalisee(v) }
 export function parcoursPaire(rn, d = {}, o = {}) {
   if (!rn || rn.etat === 'invalide') return null;
@@ -71,9 +72,11 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   let idFiche = venteV && venteV._item && fiches && fiches[venteV._item] ? venteV._item : null;
   if (!idFiche && fiches) idFiche = idsN.find((id) => fiches[id] && str(fiches[id].buyPrice)) || idsN.find((id) => fiches[id]) || null;
   const fiche = idFiche && fiches ? fiches[idFiche] : null;
-  const entree = fusionEntreeVente(fiche ? { ...fiche } : (venteV ? { numero: rn.cle } : null), venteV ? saleOv[String(venteV._tx)] : null, d.buyByNum);
+  // (16 nov., lot ecrans-restes) Une paire IMPORTÉE d'un autre outil (`rn.importe`, par son N°) : son coût est posé
+  // par N° (`vinted_buyprice_by_num`) — l'entrée de CE N° le retrouve, comme une vente sans fiche.
+  const entree = fusionEntreeVente(fiche ? { ...fiche } : ((venteV || rn.importe) ? { numero: rn.cle } : null), venteV ? saleOv[String(venteV._tx)] : null, d.buyByNum);
   const annonce = rn.annonces.find((a) => a.id === idFiche) || rn.annonces[0] || null;
-  const titre = (venteV && venteV.title) || (annonce && annonce.title) || (fiche && fiche.title) || (venteE && ((venteE.lineItems || [])[0] || {}).title) || (venteL && venteL.title) || '';
+  const titre = (venteV && venteV.title) || (annonce && annonce.title) || (fiche && fiche.title) || (venteE && ((venteE.lineItems || [])[0] || {}).title) || (venteL && venteL.title) || (rn.importe && rn.importe.titre) || '';
   const etapes = [];
 
   // 1. ACHAT
@@ -103,6 +106,8 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   if (rn.stock) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', detail: [rn.stock.roomName, rn.stock.itemName, rn.stock.nom].filter(Boolean).join(' · ') });
   else if (so && (so.itemName || so.nom)) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', sortie: true, date: Number.isFinite(so.at) ? new Date(so.at).toISOString() : null,
     detail: [so.roomName, so.itemName, so.nom].filter(Boolean).join(' · ') + ' · sa place est libérée (colis parti)' });
+  else if (rn.importe) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Importée', importee: true, date: rn.importe.date || null,
+    detail: [rn.importe.emplacement ? `rangée « ${rn.importe.emplacement} » (dit par ton fichier)` : null, 'importée d’un autre outil'].filter(Boolean).join(' · ') });
   else if (manque('ton Stock')) etapes.push({ cle: 'stock', etat: 'passu', titre: 'Stock', detail: 'ton Stock pas encore lu' });
   else etapes.push({ cle: 'stock', etat: 'absent', titre: 'Stock', detail: 'pas rangée dans le Stock' });
 
@@ -139,12 +144,16 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   else etapes.push({ cle: 'vente', etat: 'absent', titre: 'Vente', detail: 'pas encore vendue' });
 
   // 5. COLIS (Vinted : par la transaction ; eBay et Leboncoin : sur leur site)
-  let aPoster = false;
+  let aPoster = false, limiteEnvoi = null;
   if (venteV && !annulee(venteV)) {
     const ev = o.etapeVente ? o.etapeVente(venteV) : { label: '', step: 0 };
     const b = (rn.bordereaux || []).find((x) => x.tx === venteV._tx) || null;
     const ETB = { pret: 'bordereau prêt à imprimer', imprime: 'bordereau imprimé', poste: 'bordereau posté', attente: 'bordereau pas encore reçu' };
     aPoster = ev.step === 1;
+    // (16 nov., lot ecrans-restes) LA DATE LIMITE D'ENVOI : celle de l'e-mail du bordereau (`b.dateLimite`), sinon
+    // vente + 7 j ESTIMÉE — la règle de Colis (`o.limiteEnvoi`, api/_lib/limite-envoi.js, §11). Pas de règle fournie
+    // ou rien de daté ⇒ null (la fiche ne dit rien, jamais une date devinée).
+    if (aPoster && o.limiteEnvoi) { try { limiteEnvoi = o.limiteEnvoi(venteV, b) || null; } catch (_) { limiteEnvoi = null; } }
     // L'étape de la vente (`etapeVente`, §11) : 4 = finalisée (l'acheteur a
     // validé, donc reçu), 3 = au relais ou livrée, 2 = partie, 1 = à expédier.
     const titreC = ev.step === 4 ? 'Colis livré' : ev.step === 3 ? (/livr/i.test(ev.label) ? 'Colis livré' : 'Colis au relais') : ev.step === 2 ? 'Colis parti' : 'Colis à déposer';
@@ -220,6 +229,6 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     // (13 nov.) La fiche qui porte le prix d'achat (l'annonce vendue, sinon celle de ce N°) :
     // « Saisir le prix d'achat » écrit sur ELLE (identité, §5) — null : aucune fiche.
     idFiche: idFiche != null ? String(idFiche) : null,
-    aPoster, txAPoster: aPoster && venteV ? venteV._tx : null, etapes,
+    aPoster, txAPoster: aPoster && venteV ? venteV._tx : null, limiteEnvoi, etapes,
   };
 }

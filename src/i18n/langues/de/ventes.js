@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· Verkäufe dieses Kontos neu gelesen",
+  "ventes.venteEmailBordAVenir": "Versandetikett folgt: Die Erweiterung hat es noch nicht erfasst.",
   "ventes.photoIndisponible": "Foto nicht verfügbar",
   "ventes.montantEurosEx": "Ein Betrag in Euro (z. B. 25 oder 25,50).",
   "ventes.coutAchat": "Einkaufskosten?",
@@ -238,4 +239,13 @@ export default {
   "ventes.ventesAchetePeu2": "Bei {total} Verkäufen — kauf etwas früher.",
   "ventes.ventesAnnulees2": { one: "{n} stornierter Verkauf", other: "{n} stornierte Verkäufe" },
   "ventes.moinsVentesSans": { one: "Mindestens: {n} Verkauf ohne gelesenen Preis, nicht gezählt.", other: "Mindestens: {n} Verkäufe ohne gelesenen Preis, nicht gezählt." },
+  "ventes.regarder": {"one": "{n} Sache zum Ansehen", "other": "{n} Dinge zum Ansehen"},
+  "ventes.regarderVide": "Zum Ansehen",
+  "ventes.basculeCourt": "Öffne {login} auf vinted.fr",
+  "ventes.basculeCourtOrdi": "Öffne {login} auf vinted.fr, am Computer",
+  "ventes.connecteCourt": "Melde {login} auf vinted.fr an",
+  "ventes.pourquoiBord": "Warum wartet dieses Etikett?",
+  "ventes.puceAchat": "Einkaufspreis?",
+  "ventes.puceRelier": "Einkauf verknüpfen",
+  "ventes.gestesVinted": "Ihre Aktionen unter Verkäufe · Vinted",
 };

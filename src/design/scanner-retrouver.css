@@ -175,3 +175,29 @@
 /* Scanner ouvert : l'app dessous n'est plus dessinée (le scanner la couvre entièrement) — le processeur et la
    batterie vont à la lecture du code. Rien n'est démonté : elle revient telle quelle à la fermeture. */
 html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
+
+/* (16 nov., lot scan-achat) Ce qu'il y a dans le colis d'un achat : la photo en grand, l'article (ou la liste d'un lot),
+   ce qui a été payé, quand, à qui ; « Ranger » plein, « Signaler un problème » et « Ouvrir l'achat » en touches. */
+.vrm-rtv-achat .vrm-rtv-kicker { display: block; margin-bottom: 10px; }
+.vrm-rtv-achat-tete { display: flex; gap: 14px; align-items: flex-start; }
+.vrm-rtv-photo.is-tres-grande { width: 124px; height: 124px; border-radius: 20px; box-shadow: 0 6px 18px rgb(12 29 48 / .18); }
+.vrm-rtv-articles { list-style: none; margin: 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--rtv-porcelaine-2); }
+.vrm-rtv-article { display: flex; gap: 12px; align-items: center; padding: 10px 12px; min-height: 64px; }
+.vrm-rtv-article + .vrm-rtv-article { border-top: .5px solid rgb(12 29 48 / .1); }
+.vrm-rtv-article-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-rtv-article-txt b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-rtv-article-txt small { font-size: 13px; color: var(--rtv-gris); }
+.vrm-rtv-achat-infos { margin: 12px 0 0; padding: 10px 14px; border-radius: 16px; background: var(--rtv-porcelaine-2); display: grid; gap: 6px; }
+.vrm-rtv-achat-infos > div { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
+.vrm-rtv-achat-infos dt { font-size: 14px; color: var(--rtv-gris); }
+.vrm-rtv-achat-infos dd { margin: 0; font-size: 15px; font-weight: 600; text-align: right; overflow-wrap: anywhere; min-width: 0; font-variant-numeric: tabular-nums; }
+.vrm-rtv-gestes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.vrm-rtv-gestes .vrm-rtv-touche { width: 100%; min-height: 44px; text-decoration: none; justify-content: center; text-align: center; }
+.vrm-rtv-gestes .vrm-rtv-touche:only-child { grid-column: 1 / -1; }
+.vrm-rtv-feuille > .vrm-rtv-touche[data-scan-a-relier] { margin-top: 10px; width: 100%; }
+
+/* (17 nov., lot scan-instantane) Un code LU : le viseur le dit à l'instant (avant même la fiche), sans attendre. */
+.vrm-rtv-viseur.is-lu > i { border-color: rgb(140 196 255); }
+.vrm-rtv-viseur.is-lu .vrm-rtv-ligne { animation: none; opacity: 0; }
+/* Le zoom « 2× / 1× » : un rond du même jeu que la lampe, le chiffre au lieu d'une icône. */
+.vrm-rtv-zoom { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }

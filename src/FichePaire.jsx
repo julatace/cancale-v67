@@ -102,14 +102,20 @@ const Evenement = ({ ev }) => (
 const LIB_SOURCE = { relie: 'achat relié', gros: 'achat en gros', saisi: 'saisi à la main' };
 function EtatArticle({ etat }) {
   const r = etat.republications;
+  // (16 nov., captures de Julien) « achat pas relié à cette paire » sous deux chiffres : une même phrase sur plusieurs
+  // lignes est UNE phrase, dite une fois sous le titre (§7) ; les lignes gardent leur « — ».
+  const nbRaison = new Map();
+  for (const l of etat.lignes) if (l.jours == null && l.raison) nbRaison.set(l.raison, (nbRaison.get(l.raison) || 0) + 1);
+  const communes = [...nbRaison].filter(([, n]) => n > 1).map(([t]) => t);
   return (
     <section className="vrm-fp-etat" aria-label="L’état de cet article" data-fiche-etat-article="">
       <h3 className="vrm-fp-etat-titre">L’état</h3>
+      {communes.map((t) => <p key={t} className="vrm-fp-etat-commune" data-etat-raison-commune="">— {t}</p>)}
       <dl className="vrm-fp-etat-grille">
         {etat.lignes.map((l) => (
           <div key={l.cle} className="vrm-fp-etat-l" data-etat-ligne={l.cle} data-etat-val={l.jours == null ? '' : l.jours} data-etat-borne={l.borne || ''}>
             <dt>{l.titre}</dt>
-            <dd><b>{texteDuree(l)}</b>{l.jours == null && l.raison ? <small>{l.raison}</small> : /^depuis/.test(l.borne || '') ? <small>pas encore vendue</small> : l.borne === 'au-plus' || l.borne === 'au-moins' ? <small>la 1re annonce n’a pas de date lue</small> : null}</dd>
+            <dd><b>{texteDuree(l)}</b>{l.jours == null && l.raison ? (communes.includes(l.raison) ? null : <small>{l.raison}</small>) : /^depuis/.test(l.borne || '') ? <small>pas encore vendue</small> : l.borne === 'au-plus' || l.borne === 'au-moins' ? <small>la 1re annonce n’a pas de date lue</small> : null}</dd>
           </div>
         ))}
         <div className="vrm-fp-etat-l" data-etat-ligne="republications" data-etat-val={r.n == null ? '' : r.n}>
@@ -214,6 +220,8 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
     <section className="fd-act" data-fd-action="bordereau" aria-label={tr('fd.bord.titre')}>
       <b className="fd-act-t">{tr('fd.bord.titre')}</b>
       {a.pret ? <span className="fd-act-s">{tr('fd.bord.pret')}</span> : null}
+      {/* (16 nov., lot ecrans-restes) La date limite d'envoi, par la règle de Colis (l'e-mail du bordereau, sinon estimée). */}
+      {a.limite ? <span className={'fd-act-s' + (a.limite.ambre ? ' is-am' : '')} data-fd-limite={a.limite.jour || ''} data-fd-limite-estimee={a.limite.estimee ? '1' : '0'}>{a.limite.texte}</span> : null}
       <button type="button" className="fd-plein sb-btn-plein" data-fiche-bordereau={a.tx || ''} onClick={() => onBordereau && onBordereau(a.tx)}>{I('printer', 19)}{tr('fd.bord.plein')}</button>
     </section>
   );
@@ -237,7 +245,24 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
 }
 
 // LA VUE « ARGENT » : deux chiffres, chacun une fois (les data-* d'avant gardés).
-function VueArgent({ cases, etat }) {
+// (16 nov., bancs-rouges-a) §5 « le chiffre faux est la porte pour le corriger » : une paire EN VENTE sans prix d'achat
+// a pour action « Baisser le prix » — la fiche D n'offrait alors plus aucun moyen de saisir ce prix. Le « ? » d'« Achetée »
+// devient la porte de la saisie (`onSaisir`), seulement quand la grande action n'est pas déjà « Saisir ».
+// (16 nov., relier-fiable — Julien : « ici j'ai mal relié un achat, je veux pouvoir l'enlever, et tu peux mettre le
+// justificatif d'achat à côté ») À côté de « Achetée », l'achat RELIÉ (par son n° de transaction) : « Reçu » (le reçu de
+// CET achat — e-mail Vinted, sinon l'attestation tirée de l'achat lu) ou « Pas de reçu » (jamais un lien mort), et
+// « Délier » (confirmé, annulable). `lien` : { tx, recu: undefined (lecture) | true | false, onRecu, onDelier }.
+function GestesAchatRelie({ lien }) {
+  if (!lien || !lien.tx) return null;
+  return (
+    <span className="fd-arg-gestes" data-fd-achat-relie={lien.tx}>
+      {lien.recu === true ? <button type="button" className="fd-lien fd-arg-g" data-fd-recu={lien.tx} onClick={lien.onRecu}>{tr('fd.argent.recu')}</button>
+        : lien.recu === false ? <small className="fd-arg-n" data-fd-pas-recu="">{tr('fd.argent.pasRecu')}</small> : null}
+      <button type="button" className="fd-lien fd-arg-g" data-fd-delier={lien.tx} onClick={lien.onDelier}>{tr('fd.argent.delier')}</button>
+    </span>
+  );
+}
+function VueArgent({ cases, etat, onSaisir = null, lien = null }) {
   if (!cases.length) return null;
   const grand = cases.some((c) => c.gros);
   return (
@@ -246,11 +271,19 @@ function VueArgent({ cases, etat }) {
         const attrs = c.cle === 'achat' ? { 'data-fiche-resume-achat': c.cents == null ? '' : c.cents, ...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {}) }
           : c.cle === 'benefice' ? { 'data-fiche-resume-benefice': c.cents == null ? '' : c.cents, 'data-fiche-benefice-partiel': c.partiel ? '1' : undefined }
           : { 'data-fiche-resume-benefice': '', 'data-fiche-si-vendue': c.cents == null ? '' : c.cents, 'data-fiche-benefice-partiel': c.partiel ? '1' : undefined };
+        if (c.cle === 'achat' && c.cents == null && onSaisir) return (
+          <button key={c.cle} type="button" className="fd-arg-c fd-arg-porte is-manque" data-fiche-saisir-achat="" onClick={onSaisir} {...attrs}>
+            <span>{tr(c.lib)}</span>
+            <b className="num is-am">{eurFd(c.cents)}</b>
+            <small className="fd-arg-n">{tr('fd.saisir.plein')}</small>
+          </button>
+        );
         return (
           <div key={c.cle} className={'fd-arg-c' + (c.gros ? ' is-gros' : '') + (c.cents == null ? ' is-manque' : '')} {...attrs}>
             <span>{tr(c.lib)}</span>
             <b className={'num' + (c.cents == null && c.ambre ? ' is-am' : '')} title={c.cents == null && c.raison ? c.raison : undefined}>{c.signe ? signeFd(c.cents) : eurFd(c.cents)}</b>
             {c.cents == null && c.raison ? <small className="vg-sr" data-fiche-raison-benef="">{c.raison}</small> : c.partiel ? <small className="fd-arg-n">{tr('fd.argent.auPlus')}</small> : null}
+            {c.cle === 'achat' && c.cents != null ? <GestesAchatRelie lien={lien}/> : null}
           </div>
         );
       })}
@@ -259,38 +292,21 @@ function VueArgent({ cases, etat }) {
 }
 
 // LA VUE « SITES » : une rangée par site (en ligne, ou la vente), son compte, son prix ou ce qui s'y passe.
-// (16 nov., finitions) Les annonces viennent du STOCK (src/stockAnnonces.js, `sitesStockDuNumero`) : site, compte, état
-// (en ligne · à confirmer · masquée par Vinted), et ce qui n'a PAS été lu, dit à part (`pas-su`, sa raison) — « pas su »
-// n'est jamais « pas en ligne ». `lecture` : la lecture des annonces n'a pas encore répondu.
 function VueSites({ sites, I }) {
-  const lignes = sites.filter((s) => s.etat !== 'lecture' && !(s.etat === 'pas-su' && !s.site));
-  const enLecture = sites.some((s) => s.etat === 'lecture');
-  const pasSuTout = sites.find((s) => s.etat === 'pas-su' && !s.site) || null;
-  const pasSu = lignes.some((s) => s.etat === 'pas-su');
-  const vus = lignes.filter((s) => s.etat !== 'pas-su');
-  if (!lignes.length && !enLecture && !pasSuTout) return <p className="fd-vide" data-fd-sites="0">{tr('fd.sites.aucun')}</p>;
+  if (!sites.length) return <p className="fd-vide" data-fd-sites="0">{tr('fd.sites.aucun')}</p>;
   // Chaque info UNE fois : un prix partout le même est déjà dans la ligne d'état — la rangée ne le redit pas.
   const enL = sites.filter((s) => s.etat === 'en-ligne');
   const memePrix = enL.length > 0 && enL.every((s) => s.prix != null && s.prix === enL[0].prix);
-  const detail = (s) => {
-    if (s.etat === 'vendue') return [s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue'), prixFd(s.prix)].filter(Boolean).join(' · ');
-    if (s.etat === 'pas-su') return tr('fd.sites.pasSu', { raison: tr(s.raison || 'fd.sites.raison.ratee') });
-    if (s.etat === 'a-confirmer') return [tr('fd.sites.aConfirmer'), prixFd(s.prix)].filter(Boolean).join(' · ');
-    if (s.etat === 'masquee') return tr('fd.sites.masquee');
-    return [memePrix ? '' : prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ') || tr('fd.sites.enLigne');
-  };
   return (
-    <div className="fd-sites" data-fd-sites={vus.length} data-fiche-sites={vus.length} data-fd-sites-passu={pasSuTout ? 'tout' : pasSu ? 'partiel' : ''} data-fd-sites-lecture={enLecture ? '1' : undefined}>
-      {lignes.map((s, i) => (
-        <div key={i} className={'fd-site' + (s.etat === 'pas-su' ? ' is-passu' : '')} data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-compte={s.compte || undefined}>
+    <div className="fd-sites" data-fd-sites={sites.length} data-fiche-sites={sites.length}>
+      {sites.map((s, i) => (
+        <div key={i} className="fd-site" data-fiche-site={s.site} data-fiche-site-etat={s.etat}>
           <span className="fd-site-logo" aria-hidden="true">{MarqueSite(s.site, I)}</span>
           <span className="fd-site-txt"><b>{NOM_SITE_FD[s.site] || s.site}{s.compte ? ` · ${s.compte}` : ''}</b>
-            <span>{detail(s)}</span></span>
+            <span>{s.etat === 'vendue' ? [s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue'), prixFd(s.prix)].filter(Boolean).join(' · ')
+              : [memePrix ? '' : prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ') || tr('fd.sites.enLigne')}</span></span>
         </div>
       ))}
-      {enLecture ? <p className="fd-vide" data-fd-sites-etat="lecture">{tr('fd.sites.lecture')}</p> : null}
-      {pasSuTout ? <p className="fd-vide" data-fd-sites-etat="passu">{tr('fd.sites.pasSuTout', { raison: tr(pasSuTout.raison || 'fd.sites.raison.ratee') })}</p> : null}
-      {!enLecture && !pasSuTout && !vus.length && pasSu ? <p className="fd-vide" data-fd-sites-etat="aucun-lu">{tr('fd.sites.aucunLu')}</p> : null}
     </div>
   );
 }
@@ -309,7 +325,7 @@ function VueHistoire({ lignes }) {
   );
 }
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, plus = null, sites = null, relier = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, plus = null, sites = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -341,24 +357,31 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const [tuile, setTuile] = React.useState(null);
   const numCle = p ? p.num : '';
   React.useEffect(() => { setVue(null); setPlusOuvert(false); setTuile(null); }, [numCle]);
-  // (16 nov., intégration) La feuille « ⋯ » ouverte au téléphone : un message passager (la coque les met EN HAUT pendant
-  // une feuille) couvrait « Plus ✕ » quand la feuille monte haut (« Tout voir » ouvert). Même règle que la fiche et la
-  // conversation : il se pose JUSTE SOUS la tête de la feuille. Sa place change avec la hauteur de la feuille (posée en
-  // bas) : on la mesure à l'ouverture, à la fin de la montée et à chaque changement de taille (`--fd-plus-tete-bas`,
-  // lue par fiche-d.css). Banc ecrans-verre-2, F9.
-  const feuillePlusRef = React.useRef(null);
+  // (17 nov., accessibilité WCAG 2.4.3) Feuille modale : le focus ENTRE à l'ouverture, Tab et Maj+Tab
+  // tournent DEDANS (une feuille posée par-dessus, ex. « Plus », garde son propre tour), et le focus
+  // REVIENT à ce qui l'avait ouverte. En plan (ordinateur, à côté de la liste, aria-modal="false") : rien.
   React.useEffect(() => {
-    const f = feuillePlusRef.current;
-    if (!plusOuvert || !f || typeof document === 'undefined') return undefined;
-    const racine = document.documentElement;
-    const poser = () => { const t = f.querySelector('.fd-plus-tete'); if (!t) return; const b = t.getBoundingClientRect().bottom; if (Number.isFinite(b) && b > 0) racine.style.setProperty('--fd-plus-tete-bas', Math.round(b) + 'px'); };
-    poser();
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(poser) : null;
-    if (ro) ro.observe(f);
-    f.addEventListener('animationend', poser); window.addEventListener('resize', poser);
-    const t1 = setTimeout(poser, 320);
-    return () => { if (ro) ro.disconnect(); f.removeEventListener('animationend', poser); window.removeEventListener('resize', poser); clearTimeout(t1); racine.style.removeProperty('--fd-plus-tete-bas'); };
-  }, [plusOuvert]);
+    const el = racine.current; if (!el) return undefined;
+    const modale = () => el.getAttribute('aria-modal') === 'true';
+    const avant = document.activeElement;
+    const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+    const focusables = () => [...el.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]') && x.closest('[role="dialog"]') === el);
+    if (modale() && !el.contains(document.activeElement)) { el.setAttribute('tabindex', '-1'); try { el.focus({ preventScroll: true }); } catch (_) {} }
+    const k = (e) => {
+      if (e.key !== 'Tab' || !modale()) return;
+      const dessus = e.target && e.target.closest ? e.target.closest('[role="dialog"]') : null;
+      if (dessus && dessus !== el && el.contains(dessus)) return;
+      const f = focusables(); if (!f.length) { e.preventDefault(); return; }
+      const i = f.indexOf(document.activeElement);
+      if (e.shiftKey) { if (i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } }
+      else if (i === -1 || i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener('keydown', k, true);
+    return () => {
+      document.removeEventListener('keydown', k, true);
+      try { if (modale() && avant && avant !== document.body && document.contains(avant) && typeof avant.focus === 'function') avant.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, []);
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
@@ -379,7 +402,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const vueOuverte = vue || (p ? vueInitiale(p, lignesSites) : 'argent');
   const cases = p ? argentFiche(p, lignesSites) : [];
   const hist = p ? histoireFiche(p, { sites: lignesSites }) : [];
-  const dispo = { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), rappel: !!(plus && plus.rappel), onPrix, onPublierAilleurs, onDupliquer, outilsIdees, onBordereau, onEmballer, histoNum };
+  // (16 nov., captures de Julien) Ouverte depuis une ligne de COLIS, la feuille porte déjà SON geste du bordereau
+  // (« Imprimer le bordereau » / « Générer le bordereau », la place des actions de la ligne) : la tuile « Bordereau »
+  // le redisait sous une autre forme. Une fonction, une forme (§7).
+  const dispo = { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), rappel: !!(plus && plus.rappel), onPrix, onPublierAilleurs, onDupliquer, outilsIdees, onBordereau: ctx === 'colis' ? null : onBordereau, onEmballer, histoNum };
   const tuiles = p ? tuilesFiche(p, dispo) : [];
   const fermerPlus = () => { setPlusOuvert(false); setTuile(null); };
   // Une tuile : un geste direct (il ferme la feuille), ou ce qu'elle montre (la note, l'atelier, le rappel, l'histoire du N°).
@@ -405,7 +431,6 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       {/* (15 nov., lot argent-plus ; rangé dans la fiche D le 16 nov.) Ce que le site et les frais saisis retirent
           (src/beneficeArticle.js) — derrière « Tout voir » : la fiche D tient en un écran, chaque montant une fois (§7). */}
       {!double && r && r.detail && !cases.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
-      {depuis ? <section className="vrm-fp-contexte" data-fiche-contexte={ctx} aria-label={tr(CLE_CTX[ctx] || 'fiche.ctx.vente')} ref={slotCtx}/> : null}
       {etat && !double ? <EtatArticle etat={etat}/> : null}
       <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>
       <HistoriqueModifications owner={owner} numero={p.num}/>
@@ -435,9 +460,13 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const feuillePlus = p ? (
     <div className="fd-plus" hidden={!plusOuvert} data-fd-plus={plusOuvert ? '1' : '0'} data-noglisse="1">
       <button type="button" className="fd-plus-voile" aria-label={tr('fd.plus.fermer')} tabIndex={-1} onClick={fermerPlus}/>
-      <div className="fd-plus-f" ref={feuillePlusRef} role="dialog" aria-modal="true" aria-label={tr('fd.plus.titre')}>
+      <div className="fd-plus-f" role="dialog" aria-modal="true" aria-label={tr('fd.plus.titre')}>
         <div className="fd-plus-tete"><b>{tr('fd.plus.titre')}</b><Rond className="is-clair" aria-label={tr('fd.plus.fermer')} data-fd-plus-fermer="" onClick={fermerPlus}>{I('close', 18)}</Rond></div>
         {depuis ? <section className="vrm-fp-actions-sec" data-fiche-actions={ctx} aria-label={tr('fiche.actions')}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></section> : null}
+        {/* (16 nov., bancs-rouges-a) La place « contexte » de la LIGNE (le Stock : où est la paire, « Retirer de la case »,
+            « Déplacer ») vit dans la feuille, à côté des actions — comme le dit la fiche D — et non repliée sous
+            « Tout voir » : trois touchers pour retirer une paire de sa case, et un geste caché ne se trouve pas. */}
+        {depuis ? <section className="vrm-fp-contexte" data-fiche-contexte={ctx} aria-label={tr(CLE_CTX[ctx] || 'fiche.ctx.vente')} ref={slotCtx}/> : null}
         {tuiles.length ? <div className="fd-tuiles" role="group" aria-label={tr('fd.plus.titre')}>
           {tuiles.map((t) => <button key={t} type="button" className="fd-tuile" data-fd-tuile={t} aria-pressed={tuile === t ? 'true' : undefined}
             {...(t === 'prix' ? { 'data-fiche-prix': '' } : t === 'publier' ? { 'data-fiche-publier-ailleurs': '' } : t === 'dupliquer' ? { 'data-fiche-dupliquer': '' } : t === 'emballer' ? { 'data-fiche-emballer': '' } : t === 'bordereau' ? { 'data-fiche-bordereau-tuile': p.txAPoster } : {})}
@@ -472,9 +501,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   ) : null;
   // Ordinateur : un voile derrière le panneau (hors de lui : il couvre la page, un clic ferme la fiche) — sauf en plan.
   return createPortal(<>
-    {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label="Fermer la fiche" tabIndex={-1} onClick={onFermer}/> : null}
-    <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
-      data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture || lignesSites.some((x) => x && x.etat === 'lecture') ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
+    {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label={tr('a11y.fiche.fermer')} tabIndex={-1} onClick={onFermer}/> : null}
+    <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? tr('a11y.fiche.nom', { n: String(nomFiche) }) : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
+      data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
       <div className="fd-cadre" ref={cadre}>
         <div className={'fd-ph' + (photo ? '' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} data-fiche-photo-vedette={photo ? '1' : '0'}>
@@ -493,7 +522,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           {(p || depuis) ? <div className="fd-t" aria-label={tr('fiche.heros')}>
             {ctxHeros ? <span className="fd-ctx" data-fiche-heros-ctx="">{codeHeros ? <>{`${ctxHeros} · `}<span className="vrm-sensible" data-stream-type="code" data-fiche-heros-code="">{codeHeros}</span></> : [ctxHeros, depuis && depuis.sous].filter(Boolean).join(' · ')}</span> : null}
             <h1 className="fd-nom">{motsInsecables(titre)}{taille ? ` · ${taille}` : ''}</h1>
-            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
+            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'} data-fd-limite={lEtat.limite ? (lEtat.limite.jour || '') : undefined}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
               : depuis && depuis.prix ? <span className="fd-etat" data-fiche-heros-prix={depuis.prix}>{depuis.prix}</span> : null}
             {neuve ? <span className="fd-etat" data-fiche-neuve="">Photos à prendre</span> : null}
             {p && p.ancienNumero ? <span className="fd-etat">Ancien numéro (d’avant la remise à zéro)</span> : null}
@@ -506,7 +535,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
               {['argent', 'sites', 'histoire'].map((v) => <button key={v} type="button" role="tab" className="fd-seg-b" aria-selected={vueOuverte === v} data-fd-seg={v} onClick={() => setVue(v)}>{tr('fd.seg.' + v)}</button>)}
             </div>
             <div className="fd-v" role="tabpanel" data-fd-vue-ouverte={vueOuverte}>
-              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat}/>)
+              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat} lien={achatRelie} onSaisir={saisir && !(action && action.sorte === 'saisir') ? saisir : null}/>)
                 : vueOuverte === 'sites' ? <VueSites sites={lignesSites} I={I}/>
                 : <VueHistoire lignes={hist}/>}
             </div>

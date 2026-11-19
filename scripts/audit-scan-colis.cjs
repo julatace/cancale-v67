@@ -89,7 +89,7 @@ dit(cle('47312482') === 9 && cle('01830004') === 5, '0 la clé S10 du banc retro
   // ════════ 1. CE QUE CONTIENT UN CODE ════════
   // Mondial Relay / InPost : Code 128 (ou ITF) de 26 chiffres, marque en tête, n° d'expédition aux chiffres 3 à 10.
   dit(vaut('56' + '41235813' + '0101' + '402623166859', 'mondialrelay', '41235813'), '1a Mondial Relay / InPost (26 chiffres « 56… ») ⇒ chiffres 3 à 10');
-  dit(vaut('55' + '27182818' + '0101' + '000000004242', 'vinted', '27182818'), '1b Vinted sur le réseau Mondial Relay (26 chiffres « 55… ») ⇒ chiffres 3 à 10');
+  dit(vaut('55' + '27182818' + '0101' + '000000004242', 'mondialrelay', '27182818'), '1b « 55… » (26 chiffres) : MESURÉ le 17 nov. sur une étiquette Mondial Relay ⇒ Mondial Relay, chiffres 3 à 10');
   dit(vaut('12' + '31415926' + '5358979323846264'.slice(0, 16), 'mondialrelay', '31415926'), '1c 26 chiffres d’une autre marque : le n° reste aux chiffres 3 à 10 (forme de la spécification)');
   dit(vaut('https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=MRLBCOIN&exp=87654321&language=FR&CodePostal=35260', 'mondialrelay', '87654321'), '1d lien de suivi Mondial Relay (QR, forme mesurée Leboncoin) ⇒ `exp`');
   dit(vaut('41235813', 'mondialrelay', '41235813'), '1e 8 chiffres seuls (n° Mondial Relay, forme mesurée)');
@@ -164,7 +164,9 @@ dit(cle('47312482') === 9 && cle('01830004') === 5, '0 la clé S10 du banc retro
 
   // ════════ 3. L'APP ════════
   const app = src.app, ui = src.ui, sr = src.src;
-  const bloc = app.slice(app.indexOf('sourceRetrouver.current = () => {'), app.indexOf("return enregistrerSourceColis('comptabilite:'"));
+  // (17 nov., lot scan-bordereau-vente) l'enregistrement d'une vente vit dans `enregVenteScan`, juste avant la source.
+  const debutBloc = app.indexOf('const enregVenteScan = (o) => {') >= 0 ? app.indexOf('const enregVenteScan = (o) => {') : app.indexOf('sourceRetrouver.current = () => {');
+  const bloc = app.slice(debutBloc, app.indexOf("return enregistrerSourceColis('comptabilite:'"));
   const affect = [...bloc.matchAll(/(?:const suivis = |suivis: )(\[[^\]]*\](?:\.filter\(Boolean\))?|[\w.]+(?:\([^)]*\))?)/g)].map((m) => m[1]);
   dit(bloc.length > 500 && affect.length >= 5 && affect.every((x) => !/title|titre|\.nom\b|modele|article/.test(x)), '3a App : les n° d’un enregistrement sont ceux LUS (bordereau, suivi, e-mail, retour, Vestiaire), jamais un titre', affect.filter((x) => /title|titre/.test(x)).join(' | '));
   dit(/b && b\.suivi, b && b\.suiviPdf/.test(bloc) && /suivisAchat\(o, indexSuivisAchats\)/.test(bloc) && /suiviDeLigne\(t\)/.test(bloc) && /suivis: \[c\.suivi\]/.test(bloc), '3b App : vente ⇐ son bordereau ; achat ⇐ son suivi et l’e-mail relié ; retour ⇐ son bordereau de retour');
@@ -172,7 +174,7 @@ dit(cle('47312482') === 9 && cle('01830004') === 5, '0 la clé S10 du banc retro
   const lbc = app.slice(app.indexOf('lbcSourceRef.current = () => {'), app.indexOf("enregistrerSourceColis('leboncoin'"));
   dit(/lireCodeColis\(o\.label && o\.label\.trackingUrl\)/.test(lbc) && /o\.isSeller !== true && o\.isSeller !== false/.test(lbc), '3d Leboncoin : le n° de SON lien de suivi (la même règle), vente ou achat jamais deviné');
   dit(/retrouverParSuivi\(lu, S\.enregistrements\)/.test(ui) && !/includes\(|startsWith\(|indexOf\(/.test(ui.slice(ui.indexOf('const resoudre'), ui.indexOf('const traiter'))), '3e le scanner ne cherche que par la règle (aucune comparaison à lui)');
-  dit(/onClick=\{\(\) => onOuvrir\(e\)\}/.test(ui) && /new CustomEvent\('vrm:aller', \{ detail: e\.lien \}\)/.test(ui), '3f « Ouvrir » sur SON toucher, par le chemin des notifications');
+  dit(/onClick=\{\(\) => onOuvrir\(e\)\}/.test(ui) && (/new CustomEvent\('vrm:aller', \{ detail: e\.lien \}\)/.test(ui) || (/let lien = e\.lien;/.test(ui) && /new CustomEvent\('vrm:aller', \{ detail: lien \}\)/.test(ui))), '3f « Ouvrir » sur SON toucher, par le chemin des notifications');
   dit(/if \(!S\.pret\)|if \(S\.pret\) \{ finir\(false\); return; \}/.test(ui) && /ATTENTE_SOURCES_MS/.test(ui), '3g une lecture qui attend ses sources (jamais « pas dans VRM » avant d’avoir lu)');
   dit(/startsWith\('comptabilite'\)/.test(sr) && /if \(!r\.pret\) pret = false;/.test(sr), '3h les sources : la principale doit être là et chacune lue');
   dit(!/fetch\(|XMLHttpRequest|sendBeacon/.test(ui), '3i le scanner n’envoie rien (aucune requête : l’image reste dans la page)');

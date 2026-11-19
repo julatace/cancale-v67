@@ -21,6 +21,7 @@
 // répondu : rien n'est affirmé) · 4xx un refus RÉEL, dit en clair.
 import { rpcEquipe } from './equipe.js';
 import { sbCle } from './cle.js';
+import { routeCoucou } from './coucou.js';
 
 export const ACCOMP_NON_INSTALLE = "Les groupes d'accompagnement ne sont pas encore activés sur ta base.";
 const PAS_SU = "Je n'ai pas pu joindre la base — rien n'a changé. Réessaie dans un instant.";
@@ -53,7 +54,9 @@ export const RAISONS_ACCOMP = {
 
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
 
-export async function routeAccompagnement(req, res, { corps, qui, action }) {
+export async function routeAccompagnement(req, res, { corps, qui, action, utilisateur = null }) {
+  // (17 nov.) Le coucou et l'habillage (046) : leur propre fichier, la même session.
+  if (action.startsWith('accomp-coucou') || action === 'accomp-habiller') return routeCoucou(req, res, { corps, qui, action, utilisateur });
   const dire = (code, c) => res.status(code).json(c);
   const nonInstalle = () => dire(503, { ok: false, erreur: 'non-installe', message: ACCOMP_NON_INSTALLE });
   const pasSu = () => dire(503, { ok: false, erreur: 'pas-su', message: PAS_SU });

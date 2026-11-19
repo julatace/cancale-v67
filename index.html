@@ -121,7 +121,12 @@
        règle `!important` et visée par la racine de son écran. */
     /* (15 nov., « J'aime la 9 ») `vrm-verre` devant toutes : la matière « Verre dépoli » (src/design/studio-verre.css) —
        le fond bleu profond, le verre, l'encre claire sur le fond. */
-    @layer vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
+    /* (17 nov.) `vrm-v2` devant toutes : le nouveau design en essai (src/designV2/achats-v2.css), chaque règle `!important`
+       et sous `html[data-design="v2"]` — éteint, aucune ne s'applique. */
+    /* (18 nov.) `vrm-apple` devant toutes : le style « Apple » (src/designV2/theme-apple.css), chaque règle `!important`
+       et sous `html[data-theme-style="apple"]` — éteint, aucune ne s'applique. */
+    /* L’interface de VRM reprend la palette et les composants de l’aperçu. */
+    @layer vrm-interface, vrm-apple, vrm-v2, vrm-a11y, vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
     body{margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,
@@ -517,6 +522,7 @@
     #vrm-demarrage .vrm-boot-lent p{margin:0;color:rgba(255,255,255,.88);font-size:15px;line-height:1.45}
     #vrm-demarrage .vrm-boot-lent a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.34);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);color:#fff;font-weight:600;font-size:15px;text-decoration:none}
     #vrm-demarrage .vrm-boot-lent a:active{background:rgba(255,255,255,.26)}
+    #vrm-demarrage .vrm-boot-lent a:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px #0C1D30}
     /* L'instantané de Ma journée peint dans l'écran de démarrage (src/OuvertureInstantanee.jsx) : il a ses chiffres, la phrase « lente » n'a rien à y faire. */
     #vrm-demarrage[data-apercu] > .vrm-boot-lent{display:none}
     @keyframes vrmBootReflet{from{transform:translateX(-48px)}to{transform:translateX(140px)}}
@@ -535,6 +541,10 @@
       #vrm-demarrage .vrm-boot-lent{animation:vrmBootLent .001ms linear 8s forwards!important}
     }
   </style>
+  <link rel="stylesheet" href="/src/designV2/interface/vrm-interface.css">
+  <link rel="stylesheet" href="/src/designV2/interface/vrm-composants.css">
+  <link rel="stylesheet" href="/src/designV2/interface/vrm-lecture.css">
+  <link rel="stylesheet" href="/src/designV2/interface/vrm-iphone.css">
 </head>
 <body><div id="root"></div>
 <div id="vrm-demarrage" role="status" aria-live="polite" aria-busy="true"><div class="vrm-boot-centre">

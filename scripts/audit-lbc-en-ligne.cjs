@@ -73,24 +73,6 @@ if (process.argv.includes('--prouve')) {
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++; console.log('❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 300) : '')); } };
 
-// (16 nov., intégration) Les imports RELATIFS des fichiers copiés (api/_lib → ../../src/alertesSeuils.js, et ce qu'ils
-// importent eux-mêmes) suivis jusqu'au bout : un fichier manquant est copié tel quel depuis la racine (jamais un fichier
-// déjà posé, qui peut porter une mutation). Sans eux l'import levait « Cannot find module … alertesSeuils.js ».
-function copierDependances(dossier, racine) {
-  const vus = new Set(); const file = [];
-  const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) marche(p); else if (/\.m?js$/.test(e.name)) file.push(p); } };
-  marche(dossier);
-  while (file.length) {
-    const p = file.pop(); if (vus.has(p)) continue; vus.add(p);
-    const s = fs.readFileSync(p, 'utf8');
-    for (const m of s.matchAll(/(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+\.m?js)['"]/g)) {
-      const cible = path.resolve(path.dirname(p), m[1]); const rel = path.relative(dossier, cible);
-      if (rel.startsWith('..') || fs.existsSync(cible)) { if (fs.existsSync(cible)) file.push(cible); continue; }
-      const src = path.join(racine, rel); if (!fs.existsSync(src)) continue;
-      fs.mkdirSync(path.dirname(cible), { recursive: true }); fs.copyFileSync(src, cible); file.push(cible);
-    }
-  }
-}
 // Une copie de l'arbre des fichiers jugés (mutée si demandé).
 const mut = arg('--mutation');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-lbc-en-ligne-'));
@@ -103,7 +85,6 @@ for (const f of ['src/enLigneLbc.js', 'src/etatAnnonceLeboncoin.js', 'src/stockA
 }
 // Le Stock importe les règles du serveur (api/_lib) : copiées telles quelles.
 fs.cpSync(path.join(RACINE, 'api', '_lib'), path.join(tmp, 'api', '_lib'), { recursive: true });
-copierDependances(tmp, RACINE);
 if (mut) {
   const M = MUTATIONS[mut]; if (!M) { console.log('mutation inconnue : ' + mut); process.exit(2); }
   const p = path.join(tmp, M[0]); const s = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
@@ -111,6 +92,8 @@ if (mut) {
   fs.writeFileSync(p, s.replace(M[1], M[2]));
   console.log('── mutation : ' + mut);
 }
+// (16 nov.) Les règles de l'app qu'importe api/_lib (argent-notif → src/alertesSeuils.js) : copiées si elles manquent.
+require('./_copie-imports.cjs').completerImports(RACINE, tmp);
 
 const APPSRC = fs.readFileSync(APP, 'utf8');
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');

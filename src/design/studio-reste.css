@@ -214,12 +214,7 @@
   background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   font: 600 14px/1.2 var(--sb-police-texte) !important; box-shadow: var(--sb-ombre-plan) !important; filter: none !important;
 }
-/* (16 nov., finitions) Au téléphone par la LARGEUR aussi (même requête que les segments plus bas) : « Voir les
-   notifications envoyées », « M'envoyer un e-mail d'essai » restaient à 40 px à 390 px (banc centre-notifs F8). */
-@media (max-width: 767px), (pointer: coarse), (hover: none) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: 44px !important; min-height: 44px !important; } }
-/* (16 nov., finitions) « Tout va bien ? » (Paramètres) : ses gestes — « Envoyer un rapport de l'extension », les paquets
-   à télécharger — font 44 px à la souris aussi (banc tout-va-bien : 40 px à 1512). Même spécificité, plus loin : gagne. */
-:root:root:root:root:root:root body [data-tout-va-bien] .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: auto !important; min-height: 44px !important; }
+@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(.vrm-b-icone):where(:not(.sb-lien, .sb-touche, .sb-rond, .sb-btn-plein)) { height: 44px !important; min-height: 44px !important; } }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b.vrm-b-danger { color: var(--sb-ambre) !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(:disabled):active,
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger)[aria-pressed="true"] { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
@@ -245,10 +240,11 @@
   color: var(--sb-encre-2) !important; font: 600 13px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important;
   padding: 0 8px !important; flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important;
 }
-/* (16 nov., finitions) Au TÉLÉPHONE aussi par la largeur : « (pointer: coarse) » seul ne joue pas partout (les segments de
-   l'heure du soir, Réglages → Notifications, restaient à 40 px à 390 px — banc centre-notifs F8). La requête du reste
-   de la coque (styles-coque.css) : largeur de téléphone, doigt, ou pas de survol. */
-@media (max-width: 767px), (pointer: coarse), (hover: none) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
+@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
+/* (16 nov., parcours-vert) « Questions · Tout » (eBay) et la navigation « 1 · 2 » entre les questions d'une annonce :
+   44 × 44 px au doigt ET à la souris (styles-parcours-clairs.css, banc offres-objectif) — le segmenté ci-dessus (40 px,
+   largeur libre) les réduisait à 22 × 40 px. */
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([data-q-aller], [data-ebay-vue]) { min-width: 44px !important; min-height: 44px !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
   background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }

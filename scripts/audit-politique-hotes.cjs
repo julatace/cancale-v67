@@ -37,8 +37,6 @@ const SERVICE = {
   'carrier.vintedgo.com': /Vinted Go/,
   'www.mondialrelay.fr': /Mondial Relay/,
   // (13 nov., lot 89) les API officielles lues par le serveur quand leur clé est posée
-  'api.laposte.fr': /La Poste/,
-  'onlinetools.ups.com': /UPS/,
   // (5 nov.) les icônes de site des transporteurs (src/transporteursVisuels.js, PastilleTransporteur)
   'www.chronopost.fr': /Chronopost/,
   'www.laposte.fr': /La Poste/,
@@ -55,17 +53,19 @@ const SERVICE = {
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
   ville: { quoi: 'recherche de ville de la carte de la communauté (repli du navigateur)', role: /communaut/i, donnee: /navigateur/i },
+  // (16 nov.) La carte de tes ventes (Argent, 14 nov.) : ville + code postal à la BAN, depuis le navigateur.
+  ventes: { quoi: 'villes de la carte de tes ventes (écran Argent)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   fond: { quoi: 'fond de la carte de la communauté (tuiles)', role: /carte de la communaut/i, donnee: /adresse IP/i },
   avatar: { quoi: 'photos de profil Discord sur la carte', role: /communaut/i, donnee: /navigateur|adresse IP/i },
   pdfjs: { quoi: 'aperçu des bordereaux (pdf.js)', role: /pdf\.js|aperçu des bordereaux/i, donnee: /navigateur|adresse IP/i },
   ort: { quoi: 'détourage du Studio photo (onnxruntime)', role: /Studio photo|onnxruntime/i, donnee: /navigateur|adresse IP/i },
+  // (16 nov., bancs-rouges-a) la carte de tes ventes (Argent, 14 nov.) cherche la VILLE à la BAN, depuis le navigateur.
+  carteventes: { quoi: 'villes de la carte de tes ventes (écran Argent)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
   // (5 nov.) deux outils de plus chargés de jsDelivr par le navigateur, et les logos des transporteurs.
   zxing: { quoi: 'lecture du code-barres d’un colis à la caméra (ZXing, src/ScannerColis.jsx)', role: /ZXing/, donnee: /navigateur|adresse IP/i },
   tesseract: { quoi: 'lecture d’un ticket de dépense photographié (Tesseract, src/depensesTicket.js)', role: /Tesseract/, donnee: /navigateur|adresse IP/i },
   logos: { quoi: 'logo du transporteur (icône de son site, src/transporteursVisuels.js)', role: /logo du transporteur/i, donnee: /navigateur/i },
-  // (16 nov., finitions) La carte de tes ventes (src/CarteVentes.jsx) place les VILLES de livraison par la BAN, depuis le navigateur.
-  carteventes: { quoi: 'villes de la carte de tes ventes (Statistiques)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
   transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
   // (24 oct., suite) Mondial Relay lu par le SERVEUR (route `_mvc`) : n° ET code postal.
@@ -78,6 +78,23 @@ const COUPLES = {
   'src/App.jsx|nominatim.openstreetmap.org': ['politique', 'achats'],
   // (1er nov.) La carte des points relais (Colis → À retirer, Tournée) géocode par la même BAN, depuis le navigateur.
   'src/CarteRelais.jsx|api-adresse.data.gouv.fr': ['politique', 'achats'],
+  // (16 nov., audits-vert-main) Arrivés du 9 au 15 nov., lus un à un : une recherche du navigateur (la carte des ventes)
+  // et des liens ouverts d'un clic.
+  'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — « Créer sur Vinted » (brouillons), ouvert dehors'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la source officielle d’un seuil (DAC7)'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce sur Vinted'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages d’aide de Vinted'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les pages d’aide de Leboncoin'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » sur le site'],
+  'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — le site Vestiaire'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation sur Vinted'],
   'src/App.jsx|cdn.jsdelivr.net': ['politique', 'pdfjs'],
   'src/studioPhoto.js|cdn.jsdelivr.net': ['politique', 'ort'],
   'src/communaute/Communaute.jsx|api-adresse.data.gouv.fr': ['politique', 'ville'],
@@ -100,8 +117,6 @@ const COUPLES = {
   'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
-  // (16 nov., intégration) lot deux-comptes : l'annonce à retirer, ouverte d'un clic (src/DeuxComptes.jsx « Retirer » / la photo)
-  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted d’un des deux comptes (« Deux comptes, une paire »)'],
   // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».
   'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],
   'src/CreerSurVinted.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » le brouillon créé sur vinted.fr'],
@@ -229,31 +244,27 @@ const COUPLES = {
   'src/ecrans/Vestiaire.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » l’annonce encore en ligne sur Vinted'],
   'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
   'src/enLigneLbc.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir « Mes annonces » sur leboncoin.fr ↗ »'],
-  // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
-  // (16 nov., finitions) Hôtes écrits depuis le 12 nov. sans être déclarés ici — chacun relu à sa ligne :
-  //   · contacté TOUT SEUL par le navigateur ⇒ une ligne de la politique (ajoutée le 16 nov.) :
+  // (16 nov., bancs-rouges-a) couples écrits du 11 au 15 nov. sans être déclarés ici, relus à leur ligne.
   'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'carteventes'],
-  //   · des liens ouverts d'un clic (un <a href>, un bouton « … ↗ ») — rien ne part tout seul :
-  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (À retirer ailleurs, LIEN_SITE → <a href> de src/ARetirerAilleurs.jsx)'],
-  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « Ouvrir eBay » (À retirer ailleurs)'],
-  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » (À retirer ailleurs)'],
-  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (À retirer ailleurs)'],
-  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — la suite d’un geste accompagné (« Ensuite : … », un bouton, src/ui/Accompagne.jsx)'],
-  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil (fiches F32353, F21746 ; <a href> de src/AlertesSeuils.jsx)'],
-  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la directive DAC7 citée comme source (<a href> de src/AlertesSeuils.jsx)'],
-  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages de frais citées comme source (« Où vendre », <a href> de src/OuVendre.jsx)'],
-  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les CGU Leboncoin citées comme source (« Où vendre »)'],
-  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces) du parcours d’arrivée'],
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE, un <a> de ARetirerAilleurs.jsx)'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — « ensuite » de l’accompagnement (`dehors: true`, les brouillons Vinted)'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle citée sous un seuil'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la directive DAC7 citée sous un seuil'],
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base de `new URL` pour juger un lien de notification, jamais appelée)'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les sources des frais (OuVendre.jsx)'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les sources des frais (OuVendre.jsx)'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » du parcours d’arrivée'],
   'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » du parcours d’arrivée'],
-  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation d’un retour (« À renvoyer », <a href> de src/RetoursLitiges.jsx)'],
-  //   · VRM lui-même, jamais contacté : l'origine de base pour LIRE une adresse relative (`new URL(href, base)`).
-  'src/notifsBonMoment.js|vrm.center': ['vrm', 'origine de base d’un `new URL()` (lire un lien de notification), jamais contactée'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation du retour'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir sur Vinted » une des deux annonces (deux comptes, même paire)'],
+  // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
   // (13 nov., lot 89) Colissimo / La Poste (« Suivi v2 ») et UPS (« Tracking »), lus par le serveur avec la clé de l'installation.
-  'api/_lib/transporteurs-lecture.js|api.laposte.fr': ['politique', 'transp'],
-  'api/_lib/transporteurs-lecture.js|onlinetools.ups.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
@@ -325,16 +336,17 @@ if (PROUVE) {
   const MUT = [
     ['la ligne « points relais (écran Achats) » retirée', () => [fichiers, sansLigne('points relais où arrivent tes colis')]],
     ['la ligne Achats dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('Adresse du point relais, envoyée par ton navigateur (ton adresse IP)', 'Adresse du point relais, envoyée par le serveur VRM')]],
+    ['la ligne « carte de tes ventes » retirée', () => [fichiers, sansLigne('carte de tes ventes')]],
     ['la ligne jsDelivr retirée', () => [fichiers, sansLigne('jsDelivr')]],
     ['la ligne jsDelivr ne cite plus ZXing ni Tesseract', () => [fichiers, politique.replace(', la lecture du code-barres d’un colis à la caméra quand le téléphone ne sait pas le lire seul (ZXing) et la lecture d’un ticket de dépense photographié (Tesseract)', '')]],
-    ['la ligne des logos des transporteurs retirée', () => [fichiers, sansLigne('Afficher le logo du transporteur')]],
+    // (16 nov.) les logos sont dessinés dans l'app depuis le 10 nov. (aucune requête) : la ligne de la politique est retirée ;
+    // la mutation remet un logo chargé depuis le site du transporteur ⇒ il doit être déclaré.
+    ['un logo de transporteur rechargé depuis son site, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/transporteursVisuels.js' ? t + '\nconst icone = `https://www.chronopost.fr/favicon.ico`;\n' : t]), politique]],
     ['la ligne des photos Discord retirée', () => [fichiers, sansLigne('Photo de profil Discord')]],
     ['la ligne Chronopost / Vinted Go retirée', () => [fichiers, sansLigne('Chronopost \\(groupe La Poste\\)')]],
     ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],
     ['la ligne Mondial Relay ne dit plus que le serveur VRM l’appelle', () => [fichiers, politique.replace('envoyés par le serveur VRM (son adresse IP, pas la tienne) ; en secours, quand Mondial Relay refuse le serveur, ', '')]],
     ['un nouvel hôte contacté par le serveur des transporteurs, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'api/_lib/transporteurs-lecture.js' ? t + '\nconst sonde = () => fetch(`https://suivi.exemple-tiers.com/v1/x`);\n' : t]), politique]],
-    ['la ligne « carte de tes ventes » retirée (16 nov.)', () => [fichiers, sansLigne('Placer les villes de tes ventes')]],
-    ['la ligne « carte de tes ventes » dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('jamais une rue, un nom ou un pseudo), envoyés par ton navigateur', 'jamais une rue, un nom ou un pseudo), envoyés par le serveur VRM')]],
     ['un nouvel hôte appelé par le navigateur, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/App.jsx' ? t + '\nconst sonde = () => fetch(`https://api.exemple-tiers.com/v1/x`);\n' : t]), politique]],
   ];
   let prouvees = 0;

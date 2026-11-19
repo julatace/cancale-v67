@@ -709,6 +709,7 @@ export default {
   "compta.recapImprimer": "Stampa (1 pagina)",
   "compta.recapImprimerTitre": "Una pagina A4: vendite, ricevuto, acquisti, spese, utile, URSSAF",
   "compta.recapImprimerNote": "Una pagina A4, leggibile in bianco e nero. Per un PDF, scegli «Salva come PDF» nella finestra di stampa.",
+  "compta.recapImprimerAide": "Salvare in PDF?",
   "compta.recapFenetreBloquee": "Il browser ha bloccato la finestra di stampa: consenti le finestre per VRM e riprova.",
   "compta.recapPrepare": "Preparo il riepilogo…",
   "compta.dontConversation": " · {nbAd} tramite la conversazione della vendita",
@@ -716,6 +717,10 @@ export default {
   "compta.environHeuresVinted": { one: "Circa {n} h con vinted.fr aperto su questo account.", other: "Circa {n} h con vinted.fr aperto su questo account." },
   "compta.releveAVerifier": { one: "{n} vendita nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla.", other: "{n} vendite nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla." },
   "compta.releveDesaccord": { one: "{n} vendita nell’estratto del portafoglio: la sua data non cade nello stesso giorno del dettaglio della vendita ({desaccords} disaccordo). L’estratto di questo account non data nulla.", other: "{n} vendite nell’estratto del portafoglio: le loro date non cadono nello stesso giorno del dettaglio delle vendite ({desaccords} disaccordi). L’estratto di questo account non data nulla." },
+  "facturePro.serieVrmTitre": {"one": "Inviare {n} fattura con VRM?", "other": "Inviare {n} fatture con VRM?"},
+  "facturePro.serieVrmDesc": "La tua casella non è collegata: VRM le invia al posto tuo, ognuna al SUO acquirente verificato, con te in copia. La tua impostazione «dalla mia casella» non cambia.",
+  "facturePro.envoyerAvecVrm": "Invia con VRM",
+  "facturePro.toutEnvoyerVrm": "Invia tutto con VRM ({n})",
   // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
   "versement.ligne": { one: "Date di versamento: l’estensione le recupera (≈ {n} rimanente · circa {h} h con vinted.fr aperto).", other: "Date di versamento: l’estensione le recupera (≈ {n} rimanenti · circa {h} h con vinted.fr aperto)." },
   "versement.ligneSans": { one: "Date di versamento: l’estensione le recupera (≈ {n} rimanente).", other: "Date di versamento: l’estensione le recupera (≈ {n} rimanenti)." },

@@ -39,11 +39,8 @@ const VUES = {
   'fiche-vendue': '/?tab=journee', 'fiche-reliee': '/?tab=journee', 'fiche-2sites': '/?tab=journee',
   // la vue Histoire de la vendue, et sa feuille « ⋯ » ouverte (tuiles + Tout voir)
   'fiche-histoire': '/?tab=journee', 'fiche-plus': '/?tab=journee',
-  // (16 nov., finitions) la vente reliée (N°3120, bordereau prêt) OUVERTE DEPUIS SA LIGNE de Ventes, « ⋯ » puis « Tout voir » :
-  // le récapitulatif de la vente y est rendu (sa rangée « transporteur · Imprimer le bordereau »).
-  'fiche-vente-tout': '/?tab=ventes',
 };
-const NUM_FICHE = { 'fiche-vente-tout': '3120', 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102', 'fiche-histoire': '3119', 'fiche-plus': '3119' };
+const NUM_FICHE = { 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102', 'fiche-histoire': '3119', 'fiche-plus': '3119' };
 // LES TROIS PAIRES DE LA FICHE D (inventées) ajoutées à la base de volume : le premier compte, ses lignes de toujours.
 const J = 86400000;
 function baseFiches() {
@@ -69,7 +66,7 @@ function baseFiches() {
     sold.data.payload.my_orders.unshift({ transaction_id: v.tx, title: v.titre, price: { amount: v.prix, currency_code: 'EUR' }, status: 'Le paiement a été validé', date: iso(0.2), item_id: v.item,
       transaction_user_status: 'needs_action', photo: { url: photo(v.item) } });
     b.rows.push({ id: `harvest_${uid}_txn_${v.tx}`, data: { capturedAt: iso(0.2), payload: { transaction: { id: v.tx, item_id: v.item, status: 300, status_title: 'Le paiement a été validé', status_updated_at: iso(0.2), shipment: { status_title: 'En attente' }, item: { id: v.item, title: v.titre } } } } });
-    b.rows.push({ id: `email_bord_${v.tx}`, data: { filename: `bordereau-${v.tx}.pdf`, transaction: String(v.tx), receivedAt: iso(0.1), suivi: 'XW' + v.tx, modele: 'x', numero: v.n, ...(v.relie ? { transporteurPdf: 'Mondial Relay' } : {}), dateLimite: new Date(Date.now() + 4 * J).toISOString(), pdfB64: 'JVBERi0xLjQK' } });
+    b.rows.push({ id: `email_bord_${v.tx}`, data: { filename: `bordereau-${v.tx}.pdf`, transaction: String(v.tx), receivedAt: iso(0.1), suivi: 'XW' + v.tx, modele: 'x', numero: v.n, dateLimite: new Date(Date.now() + 4 * J).toISOString(), pdfB64: 'JVBERi0xLjQK' } });
   }
   sold.data.nItems = sold.data.payload.my_orders.length;
   // L'ACHAT qui ressemble à la paire N°3119 (même marque, même modèle, même taille, commandé AVANT la mise en ligne) : proposé, jamais relié seul.
@@ -84,10 +81,7 @@ function baseFiches() {
   const enl = b.rows.find((r) => r.id === `harvest_${uid}_enligne`);
   if (enl) { enl.data.ids.push(it); enl.data.items.push({ id: it, title: 'Adidas Samba OG taille 40' }); enl.data.n = enl.data.ids.length; }
   lst.data.nItems = lst.data.payload.items.length; lst.data.payload.pagination = { total_entries: lst.data.payload.items.length };
-  // (16 nov., finitions) la FORME mesurée (comme scripts/bancs/stock-etageres.cjs) : l'annonce porte son `id` et son compte,
-  // la lecture du compte est datée — la fiche lit désormais ses sites comme le Stock (src/stockAnnonces.js).
-  b.rows.push({ id: 'lbc_listings', data: { items: { 2900000001: { id: 2900000001, account: 'lbc1', subject: 'Adidas Samba OG 40', price: 85, status: 'active', url: 'https://www.leboncoin.fr/ad/chaussures/2900000001' } },
-    lectures: { lbc1: { at: new Date(Date.now() - 3600000).toISOString(), total: 1, n: 1 } } } });
+  b.rows.push({ id: 'lbc_listings', data: { items: { 2900000001: { subject: 'Adidas Samba OG 40', price: 85, status: 'active', url: 'https://www.leboncoin.fr/ad/chaussures/2900000001' } }, lectures: {} } });
   m.vrm_lbc_liens = { ...(m.vrm_lbc_liens || {}), 2900000001: '3102' };
   m.vinted_used_nums = [...new Set([...(m.vinted_used_nums || []), 3119, 3120, 3102])];
   return b;
@@ -127,42 +121,14 @@ async function preparer(o, vue) {
     if (!ok) await toucher('[data-cat="ventes"]');
     await pg.waitForTimeout(1200);
   }
-  if (vue === 'fiche-vente-tout') {
-    // Ventes → « Toutes » → la vente (elle mène à la vue Vinted) → SA ligne (son n° de transaction : `data-fl-tx`) : la fiche
-    // s'ouvre DEPUIS la ligne, son récapitulatif rendu dans « Tout voir » (la rangée « transporteur · Imprimer le bordereau »).
-    await pg.waitForSelector('[data-ventes-seg-choix]', { timeout: 15000 }).catch(() => {});
-    await toucher('[data-ventes-seg-choix="toutes"]'); await pg.waitForTimeout(2000);
-    await pg.evaluate(() => { const b = [...document.querySelectorAll('.vrm-toutes-ligne')].find((e) => e.getClientRects().length && /Terminator Low taille 37/.test(e.textContent)); if (b) b.click(); });
-    await pg.waitForTimeout(2500);
-    await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fiche-ligne][data-fl-tx="64000000002"]')].find((e) => e.getClientRects().length); if (l) { l.scrollIntoView({ block: 'center' }); l.click(); } });
-  }
   if (vue.startsWith('fiche-')) {
-    if (vue !== 'fiche-vente-tout') await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), NUM_FICHE[vue]);
+    await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), NUM_FICHE[vue]);
     await pg.waitForSelector('[data-fiche-paire] .fd-s', { timeout: 8000 }).catch(() => {});
     // la fiche a fini de lire (l'achat proposé, les sites) : plus de « lecture » sur la carte d'action
     await pg.waitForFunction(() => !document.querySelector('[data-fd-propose="lecture"], [data-fiche-lecture-en-cours="1"]'), null, { timeout: 12000 }).catch(() => {});
     await pg.waitForTimeout(1200);
     if (vue === 'fiche-histoire') { await toucher('[data-fd-seg="histoire"]'); await pg.waitForTimeout(500); }
     if (vue === 'fiche-plus') { await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700); }
-    if (vue === 'fiche-vente-tout') {
-      await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700);
-      await toucher('.fd-plus .fd-tout > summary'); await pg.waitForTimeout(700);
-      // (16 nov., intégration) F9 : « Tout voir » déplié, la feuille monte haut — un message passager (sonde de la vraie
-      // forme, dans la vraie zone `.vrm-toasts`) ne couvre pas sa tête (« Plus », ✕). Mesuré AVANT de faire défiler.
-      await pg.evaluate(() => {
-        const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); const c = getComputedStyle(e); return r.width > 1 && r.height > 1 && c.visibility !== 'hidden' && c.display !== 'none' && !e.closest('[hidden]'); };
-        const R = (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), b: Math.round(r.bottom), r: Math.round(r.right) }; };
-        const z = document.querySelector('.vrm-toasts'); if (!z) { window.__sondeF9 = null; return; }
-        const b = document.createElement('div'); b.className = 'vrm-toast'; b.setAttribute('data-sonde-toast', '');
-        b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
-        b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°2323, 2324, 2325 · à écrire sur leurs cartons</span>'; z.prepend(b);
-        const bulles = [...z.children].filter(vis).map(R), tete = [...document.querySelectorAll('.vrm-fp .fd-plus:not([hidden]) .fd-plus-tete > *')].filter(vis).map(R); b.remove();
-        const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
-        window.__sondeF9 = { place: z.getAttribute('data-toasts-place'), bulles, tete: tete.length, teteR: tete, couvreTete: tete.filter((r) => bulles.some((t) => coupe(t, r))).length };
-      });
-      await pg.evaluate(() => { const r = document.querySelector('.fd-plus .fd-tout [data-rangee-bord]'); if (r) r.scrollIntoView({ block: 'center' }); });
-      await pg.waitForTimeout(400);
-    }
   }
 }
 
@@ -237,16 +203,6 @@ function mesurer(vue) {
       offre: carte ? carte.getAttribute('data-offre') : null,
       proposer: (() => { const b = racine.querySelector('[data-offre-geste="proposer"]'); return b ? b.classList.contains('vrm-chat-btn-p') : null; })(),
       pleinsCarte: carte ? carte.querySelectorAll('.vrm-chat-btn-p').length : null };
-    // (16 nov., finitions) Un message passager dit PENDANT une conversation (« 24 nouvelles paires numérotées ») se posait
-    // sur la tête du fil (‹, Retirer) au téléphone. Même sonde que la fiche (F8) : une bulle de la vraie forme posée dans
-    // la VRAIE zone `.vrm-toasts`, chaque bulle déjà là jugée aussi, contre chaque geste VISIBLE de la tête du fil.
-    out.toastFil = (() => { const z = document.querySelector('.vrm-toasts'); const tete = racine.querySelector('.vrm-chat-head'); if (!z || !tete) return null;
-      const b = document.createElement('div'); b.className = 'vrm-toast'; b.setAttribute('data-sonde-toast', '');
-      b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
-      b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°2323, 2324, 2325 · à écrire sur leurs cartons</span>'; z.prepend(b);
-      const bulles = [...z.children].filter(vis).map(R), gestes = [...tete.querySelectorAll('button, a[href], [role="button"]')].filter(vis).map(R); b.remove();
-      const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
-      return { place: z.getAttribute('data-toasts-place'), tete: R(tete), bulles, gestes: gestes.length, couvre: gestes.filter((g) => bulles.some((t) => coupe(t, g))).length }; })();
   }
   if (vue === 'parametres') {
     const cats = [...document.querySelectorAll('[data-categories-reglages] [data-categorie-ouvrir]')].filter(vis);
@@ -264,22 +220,6 @@ function mesurer(vue) {
       rangees: [...racine.querySelectorAll('.vrm-pm-cat .vrm-set-ligne')].filter(vis).map((l) => Math.round(l.getBoundingClientRect().height)),
       titre: (() => { const h = racine.querySelector('.vg-pm-nav-txt h2'); return h ? { fs: parseFloat(getComputedStyle(h).fontSize), clair: lum(getComputedStyle(h).color) > 0.8 } : null; })(),
       retour: (() => { const b = racine.querySelector('[data-categorie-retour]'); return b && vis(b) ? R(b) : null; })() };
-  }
-  if (vue === 'fiche-vente-tout') {
-    // (16 nov., finitions) « Tout voir » d'une vente : la rangée « transporteur · Imprimer le bordereau » du récapitulatif.
-    // Le geste ne touche pas la marque du transporteur (8 px au moins, aucun recouvrement), et ce n'est pas un SECOND plein
-    // (la fiche a déjà le sien, sa carte d'action « Imprimer le bordereau » : un fond opaque n'est permis qu'au principal).
-    const opaque = (e) => { const c = getComputedStyle(e).backgroundColor; const m = String(c).match(/[\d.]+/g); return !!m && (m.length < 4 || Number(m[3]) > 0.5) && !/^rgba\(0, 0, 0, 0\)$/.test(c); };
-    out.toutVoirBord = [...racine.querySelectorAll('.fd-plus .fd-tout [data-rangee-bord]')].filter(vis).map((r) => {
-      const puce = r.querySelector('.vrm-puce-transp'); const g = [...r.querySelectorAll('button, a[href]')].filter(vis).find((b) => !b.closest('.vrm-puce-transp'));
-      if (!puce || !g) return { puce: !!puce, geste: !!g };
-      const a = R(puce), b = R(g);
-      return { ecart: b.x - a.r, recouvre: a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b, plein: opaque(g) && !g.hasAttribute('data-fiche-principal'), h: b.h };
-    });
-    out.toastPlus = window.__sondeF9 || null;
-    // (16 nov., intégration) le sur-titre de la fiche ouverte depuis sa ligne (« Colis à envoyer ») : la taille du texte courant
-    out.ctxFiche = (() => { const e = racine.querySelector('[data-fiche-heros-ctx]'); return e && vis(e) ? parseFloat(getComputedStyle(e).fontSize) : null; })();
-    return out;
   }
   if (racineFiche) {
     // (15 nov., fiche D) Ce qui est VU : la hauteur de la fiche (la feuille « ⋯ » fermée), la photo pleine largeur et la plaque,
@@ -320,11 +260,9 @@ function mesurer(vue) {
         b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
         b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées</span>'; z.prepend(b);
         // la sonde en PREMIÈRE place, et chaque bulle déjà là (un vrai message de la coque) jugée aussi
-        const bulles = [...z.children].filter(vis).map(R), ronds = [...racine.querySelectorAll('.fd-top .fd-rond')].filter(vis).map(R);
-        // (16 nov., intégration) la feuille « ⋯ » ouverte : sa tête (« Plus », ✕) jugée aussi (F9)
-        const tete = [...racine.querySelectorAll('.fd-plus:not([hidden]) .fd-plus-tete > *')].filter(vis).map(R); b.remove();
+        const bulles = [...z.children].filter(vis).map(R), ronds = [...racine.querySelectorAll('.fd-top .fd-rond')].filter(vis).map(R); b.remove();
         const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
-        return { place: z.getAttribute('data-toasts-place'), bulles, ronds: ronds.length, couvre: ronds.filter((r) => bulles.some((t) => coupe(t, r))).length, tete: tete.length, couvreTete: tete.filter((r) => bulles.some((t) => coupe(t, r))).length }; })(),
+        return { place: z.getAttribute('data-toasts-place'), bulles, ronds: ronds.length, couvre: ronds.filter((r) => bulles.some((t) => coupe(t, r))).length }; })(),
     };
   }
   return out;
@@ -376,7 +314,6 @@ function juger(m, suf, tel) {
   if (m.vue === 'messages-offre') {
     const K = m.conv;
     dit(K.paire && K.paireAvant, `M6 ${suf} : la paire en tête du fil`, JSON.stringify(K));
-    dit(!!m.toastFil && m.toastFil.gestes >= 1 && m.toastFil.couvre === 0, `M8 ${suf} : un message passager ne couvre aucun geste de la tête du fil (‹, Retirer)`, JSON.stringify(m.toastFil));
     if (K.proposer != null) dit(K.proposer === true && K.pleinsCarte === 1, `M7 ${suf} : le plein va à « Proposer N € », un seul`, JSON.stringify(K));
     else console.log(`   ℹ️ M7 ${suf} : pas d'offre à trancher ICI (offre ${K.offre || 'aucune'} : l'extension n'est pas dans ce navigateur) — la règle est jugée sur le code (audit).`);
   }
@@ -396,15 +333,6 @@ function juger(m, suf, tel) {
     dit(K.icones === 0 && K.rangees.length > 0 && K.rangees.every((h) => h >= 44), `P3 ${suf} : des rangées sans icône, ≥ 44 px`, `${K.icones} icône(s) · ${K.rangees.join(',')}`);
     dit(!!K.retour && K.retour.w >= 44 && K.retour.h >= 44, `P3 ${suf} : le rond « ‹ » ≥ 44 px`, JSON.stringify(K.retour));
   }
-  if (m.toutVoirBord) {
-    const T = m.toutVoirBord;
-    dit(T.length >= 1 && T.every((x) => x.ecart >= 8 && !x.recouvre), `FV1 ${suf} : « Tout voir » d'une vente — « Imprimer le bordereau » ne touche pas la marque du transporteur (≥ 8 px)`, JSON.stringify(T));
-    dit(T.length >= 1 && T.every((x) => x.plein === false), `FV2 ${suf} : … et ce n'est pas un second plein (la fiche porte déjà le sien)`, JSON.stringify(T));
-    // (16 nov., intégration, capture de Julien) au téléphone, « ⋯ » puis « Tout voir » : la tête de la feuille (Plus, ✕) jamais
-    // sous un message passager (même règle que la fiche et la conversation : sous la tête). À l'ordinateur, en bas à droite.
-    dit(m.ctxFiche != null && m.ctxFiche >= 15, `F10 ${suf} : le sur-titre de la fiche ouverte depuis sa ligne au texte courant (≥ 15 px)`, String(m.ctxFiche));
-    if (m.W < 744) dit(!!m.toastPlus && m.toastPlus.tete >= 2 && m.toastPlus.couvreTete === 0, `F9 ${suf} : « Tout voir » déplié — un message passager ne couvre pas « Plus ✕ »`, JSON.stringify(m.toastPlus));
-  }
   if (m.fd) {
     const F = m.fd, v = m.vue;
     if (tel) dit(F.hauteur != null && F.hauteur <= 844, `F4 ${suf} : la fiche tient en UN écran (${F.hauteur} px ≤ 844)`);
@@ -417,9 +345,6 @@ function juger(m, suf, tel) {
     if (v !== 'fiche-plus') dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
     else dit(!F.plusFerme && !!F.feuille && F.feuille.r <= m.W + 1 && F.tuilesVues.length >= 8 && F.tuilesVues.every((h) => h >= 44) && F.toutVoir, `F6 ${suf} : « ⋯ » ouvert : ${F.tuilesVues.length} tuiles (≥ 44 px) et « Tout voir », dans l'écran`, JSON.stringify({ feuille: F.feuille, t: F.tuilesVues }));
     dit(!!F.toast && F.toast.ronds === 2 && F.toast.couvre === 0, `F8 ${suf} : un message passager ne couvre ni ‹ ni ⋯ (fiche plein écran)`, JSON.stringify(F.toast));
-    // (16 nov., intégration, capture de Julien) « ⋯ » ouvert au téléphone, « Tout voir » déplié : la feuille monte haut et
-    // un message passager couvrait « Plus ✕ ». Même règle que la fiche et la conversation : sous la tête.
-    if (F.toast && F.toast.tete) dit(F.toast.tete >= 2 && F.toast.couvreTete === 0, `F9 ${suf} : un message passager ne couvre pas la tête de la feuille « ⋯ » (Plus, ✕)`, JSON.stringify(F.toast));
     if (v === 'fiche-histoire') dit(F.vue === 'histoire' && F.histoire.length >= 3 && F.histoire.length <= 5 && F.histoire[0] === 'achat:am' && F.histoire.includes('vente') && F.histoire.includes('colis:am'), `F7 ${suf} : l'histoire en 3 à 5 lignes, l'achat à relier et l'envoi en ambre`, F.histoire.join(','));
     dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
     dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
@@ -438,9 +363,7 @@ function juger(m, suf, tel) {
     }
     if (v === 'fiche-2sites') {
       dit(F.actions[0] === 'baisser', `D3 ${suf} : en vente ⇒ « Baisser le prix »`, F.actions.join(','));
-      // (16 nov., finitions) les sites du Stock ; une lecture absente (eBay, Vestiaire…) est une rangée « pas su » à part.
-      const vusD3 = F.sites.filter((x) => !/:pas-su$/.test(x));
-      dit(F.vue === 'sites' && vusD3.length === 2 && vusD3.includes('vinted:en-ligne') && vusD3.includes('leboncoin:en-ligne'), `D3 ${suf} : ouverte sur Sites, une rangée par site`, F.sites.join(','));
+      dit(F.vue === 'sites' && F.sites.length === 2 && F.sites.includes('vinted:en-ligne') && F.sites.includes('leboncoin:en-ligne'), `D3 ${suf} : ouverte sur Sites, une rangée par site`, F.sites.join(','));
       dit(F.etat && /sur 2 sites/.test(F.etat.txt) && !F.etat.ambre, `D3 ${suf} : « En vente 85 € · sur 2 sites… »`, JSON.stringify(F.etat));
     }
   }

@@ -176,12 +176,15 @@ function juger(T, nom, viols) {
 }
 // B : zones tactiles. Un bouton (ou lien-bouton) visible plus petit que 44 × 44 px
 // en boîte, et sans zone étendue (::before/::after en position absolue plus grand).
-async function petitesCibles(pg) {
+async function petitesCibles(pg, racine = null) {
   await finirAnimations(pg);
-  return pg.evaluate(() => {
+  return pg.evaluate((racine) => {
+    // (16 nov.) `racine` : seulement DANS la feuille du dessus (accessibilite-feuilles.cjs).
+    const dans = racine ? ([...document.querySelectorAll(racine)].filter((e) => e.getClientRects().length).pop() || null) : document;
+    if (!dans) return [];
     const out = [];
     const sel = 'button, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], input[type="checkbox"], input[type="radio"], a.vrm-lien-action, a[role]';
-    for (const e of document.querySelectorAll(sel)) {
+    for (const e of dans.querySelectorAll(sel)) {
       if (e.closest('[aria-hidden="true"],[inert]')) continue;
       const r = e.getBoundingClientRect(); if (!r.width || !r.height) continue;
       if (r.bottom < 0 || r.top > innerHeight * 3) continue;
@@ -199,7 +202,7 @@ async function petitesCibles(pg) {
       if (w + 0.5 < 44 || h + 0.5 < 44) out.push(`${Math.round(w)}×${Math.round(h)} ${(e.outerHTML || '').replace(/\s+/g, ' ').slice(0, 120)}`);
     }
     return out;
-  });
+  }, racine);
 }
 
 

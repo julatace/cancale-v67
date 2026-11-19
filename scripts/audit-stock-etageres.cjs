@@ -39,14 +39,6 @@
 //  Sur le code d'avant (`git archive`, le banc copié DEDANS) : P1, P2 (paire pas
 //  montrée), P3, P6, P7, M rougissent. `--prouve` : chaque mutation réaffaiblit la
 //  règle ; l'audit DOIT rougir.
-//   R  L'ÉTAGÈRE PERSONNALISABLE (v4, 15 nov. — src/etageres/reglages.js)
-//     R1 un meuble d'hier (sans `reglages`) se lit avec les défauts d'un meuble neuf (Cartons, teintes mêlées,
-//        confortable ; photo, sites, compte) ; une valeur abîmée se lit comme absente ; ni rouge ni violet ;
-//     R2 « de loin » retire la photo ; « À sortir » et « En double » se disent TOUJOURS (quoi que l'étiquette coche) ;
-//     R3 écrire des réglages garde TOUS les champs du meuble d'origine ;
-//     R4 deux appareils : l'un change l'affichage, l'autre le nom (ou un autre champ de l'étiquette) ⇒ les deux restent
-//        (la fusion du nuage, champ par champ) ;
-//     R5 la teinte « mêlée » d'un carton tient à son N° (la même partout) ; l'écran enregistre par `avecReglages`.
 //    node scripts/audit-stock-etageres.cjs [--mutation=NOM | --prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -69,15 +61,11 @@ const MUTATIONS = {
   'pseudo-uid': ['src/ecrans/Stock.jsx', "pseudo: String(acc.login || acc.username || ''),", "pseudo: String(acc.login || acc.username || uid),"],
   'ebay-vieux-en-ligne': ['src/stockAnnonces.js', "const etat = p.frais === false && p.etat === 'enligne' ? 'aconfirmer' : p.etat;", "const etat = p.etat;"],
   'annuler-partiel': ['src/stockEtageres.js', "  for (const d of r.descentes) ops.push(", "  for (const d of []) ops.push("],
+  'placer-echange': ['src/stockEtageres.js', "  const tri = l.slice(); const [x] = tri.splice(k, 1); tri.splice(j, 0, x);", "  const tri = l.slice(); const x = tri[k]; tri[k] = tri[j]; tri[j] = x;"],
   'ordre-ignore': ['src/stockEtageres.js', "    .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2])).map((x) => x[0]);", "    .map((x) => x[0]);"],
   'deplacer-recopie': ['src/stockEtageres.js', "place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));", "place.has(String(m.id)) ? { id: m.id, name: m.name, cols: m.cols, rows: m.rows, ordre: place.get(String(m.id)) } : m));"],
   'couleurs-par-index': ['src/stockEtageres.js', "export const cleCase = (i, m) => { const { cols } = dims(m); return `${Math.floor(i / cols) + 1}:${(i % cols) + 1}`; };", "export const cleCase = (i, m) => `${Math.floor(i / 4) + 1}:${(i % 4) + 1}`;"],
   'ecran-montrees': ['src/ecrans/Stock.jsx', "const r = tasserApres(slots, u, ms || meubles, ids);", "const r = tasserApres(slots, Object.fromEntries(Object.entries(u).filter(([k]) => ficheParCle[k])), ms || meubles, ids);"],
-  'loin-garde-photo': ['src/etageres/reglages.js', "photo: e.photo && r.densite !== 'loin',", "photo: e.photo,"],
-  'sortir-masque': ['src/etageres/reglages.js', "  if (etat === 'vendue') return { sorte: 'sortir', bits: [] };\n", ""],
-  'reglages-ecrasent': ['src/etageres/reglages.js', "  return { ...(m || {}), reglages: {", "  return { id: m && m.id, reglages: {"],
-  'teinte-rouge': ['src/etageres/reglages.js', "export const TEINTES = ['kraft',", "export const TEINTES = ['rouge', 'kraft',"],
-  'reglages-stricts': ['src/etageres/reglages.js', "    affichage: AFFICHAGES.includes(r.affichage) ? r.affichage : DEFAUTS.affichage,", "    affichage: r.affichage,"],
   'ecran-au-montage': ['src/ecrans/Stock.jsx', "  const meublesVus = ordonner(meubles);", "  const meublesVus = ordonner(meubles); React.useEffect(() => { const t = tasserApres({}, slots, meubles, meubles.map((x) => x.id)); if (t.descentes.length) ecrireSlotsBrut(t.slots); }, []);"],
 };
 
@@ -100,33 +88,17 @@ let ko = 0, n = 0;
 const dit = (c, msg, det) => { n++; if (c) console.log('✅ ' + msg); else { ko++; console.log('❌ ' + msg + (det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 500) : '')); } };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; console.log('❌ ' + nom + ' a levé : ' + String(e && e.message || e).slice(0, 300)); } };
 
-// (16 nov., intégration) Les imports RELATIFS des fichiers copiés (api/_lib → ../../src/alertesSeuils.js, et ce qu'ils
-// importent eux-mêmes) suivis jusqu'au bout : un fichier manquant est copié tel quel depuis la racine (jamais un fichier
-// déjà posé, qui peut porter une mutation). Sans eux l'import levait « Cannot find module … alertesSeuils.js ».
-function copierDependances(dossier, racine) {
-  const vus = new Set(); const file = [];
-  const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) marche(p); else if (/\.m?js$/.test(e.name)) file.push(p); } };
-  marche(dossier);
-  while (file.length) {
-    const p = file.pop(); if (vus.has(p)) continue; vus.add(p);
-    const s = fs.readFileSync(p, 'utf8');
-    for (const m of s.matchAll(/(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+\.m?js)['"]/g)) {
-      const cible = path.resolve(path.dirname(p), m[1]); const rel = path.relative(dossier, cible);
-      if (rel.startsWith('..') || fs.existsSync(cible)) { if (fs.existsSync(cible)) file.push(cible); continue; }
-      const src = path.join(racine, rel); if (!fs.existsSync(src)) continue;
-      fs.mkdirSync(path.dirname(cible), { recursive: true }); fs.copyFileSync(src, cible); file.push(cible);
-    }
-  }
-}
 (async () => {
   // Les règles, copiées dans un dossier (la mutation y est posée).
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'etag-'));
   fs.mkdirSync(path.join(dir, 'src', 'ecrans'), { recursive: true });
-  const FICHIERS = ['src/stockEtageres.js', 'src/stockRegles.js', 'src/stockSortie.js', 'src/cycleArticle.js', 'src/gesteAnnulable.js', 'src/ecrans/Stock.jsx', 'src/stockAnnonces.js', 'src/etageres/reglages.js', 'src/fusionNuage.js'];
-  fs.mkdirSync(path.join(dir, 'src', 'etageres'), { recursive: true });
+  const FICHIERS = ['src/stockEtageres.js', 'src/stockRegles.js', 'src/stockSortie.js', 'src/cycleArticle.js', 'src/gesteAnnulable.js', 'src/ecrans/Stock.jsx', 'src/stockAnnonces.js'];
   // (15 nov., sites sur la case) La règle de Vestiaire importée par stockAnnonces.js : api/_lib copié tel quel.
   fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true });
   for (const f of fs.readdirSync(path.join(R, 'api', '_lib'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(R, 'api', '_lib', f), path.join(dir, 'api', '_lib', f));
+  // (16 nov., lot retirer-case-compact) api/_lib importe aussi des règles de src/ (argent-notif.js → src/alertesSeuils.js) :
+  // les modules purs de src/ (premier niveau) sont copiés tels quels — ceux de FICHIERS sont réécrits plus bas (mutation).
+  for (const f of fs.readdirSync(path.join(R, 'src'))) if (/\.(js|mjs)$/.test(f)) fs.copyFileSync(path.join(R, 'src', f), path.join(dir, 'src', f));
   const texte = {};
   for (const f of FICHIERS) { const p = path.join(R, f); texte[f] = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null; }
   if (mut) {
@@ -134,8 +106,11 @@ function copierDependances(dossier, racine) {
     if (!texte[m[0]] || !texte[m[0]].includes(m[1])) { console.log('❌ ancre de mutation introuvable : ' + mut); process.exit(1); }
     texte[m[0]] = texte[m[0]].replace(m[1], m[2]);
   }
+  // (16 nov.) api/_lib (copié tel quel) importe des règles de src/ (argent-notif.js → alertesSeuils.js → …) : les modules
+  // purs de src/ (premier niveau) sont copiés tels quels, sous les fichiers jugés (qui gardent leur texte, mutations comprises).
+  for (const f of fs.readdirSync(path.join(R, 'src'))) if (f.endsWith('.js') && !FICHIERS.includes('src/' + f)) fs.copyFileSync(path.join(R, 'src', f), path.join(dir, 'src', f));
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
-  copierDependances(dir, R);
+  require('./_copie-imports.cjs').completerImports(R, dir);   // (16 nov.) ce qu'importe api/_lib depuis src/ (argent-notif → alertesSeuils)
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
   const A = await imp('src/stockAnnonces.js');
@@ -323,6 +298,13 @@ function copierDependances(dossier, racine) {
     dit(u && E.ordonner(u).map((m) => m.id).join(',') === 'mB,mA', 'M2 · « monter » le Bureau le met en premier');
     dit(u && u[1].gravite === false && Array.isArray(u[1].planches) && u[1].cols === 7 && u[1].rows === 10 && u[1].name === 'Bureau', 'M2 · un déplacement garde TOUS les champs d’origine', u && u[1]);
     dit(E.deplacerMeuble(anciens, 'mA', -1) === null, 'M2 · le premier ne monte pas plus haut (rien n’est écrit)');
+    // (16 nov., design-restes) Glisser au doigt : poser un meuble au rang voulu, les autres gardent leur ordre relatif.
+    const trois = [...anciens, { id: 'mC', name: 'Cave', cols: 2, rows: 2, ordre: 2 }];
+    const g = typeof E.placerMeuble === 'function' ? E.placerMeuble(trois, 'mA', 2) : null;
+    dit(g && E.ordonner(g).map((m) => m.id).join(',') === 'mB,mC,mA', 'M2 · glisser le Garage tout en bas : Bureau, Cave, Garage', g && E.ordonner(g).map((m) => m.id));
+    const g2 = typeof E.placerMeuble === 'function' ? E.placerMeuble(trois, 'mC', 0) : null;
+    dit(g2 && E.ordonner(g2).map((m) => m.id).join(',') === 'mC,mA,mB' && g2[1].gravite === false && g2[1].cols === 7, 'M2 · glisser la Cave en haut garde l’ordre des autres et TOUS leurs champs', g2 && E.ordonner(g2).map((m) => m.id));
+    dit(typeof E.placerMeuble === 'function' && E.placerMeuble(trois, 'mB', 1) === null, 'M2 · posé à sa place : rien n’est écrit');
   });
   await essaie('M3', async () => {
     let ok = true, l = null;
@@ -344,63 +326,6 @@ function copierDependances(dossier, racine) {
     dit(/askConfirm\(\{ title: tr\('etag\.retrecir'/.test(corps), 'M4 · un meuble rétréci DEMANDE avant de faire sortir des paires de leur case');
   });
 
-  // ── R : l'étagère personnalisable (v4) ──
-  const RG = await imp('src/etageres/reglages.js'), FN = await imp('src/fusionNuage.js');
-  await essaie('R1', async () => {
-    dit(!RG.__absent && !RG.__erreur && typeof RG.reglagesDe === 'function', 'R1 · les réglages d’un meuble se chargent (src/etageres/reglages.js)', RG.__erreur || (RG.__absent ? 'absent' : undefined));
-    const d = RG.reglagesDe({ id: 'mA', name: 'Garage', cols: 4, rows: 8 });
-    dit(d.affichage === 'cartons' && d.teinte === 'melees' && d.densite === 'confortable' && d.etiquette.photo && d.etiquette.sites && d.etiquette.compte && !d.etiquette.prix && !d.etiquette.taille && !d.etiquette.grand,
-      'R1 · un meuble d’hier se lit en Cartons, teintes mêlées, confortable (photo, sites, compte)', d);
-    let ok = true, a = null; try { a = RG.reglagesDe({ reglages: { affichage: 'iso', teinte: 'rouge', densite: 3, etiquette: { photo: 'oui', prix: true } } }); } catch (_) { ok = false; }
-    dit(ok && a && a.affichage === 'cartons' && a.teinte === 'melees' && a.densite === 'confortable' && a.etiquette.photo === true && a.etiquette.prix === true, 'R1 · une valeur abîmée se lit comme absente (jamais d’exception, jamais « rouge »)', a);
-    dit(Array.isArray(RG.TEINTES) && !RG.TEINTES.concat(RG.COULEURS_MEUBLE || []).some((c) => /rouge|red|violet|purple|magenta|rose/i.test(c)), 'R1 · ni rouge (le doublon) ni violet parmi les teintes et les couleurs de meuble', RG.TEINTES);
-    const css = (() => { try { return fs.readFileSync(path.join(R, 'src', 'etageres', 'etageres-v4.css'), 'utf8'); } catch (_) { return ''; } })();
-    dit(!/#(8A2BE2|800080|9400D3|7B2CBF|A020F0)\b/i.test(css) && !/\bviolet\b|\bpurple\b/i.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'R1 · aucun violet dans le dessin de l’étagère');
-  });
-  await essaie('R2', async () => {
-    const loin = RG.etiquetteVue(RG.reglagesDe({ reglages: { densite: 'loin', etiquette: { photo: true } } }));
-    dit(loin.photo === false, '« de loin » retire la photo'.replace(/^/, 'R2 · '), loin);
-    const ray = RG.etiquetteVue(RG.reglagesDe({ reglages: { affichage: 'rayonnage', densite: 'compacte' } }));
-    const comp = RG.etiquetteVue(RG.reglagesDe({ reglages: { affichage: 'cartons', densite: 'compacte' } }));
-    dit(ray.sites === true && comp.sites === false, 'R2 · les logos tiennent sur une étiquette de rayonnage, pas sur un carton compact', { ray: ray.sites, comp: comp.sites });
-    const rien = { photo: false, grand: false, sites: false, compte: false, prix: false, taille: false };
-    const s = RG.ligneEtiquette({ etat: 'vendue', double: true, compte: 'x', prix: 50 }, rien), db = RG.ligneEtiquette({ double: true, compte: 'x' }, rien);
-    dit(s.sorte === 'sortir' && db.sorte === 'double', 'R2 · « À sortir » puis « En double » se disent TOUJOURS, même étiquette vide', { s, db });
-    const pl = RG.ligneEtiquette({ etat: 'plusenligne', compte: 'x', prix: 3 }, { ...rien, compte: true, prix: true });
-    dit(pl.sorte === 'plusenligne', 'R2 · « Plus en ligne » (rangée, plus une annonce actuelle) se dit toujours, avant le compte et le prix', pl);
-    const p = RG.ligneEtiquette({ compte: 'shop', prix: 95, taille: 'T42' }, { ...rien, prix: true }), h = RG.ligneEtiquette({ horsLigne: true }, { ...rien, compte: true });
-    dit(p.sorte === 'texte' && p.bits.length === 1 && p.bits[0].prix === 95 && h.bits.length === 1 && h.bits[0].horsLigne === true, 'R2 · l’étiquette dit ce qu’il coche (le prix seul ; « hors ligne » sans compte)', { p, h });
-  });
-  await essaie('R3', async () => {
-    const m = { id: 'mB', name: 'Bureau', cols: 7, rows: 10, gravite: false, planches: [], couleurs: { '1:1': 'ciel' }, ordre: 3, type: 'armoire' };
-    const w = RG.avecReglages(m, { affichage: 'rayonnage', teinte: 'violet', densite: 'loin', etiquette: { prix: true }, intrus: 1 });
-    dit(w.id === 'mB' && w.name === 'Bureau' && w.cols === 7 && w.rows === 10 && w.gravite === false && Array.isArray(w.planches) && w.couleurs['1:1'] === 'ciel' && w.ordre === 3 && w.type === 'armoire', 'R3 · écrire des réglages garde TOUS les champs du meuble d’origine', w);
-    dit(w.reglages && w.reglages.affichage === 'rayonnage' && w.reglages.teinte === 'melees' && w.reglages.densite === 'loin' && w.reglages.etiquette.prix === true && !('intrus' in w.reglages), 'R3 · seules des valeurs valides sont écrites (« violet » ⇒ teintes mêlées)', w.reglages);
-  });
-  await essaie('R4', async () => {
-    dit(typeof FN.fusion3 === 'function', 'R4 · la fusion du nuage se charge', FN.__erreur);
-    const base = [{ id: 'mA', name: 'Garage', cols: 4, rows: 8 }, { id: 'mB', name: 'Bureau', cols: 7, rows: 10 }];
-    const l = [RG.avecReglages(base[0], { affichage: 'rayonnage' }), base[1]];   // cet appareil : le Garage en rayonnage
-    const nn = [{ ...base[0], name: 'Garage du fond' }, base[1]];                  // l'autre : le Garage renommé
-    const f = FN.fusion3(base, l, nn);
-    const g = f && f.find((x) => x.id === 'mA');
-    dit(!!g && g.name === 'Garage du fond' && g.reglages && g.reglages.affichage === 'rayonnage' && f.length === 2, 'R4 · deux appareils (l’affichage ici, le nom là-bas) : les deux restent', g);
-    const b2 = [RG.avecReglages(base[0], {})];
-    const l2 = [RG.avecReglages(base[0], { etiquette: { prix: true } })], n2 = [RG.avecReglages(base[0], { etiquette: { taille: true } })];
-    const g2 = FN.fusion3(b2, l2, n2)[0];
-    dit(!!g2 && g2.reglages.etiquette.prix === true && g2.reglages.etiquette.taille === true, 'R4 · le prix coché ici, la taille là-bas : l’étiquette garde les deux', g2 && g2.reglages);
-  });
-  await essaie('R5', async () => {
-    const r = RG.reglagesDe(null);
-    dit(RG.teinteCarton(r, '12') === RG.teinteCarton(r, 'B12') && RG.teinteCarton(r, '12') === RG.teinteCarton(r, 12), 'R5 · la teinte mêlée d’un carton tient à son N° (« 12 », « B12 » : la même)');
-    dit(RG.teinteCarton({ ...r, teinte: 'sauge' }, '7') === 'sauge', 'R5 · une teinte choisie vaut pour tous les cartons du meuble');
-    const corps = sansCom.slice(sansCom.indexOf('function StockMeubles('), sansCom.indexOf('function EditeurMeuble('));
-    dit(/avecReglages\(\{ \.\.\.m0,/.test(corps), 'R5 · « Enregistrer » (Personnaliser) réécrit le meuble d’ORIGINE augmenté de ses réglages');
-    dit(!/save\('vrm_meubles'[^)]*reglages/.test(corps) && !/useEffect\([^;]*avecReglages/.test(corps), 'R5 · aucun réglage écrit au montage (un meuble d’hier n’est pas réécrit pour être lu)');
-  });
-
   console.log(`\n${n - ko}/${n} contrôles verts${ko ? ` — ${ko} rouge(s)` : ''}.`);
-  // (16 nov., intégration) la copie temporaire est retirée (plus de cent dossiers « etag-* » restaient dans /tmp, disque serré)
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
   process.exit(ko ? 1 : 0);
 })();
