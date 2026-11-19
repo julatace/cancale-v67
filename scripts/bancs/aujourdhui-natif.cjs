@@ -100,6 +100,13 @@ async function unEcran(nav, port, base, W, sombre) {
         await toucherS('[data-v2-stat="benefice"]'); await pg.waitForTimeout(200);
         dit(await pg.evaluate(() => document.documentElement.getAttribute('data-banc-argent')) === 'semaine', `S ${ou} : toucher le bénéfice ouvre Argent sur la semaine`);
         await pg.goto(pg.url(), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
+        // (19 nov.) Au téléphone, le titre d'un colis ou d'une vente garde SA ligne : l'échéance est sur la 2e ligne (« N° · échéance »),
+        // le prix à droite de la 1re ; un titre court n'est jamais coupé, un long tient en 2 lignes au plus.
+        const lig = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-colis], [data-v2-vente]')].map((r) => { const t = r.querySelector('.n-rangee-titre'); const p = r.querySelector('.n-pastille');
+          const lh = parseFloat(getComputedStyle(t).lineHeight) || 22; const tq = t.getBoundingClientRect();
+          return { t: t.textContent.slice(0, 20), coupe: t.textContent.length <= 30 && (t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 1), lignes: Math.round(tq.height / lh),
+            pastilleSous: !p || !!p.closest('.n-rangee-sous') }; }));
+        dit(lig.length >= 6 && lig.every((x) => !x.coupe && x.lignes <= 2 && x.pastilleSous), `L ${ou} : ${lig.length} rangées — titre entier (2 lignes au plus), l’échéance sous le titre, jamais à côté`, lig.filter((x) => x.coupe || x.lignes > 2 || !x.pastilleSous));
         // (19 nov., « applique ce que tu proposes ») L'objectif sous les tuiles ; « Personnaliser » coche une carte et elle vient.
         const ob = await pg.evaluate(() => { const o = document.querySelector('[data-v2-objectif]'); return o ? { e: o.getAttribute('data-v2-objectif'), pct: o.getAttribute('data-v2-objectif-pct'), t: o.textContent } : null; });
         dit(!!ob && ob.e === 'lu' && ob.pct === '61' && /1\s?840/.test(ob.t) && /3\s?000/.test(ob.t) && /11 jours/.test(ob.t), `O ${ou} : objectif « 1 840 € / 3 000 € · 61 % · il reste 11 jours »`, ob);
