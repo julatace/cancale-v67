@@ -222,8 +222,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const gestes = A ? A.gestes.filter((t) => !RARES.includes(t)).map(geste) : [];
   const rares = A ? A.gestes.filter((t) => RARES.includes(t)).map(geste) : [];
   // L'HISTOIRE : ses étapes en mots (l'achat relié dit son vendeur, sa date, son prix).
-  const lignesHist = A ? A.histoire.map((l) => ({ cle: l.cle, ambre: l.ton === 'am', titre: l.libre || tr(l.titre),
-    reste: [l.vendeur ? tr('fd.h.vendeur', { nom: l.vendeur }) : '', l.at != null ? dateFd(l.at) : '', l.montant != null ? eur(l.montant) : '', l.compte || '', l.sites && l.sites.length ? l.sites.map((x) => NOM_SITE_FD[x] || x).join(', ') : '', l.detail ? tr(l.detail, { n: l.n }) : ''].filter(Boolean).join(' · ') })) : [];
+  // (19 nov.) Le montant (sinon la date) à droite de l'étape, le reste dessous : une étape sans autre détail tient sur une ligne.
+  const lignesHist = A ? A.histoire.map((l) => { const montant = l.montant != null ? eur(l.montant) : '', date = l.at != null ? dateFd(l.at) : '';
+    return { cle: l.cle, ambre: l.ton === 'am', titre: l.libre || tr(l.titre), valeur: montant || date,
+      reste: [l.vendeur ? tr('fd.h.vendeur', { nom: l.vendeur }) : '', montant ? date : '', l.compte || '', l.sites && l.sites.length ? l.sites.map((x) => NOM_SITE_FD[x] || x).join(', ') : '', l.detail ? tr(l.detail, { n: l.n }) : ''].filter(Boolean).join(' · ') }; }) : [];
   // « Tout voir » : le détail d'avant, posé tel quel sous l'histoire ouverte — rien n'est supprimé, rien n'est derrière « ⋯ ».
   const toutVoir = p ? (<>
     {!double && r && r.detail && !faits.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}

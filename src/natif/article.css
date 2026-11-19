@@ -23,6 +23,12 @@
   .n-article-etat[data-n-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-second-fort); }
   .n-article-etat[data-n-ton="doublon"] { color: var(--n-doublon); font: var(--n-t-second-fort); }
 
+  /* La ligne qui situe le bouton principal, sous l'état (« Bordereau prêt · 7 j pour poster ») ; ambre s'il y a un geste. */
+  .n-article-suite { max-width: 100%; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-article-suite[data-n-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-second-fort); }
+  /* Le compte d'un site, à la suite de son nom, sur la même ligne. */
+  .n-site-compte { color: var(--n-encre-2); }
+
   /* ── Fait : « — » et sa raison sur UNE ligne ───────────────────────────── */
   .n-fait-ligne { display: flex; align-items: baseline; gap: 8px; max-width: 100%; min-width: 0; }
   .n-fait-ligne > .n-fait-detail { min-width: 0; overflow-wrap: anywhere; }

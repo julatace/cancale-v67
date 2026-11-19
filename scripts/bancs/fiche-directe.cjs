@@ -66,7 +66,7 @@ function baseDirecte() {
   enLigne(7699990014, '3104', 'Nike Air Jordan 1 Retro High OG Chicago Lost and Found édition anniversaire avec boîte d’origine et lacets de rechange taille 43 1/3', '1250.0', {}, { buyPrice: '1020', min: '1100' });
   // SIX SITES — Vinted et cinq annonces Leboncoin reliées à la main au même N° (comptes différents).
   enLigne(7699990015, '3105', 'New Balance 550 blanc vert taille 42', '70.0', {}, { buyPrice: '30' });
-  for (let k = 1; k <= 5; k++) { const id = 2900000100 + k; lbc.data.items[id] = { subject: 'New Balance 550 blanc vert 42', price: 70 + (k === 5 ? 5 : 0), status: 'active', url: `https://www.leboncoin.fr/ad/chaussures/${id}`, account: 'compte_lbc_' + k }; m.vrm_lbc_liens[id] = '3105'; }
+  for (let k = 1; k <= 5; k++) { const id = 2900000100 + k; lbc.data.items[id] = { subject: 'New Balance 550 blanc vert 42', price: 70 + (k === 5 ? 5 : 0), status: 'active', url: `https://www.leboncoin.fr/ad/chaussures/${id}`, account: 'compte_lbc_' + k, accountName: 'boutique_lbc_' + k }; m.vrm_lbc_liens[id] = '3105'; }
   // TOUT PAS SU — un N° dont la fiche existe, sans annonce lue, sans prix d'achat, sans taille, sans place.
   num[7699990016] = { numero: '3106', num: '3106', accountId: String(uid), numberedAt: iso(40), title: 'Sac en toile', photo: '' };
   m.vinted_used_nums.push(3106);

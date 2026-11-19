@@ -38,6 +38,9 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
     : f.cle === 'quand' ? (f.date != null ? T.date(f.date) : f.jours != null ? T.jours(f.jours) : null)
     : f.cents == null ? null : f.signe ? T.signe(f.cents) : T.euros(f.cents));
   const suDe = (f, v) => (f.cle === 'interet' ? true : v != null && v !== '');
+  // La ligne qui situe le bouton principal (« Bordereau prêt · 7 j pour poster », « Aucune offre en 20 jours ») : sous l'état,
+  // dans l'en-tête — pas une carte de plus. Avec un achat proposé, elle reste dans sa carte.
+  const ligneSeule = !proposition && ligneAction ? ligneAction : null;
   const tous = histoire ? histoire.lignes : [];
   const etapes = toutHist ? tous : tous.slice(-HISTOIRE_REPLIEE);
   const allerAchat = () => setToutHist(true);
@@ -54,7 +57,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
         photo={photo ? rendre.photo(photo) : null} nPhotos={photos.length} onPhoto={photo ? () => setGrand(true) : null} libellePhoto={photos.length > 1 ? T.voirPhotos(photos.length) : T.agrandir}
         plaque={A ? <span data-fiche-grand-num=""><Plaque numero={A.num} doublon={A.double} grand/></span> : sansNumero ? <span data-fiche-grand-num="" data-fiche-sans-num="">{sansNumero}</span> : null}
         titre={A ? T.titre : (sans && sans.titre) || T.sansTitre}
-        etat={etat ? T.etat(etat) : (sans && sans.prix) || ''} ton={etat && etat.rouge ? 'doublon' : etat && etat.ambre ? 'ambre' : 'neutre'} suite={suiteEtat}
+        etat={etat ? T.etat(etat) : (sans && sans.prix) || ''} ton={etat && etat.rouge ? 'doublon' : etat && etat.ambre ? 'ambre' : 'neutre'} suite={<>{suiteEtat}{ligneSeule ? <span className="n-article-suite" data-n-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</span> : null}</>}
         attrs={{ 'data-fiche-heros': contexteBarre || 'numero', 'data-fiche-photo-vedette': photo ? '1' : '0' }} attrsPhoto={{ 'data-fiche-heros-photo': photo ? '1' : '0', 'data-fd-photo-agrandir': photos.length }}
         attrsTitre={{ 'data-fd-titre': '' }} attrsEtat={etat ? { 'data-fd-etat': etat.cle, 'data-fd-ambre': etat.ambre ? '1' : '0', 'data-fd-limite': etat.limite ? (etat.limite.jour || '') : undefined } : null}/> : null}
       {blocs.alerte || null}
@@ -76,14 +79,14 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       {A && !A.double ? <Groupe titre={T.sites} pied={A.sitesManques && A.sitesManques.length ? T.pasLus(A.sitesManques.join(', ')) : ''} attrs={{ 'data-fd-sites': A.sites.length, 'data-fiche-sites': A.sites.length, 'data-fd-sites-pas-lus': A.sitesManques && A.sitesManques.length ? A.sitesManques.join(',') : undefined }}>
         {A.sites.length ? A.sites.map((s, i) => {
           const prix = s.prix != null && s.prix !== A.prixRef ? T.euros(s.prix) : null;
-          return <Rangee key={i} icone={rendre.logo(s.site)} titre={T.site(s.site)} sousTitre={s.compte || ''} valeur={prix || T.etatSite(s)} valeurForte={!!prix} detailValeur={prix ? T.etatSite(s) : ''}
+          return <Rangee key={i} icone={rendre.logo(s.site)} titre={<>{T.site(s.site)}{s.compte ? <span className="n-site-compte">{' · ' + s.compte}</span> : null}</>} valeur={prix || T.etatSite(s)} valeurForte={!!prix} detailValeur={prix && s.etat === 'vendue' ? T.etatSite(s) : ''}
             fin={s.lien && s.etat !== 'vendue' ? 'chevron' : null} href={s.lien && s.etat !== 'vendue' ? s.lien : ''} attrs={{ 'data-fiche-site': s.site, 'data-fiche-site-etat': s.etat, ...(s.lien && s.etat !== 'vendue' ? { target: '_blank', rel: 'noreferrer', 'data-fiche-site-lien': '' } : {}) }}/>;
         }) : <Rangee titre={T.aucunSite} indisponible/>}
       </Groupe> : null}
-      {proposition || ligneAction ? <Groupe titre={proposition ? T.achatPropose : ''} attrs={{ 'data-fd-action-contexte': '' }}>
+      {proposition ? <Groupe titre={proposition ? T.achatPropose : ''} attrs={{ 'data-fd-action-contexte': '' }}>
         {proposition ? <Rangee vignette={rendre.vignette(proposition.photo)} titre={proposition.titre} lignes={2} sousTitre={proposition.sous} attrs={proposition.attrs}/> : null}
         {proposition && proposition.onAutre ? <Rangee titre={T.autreAchat} fin="chevron" onClick={proposition.onAutre} attrs={{ 'data-fd-relier-autre': '' }}/> : null}
-        {ligneAction ? <Rangee titre={ligneAction.titre} valeur={ligneAction.valeur || null} ton={ligneAction.ambre ? 'ambre' : 'neutre'} sousTitre={ligneAction.sous || ''} attrs={ligneAction.attrs}/> : null}
+        {ligneAction && proposition ? <Rangee titre={ligneAction.titre} valeur={ligneAction.valeur || null} ton={ligneAction.ambre ? 'ambre' : 'neutre'} sousTitre={ligneAction.sous || ''} attrs={ligneAction.attrs}/> : null}
       </Groupe> : null}
       {blocs.sansPaire || null}
       {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
@@ -93,7 +96,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </Groupe> : null}
       {blocs.contexte || null}
       {histoire ? <Groupe titre={T.histoire} attrs={{ 'data-fd-histoire': toutHist ? 'tout' : 'repliee', 'data-fiche-hist': tous.length }}>
-        {etapes.map((l) => <Rangee key={l.cle} titre={l.titre} sousTitre={l.reste} ton={l.ambre ? 'ambre' : 'neutre'} attrs={{ 'data-fiche-hist-etape': l.cle }}/>)}
+        {etapes.map((l) => <Rangee key={l.cle} titre={l.titre} valeur={l.valeur || null} sousTitre={l.reste} ton={l.ambre ? 'ambre' : 'neutre'} attrs={{ 'data-fiche-hist-etape': l.cle }}/>)}
         {toutHist && achatRelie && achatRelie.recu ? <Rangee titre={T.recu} fin="chevron" onClick={achatRelie.onRecu} attrs={{ 'data-fd-recu': achatRelie.tx }}/> : null}
         {toutHist && achatRelie ? <Rangee titre={T.delier} fin="chevron" onClick={achatRelie.onDelier} attrs={{ 'data-fd-delier': achatRelie.tx, 'data-fd-achat-relie': achatRelie.tx }}/> : null}
         <Rangee titre={toutHist ? T.replier : T.toutVoir} fin={toutHist ? null : 'chevron'} onClick={() => setToutHist((x) => !x)} attrs={{ 'data-fd-tout-voir': '', 'aria-expanded': toutHist ? 'true' : 'false' }}/>
