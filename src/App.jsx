@@ -480,7 +480,8 @@ function SuiviTravailCoque() {
 const VeilleJourneeParesseux = lazySur(() => import('./VeilleJournee.jsx'));
 const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
-const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
+const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));
+const EcranExtension = lazySur(() => import('./extension/EcranExtension.jsx'));   // (19 nov., demande H) LE seul endroit « Extension »   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
 const PublierPartout = aLaDemande(() => import('./PublierPartout.jsx'), true);
@@ -11417,6 +11418,26 @@ function extVivanteAilleurs() {
 // (Banc `extension-detectee`) Ce que l'app SAIT de l'extension, en lecture : aucune donnée du vendeur.
 try { if (typeof window !== 'undefined') window.__vrmExtVu = () => ({ present: __vmrExtReady, version: __vmrExtVersion, canal: !!canalExt(), installeeIci: vmrExtInstalleeIci(), appelsFinis: __vmrAppelsFinis,
   retard: __vmrExtReady ? cmpVersion(__vmrExtVersion || '0.0.0', EXT_ATTENDUE) < 0 : null, sait: { ancienne: extSait('baisseprix'), recente: extSait('repubetapes') }, ailleurs: extVivanteAilleurs() }); } catch (_) {}
+// ══ LES FAITS DE LA PAGE « EXTENSION » (19 nov., demande H) ════════════════════════════════
+// Ce que l'app SAIT de l'extension de ce navigateur, en données brutes : la règle (src/extension/peutFaire.js)
+// en tire les phrases et les gestes. Rien n'est lu ici, rien n'est deviné ; `etat` garde ses trois états
+// (undefined pas encore demandé · null muette · objet répondu).
+function faitsExtensionApp(sansSouris) {
+  const e = __vmrEtat;
+  const rl = (() => { try { return etatRelais(); } catch (_) { return { niveau: 'hors' }; } })();
+  return {
+    maintenant: Date.now(), attendue: EXT_ATTENDUE, capacites: EXT_CAPACITES, telephone: !!sansSouris, brancheEnCours: !!__sessExtEnVol,
+    moi: { id: String((AUTH.user && AUTH.user.id) || ''), email: String((AUTH.user && AUTH.user.email) || '') },
+    ext: { present: vmrExtPresent(), appelsFinis: __vmrAppelsFinis, installeeIci: vmrExtInstalleeIci(), version: vmrExtVersion(), plusieurs: __vmrPlusieurs,
+      perime: (() => { try { return !!codePerime(); } catch (_) { return false; } })(),
+      etat: e === undefined ? undefined : (e && e.ok ? e : null) },
+    relais: { niveau: rl.niveau, vinted: rl.vinted || null, pauseMs: rl.pauseMs || 0, ou: '' },
+  };
+}
+// « Brancher à mon compte » : l'app lui transmet sa connexion (le même chemin que d'elle-même, `assurerSessionExtension`).
+function brancherExtensionApp() { try { return assurerSessionExtension(); } catch (_) { return null; } }
+// Aller à la page « Extension » depuis n'importe où (la pastille, le menu du profil).
+const ouvrirPageExtension = () => { try { window.dispatchEvent(new Event('vrm:extension-ouvrir')); } catch (_) {} };
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
 // (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
 // n'est pas là ou ne répond pas — jamais une supposition.
@@ -18483,6 +18504,8 @@ const GROUPES_PLUS=[
   // (src/profil/MenuProfil.jsx). « g p », ⌘K et `?tab=settings` y mènent toujours.
   groupeNav({ cle:'moi', nom:'Moi', items:[
     entreeNav({id:'communaute', icon:'pin',  label:'Communauté'}),
+    // (19 nov., demande H) LE seul endroit qui parle de l'extension et des comptes ; la pastille de la coque y mène.
+    entreeNav({id:'extension', icon:'link', label:'Extension'}),
     // (13 nov., lot 54) UNE ligne discrète « Parrainer » (téléphone) : ouvre Réglages → Mon abonnement,
     // groupe Parrainage. Montrée seulement quand le programme est OUVERT (`siParrainage`), jamais une pop-up.
     entreeNav({id:'parrainage', icon:'cadeau', label:'Parrainer', tel:true, siParrainage:true}),
@@ -18540,7 +18563,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=[...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['extension',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -20108,7 +20131,7 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   // À l'ordinateur, l'île les montre déjà : rien en double.
   // (14 nov., maquette de Julien : « le menu du haut s'ouvre depuis le titre ou l'avatar ») Au téléphone, le
   // reste des écrans (tout ce que « Plus » portait, groupé, avec ses pastilles) vit en tête de ce menu.
-  const groupesEcrans = ordiMenu ? [] : groupesVisibles(sites, () => true);
+  const groupesEcrans = ordiMenu ? [] : groupesVisibles(sites, (t) => t.id !== 'extension');   // (19 nov.) « Extension » : la ligne d'état ci-dessous (`enPlus`) y mène déjà
   const ecrans = ordiMenu ? null : groupesEcrans.map((g) => <div className="vrm-profil-groupe vrm-profil-ecrans" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>
     {g.items.map((t) => <button key={cleEntree(t)} type="button" className="vrm-profil-ligne" data-nav-entree={cleEntree(t)} aria-label={t.label + suffixeBadgeNav(t, badges)} onClick={() => { setOuvert(false); ouvrirEntree(t, setTab); }}>
       <span className="vrm-profil-ligne-ic" aria-hidden="true"><NavigationIcon item={t} size={18}/></span>
@@ -20119,9 +20142,9 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   </div>);
   const enPlus = ordiMenu ? null : <>
     {MULTI_USER ? <button type="button" className="vrm-profil-ligne" data-profil-menu="etat-actions" data-etat-ton={etatVu ? etatVu.ton : undefined}
-      onClick={() => { setOuvert(false); setTimeout(ouvrirEtatActions, 0); }}>
+      onClick={() => { setOuvert(false); setTimeout(ouvrirPageExtension, 0); }}>
       <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="shop" size={18}/></span>
-      <span className="vrm-profil-ligne-lib">{tr('coque.actionsVinted')}{etatVu && etatVu.nom ? <span className="vrm-profil-ligne-etat"> · {etatVu.nom}</span> : null}</span>
+      <span className="vrm-profil-ligne-lib">{tr('ext.plus.libelle')}{etatVu && etatVu.nom ? <span className="vrm-profil-ligne-etat"> · {etatVu.nom}</span> : null}</span>
       {etatVu ? <span className="vrm-hdr-profil-etat vrm-profil-ligne-point" data-etat-point={etatVu.ton} aria-hidden="true" style={{ '--etat-point': etatVu.point }}/> : null}
       <span aria-hidden="true" className="vrm-profil-ligne-fin"><Icon name="chevron" size={15}/></span>
     </button> : null}
@@ -20144,7 +20167,8 @@ let ETAT_ACTIONS_VU = null;
 const _etatActionsSubs = new Set();
 const publierEtatActions = (e) => { ETAT_ACTIONS_VU = e; _etatActionsSubs.forEach((f) => { try { f(); } catch (_) {} }); };
 const useEtatActionsVu = () => React.useSyncExternalStore((f) => { _etatActionsSubs.add(f); return () => _etatActionsSubs.delete(f); }, () => ETAT_ACTIONS_VU);
-const ouvrirEtatActions = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
+// (19 nov., demande H) L'ancien panneau de la pastille est remplacé par la page « Extension » : tout chemin qui l'ouvrait y mène.
+const ouvrirEtatActions = () => ouvrirPageExtension();
 // La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
 // (14 nov.) Elle porte le point d'état de la pastille « Actions Vinted » (qui ne tient plus dans la barre) :
 // ambre = un geste à faire, encre = tu peux agir, gris = lecture seule — jamais rouge (§7).
@@ -23240,7 +23264,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // que s'il y a un geste à faire ici (§7) ; « pas de geste » reste gris.
   const point = aRattraper ? C.warn : st.niveau === 'ok' ? C.text : C.muted;
   const rl = etatRelais();
-  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? (st.glob && st.glob.ailleurs ? 'Extension : pas dans ce navigateur' : 'Extension à installer') : 'Lecture seule';
+  // (19 nov., demande H) La pastille ne dit plus que UN mot simple ; le détail (la phrase, le geste, ce que VRM peut
+  // faire pour chaque compte) vit sur la page « Extension », où elle mène. Plus de « Lecture seule », d'« Actions
+  // possibles · sauf publier » ni d'« Extension à installer » : ces états sont des phrases de la page.
+  const libelle = st.niveau === 'ok' ? (st.relais ? tr('ext.pastille.ordi') : tr('ext.pastille.ok')) : st.niveau === 'verif' ? tr('ext.pastille.verif')
+    : code === 'telephone' ? tr('ext.pastille.ordiSeul') : code === 'pause' ? tr('ext.pastille.pause') : code === 'vinted' ? tr('ext.pastille.vintedFerme') : tr('ext.pastille.aFaire');
   // Ce que la pastille ÉCRIT (le libellé complet reste en aria-label et en titre).
   const visible = st.niveau === 'ok' && loginVinted ? loginVinted : libelle;
   // (1er nov., vendeur neuf) Avant toute installation, « Lecture seule » était la
@@ -23392,7 +23420,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
     <div ref={boite} className="vrm-hdr-etat" style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ici={st.glob && st.glob.ici ? '1' : undefined} data-etat-ailleurs={st.glob && st.glob.ailleurs ? (st.glob.ailleurs.ver || '1') : undefined} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ici={st.glob && st.glob.ici ? '1' : undefined} data-etat-ailleurs={st.glob && st.glob.ailleurs ? (st.glob.ailleurs.ver || '1') : undefined} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => { setOuvert(false); if (onNav) onNav('extension'); else ouvrirPageExtension(); }}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
@@ -63167,6 +63195,7 @@ function AppCoeur() {
   React.useEffect(()=>{ const lire=()=>{ const et=etatActionsExt(sansSouris); const v=et&&et.niveau==='ok'?et.vinted:null; setCompteChrome(v&&v.uid?String(v.uid):''); }; lire(); return onVmrExt(lire); },[sansSouris]);
   // L'ancien onglet « Messages » (cloche, bandeau, « à faire ») mène désormais
   // aux messages DANS Vinted : une seule porte pour un seul écran.
+  React.useEffect(()=>{ const f=()=>setTab('extension'); window.addEventListener('vrm:extension-ouvrir',f); return ()=>window.removeEventListener('vrm:extension-ouvrir',f); },[]);   // (19 nov., demande H) la pastille et « Plus » mènent à la page « Extension »
   React.useEffect(()=>{ if(tab==='cat_msg'){ subVoulue.current='messages'; setTab('plat_vinted'); } },[tab]);
   // (11 nov., lot DJ4) « À trancher » n'est plus un écran : un ancien lien (`?tab=trancher`, raccourci,
   // notification) ouvre Ma journée, sa carte ouverte en place.
@@ -67510,6 +67539,7 @@ function AppCoeur() {
         {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
+        {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
           vueInitiale={DEMANDE_ADRESSES.on?'relier':'boite'}
@@ -67601,6 +67631,7 @@ function AppCoeur() {
 }
 // ⟦démarrage léger⟧ emprunts des écrans à la demande
 export { useProfilFiscal, profilFiscalLu };
+export { faitsExtensionApp, brancherExtensionApp, ouvrirPageExtension };   // (19 nov., demande H) la page « Extension »
 export { useJourneePerso, JourneePersoSetting };
 export { lireLitigesVinted, changerCompteVrm };
 export { bilanThermique };   // (11 nov., lot thermique) l'aperçu de Paramètres → Impression des bordereaux

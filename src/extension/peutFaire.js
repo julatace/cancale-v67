@@ -96,7 +96,7 @@ export function etatNavigateur(f) {
     if (ail) return { code: 'ailleurs', ton: 'geste', cle: 'ext.nav.ailleurs', vars: { ou: ail.nom }, geste: 'installer', pourquoi: 'ext.pourquoi.ailleurs' };
     return { code: 'absente', ton: 'geste', cle: 'ext.nav.absente', vars: {}, geste: 'installer', pourquoi: 'ext.pourquoi.absente' };
   }
-  if (Array.isArray(e.plusieurs) && e.plusieurs.length) return { code: 'plusieurs', ton: 'geste', cle: 'ext.nav.plusieurs', vars: { garder: e.plusieurs.filter(versionOk).sort(cmpVersion).pop() || '' }, geste: 'extensions', pourquoi: 'ext.pourquoi.plusieurs' };
+  if (Array.isArray(e.plusieurs) && e.plusieurs.length) { const garder = e.plusieurs.filter(versionOk).sort(cmpVersion).pop() || ''; return { code: 'plusieurs', ton: 'geste', cle: garder ? 'ext.nav.plusieurs' : 'ext.nav.plusieursSans', vars: { garder }, geste: 'extensions', pourquoi: 'ext.pourquoi.plusieurs' }; }
   if (e.perime) return { code: 'perime', ton: 'geste', cle: 'ext.nav.perime', vars: {}, geste: 'extensions', pourquoi: 'ext.pourquoi.perime' };
   if (e.etat === undefined) return { code: 'verif', ton: 'neutre', cle: 'ext.nav.verif', vars: {}, geste: null, pourquoi: null };
   if (e.etat === null) return { code: 'muette', ton: 'geste', cle: 'ext.nav.muette', vars: {}, geste: 'recharger', pourquoi: 'ext.pourquoi.muette' };

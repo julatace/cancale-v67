@@ -2,6 +2,7 @@
 // Les codes viennent de src/extension/peutFaire.js ; l'audit `audit-extension-claire` vérifie que chaque code a sa phrase.
 export default {
   "ext.titre": "Extension",
+  "nav.extension": "Extension",
   "ext.plus.libelle": "Extension et comptes",
   "ext.groupe.navigateur": "Ce navigateur",
   "ext.groupe.autres": "Tes autres navigateurs",
@@ -26,6 +27,7 @@ export default {
   "ext.nav.ailleurs": "L’extension est dans {ou}, pas dans ce navigateur. Ouvre VRM dans {ou}, ou installe-la ici.",
   "ext.nav.muette": "L’extension est installée mais ne répond pas sur cette page. Recharge la page.",
   "ext.nav.plusieurs": "Deux extensions VRM sont installées dans ce navigateur : VRM n’envoie rien tant qu’il y en a deux. Garde seulement la {garder}.",
+  "ext.nav.plusieursSans": "Deux extensions VRM sont installées dans ce navigateur : VRM n’envoie rien tant qu’il y en a deux. Garde seulement la plus récente.",
   "ext.nav.perime": "L’extension a été mise à jour mais tourne encore l’ancienne version. Relance-la une fois.",
   "ext.nav.vrm": "L’extension n’est pas encore branchée à ton compte VRM.",
   "ext.nav.vrmPasSu": "VRM n’a pas pu savoir à quel compte l’extension est branchée. Recharge la page.",
@@ -93,6 +95,7 @@ export default {
   "ext.pastille.ordiSeul": "Extension · ordinateur",
   "ext.pastille.arret": "VRM à l’arrêt",
   "ext.pastille.vintedFerme": "Vinted pas ouvert",
+  "ext.pastille.pause": "VRM en pause",
 
   "ext.etape.installer": "Extension installée dans ce navigateur",
   "ext.etape.brancher": "Branchée à ton compte VRM",
