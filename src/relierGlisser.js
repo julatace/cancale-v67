@@ -22,7 +22,7 @@
 // ombre, petite oscillation) est le seul retour. Aucun texte ne promet une vibration.
 //
 // Module PUR : exécuté par scripts/audit-relier-glisser.cjs.
-import { tousAchatsLibres } from './suggestionsAchat.js';
+import { tousAchatsLibres, tousAchatsLibresDetail } from './suggestionsAchat.js';
 
 export const DELAI_APPUI_MS = 400;     // appui long (iPhone : ~0,5 s pour soulever une icône)
 export const SEUIL_DEFILEMENT_PX = 10; // un doigt qui bouge plus avant le délai = un défilement
@@ -79,6 +79,34 @@ export function listesGlisser({ achats, liens, tresProbables = null, cibles = []
   // Les « très probables » d'abord (l'ordre des dates gardé à l'intérieur de chaque groupe).
   out.sort((x, y) => (x.propose ? 0 : 1) - (y.propose ? 0 : 1));
   return { achats: out, cibles: cs };
+}
+
+// ── (19 nov., Julien, sur son Mac) Les filtres et « Très probable » au bon moment ────────────────────────────
+// « je ne vois pas pourquoi il y a "Très probable" de marqué alors que je n'ai sélectionné aucune annonce » ⇒ un achat
+// n'est MARQUÉ que pour la vente / l'annonce CHOISIE (`cle`), et ceux-là viennent en tête ; rien de choisi : aucune
+// marque, l'ordre de `listesGlisser` gardé. `tresProbables` : { [tx]: [{ key, niveau }] } (src/liaisonAchat.js).
+export function marquerPour(liste, tresProbables = null, cle = '') {
+  if (!Array.isArray(liste)) return liste;
+  const k = String(cle || '');
+  const pour = (x) => !!(k && tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable' && String(p.key) === k));
+  const out = liste.map((x) => ({ ...x, pour: pour(x) }));
+  if (k) out.sort((x, y) => (x.pour ? 0 : 1) - (y.pour ? 0 : 1));   // tri stable : l'ordre des dates gardé dans chaque groupe
+  return out;
+}
+// « je veux un filtre avec les articles que j'ai déjà reliés » : les achats DÉJÀ reliés (`pris` de la même règle que les
+// libres — jamais les annulés ni les hors-relier), du plus récent au plus ancien. Montrés à part, jamais proposés.
+export function achatsRelies({ achats, liens } = {}) {
+  if (!Array.isArray(achats)) return achats === null ? null : undefined;
+  return tousAchatsLibresDetail({ achats, liens }).pris.map((a) => ({ a, tx: String(a.transaction_id), relie: true }));
+}
+// « à droite, un filtre annonces en ligne / vendues » : `genre` de la cible ('annonce' = en ligne, 'vente' = vendue).
+export function compterCibles(cibles) {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return { toutes: cs.length, annonce: cs.filter((c) => c && c.genre === 'annonce').length, vente: cs.filter((c) => c && c.genre === 'vente').length };
+}
+export function filtrerCibles(cibles, filtre = 'toutes') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;
 }
 
 // ── La phrase de confirmation (une ligne) ───────────────────────────────────
