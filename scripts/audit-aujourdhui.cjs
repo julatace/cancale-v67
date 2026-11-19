@@ -210,7 +210,7 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   const vue = ['src/natif/ecrans/Aujourdhui.jsx', 'src/designV2/Aujourdhui.jsx'].map((f) => path.join(RACINE, f)).filter((f) => fs.existsSync(f)).map((f) => fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')).join('\n');
   dit(!/data-v2-job|data-v2-afaire|v2-afaire/.test(vue), 'S1 Aujourd’hui ne rend plus aucune rangée « À faire »');
   dit(/publierARegler\(/.test(vue), 'S2 Aujourd’hui PUBLIE ses groupes (src/designV2/aRegler.js)');
-  dit(/chiffresAujourdhui\(\{/.test(app) && /alerteDuJour\(\{/.test(app) && /dernieresVentesFaites\(/.test(app), 'S3 l’app demande ses chiffres, son alerte et ses dernières ventes au modèle (aucune règle recopiée)');
+  dit(/chiffresAujourdhui\(\{/.test(app) && /alerteDuJour\(\{/.test(app) && /Mo\.dernieresVentes\(/.test(app) && /import\('\.\/modele\.js'\)|from '\.\/modele\.js'/.test(fs.readFileSync(path.join(RACINE, 'src', 'aujourdhui', 'Branche.jsx'), 'utf8')), 'S3 l’app demande ses chiffres, son alerte et ses dernières ventes au modèle (aucune règle recopiée)');
   dit(/<ARegler onglet="argent"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8')) && /<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
     'S4 le bloc « À régler » est branché en tête de Ventes, Achats, Annonces (une ligne), du Stock et de « Tout va bien ? »');
   dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');

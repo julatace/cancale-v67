@@ -1109,11 +1109,16 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 // `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres → Apparence → Style) : `data-theme-style` posé dès l'import, éteint par défaut
-import AujourdhuiV2 from "./natif/ecrans/Aujourdhui.jsx";   // (19 nov.) « VRM natif » : l'écran compose src/natif/
-import { poserIcone } from "./natif/index.js";
-import ARegler, { useARegler } from "./designV2/ARegler.jsx";   // (19 nov.) « À régler » : chaque chose à faire dans SON onglet
+// (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
+// (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
+const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
+import { poserIcone } from "./natif/icones.jsx";   // les glyphes seuls, sans les feuilles de style
+// (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
+const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
+import { useARegler } from "./designV2/useARegler.js";
 import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
-import { chiffresAujourdhui, dernieresVentes as dernieresVentesFaites, alerteDuJour } from "./aujourdhui/modele.js";   // (19 nov.) le fond d'« Aujourd'hui » : il demande chaque chiffre à son propriétaire
+// (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
+// avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -33570,8 +33575,9 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const live = liveStats || liveCoque;
   const S = useSourcesCarte(live);
   const maintenant = Date.now();
-  // Le modèle (src/aujourdhui/modele.js) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
-  const M = chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
+  // Le modèle (src/aujourdhui/modele.js, reçu en `Mo`) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
+  const calculer = (Mo) => {
+  const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
     etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
     mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
@@ -33580,8 +33586,9 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
     mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
       benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
-  return <AujourdhuiV2 {...reste} chiffres={chiffres}
-    aVenir={M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null}/>;
+  return { chiffres, aVenir: M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null };
+  };
+  return <AujourdhuiV2 {...reste} calculer={calculer}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -51155,25 +51162,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // AU PLUS UNE LIGNE D'ALERTE : une date limite LUE qui tombe aujourd'hui ou demain (ou déjà passée). Aucune règle
           // neuve : `toShip` et `texteLimiteEnvoi` (api/_lib/limite-envoi.js — une limite ESTIMÉE n'est jamais dite ici, §5),
           // `pickupUnion.urgents` (la règle du point ambre d'« À retirer »), les retours « à déposer » (src/retoursAchat.js).
-          const alerteJ = (() => {
+          const alerteJ = (Mo) => {
             try {
-              const A = alerteDuJour({ aPoster: toShip, urgentsRetrait: lu(xR) && pickupCount && pickupUnion && tracking !== null ? (Number(pickupUnion.urgents) || 0) : null,
+              const A = Mo.alerteDuJour({ aPoster: toShip, urgentsRetrait: lu(xR) && pickupCount && pickupUnion && tracking !== null ? (Number(pickupUnion.urgents) || 0) : null,
                 retours: retoursAchatVus && retoursAchatVus.etat === 'lu' && Array.isArray(retoursAchatVus.aRenvoyer) ? retoursAchatVus.aRenvoyer : [], joursAvant });
               if (!A) return null;
               if (A.id === 'poster') return { id: 'poster', txt: tr('v2.alerte.poster', { n: A.n, quand: limiteCourte(texteLimiteEnvoi(A.premier)) }), faire: () => { if (onNav) onNav('cat_bord'); } };
               if (A.id === 'retirer') return { id: 'retirer', txt: tr('journee.colisRetirerAujourd', { hd: String(A.n) }), faire: () => { if (onNav) onNav('retraits'); } };
               return { id: 'retour', txt: tr('v2.alerte.retour', { n: A.n }), faire: () => { if (onNav) onNav('achats'); } };
             } catch (_) { return null; /* pas su ⇒ aucune alerte inventée */ }
-          })();
+          };
           // LES 5 DERNIÈRES VENTES : les lignes de « Vendu » de la coque (`ventesFaites`, toutes plateformes), les plus
           // récentes (`dernieresVentesFaites`, src/aujourdhui/modele.js) ; la photo, le titre et le N° d'une vente Vinted par SA transaction (jamais un titre
           // comme identité).
-          const dernieresJ = (() => {
+          const dernieresJ = (Mo) => {
             const ev = venduEtat(liveStats);
             if (ev !== 'lu' || baseKO) return { etat: ev === 'pasSu' || baseKO ? 'passu' : 'encours', lignes: [] };
             try {
               const parTx = new Map(); for (const o of (sales.items || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) parTx.set(String(tx), o); }
-              const lignes = (dernieresVentesFaites(liveStats.venduLignes, 5) || []).map((x) => {
+              const lignes = (Mo.dernieresVentes(liveStats.venduLignes, 5) || []).map((x) => {
                 const o = x.plateforme === 'Vinted' ? parTx.get(x.tx) : null;
                 const bd = o ? bordsParTxn[x.tx] : null; const en = o ? effEntry(o) : null;
                 const num = String(o ? ((bd ? numForBord(bd) : '') || (en && en.numero) || '') : '');
@@ -51182,7 +51189,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               });
               return { etat: 'lu', lignes };
             } catch (_) { return { etat: 'passu', lignes: [] }; }
-          })();
+          };
           return (
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}

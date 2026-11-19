@@ -7,18 +7,12 @@ export default {
   "v2.passe.suivant": "Pacco successivo",
   "v2.reglage.lib": "Design precedente",
   "v2.reglage.desc": "Torna all'aspetto precedente su questo dispositivo. Dati e impostazioni restano uguali.",
-  "v2.aEnvoyer.aria": "{n} pacchi da spedire",
   "v2.aEnvoyer.mot": {
     "one": "pacco da spedire",
     "other": "pacchi da spedire"
   },
   "v2.pasLu": "non ancora letto",
   "v2.rienAEnvoyer": "niente da spedire",
-  "v2.ecart": "{p} pronti da stampare · {r} non ancora pronti",
-  "v2.prets": {
-    "one": "{n} etichetta pronta",
-    "other": "{n} etichette pronte"
-  },
   "v2.pretsAuMoins": {
     "one": "almeno {n} etichetta pronta",
     "other": "almeno {n} etichette pronte"
@@ -48,7 +42,6 @@ export default {
     "one": "il primo tra {n} giorno",
     "other": "il primo tra {n} giorni"
   },
-  "v2.afaire.titre": "Da fare",
   "v2.g.messages": {
     "one": "{n} messaggio da leggere",
     "other": "{n} messaggi da leggere"
@@ -71,11 +64,9 @@ export default {
   "v2.passe.limiteInconnue": "scadenza non indicata",
   "v2.passe.qr": "QR di ritiro",
   "v2.passe.codeAVenir": "codice non ancora letto",
-  "v2.passe.enGrand": "A schermo intero",
   "v2.passe.relier": "Collega l’acquisto",
   "v2.passe.retire": "L’ho ritirato",
   "v2.passe.page": "{i} di {n}",
-  "v2.passe.aucun": "Nessun pacco da ritirare per ora.",
   "v2.passe.detail": "Tutti i dettagli dei ritiri",
   "v2.enRoute.titre": "In viaggio",
   "v2.enRoute.sansTitre": "Acquisto senza titolo",
@@ -192,7 +183,6 @@ export default {
   "v2.style.studio": "Studio blu",
   "v2.style.studio.desc": "Lo sfondo blu e il vetro di prima.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.aria": "Le vendite di oggi, della settimana e del mese",
   "v2.jour.auj": "oggi",
   "v2.jour.hier": "ieri",
   "v2.jour.le": "{quand}",
@@ -206,7 +196,6 @@ export default {
     "other": "{n} vendite"
   },
   "v2.jour.pasSu": "vendite non ancora lette",
-  "v2.mois.titre": "Questo mese",
   "v2.mois.vendu": "Venduto",
   "v2.mois.recu": "Ricevuto",
   "v2.mois.benefice": "Utile",
@@ -214,7 +203,6 @@ export default {
     "one": "{k} vendita su {n}",
     "other": "{k} vendite su {n}"
   },
-  "v2.mois.aria": "{mois}: venduto, ricevuto, utile — apri Denaro",
   "v2.envoyer.titre": "Da spedire",
   "v2.bande.plus": {
     "one": "{n} altro pacco da spedire",
@@ -232,13 +220,8 @@ export default {
     "other": "{n} resi da consegnare oggi o domani"
   },
   "v2.reg.titre": "Da sistemare",
-  "v2.reg.titreN": {
-    "one": "Da sistemare: {n} cosa",
-    "other": "Da sistemare: {n} cose"
-  },
   "v2.reg.toutVoir": "Vedi tutto · {n}",
   "v2.reg.moins": "Vedi meno",
-  "v2.reg.ouvrir": "Apri",
   "v2.reg.completer": "Completa i miei annunci",
   "v2.reg.completerN": "Completa i miei annunci · {n}",
   "v2.jour.lecture": "lettura…",

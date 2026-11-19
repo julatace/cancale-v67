@@ -7,18 +7,12 @@ export default {
   "v2.passe.suivant": "Next parcel",
   "v2.reglage.lib": "Previous design",
   "v2.reglage.desc": "Go back to the previous look on this device. Your data and settings stay the same.",
-  "v2.aEnvoyer.aria": "{n} parcels to send",
   "v2.aEnvoyer.mot": {
     "one": "parcel to send",
     "other": "parcels to send"
   },
   "v2.pasLu": "not read yet",
   "v2.rienAEnvoyer": "nothing to send",
-  "v2.ecart": "{p} ready to print · {r} not ready yet",
-  "v2.prets": {
-    "one": "{n} label ready",
-    "other": "{n} labels ready"
-  },
   "v2.pretsAuMoins": {
     "one": "at least {n} label ready",
     "other": "at least {n} labels ready"
@@ -48,7 +42,6 @@ export default {
     "one": "first one in {n} day",
     "other": "first one in {n} days"
   },
-  "v2.afaire.titre": "To do",
   "v2.g.messages": {
     "one": "{n} message to read",
     "other": "{n} messages to read"
@@ -71,11 +64,9 @@ export default {
   "v2.passe.limiteInconnue": "deadline not given",
   "v2.passe.qr": "Pickup QR code",
   "v2.passe.codeAVenir": "code not read yet",
-  "v2.passe.enGrand": "Full screen",
   "v2.passe.relier": "Link the purchase",
   "v2.passe.retire": "I picked it up",
   "v2.passe.page": "{i} of {n}",
-  "v2.passe.aucun": "No parcel to pick up for now.",
   "v2.passe.detail": "Full pickup details",
   "v2.enRoute.titre": "On the way",
   "v2.enRoute.sansTitre": "Untitled purchase",
@@ -192,7 +183,6 @@ export default {
   "v2.style.studio": "Blue studio",
   "v2.style.studio.desc": "The previous blue background and glass.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.aria": "Sales today, this week and this month",
   "v2.jour.auj": "today",
   "v2.jour.hier": "yesterday",
   "v2.jour.le": "{quand}",
@@ -206,7 +196,6 @@ export default {
     "other": "{n} sales"
   },
   "v2.jour.pasSu": "sales not read yet",
-  "v2.mois.titre": "This month",
   "v2.mois.vendu": "Sold",
   "v2.mois.recu": "Received",
   "v2.mois.benefice": "Profit",
@@ -214,7 +203,6 @@ export default {
     "one": "{k} sale out of {n}",
     "other": "{k} sales out of {n}"
   },
-  "v2.mois.aria": "{mois}: sold, received, profit — open Money",
   "v2.envoyer.titre": "To ship",
   "v2.bande.plus": {
     "one": "{n} more parcel to ship",
@@ -232,13 +220,8 @@ export default {
     "other": "{n} returns to drop off today or tomorrow"
   },
   "v2.reg.titre": "To sort out",
-  "v2.reg.titreN": {
-    "one": "To sort out: {n} item",
-    "other": "To sort out: {n} items"
-  },
   "v2.reg.toutVoir": "See all · {n}",
   "v2.reg.moins": "See less",
-  "v2.reg.ouvrir": "Open",
   "v2.reg.completer": "Complete my listings",
   "v2.reg.completerN": "Complete my listings · {n}",
   "v2.jour.lecture": "reading…",

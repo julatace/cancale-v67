@@ -12,14 +12,11 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Groupe, Rangee, Vignette } from '../natif/index.js';
-import { groupesDe, lireARegler, abonnerARegler, atelierCompleter } from './aRegler.js';
+import { groupesDe, atelierCompleter } from './aRegler.js';
+import { useARegler } from './useARegler.js';
+export { useARegler };
 
 const VISIBLES = 3;
-
-// La publication, relue quand elle change (un écran gardé qui revient la relit aussi).
-export function useARegler() {
-  return React.useSyncExternalStore(abonnerARegler, lireARegler, () => null);
-}
 
 export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) {
   const pub = useARegler();
