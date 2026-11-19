@@ -40,6 +40,7 @@ export default {
   "agent.preciser": "Clarify",
   "agent.question.titre": "No.{n} · to clarify",
   "agent.question.titreSans": "To clarify",
+  "agent.question.aucune": "Answer at least one question",
   "agent.question.retenu": "Your answers are kept: the same category or brand won't be asked again.",
   "agent.question.pourTous": "For all sites",
   "agent.question.pourSite": "For {site}",

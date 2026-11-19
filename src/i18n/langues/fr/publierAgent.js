@@ -31,6 +31,7 @@ export default {
   "agent.preciser": "Préciser",
   "agent.question.titre": "N°{n} · à préciser",
   "agent.question.titreSans": "À préciser",
+  "agent.question.aucune": "Réponds à au moins une question",
   "agent.question.retenu": "Tes réponses sont retenues : la même catégorie ou la même marque ne te sera plus demandée.",
   "agent.question.pourTous": "Pour tous les sites",
   "agent.question.pourSite": "Pour {site}",

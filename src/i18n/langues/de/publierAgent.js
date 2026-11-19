@@ -40,6 +40,7 @@ export default {
   "agent.preciser": "Klären",
   "agent.question.titre": "Nr. {n} · zu klären",
   "agent.question.titreSans": "Zu klären",
+  "agent.question.aucune": "Beantworte mindestens eine Frage",
   "agent.question.retenu": "Deine Antworten werden gemerkt: dieselbe Kategorie oder Marke wird nicht mehr gefragt.",
   "agent.question.pourTous": "Für alle Seiten",
   "agent.question.pourSite": "Für {site}",

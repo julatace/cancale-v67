@@ -40,6 +40,7 @@ export default {
   "agent.preciser": "Precisar",
   "agent.question.titre": "N.º{n} · por precisar",
   "agent.question.titreSans": "Por precisar",
+  "agent.question.aucune": "Responde al menos a una pregunta",
   "agent.question.retenu": "Tus respuestas se guardan: no se te volverá a preguntar la misma categoría ni la misma marca.",
   "agent.question.pourTous": "Para todos los sitios",
   "agent.question.pourSite": "Para {site}",

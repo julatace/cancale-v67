@@ -21,7 +21,7 @@
 
   /* L'étiquette douce : neutre ; accent = prêt / sûre ; ambre = un geste à faire. Jamais de rouge ni de vert. */
   .n-pa-etiquette { display: inline-block; padding: 3px 10px; border-radius: 999px; font: var(--n-t-legende-fort); white-space: nowrap; background: var(--n-carte-2); color: var(--n-encre-2); }
-  .n-pa-etiquette[data-pa-ton="accent"] { background: var(--n-teinte); color: var(--n-accent); }
+  .n-pa-etiquette[data-pa-ton="accent"] { background: var(--n-teinte); color: var(--n-encre); }
   .n-pa-etiquette[data-pa-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
 
   .n-pa-qs { display: flex; flex-direction: column; }

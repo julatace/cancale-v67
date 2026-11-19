@@ -199,7 +199,8 @@ export function planSite(fiche, site, memoire, ctx = {}) {
   const f = fiche || { champs: {}, conflits: {}, manques: CHAMPS_FICHE.slice() };
   const mem = lireMemoireAgent(memoire);
   const out = { site, etat: 'pret', valeurs: {}, origine: {}, questions: [], refus: null, chemin: '' };
-  const refuser = (code, extra = {}) => { out.etat = 'refus'; out.refus = { code, ...extra }; return out; };
+  // Un site qui refuse ne pose plus aucune question (rien à préciser pour un article qu'il ne vendra pas).
+  const refuser = (code, extra = {}) => { out.etat = 'refus'; out.refus = { code, ...extra }; out.questions = []; return out; };
   if (ctx.deja && ctx.deja[site] === true) { out.etat = 'deja'; return out; }
   if (!f.numero) return refuser('sans-numero');
   if (ctx.ext && ctx.ext[site] === false) return refuser('extension');

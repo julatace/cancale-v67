@@ -114,7 +114,7 @@ function FeuilleQuestion({ cible, onFermer, onEnregistrer }) {
   const refus = cible.plans.filter((p) => p.refus && p.refus.code === 'marque-hors-liste');
   return (
     <Feuille ouverte onFermer={onFermer} titre={fiche.numero ? tr('agent.question.titre', { n: fiche.numero }) : tr('agent.question.titreSans')} detentes={['moitie', 'pleine']} attrs={{ 'data-pa-question': fiche.cle }}
-      pied={<Bouton variante="plein" indisponible={!nRep} raison={!nRep ? tr('agent.choisir') : ''} onClick={enregistrer} attrs={{ 'data-pa-enregistrer': String(nRep) }}>{tr('agent.enregistrer')}</Bouton>}>
+      pied={<Bouton variante="plein" indisponible={!nRep} raison={!nRep ? tr('agent.question.aucune') : ''} onClick={enregistrer} attrs={{ 'data-pa-enregistrer': String(nRep) }}>{tr('agent.enregistrer')}</Bouton>}>
       {tous.length ? <Groupe titre={tr('agent.question.pourTous')}><div className="n-pa-qs">{tous.map(champ)}</div></Groupe> : null}
       {parSite.map(([s, l]) => <Groupe key={s} titre={tr('agent.question.pourSite', { site: NOM[s] })}
         pied={s === 'vestiaire' && refus.length ? tr('agent.refus.marque-hors-liste', { marque: refus[0].refus.marque }) : ''}><div className="n-pa-qs">{l.map(champ)}</div></Groupe>)}
@@ -206,14 +206,18 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
   const cellule = (l, p) => { const e = etatCase(l, p); const nq = p.questions.filter((x) => x.bloque).length;
     return <td key={p.site} className="n-pa-td" data-pa-col={p.site} data-pa-etat={e} title={p.refus ? tr('agent.refus.' + p.refus.code, { marque: p.refus.marque || '' }) : texteRelu(l, p) || undefined}><Etiquette etat={e} n={nq}/></td>; };
   const ouvrir = (l) => setQuestion(l.f.cle);
-  const sousDe = (l) => [l.f.champs.categorie ? libelleCategorie(l.f.champs.categorie.v) : tr('agent.sansCategorie'),
-    ...l.plans.map((p) => { const e = etatCase(l, p); const nq = p.questions.filter((x) => x.bloque).length; return NOM[p.site] + ' ' + (e === 'question' && nq ? tr('agent.questions', { n: nq }) : tr('agent.etat.' + e)).toLowerCase(); })].join(' · ');
+  // Au téléphone : la catégorie, puis les sites prêts ; l'étiquette dit ce qui reste à faire (une question l'emporte).
+  const sousDe = (l) => { const prets = l.plans.filter((p) => etatCase(l, p) === 'pret').map((p) => NOM[p.site]);
+    return [l.f.champs.categorie ? libelleCategorie(l.f.champs.categorie.v) : tr('agent.sansCategorie'), prets.length ? tr('agent.etat.pret') + ' : ' + prets.join(', ') : ''].filter(Boolean).join(' · '); };
+  const resume = (l) => { const e = l.plans.map((p) => etatCase(l, p)); const nq = l.q.questions.filter((x) => x.bloque).length;
+    if (e.includes('question') && nq) return <Etiquette etat="question" n={nq}/>; if (e.includes('ecart')) return <Etiquette etat="ecart"/>;
+    for (const k of ['envoi', 'attente', 'parti', 'pret', 'ok', 'echec', 'pasEncore', 'nonRelisible', 'deja', 'refus']) if (e.includes(k)) return <Etiquette etat={k}/>; return null; };
 
   const outils = (
     <div className="n-pa-outils" data-pa-outils="">
       <Segmente libelle={tr('agent.vue.libelle')} valeur={vue} onChange={setVue} options={[{ cle: 'articles', libelle: tr('agent.vue.articles') }, { cle: 'couverture', libelle: tr('agent.vue.couverture') }]}/>
       <div className="n-pa-outils-d">
-        <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-pa-sites': sitesVus.join(',') }}>{tr('agent.sitesChoisis', { liste: sitesVus.map((s) => NOM[s]).join(', ') || '—' })}</Bouton>
+        <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-pa-sites': sitesVus.join(',') }}>{tr('agent.sitesChoisis', { liste: ordinateur ? (sitesVus.map((s) => NOM[s]).join(', ') || '—') : String(sitesVus.length) })}</Bouton>
         <Bouton variante="texte" onClick={() => setTic((t) => t + 1)} attrs={{ 'data-pa-relire': '' }}>{tr('agent.relire')}</Bouton>
       </div>
     </div>
@@ -234,8 +238,8 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
         </tr></thead>
         <tbody>{lignes.map((l) => (
           <tr key={l.f.cle} className="n-pa-tr" tabIndex={0} data-pa-article={l.f.cle} data-pa-questions={String(l.q.questions.length)} onClick={() => ouvrir(l)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrir(l); } }}>
-            <td className="n-pa-td n-pa-td-article"><Vignette src={l.a.photo || ''} alt="" taille={44}/><span className="n-pa-article"><span className="n-pa-article-titre">{l.a.titre || '—'}</span>
-              <span className="n-pa-article-sous">{[l.f.numero ? 'N°' + l.f.numero : '', l.f.champs.pointure ? l.f.champs.pointure.v : '', l.f.champs.marque ? l.f.champs.marque.v : ''].filter(Boolean).join(' · ') || ' '}</span></span></td>
+            <td className="n-pa-td"><div className="n-pa-td-article"><Vignette src={l.a.photo || ''} alt="" taille={44}/><span className="n-pa-article"><span className="n-pa-article-titre">{l.a.titre || '—'}</span>
+              <span className="n-pa-article-sous">{[l.f.numero ? 'N°' + l.f.numero : '', l.f.champs.pointure ? l.f.champs.pointure.v : '', l.f.champs.marque ? l.f.champs.marque.v : ''].filter(Boolean).join(' · ') || ' '}</span></span></div></td>
             <td className="n-pa-td" data-pa-col="categorie" data-pa-vide={l.f.champs.categorie ? undefined : '1'}>{l.f.champs.categorie ? libelleCategorie(l.f.champs.categorie.v) : tr('agent.sansCategorie')}</td>
             {l.plans.map((p) => cellule(l, p))}
           </tr>))}</tbody>
@@ -244,7 +248,7 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
   );
   const rangees = () => (
     <Groupe attrs={{ 'data-pa-liste': '' }}>{lignes.map((l) => <Rangee key={l.f.cle} vignette={<Vignette src={l.a.photo || ''} alt=""/>} titre={l.a.titre || '—'} lignes={2} sousTitre={sousDe(l)} sousLignes={2}
-      plaque={l.f.numero ? <Plaque numero={l.f.numero}/> : null} ton={l.plans.some((p) => etatCase(l, p) === 'question' || etatCase(l, p) === 'ecart') ? 'ambre' : 'neutre'} fin="chevron" onClick={() => ouvrir(l)}
+      plaque={l.f.numero ? <Plaque numero={l.f.numero}/> : null} pastille={resume(l)} fin="chevron" onClick={() => ouvrir(l)}
       attrs={{ 'data-pa-article': l.f.cle, 'data-pa-questions': String(l.q.questions.length) }}/>)}</Groupe>
   );
   const cv = Array.isArray(lignes) ? couverture(lignes.map((l) => l.f), mem, { corr }) : null;
