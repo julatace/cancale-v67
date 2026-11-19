@@ -119,5 +119,6 @@ export default {
   "vn.toutes": "Tutte le vendite",
   "vn.filtrer": "Filtra",
   "vn.plus": "Altre azioni",
-  "vn.terminees": "Concluse"
+  "vn.terminees": "Concluse",
+  "vn.detailVide": "Tocca una vendita per vederla qui."
 };

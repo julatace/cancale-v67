@@ -26,4 +26,5 @@ export { Page, PagePoussee, ChampRecherche, ContexteCoque } from './Page.jsx';
 export { BarreOnglets } from './BarreOnglets.jsx';
 export { BarreLaterale } from './BarreLaterale.jsx';
 export { Coque, Avatar, useOrdinateur, LARGEUR_ORDINATEUR } from './Coque.jsx';
+export { Volets } from './Volets.jsx';
 export { TIRET, estVide, cx } from './outils.js';

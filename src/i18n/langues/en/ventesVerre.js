@@ -119,5 +119,6 @@ export default {
   "vn.toutes": "All sales",
   "vn.filtrer": "Filter",
   "vn.plus": "More actions",
-  "vn.terminees": "Completed"
+  "vn.terminees": "Completed",
+  "vn.detailVide": "Tap a sale to see it here."
 };

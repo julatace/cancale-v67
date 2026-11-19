@@ -10,7 +10,7 @@
 // Aucun style en ligne, aucune classe de mise en page, aucune couleur : des composants de src/natif/.
 import React from 'react';
 import { tr } from '../../i18n/index.js';
-import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Affiche, Vide, Attente, Faits, Fait, Feuille, poserIcone, iconePosee } from '../index.js';
+import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Affiche, Vide, Attente, Faits, Fait, Feuille, Volets, poserIcone, iconePosee } from '../index.js';
 import { filtrerRangs, rangChoisi } from '../../ventes/modeleVentes.js';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
@@ -144,7 +144,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
   const actionPlateforme = <>{filtre}{surEnvoyer ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   return (
-    <>
+    <Volets detailVide={<Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>} attrs={{ 'data-vn-volets': '' }}>
       <Page titre={tr('vn.titre')} plein={plein} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet }}
         recherche={m.onglet !== 'toutes' ? <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')} onScanner={g.retrouver} attrs={{ 'data-vn-champ': '' }}/> : null}>
         <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
@@ -199,6 +199,6 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
       {plateforme ? <Feuille ouverte={feuillePlateforme} onFermer={() => setFeuillePlateforme(false)} titre={tr('vn.plateformes')} detente="moitie">
         <Groupe>{plateforme.options.map((o) => <Rangee key={o.cle} titre={o.libelle} fin={o.cle === plateforme.cle ? 'coche' : null} onClick={() => { setFeuillePlateforme(false); plateforme.onChoisir(o.cle); }} attrs={{ 'data-vn-plateforme-choix': o.cle }}/>)}</Groupe>
       </Feuille> : null}
-    </>
+    </Volets>
   );
 }

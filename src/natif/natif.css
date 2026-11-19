@@ -541,6 +541,19 @@
     .n-toast { left: auto; right: 24px; margin: 0; width: 380px; }
   }
 
+  /* ── Volets : la liste et son détail dans un écran (ordinateur seulement ; au téléphone le composant ne rend rien) ── */
+  .n-volets {
+    --n-l-liste: 520px;
+    display: grid; grid-template-columns: minmax(380px, var(--n-l-liste)) minmax(0, 1fr); align-items: start;
+    min-height: 100%; background: var(--n-fond);
+  }
+  .n-volets-liste { min-width: 0; align-self: stretch; display: flex; flex-direction: column; border-inline-end: .5px solid var(--n-trait); }
+  .n-volets-liste > .n-page { flex: 1 0 auto; }
+  .n-volets-detail { position: sticky; top: 0; height: 100dvh; min-width: 0; overflow: hidden; background: var(--n-fond); }
+  .n-volets-fente { display: contents; }
+  .n-volets-vide { display: none; height: 100%; align-items: center; justify-content: center; }
+  .n-volets-fente:empty ~ .n-volets-vide { display: flex; }
+
   /* ── le survol, seulement là où il existe (souris) ──────────────────────── */
   @media (hover: hover) and (pointer: fine) {
     .n-rangee[data-n-touche] .n-rangee-corps:hover::after { opacity: .5; }
