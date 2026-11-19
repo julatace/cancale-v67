@@ -49343,11 +49343,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
     {id:'messages-vinted',libelle:'Conversations Vinted',onglet:'cat_msg',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(convs.items)?convs.items.map(c=>({id:c.id,compte:String(c._acc?.vinted_user_id||''),titre:c.description||c.title||c.opposite_user?.login,valeurs:[c.last_message,c.updated_at,c.unread]})):null,charge:convs.loading,erreur:convs.error,echecs:(convs.ko||[]).map(a=>String(a.vinted_user_id)),partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_inbox`])}
   ];
+  const natifVentes = VENTES_NATIF && colisDans === 'ventes' && ongletColis !== 'toutes';
   return (
     // (11 nov., lot ventes-achats-visuel) En SECTION de Ventes / Achats (`colisDans`), le bas de 40 px de l'ancien
     // écran Colis laissait un trou avant la suite de l'écran : 12 px suffisent ; les outils de « À retirer »
     // (montés à part, `retraitsOutils`) n'ajoutent plus que ce qu'ils montrent.
-    <div style={{padding: colisDans ? '16px 14px 12px' : retraitsOutils ? '0 14px' : '16px 14px 40px'}} data-colis-dans={colisDans || undefined}>
+    // (19 nov., « VRM natif ») Ventes (À envoyer, En route) : l'écran natif pose ses propres marges — ni le cadre de
+    // 14–16 px d'avant, ni `data-colis-dans` (que des règles d'avant élargissaient en !important) : la liste reprend sa place.
+    <div style={{padding: natifVentes ? 0 : colisDans ? '16px 14px 12px' : retraitsOutils ? '0 14px' : '16px 14px 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {emballage && (()=>{
         // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).
