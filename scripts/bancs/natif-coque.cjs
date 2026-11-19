@@ -21,11 +21,13 @@ require('./_porte-banc.cjs');
 //        les cinq onglets en tête, puis Stock, Messages, E-mails, Tout va bien ?, Notifications, Paramètres, Communauté ;
 //        l'entrée active ≥ 4,5:1 ; aucun débordement horizontal ;
 //  Les deux :
-//    K8  changer d'onglet ne restyle pas le document : trace Chrome, aucune tâche de style (UpdateLayoutTree) > 50 ms de
-//        THREAD pour un écran déjà visité, et le nombre d'éléments restylés au retour reste petit (≤ 3 000).
-//        (La machine est partagée : on juge le temps de thread et les comptes, jamais l'horloge.)
+//    K8a changer d'onglet ne restyle pas le document : trace Chrome (InvalidationTracking), aucune invalidation de style
+//        sur <html>, <body> ou la racine de la coque ;
+//    K8b aucune tâche de style (UpdateLayoutTree) > 50 ms de THREAD au retour sur un écran déjà visité (≤ 3 000 éléments).
+//        (La machine est partagée : on juge le temps de thread et les comptes, jamais l'horloge.) La tâche la plus lourde
+//        est l'écran gardé qui ré-apparaît (moteur `src/ecransGardes.jsx`) : mesurée aussi sur le build d'avant.
 //  Mutations (rouge attendu) : MUTATION=dessous (l'écran passe sous la barre) ⇒ K2 ; MUTATION=largeur (un onglet plus
-//  large) ⇒ K1 ; MUTATION=restyle (un attribut posé sur <body> à chaque toucher, lu par une règle universelle) ⇒ K8.
+//  large) ⇒ K1 ; MUTATION=restyle (un attribut posé sur <body> à chaque toucher, lu par une règle universelle) ⇒ K8a.
 //  `BANC_DIST=…` juge un autre build ; `SHOTS=dossier` garde les captures (regarde-les) ; `DSF=2` des captures nettes.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -76,6 +78,8 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee', dsf: DSF });
   await pret(pg); await poser(pg); await pg.evaluate(MESURE_CONTRASTE);
   const t = `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`;
+  // K8_SEUL=1 : la seule mesure du changement d'onglet (pour la comparer à un build d'AVANT, qui n'a pas la coque native).
+  if (process.env.K8_SEUL) { await k8(pg, t, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true); await ctx.close(); return; }
   // K1
   const k1 = await pg.evaluate(() => {
     const bar = document.querySelector('[data-n-onglets]'); if (!bar) return null;
@@ -146,7 +150,7 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     if (id === 'ventes' && !sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-ventes.png') });
   }
   erreursTout.push(...erreurs);
-  await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, '[data-n-onglet="%s"]', true);
+  await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);
   await ctx.close();
 }
 
@@ -155,6 +159,7 @@ async function ordinateur(nav, b, W, sombre, nomBase, erreursTout) {
   if (W !== 1512) await pg.setViewportSize({ width: W, height: 860 });
   await pret(pg); await poser(pg); await pg.evaluate(MESURE_CONTRASTE);
   const t = `${W} ${sombre ? 'sombre' : 'clair'} ${nomBase}`;
+  if (process.env.K8_SEUL) { if (W === 1512) await k8(pg, t, ':is([data-n-laterale], .vrm-sidebar) [data-nav-entree="%s"]', false); await ctx.close(); return; }
   const k7 = await pg.evaluate(() => {
     const lat = document.querySelector('[data-n-laterale]'), main = document.querySelector('.vrm-main');
     if (!lat || !main) return null;
@@ -181,7 +186,7 @@ async function ordinateur(nav, b, W, sombre, nomBase, erreursTout) {
     dit(r.ecran === id && r.actif === id && erreurs.length === n0, `K6 ${t} : ${id} s’ouvre depuis la barre latérale, sans erreur`, { ...r, erreurs: erreurs.slice(n0) });
   }
   erreursTout.push(...erreurs);
-  if (W === 1512) await k8(pg, t, '[data-n-laterale] [data-n-entree="%s"]', false);
+  if (W === 1512) await k8(pg, t, ':is([data-n-laterale], .vrm-sidebar) [data-nav-entree="%s"]', false);
   await ctx.close();
 }
 
@@ -193,7 +198,7 @@ async function k8(pg, t, modele, tactile) {
   const cdp = await pg.context().newCDPSession(pg);
   const evts = [];
   cdp.on('Tracing.dataCollected', (d) => { for (const e of d.value) evts.push(e); });
-  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
+  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.invalidationTracking', transferMode: 'ReportEvents' });
   await toucher('ventes'); await toucher('journee');
   const fini = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
   await cdp.send('Tracing.end'); await fini;
@@ -206,8 +211,25 @@ async function k8(pg, t, modele, tactile) {
   const tailles = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length > 0; const m = document.querySelector('.vrm-main');
     return { document: document.getElementsByTagName('*').length, ecran: m ? [...m.getElementsByTagName('*')].filter(vis).length : 0 }; });
   const top = style.map((e, i) => [Math.round(tdur[i] * 10) / 10, elements[i]]).sort((a, b) => b[0] - a[0]).slice(0, 4);
-  dit(style.length > 0 && pire <= 50 && maxEl <= Math.min(3000, tailles.ecran + 600) && maxEl < tailles.document * 0.6,
-    `K8 ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus (écran montré ${tailles.ecran}, document ${tailles.document})`, { pire, maxEl, n: style.length, top, ...tailles });
+  // K8a — LA COQUE : aucune invalidation de style posée sur <html>, <body> ou la racine de la coque (un attribut qui suit
+  // l'onglet là-haut restylerait tout le document). Lu dans les événements « InvalidationTracking » de la trace.
+  const inval = evts.filter((e) => /InvalidationTracking/.test(e.name) && e.args && e.args.data);
+  // « Affected by :has() » : une règle d'AVANT ancrée sur body / la coque (`body:has(…)`, `.vrm-app-shell:has(…)`) que le
+  // contenu de l'écran réveille — comptée et dite (chantier `claude/lisible-partout`), pas jugée ici : K8a juge ce que la
+  // coque POSE (un attribut, une classe, un style sur html / body / la racine).
+  const enHaut = (e) => /^(HTML|BODY)\b|vrm-app-shell|n-coque'|n-coque /.test(String(e.args.data.nodeName || ''));
+  const parHas = (e) => /:has\(\)/.test(String(e.args.data.reason || ''));
+  // Ce qui est POSÉ là-haut : un attribut, une classe ou un id changé sur html / body / la racine (ScheduleStyleInvalidationTracking).
+  // Les autres invalidations de ces nœuds (focus, survol, style en ligne d'une mesure, :has() d'avant) sont comptées, pas jugées.
+  const pose = (e) => { const d = e.args.data; return d.changedAttribute || d.changedClass || d.changedId; };
+  const haut = inval.filter((e) => enHaut(e) && !parHas(e) && pose(e));
+  const autres = inval.filter((e) => enHaut(e) && !pose(e)).length;
+  const nomsHaut = [...new Set(haut.map((e) => `${e.args.data.nodeName} · ${pose(e)}`))].slice(0, 6);
+  dit(inval.length > 0 && haut.length === 0, `K8a ${t} : la coque ne pose aucun attribut, classe ou id sur <html>, <body> ou sa racine au changement d’onglet (${inval.length} invalidations ; ${haut.length} posées en haut ; ${autres} autres en haut : focus, :has() d’avant, style en ligne)`, nomsHaut);
+  // K8b — le temps de THREAD des tâches de style. ⚠️ La plus lourde est l'écran gardé qui RE-APPARAÎT (src/ecransGardes.jsx,
+  // chantier `claude/vite-et-sans-bug`) : mesuré aussi sur le build d'avant (main ad73a3c7c), voir le récit du 19 nov.
+  dit(style.length > 0 && pire <= 50 && maxEl <= 3000,
+    `K8b ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus, ${style.length} tâches (écran montré ${tailles.ecran}, document ${tailles.document})`, { pire, maxEl, n: style.length, top, ...tailles });
 }
 
 (async () => {
