@@ -151,3 +151,24 @@ suggestion de catégorie eBay) ; PAS D'IA (Julien, même jour : « tu n'intègre
 uniquement des règles, des tables, ce qui est lu et ce qu'il a déjà répondu ; il apprend de chaque réponse. Doute restant ⇒ UNE question groupée par article
 (toutes les inconnues sur un écran, choix du site, réponse retenue). Publie, RELIT, et dit le résultat ; un échec dit
 pourquoi et quoi faire. Garde-fous de l'extension inchangés (son geste, compte de l'onglet, plafonds, une à la fois).
+G ter : « c'est l'extension qui va publier dans tous les cas » — l'agent prépare et décide des champs dans l'app ;
+la PUBLICATION part toujours de l'extension (onglet du site, compte de l'onglet, plafonds), comme aujourd'hui.
+
+### H. Le lien extension ↔ application, compréhensible par n'importe quel vendeur
+Julien : « améliore le lien entre l'extension et l'application : on ne sait pas quand ton compte Vinted est ouvert,
+quelles actions on peut faire, on ne sait rien ; des fois c'est marqué [qu'il y a] trop [d'onglets / de comptes]
+ouverts, vraiment pas clair du tout ; beaucoup mieux accompagné : le vendeur doit comprendre, pour que je n'aie pas trop
+de questions de leur part. »
+À construire : UN endroit unique « Extension » (dans « Plus », et la pastille de la coque y mène), en phrases simples :
+- par navigateur : l'extension est-elle là, à jour, branchée à CE compte VRM (pastille correctifs `vite-et-sans-bug` :
+  « pas dans ce navigateur », « ne répond pas sur cette page ») ;
+- par compte de chaque site : « Vinted · shop_x — ouvert dans ce Chrome · lu il y a 3 min » / « pas ouvert : ouvre
+  vinted.fr connecté à shop_x » ; quel onglet sert à quoi ;
+- CE QUE VRM PEUT FAIRE MAINTENANT pour ce compte, en liste verte / grise avec la raison du gris (« baisser un prix :
+  oui · publier : oui · lire les codes : oui · messages aux favoris : non, Vinted n'est pas ouvert ») ;
+- chaque message d'état réécrit en une phrase + le geste (« deux comptes Vinted sont ouverts dans ce Chrome : VRM
+  n'agit que sur celui de l'onglet actif — garde un seul compte par navigateur »), jamais un terme technique ;
+- un pas-à-pas d'installation et de premier branchement qui vérifie chaque étape en direct (« extension vue ✓ »,
+  « compte Vinted vu ✓ ») ; une aide « Pourquoi ? » d'une ligne par état.
+Mesure d'abord, en prod, les états réellement rencontrés (lignes `ext_appareil_*`, `actions_compte_*`, rapports) et les
+libellés actuels (inventaire de l'audit d'utilité) ; extension probablement touchée ⇒ version unique 5.409.
