@@ -296,6 +296,7 @@ const shot = async (pg, nom) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
         await pg.fill('[data-prix-champ]', '58');
         await pg.click('[data-prix-appliquer]');
         await pg.waitForFunction(() => { const l = document.querySelector('[data-prix-cle="vinted:6134"]'); return l && l.getAttribute('data-prix-etat') === 'refuse'; }, null, { timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(400);   // le plein sort de « chargement » : sa couleur finit sa transition (80 ms) avant la mesure du contraste
         const m = await mesurer(pg);
         await shot(pg, `C-${N}-1-refus`);
         commun(T, m, 'C refus');
@@ -306,6 +307,7 @@ const shot = async (pg, nom) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
         const n0 = await pg.evaluate(() => (window.__cmds || []).length);
         await pg.click('[data-prix-appliquer]');
         await pg.waitForFunction(() => { const l = document.querySelector('[data-prix-cle="vinted:6134"]'); return l && l.getAttribute('data-prix-etat') === 'hausse'; }, null, { timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(400);   // le plein sort de « chargement » : sa couleur finit sa transition (80 ms) avant la mesure du contraste
         const h = await mesurer(pg);
         await shot(pg, `C-${N}-2-hausse`);
         commun(T, h, 'C hausse');
