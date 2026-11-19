@@ -1094,6 +1094,7 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
 import { ordreDeSortie, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
+import './natif/anciens.js';   // (19 nov., « VRM natif ») LE STYLE UNIQUE des écrans pas encore réécrits : leurs jetons d'hier lisent `--n-*` (couche `n-anciens`)
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
@@ -1104,11 +1105,10 @@ import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
-// (17 nov.) LE NOUVEAU DESIGN « Studio Premium », en essai derrière Paramètres → Apparence (`vrm_design_v2`, éteint par
-// défaut : éteint, rien ne change). Ses règles (src/designV2/design-v2.css, importée par ses composants) sont toutes sous
+// (17 nov.) Le design « Studio Premium » — le SEUL depuis le 19 nov. (« VRM natif » : plus d'« Ancien design », src/designV2/reglage.js).
+// Ses règles (src/designV2/design-v2.css, importée par ses composants) sont toutes sous
 // `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
-import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres → Apparence → Style) : `data-theme-style` posé dès l'import, éteint par défaut
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
@@ -63260,7 +63260,7 @@ function AppCoeur() {
       const m = document.querySelector('meta[name="theme-color"]');
       // (15 nov., chantier « ouverture ») Tant que l'écran de démarrage couvre l'app (`data-vrm-boot`), la barre
       // d'état garde le haut de SON dégradé (public/demarrage-theme.js) : elle prend celle de l'app à sa sortie.
-      const poser = () => { if (m) m.setAttribute('content', document.documentElement.getAttribute('data-theme-style') === 'apple' ? (dark ? '#000000' : '#F2F2F7') : (t.haut || t.bg)); };   // (18 nov.) style « Apple » : la barre d'état prend le fond groupé (src/designV2/style.js)   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      const poser = () => { if (m) m.setAttribute('content', dark ? '#000000' : '#F2F2F7'); };   // (19 nov., « VRM natif ») la barre d'état prend le fond de la page (`--n-fond`), jour et nuit
       if (document.documentElement.hasAttribute('data-vrm-boot')) window.addEventListener('vrm:demarrage-fin', poser, { once: true }); else poser();
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
