@@ -244,7 +244,7 @@ function Meubles({ s, zoom, setZoom, vise }) {
         </div>
         <div>
           <h2 className="sm-zoom-nom">{m.name}</h2>
-          <p className="sm-zoom-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}</p>
+          <p className="sm-zoom-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sm-tuile-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</p>
         </div>
         <div className="sm-defile">
           <MeubleDessin m={m} info={(i) => s.caseInfo(m.id, i)} mode="pres" vise={vise && String(vise.m) === String(m.id) ? vise.i : null} onCase={(i) => s.toucherCase(m.id, i)}/>
