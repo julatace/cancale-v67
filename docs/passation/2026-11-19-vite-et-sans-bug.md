@@ -122,4 +122,12 @@ Médianes des 27 seconds passages : **main 1 487 ms** (style 507, 5 236 élémen
   (`lazySur`, 15 nov.).
 - **Erreurs serveur Vercel (7 jours)** : aucune (`get_runtime_errors`), aucune dans la dernière heure des journaux.
 - **« Extension à installer » alors qu'elle est là** (photo du Mac de Julien) : corrigé, `0deda8fb3` (déjà fusionné).
-- **Parcours de tous les écrans** (`parcours-erreurs`) : PARCOURS_RESULTAT
+- **Parcours de tous les écrans** (`parcours-erreurs`, 44 écrans + leurs segments, 390 et 1512) : base de volume et
+  base vide **sans aucun relevé** (ni erreur, ni promesse rejetée, ni écran blanc, ni requête en boucle) ; base en
+  panne (lectures en 503) : **un bug, toujours sur `origin/main`** — l'écran Comptes (Réglages → Comptes, `vintedaccounts`)
+  tombait sur « Cet écran a un souci » : `GroupeComptes` disait bien « — Réessayer » pour une liste « pas su » (`null`),
+  mais `ComptesAutresSites` calculait `liste.length` quand même. En vrai : une lecture de Vestiaire, Leboncoin ou eBay
+  ratée (réseau, base lente) faisait tomber tout l'écran des comptes. Corrigé (src/ecrans/Reglages.jsx) ; contrôle :
+  `BASES=panne ECRANS=vintedaccounts node scripts/bancs/parcours-erreurs.cjs <dist>` — rouge sur le build d'avant
+  (garde-fou affiché, 390 et 1512 ; la « mutation » est le code d'avant, une seule expression), vert après (panne et vide,
+  Comptes, Paramètres, Ma journée : 0 relevé).
