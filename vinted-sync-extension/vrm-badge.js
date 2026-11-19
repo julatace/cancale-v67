@@ -721,6 +721,35 @@
   .etapes5 li[data-fait] { border-color: var(--n-accent); }
   .etapes5 li[aria-current] { color: var(--n-encre); border-color: var(--n-accent); }
   .guide5 { margin: 0 16px 8px; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+
+  /* 5.409 — à l'ordinateur, le grand panneau prend la forme de l'outil de référence : les onglets en BARRE LATÉRALE à
+     gauche, la liste au centre ; Messages en deux volets (liste · conversation). Au téléphone : la liste empilée. */
+  @media (min-width: 1024px) {
+    .carte[data-grand] .listes5 { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 16px; align-items: start; }
+    .carte[data-grand] .seg5 { grid-template-columns: none; grid-auto-flow: row; grid-auto-rows: 44px; background: transparent; padding: 0; gap: 2px; top: 0; }
+    .carte[data-grand] .seg5 button { justify-content: flex-start; text-align: left; padding: 0 12px; border-radius: 10px; color: var(--n-encre); display: flex; align-items: center; }
+    .carte[data-grand] .seg5 button[aria-selected="true"] { background: var(--n-teinte); color: var(--n-accent); box-shadow: none; }
+    .carte[data-grand] .panneau { margin-top: 0; }
+    .carte[data-grand] .reg5 { justify-content: flex-start !important; }
+    .deux5 { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0,1fr); min-height: 60vh; }
+    .gauche5 { border-right: .5px solid var(--n-trait); }
+    .conv5-sous { display: none; }
+  }
+  @media (max-width: 1023px) { .volet5 { display: none; } }
+  .outils5 { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
+  .cherche5 { flex: 1; min-width: 0; min-height: 44px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); padding: 0 12px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .filtre5 { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; cursor: pointer; }
+  .filtre5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
+  .volet5 { padding: 16px; }
+  .vide5 { display: grid; place-content: center; text-align: center; gap: 6px; min-height: 50vh; color: var(--n-encre-2); font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .vide5 b { color: var(--n-encre); font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .conv5 { padding: 8px 0; }
+  .conv5-ph { width: 120px; height: 120px; border-radius: 12px; object-fit: cover; }
+  .conv5-t { display: flex; align-items: baseline; gap: 8px; margin: 8px 0; color: var(--n-encre); }
+  .conv5-t b { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .conv5-t span { color: var(--n-encre-2); font-size: 13px; }
+  .conv5 .bulle { background: var(--n-carte-2); color: var(--n-encre); border-radius: 16px; padding: 10px 14px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; max-width: 520px; }
+  .conv5-sous { padding: 0 16px 12px; }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -1239,11 +1268,17 @@
   // La durée attendue AU VRAI RYTHME : chaque message (ouvrir, l'offre, 8–20 s, le temps de l'écrire)
   // ≈ 45 s, plus l'écart choisi entre deux messages (« Rapide » : 6–10 s), et au plus 15 par heure
   // (sécurité des comptes, 12 nov.) : au-delà, la suite attend l'heure suivante.
+  // 5.409 (Julien : « 4 min entre les messages c'est peut-être beaucoup, on garde toujours le temps aléatoire ») :
+  // le rythme de CET envoi — « Au hasard » 40 à 90 s (défaut), « Plus prudent » 2 à 4 min — choisi à l'étape 3 ;
+  // le serveur tire le temps (api/_lib/favoris-file.js `delaiRythme`), le temps d'écriture s'ajoute.
+  let rythmeFav = null;
+  const rythmeDe = (m) => rythmeFav || (m && ['normal', 'prudent', 'perso'].includes(m.rythme) ? m.rythme : 'normal');
   function dureeFavMs(n, m) {
     n = Math.max(0, Math.round(Number(n) || 0)); if (!n) return 0;
     m = m || {};
     const lo = Number(m.intervalleMinutes) || 0, hi = Number(m.intervalleMaxMinutes) || lo;
-    const ecart = lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
+    const ry = rythmeDe(m);
+    const ecart = ry === 'normal' ? 65 / 60 : ry === 'prudent' ? 3 : lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
     let min = n * 0.75 + (n - 1) * ecart;
     const HEURE = 15;
     if (n > HEURE) min = Math.max(min, Math.floor((n - 1) / HEURE) * 60 + ((n - 1) % HEURE) * Math.max(ecart, 0.75) + 0.75);
@@ -1265,6 +1300,7 @@
       <div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
       <div class="fl-lbl">${esc(TU('fr_message'))}${Number(m.versions) > 1 ? ' · ' + esc(TU('fr_versions', { n: Number(m.versions) })) : ''}</div>
       ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}
+      <div class="vu-seg fl-rythme" role="group" aria-label="${esc(TU('f5_rythme'))}" data-fav-rythme="${esc(rythmeDe(m))}">${['normal', 'prudent'].map((k) => `<button type="button" data-fav-rythme-b="${k}" aria-pressed="${rythmeDe(m) === k ? 'true' : 'false'}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div>
       <div class="fl-duree" data-fav-duree="${dureeFavMs(n, m)}">${esc(TU('fr_duree', { d: U.duree(dureeFavMs(n, m)), h: 15 }))}</div>
       <p class="fl-note">${esc(TU('fr_rien_avant'))}</p>
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
@@ -1341,6 +1377,7 @@
     if (relire) relire.addEventListener('click', () => { favErreur = ''; apercuFav = null; rendre(); chargerFavoris(e, true); });
     const aideB = carte.querySelector('[data-fav-aide]');
     if (aideB) aideB.addEventListener('click', () => { aideFav = !aideFav; rendre(); });
+    carte.querySelectorAll('[data-fav-rythme-b]').forEach((b) => b.addEventListener('click', () => { rythmeFav = b.getAttribute('data-fav-rythme-b'); rendre(); }));
     const lancer = carte.querySelector('[data-fav-lancer]');
     if (lancer) lancer.addEventListener('click', () => {
       const a = apercuFav;
@@ -1354,7 +1391,7 @@
       favOccupe = true; favErreur = ''; rendre();
       // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
       const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
-      demander('lancer', { selection, reglages: a.reglages, confirme: true, items }, (r) => {
+      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
         favOccupe = false;
         if (r && r.ok) {
           const suite = () => { vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); };
@@ -1445,7 +1482,8 @@
   let menuCompteOuvert = false, ongletListe = 'messages', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
   try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (ONGLETS5.includes(g.vrmCarteOnglet)) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
-  const ETAT_VENTE = { a_expedier: 'à expédier', en_route: 'en route', finalisee: 'finalisée', annulee: 'annulée — pas une vente', pas_su: 'état pas encore lu' };
+  // 5.409 (captures « Commandes » de Vintex) : l'état en mots clairs — « Action requise : à expédier » en ambre, le reste neutre.
+  const ETAT_VENTE = { a_expedier: 'Action requise : à expédier', en_route: 'En route : rien à faire', finalisee: 'Terminée', annulee: 'Annulée — pas une vente', pas_su: 'État pas encore lu' };
   function chargerListes(force) {
     if (listesEnVol || !vivant()) return;
     if (!force && listes && Date.now() - listesAt < 60000 && (!porteeTous || Array.isArray(listes.autres))) return;
@@ -1524,6 +1562,14 @@
   }
   // ══ 5.409 — MESSAGES : les conversations du compte de l'onglet (la boîte rangée), du plus récent ═════════
   // Toucher une conversation l'ouvre sur Vinted (la réponse part de Vinted : la carte n'envoie pas encore).
+  // 5.409 (captures « Conversations » de Vintex envoyées par Julien) : deux volets à l'ordinateur — la liste à gauche
+  // (filtre « Non lus · N », recherche), la conversation choisie à droite (article, pseudo, dernier message, la
+  // réponse s'ouvre sur Vinted) ; au téléphone, la liste seule, une conversation dépliée sous sa rangée.
+  let convChoisie = '', msgNonLus = false, msgCherche = '';
+  function convHtml(x, ici) {
+    return `<div class="conv5" data-conv-ouverte="${esc(x.conv)}">${x.photo ? `<img class="conv5-ph" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<div class="conv5-t"><b>${esc(x.qui || '—')}</b><span>${esc(x.at ? depuis(x.at) : '')}</span></div>`
+      + `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div><div class="ge5"><a class="vu-btn vu-plein" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_repondre'))}</a></div></div>`;
+  }
   function messagesHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
@@ -1532,9 +1578,18 @@
     if (!m.liste.length) return `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
+    const q = msgCherche.trim().toLowerCase();
+    const vus = m.liste.filter((x) => (!msgNonLus || x.nonlu) && (!q || String(x.qui).toLowerCase().includes(q) || String(x.texte).toLowerCase().includes(q)));
     const lu = depuis(m.lu);
-    return `<div class="lu" data-messages-nonlus="${nl}">${esc(nl ? TU('m_nonlus', { n: nl }) : TU('m_tous_lus'))}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`
-      + `<ul class="rangs" data-messages="${m.liste.length}" data-defil="messages">${m.liste.map((x) => `<li><a class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="${LISTES ? '_blank' : '_top'}"${LISTES ? ' rel="noopener"' : ''}>${vignette(x.photo)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span><span class="px quand">${esc(x.at ? depuis(x.at) : '')}</span></a></li>`).join('')}</ul>`;
+    const choisie = vus.find((x) => x.conv === convChoisie) || null;
+    const outils = LISTES ? '' : `<div class="outils5"><input type="search" class="cherche5" data-msg-cherche placeholder="${esc(TU('m_chercher'))}" aria-label="${esc(TU('m_chercher'))}" value="${esc(msgCherche)}"><button type="button" class="filtre5" data-msg-nonlus aria-pressed="${msgNonLus ? 'true' : 'false'}">${esc(TU('m_filtre_nonlus', { n: nl }))}</button></div>`;
+    const liste = `<ul class="rangs" data-messages="${vus.length}" data-defil="messages">${vus.map((x) => LISTES
+      ? `<li><a class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="_blank" rel="noopener">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span></a></li>`
+      : `<li${x.conv === convChoisie ? ' data-ouverte' : ''}><button type="button" class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" data-conv-b="${esc(x.conv)}" aria-pressed="${x.conv === convChoisie ? 'true' : 'false'}">${vignette(x.photo)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span><span class="px quand">${esc(x.at ? depuis(x.at) : '')}</span></button>${x.conv === convChoisie ? `<div class="conv5-sous">${convHtml(x, ici)}</div>` : ''}</li>`).join('')}</ul>`;
+    const tete = `<div class="lu" data-messages-nonlus="${nl}">${esc(nl ? TU('m_nonlus', { n: nl }) : TU('m_tous_lus'))}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`;
+    if (LISTES) return tete + liste;
+    const droite = `<div class="volet5" data-volet-conv="${choisie ? esc(choisie.conv) : ''}">${choisie ? convHtml(choisie, ici) : `<div class="vide5"><b>${esc(TU('m_choisir'))}</b><span>${esc(TU('m_choisir_note'))}</span></div>`}</div>`;
+    return `<div class="deux5"><div class="gauche5">${outils}${tete}${vus.length ? liste : `<div class="val gris" data-messages-filtre="0">${esc(TU('m_aucun_filtre'))}</div>`}</div>${droite}</div>`;
   }
   function autresHtml() {
     if (!porteeTous) return '';
@@ -1583,6 +1638,9 @@
       chargerListes(porteeTous);
       if (LISTES) rendreListesSeules(); else rendre();
     }));
+    racine.querySelectorAll('[data-conv-b]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-conv-b'); convChoisie = convChoisie === k ? '' : k; rendre(); }));
+    const nlB = racine.querySelector('[data-msg-nonlus]'); if (nlB) nlB.addEventListener('click', () => { msgNonLus = !msgNonLus; rendre(); });
+    const ch = racine.querySelector('[data-msg-cherche]'); if (ch) ch.addEventListener('input', () => { msgCherche = ch.value; const pos = ch.selectionStart; rendre(); const n = carte.querySelector('[data-msg-cherche]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } });
     // 5.409 : toucher une rangée déplie SA fiche (une à la fois) ; la retoucher la replie.
     racine.querySelectorAll('[data-fiche-b]').forEach((b) => b.addEventListener('click', () => {
       const k = b.getAttribute('data-fiche-b'); ficheOuverte = ficheOuverte === k ? '' : k;

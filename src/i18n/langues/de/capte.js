@@ -52,4 +52,9 @@ export default {
   "capte.arrivee.refus.prudence": "Konto 24 Std. im Vorsichtsmodus: VRM macht langsamer",
   "capte.arrivee.refus.moderation": "Vinted hat dieses Konto moderiert: VRM hat angehalten",
   "capte.arrivee.refus.deconnecte": "Dieses Konto ist auf vinted.fr nicht mehr angemeldet",
+  // (19 nov., ext. 5.409) le rythme des messages aux favoris — src/FavorisVinted.jsx
+  "favoris.rythme.normal": "Zufällig · 40 bis 90 s",
+  "favoris.rythme.prudent": "Vorsichtiger · 2 bis 4 Min.",
+  "favoris.rythme.normalPhrase": "Eine zufällige Pause von 40 bis 90 s zwischen zwei Nachrichten, nie zweimal gleich, plus die Zeit zum Tippen.",
+  "favoris.rythme.prudentPhrase": "Eine zufällige Pause von 2 bis 4 Min. zwischen zwei Nachrichten, plus die Zeit zum Tippen.",
 };

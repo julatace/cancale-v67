@@ -31,6 +31,21 @@ export function delaiFavori(min,max,jeton){
   if(b===a)return a*60000+1000+Math.floor((h/4294967296)*29)*1000;
   return Math.round((a+(h/4294967296)*(b-a))*60)*1000;
 }
+// (19 nov., ext. 5.409 — Julien : « 4 min entre les messages c'est peut-être beaucoup, on garde toujours le temps
+// aléatoire ») LE RYTHME PAR DÉFAUT : entre deux favoris, 40 à 90 s TIRÉES AU HASARD (à la seconde), jamais deux fois
+// de suite la même valeur ; « Plus prudent » : 2 à 4 min. Le temps d'écriture de l'extension (`attendreEcriture`)
+// s'AJOUTE ; aucun plafond ne bouge (15/h favoris, 50/h, réserve 5, plafond du jour, prudence, arrêt captcha :
+// ils restent dans l'extension). `perso` (ou absent sur une ancienne file) = les minutes choisies, comme avant.
+// Déterministe (empreinte du jeton + le temps précédent) : une décision rejouée donne le même temps.
+export const RYTHMES_FAVORIS=Object.freeze({normal:Object.freeze([40000,90000]),prudent:Object.freeze([120000,240000])});
+export function delaiRythme(rythme,jeton,precedent){
+  const b=RYTHMES_FAVORIS[rythme];if(!b)return null;
+  let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
+  const pas=Math.round((b[1]-b[0])/1000)+1;            // 51 secondes possibles (40…90), 121 (120…240)
+  let k=Math.floor((h/4294967296)*pas);
+  if(b[0]+k*1000===Number(precedent))k=(k+1+(h%(pas-1)))%pas;   // jamais deux fois de suite la même valeur
+  return b[0]+k*1000;
+}
 export function initialiserFile(d){
   if(d==null)return {version:1,groupes:{},tentatives:[],enCours:null};
   if(d.version!==1||!d.groupes||!Array.isArray(d.tentatives))throw new RefusFavoris('Le format de la file nécessite une vérification.');
@@ -47,7 +62,7 @@ function vueAuto(d,g){
 export function vueFile(d,owner){
   const g=d?.groupes?.[owner];
   const auto=vueAuto(d,g);
-  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
+  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,...(g.rythme?{rythme:g.rythme}:{}),prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
 }
 // L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
 const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
@@ -57,7 +72,8 @@ export const exige5281=j=>/[{}]/.test(String(j?.message||'')+(Array.isArray(j?.v
 // (12 nov., ext. 5.369) `variantes` : ses autres versions du message (2 à 5), copiées dans
 // chaque tentative ; l'extension en tire une, jamais celle du message précédent.
 const variantesValides=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(x=>typeof x==='string'&&x.trim()&&x.length<=2000);
-export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null}){
+export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null}){
+  const ry=RYTHMES_FAVORIS[rythme]?rythme:null;
   d=initialiserFile(d);
   if(!offreValide(offre))throw new RefusFavoris('Offre invalide.',400);
   if(!Array.isArray(targets)||!targets.length||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
@@ -75,11 +91,11 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   // sélectionnable, et seule la relecture du fil chez Vinted le protégeait).
   const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0)).map(x=>x.itemId+':'+x.recipientId));
   const nouveaux=[];
-  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,...(variantesValides(variantes)?{variantes:[...variantes]}:{}),intervalleMinutes,...(max?{intervalleMax:max}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),...(offre?{offre:{mode:offre.mode,valeur:offre.valeur,arrondi:offre.arrondi}}:{}),lot});}}
+  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,...(variantesValides(variantes)?{variantes:[...variantes]}:{}),intervalleMinutes,...(max?{intervalleMax:max}:{}),...(ry?{rythme:ry}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),...(offre?{offre:{mode:offre.mode,valeur:offre.valeur,arrondi:offre.arrondi}}:{}),lot});}}
   if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');
   const anciens=g.jobs.filter(x=>!nouveaux.some(n=>n.id===x.id));
   if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
-  d.groupes[owner]={...g,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes,intervalleMax:max};
+  d.groupes[owner]={...g,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes,intervalleMax:max,rythme:ry};
   d.proprietaires=Object.keys(d.groupes);
   if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
   return {data:d,valeur:vueFile(d,owner)};
@@ -110,7 +126,8 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
     if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;
     return {data:d,valeur:{vue:vueFile(d,owner)}};
   }
-  const delai=j.auto?ecartAutoMs(jeton):delaiFavori(j.intervalleMinutes,j.intervalleMax,jeton);
+  const delai=j.auto?ecartAutoMs(jeton):(RYTHMES_FAVORIS[j.rythme]?delaiRythme(j.rythme,jeton,g.dernierDelai):delaiFavori(j.intervalleMinutes,j.intervalleMax,jeton));
+  if(!j.auto)g.dernierDelai=delai;
   // Le quota du mode auto se compte à la RÉSERVATION (comme `tentatives`) : une
   // réponse perdue ne libère jamais une place.
   if(j.auto)d.autoEnvois=[...(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(x=>x>maintenant-86400000),maintenant];

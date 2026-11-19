@@ -18714,7 +18714,8 @@ async function favorisCarte(msg, sender) {
     if ((await toutArreteDepuis(null)) > 0) return { ok: false, code: 'tout-arrete', raison: '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.' };
     const avant = await lireEtatFavorisCarte();
     if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages });
+    // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
