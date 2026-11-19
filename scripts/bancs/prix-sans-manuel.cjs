@@ -159,7 +159,7 @@ async function ouvrir(pg, num) {
 const ferme = async (pg) => { for (let i = 0; i < 60; i++) { if (!(await pg.$('[data-prix-partout]'))) return true; await pg.waitForTimeout(150); } return false; };
 // La mesure de la feuille : géométrie, cibles, contrastes — jamais un libellé.
 const mesurer = (pg) => pg.evaluate(() => {
-  const f = document.querySelector('[data-prix-partout] [role="dialog"]'); if (!f) return null;
+  const f = document.querySelector('[role="dialog"][data-prix-partout]'); if (!f) return null;   // (19 nov.) la Feuille du natif porte l'attribut
   const R = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
   const croise = (a, b) => a.x < b.r - 0.5 && b.x < a.r - 0.5 && a.y < b.b - 0.5 && b.y < a.b - 0.5;
   // Les boîtes de TEXTE (au glyphe près : `Range`), par rangée.
@@ -169,12 +169,12 @@ const mesurer = (pg) => pg.evaluate(() => {
   for (let i = 0; i < tous.length; i++) for (let k = i + 1; k < tous.length; k++) { const a = tous[i], b = tous[k]; if (a.p === b.p) continue; if (croise(a, b)) chevauchements.push(a.t + ' ⨯ ' + b.t); }
   const fr = R(f);
   const hors = tous.filter((a) => a.x < fr.x - 0.5 || a.r > fr.r + 0.5).map((a) => a.t);
-  const cibles = [...f.querySelectorAll('button, a, label.pp-coche')].map((el) => ({ t: (el.textContent || el.getAttribute('aria-label') || el.className).trim().slice(0, 20), ...R(el) })).filter((c) => c.h > 0);
+  const cibles = [...f.querySelectorAll('button, a')].map((el) => ({ t: (el.textContent || el.getAttribute('aria-label') || el.className).trim().slice(0, 20), ...R(el) })).filter((c) => c.h > 0);
   const lum = (c) => { const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?/.exec(c) || []; const v = [m[1], m[2], m[3]].map((x) => { x = Number(x) / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return { l: 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2], a: m[4] == null ? 1 : Number(m[4]) }; };
   const fondDe = (el) => { for (let e = el; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (lum(c).a > 0.95) return c; } return 'rgb(255, 255, 255)'; };
   const contrastes = [];
-  for (const el of f.querySelectorAll('.pp-site, .pp-prix, .pp-prix b, .pp-etat, .pp-geste, .pp-plein:not(:disabled), .pp-tete h2, .pp-num, .pp-champ > span:first-child, .pp-mini, .pp-vide')) {
-    if (!el.textContent.trim() || el.closest(':disabled')) continue;
+  for (const el of f.querySelectorAll('.pp-site, .pp-prix, .pp-prix b, .pp-etat, [data-prix-annuler], .pp-plein:not([aria-disabled]), .n-feuille-titre, .n-bouton-raison, .pp-champ > span:first-child, .pp-mini, .n-vide')) {
+    if (!el.textContent.trim() || el.closest(':disabled') || el.closest('[aria-disabled]')) continue;
     const a = lum(getComputedStyle(el).color).l, b = lum(fondDe(el)).l;
     const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
     contrastes.push({ t: el.textContent.trim().slice(0, 24), c: el.className, ratio: Math.round(ratio * 100) / 100 });
@@ -185,7 +185,7 @@ const mesurer = (pg) => pg.evaluate(() => {
     const hautes = new Set(rp.map((r) => Math.round(r.top)));
     return { cle: li.getAttribute('data-prix-cle'), etat: li.getAttribute('data-prix-etat'), mode: li.getAttribute('data-prix-mode'), prix: pl ? pl.textContent : '', uneLigne: hautes.size <= 1,
       phrase: et ? et.textContent : '', sorte: et ? et.getAttribute('data-prix-phrase') : '', dessous: !et || !pl || R(et).y >= Math.max(R(pl).b, si ? R(si).b : 0) - 1,
-      annuler: !!li.querySelector('[data-prix-annuler]'), lien: !!li.querySelector('[data-prix-lien]'), boutons: li.querySelectorAll('button').length };
+      annuler: !!f.querySelector(`[data-prix-annuler-cle="${li.getAttribute('data-prix-cle')}"]`), lien: li.hasAttribute('data-prix-lien'), boutons: li.querySelectorAll('button').length };
   });
   const plein = [...f.querySelectorAll('.pp-plein')];
   return { chevauchements, hors, petites: cibles.filter((c) => c.h < 43.5 || c.w < 43.5).map((c) => c.t + ' ' + Math.round(c.w) + '×' + Math.round(c.h)), faibles: contrastes.filter((c) => c.ratio < 4.5),

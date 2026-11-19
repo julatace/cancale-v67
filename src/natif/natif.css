@@ -254,6 +254,7 @@
   .n-rangee-sous[data-n-ton="ambre"] { color: var(--n-ambre); }
   .n-rangee-sous-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-rangee-sous[data-n-raison] .n-rangee-sous-texte { white-space: normal; overflow-wrap: anywhere; }
+  .n-rangee-sous-texte[data-n-lignes="2"] { white-space: normal; overflow-wrap: anywhere; }
   .n-rangee-detail { grid-column: 2; grid-row: 2; justify-self: end; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; }
   .n-rangee-fin { flex: 0 0 auto; display: flex; align-items: center; color: var(--n-encre-3); }
   .n-rangee-fin .n-rangee-chevron { margin-inline-end: -4px; }

@@ -3,6 +3,7 @@
 // Props :
 //   titre        le texte principal (17/22) — 1 ligne, ou `lignes={2}` pour un titre d'annonce
 //   sousTitre    15/20 gris, une ligne (« N° 124 · 42 · en ligne »)
+//   sousLignes   2 ⇒ le sous-titre peut passer à la ligne (une phrase d'état qu'on ne coupe pas : « En attente : partira dès que… ») — ajout du 19 nov.
 //   valeur       à droite, 17/22 (un prix, un état court) ; `valeurForte` ⇒ en encre et 600
 //   detailValeur sous la valeur, 13/18 gris (« il y a 2 j »)
 //   vignette     <Vignette src=… /> (56 par défaut, `taille={44}` pour la rangée de 56)
@@ -68,7 +69,7 @@ let _fermerOuverte = null;
 const SEUIL = 10;        // px avant de décider que c'est un balayage (et pas un défilement)
 const VITESSE = 0.35;    // px/ms : un coup sec ouvre ou referme, quelle que soit la position
 
-export function Rangee({ titre, sousTitre = '', valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
+export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
   pastille = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
   indisponible = false, raison = '', className = '', attrs = null }) {
   const idAide = React.useId();
@@ -190,7 +191,7 @@ export function Rangee({ titre, sousTitre = '', valeur = null, valeurForte = fal
         {plaque || sous ? (
           <span className="n-rangee-sous" data-n-ton={ton} data-n-seul={detailValeur ? undefined : '1'} data-n-raison={indisponible && raison ? '1' : undefined}>
             {plaque}
-            {sous ? <span className="n-rangee-sous-texte">{sous}</span> : null}
+            {sous ? <span className="n-rangee-sous-texte" data-n-lignes={sousLignes === 2 ? '2' : undefined}>{sous}</span> : null}
           </span>
         ) : null}
         {detailValeur ? <span className="n-rangee-detail">{detailValeur}</span> : null}

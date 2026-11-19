@@ -39,9 +39,14 @@ Puis une photo de son Mac (Annonces → Leboncoin, « Publier sur Leboncoin », 
   prix est maintenant 55 € »), un « pas sûr », une hausse.
 - Leboncoin et Vestiaire : le même geste (recette apprise). Recette pas apprise : une phrase sur la rangée, dite
   avant même d'appliquer.
-- La rangée : le site à gauche, « 59 € → 58 € » sur UNE ligne, l'état dessous, au plus un geste texte à droite
-  (« Annuler » ou « Ouvrir »). Un seul plein. Disposition du contrat « VRM natif » (`docs/design/NATIF.md`),
-  classes `pp-*` (`src/prix-partout.css`), jetons `--n-*` quand ils sont posés, sinon leurs valeurs du contrat.
+- La feuille est la `Feuille` du natif (`src/natif/`, fusionné au commit « FONDATION PRÊTE » 6be64ba5) :
+  le champ du prix, un `Groupe` avec une `Rangee` par site (le site · « 59 € → 58 € » sur UNE ligne en valeur ·
+  l'état dessous, en ambre s'il y a quelque chose à faire), un seul `Bouton` plein « Appliquer » (éteint avec sa
+  raison : « Tape le nouveau prix. »). Toucher la rangée coche / décoche le site ; une rangée qui a quelque chose
+  à faire SUR le site (hausse, refus, format pas appris) ouvre le site dans un nouvel onglet (chevron). « Annuler la
+  baisse en attente sur Vinted » est un bouton texte SOUS le groupe (jamais un bouton dans une rangée, règle du
+  natif). Ajout au natif, sans rien casser : `Rangee sousLignes={2}` (une phrase d'état qu'on ne coupe pas).
+  Les habillages « VRM » / « Apple » / ancien ne s'y appliquent plus ; preuves en natif clair et sombre.
 - « Publier sur Leboncoin » : à l'ouverture, les photos qui manquent sont demandées à l'extension (« lecture… 0 sur
   13 », puis elles apparaissent) ; si elle ne peut pas maintenant : « Les photos seront lues dès que Vinted est
   ouvert sur {compte}. » Les puces de modèles sont précédées de « Insérer : » et montrent ce qui sera inséré

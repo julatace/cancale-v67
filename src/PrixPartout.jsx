@@ -14,7 +14,7 @@
 // Disposition (« VRM natif », docs/design/NATIF.md) : une feuille, un champ, un groupe
 // de rangées (nom du site · « 59 € → 58 € » sur UNE ligne · l'état dessous), UN plein.
 import React from 'react';
-import { createPortal } from 'react-dom';
+import { Feuille, Groupe, Rangee, Bouton, Vide, Attente } from './natif/index.js';
 import { prixTape, minisAuDessus, NOM_SITE, toutEstDit } from './prixPartout.js';
 import { commandeCourante } from './prixAttente.js';
 import { tr } from './i18n/index.js';
@@ -65,7 +65,7 @@ function phrase(e, s, compteDe) {
   return null;
 }
 
-export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null }) {
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -78,11 +78,6 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     neufs.forEach((s) => vus.current.add(s.cle));
     setCoches((c) => { const n = new Set(c); neufs.forEach((s) => n.add(s.cle)); return n; });
   }, [sites]);
-  React.useEffect(() => {
-    const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented && !enCours) { e.preventDefault(); onFermer(); } };
-    window.addEventListener('keydown', k, true);
-    return () => window.removeEventListener('keydown', k, true);
-  }, [onFermer, enCours]);
   const p = prixTape(prix);
   const minis = minisAuDessus(sites, p);
   const nCoches = sites.filter((s) => coches.has(s.cle)).length;
@@ -120,58 +115,55 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     if (ok === true) setEtats((x) => { const n = { ...x }; delete n[s.cle]; return n; });
   };
   if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div className="pp-voile" data-prix-partout={num} onClick={(e) => { if (e.target === e.currentTarget && !enCours) onFermer(); }}>
-      {Retour ? <Retour fermer={onFermer}/> : null}
-      <div className="pp-feuille" role="dialog" aria-modal="true" aria-label={tr('prixPartout.aria', { num })}>
-        <span className="pp-poignee" aria-hidden="true"/>
-        <header className="pp-tete">
-          <h2>{tr('prixPartout.titre')}</h2>
-          <span className="pp-num">N°{num}</span>
-          <button type="button" className="pp-x" aria-label={tr('prixPartout.fermer')} data-prix-fermer="" onClick={onFermer} disabled={enCours}><span aria-hidden="true">×</span></button>
-        </header>
-        <label className="pp-champ">
-          <span>{tr('prixPartout.nouveau')}</span>
-          <span className="pp-champ-saisie">
-            <input inputMode="decimal" autoComplete="off" enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } }}
-              disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
-            <b aria-hidden="true">€</b>
-          </span>
-        </label>
-        <ul className="pp-groupe" data-prix-sites={sites.length}>
-          {sites.map((s) => {
-            const e = etatDe(s);
-            const ph = phrase(e, s, compteDe);
-            const coche = coches.has(s.cle);
-            const cible = p == null ? null : (prixDe ? prixDe(s.site, p) : p);
-            const change = cible != null && s.prix != null && Math.round(cible * 100) !== Math.round(s.prix * 100);
-            return (
-              <li key={s.cle} className="pp-rangee" data-prix-site={s.site} data-prix-cle={s.cle} data-prix-mode={s.mode} data-prix-etat={e && !e.avant ? e.etat : ''} data-prix-relu={e && e.relu ? '1' : ''}>
-                <label className="pp-coche">
-                  <input type="checkbox" checked={coche} onChange={() => basculer(s.cle)} disabled={enCours} data-prix-coche={s.cle} aria-label={NOM_SITE[s.site]}/>
-                </label>
-                <div className="pp-corps">
-                  <div className="pp-ligne">
-                    <b className="pp-site">{NOM_SITE[s.site]}</b>
-                    <span className="pp-prix" data-prix-ligne="">{eur(s.prix)}{change ? <span data-prix-cible={cible}>{' → '}<b>{eur(cible)}</b></span> : null}</span>
-                  </div>
-                  {ph ? <p className={'pp-etat is-' + ph.ton} data-prix-phrase={e.etat} aria-live="polite">
-                    {ph.texte}{ph.raison ? <span data-prix-raison="">{' — ' + ph.raison}</span> : null}
-                  </p> : null}
-                </div>
-                {ph && ph.annuler && onAnnuler ? <button type="button" className="pp-geste" data-prix-annuler={e.idCmd} disabled={annule === e.idCmd || enCours} onClick={() => annuler(s, e)}>{tr('prixPartout.annuler')}</button>
-                  : ph && ph.lien && s.lien ? <a className="pp-geste" href={s.lien} target="_blank" rel="noopener noreferrer" data-prix-lien={s.cle}>{tr('prixPartout.ouvrir')}</a> : null}
-              </li>
-            );
-          })}
-          {manques.map((m) => <li key={'m' + m} className="pp-rangee is-passu" data-prix-passu={m}><div className="pp-corps"><div className="pp-ligne"><b className="pp-site">{m}</b><span className="pp-prix">{tr('prixPartout.passu')}</span></div></div></li>)}
-          {lecture ? <li className="pp-rangee is-passu" data-prix-lecture=""><div className="pp-corps"><div className="pp-ligne"><span className="pp-prix">…</span></div></div></li> : null}
-        </ul>
-        {!lecture && !sites.length && !manques.length ? <p className="pp-vide" data-prix-aucun="">{tr('prixPartout.aucune')}</p> : null}
-        {minis.map((m) => <p key={m.cle} className="pp-mini" data-prix-mini={m.mini}>{tr('prixPartout.mini', { prix: eur(m.mini) })}</p>)}
-        <button type="button" className="pp-plein" data-prix-appliquer="" disabled={p == null || !nCoches || enCours} onClick={appliquer}>
-          {enCours ? tr('prixPartout.envoi') : tr('prixPartout.appliquer')}
-        </button>
-      </div>
-    </div>, document.body);
+  const fermer = () => { if (!enCours) onFermer(); };
+  const aAnnuler = [];   // les baisses qui attendent : « Annuler » sous le groupe (jamais un bouton DANS une rangée)
+  const rangees = sites.map((s) => {
+    const e = etatDe(s);
+    const ph = phrase(e, s, compteDe);
+    const coche = coches.has(s.cle);
+    const cible = p == null ? null : (prixDe ? prixDe(s.site, p) : p);
+    const change = coche && cible != null && s.prix != null && Math.round(cible * 100) !== Math.round(s.prix * 100);
+    if (ph && ph.annuler && onAnnuler) aAnnuler.push({ s, e });
+    // Quelque chose à faire SUR le site (hausse, refus, format pas appris) : la rangée entière l'ouvre (nouvel onglet).
+    const lien = ph && ph.lien && s.lien ? s.lien : '';
+    const valeur = <span className="pp-prix" data-prix-ligne="">{eur(s.prix)}{change ? <span data-prix-cible={cible}>{' → '}<b>{eur(cible)}</b></span> : null}</span>;
+    const sous = ph ? <span className={'pp-etat is-' + ph.ton} data-prix-phrase={e.etat} aria-live="polite">{ph.texte}{ph.raison ? <span data-prix-raison="">{' — ' + ph.raison}</span> : null}</span> : '';
+    return (
+      <Rangee key={s.cle} titre={<span className="pp-site">{NOM_SITE[s.site]}</span>} valeur={valeur} valeurForte={change} sousTitre={sous} sousLignes={2}
+        ton={ph && ph.ton === 'geste' ? 'ambre' : 'neutre'}
+        fin={lien ? 'chevron' : coche ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>}
+        onClick={enCours ? null : lien ? () => { try { window.open(lien, '_blank', 'noopener,noreferrer'); } catch (_) {} } : () => basculer(s.cle)}
+        className="pp-rangee"
+        attrs={{ 'data-prix-site': s.site, 'data-prix-cle': s.cle, 'data-prix-mode': s.mode, 'data-prix-etat': e && !e.avant ? e.etat : '', 'data-prix-relu': e && e.relu ? '1' : '',
+          'data-prix-coche': lien ? undefined : s.cle, 'data-prix-coche-etat': coche ? '1' : '0', ...(lien ? { 'data-prix-lien': s.cle } : {}) }}/>
+    );
+  });
+  const raison = p == null ? tr('prixPartout.raisonPrix') : !nCoches ? tr('prixPartout.raisonSite') : '';
+  return (
+    <Feuille ouverte onFermer={fermer} titre={tr('prixPartout.aria', { num })} className="pp-feuille" attrs={{ 'data-prix-partout': num }}
+      pied={<Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquer')}</Bouton>}>
+      <label className="pp-champ">
+        <span>{tr('prixPartout.nouveau')}</span>
+        <span className="pp-champ-saisie">
+          <input inputMode="decimal" autoComplete="off" enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } }}
+            disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
+          <b aria-hidden="true">€</b>
+        </span>
+      </label>
+      {lecture && !sites.length ? <Attente forme="rangees" n={2}/> : (
+        <Groupe attrs={{ 'data-prix-sites': sites.length }}>
+          {rangees}
+          {manques.map((m) => <Rangee key={'m' + m} titre={m} valeur={tr('prixPartout.passu')} attrs={{ 'data-prix-passu': m }}/>)}
+          {lecture ? <Rangee titre="…" attrs={{ 'data-prix-lecture': '' }}/> : null}
+        </Groupe>
+      )}
+      {aAnnuler.map(({ s, e }) => (
+        <Bouton key={'a' + e.idCmd} variante="texte" large indisponible={annule === e.idCmd || enCours} onClick={() => annuler(s, e)} attrs={{ 'data-prix-annuler': e.idCmd, 'data-prix-annuler-cle': s.cle }}>
+          {tr('prixPartout.annulerSite', { site: NOM_SITE[s.site] })}
+        </Bouton>
+      ))}
+      {!lecture && !sites.length && !manques.length ? <div data-prix-aucun=""><Vide phrase={tr('prixPartout.aucune')}/></div> : null}
+      {minis.map((m) => <p key={m.cle} className="pp-mini" data-prix-mini={m.mini}>{tr('prixPartout.mini', { prix: eur(m.mini) })}</p>)}
+    </Feuille>
+  );
 }

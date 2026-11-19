@@ -498,8 +498,9 @@ const MUT = {
   'app : deux baisses en attente': ['src/prixAttente.js', "for (const v of avant) if (v.etat === 'attente') { const ok = await changerSiAttente(dep, v.id, 'remplacee', maintenant); if (ok === null) return null; }", ''],
   'app : rangée sur lecture ratée': ['src/prixAttente.js', "  if (avant === null) return null;\n  for (const v of avant)", "  for (const v of (avant || []))"],
   'app : se ferme sur un refus': ['src/prixPartout.js', "return l.length > 0 && l.every((e) => e.etat === 'fait' || e.etat === 'attente');", 'return l.length > 0;'],
-  'feuille : second bouton': ['src/PrixPartout.jsx', '<button type="button" className="pp-plein"', '<button type="button" data-prix-proposer="">x</button><button type="button" className="pp-plein"'],
-  'feuille : plein renommé': ['src/PrixPartout.jsx', "{enCours ? tr('prixPartout.envoi') : tr('prixPartout.appliquer')}", "{enCours ? tr('prixPartout.envoi') : etats.x ? 'Appliquer à nouveau' : tr('prixPartout.appliquer')}"],
+  // (19 nov.) la feuille est la Feuille du natif : son plein est un <Bouton variante="plein" className="pp-plein">.
+  'feuille : second bouton': ['src/PrixPartout.jsx', '<Bouton variante="plein" className="pp-plein"', '<Bouton variante="teinte" attrs={{ \'data-prix-proposer\': \'\' }}>x</Bouton><Bouton variante="plein" className="pp-plein"'],
+  'feuille : plein renommé': ['src/PrixPartout.jsx', ">{tr('prixPartout.appliquer')}</Bouton>", ">{etats.x ? 'Appliquer à nouveau' : tr('prixPartout.appliquer')}</Bouton>"],
 };
 
 (async () => {

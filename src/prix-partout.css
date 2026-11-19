@@ -1,97 +1,34 @@
-/* ── LA FEUILLE « CHANGER LE PRIX » (19 nov.) — disposition « VRM natif » (docs/design/NATIF.md) ──
-   Une feuille, un champ, un groupe de rangées (site · « 59 € → 58 € » sur UNE ligne · l'état dessous),
-   UN plein. Jetons `--n-*` du natif quand ils sont posés, sinon leurs valeurs du contrat (clair / sombre
-   choisi : `data-theme`). Grille de 4, cibles ≥ 44, graisses 400 / 600 / 700, jamais sous 13 px.
-   Aucun `!important`, aucun `:has()`, aucune ombre hors la feuille. Classes `pp-*` : rien d'un ancien
-   habillage ne s'y applique. */
-.pp-voile {
-  --pp-fond: var(--n-fond, #F2F2F7); --pp-carte: var(--n-carte, #FFFFFF); --pp-trait: var(--n-trait, rgb(60 60 67 / .18));
-  --pp-encre: var(--n-encre, #111114); --pp-encre-2: var(--n-encre-2, #6C6C70); --pp-encre-3: var(--n-encre-3, #8E8E93);
-  --pp-accent: var(--n-accent, #0068D6); --pp-plein: var(--n-plein, #0068D6); --pp-sur-plein: var(--n-sur-plein, #FFFFFF);
-  --pp-ambre: var(--n-ambre, #8A4B00); --pp-ambre-fond: var(--n-ambre-fond, #FFF4DD);
-  position: fixed; inset: 0; z-index: 9100; background: rgb(0 0 0 / .4);
-  display: flex; align-items: flex-end; justify-content: center;
-  font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; font-variant-numeric: tabular-nums;
+/* ── LA FEUILLE « CHANGER LE PRIX » (19 nov.) — « VRM natif » (docs/design/NATIF.md) ──
+   La feuille, le groupe, les rangées et le plein sont ceux de `src/natif/` (Feuille, Groupe, Rangee, Bouton).
+   Ici seulement ce que le natif n'a pas encore : le champ du prix (34 px, jamais sous 16 : pas de zoom
+   d'iOS), le cercle d'une rangée décochée, le ton des phrases d'état, l'avis « prix mini ».
+   Rien que des jetons `--n-*` ; aucun `!important`, aucun `:has()`. */
+.pp-champ {
+  display: block; margin: 0 var(--n-marge) 24px; padding: 12px 16px 8px; border-radius: var(--n-r-carte);
+  background: var(--n-carte-2); color: var(--n-encre); cursor: text;
 }
-html[data-theme="dark"] .pp-voile {
-  --pp-fond: var(--n-carte, #1C1C1E); --pp-carte: var(--n-carte-2, #2C2C2E); --pp-trait: var(--n-trait, rgb(84 84 88 / .60));
-  --pp-encre: var(--n-encre, #FFFFFF); --pp-encre-2: var(--n-encre-2, #98989F); --pp-encre-3: var(--n-encre-3, #636366);
-  --pp-accent: var(--n-accent, #409CFF); --pp-ambre: var(--n-ambre, #FFB340); --pp-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
-  background: rgb(0 0 0 / .6);
-}
-@media (min-width: 720px) { .pp-voile { align-items: center; } }
-.pp-feuille {
-  box-sizing: border-box; width: 100%; max-width: 520px; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--pp-fond); color: var(--pp-encre); border-radius: 16px 16px 0 0;
-  padding: 8px 16px max(16px, env(safe-area-inset-bottom)); box-shadow: 0 8px 30px rgb(0 0 0 / .12);
-  animation: pp-monte 280ms cubic-bezier(.32, .72, 0, 1);
-}
-@media (min-width: 430px) { .pp-feuille { padding-left: 20px; padding-right: 20px; } }
-@media (min-width: 720px) { .pp-feuille { border-radius: 16px; padding-bottom: 20px; } }
-@keyframes pp-monte { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .pp-feuille { animation: none; } }
-.pp-poignee { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--pp-encre-3); opacity: .5; margin: 0 auto 4px; }
-@media (min-width: 720px) { .pp-poignee { display: none; } }
-.pp-tete { display: flex; align-items: center; gap: 8px; min-height: 52px; }
-.pp-tete h2 { margin: 0; flex: 1; min-width: 0; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; color: var(--pp-encre); }
-.pp-num { flex: none; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--pp-encre-2); padding: 4px 8px; border-radius: 8px; background: var(--pp-carte); }
-.pp-x {
-  flex: none; width: 44px; height: 44px; margin-right: -8px; border: 0; padding: 0; background: transparent; color: var(--pp-encre-2);
-  display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.pp-x > span { width: 30px; height: 30px; border-radius: 50%; background: var(--pp-carte); display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; font-weight: 400; }
-.pp-x:disabled { opacity: .4; cursor: default; }
-
-/* Le champ : libellé 13 gris, le prix en grand (jamais sous 16 px : pas de zoom d'iOS). */
-.pp-champ { display: block; background: var(--pp-carte); border-radius: 12px; padding: 12px 16px 8px; margin: 4px 0 16px; cursor: text; }
-.pp-champ > span:first-child { display: block; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--pp-encre-2); margin-bottom: 4px; }
+.pp-champ > span:first-child { display: block; font: var(--n-t-legende); color: var(--n-encre-2); margin-bottom: 4px; }
 .pp-champ-saisie { display: flex; align-items: baseline; gap: 8px; }
 .pp-champ-saisie input {
-  flex: 1; min-width: 0; width: 100%; height: 48px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent; color: var(--pp-encre);
-  font: inherit; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; border-radius: 0; box-shadow: none; -webkit-appearance: none; appearance: none;
+  flex: 1; min-width: 0; width: 100%; height: 48px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent; color: var(--n-encre);
+  font: var(--n-t-grand); font-variant-numeric: tabular-nums; border-radius: 0; box-shadow: none; -webkit-appearance: none; appearance: none;
 }
-.pp-champ-saisie input[aria-invalid="true"] { color: var(--pp-ambre); }
-.pp-champ-saisie b { flex: none; font-size: 22px; line-height: 28px; font-weight: 600; color: var(--pp-encre-2); }
-.pp-champ:focus-within { box-shadow: inset 0 0 0 2px var(--pp-accent); }
+.pp-champ-saisie input[aria-invalid="true"] { color: var(--n-ambre); }
+.pp-champ-saisie b { flex: none; font: var(--n-t-section); color: var(--n-encre-2); }
+.pp-champ:focus-within { box-shadow: inset 0 0 0 2px var(--n-accent); }
 /* Le foyer se lit sur le CHAMP (l'anneau ci-dessus), pas sur la zone de saisie : l'anneau général des anciens
-   habillages (`:focus-visible`) dessinait une boîte qui mordait sur le libellé. */
-html body .pp-voile .pp-feuille .pp-champ .pp-champ-saisie input[data-prix-champ]:focus,
-html body .pp-voile .pp-feuille .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outline: 0; outline-offset: 0; border: 0; box-shadow: none; background: transparent; }
+   écrans (`:focus-visible`) dessinait une boîte qui mordait sur le libellé. */
+html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus,
+html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outline: 0; outline-offset: 0; border: 0; box-shadow: none; background: transparent; }
 
-/* Le groupe : une rangée par site. Case à cocher (44 × 44) · le corps · au plus UN geste texte. */
-.pp-groupe { list-style: none; margin: 0 0 16px; padding: 0; background: var(--pp-carte); border-radius: 12px; overflow: hidden; }
-.pp-rangee { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; column-gap: 4px; min-height: 60px; padding: 8px 8px 8px 4px; box-sizing: border-box; position: relative; }
-.pp-rangee + .pp-rangee::before { content: ""; position: absolute; top: 0; left: 52px; right: 0; height: 1px; background: var(--pp-trait); }
-.pp-rangee.is-passu { grid-template-columns: minmax(0, 1fr); padding-left: 16px; padding-right: 16px; min-height: 44px; color: var(--pp-encre-2); }
-.pp-rangee.is-passu + .pp-rangee::before, .pp-rangee + .pp-rangee.is-passu::before { left: 16px; }
-.pp-coche { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.pp-coche input { width: 22px; height: 22px; margin: 0; accent-color: var(--pp-accent); cursor: pointer; }
-.pp-corps { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-/* Le site et « 59 € → 58 € » : une ligne ; si elle ne tient pas, le prix passe DESSOUS (jamais dessus). */
-.pp-ligne { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; row-gap: 0; min-width: 0; }
-.pp-site { font-size: 17px; line-height: 22px; font-weight: 600; color: var(--pp-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pp-prix { font-size: 17px; line-height: 22px; font-weight: 400; color: var(--pp-encre-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.pp-prix b { font-weight: 600; color: var(--pp-encre); }
-.pp-etat { margin: 0; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--pp-encre-2); overflow-wrap: anywhere; }
-.pp-etat.is-ok { color: var(--pp-encre); font-weight: 600; }
-.pp-etat.is-geste { color: var(--pp-ambre); }
-.pp-etat [data-prix-raison] { color: var(--pp-encre-2); }
-.pp-geste {
-  flex: none; min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--pp-accent);
-  font: inherit; font-size: 17px; line-height: 22px; font-weight: 400; text-decoration: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 8px; -webkit-tap-highlight-color: transparent;
-}
-.pp-geste:disabled { opacity: .4; cursor: default; }
-.pp-geste:active, .pp-x:active > span { filter: brightness(.92); transition: filter 80ms; }
+/* « 59 € → 58 € » : une ligne (la valeur de la rangée), le nouveau prix en encre. */
+.pp-prix { white-space: nowrap; }
+.pp-prix b { font: var(--n-t-corps-fort); color: var(--n-encre); }
+/* L'état, sous le site : calme (gris), ok (encre), geste (ambre, porté par `ton="ambre"` de la rangée). */
+.pp-etat.is-ok { color: var(--n-encre); font: var(--n-t-second-fort); }
+.pp-etat [data-prix-raison] { color: var(--n-encre-2); }
+/* Une rangée décochée : un cercle vide là où la coche se pose (22 px, la même place). */
+.pp-sans-coche { display: block; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--n-encre-3); }
 
-.pp-vide { margin: 0 0 16px; padding: 0 4px; font-size: 15px; line-height: 20px; color: var(--pp-encre-2); }
-.pp-mini { margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; background: var(--pp-ambre-fond); color: var(--pp-ambre); font-size: 15px; line-height: 20px; font-weight: 600; }
-
-/* LE plein de la feuille : un seul. */
-.pp-plein {
-  display: block; width: 100%; height: 50px; border: 0; border-radius: 14px; background: var(--pp-plein); color: var(--pp-sur-plein);
-  font: inherit; font-size: 17px; line-height: 22px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.pp-plein:active { filter: brightness(.92); transition: filter 80ms; }
-.pp-plein:disabled { opacity: .4; cursor: default; }
-.pp-x:focus-visible, .pp-plein:focus-visible, .pp-geste:focus-visible, .pp-coche input:focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 2px; }
+.pp-mini { margin: 0 var(--n-marge) 16px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-ambre-fond); color: var(--n-sur-ambre, var(--n-ambre)); font: var(--n-t-second-fort); }
+.pp-feuille .n-feuille-corps > .n-bouton-bloc { display: block; margin: -16px var(--n-marge) 16px; }

@@ -1,16 +1,16 @@
 // de · « Changer le prix » en UN geste (19 nov., extension 5.409) — src/PrixPartout.jsx, src/prixPartout.js, src/prixAttente.js.
 // Décision de Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ». L'ancien état intermédiaire et son second bouton sont retirés.
 export default {
-  "prixPartout.titre": "Preis ändern",
   "prixPartout.aria": "Preis von Nr. {num} ändern",
-  "prixPartout.fermer": "Schließen",
   "prixPartout.nouveau": "Neuer Preis",
   "prixPartout.appliquer": "Anwenden",
   "prixPartout.envoi": "Senden…",
   "prixPartout.aucune": "Kein Angebot online",
   "prixPartout.mini": "Mindestpreis für Angebote: {prix}",
   "prixPartout.ouvrir": "Öffnen",
-  "prixPartout.annuler": "Abbrechen",
+  "prixPartout.annulerSite": "Wartende Senkung auf {site} abbrechen",
+  "prixPartout.raisonPrix": "Gib den neuen Preis ein.",
+  "prixPartout.raisonSite": "Wähle mindestens eine Seite.",
   "prixPartout.passu": "nicht gelesen",
   "prixPartout.etat.fait": "Erledigt",
   "prixPartout.etat.faitRelu": "Erledigt · geprüft {prix}",

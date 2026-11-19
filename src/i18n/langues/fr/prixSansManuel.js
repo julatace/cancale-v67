@@ -1,16 +1,16 @@
 // fr · « Changer le prix » en UN geste (19 nov., extension 5.409) — src/PrixPartout.jsx, src/prixPartout.js, src/prixAttente.js.
 // Décision de Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ». L'ancien état intermédiaire et son second bouton sont retirés.
 export default {
-  "prixPartout.titre": "Changer le prix",
   "prixPartout.aria": "Changer le prix du N°{num}",
-  "prixPartout.fermer": "Fermer",
   "prixPartout.nouveau": "Nouveau prix",
   "prixPartout.appliquer": "Appliquer",
   "prixPartout.envoi": "Envoi…",
   "prixPartout.aucune": "Aucune annonce en ligne",
   "prixPartout.mini": "Prix mini des offres : {prix}",
   "prixPartout.ouvrir": "Ouvrir",
-  "prixPartout.annuler": "Annuler",
+  "prixPartout.annulerSite": "Annuler la baisse en attente sur {site}",
+  "prixPartout.raisonPrix": "Tape le nouveau prix.",
+  "prixPartout.raisonSite": "Coche au moins un site.",
   "prixPartout.passu": "pas lu",
   "prixPartout.etat.fait": "Fait",
   "prixPartout.etat.faitRelu": "Fait · relu {prix}",
