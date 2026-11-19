@@ -22,6 +22,8 @@ import { casesProposees, caseEnMots, caseLibreDans, premiereCaseLibre } from '..
 // (17 nov., lot stock-rangement) Le nouveau design (essai, `vrm_design_v2`) : le Stock « Ranger » en séance (src/stockV2/).
 import { useDesignV2 } from '../designV2/reglage.js';
 import StockV2 from '../stockV2/StockV2.jsx';
+import { methodeDe, CLE_ETIQUETAGE } from '../etiquetage/methode.js';   // (19 nov., lot stock-etiquetage) la méthode choisie, LUE (jamais écrite ici)
+import { imprimerEtiquettes } from '../etiquetage/impression.js';
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
@@ -1528,6 +1530,21 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // La dernière place utilisée d'abord (le même meuble), sinon la première case libre — les règles de src/ouRanger.js.
     caseProposee: (cle, derniere) => (derniere ? caseLibreDans({ meubles: meublesVus, slots, meubleId: derniere }) : null) || premiereCaseLibre({ meubles: meublesVus, slots }),
     poser, montrer, place, setPlace,
+    // (19 nov., lot stock-etiquetage) Ce que le meuble DESSINÉ montre d'une case (lecture seule) : la paire montrée, ou le N°
+    // noté là mais pas montré (case PRISE), et son état (à sortir, plus en ligne, en double — le seul rouge).
+    caseInfo: (mid, i) => {
+      const o = occupant(mid, i);
+      if (o) { const k = cleDeFiche(o); const e = rangeeEtat(o); return { num: String(o.numero), cle: k, etat: estVendu(o) ? 'vendue' : e === 'plusenligne' ? 'plusenligne' : '', double: doublonsStock.has(k), photo: o.photo || null }; }
+      const n = noteeIci(mid, i);
+      return n ? { num: String(n), cle: String(n), etat: '', double: false, notee: true, photo: null } : null;
+    },
+    toucherCase: (mid, i) => cliquerCase(mid, i),   // les gestes d'une case, ceux d'avant (fiche, sortie d'une vendue, placer)
+    estDouble: (k) => !!(k && doublonsStock.has(k)),
+    etiquetage: (() => { const mE = methodeDe({ numeroEcrit: load('vrm_numero_ecrit', null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load(CLE_ETIQUETAGE, null) });
+      return mE.qui ? { ...mE, resume: tr(mE.qui === 'moi' ? 'etq.resume.moi' : mE.serie === 'lettre' ? 'etq.resume.lettre' : 'etq.resume.chiffres', { l: mE.lettre }) + (mE.support ? ' · ' + tr('etq.support.' + mE.support) : '') } : null; })(),
+    // Les étiquettes imprimées : les N° TELS QU'ILS SONT (aucun N° calculé, donné ni réservé), au format choisi.
+    imprimerEtiquettes: (liste) => { const mE = methodeDe({ etiquetage: load(CLE_ETIQUETAGE, null) }); if (imprimerEtiquettes(liste, { format: mE.format, titre: mE.titre })) toast(tr('sm.imprime', { n: liste.length })); },
+    ouvrirEtiquetage: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=etiquetage' })); } catch (_) {} },
     q, setQ: (v) => { setQ(v); setCibles([]); }, resultats, qEstNum, exactNum, cibles, setCibles, cherche: !!(filtre || cibles.length), chercheRef,
     compteMeuble, rendreMeuble: cadreMeuble, creerMeuble: () => setModal({ type: 'meuble' }),
     modifierMeuble: (m) => { const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined; setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] }); },
@@ -1965,7 +1982,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   let colN=0;
   // (17 nov., lot stock-rangement) Nouveau design (essai) : la tête est celle de src/stockV2/StockV2.jsx (grand titre, deux ronds).
   if (designV2) return (
-    <div className="vrm-ms-stock sr-hote" data-refonte-ms="stock" data-sr-garage="">
+    <div className="vrm-ms-stock sr-hote sm-hote" data-refonte-ms="stock" data-sr-garage="">
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
     </div>
   );
