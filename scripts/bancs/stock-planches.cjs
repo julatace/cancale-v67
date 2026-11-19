@@ -109,7 +109,11 @@ const retirer = async (pg, n) => {
   const ici = await ou(pg, n); if (ici) await voir(pg, ici.split(':')[0]);
   await pg.click(`[data-case-num="${n}"]`);
   if (await BUREAU(pg)) await pg.click(`[data-cote-fiche="${n}"]`, { timeout: 20000 });
-  await pg.click('button:has-text("Retirer de la case")'); await pg.waitForTimeout(300);
+  // (16 nov., intégration — fiche D, docs/passation/2026-11-15-fiche-d.md) les gestes de la case (Déplacer, Retirer)
+  // vivent derrière « ⋯ » de la fiche : un toucher les montre, comme lui (même geste que le banc stock-etageres).
+  await pg.waitForSelector('[data-fiche-retirer]', { state: 'attached', timeout: 20000 }).catch(() => {});
+  await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); }); await pg.waitForTimeout(400);
+  await pg.click('[data-fiche-retirer]'); await pg.waitForTimeout(300);
   if (await BUREAU(pg)) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(300); }
 };
 // « Modifier le meuble » (l'éditeur : forme, planches) s'ouvre depuis « Personnaliser ».

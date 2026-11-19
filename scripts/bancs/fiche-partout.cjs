@@ -185,7 +185,10 @@ const LISTES = [
     inventaire: ['[data-ebay-fiche]'] },
   { cle: 'annonces-vestiaire', tab: 'tab=annonces&site=vestiaire', ligne: '[data-vc-annonce="71000009"]', toucher: '[data-vc-annonce="71000009"] strong', num: '212', ctx: 'annonce',
     inventaire: [] },
+  // (16 nov., intégration — Stock v4, docs/passation/2026-11-15-stock-v4.md, maquettes validées par Julien) À l'ordinateur
+  // (trois volets), toucher la case la montre dans le volet de droite ; « La fiche » de ce volet ouvre LA fiche.
   { cle: 'stock', tab: 'tab=garage', ligne: '[data-case-num="203"]', toucher: '[data-case-num="203"]', num: '203', ctx: 'stock',
+    bureau: { avant: '[data-case-num="203"]', toucher: '[data-cote-fiche="203"]' },
     inventaire: ['[data-fiche-ranger]', '[data-fiche-retirer]'] },
   { cle: 'achats', tab: 'tab=achats&site=vinted', ligne: '[data-achat-tx="33000000001"]', toucher: '[data-achat-tx="33000000001"] .vrm-buy-title', num: '206', ctx: 'achat',
     inventaire: ['[data-rappel-bouton]', '[data-achat-masquer="33000000001"]', '[data-achat-joindre-facture="33000000001"]'] },
@@ -292,7 +295,9 @@ const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector
           let trace = null; if (process.env.TRACE === '1') { await b.startTracing(pg, { categories: ['devtools.timeline', 'blink.user_timing'] }); trace = true; }
           let cdp = null; if (process.env.PROFIL === '1') { cdp = await ctx.newCDPSession(pg); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
           if (process.env.SONDE) console.log('sonde', JSON.stringify(await pg.evaluate(fs.readFileSync(process.env.SONDE, 'utf8'))));
-          const t0 = await toucher(pg, L.toucher, tel);
+          let T = L.toucher;
+          if (L.bureau && await pg.$('[data-stock-volets]')) { await pg.click(L.bureau.avant).catch(() => {}); await pg.waitForSelector(L.bureau.toucher, { timeout: 15000 }).catch(() => {}); T = L.bureau.toucher; }
+          const t0 = await toucher(pg, T, tel);
           const vu = await attendreFiche(pg, t0);
           if (trace) { const buf = await b.stopTracing(); const ev = JSON.parse(buf.toString()).traceEvents || []; const tot = new Map(); for (const e of ev) { if (e.ph === 'X' && e.dur) tot.set(e.name, (tot.get(e.name) || 0) + e.dur); } console.log([...tot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, v]) => `${(v / 1000).toFixed(1)}ms ${k}`).join('\n')); const clic = ev.find((e) => e.name === 'EventDispatch' && e.args && e.args.data && e.args.data.type === 'click'); const z = clic ? clic.ts : 0; console.log(ev.filter((e) => e.ph === 'X' && e.dur > 4000 && e.ts >= z - 1000).map((e) => `+${Math.round((e.ts - z) / 1000)}ms ${e.name} ${Math.round(e.dur / 1000)}ms ${e.args && e.args.elementCount ? 'el=' + e.args.elementCount : ''} ${e.args && e.args.data && (e.args.data.type || e.args.data.functionName || '')}`).slice(0, 30).join('\n')); }
           if (cdp) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const dt = profile.timeDeltas; const idx = new Map(profile.nodes.map((n) => [n.id, n])); profile.samples.forEach((id, i) => { const n = idx.get(id); const k = n.callFrame.functionName + ' ' + (n.callFrame.url || '').split('/').pop() + ':' + n.callFrame.lineNumber + ':' + n.callFrame.columnNumber; self.set(k, (self.get(k) || 0) + (dt[i] || 0)); }); console.log([...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => `${(v / 1000).toFixed(1)}ms ${k}`).join('\n')); }
@@ -307,7 +312,7 @@ const fermerFiche = (pg) => pg.evaluate(() => { const b = document.querySelector
           const temps = [vu.ms]; const bruts = [`${Math.round(vu.ms)} (image ${Math.round(vu.image || 0)}, voile vide ${Math.round(vu.base)})`];
           for (let k = 0; k < 2; k++) {
             await fermerFiche(pg); await pg.waitForTimeout(1500);
-            const tk = await toucher(pg, L.toucher, tel); const v2 = await attendreFiche(pg, tk); if (v2) { temps.push(v2.ms); bruts.push(`${Math.round(v2.ms)} (image ${Math.round(v2.image || 0)}, voile vide ${Math.round(v2.base)})`); }
+            const tk = await toucher(pg, T, tel); const v2 = await attendreFiche(pg, tk); if (v2) { temps.push(v2.ms); bruts.push(`${Math.round(v2.ms)} (image ${Math.round(v2.image || 0)}, voile vide ${Math.round(v2.base)})`); }
           }
           const med = temps.slice().sort((x, y) => x - y)[Math.floor(temps.length / 2)];
           dit(temps.length === 3 && med < 150, `D ${L.cle} ${TT} la fiche est posée ${Math.round(med)} ms après le toucher (médiane de ${bruts.join(', ')} ; < 150)`, bruts);

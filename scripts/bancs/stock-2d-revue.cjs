@@ -119,13 +119,16 @@ const toucher = async (pg, tel, sel) => { if (tel) await pg.tap(sel); else await
         dit(theme === (sombre ? 'dark' : 'light'), `${t} : le thème demandé est rendu`, theme);
         // B — « Voir l'état » de N°7 (achat relié depuis la vente).
         await pg.evaluate(() => window.scrollTo(0, 0));
+        // (16 nov., intégration) Depuis le 14 nov. toucher une case ouvre LA fiche (« fiche partout »,
+        // docs/passation/2026-11-14-fiche-partout.md) et « L'état de cet article » y est (plus de bouton « Voir l'état ») ;
+        // depuis le 15 nov. (Stock v4, maquettes validées, docs/passation/2026-11-15-stock-v4.md), à l'ordinateur la case se
+        // montre d'abord dans le volet de droite et « La fiche » l'ouvre. Même règle jugée : l'état de N°7, achat relié.
         await toucher(pg, tel, '[data-case-num="7"]');
-        await pg.waitForTimeout(400);
-        const ve = await pg.$('[data-fiche-voir-etat]');
-        dit(!!ve, `${t} : B — la fiche de la case N°7 propose « Voir l'état »`);
+        if (await pg.$('[data-stock-volets]')) { await pg.waitForSelector('[data-cote-fiche="7"]', { timeout: 15000 }).catch(() => {}); await pg.click('[data-cote-fiche="7"]').catch(() => {}); }
+        await pg.waitForSelector('[data-fiche-paire="7"] [data-fiche-etat-article]', { state: 'attached', timeout: 15000 }).catch(() => {});
+        const ve = await pg.$('[data-fiche-paire="7"] [data-fiche-etat-article]');
+        dit(!!ve, `${t} : B — la fiche de la case N°7 porte « L'état de cet article »`);
         if (ve) {
-          await ve.click();
-          await pg.waitForSelector('[data-fiche-etat-article]', { timeout: 15000 }).catch(() => {});
           await pg.waitForFunction(() => { const el = document.querySelector('[data-etat-ligne="achat-vente"] b'); return el && el.textContent !== '…'; }, null, { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(600);
           const et = await pg.evaluate(() => { const o = {}; document.querySelectorAll('[data-etat-ligne]').forEach((el) => { o[el.getAttribute('data-etat-ligne')] = { val: el.getAttribute('data-etat-val'), src: el.getAttribute('data-etat-source') || '', txt: el.innerText.replace(/\s+/g, ' ') }; }); return o; });
@@ -133,6 +136,7 @@ const toucher = async (pg, tel, sel) => { if (tel) await pg.tap(sel); else await
           dit(pa.val === '3000' && pa.src === 'relie' && /achat relié/.test(pa.txt) && !/saisi/.test(pa.txt), `${t} : B — prix d'achat 30 €, « achat relié » (relié depuis la vente), jamais « saisi à la main »`, JSON.stringify(pa));
           dit(avt.val === '19' && !/pas relié/.test(avt.txt), `${t} : B — achat (1 oct.) → vente (20 oct.) : 19 j`, JSON.stringify(avt));
           await shot(pg, (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-etat');
+          await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fiche-fermer]'); if (b) b.click(); }); await pg.waitForTimeout(300);
           await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
         }
         if (await pg.$('[data-stock-modale]')) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300); }
