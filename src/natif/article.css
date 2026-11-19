@@ -23,11 +23,32 @@
   .n-article-etat[data-n-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-second-fort); }
   .n-article-etat[data-n-ton="doublon"] { color: var(--n-doublon); font: var(--n-t-second-fort); }
 
+  /* ── Fait : « — » et sa raison sur UNE ligne ───────────────────────────── */
+  .n-fait-ligne { display: flex; align-items: baseline; gap: 8px; max-width: 100%; min-width: 0; }
+  .n-fait-ligne > .n-fait-detail { min-width: 0; overflow-wrap: anywhere; }
+
   /* ── Fait : la valeur qui se tape SUR PLACE ────────────────────────────── */
   .n-fait-champ {
     appearance: none; -webkit-appearance: none; box-sizing: border-box; width: 100%; max-width: 128px; height: 36px; margin: 2px 0 0; padding: 0 8px; border: 0; border-radius: var(--n-r-plaque);
     background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; outline: 2px solid var(--n-accent); outline-offset: 0;
   }
+
+  /* ── Gestes : une GRILLE de rangées (2 colonnes au téléphone, 4 à l'ordinateur), traits entre les cases ── */
+  .n-gestes > .n-groupe-carte { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .n-gestes > .n-groupe-carte > * { position: relative; min-width: 0; background: var(--n-surface, var(--n-carte)); }
+  .n-gestes > .n-groupe-carte > .n-rangee::before { display: none; }
+  .n-gestes > .n-groupe-carte > *:nth-child(n+3)::after { content: ""; position: absolute; z-index: 2; top: 0; left: 0; right: 0; border-top: .5px solid var(--n-trait); pointer-events: none; }
+  .n-gestes > .n-groupe-carte > .n-rangee:nth-child(even) { box-shadow: inset .5px 0 0 var(--n-trait); }
+  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > *:nth-child(n+3)::after { display: none; }
+  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > *:nth-child(n+5)::after { display: block; }
+  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > .n-rangee:nth-child(even) { box-shadow: none; }
+  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > .n-rangee:not(:nth-child(4n+1)) { box-shadow: inset .5px 0 0 var(--n-trait); }
+  .n-gestes .n-rangee-corps { padding-inline: 12px; gap: 10px; }
+  /* « Vendu ailleurs » (une rangée ; ouvert : son prix et sa date) : toute la largeur, sous les gestes. */
+  .n-gestes > .n-groupe-carte > .n-gestes-case { grid-column: 1 / -1; }
+  .n-gestes > .n-groupe-carte > .n-gestes-case:nth-child(n+2)::after { content: ""; display: block; position: absolute; z-index: 2; top: 0; left: 0; right: 0; border-top: .5px solid var(--n-trait); pointer-events: none; }
+  .n-gestes-case > :is(form, [data-vendu-ailleurs-fait]) { box-sizing: border-box; margin: 0; padding: 12px 16px; }
 
   /* ── Photos : en grand, une par page, défilement natif ─────────────────── */
   .n-photos { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior: contain; scrollbar-width: none; margin: 0 0 16px; }

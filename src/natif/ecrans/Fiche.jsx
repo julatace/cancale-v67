@@ -42,7 +42,9 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
   const etapes = toutHist ? tous : tous.slice(-HISTOIRE_REPLIEE);
   const allerAchat = () => setToutHist(true);
   const toucher = (g) => { if (g.contenu) setOuvert(g); else if (g.onClick) g.onClick(); };
-  const rangeeGeste = (g) => <Rangee key={g.cle} icone={rendre.icone(g.icone, 22)} titre={g.libelle} fin="chevron" onClick={() => { setPlus(false); toucher(g); }} attrs={{ 'data-fd-tuile': g.cle, ...(g.attrs || {}) }}/>;
+  // Un geste = une rangée (icône + libellé). Sur la fiche, les gestes forment une GRILLE de rangées (2 colonnes au téléphone,
+  // 4 à l'ordinateur) : tous visibles, la fiche tient sur un écran et demi ; dans « ⋯ », une liste (avec son chevron).
+  const rangeeGeste = (g, grille = false) => <Rangee key={g.cle} icone={rendre.icone(g.icone, 22)} titre={g.libelle} lignes={grille ? 2 : 1} fin={grille ? null : 'chevron'} onClick={() => { setPlus(false); toucher(g); }} attrs={{ 'data-fd-tuile': g.cle, ...(g.attrs || {}) }}/>;
   return (
     <PagePoussee ouverte titre={titreBarre} libelleRetour={libelleRetour} onRetour={onRetour}
       actions={rares.length ? <BoutonIcone libelle={T.plus} icone={rendre.icone('more', 22)} onClick={() => setPlus(true)} attrs={{ 'data-fd-plus-ouvrir': '' }}/> : null}
@@ -85,7 +87,10 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </Groupe> : null}
       {blocs.sansPaire || null}
       {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
-      {gestes.length ? <Groupe titre={T.gestes} attrs={{ 'data-fd-tuiles': gestes.map((g) => g.cle).join(',') }}>{gestes.map(rangeeGeste)}</Groupe> : null}
+      {gestes.length || blocs.vendueAilleurs ? <Groupe titre={T.gestes} className="n-gestes" attrs={{ 'data-fd-tuiles': gestes.map((g) => g.cle).join(','), 'data-n-colonnes': ordi ? 4 : 2 }}>
+        {gestes.map((g) => rangeeGeste(g, true))}
+        {blocs.vendueAilleurs ? <div className="n-gestes-case" data-fd-gestes="">{blocs.vendueAilleurs}</div> : null}
+      </Groupe> : null}
       {blocs.contexte || null}
       {histoire ? <Groupe titre={T.histoire} attrs={{ 'data-fd-histoire': toutHist ? 'tout' : 'repliee', 'data-fiche-hist': tous.length }}>
         {etapes.map((l) => <Rangee key={l.cle} titre={l.titre} sousTitre={l.reste} ton={l.ambre ? 'ambre' : 'neutre'} attrs={{ 'data-fiche-hist-etape': l.cle }}/>)}
@@ -95,13 +100,12 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </Groupe> : null}
       {histoire && toutHist && blocs.toutVoir ? <Herite attrs={{ 'data-fiche-plus': '' }}>{blocs.toutVoir}</Herite> : null}
       {blocs.actions || null}
-      {blocs.vendueAilleurs ? <Herite nu attrs={{ 'data-fd-gestes': '' }}>{blocs.vendueAilleurs}</Herite> : null}
       {blocs.lecture || null}
       <Feuille ouverte={grand && photos.length > 0} onFermer={() => setGrand(false)} titre={A ? T.titre : ''} detente="pleine" attrs={{ 'data-fd-visionneuse': photos.length }}>
         <Photos sources={photos} rendre={rendre.photo}/>
       </Feuille>
       <Feuille ouverte={plus} onFermer={() => setPlus(false)} titre={T.plus} attrs={{ 'data-fd-plus': plus ? '1' : '0' }}>
-        <Groupe>{rares.map(rangeeGeste)}</Groupe>
+        <Groupe>{rares.map((g) => rangeeGeste(g))}</Groupe>
       </Feuille>
       <Feuille ouverte={!!ouvert} onFermer={() => setOuvert(null)} titre={ouvert ? ouvert.libelle : ''} detente="pleine" attrs={{ 'data-fd-tuile-vue': ouvert ? ouvert.cle : '' }}>
         {ouvert ? <Herite>{ouvert.contenu}</Herite> : null}

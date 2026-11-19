@@ -37,11 +37,14 @@ function ChampFait({ libelle, saisie }) {
 export function Fait({ libelle, valeur, onModifier = null, ton = 'neutre', detail = '', saisie = null, className = '', attrs = null }) {
   const vide = estVide(valeur);
   if (saisie) return <div role="listitem" className={cx('n-fait-case', 'n-fait', className)} data-n-ton={ton} {...(attrs || {})}><span className="n-fait-libelle">{libelle}</span><ChampFait libelle={libelle} saisie={saisie}/></div>;
+  // (19 nov., fiche directe) Un « — » et sa raison tiennent sur UNE ligne (« — à saisir ») : la grille garde des rangées
+  // égales et la fiche tient sur un écran ; une valeur sue garde sa légende dessous (« au plus »).
+  const val = <span className="n-fait-valeur" data-n-vide={vide ? '1' : undefined}>{vide ? TIRET : valeur}</span>;
   const contenu = (
     <>
       <span className="n-fait-libelle">{libelle}</span>
-      <span className="n-fait-valeur" data-n-vide={vide ? '1' : undefined}>{vide ? TIRET : valeur}</span>
-      {detail ? <span className="n-fait-detail">{detail}</span> : null}
+      {vide && detail ? <span className="n-fait-ligne">{val}<span className="n-fait-detail">{detail}</span></span>
+        : <>{val}{detail ? <span className="n-fait-detail">{detail}</span> : null}</>}
     </>
   );
   if (onModifier) {

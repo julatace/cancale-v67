@@ -19,7 +19,12 @@ import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDe
 // (15 nov., direction D « fiche produit ») la règle de rangement (pure) et sa matière.
 import { articleFiche, RARES } from './ficheProduit.js';
 import Fiche from './natif/ecrans/Fiche.jsx';   // (19 nov.) la vue « VRM natif » de la fiche
-import { Herite, Bouton, Vignette, poserIcone, iconePosee } from './natif/index.js';
+import { Herite, Bouton, Vignette, Rangee, Glyphe, poserIcone, iconePosee } from './natif/index.js';
+// (19 nov.) « Vendu ailleurs » sur la fiche : son bouton d'ouverture est une RANGÉE de la grille des gestes (icône + libellé,
+// 44 px) ; ses boutons « Annuler » / « Valider » sont des boutons natifs teintés (le seul plein reste celui de la fiche).
+const BoutonRangeeGeste = ({ children, onClick, variante, className, type, ...attrs }) => (attrs['data-vendu-ailleurs-ouvrir'] != null
+  ? <Rangee icone={<Glyphe nom="check" taille={22}/>} titre={children} onClick={onClick} attrs={attrs}/>
+  : <Bouton variante={variante === 'primaire' ? 'teinte' : 'texte'} type={type || 'button'} onClick={onClick} attrs={attrs}>{children}</Bouton>);
 
 // (14 nov., proposition 62) Ouverte DEPUIS une ligne de liste : ce que la ligne est (le titre de sa partie).
 const CLE_CTX = { vente: 'fiche.ctx.vente', colis: 'fiche.ctx.colis', achat: 'fiche.ctx.achat', annonce: 'fiche.ctx.annonce', stock: 'fiche.ctx.stock', retrait: 'fiche.ctx.retrait', journee: 'fiche.ctx.journee' };
@@ -295,7 +300,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         // ses seuils ; la vente : son récapitulatif) et ses gestes — SUR la fiche, toujours montés (la ligne y pose ses éléments).
         contexte: depuis ? <Herite ref={slotCtx} attrs={{ 'data-fiche-contexte': ctx, 'aria-label': tr(CLE_CTX[ctx] || 'fiche.ctx.vente') }}/> : null,
         actions: depuis ? <Herite attrs={{ 'data-fiche-actions': ctx, 'aria-label': tr('fiche.actions') }}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></Herite> : null,
-        vendueAilleurs: p && plus && plus.gestes ? plus.gestes : null,
+        vendueAilleurs: p && plus && plus.gestes ? (React.isValidElement(plus.gestes) ? React.cloneElement(plus.gestes, { Bouton: BoutonRangeeGeste }) : plus.gestes) : null,
         toutVoir,
         lecture: p && lecture ? <Herite nu attrs={{ 'data-fiche-lecture': '' }}>Lecture en cours…</Herite> : null,
       }}/>

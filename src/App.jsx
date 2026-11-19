@@ -66858,7 +66858,8 @@ function AppCoeur() {
               return sitesPrixDe(numF, rn, ex).manques.filter((m) => m !== 'le numéro' && (!aff || aff.includes(String(m).toLowerCase()))); } catch (_) { return undefined; } })();
           // La taille : celle de la fiche de l'annonce, sinon de l'annonce lue, sinon celle écrite en fin de titre (la règle des listes).
           const tailleFiche = (() => { if (!p) return ''; try { const f = p.idFiche && numeros ? numeros[p.idFiche] : null; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)) || (rn.annonces || [])[0] || null;
-            const tf = tailleEnFin(p.titre || ''); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
+            // (19 nov.) Un article sans annonce Vinted : la taille écrite en fin du titre de SON annonce (Leboncoin, eBay…).
+            const tf = [p.titre].concat((sitesFiche || []).map((s) => s && s.titre)).map((t) => tailleEnFin(t || '')).find(Boolean); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
           const photosFiche = p ? (rn.annonces || []).map((a) => (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || ''))).filter(Boolean) : [];
           // « Acheté » et « Prix mini » se tapent SUR PLACE (Julien, 19 nov. : « l'outil doit être pratique, pas chiant ») : les
           // MÊMES écritures qu'avant — `poserPrixAchatVente` (la feuille « prix d'achat ») et `montantSeuil` (la case « accepter
