@@ -9,7 +9,7 @@ export default {
   "ext.groupe.premier": "Connect VRM, step by step",
   "ext.groupe.site": "{site}",
   "ext.pourquoi": "Why?",
-  "ext.peut.n": { "zero": "Nothing for now", "one": "1 action out of {total}", "other": "{n} actions out of {total}" },
+  "ext.peut.n": { "one": "{n} action out of {total}", "other": "{n} actions out of {total}" },
   "ext.jauge": "{n}/{max} actions this hour",
   "ext.jauge.passu": "Actions this hour: not reported yet",
   "ext.jauge.repart": "a slot frees up at {heure}",

@@ -10,7 +10,7 @@ export default {
   "ext.groupe.premier": "Brancher VRM, pas à pas",
   "ext.groupe.site": "{site}",
   "ext.pourquoi": "Pourquoi ?",
-  "ext.peut.n": { "zero": "Rien pour l’instant", "one": "1 geste sur {total}", "other": "{n} gestes sur {total}" },
+  "ext.peut.n": { "one": "{n} geste sur {total}", "other": "{n} gestes sur {total}" },
   "ext.jauge": "{n}/{max} gestes cette heure",
   "ext.jauge.passu": "Gestes de l’heure : pas encore dit",
   "ext.jauge.repart": "une place se libère à {heure}",

@@ -9,7 +9,7 @@ export default {
   "ext.groupe.premier": "Collegare VRM, passo dopo passo",
   "ext.groupe.site": "{site}",
   "ext.pourquoi": "Perché?",
-  "ext.peut.n": { "zero": "Niente per ora", "one": "1 azione su {total}", "other": "{n} azioni su {total}" },
+  "ext.peut.n": { "one": "{n} azione su {total}", "other": "{n} azioni su {total}" },
   "ext.jauge": "{n}/{max} azioni in quest’ora",
   "ext.jauge.passu": "Azioni di quest’ora: non ancora comunicate",
   "ext.jauge.repart": "un posto si libera alle {heure}",
@@ -112,7 +112,7 @@ export default {
   "ext.g.baisser": "Abbassare un prezzo",
   "ext.g.publier": "Pubblicare un annuncio",
   "ext.g.republier": "Ripubblicare",
-  "ext.g.favoris": "Scrivere a chi l’ha messo tra i preferiti",
+  "ext.g.favoris": "Scrivere ai preferiti",
   "ext.g.offres": "Rispondere da sola alle offerte",
 
   "ext.oui": "sì",

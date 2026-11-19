@@ -9,7 +9,7 @@ export default {
   "ext.groupe.premier": "VRM verbinden, Schritt für Schritt",
   "ext.groupe.site": "{site}",
   "ext.pourquoi": "Warum?",
-  "ext.peut.n": { "zero": "Im Moment nichts", "one": "1 von {total} Aktionen", "other": "{n} von {total} Aktionen" },
+  "ext.peut.n": { "one": "{n} von {total} Aktionen", "other": "{n} von {total} Aktionen" },
   "ext.jauge": "{n}/{max} Aktionen in dieser Stunde",
   "ext.jauge.passu": "Aktionen dieser Stunde: noch nicht gemeldet",
   "ext.jauge.repart": "ein Platz wird um {heure} frei",

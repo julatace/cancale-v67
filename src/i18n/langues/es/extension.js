@@ -9,7 +9,7 @@ export default {
   "ext.groupe.premier": "Conectar VRM, paso a paso",
   "ext.groupe.site": "{site}",
   "ext.pourquoi": "¿Por qué?",
-  "ext.peut.n": { "zero": "Nada por ahora", "one": "1 acción de {total}", "other": "{n} acciones de {total}" },
+  "ext.peut.n": { "one": "{n} acción de {total}", "other": "{n} acciones de {total}" },
   "ext.jauge": "{n}/{max} acciones esta hora",
   "ext.jauge.passu": "Acciones de esta hora: aún sin datos",
   "ext.jauge.repart": "se libera un hueco a las {heure}",
@@ -112,7 +112,7 @@ export default {
   "ext.g.baisser": "Bajar un precio",
   "ext.g.publier": "Publicar un anuncio",
   "ext.g.republier": "Volver a publicar",
-  "ext.g.favoris": "Escribir a quienes lo marcaron como favorito",
+  "ext.g.favoris": "Escribir a los favoritos",
   "ext.g.offres": "Responder sola a las ofertas",
 
   "ext.oui": "sí",
