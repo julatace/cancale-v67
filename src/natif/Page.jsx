@@ -124,6 +124,26 @@ function useTitreReduit(refBarre, refTitre) {
   }, [refBarre, refTitre]);
 }
 
+// La TÊTE d'une page, seule : la barre collée, le grand titre (ou rien : `grandTitre={false}` — la barre montre alors le
+// titre dès qu'on défile), la recherche. Elle n'enveloppe pas le contenu : c'est ce que la coque pose au-dessus d'un écran
+// d'AVANT, qui garde son propre titre. `gauche` : nœuds à gauche de la barre (rare).
+//   <TetePage titre="Ventes" grandTitre={false} actions={…} recherche={<ChampRecherche onOuvrir={ouvrir}/>}/>
+export function TetePage({ titre = '', grandTitre = true, gauche = null, actions = null, recherche = null, attrs = null }) {
+  const refBarre = React.useRef(null), refTitre = React.useRef(null);
+  useTitreReduit(refBarre, refTitre);
+  return (
+    <>
+      <header className="n-barre-titre" ref={refBarre} data-n-tete="" {...(attrs || {})}>
+        <div className="n-barre-gauche">{gauche}</div>
+        <div className="n-barre-centre" aria-hidden={grandTitre ? 'true' : undefined}>{titre}</div>
+        <div className="n-barre-droite">{actions}</div>
+      </header>
+      {grandTitre && titre ? <h1 className="n-grand-titre" ref={refTitre}>{titre}</h1> : <div className="n-tete-repere" ref={refTitre} aria-hidden="true"/>}
+      {recherche ? <div className="n-page-recherche">{recherche}</div> : null}
+    </>
+  );
+}
+
 export function Page({ titre = '', actions = null, recherche = null, plein = null, className = '', attrs = null, children }) {
   const coque = React.useContext(ContexteCoque);
   const refBarre = React.useRef(null), refTitre = React.useRef(null);
