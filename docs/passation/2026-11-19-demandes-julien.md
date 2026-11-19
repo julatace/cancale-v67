@@ -142,3 +142,12 @@ demander), Vestiaire (7 / 14), eBay (suggestion de l'API) ; réponses retenues d
 4. Un tableau de couverture : pour chaque catégorie présente dans le stock, sûre / à demander / impossible, par site.
 Dépend de `annonces-a-egalite` (l'article central). Extension probablement touchée (lecture des fiches Leboncoin /
 eBay / Vestiaire) ⇒ dans la version unique 5.409.
+G bis (même jour) : « il faut un agent totalement intelligent capable de poster, peu importe ; s'il y a un doute il
+regarde, et s'il ne trouve pas il demande l'information à l'utilisateur ; 100 % autonome et intelligent. »
+Décision : UN geste « Publier sur… » (un article ou une sélection) ; l'agent remplit tout seul chaque champ de chaque
+site depuis la fiche article, dans cet ordre de confiance : (1) tables vérifiées ; (2) ses réponses passées
+(retenues par catégorie et par marque) ; (3) ce qui est LU sur le site cible (listes de valeurs du formulaire,
+suggestion de catégorie eBay) ; (4) en dernier, une IA sur la clé du VENDEUR si elle est posée (CLAUDE.md §2.9 :
+jamais celle de Julien pour les autres) — toujours une PROPOSITION. Doute restant ⇒ UNE question groupée par article
+(toutes les inconnues sur un écran, choix du site, réponse retenue). Publie, RELIT, et dit le résultat ; un échec dit
+pourquoi et quoi faire. Garde-fous de l'extension inchangés (son geste, compte de l'onglet, plafonds, une à la fois).
