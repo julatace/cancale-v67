@@ -216,7 +216,7 @@ function collecter(o) {
   const texteVu = (b) => { const tw = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); while (tw.nextNode()) { const n = tw.currentNode; if (!/\S/.test(n.nodeValue)) continue; const p = n.parentElement; if (!p || p.closest('svg')) continue; const r = p.getBoundingClientRect(); const c = cs(p); if (r.width > 2 && r.height > 2 && c.visibility !== 'hidden' && c.clip !== 'rect(0px, 0px, 0px, 0px)' && c.clipPath !== 'inset(50%)' && (parse(c.webkitTextFillColor || c.color) || [0, 0, 0, 1])[3] > 0.05) return true; } return false; };
 
   const out = { textes: [], icones: [], geo: [], n: { textes: 0, inter: 0 }, haut: document.documentElement.scrollHeight };
-  const barre = o.tel ? [...document.querySelectorAll('.vrm-tabbar, [data-v2-barre], nav.v2-barre')].find((b) => b.getClientRects().length && cs(b).visibility !== 'hidden') : null;
+  const barre = o.tel ? [...document.querySelectorAll('[data-n-onglets], .vrm-tabbar, [data-v2-barre], nav.v2-barre')].find((b) => b.getClientRects().length && cs(b).visibility !== 'hidden') : null;
   const rb = barre ? barre.getBoundingClientRect() : null;
 
   // ── Les textes ──
