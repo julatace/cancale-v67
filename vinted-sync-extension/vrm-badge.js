@@ -818,6 +818,10 @@
   @media (max-width: 760px) { .trn5 { grid-template-columns: minmax(0, 1fr) auto auto 16px; } .notif5 .th5 { display: none; } }
   .rep5 textarea { width: 100%; box-sizing: border-box; margin-top: 12px; min-height: 88px; border-radius: 12px; border: 0; background: var(--n-carte-2); color: var(--n-encre); padding: 10px 12px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; resize: vertical; }
   .rep5 .err, .rep5 .val { margin-top: 8px; }
+
+  .conf5 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .conf5 span { flex: 1 1 200px; }
+  .conf5 .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -1578,9 +1582,10 @@
   //    « Statut » à compteurs LUS (en vente, brouillon, masqué, réservé, vendu, à confirmer), liste / grille,
   //    « Colonnes ▾ » mémorisé (chrome.storage.local), cases + « tout ». Rien ne part d'ici : une action ouvre le
   //    geste gardé (VRM, ou le parcours des favoris de la carte).
-  const COLS5 = ['num', 'prix', 'mini', 'achat', 'date', 'vues', 'favoris', 'statut'];
+  const COLS5 = ['num', 'prix', 'mini', 'achat', 'date', 'vues', 'favoris', 'place', 'statut'];
   const COLS5_DEFAUT = ['num', 'prix', 'mini', 'date', 'favoris', 'statut'];
   const STATUTS5 = ['en_vente', 'brouillon', 'masque', 'reserve', 'vendu', 'a_confirmer'];
+  let annConfirme = null, annEnVol = false, annResultat = null;
   let annStatut = 'en_vente', annVue = 'liste', annCols = new Set(COLS5_DEFAUT), annSel = new Set(), annCherche = '', annColsOuvert = false;
   try { chrome.storage.local.get(['vrmPanneauAnnonces'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} const v = g && g.vrmPanneauAnnonces; if (v && typeof v === 'object') { if (v.vue === 'grille' || v.vue === 'liste') annVue = v.vue; if (Array.isArray(v.cols)) annCols = new Set(v.cols.filter((c) => COLS5.includes(c))); } }); } catch (_) {}
   const garderAnn = () => ranger({ vrmPanneauAnnonces: { vue: annVue, cols: [...annCols] } });
@@ -1592,6 +1597,7 @@
     if (c === 'date') return x.jours != null ? esc(TU('p_jours', { n: x.jours })) : '—';
     if (c === 'vues') return x.vues != null ? esc(String(x.vues)) : '—';
     if (c === 'favoris') return x.favoris != null ? esc(String(x.favoris)) + ' ♥' : '—';
+    if (c === 'place') return x.place ? esc(x.place) : '—';
     if (c === 'statut') return `<span class="st5" data-statut="${esc(x.statut || '')}">${esc(TU('s_' + (x.statut || 'a_confirmer')))}</span>`;
     return '';
   };
@@ -1607,21 +1613,23 @@
     const chip = (k, n) => `<button type="button" class="chip5" data-ann-statut="${k}" aria-pressed="${annStatut === k ? 'true' : 'false'}">${esc(TU('s_' + k))} · ${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</button>`;
     const cols = COLS5.filter((c) => annCols.has(c));
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
-      + (e && e.plateforme === 'leboncoin' || e && e.plateforme === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'favoris', 'ouvrir']).map((k) => `<option value="${k}"${k === 'ouvrir' && nSel !== 1 ? ' disabled' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
+      + (e && e.plateforme === 'leboncoin' || e && e.plateforme === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'masquer', 'afficher', 'favoris', 'ouvrir']).map((k) => `<option value="${k}"${(k === 'ouvrir' && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
     const outils = `<div class="barre5">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">`
       + `<div class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}">${esc(TU('a_liste'))}</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}">${esc(TU('a_grille'))}</button></div>`
       + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS5.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></div>`
       + `<div class="chips5" role="group" aria-label="${esc(TU('a_statut'))}">${chip('tous', a.nTous != null ? a.nTous : toutes.length)}${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => chip(k, st ? st[k] : null)).join('')}</div>`
       + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`);
+    const conf = annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
+    const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
     const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${esc(TU('a_lues', { quand: depuis(a.lu) || '—' }))}${a.relecture ? ' · ' + esc(TU('a_relecture')) : ''}</div>`;
-    if (!vus.length) return outils + tete + `<div class="val gris" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
+    if (!vus.length) return outils + conf + res + tete + `<div class="val gris" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
     if (annVue === 'grille') {
-      return outils + tete + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))}</span></button></li>`).join('')}</ul>`
+      return outils + conf + res + tete + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))}</span></button></li>`).join('')}</ul>`
         + (ficheOuverte.startsWith('a:') ? (() => { const x = vus.find((y) => 'a:' + y.id === ficheOuverte); return x ? ficheAnnonceHtml(x, ici) : ''; })() : '');
     }
     const enTete = `<div class="tr5 th5" style="--n5:${cols.length}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label><span>${esc(TU('c5_article'))}</span><span class="cels5">${cols.map((c) => `<span>${esc(TU('c5_' + c))}</span>`).join('')}</span></div>`;
-    return outils + tete + `<div class="table5" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr5" style="--n5:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="rang art5" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${esc(x.titre || '')}</span></button><span class="cels5">${cols.map((c) => `<span class="cel5" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${celluleAnn(x, c)}</span>`).join('')}</span></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    return outils + conf + res + tete + `<div class="table5" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr5" style="--n5:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="rang art5" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${esc(x.titre || '')}</span></button><span class="cels5">${cols.map((c) => `<span class="cel5" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${celluleAnn(x, c)}</span>`).join('')}</span></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((b) => b.addEventListener('click', () => { annStatut = b.getAttribute('data-ann-statut'); rendre(); }));
@@ -1631,6 +1639,21 @@
     racine.querySelectorAll('[data-ann-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-sel'); if (c.checked) annSel.add(k); else annSel.delete(k); rendre(); }));
     const t = racine.querySelector('[data-ann-tout]'); if (t) t.addEventListener('change', () => { racine.querySelectorAll('[data-ann-sel]').forEach((c) => { const k = c.getAttribute('data-ann-sel'); if (t.checked) annSel.add(k); else annSel.delete(k); }); rendre(); });
     const ch = racine.querySelector('[data-ann-cherche]'); if (ch) ch.addEventListener('input', () => { annCherche = ch.value; const pos = ch.selectionStart; rendre(); const n = carte.querySelector('[data-ann-cherche]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } });
+    const cnon = racine.querySelector('[data-ann-confirme-non]'); if (cnon) cnon.addEventListener('click', () => { annConfirme = null; rendre(); });
+    const cok = racine.querySelector('[data-ann-confirme-ok]');
+    if (cok) cok.addEventListener('click', () => {
+      const c = annConfirme; if (!c || annEnVol) return;
+      annEnVol = true; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'masquerCarte', ids: c.ids, voulu: c.k === 'masquer', confirme: true }, (r) => {
+          void chrome.runtime.lastError; annEnVol = false; annConfirme = null;
+          const n = r && Array.isArray(r.faits) ? r.faits.filter((x) => x.ok).length : 0;
+          annResultat = r && r.ok ? { ok: true, texte: TU(c.k === 'masquer' ? 'a_masque_ok' : 'a_affiche_ok', { n }) } : { ok: false, texte: (r && r.raison) || TU('a_masque_ko', { n }) };
+          if (n) { annSel.clear(); chargerListes(true); }
+          rendre();
+        });
+      } catch (_) { annEnVol = false; annConfirme = null; annResultat = { ok: false, texte: TU('a_masque_ko', { n: 0 }) }; rendre(); }
+    });
     const act = racine.querySelector('[data-ann-action]');
     if (act) act.addEventListener('change', () => {
       const k = act.value; act.value = '';
@@ -1641,6 +1664,8 @@
       if (k === 'republier') { try { window.open('https://vrm.center/?tab=annonces&site=vinted&vue=republier', '_blank', 'noopener'); } catch (_) {} return; }
       if (k === 'baisser') { try { window.open('https://vrm.center/?tab=annonces&site=' + (listes && listes.plateforme ? listes.plateforme : 'vinted'), '_blank', 'noopener'); } catch (_) {} return; }
       if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
+      // 5.409 : masquer / afficher sur Vinted, sur SON clic CONFIRMÉ (le geste appris de la règle « vendue ailleurs »).
+      if ((k === 'masquer' || k === 'afficher') && ids.length <= 10) { annConfirme = { k, ids }; annResultat = null; rendre(); return; }
       if (k === 'favoris') { ongletListe = 'favoris'; if (ids.length === 1) filtreAnnonce = ids[0]; ranger({ vrmCarteOnglet: ongletListe }); rendre(); }
     });
   }
@@ -1688,7 +1713,7 @@
       + (photos.length ? `<div class="ph5" data-photos="${photos.length}">${photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`).join('')}</div>` : '')
       + `<div class="g5">${fait5('p_num', x.num || null, 'num')}${fait5('p_prix', Number(x.prix) > 0 ? eurosL(x.prix) : null, 'prix')}${fait5('p_mini', Number(x.mini) > 0 ? eurosL(x.mini) : null, 'mini')}${fait5('p_achat', Number(x.achat) > 0 ? eurosL(x.achat) : null, 'achat')}`
       + `${fait5('p_ecart', ecart5(x.prix, x.achat), 'ecart')}${fait5('p_taille', x.taille, 'taille')}${fait5('p_marque', x.marque, 'marque')}${fait5('p_etat', x.etat, 'etat')}`
-      + `${fait5('p_depuis', x.jours != null ? TU('p_jours', { n: x.jours }) : null, 'depuis')}${fait5('p_favoris', x.favoris != null ? String(x.favoris) : null, 'favoris')}${fait5('p_vues', x.vues != null ? String(x.vues) : null, 'vues')}</div>`
+      + `${fait5('p_depuis', x.jours != null ? TU('p_jours', { n: x.jours }) : null, 'depuis')}${fait5('p_favoris', x.favoris != null ? String(x.favoris) : null, 'favoris')}${fait5('p_vues', x.vues != null ? String(x.vues) : null, 'vues')}${fait5('p_place', x.place || null, 'place')}</div>`
       + (x.description ? `<p class="desc5" data-desc>${esc(x.description)}</p>` : '')
       + `<div class="ge5"><a class="vu-btn vu-sec" href="${esc(lien)}" target="_top" data-geste="ouvrir">${esc(TU('p_ouvrir_vinted'))}</a><a class="vu-btn vu-sec" href="https://vrm.center/?tab=annonces&site=vinted" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
   }
@@ -1727,14 +1752,14 @@
       // pause, compte de l'onglet ; `repondreCarte` dans le fond). Le fil complet reste sur Vinted (« Ouvrir »).
       + `<div class="rep5"><textarea data-rep-texte="${esc(x.conv)}" rows="3" maxlength="1000" placeholder="${esc(TU('m_ecrire'))}" aria-label="${esc(TU('m_ecrire'))}">${esc(brouillons.get(x.conv) || '')}</textarea>`
       + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>` : ''}`
-      + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button><a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a></div></div></div>`;
+      + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button>${listes && listes.plateforme === 'leboncoin' ? `<a class="vu-btn vu-sec" href="https://www.leboncoin.fr/messages" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_site'))}</a>` : listes && listes.plateforme === 'vestiaire' ? '' : `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a>`}</div></div></div>`;
   }
   function messagesHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
     const m = listes.messages;
     if (!m) return `<div class="val gris" data-messages="pas_su">${esc(TU('m_pas_su'))}</div>`;
-    if (!m.liste.length) return `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
+    if (!m.liste.length) return m.site ? `<div class="val gris" data-messages="0" data-messages-site="${esc(m.site)}">${esc(m.nonlusSite != null ? TU('m_site_nonlus', { n: m.nonlusSite }) : TU('m_site_rien'))}</div>` : `<div class="val gris" data-messages="0">${esc(TU('m_aucun'))}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
     const q = msgCherche.trim().toLowerCase();
@@ -1780,7 +1805,9 @@
         + ligne('au_paliers_plancher', au.paliers ? (au.paliers.remiseMax ? TU('au_plancher_remise', { r: au.paliers.remiseMax }) : TU('au_plancher_mini')) : null)
         + ligne('au_messages', au.paliers ? (au.paliers.messages ? TU('au_versions', { n: au.paliers.messages }) : TU('au_pas_de_message')) : null),
         '?tab=messages&site=vinted&vue=offres')
-      + `<section class="au5" data-auto-carte="baisse"><div class="au5-t"><h3>${esc(TU('au_baisse'))}</h3><span class="et5" data-etat="bientot">${esc(TU('au_bientot'))}</span></div><p class="note5">${esc(TU('au_baisse_pas_livree'))}</p></section>`
+      + carteA('baisse', 'au_baisse', pastilleEtat(au.baisse ? au.baisse.actif : null),
+        ligne('au_baisse_regle', au.baisse && au.baisse.pct ? TU('au_baisse_pct', { p: au.baisse.pct, j: au.baisse.jours }) : null)
+        + `<p class="note5">${esc(TU('au_baisse_plancher'))}</p>`, '?tab=annonces&site=vinted')
       + `</div>`;
   }
   // ══ 5.409 — NOTIFICATIONS (capture « Notifications » de Vintex) : le journal capté des 7 derniers jours, en tableau
@@ -1827,11 +1854,12 @@
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = ventesHtml(e);
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'notifications') panneau = notificationsHtml();
+    else if (!vinted && ongletListe === 'messages') panneau = carte.hasAttribute('data-grand') && listes && listes.plateforme === e.plateforme && listes.messages ? messagesHtml() : (!listes && carte.hasAttribute('data-grand') ? `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>` : `<div class="val gris" data-liste-site="${esc(e.plateforme)}">${esc(TU('m_site', { site: nomSite }))}</div>`);
     else if (!vinted) panneau = `<div class="val gris" data-liste-site="${esc(e.plateforme)}">Sur ${esc(nomSite)}, tes ${ongletListe === 'ventes' ? 'ventes' : 'annonces'} sont dans les pages du site (liens ci-dessous) : la carte ne les recopie pas encore.</div>`;
     else if (ongletListe === 'parametres') panneau = parametres || `<div class="val gris">${esc(TU('r_rien'))}</div>`;
     else if (ongletListe === 'automatisations') panneau = !vinted ? `<div class="val gris">${esc(TU('m_site', { site: nomSite }))}</div>` : automatisationsHtml();
     else if (ongletListe === 'notifications') panneau = notificationsHtml();
-    else if (ongletListe === 'messages') panneau = !vinted ? `<div class="val gris" data-liste-site="${esc(e.plateforme)}">${esc(TU('m_site', { site: nomSite }))}</div>` : messagesHtml();
+    else if (ongletListe === 'messages') panneau = !vinted && !(carte.hasAttribute('data-grand') && listes && listes.plateforme === e.plateforme && listes.messages) ? `<div class="val gris" data-liste-site="${esc(e.plateforme)}">${esc(TU('m_site', { site: nomSite }))}</div>` : messagesHtml();
     else panneau = ongletListe === 'annonces' ? annoncesHtml(e) : ventesHtml(e);
     const tab = (k, t) => `<button role="tab" data-onglet-b="${k}" aria-selected="${ongletListe === k ? 'true' : 'false'}"${ongletListe === k ? ' data-actif' : ''}>${t}</button>`;
     const nom = listes && listes.compte && listes.compte.nom ? listes.compte.nom : (e && e.site && e.site.nom) || '';

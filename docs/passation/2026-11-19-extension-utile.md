@@ -241,3 +241,44 @@ des lignes écrites par des versions sans champ `v`, d'avant la 5.337 qui a cré
 - Masquer / Afficher en série (aucun chemin gardé n'existe encore ; décision 3 = autre chantier).
 - Messages Leboncoin / Vestiaire dans le panneau ; baisse auto (décision 1) ; paliers pour Vestiaire.
 - Place au stock dans les colonnes.
+
+---
+
+## Troisième passe (19 nov. soir) — après le merge de `claude/prix-sans-manuel`
+
+- **Merge** réel de `origin/claude/prix-sans-manuel` (baisse par règle, masquer « vendue ailleurs », prix en attente) ;
+  conflits réglés par UNION : `EXT_CAPACITES`/`audit-coherence` (toutes les capacités 5.409 des deux branches), clés
+  synchronisées (`vinted_offres_paliers` + `vinted_baisse_regle` + `vinted_masquer_ailleurs`), « Quoi de neuf » (les
+  lignes des deux) ; la page Extension d'`extension-claire` gardée (le bouton profil).
+- **Masquer / Afficher** dans « Choisir une action » (Vinted) : `masquerCarte` — sur SON clic CONFIRMÉ (barre de
+  confirmation dans le panneau), 10 annonces au plus, chacune du dressing de CE compte, par le geste APPRIS
+  (`masquerAppris` ; pas appris ⇒ rien ne part, dit comment l'apprendre), une à la fois (file Vinted), chacune par la
+  garde stricte (sécurité, 50/h, pause, compte de l'onglet), état RELU dans la réponse, journal `masquee`/`demasquee`.
+  Un masquage À LA MAIN n'entre PAS au registre `vinted_masquees_vrm` (la règle automatique ne démasque jamais ce
+  qu'il a masqué lui-même). Capacité `masquercarte: '5.409.0'`.
+- **Messages Leboncoin / Vestiaire** : Vestiaire — les conversations rangées (`vc_messages`) de CE compte ; Leboncoin —
+  le nombre de non lus de CE compte (`lbc_messages`) et les fils rangés à leur ouverture (`lbc_fil_*`). **Répondre**
+  depuis le volet par LEUR chemin gardé (`repondreVestiaire` / `repondreLeboncoin` : recette apprise, compte du fil =
+  compte de l'onglet, sécurité, plafond, pause), une conversation de CE compte seulement ; « incertain » n'est jamais dit
+  « envoyé ». (Corrigé au banc : l'onglet Messages de ces sites affichait la phrase des annonces.)
+- **Baisse automatique sur Leboncoin** : `regleBaisseLbcTick` — la MÊME règle (`vinted_baisse_regle.comptes['lbc:{compte}']`,
+  éteinte par défaut, réglée dans l'app sur la fiche du N° → Prix, une ligne par compte Leboncoin), le MÊME plancher
+  (prix mini, sinon achat + 10 %) lu sur la fiche du N° que LUI a relié à l'annonce (`vrm_lbc_liens` ; pas de lien ⇒
+  pas de baisse), « depuis » = mise en ligne lue ou dernière baisse, 12 par jour ; DÉPOSE une commande `cmd_prix_*`
+  exécutée par `prixAttenteTick` → `baisserPrixLbc` (recette, prix relu, sécurité). Capacité `baisselbc: '5.409.0'`.
+  **Vestiaire : pas de baisse automatique** — aucune date de mise en ligne n'est lue (jamais inventée) ; dit.
+- **Paliers sur Vestiaire : « pas encore »** — l'extension lit et répond aux offres Vestiaire sur SON clic, mais aucun
+  moteur ne les traite en continu ; dit dans le panneau (Automatisations du site).
+- **Place au stock** : colonne « Place » et ligne de la fiche (« Étagère · 2-2 » = rangée-colonne), lue comme
+  `ouDansMeubles` de l'app (`vrm_slots` → `vrm_meubles`, par `cleNum`).
+- Automatisations (Vinted) : la baisse par règle de CE compte est maintenant LUE (« −5 % tous les 14 jours sans vente »,
+  Activé/Désactivé), plus « Bientôt ».
+
+### Preuves
+- `audit-panneau-carte` **27/27** (G masquer : pas appris, sans confirmation, hors dressing, 50/50 ⇒ rien ; 2 PUT
+  relus ; pas au registre — H messages et réponse Vestiaire/Leboncoin par compte — I baisse Leboncoin : éteinte, sans
+  lien ⇒ rien ; allumée ⇒ 100 → 90 déposée — J place) ; `--prouve` **11/11** ; rouge sur l'arbre d'avant.
+- Bancs : `grand-panneau` **155/155** (Masquer : confirmation puis `confirme`, résultat dit), `grand-panneau-sites`
+  **80/80** (Messages Leboncoin et Vestiaire, réponse Vestiaire), captures regardées.
+- Build vert ; audits verts (traduction, coherence, tdz, variables, extension-feuille, actions-gardees, carte-listes,
+  negociation-paliers, quoi-de-neuf, regles-auto, prix-attente, fonctions-api).

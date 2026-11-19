@@ -21,8 +21,13 @@ const MUTATIONS = {
   statut: ["it.is_hidden === true ? 'masque' : ", ''],
   transporteur: ["if (tx && TRANSPORTEURS_CARTE[c] && !parTx.has(tx)) parTx.set(tx, TRANSPORTEURS_CARTE[c]);", "if (tx && !parTx.has(tx)) parTx.set(tx, c || 'inconnu');"],
   boite: ["if (!Object.values(r0).some((v) => String(v) === conv))", 'if (false)'],
-  confirme: ["if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Envoyer ».' };", ''],
+  confirme: ["raison: 'La réponse part seulement de l’onglet vinted.fr.' };\n  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Envoyer ».' };", "raison: 'La réponse part seulement de l’onglet vinted.fr.' };"],
   siteCompte: ["if (c !== moi) continue;\n        const st = STATUT_LBC", "const st = STATUT_LBC"],
+  masquerAppris: ["if (!masquerAppris(wr)) return { ok: false, code: 'pas-appris'", "if (false) return { ok: false, code: 'pas-appris'"],
+  masquerDressing: ["if (ids.some((id) => !d.parId[id])) return { ok: false, code: 'autre-compte'", "if (false) return { ok: false, code: 'autre-compte'"],
+  baisseLbcLien: ["if (!num) { raisons.sansLien = (raisons.sansLien || 0) + 1; continue; }", "if (!num) { }"],
+  baisseLbcEteinte: ["  const regle = regleBaisseDe(m0[REGLE_BAISSE_CLE], cleRegle);\n  if (!regle) return { saute: 'eteinte' };", "  const regle = { pct: 10, jours: 7 };"],
+  repondreVcCompte: ["if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte'", "if (false) return { ok: false, code: 'autre-compte'"],
   autreCompteNotif: ["if (e.p === 'vinted' && e.c !== u) continue;", ''],
 };
 if (args.includes('--prouve')) {
@@ -84,7 +89,7 @@ function monde() {
     const vt = (tx) => (v.find((x) => x.tx === String(tx)) || {}).transporteur;
     dit(vt(7000) === 'Chronopost' && vt(7001) === undefined && vt(7002) === undefined, 'B. transporteur par identité (transaction → suivi → transporteur) ; « autre » ou rien relié ⇒ aucun', JSON.stringify(v.map((x) => x.tx + ':' + x.transporteur)));
     const au = r && r.automatisations;
-    dit(au && au.offres && au.offres.actif === true && au.offres.minis === 1 && au.favoris && au.favoris.versions === 2 && au.favoris.rythme === 'prudent' && au.baisse === null, 'C. automatisations : offres auto activées (1 prix mini), favoris 2 versions au rythme « prudent », baisse auto pas livrée (null)', JSON.stringify(au));
+    dit(au && au.offres && au.offres.actif === true && au.offres.minis === 1 && au.favoris && au.favoris.versions === 2 && au.favoris.rythme === 'prudent' && au.baisse && au.baisse.actif === false && au.paliers && au.paliers.actif === false, 'C. automatisations : offres auto activées (1 prix mini), favoris 2 versions au rythme « prudent », baisse auto et paliers éteints (défaut) — lus', JSON.stringify(au));
     const n = r && r.notifications;
     dit(n && n.liste.length === 2 && n.liste.every((e) => e.c === '111') && !n.liste.some((e) => e.id === '6000') && n.vu === T0 - 2 * H, 'D. notifications : 7 jours, le compte de l’onglet seulement, le marqueur « vu » lu', JSON.stringify(n));
     const ecr = () => f.j.vinted.filter((x) => String(x.methode || x.method || 'GET').toUpperCase() !== 'GET').length;
@@ -116,6 +121,57 @@ function monde() {
     dit(rl && rl.ventes && rl.ventes.liste.length === 1 && rl.ventes.liste[0].tx === 'T1' && rl.ventes.liste[0].etat === 'a_expedier', 'F. Leboncoin : les ventes du compte de l’onglet seulement', JSON.stringify(rl && rl.ventes));
     const rv = await h.ctx.carteListes({ action: 'carteListes' }, { tab: { id: 9, url: 'https://www.vestiairecollective.com/' } });
     dit(rv && rv.annonces && rv.annonces.toutes.length === 1 && rv.annonces.toutes[0].favoris === 7 && rv.ventes && rv.ventes.liste.length === 1 && rv.ventes.liste[0].transporteur === 'Chronopost' && rv.ventes.liste[0].etat === 'a_expedier', 'F. Vestiaire : annonces (favoris lus) et ventes (état, transporteur) du compte de l’onglet seulement', JSON.stringify(rv && { a: rv.annonces, v: rv.ventes }));
+    // G. Masquer / afficher depuis le panneau (le geste APPRIS de la règle « vendue ailleurs »).
+    const m1 = monde();
+    const ecrM = (f) => f.j.vinted.filter((x) => String(x.methode || x.method || '').toUpperCase() === 'PUT' && /\/is_hidden$/.test(String(x.chemin || x.url || x.path || '')));
+    const g1 = await m1.ctx.masquerCarte({ ids: ['111000'], voulu: true, confirme: true }, ONGLET);
+    dit(g1 && g1.ok === false && g1.code === 'pas-appris' && ecrM(m1).length === 0, 'G. geste pas encore appris ⇒ rien ne part, dit', JSON.stringify(g1));
+    const appris = { harvest_111_wreq_api_v2_items_id_is_hidden: { method: 'PUT', path: '/api/v2/items/123456/is_hidden', body: '{"is_hidden":true}' } };
+    const m2 = faireFond({ src: BG, connecte: '111', lignes: Object.assign(monde().lignes, appris), comptes: [{ vinted_user_id: '111', login: 'shop_sophie', domain: 'www.vinted.fr' }], vinted: () => ({ status: 200, body: { item: { is_hidden: true } } }) });
+    m2.ctx.compteConnecte = async () => '111';
+    const g2 = await m2.ctx.masquerCarte({ ids: ['111000'], voulu: true }, ONGLET);
+    dit(g2 && g2.code === 'confirmation' && ecrM(m2).length === 0, 'G. sans confirmation : rien ne part', JSON.stringify(g2));
+    const g3 = await m2.ctx.masquerCarte({ ids: ['999999'], voulu: true, confirme: true }, ONGLET);
+    dit(g3 && g3.ok === false && g3.code === 'autre-compte' && ecrM(m2).length === 0, 'G. une annonce hors du dressing de CE compte : rien ne part', JSON.stringify(g3));
+    const g4 = await Promise.race([m2.ctx.masquerCarte({ ids: ['111000', '111001'], voulu: true, confirme: true }, ONGLET), new Promise((r9) => setTimeout(() => r9({ to: 1 }), 6000))]);
+    dit(g4 && g4.ok === true && ecrM(m2).length === 2 && g4.faits.every((x) => x.relu === true), 'G. confirmé, appris, de CE compte : deux PUT is_hidden, l’état RELU dans la réponse', JSON.stringify(g4));
+    dit(!Object.keys(m2.lignes).some((k) => k === 'vinted_masquees_vrm'), 'G. un masquage à la main n’entre PAS au registre de la règle automatique');
+    const m3 = faireFond({ src: BG, connecte: '111', lignes: Object.assign(monde().lignes, appris), store: { vrmActions: { 111: Array.from({ length: 50 }, (_, i) => T0 - i * 1000) } }, comptes: [{ vinted_user_id: '111', login: 'shop_sophie', domain: 'www.vinted.fr' }] });
+    m3.ctx.compteConnecte = async () => '111';
+    const g5 = await m3.ctx.masquerCarte({ ids: ['111000'], voulu: true, confirme: true }, ONGLET);
+    dit(g5 && g5.ok === false && ecrM(m3).length === 0, 'G. 50 actions dans l’heure : la garde stricte arrête, rien ne part', JSON.stringify(g5));
+    // H. Messages et réponses Vestiaire / Leboncoin.
+    const lh = Object.assign({}, lignesSites, { vc_messages: { capturedAt: iso(T0 - H), conversations: { c1: { ref: 'conv-1', titre: 'Sac', apercu: 'Bonjour', date: iso(T0 - H), nonLu: true, compte: '42' }, c2: { ref: 'conv-2', titre: 'Autre', apercu: 'x', compte: '43' } } }, lbc_messages: { compteurs: { moi: { unread: 3 } } } });
+    const hh = faireFond({ src: BG, connecte: '111', lignes: lh });
+    hh.ctx.compteOngletCapte = async (url) => (/leboncoin/.test(url) ? { p: 'leboncoin', id: 'lbc-account:moi' } : { p: 'vestiaire', id: '42' });
+    let appelVc = 0; hh.ctx.repondreVestiaire = async () => { appelVc++; return { accepte: true, etape: 'fait' }; };
+    const rv2 = await hh.ctx.carteListes({ action: 'carteListes' }, { tab: { id: 9, url: 'https://www.vestiairecollective.com/' } });
+    dit(rv2 && rv2.messages && rv2.messages.liste.length === 1 && rv2.messages.liste[0].conv === 'conv-1' && rv2.messages.liste[0].nonlu === true, 'H. Vestiaire : les conversations RANGÉES du compte de l’onglet seulement', JSON.stringify(rv2 && rv2.messages));
+    const rl2 = await hh.ctx.carteListes({ action: 'carteListes' }, { tab: { id: 8, url: 'https://www.leboncoin.fr/' } });
+    dit(rl2 && rl2.messages && rl2.messages.nonlusSite === 3, 'H. Leboncoin : le nombre de non lus de CE compte (les fils se rangent à l’ouverture)', JSON.stringify(rl2 && rl2.messages));
+    const h1 = await hh.ctx.repondreCarte({ conv: 'conv-2', texte: 'Oui', confirme: true }, { tab: { id: 9, url: 'https://www.vestiairecollective.com/' } });
+    const h2 = await hh.ctx.repondreCarte({ conv: 'conv-1', texte: 'Oui', confirme: true }, { tab: { id: 9, url: 'https://www.vestiairecollective.com/' } });
+    dit(h1 && h1.ok === false && h1.code === 'autre-compte' && h2 && h2.ok === true && appelVc === 1, 'H. répondre sur Vestiaire : seulement une conversation de CE compte, par `repondreVestiaire` (son chemin gardé)', JSON.stringify({ h1, h2, appelVc }));
+    // I. La baisse par règle sur Leboncoin.
+    const li = (regleOn, lien) => faireFond({ src: BG, connecte: '111', lignes: {
+      main: { vinted_baisse_regle: { v: 1, comptes: regleOn ? { 'lbc:moi': { actif: true, pct: 10, jours: 7 } } : {} }, vrm_lbc_liens: lien ? { 2222222: '12' } : {}, vinted_annonce_numeros: { 4242: { numero: '12', accountId: '111', min: 60 } }, vinted_buyprice_by_num: {} },
+      lbc_listings: { items: { x: { id: '2222222', subject: 'Paire', price: [100], status: 'active', account: 'lbc-account:moi', publieeLe: iso(T0 - 20 * 864e5) } } } }, store: { vrmLbcCompte: { v: 2, id: 'lbc-account:moi', name: 'Sophie' } } });
+    const liS = (on, lien) => { const f = li(on, lien); f.ctx.relaisSessionOwner = async () => 'owner-banc'; return f; };
+    const cmdsDe = (f) => Object.keys(f.lignes).filter((k) => /^cmd_prix_/.test(k)).map((k) => f.lignes[k]);
+    const i0 = liS(false, true); const ri0 = await i0.ctx.regleBaisseLbcTick('audit');
+    dit(cmdsDe(i0).length === 0 && ri0 && ri0.saute === 'eteinte', 'I. règle Leboncoin ÉTEINTE (défaut) ⇒ aucune baisse', JSON.stringify(ri0));
+    const i1 = liS(true, false); const ri1 = await i1.ctx.regleBaisseLbcTick('audit');
+    dit(cmdsDe(i1).length === 0 && ri1 && ri1.raisons && ri1.raisons.sansLien === 1, 'I. sans lien posé par lui (annonce → N°) ⇒ pas de plancher ⇒ aucune baisse');
+    const i2 = liS(true, true); const ri = await i2.ctx.regleBaisseLbcTick('audit');
+    const c2 = cmdsDe(i2);
+    dit(c2.length === 1 && c2[0].site === 'leboncoin' && c2[0].prix === 90 && c2[0].prixAvant === 100 && c2[0].source === 'regle' && c2[0].uidRegle === 'lbc:moi', 'I. allumée, reliée, 20 j sans vente : une baisse de 10 % DÉPOSÉE (100 → 90, plancher 60), exécutée ensuite par `baisserPrixLbc`', JSON.stringify({ ri, c2 }));
+    // J. La place au stock.
+    const pj = faireFond({ src: BG, connecte: '111', lignes: Object.assign(monde().lignes, {}) });
+    pj.lignes.main.vrm_slots = { 124: { m: 'm1', i: 5 } }; pj.lignes.main.vrm_meubles = [{ id: 'm1', name: 'Étagère', cols: 4, rows: 3 }];
+    pj.ctx.compteConnecte = async () => '111'; pj.ctx.retourSurVinted = async () => ({ ok: true });
+    const rj = await pj.ctx.carteListes({ action: 'carteListes' }, ONGLET);
+    const aj = ((rj && rj.annonces && rj.annonces.toutes) || []).find((x) => x.num === '124');
+    dit(aj && aj.place === 'Étagère · 2-2', 'J. la place au stock du N° (meuble · rangée-colonne), lue comme dans l’app', JSON.stringify(aj && aj.place));
   } catch (e) { dit(false, 'exception', e && e.stack); }
   console.log(`\n${ko ? '❌' : '✅'} audit-panneau-carte : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

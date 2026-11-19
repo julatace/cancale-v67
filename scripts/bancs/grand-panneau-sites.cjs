@@ -149,9 +149,9 @@ const montrer = async (pg, mobile) => {
 
 const SITES = {
   leboncoin: { url: 'https://www.leboncoin.fr/mes-annonces', etat: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: 'lbc-account:moi', nom: 'Sophie' }, lbc: { compte: { ok: true, texte: 'Sophie' }, annonces: { ok: true, texte: '2 annonces' }, ventes: { ok: true, texte: '1 vente' } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
-    listes: { ok: true, plateforme: 'leboncoin', compte: { id: 'moi', nom: 'Sophie' }, annonces: { lu: T0 - H, aConfirmer: false, total: 2, liste: [], toutes: [{ id: 'a1', titre: 'Paire A', prix: 80, statut: 'en_vente', url: 'https://www.leboncoin.fr/ad/a1', photos: [], photo: '' }, { id: 'a2', titre: 'Paire B', prix: 60, statut: 'masque', url: 'https://www.leboncoin.fr/ad/a2', photos: [], photo: '' }], nTous: 2, statuts: { en_vente: 1, brouillon: 0, masque: 1, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 124 }, ventes: { lu: null, total: 1, liste: [{ tx: 'T1', titre: 'Paire A', prix: 80, date: T0 - H, etat: 'a_expedier', vendue: true, num: '' }] }, messages: null, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [{ p: 'leboncoin', c: 'moi', s: 'ventes', id: 'T1', t: T0 - H }] }, autres: null } },
+    listes: { ok: true, plateforme: 'leboncoin', compte: { id: 'moi', nom: 'Sophie' }, annonces: { lu: T0 - H, aConfirmer: false, total: 2, liste: [], toutes: [{ id: 'a1', titre: 'Paire A', prix: 80, statut: 'en_vente', url: 'https://www.leboncoin.fr/ad/a1', photos: [], photo: '' }, { id: 'a2', titre: 'Paire B', prix: 60, statut: 'masque', url: 'https://www.leboncoin.fr/ad/a2', photos: [], photo: '' }], nTous: 2, statuts: { en_vente: 1, brouillon: 0, masque: 1, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 124 }, ventes: { lu: null, total: 1, liste: [{ tx: 'T1', titre: 'Paire A', prix: 80, date: T0 - H, etat: 'a_expedier', vendue: true, num: '' }] }, messages: { lu: null, site: 'leboncoin', nonlusSite: 3, liste: [] }, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [{ p: 'leboncoin', c: 'moi', s: 'ventes', id: 'T1', t: T0 - H }] }, autres: null } },
   vestiaire: { url: 'https://www.vestiairecollective.com/', etat: { ok: true, plateforme: 'vestiaire', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: '42', nom: 'Sophie VC' }, vcCapte: { ventes: { n: 1, at: T0 - H } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
-    listes: { ok: true, plateforme: 'vestiaire', compte: { id: '42', nom: 'Sophie VC' }, annonces: { lu: T0 - H, aConfirmer: false, total: 1, liste: [], toutes: [{ id: 'p1', titre: 'Sac', prix: 300, statut: 'en_vente', favoris: 7, photos: [], photo: '' }], nTous: 1, statuts: { en_vente: 1, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 0 }, ventes: { lu: null, total: 1, liste: [{ tx: 'p9', titre: 'Sac vendu', prix: 250, date: T0 - H, etat: 'a_expedier', vendue: true, num: '', bordereau: true, transporteur: 'Chronopost' }] }, messages: null, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [] }, autres: null } },
+    listes: { ok: true, plateforme: 'vestiaire', compte: { id: '42', nom: 'Sophie VC' }, annonces: { lu: T0 - H, aConfirmer: false, total: 1, liste: [], toutes: [{ id: 'p1', titre: 'Sac', prix: 300, statut: 'en_vente', favoris: 7, photos: [], photo: '' }], nTous: 1, statuts: { en_vente: 1, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 0 }, ventes: { lu: null, total: 1, liste: [{ tx: 'p9', titre: 'Sac vendu', prix: 250, date: T0 - H, etat: 'a_expedier', vendue: true, num: '', bordereau: true, transporteur: 'Chronopost' }] }, messages: { lu: T0 - H, site: 'vestiaire', liste: [{ conv: 'conv-1', qui: 'Sac', texte: 'Bonjour, prix ferme ?', at: T0 - H, nonlu: true, photo: '' }] }, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [] }, autres: null } },
 };
 async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
   const S = SITES[site];
@@ -167,7 +167,7 @@ async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
     const orig = Element.prototype.attachShadow;
     Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
     window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
-      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; setTimeout(() => cb && cb(rep), 0); } },
+      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; setTimeout(() => cb && cb(rep), 0); } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -184,7 +184,7 @@ const lireS = (pg) => pg.evaluate(() => {
     options: q('[data-ann-action]') ? Array.from(q('[data-ann-action]').options).map((o) => o.value).filter(Boolean) : [],
     ventes: Array.from(r.querySelectorAll('[data-vente]')).map((x) => x.getAttribute('data-vente') + ':' + x.getAttribute('data-vente-etat')),
     favSite: q('[data-favoris-site]') ? q('[data-favoris-site]').innerText : '', autoSite: q('[data-auto-site]') ? q('[data-auto-site]').innerText : '',
-    notifs: r.querySelectorAll('[data-notif]').length, transporteur: q('[data-fait="transporteur"] b') ? q('[data-fait="transporteur"] b').innerText : '',
+    notifs: r.querySelectorAll('[data-notif]').length, msgSite: q('[data-messages-site]') ? q('[data-messages-site]').getAttribute('data-messages-site') : null, msgTexte: q('[data-messages-site]') ? q('[data-messages-site]').innerText : '', convs: r.querySelectorAll('[data-conv-b]').length, transporteur: q('[data-fait="transporteur"] b') ? q('[data-fait="transporteur"] b').innerText : '',
     debord: document.documentElement.scrollWidth > window.innerWidth };
 });
 
@@ -197,8 +197,21 @@ const lireS = (pg) => pg.evaluate(() => {
       await essaie(T, async () => {
         const t = await ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile });
         await montrer(t.pg, mobile);
-        await clic(t.pg, '[data-onglet-b="annonces"]');
+        await clic(t.pg, '[data-onglet-b="messages"]');
+        await t.pg.waitForTimeout(250);
         let a = await lireS(t.pg);
+        await t.pg.screenshot({ path: path.join(SORTIE, `${site}-messages-${largeur}-${scheme}.png`) });
+        dit(site === 'leboncoin' ? a.msgSite === 'leboncoin' && /3/.test(a.msgTexte) : a.convs === 1, `${T} : Messages : ${site === 'leboncoin' ? 'les 3 non lus de CE compte, dits' : 'la conversation rangée de CE compte'}`, JSON.stringify({ s: a.msgSite, t: a.msgTexte, c: a.convs }));
+        if (site === 'vestiaire') {
+          await clic(t.pg, '[data-conv-b="conv-1"]');
+          await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-rep-texte="conv-1"]'); ta.value = 'Oui'; ta.dispatchEvent(new Event('input')); });
+          await clic(t.pg, '[data-rep-envoyer="conv-1"]');
+          await t.pg.waitForTimeout(150);
+          const env = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'repondreCarte'));
+          dit(env.length === 1 && env[0].conv === 'conv-1' && env[0].confirme === true, `${T} : répondre depuis le volet (chemin gardé de Vestiaire)`, JSON.stringify(env));
+        }
+        await clic(t.pg, '[data-onglet-b="annonces"]');
+        a = await lireS(t.pg);
         await t.pg.screenshot({ path: path.join(SORTIE, `${site}-annonces-${largeur}-${scheme}.png`) });
         dit(a.on && a.grand && (mobile ? a.w >= largeur - 1 : a.w >= largeur * 0.7) && !a.debord, `${T} : le grand panneau s’ouvre aussi ici`, JSON.stringify(a));
         dit(a.onglets.join(',') === 'messages,annonces,favoris,ventes,notifications,automatisations,parametres', `${T} : les mêmes onglets`, a.onglets.join(','));

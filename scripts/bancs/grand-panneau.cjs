@@ -50,7 +50,7 @@ const MSG = Array.from({ length: 7 }, (_, i) => ({ conv: String(60000 + i), qui:
 const STATUTS = ['en_vente', 'en_vente', 'brouillon', 'masque', 'en_vente', 'reserve', 'vendu', 'en_vente', 'en_vente', 'brouillon'];
 const TOUTES = ANN.map((x, i) => Object.assign({}, x, { statut: STATUTS[i] }));
 VEN[0].transporteur = 'Chronopost';
-const AUTO = { offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, baisse: null };
+const AUTO = { offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
 const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' },
   annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN, toutes: TOUTES, nTous: TOUTES.length, statuts: { en_vente: 5, brouillon: 2, masque: 1, reserve: 1, vendu: 1, a_confirmer: 0 } }, automatisations: AUTO, notifications: NOTIFS, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
@@ -89,6 +89,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
+          else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
         } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { (window.__ranges = window.__ranges || []).push(copie(o)); if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
@@ -118,6 +119,7 @@ const lire = (pg) => pg.evaluate(() => {
     rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
     secu: /Sécurité du compte/.test(texte), toutArreter: !!q('[data-tout-arreter]'),
     repOk: !!q('[data-rep-etat="ok"]'),
+    confirmeM: q('[data-ann-confirme]') ? q('[data-ann-confirme]').getAttribute('data-ann-confirme') : null, resultatM: q('[data-ann-resultat]') ? q('[data-ann-resultat]').getAttribute('data-ann-resultat') : null,
     chips: Array.from(r.querySelectorAll('[data-ann-statut]')).map((b) => b.getAttribute('data-ann-statut') + ':' + (b.innerText.split('·')[1] || '').trim()),
     annVue: q('[data-vue]') ? q('[data-vue]').getAttribute('data-vue') : null,
     lignesAnn: r.querySelectorAll('.table5 [data-annonce]').length, cartesGrille: r.querySelectorAll('.grille5 [data-annonce]').length,
@@ -233,6 +235,22 @@ const montrer = async (pg, mobile) => {
         await t.pg.waitForTimeout(200);
         a = await lire(t.pg);
         dit(a.coches === 10 && a.action && !a.action.off, `${T} : « tout » coche les 10 lignes, l’action devient possible`, JSON.stringify({ c: a.coches, a: a.action }));
+        // Masquer sur Vinted : « Choisir une action » ⇒ confirmation ⇒ SON clic ⇒ la demande part avec `confirme`.
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-ann-tout]'); c.checked = false; c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(150);
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-ann-sel="7001"]'); c.checked = true; c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(150);
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const s2 = r.querySelector('[data-ann-action]'); s2.value = 'masquer'; s2.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}masquer-${largeur}-${scheme}`);
+        const avantM = a.envoyes.filter((m) => m.action === 'masquerCarte').length;
+        dit(a.confirmeM === 'masquer' && avantM === 0 && a.action.options.includes('masquer') && a.action.options.includes('afficher'), `${T} : « Masquer » demande confirmation, rien ne part avant`, JSON.stringify({ c: a.confirmeM, n: avantM, o: a.action.options }));
+        await clic(t.pg, '[data-ann-confirme-ok]');
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        const mq = a.envoyes.find((m) => m.action === 'masquerCarte');
+        dit(mq && mq.confirme === true && mq.voulu === true && JSON.stringify(mq.ids) === '["7001"]' && a.resultatM === 'ok', `${T} : confirmé : la demande part avec SA sélection, le résultat est dit`, JSON.stringify({ mq, r: a.resultatM }));
         await clic(t.pg, '[data-ann-vue="grille"]');
         a = await lire(t.pg);
         await cap(t.pg, `${orion ? 'orion-' : ''}grille-${largeur}-${scheme}`);
@@ -242,7 +260,7 @@ const montrer = async (pg, mobile) => {
         await clic(t.pg, '[data-onglet-b="automatisations"]');
         a = await lire(t.pg);
         await cap(t.pg, `${orion ? 'orion-' : ''}automatisations-${largeur}-${scheme}`);
-        dit(a.auto.join('|') === 'favoris:off|offres:on|baisse:bientot', `${T} : Automatisations : favoris Désactivé, offres Activé, baisse « pas su » (pas livrée) — lus`, JSON.stringify(a.auto));
+        dit(a.auto.join('|') === 'favoris:off|offres:on|paliers:on|baisse:off', `${T} : Automatisations : favoris Désactivé, offres Activé, paliers Activé, baisse auto Désactivée — lus`, JSON.stringify(a.auto));
         // Notifications.
         await clic(t.pg, '[data-onglet-b="notifications"]');
         a = await lire(t.pg);
