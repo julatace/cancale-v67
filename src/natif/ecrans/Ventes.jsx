@@ -26,7 +26,7 @@ const textePlace = (p) => (p ? tr('vv.ou.court', { meuble: p.nom || tr('vv.ou.me
 const texteBordereau = (b) => (b === 'imprime' ? tr('vv.bord.imprime') : b === 'attente' ? tr('v2v.sansBordereau') : '');
 function texteEtape(etapes) {
   const i = (etapes || []).findIndex((e) => e.ici);
-  return i < 0 ? tr('v2v.etapeAucune') : tr('v2v.etape', { n: i + 1, m: etapes.length, mot: tr('vv.route.' + etapes[i].cle) });
+  return i < 0 ? tr('v2v.etapeAucune') : tr('vn.etape', { n: i + 1, m: etapes.length, mot: tr('vv.route.' + etapes[i].cle) });
 }
 
 function RangeeColis({ r, g, Icon, Logo, choisie, onOuvrir }) {
@@ -40,11 +40,11 @@ function RangeeColis({ r, g, Icon, Logo, choisie, onOuvrir }) {
       vignette={<Vignette src={r.photo || ''} alt=""/>}
       titre={r.titre} lignes={2}
       plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
-      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', r.taille ? tr('vv.taille', { t: r.taille }) : '', ech)}
+      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)}
       ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte
       detailValeur={r.transporteur || ''}
-      note={joint(textePlace(r.place), texteBordereau(r.bordereau), r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
+      note={joint(textePlace(r.place), r.taille ? tr('vv.taille', { t: r.taille }) : '', texteBordereau(r.bordereau), r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
@@ -60,10 +60,10 @@ function RangeeRoute({ r, Icon, Logo, choisie, onOuvrir }) {
       vignette={<Vignette src={r.photo || ''} alt=""/>}
       titre={r.titre} lignes={2}
       plaque={r.num ? <Plaque numero={r.num}/> : null}
-      sousTitre={joint(r.taille ? tr('vv.taille', { t: r.taille }) : '', r.etat.texte)}
+      sousTitre={texteEtape(r.etapes)}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte detailValeur={r.pourToi ? tr('vv.route.pourToi') : ''}
-      note={joint(texteEtape(r.etapes), r.transporteur, r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
+      note={joint(r.etat.texte, r.taille ? tr('vv.taille', { t: r.taille }) : '', r.transporteur, r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
       attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}

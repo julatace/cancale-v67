@@ -67,7 +67,7 @@ const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of doc
     const f = [...e.querySelectorAll('button')].find((b) => /fermer|close|×/i.test((b.getAttribute('aria-label') || '') + b.textContent)); if (f) { f.click(); break; } } }).catch(() => {}); await pg.waitForTimeout(400); };
 // La base : celle de design-passe (3 comptes, 30 colis à envoyer, envois partis) + un meuble INVENTÉ « Étagère A » où sont
 // rangés les N° 1 à 40 (vrm_meubles / vrm_slots, la forme que lit ouDansMeubles) : la place s'écrit sur la rangée.
-const MEUBLES = [{ id: 'banc-etagere-a', nom: 'Étagère A', cols: 4, rows: 10 }];
+const MEUBLES = [{ id: 'banc-etagere-a', name: 'Étagère A', cols: 4, rows: 10 }];
 const SLOTS = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [String(i + 1), { m: 'banc-etagere-a', i }]));
 function baseVentes() { const b = base(); b.main[0].data.vrm_meubles = MEUBLES; b.main[0].data.vrm_slots = SLOTS; return b; }
 

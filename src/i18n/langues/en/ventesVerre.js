@@ -120,6 +120,7 @@ export default {
   "vn.filtrer": "Filter",
   "vn.plus": "More actions",
   "vn.terminees": "Completed",
+  "vn.etape": "{mot} · {n}/{m}",
   "vn.e.coches": {"one": "{n} ticked", "other": "{n} ticked"},
   "vn.e.deposer": {"one": "{n} to drop off", "other": "{n} to drop off"},
   "vn.auMoins": "at least {n} to send",
