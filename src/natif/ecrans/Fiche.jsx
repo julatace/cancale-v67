@@ -120,6 +120,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
 
   const galerie = (
     <div className="nf-galerie" data-nf-sans={photos.length ? undefined : '1'} data-fiche-heros={contexteBarre || 'numero'} data-fiche-photo-vedette={photos.length ? '1' : '0'}>
+      <div className="nf-cadre">
       <div className="nf-defile" ref={defile} onScroll={surDefile} data-fiche-heros-photo={photos.length ? '1' : '0'} data-fd-photo-agrandir={photos.length}>
         {photos.length ? photos.map((s, i) => (
           <button key={s + i} type="button" className="nf-photo" onClick={() => setGrand(i)} aria-label={photos.length > 1 ? T.photoN(i + 1, photos.length) : T.agrandir}>{rendre.photo(s)}</button>
@@ -127,9 +128,10 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </div>
       {A ? <span className="nf-plaque" data-fiche-grand-num=""><Plaque numero={A.num} doublon={A.double} grand/></span>
         : sansNumero ? <span className="nf-plaque" data-fiche-grand-num="" data-fiche-sans-num="">{sansNumero}</span> : null}
-      {photos.length > 1 ? <div className="nf-points" role="group" aria-label={T.voirPhotos(photos.length)} data-nf-points="">
+      {photos.length > 1 && !ordi ? <div className="nf-points" role="group" aria-label={T.voirPhotos(photos.length)} data-nf-points="">
         {photos.map((s, i) => <button key={s + i} type="button" className="nf-point" data-nf-actif={i === vue ? '1' : undefined} aria-label={T.photoN(i + 1, photos.length)} onClick={() => allerPhoto(i)}/>)}
       </div> : null}
+      </div>
       {photos.length > 1 && ordi ? <div className="nf-miniatures">{photos.map((s, i) => <button key={s + i} type="button" className="nf-miniature" data-nf-actif={i === vue ? '1' : undefined} aria-label={T.photoN(i + 1, photos.length)} onClick={() => allerPhoto(i)}>{rendre.photo(s)}</button>)}</div> : null}
     </div>
   );

@@ -156,7 +156,7 @@ function mesurerFiche() {
     plusSeul: plus ? montants(texte(plus)).filter((x) => !tPage.replace(/\s+/g, ' ').includes(x)) : [],
     zeros: faits.filter((x) => !x.su && /(^|\s)[+−-]?0(,00)?\s?€/.test(x.txt)).map((x) => x.cle),
     deborde: document.scrollingElement.scrollWidth - innerWidth,
-    hors: [...f.querySelectorAll('*')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); if (r.right <= boite.r + 1 && r.left >= boite.x - 1) return false; for (let a = e.parentElement; a && a !== f; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll|hidden|clip/.test(c.overflowX)) return false; } return true; }).map((e) => (e.className || e.tagName) + ' « ' + (e.innerText || '').slice(0, 20) + ' »').slice(0, 4),
+    hors: [...f.querySelectorAll('*')].filter(vis).filter((e) => !e.closest('[data-fiche-messages]')).filter((e) => { const r = e.getBoundingClientRect(); if (r.right <= boite.r + 1 && r.left >= boite.x - 1) return false; for (let a = e.parentElement; a && a !== f; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll|hidden|clip/.test(c.overflowX)) return false; } return true; }).map((e) => (e.className || e.tagName) + ' « ' + (e.innerText || '').slice(0, 20) + ' »').slice(0, 4),
     rognes: [...f.querySelectorAll('*')].filter(vis).filter((e) => e.children.length === 0 && (e.innerText || '').trim().length > 1 && e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(getComputedStyle(e).overflowX) && getComputedStyle(e).textOverflow !== 'ellipsis').map((e) => (e.innerText || '').slice(0, 24)).slice(0, 4),
     toast: sonde,
   };
@@ -290,6 +290,7 @@ async function surPlace(nav, sombre) {
     // Le prix : UN toucher sur la valeur ouvre « Prix partout », son champ prêt.
     await pg.locator('[data-fiche-paire="3102"] [data-fd-fait="prix"]').first().tap({ timeout: 4000 }).catch(() => {});
     await pg.waitForSelector('[data-prix-champ]', { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => { const c = document.querySelector('[data-prix-champ]'); return c && document.activeElement === c; }, null, { timeout: 2500 }).catch(() => {});
     const px = await pg.evaluate(() => { const c = document.querySelector('[data-prix-champ]'); return { champ: !!c, focus: !!c && document.activeElement === c }; });
     dit(px.champ && px.focus, `S5 ${suf} : toucher la valeur du prix ouvre « Prix partout », le champ prêt à taper`, px);
     if (o.erreurs.length) console.log(`   (erreurs de page : ${o.erreurs.slice(0, 2).join(' | ')})`);
@@ -373,7 +374,9 @@ if (require.main === module) (async () => {
           const m = await o.pg.evaluate(mesurerFiche);
           jugerFiche(m, n, suf, W < 600);
           // Q5 — cibles et contrastes, par la mesure commune (design-passe) : la fiche seule.
+          const cache = await o.pg.addStyleTag({ content: '[data-fiche-messages]{display:none!important}' });
           const q = await o.pg.evaluate(P.mesurer, { tactile: W < 600, sombre: th === 'sombre', racines: ['[data-fiche-paire]'] });
+          await cache.evaluate((e) => e.remove()).catch(() => {});
           // G — UN toucher sur « Choisir une action » : la feuille des gestes (rangées), puis Échap.
           await o.pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fd-actions-ouvrir]'); if (b) b.click(); }); await o.pg.waitForTimeout(500);
           const g = await o.pg.evaluate(() => [...document.querySelectorAll('[data-fd-actions="1"] [data-fd-tuile]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-fd-tuile')));

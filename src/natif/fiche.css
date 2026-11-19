@@ -13,6 +13,7 @@
   }
   .nf-messages { padding: 0 var(--n-marge); }
   .nf-messages:empty { display: none; }
+  .nf-messages > .vrm-toasts:not(:empty) { padding: 12px 0 4px; }
   .nf-messages .vrm-toasts { padding: 12px 0 0; }
 
   .nf { color: var(--n-encre); min-width: 0; }
@@ -20,6 +21,7 @@
 
   /* ── 1. La galerie ── */
   .nf-galerie { position: relative; margin: 0 0 16px; background: var(--n-carte); }
+  .nf-cadre { position: relative; }
   .nf-defile { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; aspect-ratio: 1 / 1; width: 100%; max-height: 42svh; }
   /* (iPhone, onglet Safari : 664 px utiles) la photo garde toute la largeur mais ne passe pas 46 % de la hauteur : le prix et le plein restent au premier écran. */
   .nf-defile::-webkit-scrollbar { display: none; }
@@ -176,7 +178,9 @@
     .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
     .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
     /* Les sites en vrai tableau : Site · Compte · Prix · Vues · Favoris · État. */
-    .nf[data-nf-ordi] .nf-site { grid-template-columns: minmax(120px, 1.2fr) minmax(0, 1.2fr) 80px 56px 64px 112px; grid-template-areas: none; min-height: 48px; padding: 6px 16px; }
+    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: auto minmax(64px, 1fr) auto auto auto auto; column-gap: 14px; }
+    .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 16px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
+    .nf[data-nf-ordi] .nf-c-compte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nf[data-nf-ordi] .nf-site > * { grid-area: auto; justify-self: auto; margin: 0; }
     .nf[data-nf-ordi] .nf-site-tete { display: grid; min-height: 36px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
     .nf[data-nf-ordi] .nf-site-tete > * { font: var(--n-t-legende-fort); color: var(--n-encre-2); }

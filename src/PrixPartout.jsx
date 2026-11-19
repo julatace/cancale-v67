@@ -69,7 +69,7 @@ function phrase(e, s, compteDe) {
 export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null, regles = null, onRegle = null, focusPrix = false }) {
   // (19 nov., fiche directe) Ouvert en touchant LA VALEUR du prix : le champ reçoit le focus après la feuille (qui le prend au montage).
   const champPrixRef = React.useRef(null);
-  React.useEffect(() => { if (!focusPrix) return undefined; const t = setTimeout(() => { try { if (champPrixRef.current) champPrixRef.current.focus(); } catch (_) {} }, 350); return () => clearTimeout(t); }, [focusPrix]);
+  React.useEffect(() => { if (!focusPrix) return undefined; const t = setTimeout(() => { try { if (champPrixRef.current) champPrixRef.current.focus(); } catch (_) {} }, 120); return () => clearTimeout(t); }, [focusPrix]);
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
