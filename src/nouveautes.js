@@ -29,19 +29,44 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (19 nov., Julien : « la liaison des articles entre les différentes applications […] irréprochable ») docs/passation/2026-11-19-liaison-sites-guidee.md
   { id: 'liaison-sites-guidee', date: '2026-11-19', titre: 'Relie tes annonces, photo contre photo', phrase: 'Leboncoin, eBay, Vestiaire : touche le bon article, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
-  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/passation/2026-11-19-natif-fondation.md
-  { id: 'coque-native', date: '2026-11-19', titre: 'Une nouvelle barre, comme sur iPhone', phrase: 'Cinq onglets en bas ; le reste derrière ta photo.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov. soir, NATIF.md §2 bis) docs/passation/2026-11-19-app-tableaux.md
+  { id: 'app-tableaux', date: '2026-11-19', titre: 'Annonces, ventes, achats en tableaux de travail', phrase: 'Statut à compteurs, colonnes, tri, sélection ; et l’écran Automatisations.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « un agent 100 % autonome, sans IA » ; « c'est l'extension qui va publier ») docs/passation/2026-11-19-publier-agent.md
+  { id: 'publier-agent', date: '2026-11-19', titre: 'Publier sur… : VRM remplit chaque site', phrase: 'Catégorie, marque, pointure posées seules ; une question s’il doute.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « l'onglet e-mails est absolument catastrophique » ; « relier la boîte : beaucoup plus accompagné ») docs/passation/2026-11-19-emails-mail.md
+  { id: 'emails-mail', date: '2026-11-19', titre: 'E-mails comme Mail, plein écran', phrase: 'Segments en haut, la liste en grand, l’e-mail lisible à côté.', tab: 'emails', pour: 'tous', mode: 'tous' },
+  { id: 'relier-boite-guide', date: '2026-11-19', titre: 'Relier ta boîte, pas à pas', phrase: 'Gmail, Outlook, iCloud : une étape par écran, essai vérifié en direct.', tab: 'emails', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « reconnaître absolument tous les types de code de retrait », « je dois voir quand un nouveau QR ou colis est détecté ») docs/passation/2026-11-19-retraits-parfaits.md
   { id: 'retraits-parfaits', date: '2026-11-19', titre: 'Nouveau code de retrait : VRM te prévient', phrase: 'Consigne ou comptoir dit, colis retirés relus, codes de casier lus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'ventes-natif', date: '2026-11-19', titre: 'Ventes redessinées, tes colis cochés d’office', phrase: 'À envoyer, en route, terminées ; sur ordinateur, la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (19 nov., ext. 5.409) docs/passation/2026-11-19-extension-utile.md
+  { id: 'arrivee-capte', date: '2026-11-19', titre: 'Ce que l’extension a capté, à ton arrivée', phrase: 'Ventes, codes, messages : une feuille les dit, chacun mène à l’élément.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « je veux que ça demande pour mettre en suspens les annonces et que ça les remette ») docs/passation/2026-11-19-compte-bloque.md
+  { id: 'compte-bloque', date: '2026-11-19', titre: 'Compte bloqué par Vinted : VRM te demande', phrase: 'Ses annonces en pause, remises seules quand Vinted le débloque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « ça doit être rangé dans les onglets dédiés […] d'autres choses plus intéressantes pour cet onglet »)
+  // src/aujourdhui/modele.js, src/designV2/aRegler.js — docs/passation/2026-11-19-aujourdhui-propre.md
+  { id: 'aujourdhui-chiffres', date: '2026-11-19', titre: 'Aujourd’hui : tes chiffres d’abord', phrase: 'Vendu du jour, semaine, mois ; le reste « À régler » dans chaque onglet.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (19 nov., photo du Mac de Julien : « Extension à installer » alors qu'elle vit dans un autre Chrome) docs/passation/2026-11-19-vite-et-sans-bug.md
+  { id: 'page-extension', date: '2026-11-19', titre: 'Une page pour l’extension et tes comptes', phrase: 'Compte ouvert, ce que VRM peut faire, et pourquoi : en clair.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'extension-ou-elle-est', date: '2026-11-19', titre: 'VRM dit où est ton extension', phrase: 'Installée ici mais muette, ou vivante dans un autre navigateur : dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») docs/passation/2026-11-19-colis-achat-auto.md
   // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
   { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
-  { id: 'interface-vrm-bleu-nuit', date: '2026-11-18', titre: 'VRM adopte le design de l’aperçu', phrase: 'Bleu nuit, nouveaux boutons, photos des colis et factures visibles.', tab: 'achats', pour: 'tous', mode: 'tous' },
-  // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil
-  { id: 'style-apple', date: '2026-11-18', titre: 'Essaie le style Apple', phrase: 'Paramètres → Apparence → Style : fond gris clair, cartes blanches.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « 2 oui ») src/prixAchatRecu.js — le montant du reçu d'un achat relié, jamais un lot, jamais sur une saisie.
+  { id: 'prix-achat-recu', date: '2026-11-19', titre: 'Prix d’achat repris du reçu', phrase: 'Achat relié, reçu lu : le prix se pose seul (pas les lots).', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « trouve autre chose pour relier les achats, mettre les prix plancher […] pratique, pas chiant ») docs/passation/2026-11-19-completer-infos.md
+  { id: 'completer-infos', date: '2026-11-19', titre: 'Compléter : une question à la fois', phrase: 'Prix d’achat, prix mini, N° : un toucher par réponse.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ») src/PrixPartout.jsx, src/prixAttente.js, extension 5.409.
+  // (19 nov., décisions de Julien « 1 oui, 3 oui ») src/reglesAuto.js, background.js regleBaisseTick / masquerAilleursTick, extension 5.409.
+  { id: 'regles-auto', date: '2026-11-19', titre: 'Baisse automatique, et vendue ailleurs masquée', phrase: 'Changer le prix → « Baisser seul ». Vendue ailleurs : masquée sur Vinted.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'prix-sans-manuel', date: '2026-11-19', titre: 'Changer un prix : un seul geste', phrase: 'Tape le prix, « Appliquer » : l’extension baisse, ou ça part dès que possible.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/passation/2026-11-19-natif-fondation.md
+  { id: 'annonces-egalite', date: '2026-11-19', titre: 'Toutes tes annonces, tous sites, à égalité', phrase: 'Prix mini, acheté, N° pour Leboncoin, eBay et Vestiaire aussi.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'coque-native', date: '2026-11-19', titre: 'Une nouvelle barre, comme sur iPhone', phrase: 'Cinq onglets en bas ; le reste derrière ta photo.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/design/NATIF.md, docs/passation/2026-11-19-lisible-partout.md
+  //  — les entrées « VRM adopte le design de l’aperçu » et « Essaie le style Apple » (18 nov.) sont retirées : ces habillages et le réglage « Style » n'existent plus.
+  { id: 'un-seul-design', date: '2026-11-19', titre: 'Un seul design, clair et lisible', phrase: 'Plus de réglage Style ni Ancien design : tout se lit.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « tout doit être parfait […] de annonce à brouillon et de brouillon à en ligne ») docs/passation/2026-11-17-republication-parfaite.md
   { id: 'republication-parfaite', date: '2026-11-17', titre: 'Republier : chaque étape visible, tout se reprend', phrase: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.', tab: 'republier', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut une liste avec les favoris pour pouvoir les sélectionner etc ») docs/passation/2026-11-17-extension-favoris-liste.md

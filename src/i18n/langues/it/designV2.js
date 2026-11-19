@@ -7,18 +7,12 @@ export default {
   "v2.passe.suivant": "Pacco successivo",
   "v2.reglage.lib": "Design precedente",
   "v2.reglage.desc": "Torna all'aspetto precedente su questo dispositivo. Dati e impostazioni restano uguali.",
-  "v2.aEnvoyer.aria": "{n} pacchi da spedire",
   "v2.aEnvoyer.mot": {
     "one": "pacco da spedire",
     "other": "pacchi da spedire"
   },
   "v2.pasLu": "non ancora letto",
   "v2.rienAEnvoyer": "niente da spedire",
-  "v2.ecart": "{p} pronti da stampare · {r} non ancora pronti",
-  "v2.prets": {
-    "one": "{n} etichetta pronta",
-    "other": "{n} etichette pronte"
-  },
   "v2.pretsAuMoins": {
     "one": "almeno {n} etichetta pronta",
     "other": "almeno {n} etichette pronte"
@@ -48,7 +42,6 @@ export default {
     "one": "il primo tra {n} giorno",
     "other": "il primo tra {n} giorni"
   },
-  "v2.afaire.titre": "Da fare",
   "v2.g.messages": {
     "one": "{n} messaggio da leggere",
     "other": "{n} messaggi da leggere"
@@ -71,10 +64,8 @@ export default {
   "v2.passe.limiteInconnue": "scadenza non indicata",
   "v2.passe.qr": "QR di ritiro",
   "v2.passe.codeAVenir": "codice non ancora letto",
-  "v2.passe.enGrand": "A schermo intero",
   "v2.passe.retire": "L’ho ritirato",
   "v2.passe.page": "{i} di {n}",
-  "v2.passe.aucun": "Nessun pacco da ritirare per ora.",
   "v2.passe.detail": "Tutti i dettagli dei ritiri",
   "v2.passe.consigne": "Locker · digita il codice sullo schermo",
   "v2.passe.comptoir": "Banco · dai il codice al negoziante",
@@ -184,20 +175,54 @@ export default {
   "v2.mail.boite": "Posta in arrivo",
   "v2.mail.relier": "Collega la mia casella",
   "v2.passe.qrKo": "QR non leggibile qui — basta il codice sotto",
-  "v2.barre.lib": "Barra delle schede",
-  "v2.barre.C": "C · Essenziale (predefinita)",
-  "v2.barre.A": "A · iOS classico",
-  "v2.barre.B": "B · Pillola fluttuante",
-  "v2.barre.D": "D · Linea sopra",
-  "v2.barre.E": "E · Kraft",
-  "v2.barre.ann": "Annunci",
-  "v2.barre.ach": "Acquisti",
-  "v2.barre.ven": "Vendite",
-  "v2.barre.arg": "Soldi",
   "v2.mail.selectionner": "Seleziona",
   "v2.style.lib": "Stile",
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Sfondo grigio chiaro, schede bianche, carattere e controlli di iPhone.",
   "v2.style.studio": "Studio blu",
-  "v2.style.studio.desc": "Lo sfondo blu e il vetro di prima."
+  "v2.style.studio.desc": "Lo sfondo blu e il vetro di prima.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.auj": "oggi",
+  "v2.jour.hier": "ieri",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "venduto {quand}",
+    "other": "venduti {quand}"
+  },
+  "v2.jour.aucune": "nessuna vendita",
+  "v2.jour.ventes": {
+    "one": "{n} vendita",
+    "other": "{n} vendite"
+  },
+  "v2.jour.pasSu": "vendite non ancora lette",
+  "v2.mois.vendu": "Venduto",
+  "v2.mois.recu": "Ricevuto",
+  "v2.mois.benefice": "Utile",
+  "v2.mois.sur": {
+    "one": "{k} vendita su {n}",
+    "other": "{k} vendite su {n}"
+  },
+  "v2.envoyer.titre": "Da spedire",
+  "v2.bande.plus": {
+    "one": "{n} altro pacco da spedire",
+    "other": "{n} altri pacchi da spedire"
+  },
+  "v2.dv.titre": "Ultime vendite",
+  "v2.dv.vente": "Vendita {site}",
+  "v2.dv.aVenir": "Denaro in arrivo",
+  "v2.alerte.poster": {
+    "one": "{n} urgente · {quand}",
+    "other": "{n} urgenti · {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} reso da consegnare oggi o domani",
+    "other": "{n} resi da consegnare oggi o domani"
+  },
+  "v2.reg.titre": "Da sistemare",
+  "v2.reg.toutVoir": "Vedi tutto · {n}",
+  "v2.reg.moins": "Vedi meno",
+  "v2.reg.completer": "Completa i miei annunci",
+  "v2.reg.completerN": "Completa i miei annunci · {n}",
+  "v2.jour.lecture": "lettura…",
+  "v2.alerte.retourTitre": "Reso da consegnare"
 };

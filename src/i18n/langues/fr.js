@@ -12,6 +12,7 @@ import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Ac
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_emails_mail from './fr/emailsMail.js';   // (19 nov.) E-mails comme Mail, « Relier ma boîte » accompagné
 import ecran_design_v2 from './fr/designV2.js';   // (17 nov.) le nouveau design, en essai
 import ecran_argent_v2 from './fr/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
 import ecran_v2_ventes from './fr/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
@@ -20,6 +21,9 @@ import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'ex
 import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
+import ecran_egalite from './fr/egalite.js';
+import ecran_tableau from './fr/tableau.js';   // (19 nov. soir) le tableau de travail
+import ecran_publierAgent from './fr/publierAgent.js';
 import ecran_ecrans_restes from './fr/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -29,6 +33,7 @@ import ecran_serie_selection from './fr/serieSelection.js';   // (16 nov.) la ba
 import ecran_scan_retrouver from './fr/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './fr/liaison.js';   // (15 nov.) La liaison achat ⇄ article
+import ecran_completer from './fr/completer.js';   // (19 nov.) L'atelier « Compléter »
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './fr/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
@@ -72,16 +77,19 @@ import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './fr/republierGuide.js';
 import ecran_republication from './fr/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
+import ecran_prix_sans_manuel from './fr/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_liaisonSites from './fr/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './fr/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_compteBloque from './fr/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './fr/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './fr/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
-import ecran_natif from './fr/natif.js';   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_natif from './fr/natif.js';
+import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -90,6 +98,7 @@ export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_republication,
+  ...ecran_prix_sans_manuel,
   ...ecran_etageres,
   ...ecran_journee_verre,
   ...ecran_arrivee,
@@ -767,10 +776,6 @@ export default {
   "partout.entree": "Publier partout",
   "partout.exclues": {"one": "{n} annonce choisie n’est pas proposable (plus en ligne sur Vinted, ou sans N°).", "other": "{n} annonces choisies ne sont pas proposables (plus en ligne sur Vinted, ou sans N°)."},
   "partout.aussiSur": "aussi sur {sites}",
-  "prixPartout.propose": "Proposé : à toi de confirmer",
-  "prixPartout.relu": "Fait ✓ relu",
-  "prixPartout.aMettre": "À mettre : {prix}",
-  "prixPartout.baisser": "Baisser sur Vinted",
   "partout.val.oui": "oui",
   "partout.val.non": "non",
   "partout.val.aucune": "aucune (jamais de boost)",
@@ -2320,6 +2325,7 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_emails_mail,
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,
@@ -2329,10 +2335,12 @@ export default {
   ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
+  ...ecran_compteBloque,
   ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_completer,
   ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
@@ -2344,6 +2352,9 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_egalite,
+  ...ecran_tableau,
+  ...ecran_publierAgent,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
@@ -2351,4 +2362,5 @@ export default {
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_natif,
+  ...ecran_extension,
 };

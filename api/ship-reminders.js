@@ -85,6 +85,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 // (8 nov.) Un compte qui n'arrive plus ALORS QUE l'extension travaille : la règle (api/_lib/garde-capture.js).
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
 import { demandesDuCron as demandesPrixAchat } from './_lib/prix-achat-demande.js';   // (11 nov., saisie rapide)
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
@@ -1059,6 +1060,10 @@ async function traiterVendeurApresRelecture() {
     // le filet (une fois par événement, la mémoire du serveur décide).
     let moderation = null;
     try { const r = await notifierModeration(); moderation = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { moderation = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+    // (19 nov., lot compte-bloque) « Vinted a bloqué … » / « … est débloqué » : le filet (et le seul chemin
+    // d'une extension d'avant la 5.409, qui range l'état du profil sans appeler la route).
+    let comptesBloques = null;
+    try { const r = await notifierComptesBloques(); comptesBloques = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { comptesBloques = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
     // (11 nov., lot avis-negatif) UN AVIS ≤ SEUIL, extension sans réseau au moment de sa lecture : le filet.
     let avisBas = null;
     try { const r = await notifierAvisBas(); avisBas = { envoye: r.envoye, n: r.n, raison: r.raison }; } catch (e) { avisBas = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
@@ -1105,7 +1110,7 @@ async function traiterVendeurApresRelecture() {
     // (1er nov., audit A4) Les ventes Vestiaire : leur date limite, la règle de Colis.
     const vcR = t ? t.vestiaire : resumeColisSites({ vc: d.vc }).vestiaire;
     const vcDus = vcR ? vcR.overdue + vcR.today + vcR.tomorrow : 0;
-    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
+    if (vintedSkip && !vcDus && (!eb || (!(eb.overdue + eb.today + eb.tomorrow) && !eb.nePasPoster))) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: vintedSkip + ' — aucune notification envoyée' };
 
     const c = vintedSkip ? null : compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant: Date.now() });
     // ⚠️ (revue du 22 oct.) `overdue` = une limite LUE (email du bordereau, ou
@@ -1124,19 +1129,19 @@ async function traiterVendeurApresRelecture() {
     // Anti-doublon : une seule notification par jour pour un même total.
     const dedupLu = await getRow('ship_reminder_dedup');
     // (11 nov., M81) un mémo illisible n'est pas « jamais notifié » : rien ne part.
-    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
+    if (dedupLu === undefined) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'mémo illisible — rien', total };
     const memeJour = (d) => !!d && d.date === today && d.total === total && (d.nePasPoster || 0) === nePasPoster;
-    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: 'déjà notifié', total };
+    if (memeJour(dedupLu)) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: 'déjà notifié', total };
 
     if ((total > 0 || nePasPoster > 0) && await pushCategorieActive('expedier')) {
       // (11 nov., B130) réservé AVANT l'envoi : deux passages ⇒ une seule notification.
       const res = await reserverDedup('ship_reminder_dedup', memeJour, () => ({ date: today, total, nePasPoster }));
-      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
+      if (!res.reserve) return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, skipped: res.raison === 'deja' ? 'déjà notifié' : 'mémo illisible — rien', total };
       const txt = texteMatin({ overdue, aVerifier, dueToday, dueTomorrow, ebayDus, vestiaireDus: vcDus, nePasPoster, vinted: c });
       // (11 nov.) Des colis dus aujourd'hui (ou en retard) : urgent — il passe un jour calme.
       await sendPushToAll({ cat: 'expedier', ...txt, tag: 'ship-reminder', url: DESTINATIONS.colis({}), ...(overdue + dueToday > 0 ? { urgent: true } : {}) });
     } else await ecrireDedup('ship_reminder_dedup', { date: today, total, nePasPoster });
-    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
+    return { urssaf, bilan, retrait, offremini, relecture, capture, comptesRelies, moderation, comptesBloques, avisBas, prixAchat, overdue, aVerifier, dueToday, dueTomorrow, total,
       ...(c ? { heures: { aujourdhui: c.premier.aujourdhui ? c.premier.aujourdhui.heure : null, demain: c.premier.demain ? c.premier.demain.heure : null }, estimees: c.estimees, sansLimite: c.sansLimite } : {}),
       ebay: eb ? { aPoster: eb.total, dus: ebayDus, nePasPoster } : null, vestiaire: vcR ? { aPoster: vcR.total, dus: vcDus } : null, ...(vintedSkip ? { vintedSkip } : {}) };
 }

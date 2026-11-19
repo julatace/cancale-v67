@@ -227,7 +227,9 @@
         return;
       }
       if (d.kind === 'vcpublie') {
-        chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
+        const c = d.categorie && typeof d.categorie === 'object' ? d.categorie : null;
+        const cat = c && ['univers', 'categorie', 'sous'].every((k) => typeof c[k] === 'string' && c[k].length <= 80) ? { univers: c.univers, categorie: c.categorie, sous: c.sous } : null;
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, cat ? { categorie: cat } : {}), () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind !== 'vcrecon') return;

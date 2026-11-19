@@ -79,7 +79,9 @@ async function mesure(pg) {
     // (b) rangées de liste ≥ 64.
     for (const r of [...document.querySelectorAll('.v2l, .v2-ligne, .v2-afaire-ligne, .vrm-achats .vrm-buy-row')].filter(vis).slice(0, 40)) { const h = Math.round(r.getBoundingClientRect().height); if (h < 64) air.rangees.push(r.className.split(' ')[0] + ' ' + h); }
     // (c) deux boutons voisins (même ligne, se chevauchant en hauteur) : ≥ 12 entre eux.
-    const bs = [...document.querySelectorAll('.vrm-main button, .vrm-main a[href]')].filter(vis).map((b) => ({ b, q: b.getBoundingClientRect() })).filter((x) => x.q.width && x.q.top < innerHeight && x.q.bottom > 0 && !x.b.closest('.v2-seg, .v2l, .v2-ligne, .v2-bande, .v2-afaire-ligne, nav'));
+    //     (19 nov., Aujourd’hui refait) Les vignettes de la bande et les sept barres de la semaine sont UNE suite (comme un
+    //     contrôle segmenté) : 8 et 4 px entre elles, chacune garde sa cible de 44.
+    const bs = [...document.querySelectorAll('.vrm-main button, .vrm-main a[href]')].filter(vis).map((b) => ({ b, q: b.getBoundingClientRect() })).filter((x) => x.q.width && x.q.top < innerHeight && x.q.bottom > 0 && !x.b.closest('.v2-seg, .v2l, .v2-ligne, .v2-bande, .v2-afaire-ligne, nav, [data-v2-bande], [data-v2-semaine]'));
     for (const a of bs) for (const b of bs) { if (a === b || a.b.contains(b.b) || b.b.contains(a.b)) continue; const ch = Math.min(a.q.bottom, b.q.bottom) - Math.max(a.q.top, b.q.top); if (ch < 8) continue;
       const e = Math.round(b.q.left - a.q.right); if (e >= 0 && e < 12) air.boutons.push('« ' + a.b.textContent.trim().slice(0, 14) + ' » ↔ « ' + b.b.textContent.trim().slice(0, 14) + ' » ' + e); }
     // (d) entre deux blocs repérés (sections) qui se suivent : ≥ 32 (le squelette et la liste sont un même bloc).

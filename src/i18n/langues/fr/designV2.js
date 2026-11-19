@@ -7,18 +7,12 @@ export default {
   "v2.passe.suivant": "Colis suivant",
   "v2.reglage.lib": "Ancien design",
   "v2.reglage.desc": "Revenir à l'apparence d'avant, sur cet appareil. Tes données et tes réglages ne changent pas.",
-  "v2.aEnvoyer.aria": "{n} colis à envoyer",
   "v2.aEnvoyer.mot": {
     "one": "colis à envoyer",
     "other": "colis à envoyer"
   },
   "v2.pasLu": "pas encore lu",
   "v2.rienAEnvoyer": "rien à envoyer",
-  "v2.ecart": "{p} prêts à imprimer · {r} pas encore prêts",
-  "v2.prets": {
-    "one": "{n} bordereau prêt",
-    "other": "{n} bordereaux prêts"
-  },
   "v2.pretsAuMoins": {
     "one": "au moins {n} bordereau prêt",
     "other": "au moins {n} bordereaux prêts"
@@ -48,7 +42,6 @@ export default {
     "one": "le premier dans {n} jour",
     "other": "le premier dans {n} jours"
   },
-  "v2.afaire.titre": "À faire",
   "v2.g.messages": {
     "one": "{n} message à lire",
     "other": "{n} messages à lire"
@@ -71,10 +64,8 @@ export default {
   "v2.passe.limiteInconnue": "date limite pas dite",
   "v2.passe.qr": "QR de retrait",
   "v2.passe.codeAVenir": "code pas encore lu",
-  "v2.passe.enGrand": "En grand",
   "v2.passe.retire": "J’ai retiré",
   "v2.passe.page": "{i} sur {n}",
-  "v2.passe.aucun": "Aucun colis à aller chercher pour l’instant.",
   "v2.passe.detail": "Tout le détail des retraits",
   "v2.passe.consigne": "Consigne · code à taper sur l’écran",
   "v2.passe.comptoir": "Comptoir · code à donner au commerçant",
@@ -184,20 +175,54 @@ export default {
   "v2.mail.boite": "Boîte de réception",
   "v2.mail.relier": "Relier ma boîte",
   "v2.passe.qrKo": "QR pas lisible ici — le code dessous suffit",
-  "v2.barre.lib": "Barre d'onglets",
-  "v2.barre.C": "C · Épurée (par défaut)",
-  "v2.barre.A": "A · iOS classique",
-  "v2.barre.B": "B · Pilule flottante",
-  "v2.barre.D": "D · Trait au-dessus",
-  "v2.barre.E": "E · Kraft",
-  "v2.barre.ann": "Annonces",
-  "v2.barre.ach": "Achats",
-  "v2.barre.ven": "Ventes",
-  "v2.barre.arg": "Argent",
   "v2.mail.selectionner": "Sélectionner",
   "v2.style.lib": "Style",
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Fond gris clair, cartes blanches, police et réglages d'iPhone.",
   "v2.style.studio": "Studio bleu",
-  "v2.style.studio.desc": "Le fond bleu et le verre d'avant."
+  "v2.style.studio.desc": "Le fond bleu et le verre d'avant.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.auj": "aujourd’hui",
+  "v2.jour.hier": "hier",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "vendu {quand}",
+    "other": "vendus {quand}"
+  },
+  "v2.jour.aucune": "aucune vente",
+  "v2.jour.ventes": {
+    "one": "{n} vente",
+    "other": "{n} ventes"
+  },
+  "v2.jour.pasSu": "ventes pas encore lues",
+  "v2.mois.vendu": "Vendu",
+  "v2.mois.recu": "Reçu",
+  "v2.mois.benefice": "Bénéfice",
+  "v2.mois.sur": {
+    "one": "{k} vente sur {n}",
+    "other": "{k} ventes sur {n}"
+  },
+  "v2.envoyer.titre": "À envoyer",
+  "v2.bande.plus": {
+    "one": "{n} autre colis à envoyer",
+    "other": "{n} autres colis à envoyer"
+  },
+  "v2.dv.titre": "Dernières ventes",
+  "v2.dv.vente": "Vente {site}",
+  "v2.dv.aVenir": "Argent à venir",
+  "v2.alerte.poster": {
+    "one": "{n} pressé · {quand}",
+    "other": "{n} pressés · {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} retour à déposer aujourd’hui ou demain",
+    "other": "{n} retours à déposer aujourd’hui ou demain"
+  },
+  "v2.reg.titre": "À régler",
+  "v2.reg.toutVoir": "Tout voir · {n}",
+  "v2.reg.moins": "Voir moins",
+  "v2.reg.completer": "Compléter mes annonces",
+  "v2.reg.completerN": "Compléter mes annonces · {n}",
+  "v2.jour.lecture": "lecture…",
+  "v2.alerte.retourTitre": "Retour à déposer"
 };
