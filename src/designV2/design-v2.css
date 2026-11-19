@@ -278,8 +278,8 @@ html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-pl
 html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
 html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
-html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
 
 /* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
    Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
@@ -309,7 +309,7 @@ html[data-design="v2"] body button.v2-ann-relier { appearance: none; border: 0 !
   touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: flex !important; align-items: center; }
 html[data-design="v2"] body button.v2-ann-relier:active { opacity: .6; }
 /* La place du plein au pouce, sous la dernière annonce. */
-@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main:has(.v2-ann-segment) .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
+@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main[data-vrm-d20] .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
 
 /* ══ 8. LA RANGÉE D'ANNONCE (src/designV2/LigneAnnonce.jsx) — dessins A · B · C ════════════════════════════════
    Grille de 8 px, gouttières 16 ; une hauteur par dessin ; chiffres tabulaires ; photo recadrée pareil partout. */
@@ -551,7 +551,7 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
    SUR le grand titre. Elle passe au-dessus de la barre du bas, centrée (dans la couche de sa règle d'hier). */
 @layer vrm-verre {
   @media (max-width: 760px) {
-    :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
+    :root:root:root:root:root body[data-vrm-d21] .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
   }
 }
 /* Grand texte (Paramètres → Taille du texte, jusqu'à ×1,36) et 375 px : rien de rogné, aucun mot coupé.
@@ -662,7 +662,7 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 /* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
 :root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
 @media (max-width: 1023px) {
-  html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
+  html[data-design="v2"] body[data-vrm-d19] .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
   .v2-ecran[data-v2-plein="1"] { padding-bottom: var(--v2-pile-bas); }
 }
 /* A4. En route : le titre sur toute la largeur (2 lignes au plus), le prix seul à droite. */
@@ -675,7 +675,7 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 /* A6. « Mis à jour à … » ne se pose plus sur le grand titre : allumé au téléphone, elle descend au-dessus de la barre. */
 @media (max-width: 1023px) {
   html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
-  html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
+  html[data-design="v2"] body[data-vrm-d19] .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
 }
 /* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
 @media (min-width: 1024px) {
@@ -738,7 +738,7 @@ html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-
 html body .v2-sous-titre { gap: var(--v2-air-boutons); }
 html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
 /* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
-html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }
+html[data-design="v2"] body[data-vrm-d22] .vrm-main .vrm-market-space { display: none !important; }
 /* L'ordinateur : le plein sur la ligne du titre, À GAUCHE du « Scanner » (44 + 12) — il le couvrait (banc T, 1512). */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .v2-aujourdhui:has([data-v2-scanner]) .v2-pouce { right: calc(32px + 44px + var(--v2-air-boutons, 12px)); }
