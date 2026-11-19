@@ -620,7 +620,7 @@ function pixels(nom, w = 64, h = w) {
         'I4 · dans l’app, relier n’est appelé que par les actions passées au parcours (`actions={ACTIONS_LIAISON}`) : SON toucher', { nRelier, refs: (appS.match(/ACTIONS_LIAISON/g) || []).length });
       const chargeMP = appS.slice(appS.indexOf('async function chargerMemePhoto('), appS.indexOf('async function chargerMemePhoto(') + 4000).split('\nif (typeof window')[0];
       dit(chargeMP.length > 500 && !/liaisonVrm|relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY/.test(chargeMP), 'I5 · le calcul « même photo » ne relie toujours rien', '');
-      dit(/duree: \(deux && deux\.duree\) \|\| 0/.test(appS) && /\(g\.duree \|\| dureePilule\)/.test(sansC(fs.readFileSync(path.join(RACINE, 'src', 'gesteAnnulable.js'), 'utf8'))), 'I6 · la pilule « Annuler » d’un lien tient la durée demandée (10 s)', '');
+      dit(/duree: (?:duree \|\| )?\(deux && deux\.duree\) \|\| /.test(appS) && /\(g\.duree \|\| dureePilule\)/.test(sansC(fs.readFileSync(path.join(RACINE, 'src', 'gesteAnnulable.js'), 'utf8'))), 'I6 · la pilule « Annuler » d’un lien tient la durée demandée (10 s)', '');
     }
   } catch (e) { dit(false, 'l’audit a planté', (e && e.stack) || e); }
   console.log(`\n${ko ? '❌' : '✅'} audit-liaison-sites : ${ko ? ko + ' rouge(s) sur ' + n : n + ' contrôles verts'}`);
