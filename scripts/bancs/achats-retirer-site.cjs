@@ -170,6 +170,7 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
               presses: [...sec.querySelectorAll('[data-sb-presses]')].map((e) => e.getAttribute('data-sb-presses')).join(','),
               cases: [...sec.querySelectorAll('[data-colis-resume-case]')].map((e) => e.getAttribute('data-colis-resume-case') + ':' + e.getAttribute('data-n')).join(','),
               relais: [...sec.querySelectorAll('[data-relais-ouvrir]')].filter(vis).length,
+              repli: [...document.querySelectorAll('.vrm-achats-retirer-ligne')].filter(vis).map((e) => (e.textContent || '').trim()).join('|'),
               vide: [...sec.querySelectorAll('[data-retraits-vide="site"]')].filter(vis).map((e) => e.getAttribute('data-retraits-vide-site') + ':' + (e.textContent || '').trim()).join('|') };
           });
           // Information (rapport, pas un contrôle) : le plein « Ajouter » d'Achats a-t-il quelqu'un pour l'entendre sur ce site ?
@@ -181,6 +182,7 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
             const nom = site === 'ebay' ? 'eBay' : 'Leboncoin';
             dit(ch.chiffre === '0' && !ch.presses && !/:[1-9]/.test(ch.cases), `S Achats · ${site} : les nombres de « À retirer » sont ceux de SA liste (0), pas ceux de Vinted`, JSON.stringify(ch));
             dit(ch.relais === 0, `S Achats · ${site} : pas de « Mode relais » pour des colis d'un autre site`, String(ch.relais));
+            dit(!ch.repli, `S Achats · ${site} : pas de ligne « À retirer · N › » au nombre de tous les sites`, ch.repli || '(aucune)');
             dit(ch.vide === `${site}:Aucun colis ${nom} à retirer.`, `S Achats · ${site} : « Aucun colis ${nom} à retirer. » dit sobrement`, ch.vide || '(rien)');
           }
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-retirer-${site}-${nom}.png`) });

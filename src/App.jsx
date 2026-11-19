@@ -19500,9 +19500,10 @@ function HoteRetrouver({ onAttendreSources, onChercher }) {
   }, [attendre]);
   if (!ouvert) return null;
   const fermer = () => { setOuvert(false); setCode0(''); };
-  // « Relier à un achat » : la feuille de choix d'Achats (src/relierColis.js) ; sans écran qui sait relier, Achats s'ouvre et la reprend.
-  const relier = (d) => { if (demanderRelierColis(d)) return; DEMANDE_RELIER.d = d; DEMANDE_RELIER.at = Date.now(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); } catch (_) {} };
-  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} onRelier={relier} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  // (19 nov., Julien redemande : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » depuis le
+  // scanner : un colis inconnu se dit (transporteur, n°, « Chercher »), il ne se relie plus à la main. Le lien vient de
+  // l'identité (n° de suivi lu par l'extension, conversation, code), docs/passation/2026-11-19-colis-achat-auto.md.
+  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -25381,7 +25382,8 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
                 {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                   <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
-                  {!m.tx && <Bouton variante="secondaire" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={{ minHeight: 44 }}>Relier à un achat</Bouton>}
+                  {/* (19 nov., Julien : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » à la main :
+                      un lien ancien reste lu (« Relié à », « Délier ») ; aucun nouveau ne se pose ici. */}
                   {m.tx && <Bouton variante="discret" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }}>Délier</Bouton>}
                   {/* (revue du 24 oct.) « Retirer », dans l'onglet « À retirer », se lisait
                       « je l'ai retiré » : le bouton efface le SUIVI, il le dit. */}
@@ -33470,7 +33472,14 @@ const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
 // il peut le refermer, et ce choix ne vaut QUE pour la liste de colis qu'il avait sous les yeux (un colis
 // de plus ⇒ rouvert) ; l'ancien « fermé » (`'0'`) ne cache plus jamais un colis. Rien à retirer mais des
 // colis « à vérifier » ⇒ la ligne reste visible (fermée), avec leur nombre : jamais cachés.
-function RepliRetirerAchats({ children, sansLigne = false }) {
+// (19 nov., capture iPhone de Julien) `siteFiltre` (Achats · Leboncoin, eBay, Vestiaire) : la ligne disait le nombre de
+// TOUS les sites (« À retirer · 2 › » au-dessus de « À retirer · 0 ») ; sous un site, pas de ligne : la section s'ouvre et
+// sa tête dit le nombre de CE site (src/retirerSite.js), « Aucun colis {site} à retirer » quand il n'y en a pas.
+function RepliRetirerAchats({ children, sansLigne = false, siteFiltre = false }) {
+  if (siteFiltre) return <div className="vrm-achats-retirer-repli" data-retirer-repli="site">{children}</div>;
+  return <RepliRetirerAchatsTous sansLigne={sansLigne}>{children}</RepliRetirerAchatsTous>;
+}
+function RepliRetirerAchatsTous({ children, sansLigne = false }) {
   const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   // (17 nov., nouveau design) Allumé : les passes sont compactes — « À retirer » est TOUJOURS ouvert, sans ligne de repli.
   const designV2 = useDesignV2();
@@ -65986,7 +65995,7 @@ function AppCoeur() {
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran></AFaireHote>
       </section>);
     if(t==='achats') return (
-      <RepliRetirerAchats sansLigne={site==='vinted'}>
+      <RepliRetirerAchats sansLigne={site==='vinted'} siteFiltre={site!=='toutes'&&site!=='vinted'}>
       <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
         {/* (11 nov., revue colis) Le filtre de site d'Achats vaut pour « À retirer » (un seul filtre, comme Ventes) :
             Achats · eBay ne montre plus les colis Vinted et leurs codes (banc achats-retirer-site). Achats n'a pas
