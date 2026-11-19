@@ -22,6 +22,7 @@
 //      et le rouge du bloc Colis / de Ma journée vient bien de `conflitsNum` (une seule règle).
 //  On juge la RÈGLE (teinte calculée), pas l'orthographe : #f00, #E5484D, rgb(229,72,77)…
 //  `--mutation` rejoue les 5 règles sur des copies affaiblies : chacune DOIT rougir.
+//   R7 (19 nov., « VRM natif ») `--n-doublon` : défini dans src/natif/jetons.css, lu par une règle « doublon » seulement.
 //    node scripts/audit-rouge-doublon.cjs [--mutation]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -83,6 +84,7 @@ function juger(depot) {
   for (const rel of Object.keys(depot)) if (rel.startsWith('src/') && !tous.includes(rel)) tous.push(rel);
   const parDette = {};
   let usagesDoublon = 0;
+  let usagesNatif = 0;
   const jetonsCss = lire('src/design/jetons.css');
   // Les classes de doublon que jetons.css redirige (`--vrm-danger: var(--vrm-doublon)` sur elles).
   const redirige = (/([^{}]+)\{\s*--vrm-danger:\s*var\(--vrm-doublon\)/.exec(sansCommentaires(jetonsCss, true)) || [])[1] || '';
@@ -92,6 +94,16 @@ function juger(depot) {
     const brut = lire(rel);
     const lignes = sansCommentaires(brut, css).split('\n');
     lignes.forEach((l, i) => {
+      // R7 — (19 nov., « VRM natif ») le jeton rouge du design natif : `--n-doublon` se DÉFINIT dans src/natif/jetons.css
+      // (clair et sombre, avec son texte `--n-sur-doublon`) et ne se LIT que dans une règle dont le sélecteur dit « doublon »
+      // (`.n-plaque[data-n-doublon]`, `.n-pastille[data-n-ton="doublon"]`) — nulle part ailleurs, dans aucun écran.
+      if (/--n-doublon\b/.test(l)) {
+        const definition = rel === 'src/natif/jetons.css' && /^\s*--n-doublon\s*:/.test(l);
+        const lecture = css && /var\(--n-doublon\)/.test(l) && /doublon/.test((/^([^{]*)\{/.exec(l) || [])[1] || '');
+        if (definition || lecture) usagesNatif++;
+        else dit(false, `R7 ${rel}:${i + 1} --n-doublon hors d'un doublon de N° (permis : sa définition dans src/natif/jetons.css, une règle « doublon » d'une feuille)`, l.trim().slice(0, 140));
+      }
+      if (rel === 'src/natif/jetons.css' && /^\s*--n-(sur-)?doublon\s*:/.test(l)) return;   // la définition du jeton (comme themeMineral.js)
       // R3 — le jeton rouge.
       if (/C\.doublon\b|--vrm-doublon\b/.test(l) && !(rel === 'src/design/jetons.css' && /--vrm-danger:\s*var\(--vrm-doublon\)/.test(l))) {
         usagesDoublon++;
@@ -130,6 +142,7 @@ function juger(depot) {
   }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
   dit(usagesDoublon >= 5, `R3 le jeton doublon sert bien au doublon de N° (${usagesDoublon} usages)`);
+  dit(usagesNatif >= 4, `R7 le jeton natif --n-doublon : défini (clair, sombre) et lu par la plaque et la pastille « doublon » seulement (${usagesNatif} lignes)`);
   for (const [rel, v] of Object.entries(parDette)) {
     const d = DETTE[rel];
     dit(!!d && v.length <= d.max, `R5 ${rel} : ${v.length} rouge(s) en dur hors doublon${d ? ` (dette nommée, plafond ${d.max})` : ' — aucun permis ici'}`, v.slice(0, 6).join(' ; '));
@@ -152,6 +165,9 @@ function mutations() {
     ['R6 « Tout sur le N° » ignore la carte ambre', { 'src/App.jsx': app.replace('conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),', 'conflits: conflitsDeNumeros,') }],
     ['R6 l’alerte de la cloche ignore la carte ambre', { 'src/App.jsx': app.replace("v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id)))", 'v.length>1') }],
     ['R6 un groupe partiel suffit', { 'src/App.jsx': app.replace('ids.every(id => g.some(', 'ids.some(id => g.some(') }],
+    ['R7 le rouge natif sur un bouton', { 'src/natif/natif.css': lire('src/natif/natif.css') + '\n@layer vrm-natif { .n-bouton[data-n-variante="destructif"] { color: var(--n-doublon); } }\n' }],
+    ['R7 le rouge natif lu dans un écran', { 'src/natif/Vide.jsx': lire('src/natif/Vide.jsx') + "\nexport const ROUGE_ESSAI = { color: 'var(--n-doublon)' };\n" }],
+    ['R5 un autre jeton natif devient rouge', { 'src/natif/jetons.css': lire('src/natif/jetons.css').replace('--n-ambre: #8A4B00;', '--n-ambre: #D70015;') }],
     ['R5 un rouge en dur de plus dans App.jsx', { 'src/App.jsx': app.replace('let C = THEMES.light;', "let C = THEMES.light; const ROUGE_ESSAI = 'rgb(229, 72, 77)';") }],
   ];
   let ko = 0;
