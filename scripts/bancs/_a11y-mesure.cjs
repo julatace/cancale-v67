@@ -24,7 +24,7 @@ async function contrastePixels(pg, racine) {
   const els = await pg.evaluate((racine) => {
     try { for (const a of document.getAnimations()) { try { a.finish(); } catch (_) {} } } catch (_) {}
     const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
-    const barre = document.querySelector('.vrm-tabbar'); const br = barre && barre.getClientRects().length ? barre.getBoundingClientRect() : null;
+    const barre = document.querySelector('.vrm-tabbar, [data-n-onglets]'); const br = barre && barre.getClientRects().length ? barre.getBoundingClientRect() : null;
     const fondu = br ? br.top - 110 : Infinity;
     const vu = new Set(), out = [];
     const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -114,7 +114,7 @@ async function sequenceTab(pg, n = 45) {
       const contour = (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 1) || (cs.boxShadow && cs.boxShadow !== 'none')
         || !!(e.closest('label') && getComputedStyle(e.closest('label')).outlineStyle !== 'none');
       return { tag: e.tagName.toLowerCase(), cls: typeof e.className === 'string' ? e.className : '', nom: (e.getAttribute('aria-label') || e.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30),
-        w: Math.round(r.width), h: Math.round(r.height), contour, rail: !!e.closest('.vrm-atelier-rail, .vrm-sidebar'), main: !!e.closest('main'), suggestion: !!e.closest('#vrm-recherche-resultats'), evitement: e.hasAttribute('data-aller-contenu') };
+        w: Math.round(r.width), h: Math.round(r.height), contour, rail: !!e.closest('.vrm-atelier-rail, .vrm-sidebar, [data-n-laterale]'), main: !!e.closest('main'), suggestion: !!e.closest('#vrm-recherche-resultats'), evitement: e.hasAttribute('data-aller-contenu') };
     }));
   }
   return seq;

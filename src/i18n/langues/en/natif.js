@@ -22,4 +22,7 @@ export default {
   "natif.plus.ouvrir": "More: all screens",
   "natif.plus.titre": "More",
   "natif.detail.nom": "Detail",
+  "natif.plus.etat": "Action status",
+  "natif.plus.stream": "Stream mode",
+  "natif.plus.nouveau": "New",
 };

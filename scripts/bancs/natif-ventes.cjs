@@ -32,7 +32,7 @@ if (process.env.MUTER) {
   fs.cpSync(src, dst, { recursive: true });
   const muts = {
     // la case cochée même sans bordereau (« pas su » vaudrait « oui »)
-    case: [/possible:(\w+)=!!\((\w+)&&\2\.cochable!==!1&&\2\.pdf!==!1\)/g, 'possible:$1=!!($2)'],
+    case: [/on:(\w+)&&!!\((\w+)&&\2\.has\((\w+)\.cle\)\)/g, 'on:!0'],
     // un second plein dans la liste
     plein: [/"data-vn-plus":""/g, '"data-vn-plus":"","data-n-variante":"plein"'],
     // la liste n'est plus bornée à l'ordinateur

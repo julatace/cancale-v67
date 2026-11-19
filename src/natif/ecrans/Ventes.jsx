@@ -10,7 +10,7 @@
 // Aucun style en ligne, aucune classe de mise en page, aucune couleur : des composants de src/natif/.
 import React from 'react';
 import { tr } from '../../i18n/index.js';
-import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Affiche, Vide, Attente, Faits, Fait, Feuille, Volets, poserIcone, iconePosee } from '../index.js';
+import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Affiche, Vide, Attente, Faits, Fait, Feuille, ContexteCoque, poserIcone, iconePosee } from '../index.js';
 import { filtrerRangs, rangChoisi } from '../../ventes/modeleVentes.js';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
@@ -130,6 +130,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
   React.useEffect(() => { setChoisie(null); }, [m.onglet]);
   const rangs = surEnvoyer ? filtrerRangs(E.rangs, q) : surRoute && R ? filtrerRangs(R.rangs, q) : [];
   const ouverte = rangChoisi(surEnvoyer ? E.rangs : surRoute && R ? R.rangs : [], choisie);
+  // À l'ordinateur, la coque pose le volet de détail à droite (ContexteCoque.voletDetail) : sans vente touchée, il dit
+  // quoi faire (l'état vide dessiné du contrat, §2) au lieu de rester blanc.
+  const coque = React.useContext(ContexteCoque);
+  const volet = !!(coque && coque.voletDetail);
   const P = E.plein;
   const plein = surEnvoyer && (E.rangs.length > 0 || E.retours.length > 0)
     ? <Bouton variante="plein" icone={<Icon name="printer" size={20}/>} chargement={P.occupe} indisponible={!P.dispo && !P.occupe}
@@ -144,7 +148,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
   const actionPlateforme = <>{filtre}{surEnvoyer ? <BoutonIcone libelle={tr('vn.plus')} icone={<Icon name="more" size={22}/>} onClick={() => setFeuilleGestes(true)} attrs={{ 'data-vn-plus': '' }}/> : null}</>;
   return (
-    <Volets detailVide={<Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>} attrs={{ 'data-vn-volets': '' }}>
+    <>
       <Page titre={tr('vn.titre')} plein={plein} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet }}
         recherche={m.onglet !== 'toutes' ? <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')} onScanner={g.retrouver} attrs={{ 'data-vn-champ': '' }}/> : null}>
         <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
@@ -181,9 +185,9 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
         {m.onglet === 'toutes' && filtre ? <Groupe nu>{filtre}</Groupe> : null}
         {children}
       </Page>
-      <PagePoussee ouverte={!!ouverte} titre={ouverte && ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')} libelleRetour={tr('vn.titre')} onRetour={() => setChoisie(null)}
+      <PagePoussee ouverte={!!ouverte || (volet && m.onglet !== 'toutes')} titre={ouverte && ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : ouverte ? tr('vn.detail') : ''} libelleRetour={tr('vn.titre')} onRetour={() => setChoisie(null)}
         attrs={{ 'data-vn-detail': ouverte ? ouverte.cle : '' }}>
-        <DetailVente r={ouverte} g={g} Icon={Icon} Generer={Generer}/>
+        {ouverte ? <DetailVente r={ouverte} g={g} Icon={Icon} Generer={Generer}/> : <Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>}
       </PagePoussee>
       <Feuille ouverte={feuilleGestes} onFermer={() => setFeuilleGestes(false)} titre={tr('v2v.outils.titre')} detente="moitie" detentes={['moitie', 'pleine']}>
         <Groupe attrs={{ 'data-vn-outils': '' }}>
@@ -199,6 +203,6 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
       {plateforme ? <Feuille ouverte={feuillePlateforme} onFermer={() => setFeuillePlateforme(false)} titre={tr('vn.plateformes')} detente="moitie">
         <Groupe>{plateforme.options.map((o) => <Rangee key={o.cle} titre={o.libelle} fin={o.cle === plateforme.cle ? 'coche' : null} onClick={() => { setFeuillePlateforme(false); plateforme.onChoisir(o.cle); }} attrs={{ 'data-vn-plateforme-choix': o.cle }}/>)}</Groupe>
       </Feuille> : null}
-    </Volets>
+    </>
   );
 }
