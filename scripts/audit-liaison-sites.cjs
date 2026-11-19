@@ -62,7 +62,6 @@ const MUTATIONS = {
   avantDoute: [R, '      if (j.ok && !j.doutes.length && !j.plusieurs && !j.barre) avant = String(candidats[0].paire.id);', '      avant = String(candidats[0].paire.id);'],
   avantDeuxNumeros: [R, '      if (j.ok && !j.doutes.length && !j.plusieurs && !j.barre) avant = String(candidats[0].paire.id);', '      if ((j.ok || j.demander) && !(j.doutes || []).length && !j.plusieurs) avant = String(candidats[0].paire.id);'],
   ambiguSur: [R, "      for (const p of arr(x.paires)) { const paire = paireDe(p); if (paire && !cs.some((c) => c.paire === paire)) cs.push({ paire, niveau: 'verifier',", "      for (const p of arr(x.paires)) { const paire = paireDe(p); if (paire && !cs.some((c) => c.paire === paire)) cs.push({ paire, niveau: p.etat === 'sur' ? 'sur' : 'verifier',"],
-  relieeReproposee: [R, '    const ph = libre ? photo.get(k) : null;', '    const ph = photo.get(k) || null;'],
   relieeDansFile: [R, "  const file = entrees.filter((e) => e.etat === 'aRelier').sort(ordre);", '  const file = entrees.slice().sort(ordre);'],
   passuFile: [R, '  if (!Array.isArray(autres) || !Array.isArray(paires)) return vide;\n', '  if (!Array.isArray(autres)) autres = [];\n  if (!Array.isArray(paires)) paires = [];\n'],
   pisteAvant: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'publiee', photoAutre: '', photoVinted: '', jugement });", "        candidats.push({ paire, niveau: 'verifier', raison: 'publiee', photoAutre: '', photoVinted: '', jugement }); if (!avant) avant = String(paire.id);"],
