@@ -120,6 +120,8 @@ export default {
   "vn.filtrer": "Filtrar",
   "vn.plus": "Más acciones",
   "vn.terminees": "Terminadas",
+  "vn.e.coches": {"one": "{n} marcado", "other": "{n} marcados"},
+  "vn.e.deposer": {"one": "{n} por entregar", "other": "{n} por entregar"},
   "vn.auMoins": "al menos {n} por enviar",
   "vn.detailVide": "Toca una venta para verla aquí."
 };

@@ -120,6 +120,8 @@ export default {
   "vn.filtrer": "Filtrer",
   "vn.plus": "Plus de gestes",
   "vn.terminees": "Terminées",
+  "vn.e.coches": {"one": "{n} coché", "other": "{n} cochés"},
+  "vn.e.deposer": {"one": "{n} à déposer", "other": "{n} à déposer"},
   "vn.auMoins": "au moins {n} à envoyer",
   "vn.detailVide": "Touche une vente pour la voir ici."
 };

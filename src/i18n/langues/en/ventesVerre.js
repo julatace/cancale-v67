@@ -120,6 +120,8 @@ export default {
   "vn.filtrer": "Filter",
   "vn.plus": "More actions",
   "vn.terminees": "Completed",
+  "vn.e.coches": {"one": "{n} ticked", "other": "{n} ticked"},
+  "vn.e.deposer": {"one": "{n} to drop off", "other": "{n} to drop off"},
   "vn.auMoins": "at least {n} to send",
   "vn.detailVide": "Tap a sale to see it here."
 };

@@ -142,7 +142,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
         {P.n > 0 ? tr('vv.imprimer.n', { n: P.n }) : tr('v2v.imprimer')}
       </Bouton>
     : null;
-  const ecart = joint(E.ecart.coches ? tr('vv.hero.coches', { n: E.ecart.coches }) : '', E.ecart.sans ? tr('v2v.ecart.sans', { n: E.ecart.sans }) : '', E.ecart.imprimes ? tr('vv.hero.imprimes', { n: E.ecart.imprimes }) : '');
+  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '', E.ecart.sans ? tr('v2v.ecart.sans', { n: E.ecart.sans }) : '', E.ecart.imprimes ? tr('vn.e.deposer', { n: E.ecart.imprimes }) : '');
   // (audit d'utilité du 19 nov.) Plus de grand chiffre : le segment porte le nombre. L'en-tête de la liste dit ce que
   // le nombre ne dit pas — ce qui part à l'impression, ce qui attend son bordereau, ce qui presse (« au moins » si le
   // compte est partiel, §5 : un total partiel ne se présente jamais comme complet).

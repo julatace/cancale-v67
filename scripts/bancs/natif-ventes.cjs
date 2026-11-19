@@ -61,7 +61,15 @@ const THEMES = liste('THEMES', 'clair,sombre');
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 const attendre = async (pg, f, ms = 30000, arg) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(300); } return false; };
-const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(300); };
+// Les messages passagers (toasts, « N nouvelles paires numérotées ») sont fermés : la capture montre l'écran.
+const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click();
+  for (const e of document.querySelectorAll('body *')) { if (getComputedStyle(e).position !== 'fixed' || !/paires? numérotées?/.test(e.textContent || '') || e.closest('.n-onglets, .vrm-tabbar')) continue;
+    const f = [...e.querySelectorAll('button')].find((b) => /fermer|close|×/i.test((b.getAttribute('aria-label') || '') + b.textContent)); if (f) { f.click(); break; } } }).catch(() => {}); await pg.waitForTimeout(400); };
+// La base : celle de design-passe (3 comptes, 30 colis à envoyer, envois partis) + un meuble INVENTÉ « Étagère A » où sont
+// rangés les N° 1 à 40 (vrm_meubles / vrm_slots, la forme que lit ouDansMeubles) : la place s'écrit sur la rangée.
+const MEUBLES = [{ id: 'banc-etagere-a', nom: 'Étagère A', cols: 4, rows: 10 }];
+const SLOTS = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [String(i + 1), { m: 'banc-etagere-a', i }]));
+function baseVentes() { const b = base(); b.main[0].data.vrm_meubles = MEUBLES; b.main[0].data.vrm_slots = SLOTS; return b; }
 
 // Le contraste au fond RENDU : les fonds empilés jusqu'au premier opaque (dégradé compris : le pire de ses couleurs).
 const CONTRASTE = `(() => {
@@ -106,13 +114,13 @@ function mesure(src) {
   const plein = document.querySelector('[data-vn-plein]');
   const rangs = [...document.querySelectorAll('[data-vn-liste] [data-vn-rang], [data-vn-liste] [data-vn-route]')].filter(vis);
   const rg = rangs.map((r) => { const case_ = r.querySelector('input.n-case'); const t = r.querySelector('.n-rangee-titre'); const v = r.querySelector('.n-rangee-valeur');
-    return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), coche: case_ ? (case_.checked ? 1 : 0) : null, dispo: case_ ? !case_.disabled : null, bord: r.getAttribute('data-vn-bordereau'), lim: r.getAttribute('data-vn-limite'), code: r.getAttribute('data-vn-limite-code'),
+    return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), coche: case_ ? (case_.checked ? 1 : 0) : null, dispo: case_ ? !case_.disabled : null, bord: r.getAttribute('data-vn-bordereau') || null, lim: r.getAttribute('data-vn-limite'), code: r.getAttribute('data-vn-limite-code'),
       num: !!r.querySelector('.n-plaque'), titre: !!(t && t.textContent.trim()), prix: !!(v && v.textContent.trim()), place: r.getAttribute('data-vn-place') || '', texte: r.textContent,
       ecart: t && v ? Math.round(R(v).left - R(t).right) : null, haut: Math.round(R(r).top), bas: Math.round(R(r).bottom), larg: Math.round(R(r).width), gauche: Math.round(R(r).left) }; });
   const seg = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente [role="tab"], [data-vn="ventes"] .n-segmente button')].filter(vis).map((b) => b.textContent.replace(/\s+/g, ' ').trim());
   const barre = [...document.querySelectorAll('.n-onglets, .vrm-tabbar, nav.v2-barre, [data-v2-barre]')].filter(vis).map((b) => Math.round(R(b).top));
   const hautBarre = barre.length ? Math.min(...barre) : innerHeight;
-  const recherches = [...document.querySelectorAll('[data-n-recherche], input[type="search"], .vrm-recherche input')].filter(vis).length;
+  const recherches = [...document.querySelectorAll('[data-n-recherche], input[type="search"], .vrm-recherche input')].filter(vis).filter((e) => !(e.matches('input') && e.closest('[data-n-recherche]'))).length;
   const detail = document.querySelector('[data-vn-detail]');
   return { faibles, nC: contrastes.length, minC: contrastes.length ? Math.min(...contrastes.map((x) => x.r)) : null, petits, vides, deb, pleins: pleins.length, pleinTxt: plein ? plein.textContent.trim() : '',
     pleinN: plein ? Number(plein.getAttribute('data-vn-plein')) : null, pleinBas: plein ? Math.round(R(plein).bottom) : null, hautBarre,
@@ -124,6 +132,7 @@ function mesure(src) {
 async function ouvrirVentes(nav, { W, sombre, b }) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W: W < 600 ? 390 : 1512, sombre, b, url: '/?tab=ventes', dsf: DSF });
   if (W === 1280) await pg.setViewportSize({ width: 1280, height: 800 });
+  if (b.main[0].data.vrm_meubles) { await pg.evaluate(([m, sl]) => { localStorage.setItem('vrm_meubles', JSON.stringify(m)); localStorage.setItem('vrm_slots', JSON.stringify(sl)); }, [MEUBLES, SLOTS]); await pg.reload({ waitUntil: 'domcontentloaded' }); }
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]') && (!!document.querySelector('[data-vn-liste] [data-vn-rang]') || !!document.querySelector('[data-vn="ventes"] .n-vide')), 40000);
   await pg.waitForTimeout(1500); await sansToasts(pg);
@@ -133,7 +142,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] }).catch(() => chromium.launch({ args: ['--no-sandbox'] }));
-  const b = base();
+  const b = baseVentes();
   try {
     for (const W of LARG) for (const th of THEMES) {
       const sombre = th === 'sombre'; const tel = W < 600;
@@ -145,7 +154,8 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(m.seg.length === 3 && /\d/.test(m.seg[0]) && /\d/.test(m.seg[1]) && /Termin/.test(m.seg[2]), 'segmenté À envoyer N · En route N · Terminées', m.seg);
       const r = m.rg.filter((x) => x.bord != null);
       dit(r.length && r.every((x) => x.coche !== null), 'chaque rangée a sa case', r.filter((x) => x.coche === null).map((x) => x.cle));
-      dit(r.every((x) => x.bord === 'pret' ? x.coche === 1 : x.coche === 0), 'cochée d\'office SI son bordereau est là, jamais sans', r.filter((x) => (x.bord === 'pret') !== (x.coche === 1)).map((x) => x.cle + ':' + x.bord + ':' + x.coche));
+      // La règle du lot (cochesParDefaut) : cochée d'office si le bordereau est là (ni imprimée, ni ancienne) ; JAMAIS sans.
+      dit(r.filter((x) => x.bord !== 'pret').every((x) => x.coche === 0 && x.dispo === (x.bord === 'imprime')) && r.some((x) => x.coche === 1), 'cochées d\'office là où le bordereau est prêt, jamais sans bordereau (case grisée)', r.filter((x) => x.bord !== 'pret' && x.coche).map((x) => x.cle + ':' + x.bord));
       dit(r.some((x) => x.bord === 'pret') && r.some((x) => x.bord === 'attente'), 'la base montre des colis prêts ET sans bordereau', r.map((x) => x.bord).join(','));
       dit(r.every((x) => x.num && x.titre && x.prix), 'plaque N°, titre et prix sur chaque rangée', r.filter((x) => !(x.num && x.titre && x.prix)).map((x) => x.cle));
       dit(r.filter((x) => x.code === 'date').every((x) => x.lim === 'lue' ? /avant le/.test(x.texte) : /vers le/.test(x.texte)), 'date limite : « avant le » LUE, « vers le » estimée', r.filter((x) => x.code === 'date').slice(0, 3).map((x) => x.lim + ':' + x.texte.slice(0, 80)));
@@ -153,7 +163,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(r.some((x) => x.lim) , 'des dates limites sont écrites', r.slice(0, 3).map((x) => x.texte.slice(0, 80)));
       dit(r.some((x) => x.place), 'la place dans le stock est écrite quand elle est connue');
       dit(m.pleins === 1, `UN seul bouton plein (${m.pleins})`);
-      dit(/Imprimer \d+ bordereaux?/.test(m.pleinTxt) && m.pleinN === r.filter((x) => x.coche === 1).length, `le plein dit « Imprimer N bordereaux », N = les cochées (${m.pleinTxt} / ${r.filter((x) => x.coche === 1).length})`);
+      dit(/Imprimer (les )?\d+ bordereaux?/.test(m.pleinTxt) && m.pleinN === r.filter((x) => x.coche === 1).length, `le plein dit « Imprimer N bordereaux », N = les cochées (${m.pleinTxt} / ${r.filter((x) => x.coche === 1).length})`);
       dit(!m.faibles.length, `contraste ≥ 4,5:1 sur le fond rendu (${m.nC} textes, pire ${m.minC})`, m.faibles.slice(0, 6));
       dit(!m.petits.length, 'cibles ≥ 44 × 44 au doigt', m.petits.slice(0, 6));
       dit(!m.vides.length, 'aucun bouton vide', m.vides);
@@ -193,7 +203,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
     // Base vide
     for (const th of THEMES.slice(0, 1)) {
       console.log(`\n── Ventes · base vide · 390 · ${th}`);
-      const bv = base(); for (const k of Object.keys(bv.main[0].data)) if (/^vinted_(sales|orders|transactions)|^harvest|^colis|^label_/.test(k)) delete bv.main[0].data[k];
+      const bv = baseVentes(); for (const k of Object.keys(bv.main[0].data)) if (/^vinted_(sales|orders|transactions)|^harvest|^colis|^label_/.test(k)) delete bv.main[0].data[k];
       bv.rows = bv.rows.filter((x) => !/^(harvest_|label_|colis_|vinted_sales|tx_)/.test(x.id));
       const { ctx, pg, erreurs } = await ouvrirVentes(nav, { W: 390, sombre: th === 'sombre', b: bv });
       const m = await pg.evaluate(mesure, CONTRASTE);
