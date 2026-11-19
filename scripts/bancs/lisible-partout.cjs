@@ -73,7 +73,7 @@ const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-lisib
 fs.mkdirSync(SHOTS, { recursive: true });
 
 // ── Les chantiers en cours (19 nov., « VRM natif ») : à qui est un défaut. `null` = à ce lot (les écrans restés anciens). ──
-const RE_COQUE = /vrm-app-header|vrm-header-actions|vrm-hbtn|vrm-hdr-|vrm-sidebar|vrm-rail|vrm-nav-|vrm-tabbar|vrm-tab\b|v2-barre|vrm-barre-haut|vrm-barre-recherche|vrm-recherche-|vrm-etat-pastille|vrm-neuf|vrm-bandeau-abo|vrm-aller-contenu|vrm-fraicheur/;
+const RE_COQUE = /\bn-barre-|\bn-onglets?\b|\bn-onglet-|\bn-laterale|\bn-coque-(?!ecran)|vrm-app-header|vrm-header-actions|vrm-hbtn|vrm-hdr-|vrm-sidebar|vrm-rail|vrm-nav-|vrm-tabbar|vrm-tab\b|v2-barre|vrm-barre-haut|vrm-barre-recherche|vrm-recherche-|vrm-etat-pastille|vrm-neuf|vrm-bandeau-abo|vrm-aller-contenu|vrm-fraicheur/;
 const HORS = process.env.HORS === 'aucun' ? [] : [
   { nom: 'coque', quoi: 'la coque (barre d’onglets, barre de titre, rail) — l’agent de la fondation', de: (d, c) => RE_COQUE.test(d.sel) || (c.tel && d.regle === 'sous-barre') },
   { nom: 'aujourdhui', quoi: 'Aujourd’hui (réécrit en natif)', de: (d) => d.groupe === 'Aujourd’hui' },

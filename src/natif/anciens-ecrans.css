@@ -376,8 +376,10 @@ html body .v2-outils-feuille :is(button.vrm-outils-vers, .v2-ann-menu-tri select
 html body .v2-outils-feuille .v2-ann-menu-tri select { padding: 0 10px !important; }
 html body .v2-outils-feuille .vrm-offres-auto { background: var(--ap-remplir) !important; border-color: transparent !important; box-shadow: none !important; }
 /* « Qui dorment », les modes : le nombre d'un segment suit l'encre de son segment (gris sur le pouce de la nuit : 2,51:1). */
+/* Les puces de compte d'une feuille (portée hors de la coque) : 44 px au doigt (34 mesurés après la coque native). */
+@media (pointer: coarse) { html body .vrm-compte-puces .vrm-compte-puce { min-height: 44px !important; } }
 html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
-html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--ap-bleu) !important; padding-left: 0 !important; }
+html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: color-mix(in srgb, var(--ap-bleu) 82%, var(--ap-encre)) !important; padding-left: 0 !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
 /* Achats à l'ordinateur : « Calculette » était rogné dans sa propre boîte. */
 @media (min-width: 1024px) { html body .vrm-achats-filtres > [data-achats-calculette] { width: auto !important; max-width: none !important; overflow: visible !important; white-space: nowrap !important; flex: none !important; } }

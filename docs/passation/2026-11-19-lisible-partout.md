@@ -152,7 +152,15 @@ la rangée d'annonce 6 (« N° » de la plaque à 4,39:1, flou), Ventes 4.
   dernière. (`_garde-reseau.cjs` traduit encore un `vrm_design_v2` posé par un banc.)
 - **Les bancs qui figeaient les habillages** : `theme-apple.cjs` retiré (sa règle « aucun dégradé bleu » est dans
   `lisible-partout`) ; `verre.cjs` V1/V2 jugent désormais l'ABSENCE de dégradé et de verre (le module reste : cinq bancs
-  lisent sa mesure de contraste) ; `design-v2.cjs` R juge l'absence des deux réglages. ‹BANCS›
+  lisent sa mesure de contraste) ; `design-v2.cjs` R juge l'absence des deux réglages. `verre.cjs` V2 (19 nov. après-midi) : un CHAMP au remplissage gris d'iOS (118 118 128, .12 / .24) n'est pas
+  du verre — ses 48 rouges du relevé étaient tous ces champs ; une feuille reste jugée opaque.
+- **Signalé aux autres chantiers (vu, pas touché)** : Aujourd'hui — « 15 » blanc sur le bleu du bouton principal
+  (3,87:1, `design-v2` C) ; la rangée d'annonce — « N° » de la plaque à 4,39:1, et la PREMIÈRE rangée de la liste
+  (sans photo) décalée de 30 px à gauche, l'en-tête de groupe « vendeur_1 · 12 annonces » plus étroit que la liste
+  (déjà sur main) ; la coque — du contenu reste sous la barre d'onglets au téléphone en bas de page ; la feuille « ⋯ »
+  d'Annonces affiche « À compléter » deux fois (une rangée, puis un bouton — contenu, pas touché) ;
+  `design-v2-annonces` : les mesures de défilement (p95 150 ms) et le CLS sont ceux d'une machine saturée ;
+  `messages-offre` du banc n'est pas joignable (étape à réparer dans le banc).
 - **Les pages publiques et hors coque** gardent du bleu en dégradé (pas à ce lot, à signaler à la fondation) :
   `src/accueil/accueil.css`, `src/partenaires/partenaires.css`, `src/design/studio-reste-public.css` (Tarifs),
   `src/composants/MettreAJourVRM.jsx`, `src/parcoursNouveau/parcours-nouveau.css`, `src/design/scanner-retrouver.css`,
