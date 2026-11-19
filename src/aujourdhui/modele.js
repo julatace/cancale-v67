@@ -66,6 +66,49 @@ export function chiffresAujourdhui({ valeur, etatVendu = 'encours', sansCompte =
     aVenir: at && at.valeur != null ? { valeur: at.valeur, partiel: !!at.partiel } : null };
 }
 
+// (19 nov., Julien : « je veux peut-être plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice etc. »)
+// LES CHIFFRES D'UNE PÉRIODE — Jour · Semaine · Mois : CA vendu, bénéfice, nombre de ventes, panier moyen, et l'écart du
+// vendu avec la période d'avant AU MÊME MOMENT (hier à la même heure, la semaine dernière au même jour…). Aucune règle
+// neuve : chaque valeur est DEMANDÉE à `valeur(id, période)` (= `valeurChiffre`, les mêmes appels que l'écran Argent) :
+//   vendu / ventes  `ventesFaites` (date de vente, toutes plateformes) — « au moins » si un prix n'est pas lu ;
+//   bénéfice        le mois : celui de la case d'Argent (`beneficeMois`, le net, sinon le brut et sa couverture) ;
+//                   le jour, la semaine : `brut` (la publication `vrm_benefice_jours`, sa couverture si des prix
+//                   d'achat manquent) — le bénéfice net ne se calcule qu'au mois (règle de l'URSSAF) ;
+//   panier moyen    le vendu divisé par le nombre de ventes, SEULEMENT si les deux sont lus en entier (une moyenne sur
+//                   une partie des ventes n'est pas un minimum : « — », la règle du panier de la carte) ;
+//   écart           seulement entre deux vendus lus en entier, et une période d'avant qui a vendu (pas de « +∞ % »).
+// `precedente(p)` → { de, a } : la période d'avant, coupée au même moment (fourni par l'app : ses règles de période).
+export const PERIODES_STATS = ['jour', 'semaine', 'mois'];
+export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => '', beneficeMois = null }) {
+  const lu = (x) => !!x && x.valeur != null;
+  const out = {};
+  for (const p of PERIODES_STATS) {
+    const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
+    const vendu = { valeur: lu(V) ? V.valeur : null, partiel: lu(V) && !!V.partiel, note: lu(V) ? '' : (raisonCourte(V) || '') };
+    const ventes = { valeur: lu(N) ? N.valeur : null, partiel: lu(N) && !!N.partiel, note: lu(N) ? '' : (raisonCourte(N) || '') };
+    const entier = (x) => x.valeur != null && !x.partiel;
+    const panier = entier(vendu) && entier(ventes) && ventes.valeur > 0
+      ? { valeur: Math.round((vendu.valeur / ventes.valeur) * 100) / 100, note: '' }
+      : { valeur: null, note: entier(ventes) && ventes.valeur === 0 ? 'aucune' : (vendu.partiel || ventes.partiel) ? 'partiel' : (vendu.note || ventes.note) };
+    let benefice;
+    if (p === 'mois' && beneficeMois) {
+      const c = beneficeMois.couverture;
+      benefice = { valeur: beneficeMois.valeur == null ? null : beneficeMois.valeur, brut: !!beneficeMois.brut, partiel: !!c, couverture: c ? `${c.k}/${c.n}` : '', note: beneficeMois.note || '' };
+    } else {
+      const Bb = valeur('brut', p) || {};
+      const m = /^(\d+) sur (\d+)$/.exec(String(Bb.couverture || ''));
+      benefice = lu(Bb) ? { valeur: Bb.valeur, brut: true, partiel: !!Bb.partiel, couverture: m ? `${m[1]}/${m[2]}` : '', note: '' } : { valeur: null, brut: true, partiel: false, couverture: '', note: raisonCourte(Bb) || '' };
+    }
+    let ecart = null;
+    if (entier(vendu) && typeof precedente === 'function') {
+      const P = valeur('vendu', precedente(p)) || {};
+      if (lu(P) && !P.partiel && P.valeur > 0) ecart = Math.round(((vendu.valeur - P.valeur) / P.valeur) * 100);
+    }
+    out[p] = { vendu, ventes, panier, benefice, ecart };
+  }
+  return out;
+}
+
 // Les N dernières ventes : les lignes de « Vendu » datées et identifiées, la plus récente d'abord. Une ligne sans
 // date ou sans identité n'y est pas (jamais un titre comme identité, §5) ; deux lignes de même identité : une seule.
 export function dernieresVentes(lignes, n = 5) {
@@ -94,3 +137,126 @@ export function alerteDuJour({ aPoster = [], urgentsRetrait = null, retours = []
 }
 
 export const _interne = { JOUR_MS };
+
+// ── (19 nov., Julien : « applique ce que tu proposes ») LES CARTES EN PLUS D'AUJOURD'HUI — toujours sans règle neuve ──
+
+// LA COURBE DES 30 JOURS : le vendu de chaque jour (heure locale, minuit → minuit), le plus ancien d'abord, aujourd'hui
+// en dernier ; chaque valeur DEMANDÉE à `valeur('vendu', { de, a })` (= `valeurChiffre`, `ventesFaites`). Pas su ⇒ null.
+export function trenteJours(maintenant = Date.now()) {
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const out = [];
+  for (let k = 29; k >= 0; k--) {
+    const d = new Date(minuit); d.setDate(d.getDate() - k);
+    const f = new Date(d); f.setDate(f.getDate() + 1);
+    out.push({ de: d.getTime(), a: f.getTime(), cle: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, auj: k === 0 });
+  }
+  return out;
+}
+export function courbe30({ valeur, maintenant = Date.now() }) {
+  return trenteJours(maintenant).map((j) => {
+    const p = { de: j.de, a: j.a, label: '' };
+    const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
+    return { ...j, v: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+  });
+}
+
+// PAR COMPTE ET PAR SITE (la règle de « Quel compte vend le mieux » : les lignes de « Vendu », un compte Vinted = son
+// identifiant de connexion, les autres sites par plateforme). Chaque nombre est DEMANDÉ au propriétaire avec la
+// sélection de la ligne (`valeur(id, période, sel)` = `valeurChiffre` sur { site, compte }). Rangé par CA, le plus fort
+// d'abord ; une ligne sans vente dans la période n'est pas montrée. Lignes pas lues ⇒ null (pas su).
+const SITE_DE_PLATEFORME = { Vinted: 'vinted', Vestiaire: 'vestiaire', Leboncoin: 'leboncoin', eBay: 'ebay' };
+export function parCompteEtSite({ lignes, valeur, periodes = PERIODES_STATS }) {
+  if (!Array.isArray(lignes)) return null;
+  const vus = new Map();
+  for (const l of lignes) {
+    if (!l || !SITE_DE_PLATEFORME[l.plateforme]) continue;
+    const vinted = l.plateforme === 'Vinted' && l.compte;
+    const cle = vinted ? 'vinted|' + l.compte : SITE_DE_PLATEFORME[l.plateforme];
+    if (!vus.has(cle)) vus.set(cle, { cle, nom: vinted ? String(l.compte) : l.plateforme, site: l.plateforme, sel: { site: SITE_DE_PLATEFORME[l.plateforme], compte: vinted ? { login: String(l.compte) } : null, periode: null } });
+  }
+  const out = {};
+  for (const p of periodes) {
+    out[p] = [...vus.values()].map((x) => {
+      const V = valeur('vendu', p, x.sel) || {}, N = valeur('ventes', p, x.sel) || {};
+      return { cle: x.cle, nom: x.nom, site: x.site, v: V.valeur == null ? null : V.valeur, vp: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+    }).filter((r) => (r.n || 0) > 0 || (r.v || 0) > 0).sort((a, b) => (b.v || 0) - (a.v || 0) || (b.n || 0) - (a.n || 0));
+  }
+  return out;
+}
+
+// CE QUE VRM A FAIT AUJOURD'HUI : les gestes ACCEPTÉS (résultat « ok ») notés au journal (`journal_vrm_*`, lus par la
+// route du journal, src/securiteCompte.js), depuis minuit, comptés par famille. Journal pas lu ⇒ null ; rien ⇒ [].
+export const FAMILLES_VRM = [['baisses', ['baisse_prix']], ['favoris', ['favori', 'favori_offre']], ['offres', ['offre_acceptee']],
+  ['republications', ['republication']], ['bordereaux', ['bordereau']], ['messages', ['message_envoye']], ['offresFaites', ['offre_faite']]];
+export function vrmDuJour(evenements, maintenant = Date.now()) {
+  if (!Array.isArray(evenements)) return null;
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const du = evenements.filter((e) => e && e.resultat === 'ok' && Date.parse(String(e.at || '')) >= minuit.getTime() && Date.parse(String(e.at || '')) <= maintenant + 60000);
+  return FAMILLES_VRM.map(([cle, types]) => ({ cle, n: du.filter((e) => types.includes(e.type)).length })).filter((x) => x.n > 0);
+}
+
+// SUR TES ANNONCES AUJOURD'HUI : ce que l'extension a CAPTÉ depuis minuit (`capte_journal_*`, une entrée par identité :
+// src/capteNotif/arrivee.js `fusionner`), compté par sorte. Les favoris ne sont pas dans ce journal : null (pas su).
+export function capteDuJour(entrees, maintenant = Date.now()) {
+  if (!Array.isArray(entrees)) return null;
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const du = entrees.filter((e) => e && Number(e.t) >= minuit.getTime());
+  const n = (s) => du.filter((e) => e.s === s).length;
+  return { favoris: null, offres: n('offres'), messages: n('messages'), ventes: n('ventes') };
+}
+
+// LES CARTES D'AUJOURD'HUI, cochées et ordonnées par lui (`vrm_aujourdhui_cartes`, synchronisé). Par défaut : les
+// chiffres, À envoyer, À retirer, la courbe, les dernières ventes. Une carte inconnue est ignorée ; une carte connue
+// absente de l'ordre se pose à la fin (une carte ajoutée plus tard n'est jamais perdue).
+// (19 nov., Julien : « tu peux trouver mieux, peut-être d'autres stats ») + stock en ligne, vitesse de vente, prévision du
+// mois (les trois montrées d'office), marge, marques, paires qui dorment, argent à venir, vues et favoris.
+// (« Meilleurs moments » : refusé par Julien le 19 nov. — ne pas l'ajouter.)
+export const CARTES_AUJOURDHUI = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
+export const CARTES_DEFAUT = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes'];
+export function cartesChoisies(brut) {
+  const ok = brut && typeof brut === 'object' && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
+  const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];
+  const montrees = ok && Array.isArray(brut.montrees) ? brut.montrees.filter((x) => CARTES_AUJOURDHUI.includes(x)) : CARTES_DEFAUT;
+  return { ordre, montrees: new Set(montrees) };
+}
+
+// LE CHOIX DES CARTES, ENTRE SES APPAREILS (19 nov., « ça doit être bien fait ») : chaque écriture porte `rev` (un de
+// plus que le plus grand connu) et `at`. Deux choix se départagent par `rev`, puis par `at` : un choix plus ancien reçu
+// d'un autre appareil n'écrase JAMAIS un choix plus récent (comparer-et-échanger, la règle de `modifierCas`).
+export function choixPlusRecent(a, b) {
+  const ok = (x) => !!x && typeof x === 'object' && Array.isArray(x.ordre);
+  if (!ok(a)) return ok(b) ? b : null;
+  if (!ok(b)) return a;
+  const ra = Number(a.rev) || 0, rb = Number(b.rev) || 0;
+  if (ra !== rb) return ra > rb ? a : b;
+  return (Number(b.at) || 0) > (Number(a.at) || 0) ? b : a;
+}
+export function nouveauChoix(avant, { ordre, montrees }, maintenant = Date.now()) {
+  return { ordre: [...ordre], montrees: [...montrees], rev: (Number(avant && avant.rev) || 0) + 1, at: maintenant };
+}
+
+// LES CHIFFRES DU RELEVÉ PAR PÉRIODE (vitesse, marge, marques) — le relevé des ventes FINALISÉES de l'écran Ventes
+// (`vrm_stats_ventes`, les lignes de Statistiques : { ts, eur, achat, marqueLue, modele, enLigne }) et les règles de
+// Statistiques (src/statsVentes.js) : `delaisPar` (délai médian mise en ligne → vente, sa couverture « sur N »),
+// `margesPar` (marge = brut ÷ CA des ventes au prix d'achat connu, « sur N »). Les marques : la marque LUE de l'annonce
+// (`marqueLue`), jamais devinée d'un titre ; sans marque lue, la vente compte dans « sans marque lue ».
+// `bornes(p)` → { de, a } (les règles de période de l'app). Relevé pas lu ⇒ null.
+export function releveParPeriode({ lignes, bornes, delaisPar, margesPar, periodes = PERIODES_STATS }) {
+  if (!Array.isArray(lignes)) return null;
+  const out = {};
+  for (const p of periodes) {
+    const B = bornes(p); if (!B) { out[p] = null; continue; }
+    const L = lignes.filter((l) => l && Number.isFinite(l.ts) && l.ts >= B.de && (B.a == null || l.ts < B.a));
+    const D = delaisPar(L, () => 'tout');
+    const M = margesPar(L, () => 'tout');
+    const g = M && M.groupes[0];
+    const parMarque = margesPar(L, (l) => l.marqueLue || '');
+    out[p] = {
+      n: L.length,
+      vitesse: D ? { mediane: D.mediane, nDelai: D.nDelai, n: D.n } : null,
+      marge: g ? { pct: g.marge, brut: g.brut, nCout: g.nCout, n: g.n } : { pct: null, brut: null, nCout: 0, n: L.length },
+      marques: parMarque ? { top: [...parMarque.groupes].sort((a, b) => b.ca - a.ca || b.n - a.n).slice(0, 5).map((x) => ({ k: x.k, n: x.n, ca: x.ca })), sansMarque: parMarque.sansCle } : null,
+    };
+  }
+  return out;
+}

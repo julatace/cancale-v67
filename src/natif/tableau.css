@@ -170,3 +170,19 @@
 @layer vrm-natif {
   @container tt (max-width: 1160px) { .n-tt-article { max-width: 190px; } .n-tt-th-article { min-width: 150px; } .n-tt-th, .n-tt-td { padding-inline: 6px; } .n-tt-td-article .n-vignette { width: 44px; height: 44px; } }
 }
+/* (19 nov. soir) Messages : la barre d'outils (action, site) et l'article en tête du fil. */
+@layer vrm-natif {
+  .n-msg-outils { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 0 8px; }
+  .n-msg-outils .n-au-choix { min-width: 0; flex: 1 1 160px; min-height: 36px; padding: 0 12px; border-radius: var(--n-r-bouton); border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); }
+  .n-fil-article { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: .5px solid var(--n-trait); background: var(--n-carte); }
+  .n-fil-article-photo { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); color: var(--n-encre-3); }
+  .n-fil-article-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .n-fil-article-texte { display: flex; flex-direction: column; min-width: 0; }
+  .n-fil-article-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-fil-article-sous { font: var(--n-t-legende); color: var(--n-encre-2); }
+}
+/* (19 nov. soir) Messages · Tous : l'avatar rond de la personne et la vignette de l'article, à l'ordinateur. */
+@layer vrm-natif {
+  .n-fil-vignette { flex: 0 0 auto; display: inline-flex; width: 44px; height: 44px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); align-self: center; }
+  .n-fil-vignette img { width: 100%; height: 100%; object-fit: cover; }
+}

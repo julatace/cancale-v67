@@ -116,7 +116,7 @@ const ouvrir = async (b, vp, sombre) => {
   const errs = [], ecrits = [];
   pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: MATIN });
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s)); localStorage.setItem('vrm_visite_vue', JSON.stringify(true)); } catch (_) {} }, !!sombre);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); /* (19 nov., intégration) l'écran d'aujourd'hui, pas l'échafaudage d'avant posé par _garde-reseau */ localStorage.setItem('vinted_dark', JSON.stringify(s)); localStorage.setItem('vrm_visite_vue', JSON.stringify(true)); } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     const u = r.request().url();
     if (/api-adresse\.data\.gouv\.fr/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ features: [] }) });
@@ -229,6 +229,12 @@ const juger = (nom, ou, v, { prixSepare = true } = {}) => {
           dit(g(A).codeEtat === 'lu' && g(A).titreDe === 'achat' && g(A).limSource === 'lue' && g(A).limJour === '2026-11-24' && !!g(A).transp && g(B).transp === 'chronopost' && g(C37).transp === 'mondialrelay' && g(C37).titreDe === 'achat' && g(E48).titreDe === 'achat', `${nom} : R un colis relié en une rangée — code lu, titre « achat », transporteur nommé, date limite LUE (24/11)`, JSON.stringify({ A: g(A), B: g(B), C: g(C37) }));
           dit(g(D).codeEtat === 'lu' && g(D).titreDe === '' && g(D).limSource === 'lue' && g(D).limJour === '2026-11-25' && g(D).qr === '0', `${nom} : R un colis pas relié — aucun titre d’achat, son code et sa date limite lus quand même`, JSON.stringify(g(D)));
           dit(g(D2).limSource === 'estimee' && /^2026-11-\d\d$/.test(g(D2).limJour || '') && g(D2).titreDe === '', `${nom} : R sans date dans l’e-mail, la limite est ESTIMÉE (garde du transporteur) et dite estimée`, JSON.stringify(g(D2))); }
+        // (19 nov., intégration — l'écran qu'a vu Julien) Toucher la LIGNE d'un colis ⇒ son code en grand (plein écran, pour le comptoir).
+        { const code = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-v2-face] [data-v2-en-grand]')].find((x) => x.getClientRects().length > 0); if (!l) return ''; const f = l.closest('[data-v2-face]'); l.click(); return f ? f.getAttribute('data-v2-code') || '' : ''; });
+          await pg.waitForTimeout(900);
+          const grand = await pg.evaluate((c) => { const d = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], .vrm-fs')].filter((x) => x.getClientRects().length > 0); const t = d.map((x) => x.innerText.replace(/\s+/g, '')).join('|'); return { n: d.length, code: !!c && t.includes(c.replace(/\s+/g, '')) }; }, code);
+          dit(!!code && grand.n > 0 && grand.code, `${nom} : toucher la ligne d’un colis ⇒ son code en grand (plein écran)`, JSON.stringify({ code, ...grand }));
+          await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500); }
         dit(P.relierPartout === 0 && Object.values(P.par).every((c) => !c.boutons.some((t) => /\breli/i.test(t))), `${nom} : N aucun « Relier l’achat » sur une passe`, JSON.stringify({ n: P.relierPartout, boutons: [...new Set(Object.values(P.par).flatMap((c) => c.boutons))] }));
         // Le détail : « Tout le détail des retraits » (replié sous les passes).
         await pg.evaluate(() => { const d = document.querySelector('[data-v2-detail-retraits]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } });

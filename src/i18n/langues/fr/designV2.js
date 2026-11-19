@@ -23,6 +23,10 @@ export default {
     "other": "Imprimer {n} bordereaux"
   },
   "v2.bande.aria": "Les colis à envoyer",
+  "v2.retirer.autresPoints": {
+    "one": "{n} autre point",
+    "other": "{n} autres points"
+  },
   "v2.retirer.titre": "À retirer",
   "v2.retirer.voir": "Voir les codes de retrait",
   "v2.retirer.resume": {
@@ -182,26 +186,7 @@ export default {
   "v2.style.studio": "Studio bleu",
   "v2.style.studio.desc": "Le fond bleu et le verre d'avant.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "aujourd’hui",
-  "v2.jour.hier": "hier",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "vendu {quand}",
-    "other": "vendus {quand}"
-  },
-  "v2.jour.aucune": "aucune vente",
-  "v2.jour.ventes": {
-    "one": "{n} vente",
-    "other": "{n} ventes"
-  },
   "v2.jour.pasSu": "ventes pas encore lues",
-  "v2.mois.vendu": "Vendu",
-  "v2.mois.recu": "Reçu",
-  "v2.mois.benefice": "Bénéfice",
-  "v2.mois.sur": {
-    "one": "{k} vente sur {n}",
-    "other": "{k} ventes sur {n}"
-  },
   "v2.envoyer.titre": "À envoyer",
   "v2.bande.plus": {
     "one": "{n} autre colis à envoyer",
@@ -224,5 +209,177 @@ export default {
   "v2.reg.completer": "Compléter mes annonces",
   "v2.reg.completerN": "Compléter mes annonces · {n}",
   "v2.jour.lecture": "lecture…",
+  "v2.stats.titre": "Tes chiffres",
+  "v2.stats.ca": "CA vendu",
+  "v2.obj.fixer": "Fixer un objectif du mois",
+  "v2.obj.titre": "Objectif du mois",
+  "v2.obj.libelle": "CA vendu à atteindre ce mois",
+  "v2.obj.texte": "{v} / {c}",
+  "v2.obj.detail": {
+    "one": "{pct} % · il reste {j} jour",
+    "other": "{pct} % · il reste {j} jours"
+  },
+  "v2.obj.atteint": "atteint · {pct} %",
+  "v2.obj.enregistrer": "Enregistrer",
+  "v2.obj.retirer": "Retirer l’objectif",
+  "v2.obj.invalide": "Un montant en euros, plus grand que 0.",
+  "v2.courbe.titre": "30 derniers jours",
+  "v2.courbe.voir": "Voir les ventes",
+  "v2.comptes.titre": "Par compte et par site",
+  "v2.comptes.ventes": {
+    "one": "{n} vente",
+    "other": "{n} ventes"
+  },
+  "v2.comptes.vide": "Aucune vente sur la période",
+  "v2.capte.titre": "Sur tes annonces aujourd’hui",
+  "v2.capte.favoris": "Nouveaux favoris",
+  "v2.capte.offres": "Offres reçues",
+  "v2.capte.messages": "Messages",
+  "v2.capte.pasCapte": "pas capté",
+  "v2.capte.pasLu": "pas encore lu",
+  "v2.vrm.titre": "Ce que VRM a fait aujourd’hui",
+  "v2.vrm.rien": "Rien encore aujourd’hui",
+  "v2.vrm.pasLu": "journal pas lu",
+  "v2.vrm.baisses": {
+    "one": "{n} baisse",
+    "other": "{n} baisses"
+  },
+  "v2.vrm.favoris": {
+    "one": "{n} message aux favoris",
+    "other": "{n} messages aux favoris"
+  },
+  "v2.vrm.offres": {
+    "one": "{n} offre acceptée",
+    "other": "{n} offres acceptées"
+  },
+  "v2.vrm.republications": {
+    "one": "{n} republication",
+    "other": "{n} republications"
+  },
+  "v2.vrm.bordereaux": {
+    "one": "{n} bordereau récupéré",
+    "other": "{n} bordereaux récupérés"
+  },
+  "v2.vrm.messages": {
+    "one": "{n} message envoyé",
+    "other": "{n} messages envoyés"
+  },
+  "v2.vrm.offresFaites": {
+    "one": "{n} offre envoyée",
+    "other": "{n} offres envoyées"
+  },
+  "v2.perso.ouvrir": "Personnaliser cet écran",
+  "v2.perso.titre": "Cartes d’Aujourd’hui",
+  "v2.perso.pied": "Touche − pour retirer une carte, + pour l’ajouter ; glisse ≡ pour la déplacer.",
+  "v2.perso.monter": "Monter",
+  "v2.perso.descendre": "Descendre",
+  "v2.perso.defaut": "Remettre par défaut",
+  "v2.perso.carte.chiffres": "Tes chiffres",
+  "v2.perso.carte.envoyer": "À envoyer",
+  "v2.perso.carte.retirer": "À retirer",
+  "v2.perso.carte.courbe": "30 derniers jours",
+  "v2.perso.carte.ventes": "Dernières ventes",
+  "v2.perso.carte.comptes": "Par compte et par site",
+  "v2.perso.carte.annonces": "Sur tes annonces",
+  "v2.perso.carte.vrm": "Ce que VRM a fait",
+  "v2.st.raison.annonces": "ouvre Annonces",
+  "v2.st.raison.achats": "prix d’achat pas saisis",
+  "v2.st.raison.releve": "ouvre Ventes",
+  "v2.st.raison.dates": "dates de mise en ligne pas lues",
+  "v2.st.raison.ecoulement": "ventes ou annonces pas lues",
+  "v2.st.auMoinsSur": "au moins · {k} sur {n}",
+  "v2.st.surN": "sur {n}",
+  "v2.st.stock.titre": "Stock en ligne",
+  "v2.st.stock.enLigne": "En ligne",
+  "v2.st.stock.achat": "Au prix d’achat",
+  "v2.st.vitesse.titre": "Vitesse de vente",
+  "v2.st.vitesse.delai": "Vendue en",
+  "v2.st.vitesse.ecoulement": "Écoulement 30 j",
+  "v2.st.jours": {
+    "one": "{j} jour",
+    "other": "{j} jours"
+  },
+  "v2.st.mediane": "médiane · {k} sur {n} ventes",
+  "v2.st.ecoulementSur": "{v} ventes · {n} en ligne",
+  "v2.st.prev.titre": "Prévision du mois",
+  "v2.st.prev.vers": "Vers",
+  "v2.st.prev.deja": "Déjà vendu",
+  "v2.st.prev.entre": "entre {bas} et {haut}",
+  "v2.st.prev.tot": {
+    "one": "encore {n} jour pour prévoir",
+    "other": "encore {n} jours pour prévoir"
+  },
+  "v2.st.prev.rien": "rien vendu ce mois",
+  "v2.st.prev.jours": "en {n} jours sur {m}",
+  "v2.st.marge.titre": "Marge",
+  "v2.st.marge.pct": "Marge",
+  "v2.st.marge.sur": "sur {k} ventes au prix connu (sur {n})",
+  "v2.st.marques.titre": "Marques",
+  "v2.st.marques.aucune": "Aucune vente finalisée sur la période",
+  "v2.st.marques.sans": {
+    "one": "{n} vente sans marque lue",
+    "other": "{n} ventes sans marque lue"
+  },
+  "v2.st.dorment.titre": "Paires qui dorment",
+  "v2.st.dorment.n": {
+    "one": "{n} paire en ligne depuis plus de 30 j",
+    "other": "{n} paires en ligne depuis plus de 30 j"
+  },
+  "v2.st.dorment.sous": "sans vente · voir la liste",
+  "v2.st.avenir.sous": "versements attendus",
+  "v2.st.vues.titre": "Vues et favoris",
+  "v2.st.vues.vues": "Vues",
+  "v2.st.vues.favoris": "Favoris",
+  "v2.perso.termine": "Terminé",
+  "v2.perso.affichees": "Affichées",
+  "v2.perso.aAjouter": "À ajouter",
+  "v2.perso.retirerX": "Retirer « {x} »",
+  "v2.perso.ajouterX": "Ajouter « {x} »",
+  "v2.perso.deplacerX": "Déplacer « {x} » (flèches haut et bas)",
+  "v2.perso.remis": "Cartes remises par défaut",
+  "v2.perso.modifier": "Modifier",
+  "v2.perso.fini": "Terminé",
+  "v2.perso.ajouter": "Ajouter une carte",
+  "v2.perso.carte.stock": "Stock en ligne",
+  "v2.perso.carte.vitesse": "Vitesse de vente",
+  "v2.perso.carte.prevision": "Prévision du mois",
+  "v2.perso.carte.marge": "Marge",
+  "v2.perso.carte.marques": "Marques",
+  "v2.perso.carte.dorment": "Paires qui dorment",
+  "v2.perso.carte.avenir": "Argent à venir",
+  "v2.perso.carte.vues": "Vues et favoris",
+  "v2.perso.phrase.chiffres": "CA, bénéfice, ventes et panier, jour, semaine ou mois",
+  "v2.perso.phrase.envoyer": "Les colis à poster et l’impression",
+  "v2.perso.phrase.retirer": "Les points relais et leurs codes",
+  "v2.perso.phrase.stock": "Paires en ligne et leur valeur d’achat",
+  "v2.perso.phrase.vitesse": "En combien de jours tu vends",
+  "v2.perso.phrase.prevision": "Où finira le mois, avec sa fourchette",
+  "v2.perso.phrase.courbe": "Le vendu de chaque jour",
+  "v2.perso.phrase.ventes": "Tes 5 dernières ventes",
+  "v2.perso.phrase.comptes": "Qui vend le plus, compte par compte",
+  "v2.perso.phrase.marge": "Bénéfice ÷ ventes au prix connu",
+  "v2.perso.phrase.marques": "Les marques qui rapportent",
+  "v2.perso.phrase.dorment": "Les paires sans vente depuis 30 jours",
+  "v2.perso.phrase.avenir": "Les versements attendus",
+  "v2.perso.phrase.annonces": "Offres et messages captés aujourd’hui",
+  "v2.perso.phrase.vues": "Vues et favoris du jour",
+  "v2.perso.phrase.vrm": "Les gestes que VRM a faits pour toi",
+  "v2.stats.periode": "Période",
+  "v2.stats.jour": "Jour",
+  "v2.stats.semaine": "Semaine",
+  "v2.stats.mois": "Mois",
+  "v2.stats.vendus.jour": "vendus aujourd’hui",
+  "v2.stats.vendus.semaine": "vendus cette semaine",
+  "v2.stats.vendus.mois": "vendus en {mois}",
+  "v2.stats.ecart.jour": "{s} vs hier",
+  "v2.stats.ecart.semaine": "{s} vs sem. passée",
+  "v2.stats.ecart.mois": "{s} vs {mois}",
+  "v2.stats.benefice": "Bénéfice",
+  "v2.stats.beneficeBrut": "Bénéfice brut",
+  "v2.stats.ventes": "Ventes",
+  "v2.stats.panier": "Panier moyen",
+  "v2.stats.auMoinsSur": "au moins · achats {c}",
+  "v2.stats.aucune": "aucune vente",
+  "v2.stats.pasTout": "pas tout lu",
   "v2.alerte.retourTitre": "Retour à déposer"
 };

@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
-import { Groupe, Rangee, Vignette } from '../natif/index.js';
+import { Groupe, Rangee, Vignette, poserIcone, iconePosee } from '../natif/index.js';
 import { groupesDe, atelierCompleter } from './aRegler.js';
 import { useARegler } from './useARegler.js';
 export { useARegler };
@@ -19,6 +19,7 @@ export { useARegler };
 const VISIBLES = 3;
 
 export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) {
+  if (Icon && !iconePosee()) poserIcone(Icon);   // les glyphes natifs (chevron) = les tracés de l'app
   const pub = useARegler();
   const source = groupes || (pub ? pub.groupes : null);
   const liste = React.useMemo(() => (source ? groupesDe(onglet, source, { completer: atelierCompleter(), titreCompleter: (n) => (n > 0 ? tr('v2.reg.completerN', { n }) : tr('v2.reg.completer')) }) : []), [source, onglet]);

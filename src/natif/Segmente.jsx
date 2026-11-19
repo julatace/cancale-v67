@@ -1,6 +1,7 @@
 // ── src/natif/Segmente.jsx — le contrôle segmenté (2 à 5 choix, UN choisi) ───────────────
 // Props :
-//   options   [{ cle, libelle, n }]   `n` : un compte discret à côté du libellé (« À envoyer 3 ») — pas une pastille
+//   options   [{ cle, libelle, n, attrs }]   `n` : un compte discret à côté du libellé (« À envoyer 3 ») — pas une pastille ;
+//             `attrs` (19 nov., ajout) : des data-* posés sur le choix (les bancs d'un écran le désignent par eux)
 //   valeur    la `cle` choisie
 //   onChange  (cle) => …
 //   libelle   le nom du groupe pour le lecteur d'écran (« Filtrer les ventes »)
@@ -47,6 +48,7 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
           aria-checked={k === i ? 'true' : 'false'}
           tabIndex={k === i ? 0 : -1}
           onClick={() => choisir(k)}
+          {...(o.attrs || {})}
         >
           <span className="n-segmente-libelle">{o.libelle}</span>
           {o.n ? <span className="n-segmente-n">{o.n}</span> : null}

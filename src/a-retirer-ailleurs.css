@@ -58,5 +58,5 @@
    (`:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, …) { color: #fff !important }`,
    pensé pour l'ancienne carte sombre) — mesuré au banc : « Ouvrir Vestiaire ↗ » blanc sur porcelaine.
    Ici la matière est claire (porcelaine) : le lien reprend sa couleur, plus spécifique. */
-:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }
+:root:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }   /* (19 nov.) un :root de plus : la règle « blanc dans une carte Fusion » (jetons.css) avait la même force et passait après */
 :root:root:root body .rx a.sb-touche.rx-geste { color: var(--sb-encre, #0C1D30) !important; text-decoration: none; }

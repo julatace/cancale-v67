@@ -47,6 +47,8 @@ import { photoACacherSelon, poserReglesStream, normaliserRegles, masquerTexteStr
 import { noterTicketDiscord } from '../communaute/discordAttente.js';
 import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
+import EtiquetageReglage from '../etiquetage/EtiquetageReglage.jsx';   // (19 nov., lot stock-etiquetage) la méthode d'étiquetage
+import { CLE_ETIQUETAGE, CLE_PREFIXE, CLE_QUI, CLES_METHODE, methodeDe } from '../etiquetage/methode.js';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
 const lireNumeroEcritReglages = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
@@ -2003,6 +2005,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // ── Les valeurs dites à droite des lignes : lues dans LEUR réglage, jamais
   //    recalculées (§11). Relues à chaque rendu (fermer un sous-écran en est un).
   const valNumeros = (() => { const p = prefixeNumeros(); return p ? `Série ${p}` : 'Chiffres'; })();
+  const lireMethodeBrute = () => ({ numeroEcrit: load(CLE_QUI, null), prefixe: load(CLE_PREFIXE, ''), etiquetage: load(CLE_ETIQUETAGE, null) });
+  const valEtiquetage = (() => { const m = methodeDe(lireMethodeBrute()); if (!m.qui) return tr('etq.val.aChoisir'); return tr(m.qui === 'moi' ? 'etq.resume.moi' : m.serie === 'lettre' ? 'etq.resume.lettre' : 'etq.resume.chiffres', { l: m.lettre }); })();
+  // Les écritures de la méthode : la lettre passe par la copie locale (lue tout de suite par les champs N°, comme
+  // NumerosSetting) ; chaque clé prévient ceux qui l'écoutent. Une clé hors CLES_METHODE n'est JAMAIS écrite.
+  const ecrireMethode = (ecritures) => Promise.all((ecritures || []).filter((w) => CLES_METHODE.includes(w.cle)).map((w) => new Promise((res) => {
+    if (w.cle === CLE_PREFIXE && !ecrireCopieLocale(CLE_PREFIXE, w.valeur)) { res(false); return; }
+    save(w.cle, w.valeur, (ok) => res(ok !== false));
+    try { window.dispatchEvent(new Event(w.cle === CLE_PREFIXE ? 'vrm-prefixe' : w.cle === CLE_QUI ? 'vrm-numero-ecrit' : 'vrm-etiquetage')); } catch (_) {}
+  }))).then((r) => { const ok = r.every(Boolean); if (ok) toast(tr('etq.enregistre')); return ok; });
   const valRegime = (() => { const r = regimeFiscal(); const x = r && REGIMES_FISCAUX.find((g) => g[0] === r); return x ? x[1] : 'À choisir'; })();
   const valZoom = (() => { const z = readZoom(); const t = etroit && Number(z) < 1 ? '1' : z; return (ZOOMS.find(([v]) => v === t) || [, 'Normal'])[1]; })();
   const derniereSauvegarde = (() => { const t = Number(load('vinted_last_backup', 0)) || 0; const days = t ? Math.floor((Date.now() - t) / 86400000) : null; return { t, days, old: days === null || days >= 30 }; })();
@@ -2174,6 +2185,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (15 nov.) « Mon abonnement » n'est plus un onglet ni un renvoi : c'est un panneau de « Mon compte »
     // (GROUPES_COMPTE, `abonnement`), le même composant qu'avant (§11).
     MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
+      // (19 nov., lot stock-etiquetage) « Méthode d'étiquetage » : qui numérote, la forme des PROCHAINS N°, l'étiquette.
+      // Les seules clés écrites : CLES_METHODE (src/etiquetage/methode.js) — aucun numéro, aucun pool.
+      { id:'etiquetage', type:'panneau', nu:true, ic:'cintre', lib:tr('etq.lib'), desc:tr('etq.desc'), val:valEtiquetage, data:{ 'data-reglage-etiquetage':'' },
+        el:<EtiquetageReglage lire={lireMethodeBrute} archive={archiveNumeros()} ecrire={ecrireMethode} onNumeros={()=>{ DEMANDE_REGLAGE_SOUS.id='numeros'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }}/> },
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :

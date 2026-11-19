@@ -1,0 +1,174 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LES MEUBLES DESSINÉS ET LE STOCK NATIF (19 nov. 2026, lot stock-etiquetage) — src/stockV2/MeubleDessin.jsx,
+   src/stockV2/StockV2.jsx. Une couche (`vrm-natif`), aucun `!important`, aucun `:has()`.
+   L'interface lit les jetons natifs (`--n-*`, src/natif/jetons.css). Le DESSIN a sa palette (`--sm-*`, ci-dessous) :
+   les couleurs du bâti et des contenants de l'étagère v4 validée par Julien (src/etageres/reglages.js, TONS) —
+   aplats, sans dégradé ni ombre (NATIF.md §1). L'étiquette d'une boîte est du PAPIER : claire le jour comme la nuit,
+   encre presque noire (≥ 12:1). Mouvement : courbe iOS `--n-courbe`, 200–300 ms ; mouvement réduit ⇒ fondu seul.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  :root {
+    --sm-papier: #FBFAF6; --sm-papier-encre: #15171A;
+    --sm-bati-ciel: #9DB9D6; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;
+    --sm-fond-ciel: #DCE7F2; --sm-fond-ardoise: #D3D9E1; --sm-fond-sable: #EFE6D3; --sm-fond-sauge: #DDE6D8;
+    --sm-trou: rgb(17 17 20 / .07);
+    --sm-kraft: #D8BE93; --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: #E7D4A7; --sm-sauge: #B7CCAE; --sm-ciel: #B9D4EB; --sm-lagon: #A2D1CC;
+    --sm-bord: rgb(17 17 20 / .22);
+  }
+  :root[data-theme="dark"] {
+    --sm-bati-ciel: #3E5672; --sm-bati-ardoise: #4A5463; --sm-bati-sable: #6B5B3E; --sm-bati-sauge: #4C5E48;
+    --sm-fond-ciel: #1F2B39; --sm-fond-ardoise: #23272E; --sm-fond-sable: #2E2A22; --sm-fond-sauge: #232B22;
+    --sm-trou: rgb(0 0 0 / .35);
+    --sm-kraft: #B89A6C; --sm-blanc: #D9DCE1; --sm-ardoise: #7F90A3; --sm-sable: #BFA97A; --sm-sauge: #8FA587; --sm-ciel: #87A6C2; --sm-lagon: #79A8A3;
+    --sm-bord: rgb(0 0 0 / .45);
+  }
+
+  /* ── LE MEUBLE ─────────────────────────────────────────────────────────── */
+  .sm-meuble { --sm-bati: var(--sm-bati-ciel); --sm-fond: var(--sm-fond-ciel); width: 100%; box-sizing: border-box; }
+  .sm-meuble[data-sm-couleur="ardoise"] { --sm-bati: var(--sm-bati-ardoise); --sm-fond: var(--sm-fond-ardoise); }
+  .sm-meuble[data-sm-couleur="sable"] { --sm-bati: var(--sm-bati-sable); --sm-fond: var(--sm-fond-sable); }
+  .sm-meuble[data-sm-couleur="sauge"] { --sm-bati: var(--sm-bati-sauge); --sm-fond: var(--sm-fond-sauge); }
+  /* Le bâti : deux montants, un chapeau, un socle — les tablettes sont le bas de chaque étage. */
+  .sm-bati { background: var(--sm-bati); border-radius: 8px 8px 4px 4px; padding: 6px 6px 0; box-sizing: border-box; }
+  .sm-corps { display: flex; flex-direction: column; gap: 0; background: var(--sm-fond); border-radius: 4px 4px 0 0; overflow: hidden; }
+  .sm-etage { display: grid; grid-template-columns: repeat(var(--sm-cols, 1), minmax(0, 1fr)); gap: 4px; padding: 4px 4px 0; border-bottom: 6px solid var(--sm-bati); }
+  .sm-etage:last-child { border-bottom-width: 8px; }
+  .sm-pieds { display: block; height: 8px; margin: 0 10px; border-left: 10px solid var(--sm-bati); border-right: 10px solid var(--sm-bati); }
+  .sm-meuble[data-sm-affichage="plan"] .sm-bati { border-radius: 8px; padding: 6px; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-etage { border-bottom: 0; padding: 2px; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-corps { border-radius: 4px; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-pieds { display: none; }
+
+  /* Une case : un emplacement (le creux) qui reçoit une boîte. Le N° se règle sur la largeur de LA case. */
+  .sm-case { position: relative; display: block; aspect-ratio: 1 / .8; min-width: 0; container-type: inline-size; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-case { aspect-ratio: 1 / 1; }
+  .sm-meuble[data-sm-affichage="rayonnage"] .sm-case { aspect-ratio: 1 / .62; }
+  /* De loin, le meuble entier tient dans l'écran : des cases plus basses (le N° reste à sa taille). */
+  .sm-meuble[data-sm-mode="loin"] .sm-case { aspect-ratio: 1 / .62; }
+  .sm-meuble[data-sm-mode="loin"][data-sm-affichage="plan"] .sm-case { aspect-ratio: 1 / .8; }
+  .sm-meuble[data-sm-mode="loin"][data-sm-affichage="rayonnage"] .sm-case { aspect-ratio: 1 / .5; }
+  button.sm-case { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 4px; }
+  button.sm-case:focus-visible { outline: 3px solid var(--n-accent); outline-offset: 1px; }
+  button.sm-case:disabled { cursor: default; }
+  .sm-trou { position: absolute; inset: 2px 2px 0; background: var(--sm-trou); border-radius: 3px 3px 0 0; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-trou { inset: 2px; border-radius: 3px; border: 1px dashed var(--sm-bord); background: transparent; }
+  button.sm-case.is-libre:active .sm-trou { background: var(--n-teinte); }
+
+  .sm-boite { position: absolute; inset: 8% 6% 0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: var(--sm-kraft); border: 1px solid var(--sm-bord); border-bottom: 0; border-radius: 3px 3px 0 0; }
+  .sm-meuble[data-sm-affichage="plan"] .sm-boite { inset: 6%; border-radius: 3px; border-bottom: 1px solid var(--sm-bord); }
+  .sm-meuble[data-sm-affichage="rayonnage"] .sm-boite { inset: 6% 4% 0; }
+  .sm-boite[data-teinte="blanc"] { background: var(--sm-blanc); }
+  .sm-boite[data-teinte="ardoise"] { background: var(--sm-ardoise); }
+  .sm-boite[data-teinte="sable"] { background: var(--sm-sable); }
+  .sm-boite[data-teinte="sauge"] { background: var(--sm-sauge); }
+  .sm-boite[data-teinte="ciel"] { background: var(--sm-ciel); }
+  .sm-boite[data-teinte="lagon"] { background: var(--sm-lagon); }
+  .sm-boite[data-notee] { opacity: .72; }
+  .sm-boite[data-etat="vendue"] { box-shadow: inset 0 0 0 3px var(--n-ambre); }
+  .sm-boite[data-etat="plusenligne"] { outline: 2px dashed var(--n-ambre); outline-offset: -4px; }
+  .sm-boite[data-etat="double"] { box-shadow: inset 0 0 0 3px var(--n-doublon); }
+  .sm-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  /* L'étiquette : du papier collé sur la boîte, le N° en grand (lisible de loin). */
+  .sm-etiq { position: relative; display: flex; align-items: center; justify-content: center; max-width: 88%; min-width: 56%; padding: 0 4%;
+    background: var(--sm-papier); color: var(--sm-papier-encre); border-radius: 3px; box-sizing: border-box; }
+  .sm-meuble[data-sm-affichage="rayonnage"] .sm-etiq { width: 88%; height: 70%; }
+  .sm-n { display: block; font-family: var(--n-police); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.15;
+    font-size: clamp(13px, 30cqi, 30px); white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .sm-meuble[data-sm-affichage="rayonnage"] .sm-n { font-size: clamp(13px, 36cqi, 34px); }
+  .sm-photo ~ .sm-etiq { position: absolute; left: 6%; bottom: 6%; min-width: 0; max-width: 88%; }
+  .sm-photo ~ .sm-etiq .sm-n { font-size: clamp(13px, 22cqi, 22px); }
+  @container (max-width: 30px) { .sm-etiq { display: none; } }
+  @container (max-width: 64px) { .sm-photo { display: none; } .sm-photo ~ .sm-etiq { position: relative; left: auto; bottom: auto; } }
+
+  /* La case proposée : un liseré d'accent qui respire deux fois, et le mot « Ici ». */
+  .sm-case.is-vise { outline: 3px solid var(--n-accent); outline-offset: 0; border-radius: 4px; z-index: 1; animation: sm-respire 1.1s var(--n-courbe) 2; }
+  .sm-case.is-ici { outline: 2px dashed var(--n-encre-2); outline-offset: 0; border-radius: 4px; }
+  .sm-ici-mot { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: var(--n-t-legende-fort); color: var(--n-sur-plein); background: var(--n-plein);
+    border-radius: var(--n-r-rond); padding: 2px 8px; white-space: nowrap; pointer-events: none; }
+  .sm-case.is-prise .sm-ici-mot { display: none; }
+  .sm-case.is-arrive .sm-boite { animation: sm-arrive var(--n-duree) var(--n-courbe) both; }
+  @keyframes sm-respire { 50% { outline-offset: 3px; } }
+  @keyframes sm-arrive { from { transform: translateY(-18%) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes sm-fondu { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Près : chaque case se touche (44 px au moins) ; un grand meuble défile DANS son cadre, jamais la page. */
+  .sm-defile { overflow-x: auto; overscroll-behavior-x: contain; }
+  .sm-meuble[data-sm-mode="pres"] .sm-corps { min-width: calc(var(--sm-cols) * 52px); }
+  .sm-meuble[data-sm-mode="pres"] { max-width: calc(var(--sm-cols) * 168px + 20px); margin-inline: auto; }
+  .sm-meuble[data-sm-mode="pres"] .sm-case { min-height: 44px; }
+  .sm-meuble[data-sm-mode="loin"] { pointer-events: none; }
+
+  /* ── LE STOCK ──────────────────────────────────────────────────────────── */
+  .sm-ecran { display: flex; flex-direction: column; gap: 16px; padding: 0; color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .sm-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 8px 0 0; min-height: 44px; }
+  .sm-tete-gestes { display: flex; align-items: center; gap: 4px; flex: none; }
+  .sm-titre { margin: 0; font: var(--n-t-grand); color: var(--n-encre); }
+  .sm-bloc { padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .sm-carte-pad { padding: 16px; }
+  .sm-ranger-fin { font: var(--n-t-second-fort); color: var(--n-accent); white-space: nowrap; }
+  /* La vue d'ensemble : chaque meuble sur toute la largeur au téléphone ; côte à côte dès qu'il y a la place. */
+  .sm-tous { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; container-type: inline-size; }
+  /* Un meuble large (6 colonnes et plus) prend deux places dès qu'il y en a deux : ses N° restent lisibles de loin. */
+  @container (min-width: 740px) { .sm-tuile[data-sm-large] { grid-column: span 2; } }
+  @media (min-width: 900px) { .sm-tous { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); align-items: start; } }
+  .sm-tuile { appearance: none; display: flex; flex-direction: column; gap: 12px; width: 100%; margin: 0; padding: 16px; border: 0; border-radius: var(--n-r-carte);
+    background: var(--n-carte); color: var(--n-encre); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; box-sizing: border-box;
+    transition: transform var(--n-duree-appui) ease; }
+  .sm-tuile:active { transform: scale(.985); }
+  .sm-tuile:focus-visible { outline: 3px solid var(--n-accent); outline-offset: 2px; }
+  .sm-tuile-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+  .sm-tuile-nom { font: var(--n-t-corps-fort); color: var(--n-encre); min-width: 0; overflow-wrap: anywhere; }
+  .sm-tuile-n { font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; }
+  .sm-tuile-sortir { font: var(--n-t-legende-fort); color: var(--n-ambre); }
+  .sm-tuile-ajout { align-items: center; justify-content: center; min-height: 120px; border: 2px dashed var(--n-trait); background: transparent; color: var(--n-accent); font: var(--n-t-corps-fort); }
+  /* Le zoom : le meuble seul, sur toute la largeur, qui arrive de la tuile. */
+  .sm-zoom { display: flex; flex-direction: column; gap: 12px; }
+  .sm-zoom-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .sm-zoom-nom { margin: 0; font: var(--n-t-section); color: var(--n-encre); overflow-wrap: anywhere; }
+  .sm-zoom-n { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .sm-zoom .sm-meuble { animation: sm-zoom var(--n-duree-lente) var(--n-courbe) both; transform-origin: 50% 0; }
+  .sm-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
+  @keyframes sm-zoom { from { transform: scale(.94); opacity: .3; } to { transform: none; opacity: 1; } }
+
+  /* Dans le Stock, les groupes natifs prennent la largeur de l'écran (sa marge est celle de l'hôte, 16 px). */
+  .sm-ecran .n-groupe { margin-inline: 0; margin-bottom: 0; }
+  .n-feuille .sm-seance, .n-feuille .sm-fin { padding: 0 var(--n-marge) 16px; }
+  .sm-article-txt { align-items: flex-start; }
+
+  /* ── LA SÉANCE « RANGER » (une feuille, à la demande) ──────────────────── */
+  .sm-seance { display: flex; flex-direction: column; gap: 16px; }
+  .sm-article { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .sm-article-photo { position: relative; flex: none; width: 88px; height: 88px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); display: grid; place-items: center; color: var(--n-encre-3); }
+  .sm-article-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sm-article-photo.is-part img { opacity: .35; transition: opacity var(--n-duree) var(--n-courbe); }
+  .sm-article-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .sm-article-titre { font: var(--n-t-second); color: var(--n-encre); overflow-wrap: anywhere; }
+  .sm-article-ou { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .sm-coche { position: absolute; inset: 0; display: grid; place-items: center; color: var(--n-sur-plein); background: rgb(0 104 214 / .55); }
+  .sm-reste { font: var(--n-t-second); color: var(--n-encre-2); margin: 0; }
+  .sm-fait { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--n-t-second); color: var(--n-encre); }
+  .sm-propose { display: flex; flex-direction: column; gap: 2px; margin: 0; }
+  .sm-propose-l { font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .sm-propose-ou { font: var(--n-t-corps-fort); color: var(--n-encre); overflow-wrap: anywhere; }
+  .sm-aide { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .sm-sans { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .sm-onglets { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .sm-onglet { appearance: none; flex: none; min-height: var(--n-cible); padding: 0 16px; border: 0; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer; white-space: nowrap; }
+  .sm-onglet[aria-selected="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .sm-gestes-bas { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .sm-fin { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px 0; text-align: center; }
+  .sm-fin-ic { display: grid; place-items: center; width: 64px; height: 64px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte); animation: sm-arrive var(--n-duree) var(--n-courbe) both; }
+  .sm-fin-titre { margin: 0; font: var(--n-t-corps-fort); color: var(--n-encre); }
+  .sm-seance-corps { animation: sm-glisse var(--n-duree) var(--n-courbe) both; }
+  @keyframes sm-glisse { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* L'article qui « vole » dans sa case : posé au-dessus de tout (y compris la feuille), il ne prend jamais le doigt. */
+  .sm-vol { position: fixed; z-index: 2147483000; pointer-events: none; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--sm-kraft); will-change: transform; }
+  .sm-vol img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sm-case.is-vise { animation: none; }
+    .sm-case.is-arrive .sm-boite, .sm-zoom .sm-meuble, .sm-seance-corps, .sm-fin-ic { animation: sm-fondu 200ms ease both; }
+    .sm-tuile { transition: none; }
+  }
+}

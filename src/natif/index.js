@@ -32,3 +32,6 @@ export { Barres } from './Barres.jsx';
 export { Vignettes, CodeRetrait } from './Vignettes.jsx';   // (19 nov.) ajoutés pour « Aujourd'hui » : src/natif/complements.css
 export { Colonnes, Colonne } from './Colonnes.jsx';   // (19 nov.) deux colonnes à l'ordinateur, une au téléphone
 export { TableauTravail, depuisMaj } from './TableauTravail.jsx';   // (19 nov. soir) le tableau de travail des listes (NATIF.md §2 bis)
+export { Carte, Tuiles, Tuile } from './Carte.jsx';   // (19 nov.) carte-tableau à filet et tuiles de chiffres (« entre Vintex et celui-là »)
+export { Courbe, Progression, Champ } from './Courbe.jsx';   // (19 nov.) la courbe des 30 jours, la progression de l'objectif, un champ court
+export { ListeOrdonnee, Editable } from './ListeOrdonnee.jsx';   // (19 nov.) « Personnaliser » : la liste qu'on réordonne, la grille qu'on modifie

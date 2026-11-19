@@ -11,7 +11,7 @@
    la photo. Banc fiche-directe (Q4). Dans le volet de détail (ordinateur) ils restent où ils étaient.
    ════════════════════════════════════════════════════════════════════════════ */
 @layer vrm-verre {
-:root:root:root:root:root:root:root:root body:has([data-fiche-paire][data-n-poussee]:not([data-n-volet])) .vrm-toasts[data-toasts-place="haut"] {
+:root:root:root:root:root:root:root:root body[data-vrm-d39]:not(._):not(._) .vrm-toasts[data-toasts-place="haut"] {
   top: auto !important; bottom: calc(84px + env(safe-area-inset-bottom)) !important;
 }
 }

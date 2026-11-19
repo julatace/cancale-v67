@@ -23,6 +23,10 @@ export default {
     "other": "Print {n} labels"
   },
   "v2.bande.aria": "Parcels to send",
+  "v2.retirer.autresPoints": {
+    "one": "{n} more point",
+    "other": "{n} more points"
+  },
   "v2.retirer.titre": "To pick up",
   "v2.retirer.voir": "See pickup codes",
   "v2.retirer.resume": {
@@ -182,26 +186,7 @@ export default {
   "v2.style.studio": "Blue studio",
   "v2.style.studio.desc": "The previous blue background and glass.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "today",
-  "v2.jour.hier": "yesterday",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "sold {quand}",
-    "other": "sold {quand}"
-  },
-  "v2.jour.aucune": "no sale",
-  "v2.jour.ventes": {
-    "one": "{n} sale",
-    "other": "{n} sales"
-  },
   "v2.jour.pasSu": "sales not read yet",
-  "v2.mois.vendu": "Sold",
-  "v2.mois.recu": "Received",
-  "v2.mois.benefice": "Profit",
-  "v2.mois.sur": {
-    "one": "{k} sale out of {n}",
-    "other": "{k} sales out of {n}"
-  },
   "v2.envoyer.titre": "To ship",
   "v2.bande.plus": {
     "one": "{n} more parcel to ship",
@@ -224,5 +209,177 @@ export default {
   "v2.reg.completer": "Complete my listings",
   "v2.reg.completerN": "Complete my listings · {n}",
   "v2.jour.lecture": "reading…",
+  "v2.stats.titre": "Your figures",
+  "v2.stats.ca": "Sales",
+  "v2.obj.fixer": "Set a monthly goal",
+  "v2.obj.titre": "Monthly goal",
+  "v2.obj.libelle": "Sales to reach this month",
+  "v2.obj.texte": "{v} / {c}",
+  "v2.obj.detail": {
+    "one": "{pct} % · {j} day left",
+    "other": "{pct} % · {j} days left"
+  },
+  "v2.obj.atteint": "reached · {pct} %",
+  "v2.obj.enregistrer": "Save",
+  "v2.obj.retirer": "Remove the goal",
+  "v2.obj.invalide": "An amount in euros, above 0.",
+  "v2.courbe.titre": "Last 30 days",
+  "v2.courbe.voir": "See the sales",
+  "v2.comptes.titre": "By account and site",
+  "v2.comptes.ventes": {
+    "one": "{n} sale",
+    "other": "{n} sales"
+  },
+  "v2.comptes.vide": "No sales in this period",
+  "v2.capte.titre": "On your listings today",
+  "v2.capte.favoris": "New favourites",
+  "v2.capte.offres": "Offers received",
+  "v2.capte.messages": "Messages",
+  "v2.capte.pasCapte": "not captured",
+  "v2.capte.pasLu": "not read yet",
+  "v2.vrm.titre": "What VRM did today",
+  "v2.vrm.rien": "Nothing yet today",
+  "v2.vrm.pasLu": "log not read",
+  "v2.vrm.baisses": {
+    "one": "{n} price drop",
+    "other": "{n} price drops"
+  },
+  "v2.vrm.favoris": {
+    "one": "{n} message to favourites",
+    "other": "{n} messages to favourites"
+  },
+  "v2.vrm.offres": {
+    "one": "{n} offer accepted",
+    "other": "{n} offers accepted"
+  },
+  "v2.vrm.republications": {
+    "one": "{n} relisting",
+    "other": "{n} relistings"
+  },
+  "v2.vrm.bordereaux": {
+    "one": "{n} label fetched",
+    "other": "{n} labels fetched"
+  },
+  "v2.vrm.messages": {
+    "one": "{n} message sent",
+    "other": "{n} messages sent"
+  },
+  "v2.vrm.offresFaites": {
+    "one": "{n} offer sent",
+    "other": "{n} offers sent"
+  },
+  "v2.perso.ouvrir": "Customise this screen",
+  "v2.perso.titre": "Today’s cards",
+  "v2.perso.pied": "Tap − to remove a card, + to add it; drag ≡ to move it.",
+  "v2.perso.monter": "Up",
+  "v2.perso.descendre": "Down",
+  "v2.perso.defaut": "Reset to default",
+  "v2.perso.carte.chiffres": "Your figures",
+  "v2.perso.carte.envoyer": "To send",
+  "v2.perso.carte.retirer": "To collect",
+  "v2.perso.carte.courbe": "Last 30 days",
+  "v2.perso.carte.ventes": "Latest sales",
+  "v2.perso.carte.comptes": "By account and site",
+  "v2.perso.carte.annonces": "On your listings",
+  "v2.perso.carte.vrm": "What VRM did",
+  "v2.st.raison.annonces": "open Listings",
+  "v2.st.raison.achats": "purchase prices not entered",
+  "v2.st.raison.releve": "open Sales",
+  "v2.st.raison.dates": "listing dates not read",
+  "v2.st.raison.ecoulement": "sales or listings not read",
+  "v2.st.auMoinsSur": "at least · {k} of {n}",
+  "v2.st.surN": "of {n}",
+  "v2.st.stock.titre": "Stock online",
+  "v2.st.stock.enLigne": "Online",
+  "v2.st.stock.achat": "At purchase price",
+  "v2.st.vitesse.titre": "Selling speed",
+  "v2.st.vitesse.delai": "Sold in",
+  "v2.st.vitesse.ecoulement": "Sell-through 30 d",
+  "v2.st.jours": {
+    "one": "{j} day",
+    "other": "{j} days"
+  },
+  "v2.st.mediane": "median · {k} of {n} sales",
+  "v2.st.ecoulementSur": "{v} sales · {n} online",
+  "v2.st.prev.titre": "Month forecast",
+  "v2.st.prev.vers": "Around",
+  "v2.st.prev.deja": "Sold so far",
+  "v2.st.prev.entre": "between {bas} and {haut}",
+  "v2.st.prev.tot": {
+    "one": "{n} more day to forecast",
+    "other": "{n} more days to forecast"
+  },
+  "v2.st.prev.rien": "nothing sold this month",
+  "v2.st.prev.jours": "in {n} days of {m}",
+  "v2.st.marge.titre": "Margin",
+  "v2.st.marge.pct": "Margin",
+  "v2.st.marge.sur": "on {k} sales with known cost (of {n})",
+  "v2.st.marques.titre": "Brands",
+  "v2.st.marques.aucune": "No completed sale in this period",
+  "v2.st.marques.sans": {
+    "one": "{n} sale with no brand read",
+    "other": "{n} sales with no brand read"
+  },
+  "v2.st.dorment.titre": "Sleeping pairs",
+  "v2.st.dorment.n": {
+    "one": "{n} pair online for over 30 d",
+    "other": "{n} pairs online for over 30 d"
+  },
+  "v2.st.dorment.sous": "no sale · see the list",
+  "v2.st.avenir.sous": "expected payouts",
+  "v2.st.vues.titre": "Views and favourites",
+  "v2.st.vues.vues": "Views",
+  "v2.st.vues.favoris": "Favourites",
+  "v2.perso.termine": "Done",
+  "v2.perso.affichees": "Shown",
+  "v2.perso.aAjouter": "To add",
+  "v2.perso.retirerX": "Remove “{x}”",
+  "v2.perso.ajouterX": "Add “{x}”",
+  "v2.perso.deplacerX": "Move “{x}” (up and down arrows)",
+  "v2.perso.remis": "Cards reset to default",
+  "v2.perso.modifier": "Edit",
+  "v2.perso.fini": "Done",
+  "v2.perso.ajouter": "Add a card",
+  "v2.perso.carte.stock": "Stock online",
+  "v2.perso.carte.vitesse": "Selling speed",
+  "v2.perso.carte.prevision": "Month forecast",
+  "v2.perso.carte.marge": "Margin",
+  "v2.perso.carte.marques": "Brands",
+  "v2.perso.carte.dorment": "Sleeping pairs",
+  "v2.perso.carte.avenir": "Money to come",
+  "v2.perso.carte.vues": "Views and favourites",
+  "v2.perso.phrase.chiffres": "Sales, profit, count and average, day, week or month",
+  "v2.perso.phrase.envoyer": "Parcels to post and printing",
+  "v2.perso.phrase.retirer": "Pickup points and their codes",
+  "v2.perso.phrase.stock": "Pairs online and their purchase value",
+  "v2.perso.phrase.vitesse": "How many days you take to sell",
+  "v2.perso.phrase.prevision": "Where the month will end, with its range",
+  "v2.perso.phrase.courbe": "What you sold each day",
+  "v2.perso.phrase.ventes": "Your last 5 sales",
+  "v2.perso.phrase.comptes": "Who sells most, account by account",
+  "v2.perso.phrase.marge": "Profit ÷ sales with known cost",
+  "v2.perso.phrase.marques": "The brands that pay",
+  "v2.perso.phrase.dorment": "Pairs with no sale for 30 days",
+  "v2.perso.phrase.avenir": "Expected payouts",
+  "v2.perso.phrase.annonces": "Offers and messages captured today",
+  "v2.perso.phrase.vues": "Today’s views and favourites",
+  "v2.perso.phrase.vrm": "What VRM did for you",
+  "v2.stats.periode": "Period",
+  "v2.stats.jour": "Day",
+  "v2.stats.semaine": "Week",
+  "v2.stats.mois": "Month",
+  "v2.stats.vendus.jour": "sold today",
+  "v2.stats.vendus.semaine": "sold this week",
+  "v2.stats.vendus.mois": "sold in {mois}",
+  "v2.stats.ecart.jour": "{s} vs yesterday",
+  "v2.stats.ecart.semaine": "{s} vs last week",
+  "v2.stats.ecart.mois": "{s} vs {mois}",
+  "v2.stats.benefice": "Profit",
+  "v2.stats.beneficeBrut": "Gross profit",
+  "v2.stats.ventes": "Sales",
+  "v2.stats.panier": "Average sale",
+  "v2.stats.auMoinsSur": "at least · costs {c}",
+  "v2.stats.aucune": "no sales",
+  "v2.stats.pasTout": "not all read",
   "v2.alerte.retourTitre": "Return to drop off"
 };
