@@ -17,11 +17,11 @@
 // ══════════════════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tr } from './i18n/index.js';
-import { Bouton, Vide, Attente, Glyphe } from './natif/index.js';
-import { useAdresseVrm, MiseEnService } from './AdresseReception.jsx';
+import { Bouton, Vide, Attente, Glyphe, Groupe, Rangee } from './natif/index.js';
 import { ChoixCompte, Verification } from './RelierCompte.jsx';
-import { codeAMontrer, ilYa, NOM_FOURNISSEUR, lienConfirmationSur, lienEssai, nouveauCodeEssai, sujetEssai, etatEssai, messagerieDeDomaine } from './adresseReception.js';
+import { ROUTE_ADRESSE, gestesMiseEnService, DOC_MISE_EN_SERVICE, codeAMontrer, ilYa, NOM_FOURNISSEUR, lienConfirmationSur, lienEssai, nouveauCodeEssai, sujetEssai, etatEssai, messagerieDeDomaine } from './adresseReception.js';
 import { TUILES, AUTRES, ETAPES_MESSAGERIE, NOM_MESSAGERIE, messagerieProposee, filDuParcours, ecranCourant, compteEtapes, CLE_REPRISE, repriseLue } from './relierMaBoite.js';
+import { requeteJsonBornee } from './requeteJsonBornee.js';
 import './adresse-reception.css';   // ChoixCompte et Verification gardent leur dessin
 import './relier-ma-boite.css';
 
@@ -33,6 +33,65 @@ const lireEssai = (adresse) => { try { const x = JSON.parse(lireLocal(CLE_ESSAI)
 const heure = (ms) => (ms ? new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '');
 const espaceCode = (c) => String(c || '').replace(/(\d{3})(?=\d)/g, '$1 ');
 const adresseSession = () => { try { const s = JSON.parse(lireLocal('vrm_session') || 'null'); return String((s && s.user && s.user.email) || ''); } catch (_) { return ''; } };
+
+// ── La lecture de l'adresse (et sa relecture, page visible) ─────────────────
+// (19 nov., lot emails-mail) Venue de l'ancien parcours (src/AdresseReception.jsx) : LA MÊME lecture, relue 30 s, page visible.
+export function useAdresseVrm(headers) {
+  const [d, setD] = useState(undefined);
+  const [luA, setLuA] = useState(0);
+  const [manuel, setManuel] = useState(false);
+  const [maintenant, setMaintenant] = useState(Date.now());
+  const auth = useRef(headers); auth.current = headers;
+  const enCours = useRef(null);
+  const appeler = useCallback(async (methode = 'GET', corps) => {
+    enCours.current?.abort();
+    const controle = new AbortController(); enCours.current = controle;
+    try {
+      const h = typeof auth.current === 'function' ? auth.current() : (auth.current || {});
+      const r = await requeteJsonBornee(ROUTE_ADRESSE, { method: methode, cache: 'no-store', signal: controle.signal, headers: { ...h, ...(corps ? { 'Content-Type': 'application/json' } : {}) }, body: corps ? JSON.stringify(corps) : undefined });
+      if (!r.ok || !r.json || r.json.ok !== true) return { ko: true, message: (r.json && r.json.message) || '' };
+      setD(r.json); setMaintenant(Date.now()); setLuA(Date.now());
+      return { ok: true };
+    } catch (e) { return { ko: true, abandon: controle.signal.aborted }; }
+    finally { if (enCours.current === controle) enCours.current = null; }
+  }, []);
+  const lire = useCallback(async (parLui = false) => {
+    if (parLui) setManuel(true);
+    const r = await appeler('GET');
+    if (parLui) setManuel(false);
+    if (r.ko && !r.abandon) setD((x) => (x === undefined ? null : x));
+    return r;
+  }, [appeler]);
+  useEffect(() => {
+    lire();
+    const t = setInterval(() => { if (document.visibilityState === 'visible') lire(); else setMaintenant(Date.now()); }, 30000);
+    const retourPage = () => { if (document.visibilityState === 'visible') lire(); };
+    document.addEventListener('visibilitychange', retourPage);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', retourPage); enCours.current?.abort(); };
+  }, [lire]);
+  return { d, setD, lire, appeler, luA, manuel, maintenant, setMaintenant };
+}
+
+// Pas encore ouverte, vue du PROPRIÉTAIRE : ce qui manque (états de la route).
+function MiseEnService({ m }) {
+  const g = gestesMiseEnService(m);
+  const MOT = { fait: tr('relier.mes.fait'), 'a-faire': tr('relier.mes.afaire'), 'a-verifier': tr('relier.mes.averifier') };
+  return (
+    <div className="vrm-ar-mes" data-mise-en-service="">
+      <p className="vrm-pv-note">{tr('relier.mes.phrase')}</p>
+      <ol className="vrm-ar-mes-liste">
+        {g.map((x) => (
+          <li key={x.id} data-geste={x.id} data-geste-etat={x.etat}>
+            <span className="vrm-ar-mes-titre">{x.titre}</span>
+            <span className="vrm-ar-mes-etat">{MOT[x.etat]}</span>
+            <span className="vrm-ar-mes-detail">{x.detail}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="vrm-pv-note">{tr('relier.mes.doc')} <code>{DOC_MISE_EN_SERVICE}</code></p>
+    </div>
+  );
+}
 
 async function copier(texte) {
   try { await navigator.clipboard.writeText(texte); return true; } catch (_) { /* repli ci-dessous */ }
@@ -115,7 +174,11 @@ function CodeEnDirect({ code, maintenant, luA }) {
 
 // ══ LE PARCOURS ═══════════════════════════════════════════════════════════════
 export default function RelierMaBoite({ headers, comptes = [], uid = '', onChoisir, boites = [], lireDernier, onRelie, onPret, onBoite, proprio = false }) {
-  const { d, lire, luA, manuel, maintenant, setMaintenant } = useAdresseVrm(headers);
+  const { d, setD, lire, appeler, luA, manuel, maintenant, setMaintenant } = useAdresseVrm(headers);
+  // Les réglages de l'adresse (19 nov. : un seul parcours, ceux de l'ancien vivent ICI), sur les MÊMES gestes de la
+  // MÊME route : POST { geste: 'actif', actif } et POST { geste: 'remplacer' } — sur SON toucher seulement.
+  const [envoi, setEnvoi] = useState('');
+  const [retour, setRetour] = useState('');
   const pret = !!(d && d.pret);
   const adresse = pret ? String(d.adresse || '') : '';
   useEffect(() => { if (d !== undefined && onPret) onPret(d === null ? null : !!(d && d.pret)); }, [d, onPret]);
@@ -174,6 +237,22 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
   };
   const recommencer = (vers = 'essai') => { const cd = nouveauCodeEssai(); setEssai(null); ecrireLocal(CLE_ESSAI, null); setPrepare(cd); setRelies(new Set()); aller(vers); };
 
+  const basculer = async (actif) => {
+    if (envoi || !d) return;
+    const avant = d;
+    setEnvoi('actif'); setRetour(''); setD({ ...d, actif });
+    const r = await appeler('POST', { geste: 'actif', actif });
+    if (r.ko) { setD(avant); setRetour(r.message || tr('relier.reglages.ko')); }
+    setEnvoi('');
+  };
+  const remplacer = async () => {
+    if (envoi) return;
+    setEnvoi('remplacer'); setRetour('');
+    const r = await appeler('POST', { geste: 'remplacer' });
+    setEnvoi('');
+    if (!r.ko) { setMessagerie(''); recommencer('adresse'); }
+    setRetour(r.ko ? (r.message || tr('relier.reglages.ko')) : tr('relier.reglages.remplacee'));
+  };
   const etat = d === undefined ? 'lecture' : d === null ? 'pas-su' : !d.pret ? 'pas-prete' : d.actif === false ? 'off' : 'active';
   const nomM = NOM_MESSAGERIE[messagerie] || tr('relier.taMessagerie');
   const { n, total } = compteEtapes(fil, i);
@@ -293,6 +372,15 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
           {plein}
           {precedent ? <Bouton variante="texte" onClick={() => aller(precedent.id)} attrs={{ 'data-precedent': precedent.id }}>{tr('relier.retour')}</Bouton> : null}
         </div> : null}
+        <details className="n-relier-reglages" data-bloc="reglages-adresse">
+          <summary>{tr('relier.reglages.titre')}</summary>
+          <Groupe pied={d.actif === false ? tr('relier.reglages.offPied') : ''}>
+            <Rangee titre={tr('relier.reglages.active')} interrupteur={{ actif: d.actif !== false, onChange: basculer, attrs: { 'data-interrupteur-adresse': d.actif === false ? '0' : '1', 'aria-label': tr('relier.reglages.active') } }} indisponible={!!envoi}/>
+          </Groupe>
+          <Bouton variante="destructif" large chargement={envoi === 'remplacer'} confirmation={tr('relier.reglages.remplacerConfirmer')} onClick={remplacer} attrs={{ 'data-remplacer': '' }}>{tr('relier.reglages.remplacer')}</Bouton>
+          <p className="n-relier-note">{tr('relier.reglages.remplacerNote')}</p>
+          {retour ? <p className="n-relier-note" role="status" data-retour="">{retour}</p> : null}
+        </details>
       </> : null}
     </div>
   );

@@ -104,6 +104,13 @@
 .n-relier-plein-lien:active { filter: brightness(.92); }
 .n-relier-plein-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
 
+/* Les réglages de l'adresse, repliés sous le parcours. */
+.n-relier-reglages { display: grid; gap: 10px; }
+.n-relier-reglages > summary { display: flex; align-items: center; min-height: 44px; padding: 0 4px; font: var(--n-t-second-fort); color: var(--n-accent); cursor: pointer; list-style: none; }
+.n-relier-reglages > summary::-webkit-details-marker { display: none; }
+.n-relier-reglages[open] > summary { color: var(--n-encre-2); }
+.n-relier-reglages .n-groupe { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .n-relier-ecran, .n-relier-fleche, .n-relier-sc-curseur, .n-relier-roue { animation: none; }
   .n-relier-barre i { transition: none; }
