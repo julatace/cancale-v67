@@ -90,7 +90,10 @@ function juger(depot) {
     dit(new RegExp(`:root\\[data-theme="dark"\\] \\[data-espace="${e}"\\]\\s*\\{\\s*--sb-aplat`).test(css), `S2 [data-espace="${e}"] pose son aplat (nuit)`);
   }
   const app = lire('src/App.jsx'), gardes = lire('src/ecransGardes.jsx');
-  dit(/className="vrm-app-shell"[^>]*data-espace=\{espaceDe\(tab, BAR_GROUPE\)\}/.test(app) && /<main className="vrm-main"[^>]*data-espace=\{espaceDe\(tab, BAR_GROUPE\)\}/.test(app), 'S2 la coque et <main> portent data-espace');
+  // (19 nov., « VRM natif », décision de Julien : « ça charge plus vite entre les onglets ») La RACINE de la coque ne porte
+  // plus `data-espace` : un attribut qui suit l'onglet sur la racine restylait toute la coque à chaque toucher. Seul <main>
+  // (dont le contenu change de toute façon) le porte ; l'aplat de l'espace se lit sur lui et sur l'écran gardé.
+  dit(/className="vrm-main" attrs=\{\{[^}]*'data-espace': espaceDe\(tab, BAR_GROUPE\)/.test(app) && !/className="vrm-app-shell"[^>]{0,400}data-espace/.test(app), 'S2 <main> porte data-espace, la racine de la coque non (19 nov.)');
   dit(/setAttribute\('data-espace', espaceDe\(tab\)\)/.test(gardes), 'S2 la racine de chaque écran gardé porte data-espace');
 
   // S3 — l'ordre de la cascade, le mouvement réduit.
