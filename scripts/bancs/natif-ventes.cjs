@@ -120,7 +120,7 @@ function mesure(src) {
         if (im) return im.complete && im.naturalWidth > 0 ? 'photo' : 'vide'; return vg.querySelector('svg path, svg use, svg circle, svg rect') ? 'icone' : 'vide'; })(),
       morceaux: [...r.querySelectorAll('.n-rangee-sous-texte, .n-rangee-note, .n-rangee-detail')].flatMap((e) => e.textContent.split(' · ').map((x) => x.trim()).filter(Boolean)),
       ecart: t && v ? Math.round(R(v).left - R(t).right) : null,
-      lTitre: t ? Math.round(t.getBoundingClientRect().width) : 0, lSous: (() => { const x = r.querySelector('.n-rangee-sous-texte'); return x ? Math.round(x.getBoundingClientRect().width) : 0; })(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom), larg: Math.round(R(r).width), gauche: Math.round(R(r).left) }; });
+      lTitre: t ? Math.round(t.getBoundingClientRect().width) : 0, lSous: (() => { const x = r.querySelector('.n-rangee-sous'); const pl = x && x.querySelector('.n-plaque'); return x ? Math.round(x.getBoundingClientRect().width - (pl ? pl.getBoundingClientRect().width : 0)) : 0; })(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom), larg: Math.round(R(r).width), gauche: Math.round(R(r).left) }; });
   const seg = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente [role="tab"], [data-vn="ventes"] .n-segmente button')].filter(vis).map((b) => b.textContent.replace(/\s+/g, ' ').trim());
   const barre = [...document.querySelectorAll('.n-onglets, .vrm-tabbar, nav.v2-barre, [data-v2-barre]')].filter(vis).map((b) => Math.round(R(b).top));
   const hautBarre = barre.length ? Math.min(...barre) : innerHeight;

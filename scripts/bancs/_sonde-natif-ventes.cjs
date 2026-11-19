@@ -8,6 +8,7 @@ const { ouvrir, base, srv, PORT, chromium } = P;
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const W = Number(process.env.W || 390);
   const { ctx, pg } = await ouvrir(nav, { W, sombre: false, b: base(), url: '/?tab=ventes' });
+  if (W === 1280) await pg.setViewportSize({ width: 1280, height: 800 });
   const t0 = Date.now(); while (Date.now() - t0 < 40000 && !(await pg.evaluate(() => !!document.querySelector('[data-vn-liste] [data-vn-rang]')))) await pg.waitForTimeout(400);
   await pg.waitForTimeout(1500);
   const cdp = await ctx.newCDPSession(pg); await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
@@ -21,6 +22,7 @@ const { ouvrir, base, srv, PORT, chromium } = P;
       if (props) console.log((r.rule.layers || []).map((l) => l.text).join('>') + ' | ' + r.rule.selectorList.text.slice(0, 140) + ' { ' + props.slice(0, 300) + ' }');
     }
   }
+  console.log('\nANCETRES', JSON.stringify(await pg.evaluate(() => { const out = []; for (let e = document.querySelector('[data-vn-liste]'); e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); const r = e.getBoundingClientRect(); out.push([e.tagName + '.' + String(e.className).slice(0, 40) + (e.id ? '#' + e.id : ''), Math.round(r.left), Math.round(r.width), cs.paddingLeft, cs.paddingRight, cs.marginLeft, cs.maxWidth]); } return out; }), null, 0));
   console.log('\nRECHERCHES', await pg.evaluate(() => [...document.querySelectorAll('[data-n-recherche], input[type=search]')].map((e) => e.tagName + ':' + (e.getAttribute('placeholder') || e.querySelector('input')?.placeholder || '') + ':' + e.getBoundingClientRect().top)));
   await nav.close(); srv.close(); process.exit(0);
 })();
