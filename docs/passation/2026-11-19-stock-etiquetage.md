@@ -80,7 +80,7 @@ aucun drapeau du navigateur ne touche un numéro. Le DOM d'avant (bancs `vrm_ban
 - Banc `fiche-directe.cjs` : sa base reçoit un meuble et trois paires rangées, le chemin Stock passe par « Paires » :
   « un toucher ouvre SA fiche » vert à 390 et 1512 (S5 « Prix partout », rouge sans lien avec ce lot).
 - Banc `stock-rangement.cjs` mis au design (meubles d'entrée, séance au meuble dessiné, plus de colonne « à droite ») :
-  touchers 2→2 · 20→11 · 2→1 · 6→3, aucun N° changé.
+  touchers 2→2 · 20→11 · 2→1 · 5→3 (le « ⋯ » de la fiche d'avant a disparu avec la fiche directe), aucun N° changé ; vert à 390 clair et sombre, 1512, 375 « Très grand ».
 - Audits verts : traduction, tdz, variables, identite, configuration-depart, quoi-de-neuf, icones, pas-ranger-achat,
   parametres, centre-aide, numero-ecrit, numeros-lettres, studio, textes-courts, ligne-glissable. `coque-parametres`
   (26/27) et le banc `configuration-depart` (notifications 8 sur 9, « Ma configuration ») : rouges IDENTIQUES sur le train

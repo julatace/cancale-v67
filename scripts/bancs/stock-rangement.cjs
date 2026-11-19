@@ -237,7 +237,9 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       res.p3 = r.touchers();
       await r.toucher('[data-case-num="178"]');
       // La fiche s'ouvre ; « Déplacer » vit dans sa feuille « ⋯ » (src/FichePaire.jsx, 16 nov.).
-      await r.toucher('[data-fd-plus-ouvrir]');
+      // (19 nov., fiche directe) « Déplacer » est posé dans la fiche (sa place « contexte ») ; « ⋯ » seulement s'il n'y est pas.
+      await r.pg.waitForTimeout(600);
+      if (!(await r.pg.locator('[data-fiche-ranger="deplacer"]').locator('visible=true').count())) await r.toucher('[data-fd-plus-ouvrir]');
       await r.toucher('[data-fiche-ranger="deplacer"]');
       await r.toucher(caseLibreAvant('mB'));
     }
