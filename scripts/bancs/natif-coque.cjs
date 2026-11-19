@@ -185,6 +185,13 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     const encore = await pg.evaluate(() => !!document.querySelector('[role="dialog"][aria-modal="true"]'));
     dit(encore || !!c, `K9 ${t} : la feuille fermée, le toast revient (une seule fois)`, { encore, toast: c });
     await pg.evaluate(() => { const x = document.querySelector('[data-toast-numeros] button'); if (x) x.click(); });
+    await pg.waitForTimeout(400);
+    // « Fermer » une fois ⇒ le même message ne revient jamais (le même signal rejoué, comme après un rechargement).
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: '3 nouvelles paires numérotées · N°1, 2, 3' } })));
+    await pg.waitForTimeout(500);
+    const d = await vu();
+    const garde = await pg.evaluate(() => { try { return localStorage.getItem('vrm_toast_numeros_vu'); } catch (_) { return null; } });
+    dit(!d && !!garde, `K9 ${t} : fermé une fois, le même message ne revient pas (mémorisé : rechargement compris)`, { toast: d, garde });
   }
   erreursTout.push(...erreurs);
   await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);

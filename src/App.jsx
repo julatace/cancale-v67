@@ -16351,7 +16351,10 @@ async function alerteLocale(title, body, vers){
 // (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
 const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
 let _toastNumeros = null; const _abToastNumeros = new Set();
-function poserToastNumeros(t) { _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
+// Une fois fermé (ou fini), le même message ne revient JAMAIS, rechargement compris (mémoire de cet appareil, un confort).
+const CLE_TOAST_NUMEROS_VU = 'vrm_toast_numeros_vu';
+const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUMEROS_VU) === String(m); } catch (_) { return false; } };
+function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
 const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
 function ToastNumeros() {
@@ -16368,7 +16371,7 @@ function ToastNumeros() {
     return () => mo.disconnect();
   }, [t]);
   if (!t || cache) return null;
-  const fin = () => { _toastNumeros = null; setT(null); };
+  const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
   return <div data-toast-numeros=""><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
@@ -51666,7 +51669,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         //    (les cases, « — » quand ce n'est pas lu), `colisJournee` (le N° par identité), `listeCodesRetrait()` et
         //    `vrm_colis_retirer` (la règle `pickupUnion`), les cartes `jobs` avec LEUR geste (`avant`, `tab`). Rien n'est
         //    recalculé : on choisit, on range, on nomme.
-        if (designV2 && !premierJour) {
+        // (19 nov., intégration — Julien a refusé l'ancienne « Ma journée ») L'écran natif PARTOUT, première ouverture comprise.
+        if (designV2) {
           const Tc = (id) => T.find((x) => x.id === id);
           const xE = Tc('envoyer'), xR = Tc('retirer'), xM = Tc('messages'), xP = Tc('prix');
           const lu = (x) => !!(x && !x.pasSu && x.t && !baseKO);
@@ -67876,7 +67880,7 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={tab === 'ventes' && ongletColis !== 'toutes'} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || tab === 'annonces' || tab === 'messages'} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.

@@ -120,7 +120,11 @@ function useTitreReduit(refBarre, refTitre) {
     let t = 0;
     const taille = () => { clearTimeout(t); t = setTimeout(poser, 150); };
     window.addEventListener('resize', taille, { passive: true });
-    return () => { clearTimeout(t); window.removeEventListener('resize', taille); if (obs) obs.disconnect(); };
+    // (19 nov., intégration) La barre change de hauteur après le premier rendu (polices, zone sûre, recherche) : la marge de
+    // l'observateur était prise trop tôt et la barre se croyait « réduite » en haut de l'écran (petit titre + grand titre).
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(taille) : null;
+    if (ro) ro.observe(barre);
+    return () => { clearTimeout(t); window.removeEventListener('resize', taille); if (ro) ro.disconnect(); if (obs) obs.disconnect(); };
   }, [refBarre, refTitre]);
 }
 
