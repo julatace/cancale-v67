@@ -56,7 +56,6 @@ import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urg
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
 import ConfortCoque from './ConfortCoque.jsx';
 import CapteNotif from './capteNotif/CapteNotif.jsx';   // (14 nov., ext. 5.377) « L'extension a capté » — le toast
-import FeuilleArrivee from './capteNotif/FeuilleArrivee.jsx';   // (19 nov., ext. 5.409) « Depuis ta dernière visite » — la feuille d'arrivée
 import { brancherExtensionCapte } from './capteNotif/regle.js';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
 import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
 import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
@@ -289,8 +288,6 @@ const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
 const AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));   // (19 nov. soir) Paramètres → Automatisations
-import VentesTableau from './natif/ecrans/VentesTableau.jsx';
-import AchatsTableau from './natif/ecrans/AchatsTableau.jsx';   // (19 nov. soir) Achats à l'ordinateur   // (19 nov. soir) Ventes à l'ordinateur : le tableau de travail
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -350,6 +347,14 @@ function aLaDemandeDiscret(charger) {
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+// (19 nov., intégration — budget de démarrage) Hors du démarrage : la feuille « Depuis ta dernière visite » (ext. 5.409),
+// les tableaux de travail de l'ordinateur et Ventes natif, chargés quand ils s'affichent.
+const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
+const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
+const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
+const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
+const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
+const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('./OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
@@ -628,7 +633,6 @@ import { GuideDemarrage, BandeauExemple, CadreExemple, ChoixNumerotation, Verifi
 const ParcoursArrivee = aLaDemandeFeuille(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.ParcoursArrivee })));
 const CarteParcours = aLaDemandeDiscret(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.CarteParcours })));
 // (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
-import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
 import { CLE_ECRANS_VUS, poserStockageEcransVus, ecranNouveau, badgeAvecNouveau, abonnerEcransVus } from "./ecransVus.js";
 import { CLE_BILAN_MINUTE } from "./bilanMinute.js";
 import { CLE_PREMIER_COLIS, EVT_BORDEREAU_IMPRIME, bordereauxDejaImprimes } from "./premierColis.js";
@@ -765,7 +769,6 @@ import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau
 import { cochesEffectives, basculerCoche, memeQueDefaut, emplacementDe as emplacementVente, etapesRoute, etapesFicheVente, cleRecherche, contientRecherche } from "./ventesVerre.js";
 // (19 nov., « VRM natif ») Le fond de l'écran Ventes : les rangées en objets (src/ventes/modeleVentes.js), remplies ici.
 import { rangeeEnvoyer, rangeeRoute, ecartNomme, pleinImprimer } from "./ventes/modeleVentes.js";
-import VentesNatif from "./natif/ecrans/Ventes.jsx";
 import { ARegarder } from "./ventes/ARegarder.jsx";   // (16 nov., lot ventes-clair) « N choses à regarder » : les cartes d'information de Ventes dans UN repli
 import { SegmentVentes, HeroVentes, CaseCoche, Emplacement, PleinLarge, EtapesRoute, EtapesVente, DuoMontants, RangeeEntree, IconeV, texteEmplacement, FicheVenteBloc, VoletVente, useGrandEcran } from "./ventes/VentesVerre.jsx";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
