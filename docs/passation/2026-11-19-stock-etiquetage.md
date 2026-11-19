@@ -13,8 +13,9 @@ par un vrai `git merge` avant les grosses étapes et à la fin. Pas de PR, pas d
 ## Ce qui change
 
 ### Le Stock (src/stockV2/StockV2.jsx, design « VRM natif »)
-De haut en bas : « Stock » et « ⋯ » ; le champ « Où est… » (photo et voix dedans, plus collé en haut) ; LE plein
-« Ranger N paires » ; **« À ranger · N »** — une rangée par article (photo, titre, plaque N°, taille) et **« Ranger » au
+De haut en bas : « Stock », « Ranger N » (compact, sur la ligne du titre : visible au premier écran même à 375 px
+« Très grand », sans repousser la liste) et « ⋯ » ; le champ « Où est… » (photo et voix dedans, plus collé en haut) ;
+**« À ranger · N »** — une rangée par article (photo, titre, plaque N°, taille) et **« Ranger » au
 bout** : toucher la rangée ouvre la séance sur CET article (plus de fiche ni de colonne « à droite » ; la fiche est un
 balayage, « Fiche ») ; 5 articles, puis « Voir les N autres » ; puis **Meubles · Paires** (segmenté natif).
 - **Meubles** (l'entrée) : TOUS les meubles, DESSINÉS (src/stockV2/MeubleDessin.jsx) — le bâti à sa couleur, ses
@@ -31,7 +32,8 @@ balayage, « Fiche ») ; 5 articles, puis « Voir les N autres » ; puis **Meubl
   meuble ; « Ranger ici » (le plein de la feuille) ou le toucher de n'importe quelle case. **L'article vole dans sa case**
   (une copie de sa photo, 260 ms, `cubic-bezier(.32,.72,0,1)`), la boîte arrive dans la case, le suivant glisse ;
   un toucher pendant le vol fait arriver le suivant sans reposer l'article ; **mouvement réduit ⇒ aucun vol, un fondu**.
-  « Déplacer » = la même séance, la case actuelle marquée. La liste sous la feuille ne bouge pas pendant la séance.
+  « Déplacer » = la même séance, la case actuelle marquée. La liste et le compte « Ranger N » sous la feuille ne bougent
+  pas pendant la séance (mesuré : CLS 0,15 à 1512 avant, 0 après) ; ils se mettent à jour à la fermeture.
 - Étagère v4 (lot gardé `integration-16nov-finitions-stock-v4`, validé par Julien) : repris `src/etageres/reglages.js`
   (module pur, tel quel) — chaque meuble se dessine selon SES réglages (Cartons · Rayonnage · Plan, couleur du bâti,
   teintes des contenants, « de loin » sans photo). Pas repris : le panneau « Personnaliser », « La pièce » et

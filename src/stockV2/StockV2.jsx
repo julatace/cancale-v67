@@ -27,7 +27,7 @@ import { tr, nombre } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
-import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille } from '../natif/index.js';
+import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
 import MeubleDessin from './MeubleDessin.jsx';
 import './stock-v2.css';
 import './meubles.css';
@@ -396,7 +396,10 @@ export default function StockV2({ s }) {
 
       {chercheVide ? <>
         {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
-        {s.nombres.enLigne == null ? <p className="sm-sans" data-stock-actuelles={s.nombres.etat}>{s.nombres.attente ? tr('stock.jeLisAnnonces') : tr('sr.pasLu')}</p> : null}
+        {/* Pendant la lecture, le squelette a la FORME de « À ranger » (5 rangées) : la liste arrive à sa place, les meubles
+            ne sautent pas (mesuré au banc stock-rangement : CLS 0,31 quand la liste arrivait sur une ligne de texte). */}
+        {s.nombres.enLigne == null && s.nombres.attente ? <div data-stock-actuelles={s.nombres.etat} aria-busy="true" aria-label={tr('stock.jeLisAnnonces')}><Attente forme="rangees" n={A_RANGER_MONTRES} vignette={56} titre/></div> : null}
+        {s.nombres.enLigne == null && !s.nombres.attente ? <p className="sm-sans" data-stock-actuelles={s.nombres.etat}>{tr('sr.pasLu')}</p> : null}
         {nonRangees.length ? (
           <Groupe titre={tr('sm.aRanger', { n: nombre(nonRangees.length) })} action={imprimer} attrs={{ 'data-sr-groupe': 'aranger', 'data-sm-a-ranger': nonRangees.length }}>
             {aRangerVus.map(ligneARanger)}
