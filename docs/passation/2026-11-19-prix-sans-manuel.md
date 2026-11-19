@@ -139,7 +139,7 @@ la LECTURE que l'extension fait déjà (`GET` de la même adresse, étape 1 de l
 - `vinted-sync-extension/background.js` : `prixAttenteTick` et le bloc recopié ; alarme `vrm-relais` et visite.
 - `src/ecrans/Leboncoin.jsx`, `src/ecrans/Ebay.jsx`, `src/ModelesDescription.jsx` : photos, puces, bouton éteint.
 - `api/_lib/securite-compte.js`, `src/securiteCompte.js` : l'issue d'une baisse en attente dans « Ce que VRM a fait ».
-- Zips régénérés une fois (`node scripts/zip-extension.cjs`).
+- Zips NON commités ici (consigne du coordinateur : un autre chantier touche aussi l’extension 5.409.0) : à régénérer UNE fois à l’intégration (`node scripts/zip-extension.cjs`) ; d’ici là `audit-extension-zip` est rouge sur cette branche seule (vert constaté avec les zips régénérés localement).
 
 ## Preuves
 
