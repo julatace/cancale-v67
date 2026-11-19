@@ -152,6 +152,14 @@ jamais mises en avant, 6 au plus — `pistesLiaison`).
 
 ## 7. Ce qui reste
 
+- **Budget du démarrage** : 1 981 Ko (≤ 1 982) avant d'amener `main` le 19 nov. au soir ; **1 985 Ko** après (37 commits de
+  `main` + la fondation native, pas encore sur `main`). Les lectures du parcours (`pairesVintedLiaison`, `pistesLiaison`) sont
+  sorties d'App.jsx vers `src/liaisonDonnees.js` (chargé avec le parcours) ; ce qui reste au démarrage est l'hôte
+  (`LiaisonCoque`, `ACTIONS_LIAISON`, `donnerNumeroLiaison` — laissé en place : il touche la règle des numéros et aucun banc ne
+  l'exécute encore) et la ligne d'entrée. À trancher à l'intégration (relevé daté, comme les précédents, ou une coupe ailleurs).
+- `garde-ecrans` est rouge sur l'arbre fusionné avec la fondation native (« l'entrée Ventes est dans la navigation » : la
+  coque native a remplacé la navigation que le banc cherche) — au chantier de la fondation, rien dans ce parcours.
+
 - **Garder le N° de l'annonce quand l'article a une annonce Vinted** : refusé et expliqué (renuméroter une fiche Vinted
   touche prix d'achat, case, notes — à faire sur la fiche). À décider avec le chantier « annonces à égalité ».
 - **eBay « que sur ce site »** : notée, sans N° neuf (son N° vient de son SKU ou de l'écran Annonces).
