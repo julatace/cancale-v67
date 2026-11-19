@@ -20,7 +20,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
-import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES } from '../articles/modele.js';
+import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
@@ -103,12 +103,16 @@ export async function lireAnnoncesEgalite(accounts) {
 export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', onEcranSite = null }) {
   const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
+  // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
+  const [majLe, setMajLe] = React.useState(undefined);
+  const [relit, setRelit] = React.useState(false);
+  const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) setLu(r); }).catch(() => { if (vivant) setLu(null); });
+    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, tic]);
@@ -158,8 +162,35 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     if (!sel.length) { toast(tr('egalite.action.vintedSeul')); return; }
     demanderActionAnnonces(k, sel);
   };
+  // (19 nov. soir) Le TABLEAU de l'ordinateur : les articles au site et au compte choisis, chacun avec SON état (`statutTableau`) ;
+  // « Dorment » = la règle du segment (`filtrerArticles` etat 'dorment'), au même site et au même compte.
+  const cpts = modele ? comptesDesArticles(modele.articles, filtreT.site) : [];
+  const cptChoisi = filtreT.compte ? cpts.find((c) => c.cle === filtreT.compte) || null : null;
+  const siteT = cptChoisi ? cptChoisi.site : filtreT.site, compteT = cptChoisi ? cptChoisi.compte : '';
+  const lignesT = React.useMemo(() => {
+    if (!modele) return modele;
+    const dort = filtreT.dort === 'dorment' ? new Set(filtrerArticles(modele.articles, { ...opts, site: siteT, compte: compteT, etat: 'dorment' }).map((a) => a.cle)) : null;
+    const out = [];
+    for (const a of trierArticles(modele.articles)) { if (dort && !dort.has(a.cle)) continue; const st = statutTableau(a, { site: siteT, compte: compteT }); if (st) out.push({ a, statut: st }); }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modele, siteT, compteT, filtreT.dort, seuil]);
+  const nomCompte = (c) => (c.pseudo || ('#' + c.compte)) + (filtreT.site === 'tous' && sites.length > 1 ? ' · ' + nomSite(c.site) : '');
+  const tableau = {
+    articles: lignesT, majLe, rafraichit: relit, onRafraichir: () => { setRelit(true); setTic((t) => t + 1); },
+    compte: cptChoisi ? nomCompte(cptChoisi) : '',
+    onAutomatisations: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} },
+    filtres: [
+      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
+      ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
+        options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
+      { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => setFiltreT((f) => ({ ...f, dort: v })),
+        options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }] },
+    ],
+  };
   return (
-    <VueAnnonces articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

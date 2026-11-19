@@ -1,0 +1,52 @@
+/* ── src/natif/ecrans/automatisations.css — « Automatisations » en deux volets (19 nov. soir). Jetons seulement. */
+@layer vrm-natif {
+  .n-au-volets { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; padding: 0 var(--n-marge); align-items: start; }
+  .n-au-volet-liste .n-groupe { margin-inline: 0; }
+  .n-au-volet-detail { min-width: 0; border-radius: var(--n-r-carte); background: var(--n-carte); border: .5px solid var(--n-trait); }
+  .n-au-detail { display: flex; flex-direction: column; min-width: 0; }
+  .n-poussee .n-au-detail { padding: 0 var(--n-marge); }
+  .n-au-tete { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px 12px; border-bottom: .5px solid var(--n-trait); }
+  .n-au-tete-texte { flex: 1 1 auto; min-width: 0; }
+  .n-au-titre { margin: 0; font: var(--n-t-barre); color: var(--n-encre); }
+  .n-au-phrase { margin: 4px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-au-phrase[data-au-ton="ambre"] { color: var(--n-ambre); }
+  .n-au-compte { padding: 4px 20px 0; }
+  .n-au-onglets { display: flex; gap: 4px; padding: 8px 20px 0; border-bottom: .5px solid var(--n-trait); }
+  .n-au-onglet { appearance: none; -webkit-appearance: none; min-height: var(--n-cible); margin: 0 0 -1px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent;
+    background: transparent; color: var(--n-encre-2); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-au-onglet[aria-selected="true"] { color: var(--n-accent); border-bottom-color: var(--n-accent); }
+  .n-au-corps { padding: 4px 20px 20px; }
+  .n-au-section { padding: 16px 0 4px; }
+  .n-au-section + .n-au-section { border-top: .5px solid var(--n-trait); }
+  .n-au-section-titre { margin: 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .04em; }
+  .n-au-reglage { display: flex; align-items: center; gap: 16px; min-height: var(--n-cible); padding: 8px 0; }
+  .n-au-reglage-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-au-reglage-nom { font: var(--n-t-second); color: var(--n-encre); }
+  .n-au-reglage-phrase { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-au-reglage-controle { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  .n-au-choix { min-height: var(--n-cible); min-width: 160px; padding: 0 12px; border-radius: var(--n-r-bouton); border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); }
+  .n-au-nombre { display: inline-flex; align-items: center; gap: 6px; }
+  .n-au-nombre-champ { width: 72px; min-height: var(--n-cible); box-sizing: border-box; padding: 0 10px; border-radius: var(--n-r-bouton); border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); text-align: right; }
+  .n-au-nombre-unite { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-au-messages { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+  .n-au-message { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--n-r-carte); border: .5px solid var(--n-trait); background: var(--n-carte); }
+  .n-au-message[data-au-message-actif="0"] .n-au-message-corps { color: var(--n-encre-2); }
+  .n-au-message-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .n-au-message-corps { font: var(--n-t-second); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .n-au-message-etiquette { align-self: flex-start; padding: 0 8px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende); }
+  .n-au-icone { border-color: transparent; background: transparent; color: var(--n-encre-2); font: var(--n-t-corps); }
+  .n-au-edition { padding: 0 var(--n-marge); }
+  .n-au-zone { width: 100%; box-sizing: border-box; padding: 12px; border-radius: var(--n-r-carte); border: .5px solid var(--n-trait); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); resize: vertical; }
+  .n-au-etat { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
+  .n-au-etat-point { width: 6px; height: 6px; border-radius: var(--n-r-rond); background: currentColor; }
+  .n-au-etat[data-au-etat="on"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-au-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+  .n-au-pied .n-bouton-bloc-large { width: auto; min-width: 240px; }
+  .n-au-paliers { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+  .n-au-palier { display: flex; align-items: center; gap: 8px; }
+  .n-au-palier-message { flex: 1 1 auto; min-width: 0; min-height: var(--n-cible); box-sizing: border-box; padding: 0 12px; border-radius: var(--n-r-bouton); border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); }
+  .n-au-apercu { margin: 4px 0 0; font: var(--n-t-second); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-au-sites { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+  .n-au-site { padding: 2px 10px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); }
+  .n-au-site[data-au-site-ok="1"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+}
