@@ -137,3 +137,40 @@ plus|montee`).
   `ecrans-verre-2` (Argent et Paramètres « en blanc sur le fond ») ; `fiche-partout` 52 KO (42 sur main) — des rangées
   d'avant introuvables (sélecteurs du Studio) et des délais « fiche posée en N ms » sur une machine saturée ; les « toucher
   la ligne ouvre LA fiche » à 390, rouges sur main, y passent. `design-v2` arrêté par la limite de 2 h (pas de verdict).
+
+## 19 nov. au soir — la fiche refaite en FICHE PRODUIT
+
+Julien, sur la planche 3102 : « c'est de la merde la fiche de la paire » (photo de 124 px à côté d'un gros titre, grandes
+cases blanches « — à poser » : « on dirait l'app Réglages »). Puis : « il faut que ça rende bien sur iPhone et ordi ».
+Direction D « fiche produit » (validée le 15 nov., `docs/design/maquettes-validees/fiche/`) dans le style « entre Vintex
+et le natif » (`docs/design/NATIF.md` §2 bis). Le train `origin/claude/integration-19nov` a été fusionné d'abord (vrai merge).
+
+- `src/natif/ecrans/Fiche.jsx` (vue pure) + `src/natif/fiche.css` (couche `vrm-natif`, jetons seulement) :
+  1. **Galerie** pleine largeur, carrée (au plus 42 % de la hauteur ; 34 % si le titre est très long), toutes les photos
+     en carrousel avec points, toucher = plein écran ; plaque N° sur la photo. Ordinateur : galerie à gauche (45 %),
+     collée en défilant, miniatures dessous.
+  2. **En-tête** : titre jamais coupé, étiquettes douces (état · « En ligne 9 jours » / « Vendue le … » · « Taille 40 »).
+  3. **Prix en très grand**, pastilles « mini 70 € » « achat 40 € » « +45 € » ; chacune se touche (achat, mini : sur place).
+     Une valeur qui se corrige et manque = « Ajouter » en bleu ; sinon « — » et sa raison. Jamais 0.
+  4. **UN plein** contextuel + « Choisir une action ▾ » (toutes les actions dans une feuille, « Vendu ailleurs » compris) —
+     en haut, à côté du prix ; au téléphone sur UNE rangée (« Actions ▾ »). Plus de grille de gestes, plus de « ⋯ ».
+  5. **Informations** en tableau à filets (libellé gris / valeur, rangées 44) : place, favoris · vues (et taille / date
+     quand elles ne sont pas sues — sues, elles sont des étiquettes, jamais écrites deux fois).
+  6. **Sites** en tableau : site · compte · prix · vues · favoris · état (téléphone : deux lignes par site ; ordinateur :
+     de vraies colonnes alignées, sous-grille). Toucher = l'annonce sur le site.
+  7. **Histoire** en frise fine, dates à gauche, repliée à 3, « Tout voir ».
+- **Les messages passagers ne couvrent plus jamais la fiche** : `src/natif/zoneMessages.js` — la fiche pose une zone DANS
+  sa page, la pile des messages (`Toaster`, App.jsx) s'y range dans le flux (elle pousse la page).
+- **Annonces** (liste unique, `src/ecrans/AnnoncesEgalite.jsx` + `src/natif/ecrans/Annonces.jsx`) : un toucher sur un
+  article numéroté ouvre SA fiche complète (avant : une fiche courte puis « Toute la fiche »).
+- Toutes les photos de l'article : celles de l'annonce Vinted (la série `photos` lue, `numData.stats[id].photos`) puis
+  celles des autres sites.
+- Banc `fiche-directe.cjs` réécrit pour la fiche produit (F2 : prix et pastilles au premier écran, le reste avant
+  1,5 écran ; P2 « Choisir une action » au premier écran ; G : un toucher montre les gestes ; Q2 : 2 écrans au plus) et
+  section **I** — appareils : iPhone 390 × 844 et 430 × 932 en application installée (zone sûre 47 / 34), iPhone 390 en
+  onglet Safari (664 utiles), ordinateur 1512 × 900 et 1280 × 800, clair et sombre : photo pleine largeur sans bande vide,
+  titre et prix jamais coupés, rien sous l'encoche, plein et « Actions » visibles sans défiler, cibles, contrastes, aucun
+  défilement de côté. `PHOTOS_BANC=<dossier>` (design-passe) sert de vraies photos de chaussures (libres, jamais celles
+  d'un vendeur, jamais dans le dépôt).
+- Ventes et Aujourd'hui natifs (autres lots) ouvrent le DÉTAIL de la vente au toucher ; leurs chemins ne sont plus joués
+  par défaut (`CHEMINS=ventes,journee`).
