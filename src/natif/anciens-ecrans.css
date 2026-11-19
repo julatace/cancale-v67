@@ -60,7 +60,7 @@ html[data-theme="dark"] {
   --ap-bleu: var(--n-accent, #409CFF);
   --ap-bleu-vif: #0A84FF;
   --ap-bleu-appui: #0058B8;
-  --ap-bleu-teinte: #5AA9FF;
+  --ap-bleu-teinte: #7DBBFF;
   --ap-plein: var(--n-plein, #0068D6);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
   --ap-teinte: var(--n-teinte, rgb(64 156 255 / .20));
@@ -81,7 +81,7 @@ html:root {
   --sv-verre: var(--ap-carte) !important; --sv-verre-2: var(--ap-carte) !important;
   --sv-verre-barre: var(--ap-matiere) !important;
   --sv-verre-fin: var(--ap-remplir) !important; --sv-verre-fin-bord: transparent !important;
-  --sv-bord: transparent !important; --sv-flou: var(--ap-flou) !important;
+  --sv-bord: transparent !important; --sv-flou: none !important;   /* aucun flou dans le contenu (contrat §1) : les deux barres lisent --ap-flou */
   --sv-ombre: none !important;
   --sv-encre: var(--ap-encre) !important; --sv-encre-2: var(--ap-gris) !important;
   --sv-lien: var(--ap-bleu) !important; --sv-ambre: var(--ap-ambre) !important;
@@ -97,7 +97,7 @@ html:root {
   --sb-porcelaine: var(--ap-carte) !important; --sb-porcelaine-2: var(--ap-carte) !important;
   --sb-porcelaine-degrade: linear-gradient(var(--ap-carte), var(--ap-carte)) !important;
   --sb-creux: var(--ap-remplir) !important; --sb-socle: var(--ap-fond) !important;
-  --sb-verre: var(--ap-matiere) !important; --sb-verre-plan: var(--ap-carte) !important; --sb-verre-flou: var(--ap-flou) !important;
+  --sb-verre: var(--ap-matiere) !important; --sb-verre-plan: var(--ap-carte) !important; --sb-verre-flou: none !important;
   --sb-puits: var(--ap-remplir) !important; --sb-puits-ombre: none !important;
   --sb-encre: var(--ap-encre) !important; --sb-encre-2: var(--ap-gris) !important;
   --sb-diode: var(--ap-bleu-vif) !important; --sb-lien: var(--ap-bleu) !important;
@@ -363,4 +363,15 @@ html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px 
 html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 /* L'aide : le numéro d'une étape est posé sur le bleu plein — blanc (il était à l'encre : 3,55:1). */
 html body .vrm-aide-etape-n { color: var(--ap-sur-plein) !important; }
+/* « Qui dorment » : la case à cocher d'une ligne fait 44 px de large au doigt (36 mesurés). */
+html body .vrm-qd-coche-zone { min-width: 44px !important; justify-content: center !important; }
+/* MA bulle et le bouton principal d'un e-mail : le plein du natif, blanc dessus (la nuit, le blanc tombait à 3,65:1 sur #0A84FF,
+   et à 1:1 — blanc sur blanc — sur « Voir le colis à retirer »). */
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { background: var(--ap-plein) !important; background-image: none !important; color: var(--ap-sur-plein) !important; border-color: transparent !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle .vrm-bulle-t { color: var(--ap-sur-plein) !important; }
+html body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-principal { background: var(--ap-plein) !important; background-image: none !important; color: var(--ap-sur-plein) !important; border-color: transparent !important; box-shadow: none !important; }
+html body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-principal * { color: inherit !important; }
+/* La connexion : « CGU », « CGV » font 44 px de large au doigt ; « Se connecter avec l'iPhone » sur son remplissage. */
+html body .vrm-cx-boite > nav > a { display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 44px !important; }
+html body .vrm-cx-boite .vrm-cx-qr > summary { color: var(--ap-bleu-teinte) !important; }
 }
