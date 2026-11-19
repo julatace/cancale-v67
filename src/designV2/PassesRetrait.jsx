@@ -34,9 +34,9 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
   const rg = rangeeRetrait(x);
   const corps = (
     <>
-      <span className="v2r-photo" aria-hidden="true">{photo || <Icon name="box" size={22}/>}</span>
+      <span className="v2r-photo v2-passe-photo" data-v2-photo-article={photo ? '' : undefined} aria-hidden="true">{photo || <Icon name="box" size={22}/>}</span>
       <span className="v2r-texte">
-        <span className="v2r-titre">{aides.titre(x)}{x.num ? <> <Etiquette num={x.num}/></> : null}</span>
+        <span className="v2r-titre v2-passe-titre">{aides.titre(x)}{x.num ? <> <Etiquette num={x.num}/></> : null}</span>
         <span className={'v2r-limite v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
           {ech ? ech.t : tr('v2.passe.limiteInconnue')}{qr ? ' · QR' : ''}
         </span>

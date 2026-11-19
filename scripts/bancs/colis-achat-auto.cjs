@@ -162,7 +162,7 @@ const lirePasses = () => {
   for (const f of faces) {
     const c = f.querySelector('[data-v2-contenu]'); const im = f.querySelector('.v2-passe-photo img');
     out[f.getAttribute('data-v2-code') || ''] = { etat: c ? c.getAttribute('data-v2-contenu') : null, tx: c ? c.getAttribute('data-v2-contenu-tx') : null, raison: c ? c.getAttribute('data-v2-contenu-raison') : null, compte: c ? c.getAttribute('data-v2-contenu-compte') : null,
-      txt: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', toucher: c ? (c.querySelectorAll('button, a, [role="button"]').length + (c.closest('button, a') ? 1 : 0)) : 0,
+      txt: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', toucher: c ? (c.querySelectorAll('button, a, [role="button"]').length + (c.closest('button:not([data-v2-en-grand]), a') ? 1 : 0)) : 0,   // (19 nov.) la ligne entière ouvre le CODE en grand : ce n'est pas un geste sur le contenu
       titre: ((f.querySelector('.v2-passe-titre') || {}).textContent || '').replace(/\s+/g, ' ').trim(), photo: !!f.querySelector('[data-v2-photo-article]'), src: im ? (im.currentSrc || im.getAttribute('src') || '') : '',
       rg: { codeEtat: f.getAttribute('data-v2-code-etat'), qr: f.getAttribute('data-v2-qr-dispo'), limJour: f.getAttribute('data-v2-limite-jour'), limSource: f.getAttribute('data-v2-limite-source'), titreDe: f.getAttribute('data-v2-titre-de'), transp: f.getAttribute('data-v2-transporteur') },
       relier: f.querySelectorAll('[data-v2-relier]').length, boutons: [...f.querySelectorAll('button')].map((b) => b.textContent.replace(/\s+/g, ' ').trim()) };
