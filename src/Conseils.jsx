@@ -92,7 +92,7 @@ const lirePage = () => ({
 // Visible = une boîte non nulle, dans la fenêtre (entre le haut et la barre du bas),
 // pas caché, pas `inert`, pas désactivé.
 function basReserve() {
-  const nav = document.querySelector('.vrm-mobile-nav');
+  const nav = document.querySelector('[data-n-onglets], .vrm-mobile-nav');
   if (!nav || !nav.getClientRects().length) return 0;
   const r = nav.getBoundingClientRect();
   return r.height > 0 && r.top < window.innerHeight ? Math.max(0, window.innerHeight - r.top) : 0;
@@ -108,7 +108,7 @@ export function cibleVisible(cibles) {
       if (r.width < 4 || r.height < 4) continue;
       const cs = window.getComputedStyle(el);
       if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) continue;
-      const bas = el.closest('.vrm-mobile-nav') ? 0 : basReserve();
+      const bas = el.closest('[data-n-onglets], .vrm-mobile-nav') ? 0 : basReserve();
       if (r.bottom <= 0 || r.top >= window.innerHeight - bas || r.right <= 0 || r.left >= window.innerWidth) continue;
       return el;
     }
@@ -189,10 +189,10 @@ export default function Conseils({ ecran = '', contexte = {}, lire, ecrire, onAc
     if (!el || !el.isConnected) { el = cibleVisible(montre.cibles); elRef.current = el; }
     if (!el || !el.isConnected) { fermer(null); return; }
     const r = el.getBoundingClientRect();
-    const dehors = r.bottom <= 0 || r.top >= window.innerHeight - (el.closest('.vrm-mobile-nav') ? 0 : basReserve());
+    const dehors = r.bottom <= 0 || r.top >= window.innerHeight - (el.closest('[data-n-onglets], .vrm-mobile-nav') ? 0 : basReserve());
     if (dehors) { setPos((p) => (p && p.cache ? p : { ...(p || {}), cache: true })); return; }
     const b = bulle.current.getBoundingClientRect();
-    const p = placerConseil(r, window.innerWidth, window.innerHeight, b.width, b.height, { bas: el.closest('.vrm-mobile-nav') ? 0 : basReserve() });
+    const p = placerConseil(r, window.innerWidth, window.innerHeight, b.width, b.height, { bas: el.closest('[data-n-onglets], .vrm-mobile-nav') ? 0 : basReserve() });
     // Le halo déborde de 6 px autour de la cible, mais jamais hors de l'écran (« Plus »,
     // collé au bord de la barre, aurait un anneau coupé) : il rentre alors sur ce bord.
     const hx0 = Math.max(3, r.left - 6), hy0 = Math.max(3, r.top - 6);

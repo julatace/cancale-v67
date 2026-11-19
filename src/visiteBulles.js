@@ -24,8 +24,8 @@ export const CLE_VISITE = 'vrm_visite_vue';
 // guide de démarrage qui comptent le plus (l'extension, la boîte e-mail), puis
 // « Découvrir avec des exemples ». Ce que la visite ne trouve pas est sauté.
 export const ETAPES_VISITE = [
-  { cle: 'navigation', cible: '.vrm-mobile-nav', titre: 'Tout est en bas', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un toucher.', ou: 'telephone' },
-  { cle: 'navigation', cible: '.vrm-atelier-rail', titre: 'Tout est à gauche', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un clic.', ou: 'ordinateur' },
+  { cle: 'navigation', cible: '[data-n-onglets]', titre: 'Tout est en bas', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un toucher.', ou: 'telephone' },
+  { cle: 'navigation', cible: '[data-n-laterale]', titre: 'Tout est à gauche', texte: 'Ta journée, tes annonces, tes ventes et tes colis, d’un clic.', ou: 'ordinateur' },
   { cle: 'extension', cible: '[data-guide-demarrage] [data-guide-etape="extension"]', titre: 'D’abord, l’extension', texte: 'Elle lit tes ventes et tes colis sur Vinted, pour toi.' },
   { cle: 'emails', cible: '[data-guide-demarrage] [data-guide-etape="emails"]', titre: 'Puis ta boîte e-mail', texte: 'Bordereaux et codes de retrait arrivent alors tout seuls ici.' },
   { cle: 'exemple', cible: '[data-exemple-entrer]', titre: 'Envie de voir avant ?', texte: 'VRM rempli de données inventées : rien n’est enregistré.' },

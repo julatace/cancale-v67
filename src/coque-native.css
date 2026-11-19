@@ -13,3 +13,7 @@
 :is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
   all: revert-layer;
 }
+/* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
+   `!important`) lui posait un fond gris dans le champ blanc ; un `!important` d'avant ne se renvoie pas par revert-layer.
+   L'identifiant de <main> (#vrm-contenu) suffit à passer devant, sans surenchère ailleurs. */
+#vrm-contenu .n-page-recherche .n-recherche-champ { background: transparent !important; box-shadow: none !important; }

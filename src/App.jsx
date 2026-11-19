@@ -1079,8 +1079,8 @@ import { useGlisserSelection } from './ui/useGlisserSelection.js';
 import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.js';
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+import "./coque-native.css";   // (19 nov., « VRM natif ») le pont : les contrôles des pièces natives ne prennent plus les styles d'avant sans couche (sa place : avant styles-tablette et le studio, audits coque-tablette et studio S3 ; elle gagne par la spécificité, pas par l'ordre)
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
-import "./coque-native.css";   // (19 nov., « VRM natif ») le pont : les contrôles des pièces natives ne prennent plus les styles d'avant sans couche (sa place : avant les polices du studio, audit-studio S3 ; elle gagne par la spécificité, pas par l'ordre)
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
@@ -20264,7 +20264,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null 
       </>) : boiteOutils}/>
   );
 }
-function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, ouvrirRecherche, scanner, streamVisible = false, etats = null }) {
+function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, ouvrirRecherche, scanner, streamVisible = false, etats = null, gestesLoupe = null }) {
   useProfilVendeur(); useEcransVusTick();
   const [plus, setPlus] = React.useState(false);
   const montants = useMontantsCaches();
@@ -20293,7 +20293,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   return (
     <>
       <Natif.TetePage titre={titre} grandTitre={natif} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
-        recherche={ordi || rechercheOuverte ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '' }}/>}/>
+        recherche={ordi || rechercheOuverte ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
       {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
     </>
   );
@@ -66683,7 +66683,7 @@ function AppCoeur() {
         outils={<>
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-          {(!reglesStream.bouton && !streamOn) || montantsCaches ? <BoutonMontants/> : null}
+          {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
         </>}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
@@ -66783,6 +66783,14 @@ function AppCoeur() {
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
+          // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
+          // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
+          gestesLoupe={{ 'data-recherche-loupe-voix': DICTEE_OK && !VOIX.refus ? '1' : '0',
+            onPointerDown:(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
+              appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); },
+            onPointerUp:()=>clearTimeout(appuiLoupe.current.t), onPointerCancel:()=>clearTimeout(appuiLoupe.current.t), onPointerLeave:()=>clearTimeout(appuiLoupe.current.t),
+            onContextMenu:(e)=>{ if(DICTEE_OK) e.preventDefault(); },
+            onClick:()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } ouvrirRecherche(); } }}
           etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/>}
         {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
             recherche (touche « / ») et la place des filtres de site de l'écran. */}

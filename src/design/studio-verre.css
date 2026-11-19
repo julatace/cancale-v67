@@ -446,10 +446,6 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root body .vrm-cx[data-espace="autres"] .vrm-cx-boite > div[style*="color"] b[style*="color"] { color: var(--sv-clair-ambre) !important; }
 
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
-:root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
-  background: var(--sv-verre-barre) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .8), 0 0 0 1px var(--sv-bord), 0 18px 40px -16px rgb(8 26 50 / .6) !important;
-}
 /* La tête du téléphone : transparente sur le fond ; au défilement, le verre de la barre (et l'encre sombre). */
 @media (max-width: 743px) {
   :root:root:root:root body .vrm-app-shell > .vrm-app-header.vrm-app-header:not(.is-defile) { background: transparent !important; background-image: none !important; box-shadow: none !important; border-bottom-color: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
@@ -460,7 +456,6 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) { color: var(--sv-encre) !important; }
 :root:root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: inherit !important; }
 /* Le fondu sous la barre : vers le bas du dégradé. */
-:root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--sv-bas) 70%, transparent) 78%) !important; }
 /* (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) LE VERRE DE LA BARRE PASSE DEVANT LE FONDU. La barre est
    un contexte d'empilement (relative, z-index 60) : son fondu `::before` (z-index -1) se peint AU-DESSUS de son propre
    fond. Avec le fond bleu profond, il recouvrait le verre clair : barre bleu-gris (≈ rgb 75 100 130 mesuré) et libellés
@@ -468,12 +463,6 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
    `::after` (même couche, après le fondu dans l'ordre du document) ; le fond de la barre garde son verre (le flou de
    `backdrop-filter` reste celui de la barre) : la barre redevient le verre clair de la maquette, au-dessus du fondu.
    Banc : scripts/bancs/stabilite-iphone.cjs (S10, mesuré sur les PIXELS de la capture). */
-:root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::after {
-  content: "" !important; display: block !important; position: absolute !important; inset: 0 !important; z-index: -1 !important;
-  border-radius: inherit !important; background: var(--sv-verre-barre) !important; pointer-events: none !important;
-}
-:root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #FFFFFF !important; box-shadow: 0 0 0 2px var(--sv-verre-barre) !important; }
-:root:root:root[data-theme="dark"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #0C1D30 !important; }
 
 /* ══ 9. LES BARRES COLLÉES (recherche d'Annonces, du Stock) : 100 % opaques, à la couleur du haut du fond ══
    (Sur un verre translucide, les rangées qui passent dessous se liraient à travers la recherche.) */
@@ -517,7 +506,6 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
    de la barre du bas, où elle couvrait les tuiles. Le temps qu'elle est là, le titre de la tête (au défilement) s'efface. */
 @media (max-width: 760px) {
   :root:root:root:root body .vrm-neuf-hote { top: calc(env(safe-area-inset-top, 0px) + 14px) !important; bottom: auto !important; left: 16px !important; right: auto !important; height: 0 !important; justify-content: flex-start !important; z-index: 60 !important; }
-  :root:root:root:root body:has(.vrm-neuf) .vrm-app-header .vrm-hdr-titre { visibility: hidden !important; }
 }
 /* L'éventail du disque ouvert met la page en recul (studio.css : `transform: scale(.94)` sur .vrm-main) : .vrm-main devient
    le bloc conteneur de la pastille (position fixe, rendue dedans), qui glissait sur « Bonjour · … » sous le voile (verre V9,
@@ -611,9 +599,6 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 }
 
 /* La BARRE du bas : le verre à .80, les onglets à l'encre (#34495E au repos, l'encre pleine pour l'actif). */
-:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sv-onglet) !important; }
-:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sv-encre) !important; }
-:root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700 !important; }
 
 /* ══ 11. LE RAIL DE L'ORDINATEUR (15 nov., maquettes ordinateur validées par Julien — `scratchpad/maquettes-verre/o-ecrans.cjs`,
    `.side`) : COMMUN à tous les écrans (posé par claude/refonte-journee, repris tel quel par les autres chantiers).
@@ -622,66 +607,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
    L'entrée ouverte : une porcelaine blanche, l'encre en 750. Les nombres : une pastille d'encre à droite.
    Sous 1400 px de large : le rail se RÉDUIT (78 px, l'icône et le libellé dessous, les nombres en coin) — la maquette 1280.
    Le composant : `SideBar` (src/App.jsx, `data-rail-verre`) ; les entrées, les data-nav-entree et les pastilles ne changent pas. */
-@media (min-width: 768px) {
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
-    --rv-fond: rgb(247 250 253 / .84); --rv-bord: rgb(255 255 255 / .85); --rv-encre: #0C1D30; --rv-libelle: #2E4257; --rv-gris: #3F5468; --rv-filet: rgb(12 29 48 / .10);
-    --rv-actif: #FFFFFF; --rv-actif-ombre: inset 0 1px 2px rgb(8 26 50 / .10), 0 4px 12px -6px rgb(8 26 50 / .4); --rv-pastille: #0C1D30; --rv-pastille-t: #FFFFFF;
-    top: 14px !important; left: 14px !important; bottom: 14px !important; width: 232px !important; padding: 16px 12px 12px !important; border-radius: 24px !important;
-    background: var(--rv-fond) !important; background-image: none !important; -webkit-backdrop-filter: blur(26px) saturate(140%) !important; backdrop-filter: blur(26px) saturate(140%) !important;
-    border: 1px solid var(--rv-bord) !important; box-shadow: 0 18px 40px -16px rgb(8 26 50 / .6) !important; color: var(--rv-encre) !important;
-  }
-  :root:root:root:root:root:root[data-theme="dark"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
-    --rv-fond: rgb(16 30 50 / .72); --rv-bord: rgb(255 255 255 / .13); --rv-encre: #EAF2FB; --rv-libelle: #C9D6E4; --rv-gris: #9CB0C6; --rv-filet: rgb(255 255 255 / .10);
-    --rv-actif: rgb(255 255 255 / .14); --rv-actif-ombre: inset 0 1px 2px rgb(0 0 0 / .25); --rv-pastille: #EEF4FB; --rv-pastille-t: #0C1D30;
-  }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { padding: 2px 8px 12px !important; gap: 0 !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-tuile { display: none !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-sidebar-mot { font: 800 20px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; color: var(--rv-encre) !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { font: 750 11.5px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: .02em !important; color: var(--rv-gris) !important; padding: 14px 10px 6px !important; margin: 0 !important; text-transform: none !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] [data-nav-groupe].vrm-rail-management-group { margin-top: 0 !important; padding-top: 0 !important; border: 0 !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 2px !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
-    min-height: 44px !important; height: 44px !important; padding: 0 10px !important; gap: 11px !important; border-radius: 13px !important;
-    color: var(--rv-libelle) !important; font: 600 14.5px/1.2 Inter, system-ui, sans-serif !important; background: transparent !important; box-shadow: none !important;
-  }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child { color: inherit !important; flex: 0 0 20px !important; width: 20px !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child svg { width: 20px !important; height: 20px !important; color: inherit !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button[aria-current="page"] { color: var(--rv-encre) !important; font-weight: 750 !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre]:not([data-indicateur]) .vrm-rail-button[aria-current="page"] { background: var(--rv-actif) !important; box-shadow: var(--rv-actif-ombre) !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur { background: var(--rv-actif) !important; box-shadow: var(--rv-actif-ombre) !important; border-radius: 13px !important; border: 0 !important; }
-  /* §7 « actif = enfoncé + diode » : la pastille blanche de la maquette garde un creux à peine marqué et la diode du studio (5 px, en haut à droite). */
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur::after { top: 7px !important; right: 7px !important; width: 5px !important; height: 5px !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n {
-    margin-left: auto !important; min-width: 22px !important; height: 22px !important; padding: 0 7px !important; border-radius: 11px !important; position: static !important;
-    background: var(--rv-pastille) !important; color: var(--rv-pastille-t) !important; font: 700 11.5px/22px Inter, system-ui, sans-serif !important; text-align: center !important; box-shadow: none !important;
-  }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { margin-top: auto !important; border-top: 1px solid var(--rv-filet) !important; padding-top: 8px !important; background: transparent !important; box-shadow: none !important; }
-  /* (16 nov., parcours-vert) Fenêtre basse (1280 × 620, banc navigation-plateformes) : le pied (Paramètres, le compte)
-     passait sous le bas de l'écran. Le rail défile, son pied reste collé en bas, toujours joignable. */
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: none; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-rail-pied { position: sticky !important; bottom: -12px !important; z-index: 1; padding-bottom: 12px !important; background: var(--rv-fond) !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { background: transparent !important; box-shadow: none !important; color: var(--rv-encre) !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-nom { font: 700 13.5px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-encre) !important; }
-  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-sous { font: 550 12px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-gris) !important; }
-}
 /* La maquette 1280 : le rail réduit (78 px), l'icône et son libellé dessous, le nombre en coin ; le contenu se rapproche. */
-@media (min-width: 768px) and (max-width: 1399px) {
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { width: 78px !important; padding: 16px 8px 12px !important; align-items: center !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { justify-content: center !important; padding: 2px 0 10px !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; padding: 0 !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-scroll { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management, .vrm-rail-management-group) { align-items: center !important; width: 100% !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
-    width: 62px !important; height: 56px !important; min-height: 56px !important; padding: 0 2px !important; margin-top: 4px !important;
-    flex-direction: column !important; justify-content: center !important; align-items: center !important; gap: 3px !important; position: relative !important;
-  }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-lib { font: 600 10px/1.1 Inter, system-ui, sans-serif !important; text-align: center !important; flex: none !important; white-space: nowrap !important; overflow-wrap: normal !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n { position: absolute !important; top: 2px !important; right: 4px !important; margin: 0 !important; min-width: 18px !important; height: 18px !important; padding: 0 5px !important; font-size: 10px !important; line-height: 18px !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { justify-content: center !important; padding: 8px 0 0 !important; width: auto !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-txt { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
-  :root:root:root:root:root:root:root body .vrm-app-shell:has(nav.vrm-sidebar[data-rail-verre]) main.vrm-main { margin-left: 112px !important; }
-}
 
 /* ══ 12 bis. LE FLOU SEULEMENT LÀ OÙ IL SE VOIT (16 nov., stabilite-iphone — « l'app bug énormément ») ══════════
    Mesuré sur l'iPhone de Julien (mesures_jour_2026-11-16, Ventes · téléphone · réponse au toucher) : 7 touchers sur 9
