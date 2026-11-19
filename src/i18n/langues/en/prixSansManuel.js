@@ -52,4 +52,13 @@ export default {
   "photosFond.noteAucune": "Leboncoin rejects a listing without photos. VRM reads the photos by itself as soon as Vinted is open on the listing’s account.",
   "photosFond.noteUne": "VRM reads the other photos by itself as soon as Vinted is open on the listing’s account.",
   "prixPartout.etat.format": "VRM can’t change this listing’s price yet: change it on {site}",
+  // (19 nov., décision 1) la baisse par règle
+  "prixPartout.regle.titre": "Automatic price cut",
+  "prixPartout.regle.compte": "Cut prices on {compte} by itself",
+  "prixPartout.regle.eteinte": "Off",
+  "prixPartout.regle.resume": "−{pct}% every {jours} days without a sale",
+  "prixPartout.regle.pct": "Cut",
+  "prixPartout.regle.jours": "No sale for",
+  "prixPartout.regle.joursOpt": "{n} d",
+  "prixPartout.regle.pied": "Never below your minimum price; without one, never below cost + 10%; with neither, nothing is cut. The extension does it alone, within its limits, and logs it in “What VRM did”.",
 };

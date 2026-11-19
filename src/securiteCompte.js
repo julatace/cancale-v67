@@ -66,6 +66,9 @@ export const LIBELLES_TYPE = {
   // (11 nov., extension 5.340) relu chez Vinted après son clic
   vacances_pose: 'Mode vacances · posé',
   vacances_retire: 'Mode vacances · retiré',
+  // (19 nov., ext. 5.409, décision 3) relu chez Vinted : jamais une suppression
+  annonce_masquee: 'Masquée sur Vinted · vendue ailleurs',
+  annonce_demasquee: 'Remise en vue sur Vinted · vente annulée',
   // (11 nov., 5.350) constatés chez Vinted, jamais un geste de VRM
   moderation_masquee: 'Annonce masquée par Vinted',
   moderation_disparue: 'Annonce disparue · peut-être retirée par Vinted',

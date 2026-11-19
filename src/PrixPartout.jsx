@@ -14,7 +14,8 @@
 // Disposition (« VRM natif », docs/design/NATIF.md) : une feuille, un champ, un groupe
 // de rangées (nom du site · « 59 € → 58 € » sur UNE ligne · l'état dessous), UN plein.
 import React from 'react';
-import { Feuille, Groupe, Rangee, Bouton, Vide, Attente } from './natif/index.js';
+import { Feuille, Groupe, Rangee, Bouton, Vide, Attente, Segmente } from './natif/index.js';
+import { PALIERS_PCT, PALIERS_JOURS } from './reglesAuto.js';
 import { prixTape, minisAuDessus, NOM_SITE, toutEstDit } from './prixPartout.js';
 import { commandeCourante } from './prixAttente.js';
 import { tr } from './i18n/index.js';
@@ -65,7 +66,7 @@ function phrase(e, s, compteDe) {
   return null;
 }
 
-export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null, regles = null, onRegle = null }) {
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -163,6 +164,20 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
         </Bouton>
       ))}
       {!lecture && !sites.length && !manques.length ? <div data-prix-aucun=""><Vide phrase={tr('prixPartout.aucune')}/></div> : null}
+      {/* (19 nov., décision 1 de Julien) LA BAISSE PAR RÈGLE, par compte Vinted de ce N° : éteinte par défaut ;
+          l'extension l'applique seule, dans ses plafonds (src/reglesAuto.js, background.js `regleBaisseTick`). */}
+      {Array.isArray(regles) && regles.length && onRegle ? regles.map((r) => (
+        <Groupe key={'r' + r.uid} titre={tr('prixPartout.regle.titre')} pied={r.actif ? tr('prixPartout.regle.pied') : ''} attrs={{ 'data-prix-regle': r.uid, 'data-prix-regle-actif': r.actif ? '1' : '0' }}>
+          <Rangee titre={tr('prixPartout.regle.compte', { compte: r.nom || r.uid })} sousTitre={r.actif ? tr('prixPartout.regle.resume', { pct: r.pct, jours: r.jours }) : tr('prixPartout.regle.eteinte')} sousLignes={2}
+            interrupteur={{ actif: r.actif, onChange: (v) => onRegle(r.uid, { actif: !!v }), attrs: { 'data-prix-regle-interrupteur': r.uid } }}/>
+          {r.actif ? (
+            <div className="pp-regle-choix">
+              <Segmente libelle={tr('prixPartout.regle.pct')} valeur={String(r.pct)} onChange={(c) => onRegle(r.uid, { pct: Number(c) })} options={PALIERS_PCT.map((n) => ({ cle: String(n), libelle: '−' + n + '\u00a0%' }))}/>
+              <Segmente libelle={tr('prixPartout.regle.jours')} valeur={String(r.jours)} onChange={(c) => onRegle(r.uid, { jours: Number(c) })} options={PALIERS_JOURS.map((n) => ({ cle: String(n), libelle: tr('prixPartout.regle.joursOpt', { n }) }))}/>
+            </div>
+          ) : null}
+        </Groupe>
+      )) : null}
       {minis.map((m) => <p key={m.cle} className="pp-mini" data-prix-mini={m.mini}>{tr('prixPartout.mini', { prix: eur(m.mini) })}</p>)}
     </Feuille>
   );

@@ -42,3 +42,12 @@ html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outl
 .pp-feuille .n-rangee-corps { font: var(--n-t-corps); letter-spacing: normal; }
 .pp-feuille .n-feuille-poignee, .pp-feuille .n-feuille-croix { font: var(--n-t-corps); }
 .pp-feuille .n-feuille-poignee { min-height: 0; }
+
+/* (19 nov.) La baisse par règle : les deux choix (baisse, délai) sous l'interrupteur, dans la carte du groupe. */
+.pp-regle-choix { display: grid; gap: 8px; padding: 8px 16px 12px; }
+.pp-regle-choix .n-segmente { margin: 0; }
+/* « 1 299,50 € → 1 199,50 € » ne se coupe JAMAIS (un prix coupé est un faux prix) : le nom du site prend sa largeur,
+   le prix tout le reste (mesuré au banc prix-sans-manuel, 390 px, quatre sites). */
+.pp-rangee .n-rangee-bloc { grid-template-columns: max-content minmax(0, 1fr); }
+.pp-rangee .n-rangee-valeurs { justify-self: end; }
+.pp-rangee .n-rangee-valeur { overflow: visible; text-overflow: clip; }

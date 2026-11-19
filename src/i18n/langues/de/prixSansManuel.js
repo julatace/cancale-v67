@@ -52,4 +52,13 @@ export default {
   "photosFond.noteAucune": "Leboncoin lehnt ein Angebot ohne Foto ab. VRM liest die Fotos selbst, sobald Vinted mit dem Konto des Angebots offen ist.",
   "photosFond.noteUne": "VRM liest die anderen Fotos selbst, sobald Vinted mit dem Konto des Angebots offen ist.",
   "prixPartout.etat.format": "VRM kann den Preis dieses Angebots noch nicht ändern: ändere ihn auf {site}",
+  // (19 nov., décision 1) la baisse par règle
+  "prixPartout.regle.titre": "Automatische Preissenkung",
+  "prixPartout.regle.compte": "Auf {compte} selbst senken",
+  "prixPartout.regle.eteinte": "Aus",
+  "prixPartout.regle.resume": "−{pct} % alle {jours} Tage ohne Verkauf",
+  "prixPartout.regle.pct": "Senkung",
+  "prixPartout.regle.jours": "Ohne Verkauf seit",
+  "prixPartout.regle.joursOpt": "{n} T",
+  "prixPartout.regle.pied": "Nie unter deinem Mindestpreis; ohne ihn nie unter Einkauf + 10 %; ohne beides wird nichts gesenkt. Die Erweiterung macht es allein, in ihren Grenzen, und vermerkt es unter „Was VRM getan hat“.",
 };

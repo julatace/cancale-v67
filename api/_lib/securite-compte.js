@@ -252,7 +252,7 @@ export function evenementsJournal(sources) {
 // (file des favoris) et le bordereau (rangé dans la base) ont déjà leur preuve.
 // Le compte vient de l'IDENTIFIANT de la ligne, jamais d'un champ libre.
 // (11 nov., extension 5.340) Le mode vacances posé / retiré : aucune autre ligne ne le note.
-const SORTES_EXTENSION = { offre_acceptee: 'offre_acceptee', offre_refusee: 'offre_refusee', contre_offre: 'offre_faite', reponse: 'message_envoye', baisse_prix: 'baisse_prix', modifiee: 'annonce_modifiee', vacances_on: 'vacances_pose', vacances_off: 'vacances_retire' };
+const SORTES_EXTENSION = { offre_acceptee: 'offre_acceptee', offre_refusee: 'offre_refusee', contre_offre: 'offre_faite', reponse: 'message_envoye', baisse_prix: 'baisse_prix', modifiee: 'annonce_modifiee', vacances_on: 'vacances_pose', vacances_off: 'vacances_retire', masquee: 'annonce_masquee', demasquee: 'annonce_demasquee' };   // (19 nov., 5.409) vendue ailleurs ⇒ masquée / vente annulée ⇒ démasquée, relu
 const numeroOk = (v) => (v != null && /^\d{1,20}$/.test(String(v)) ? String(v) : null);
 const prixOk = (v) => { const n = Number(v); return v != null && v !== '' && Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) / 100 : null; };
 export function evenementsExtension(lignes) {

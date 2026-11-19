@@ -52,4 +52,13 @@ export default {
   "photosFond.noteAucune": "Leboncoin rechaza un anuncio sin foto. VRM lee las fotos solo cuando Vinted esté abierto en la cuenta del anuncio.",
   "photosFond.noteUne": "VRM lee las demás fotos solo cuando Vinted esté abierto en la cuenta del anuncio.",
   "prixPartout.etat.format": "VRM aún no sabe cambiar el precio de este anuncio: cámbialo en {site}",
+  // (19 nov., décision 1) la baisse par règle
+  "prixPartout.regle.titre": "Bajada automática",
+  "prixPartout.regle.compte": "Bajar solo en {compte}",
+  "prixPartout.regle.eteinte": "Apagada",
+  "prixPartout.regle.resume": "−{pct} % cada {jours} días sin venta",
+  "prixPartout.regle.pct": "Bajada",
+  "prixPartout.regle.jours": "Sin venta desde",
+  "prixPartout.regle.joursOpt": "{n} d",
+  "prixPartout.regle.pied": "Nunca por debajo de tu precio mínimo; sin él, nunca por debajo de la compra + 10 %; sin ninguno, no baja nada. La extensión lo hace sola, dentro de sus límites, y lo anota en «Lo que hizo VRM».",
 };

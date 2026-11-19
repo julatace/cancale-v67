@@ -107,6 +107,48 @@ la LECTURE que l'extension fait déjà (`GET` de la même adresse, étape 1 de l
    prix près ; mutation « une clé oubliée » rouge.
 4. Premier essai sur UNE annonce, relue.
 
+## Ajout du 19 nov. au soir : les décisions de Julien « 1 oui, 3 oui » (même extension 5.409.0)
+
+Texte exact : fin de `docs/passation/2026-11-19-demandes-julien.md`. Elles CHANGENT CLAUDE.md §3 (à reporter à l'intégration).
+
+### 1. La baisse par règle (`src/reglesAuto.js`, `regleBaisseTick` dans `background.js`)
+- **Réglage** : feuille « Changer le prix » → groupe « Baisse automatique » (un par compte Vinted du N°) :
+  interrupteur « Baisser seul sur {compte} » (ÉTEINT par défaut), puis −5 / −10 / −15 % et 7 / 14 / 30 j sans vente.
+  Rangé sur SON toucher dans `main.vinted_baisse_regle` `{ v:1, comptes: { uid: { actif, pct, jours, at } } }`.
+- **L'extension** (alarme + visite) : compte de l'onglet, pas de pause / vérification / prudence / « Tout arrêter » ;
+  dressing lu il y a moins de 24 h ; pour chaque annonce en ligne qui a sa fiche : dernière date où le prix a pu changer
+  (mise en ligne, dernière baisse rangée) ≥ délai ; plancher = **prix mini** (`fiche.min`), sinon **achat + 10 %**
+  (`fiche.buyPrice`, sinon `vinted_buyprice_by_num[N°]`), sinon **aucune baisse** ; nouveau prix = −pct %, arrondi à
+  l'euro inférieur, remonté au plancher, jamais une hausse ; format appris exigé (sinon elle serait refusée).
+- **Elle ne touche pas Vinted** : elle RANGE une ligne `cmd_prix_*` (`source: 'regle'`, `pasAvant` 2–40 min) ; c'est
+  `prixAttenteTick` qui l'exécute par `baisserPrixVinted` (prix lu avant = celui vu, relu après, 45/h réserve 5,
+  sécurité en mode « auto », discrétion), une par passage, au journal `baisse_prix`. Irrégulier : une baisse tirée au
+  hasard parmi les dues, passages espacés de 25–55 min, 12 par jour et par compte au plus.
+- **Pas fait** : Leboncoin / Vestiaire par règle (il faudrait la date de mise en ligne et le prix de leurs annonces
+  dans le même passage ; leurs chemins de baisse existent — lot suivant).
+
+### 3. Vendue ailleurs ⇒ masquée sur Vinted (`listeMasquerAilleurs`, `masquerAilleursTick`)
+- **Le geste, mesuré** (lecture seule de la vraie base, 19 nov.) : ses propres gestes rangés
+  `harvest_*_wreq_api_v2_items_id_is_hidden` — `PUT /api/v2/items/{id}/is_hidden`, corps `{"is_hidden":true}` ou
+  `false`, vus sur 3 comptes (31 oct., 10 nov., 18 nov.). L'extension ne le rejoue que si un tel geste est rangé
+  (`masquerAppris`) ; sinon rien ne part et le registre dit `appris: false`.
+- **L'app publie** `main.vinted_masquer_ailleurs` `{ v:1, at, complet, items:[{id, uid, num, site}] }` : annonces Vinted
+  dont la paire est VENDUE (vente engagée, par identité, `articlesVendusAilleurs`) sur un AUTRE site ; jamais une vente
+  sur un autre compte Vinted, jamais une « remise en vente à confirmer » ; lecture ratée ⇒ `complet: false`.
+- **L'extension** : liste de moins de 48 h, dressing de moins de 24 h, annonce en ligne du compte de l'onglet ⇒
+  `gardeStricte` (compte, pause, sécurité, captcha, 45/h réserve 5) ⇒ UN `PUT …/is_hidden`. « Masquée » seulement
+  RELU (réponse de Vinted, sinon la lecture suivante du dressing) ; registre `vinted_masquees_vrm` ; journal
+  `masquee` (« Masquée sur Vinted · vendue ailleurs »). **Jamais une suppression** (§3 inchangé : elle reste son toucher).
+- **Vente annulée** : une annonce que VRM a masquée (registre) et qui n'est plus dans une liste COMPLÈTE est démasquée
+  (journal `demasquee`). Une annonce qu'il a masquée lui-même n'est jamais touchée. Liste incomplète ⇒ rien.
+
+### Preuves
+`node scripts/audit-regles-auto.cjs --prouve` : 25 contrôles (vrai `background.js` dans un vm), 14 mutations rouges
+(éteinte par défaut, plancher, sans plancher, marge d'achat, prudence, anti-robot, captcha, masquer sans preuve,
+démasquer sur liste incomplète, démasquer ce qu'il a masqué, geste pas appris, suppression à la place, masquée sans
+relecture, plafond), rouge sur `origin/main`. Verts aussi : prix-attente, baisse-prix, discretion, securite-comptes,
+budget-lectures, moteur-offres, offres-auto, offres-garde, relais, coherence, extension-5340, robustesse-extension.
+
 ## L'inventaire des gestes « à la main »
 
 | Où | Ce que VRM demandait | L'extension sait ? | Sort |

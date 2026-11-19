@@ -187,8 +187,10 @@ const mesurer = (pg) => pg.evaluate(() => {
       phrase: et ? et.textContent : '', sorte: et ? et.getAttribute('data-prix-phrase') : '', dessous: !et || !pl || R(et).y >= Math.max(R(pl).b, si ? R(si).b : 0) - 1,
       annuler: !!f.querySelector(`[data-prix-annuler-cle="${li.getAttribute('data-prix-cle')}"]`), lien: li.hasAttribute('data-prix-lien'), boutons: li.querySelectorAll('button').length };
   });
+  // (19 nov.) Un prix COUPÉ (« 1199,5… ») est un faux prix : la valeur doit tenir entière.
+  const coupes = [...f.querySelectorAll('.n-rangee-valeur, .n-rangee-titre')].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent.trim().slice(0, 30));
   const plein = [...f.querySelectorAll('.pp-plein')];
-  return { chevauchements, hors, petites: cibles.filter((c) => c.h < 43.5 || c.w < 43.5).map((c) => c.t + ' ' + Math.round(c.w) + '×' + Math.round(c.h)), faibles: contrastes.filter((c) => c.ratio < 4.5),
+  return { chevauchements, coupes, hors, petites: cibles.filter((c) => c.h < 43.5 || c.w < 43.5).map((c) => c.t + ' ' + Math.round(c.w) + '×' + Math.round(c.h)), faibles: contrastes.filter((c) => c.ratio < 4.5),
     lignes, pleins: plein.length, pleinTexte: plein[0] ? plein[0].textContent.trim() : '', pleinH: plein[0] ? Math.round(R(plein[0]).h) : 0,
     proposer: f.querySelectorAll('[data-prix-proposer]').length, texte: f.innerText, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
     feuilleDansEcran: fr.x >= -0.5 && fr.r <= window.innerWidth + 0.5 && fr.b <= window.innerHeight + 0.5 };
@@ -196,6 +198,7 @@ const mesurer = (pg) => pg.evaluate(() => {
 const commun = (T, m, quoi) => {
   if (!m) { dit(false, `${T} ${quoi} : la feuille est là`); return; }
   dit(m.chevauchements.length === 0, `${T} ${quoi} : aucun texte n’en chevauche un autre`, m.chevauchements.slice(0, 4).join(' | '));
+  dit(m.coupes.length === 0, `${T} ${quoi} : aucun prix ni nom de site coupé (« … »)`, m.coupes.join(' | '));
   dit(m.hors.length === 0 && m.sw <= m.cw && m.feuilleDansEcran, `${T} ${quoi} : rien ne déborde de la feuille ni de l’écran`, m.hors.slice(0, 3).join(' | '));
   dit(m.petites.length === 0, `${T} ${quoi} : chaque cible fait au moins 44 × 44`, m.petites.join(' | '));
   dit(m.faibles.length === 0, `${T} ${quoi} : contrastes ≥ 4,5:1`, m.faibles.slice(0, 3));

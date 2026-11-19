@@ -52,4 +52,13 @@ export default {
   "photosFond.noteAucune": "Leboncoin refuse une annonce sans photo. VRM lit les photos tout seul dès que Vinted est ouvert sur le compte de l’annonce.",
   "photosFond.noteUne": "VRM lit les autres photos tout seul dès que Vinted est ouvert sur le compte de l’annonce.",
   "prixPartout.etat.format": "VRM ne sait pas encore changer le prix de cette annonce : change-le sur {site}",
+  // (19 nov., décision 1) la baisse par règle
+  "prixPartout.regle.titre": "Baisse automatique",
+  "prixPartout.regle.compte": "Baisser seul sur {compte}",
+  "prixPartout.regle.eteinte": "Éteinte",
+  "prixPartout.regle.resume": "−{pct} % tous les {jours} j sans vente",
+  "prixPartout.regle.pct": "Baisse",
+  "prixPartout.regle.jours": "Sans vente depuis",
+  "prixPartout.regle.joursOpt": "{n} j",
+  "prixPartout.regle.pied": "Jamais sous ton prix mini ; sans prix mini, jamais sous l’achat + 10 % ; sans l’un ni l’autre, rien ne baisse. L’extension le fait seule, dans ses plafonds, et le note dans « Ce que VRM a fait ».",
 };
