@@ -17797,9 +17797,12 @@ function noterCarnet(uid, sorte) {
       const m = await lireLocal('vrmCarnet');
       const l = (Array.isArray(m[u]) ? m[u] : []).filter((e) => e && t - Number(e.t) < CARNET_JOURS * 864e5);
       // Un même événement noté deux fois dans la minute (deux réponses de la même rafale) : une fois.
-      if (!l.some((e) => e.s === sorte && t - Number(e.t) < 60000)) l.push({ t, s: sorte });
+      const neuf = !l.some((e) => e.s === sorte && t - Number(e.t) < 60000);
+      if (neuf) l.push({ t, s: sorte });
       m[u] = l.slice(-CARNET_MAX);
       await chrome.storage.local.set({ vrmCarnet: m });
+      // 5.409 : un refus ou une pause de Vinted, dit à l'arrivée dans l'app (une fois par heure et par cause).
+      if (neuf && CAPTE_REFUS[sorte]) { const q = CAPTE_REFUS[sorte]; sansRejet(journalCapte('vinted', u, 'refus', [{ id: q + '@' + Math.floor(t / 3600000), q }]), 'capte_journal_refus'); }
       return true;
     } catch (_) { return false; }
   });
@@ -20336,10 +20339,64 @@ async function annoncerCapteUn(plateforme, compte, sorte, items) {
     }
     for (const k of Object.keys(lots)) { const v = lots[k]; if (!v || !(now - Number(v.maj || 0) < 3600000)) delete lots[k]; }
     try { await chrome.storage.local.set({ [CAPTE_VU]: memo, [CAPTE_LOTS]: lots, [CAPTE_ETAT]: etat }); } catch (_) { return null; }
+    if (nouveaux.length) sansRejet(journalCapte(plateforme, c, sorte, nouveaux.map((id) => ({ id }))), 'capte_journal');   // 5.409
     if (lot) { noterDiag('capte_lot'); notifierApp({ type: 'capte', lot: await lotCaptePublic(lot) }); }
     return lot ? JSON.parse(JSON.stringify(lot)) : null;
   } catch (_) { return null; }
 }
+// ══ 5.409 (19 nov.) — « CE QUE L'EXTENSION A CAPTÉ DEPUIS TA DERNIÈRE VISITE » ═════════
+// Julien, mot pour mot : « je veux que quand je rentre sur l'app, et que l'extension a capté
+// quelque chose, on est informé avec un pop up ». Le lot de la 5.377 ne vit que 2 min et ne
+// porte que des NOMBRES : VRM fermé, il était perdu. La MÊME source (`annoncerCapteUn` : une
+// écriture RÉUSSIE, nouveau PAR IDENTITÉ, jamais au point de départ) range désormais chaque
+// identité nouvelle dans un journal court, publié dans la ligne DÉDIÉE
+// `capte_journal_{navigateur}` (un seul écrivain par ligne, jamais `main`) : l'app la lit à
+// l'arrivée et dit ce qui est né depuis SA dernière visite (src/capteArrivee/).
+//   · une entrée = { p: site, c: compte, s: sorte, id: identité, t: heure où VRM l'a rangée } —
+//     jamais un titre, un pseudo, un texte ou un montant ;
+//   · 14 jours, 400 entrées au plus ; écriture sérialisée, la ligne porte toujours la liste
+//     ENTIÈRE relue du stockage (une écriture en retard n'efface rien de plus neuf) ;
+//   · le réglage « Dire ce que l'extension capte » coupé : le journal est quand même tenu
+//     (l'app relit le même réglage et se tait) ;
+//   · une écriture ratée ne bloque rien : la lecture est déjà rangée.
+// La sorte `refus` (hors captation) : Vinted a refusé ou mis en pause (`noterCarnet` : 403, 429,
+// pause, vérification, prudence, modération, déconnexion) — dite une fois, la cause en `q`.
+const CAPTE_JOURNAL = 'vrmCapteJournal', CAPTE_JOURNAL_LIGNE = 'capte_journal_';
+const CAPTE_JOURNAL_MAX = 400, CAPTE_JOURNAL_JOURS = 14;
+const CAPTE_JOURNAL_SORTES = [...CAPTE_SORTES, 'refus'];
+let _chaineCapteJournal = Promise.resolve();
+function entreeCapteJournal(x) {
+  if (!x || typeof x !== 'object' || !CAPTE_PLATEFORMES.includes(x.p) || !CAPTE_JOURNAL_SORTES.includes(x.s)) return null;
+  const c = String(x.c == null ? '' : x.c), id = String(x.id == null ? '' : x.id), t = Number(x.t);
+  if (!/^[\w:.-]{1,80}$/.test(c) || !RE_ID_CAPTE.test(id) || !(t > 1.5e12 && t < 4e12)) return null;
+  const e = { p: x.p, c, s: x.s, id, t: Math.round(t) };
+  if (x.s === 'refus' && /^[a-z0-9]{1,12}$/.test(String(x.q || ''))) e.q = String(x.q);
+  return e;
+}
+function journalCapte(plateforme, compte, sorte, items) {
+  const suite = _chaineCapteJournal.then(async () => {
+    try {
+      const t = Date.now();
+      const neufs = (Array.isArray(items) ? items : []).map((x) => entreeCapteJournal({ p: plateforme, c: compte, s: sorte, id: x && x.id, q: x && x.q, t })).filter(Boolean);
+      if (!neufs.length) return false;
+      const cur = (await chrome.storage.local.get(CAPTE_JOURNAL))[CAPTE_JOURNAL];
+      const lim = t - CAPTE_JOURNAL_JOURS * 864e5;
+      const vus = new Set();
+      const l = (Array.isArray(cur) ? cur : []).map(entreeCapteJournal).filter((e) => e && e.t > lim);
+      for (const e of l) vus.add(e.p + '|' + e.c + '|' + e.s + '|' + e.id);
+      for (const e of neufs) { const k = e.p + '|' + e.c + '|' + e.s + '|' + e.id; if (!vus.has(k)) { vus.add(k); l.push(e); } }
+      l.sort((a, b) => a.t - b.t);
+      const garde = l.slice(-CAPTE_JOURNAL_MAX);
+      await chrome.storage.local.set({ [CAPTE_JOURNAL]: garde });
+      const moi = await idNavigateur();
+      if (moi) { try { await supabaseUpsert('app_data', [{ id: CAPTE_JOURNAL_LIGNE + moi, data: { nav: moi, v: CODE_VERSION, at: new Date(t).toISOString(), e: garde } }], 'id'); } catch (_) {} }
+      return true;
+    } catch (_) { return false; }
+  });
+  _chaineCapteJournal = suite.then(() => {}, () => {});
+  return suite;
+}
+const CAPTE_REFUS = { pause: 'pause', captcha: 'captcha', prudence: 'prudence', moderation: 'moderation', deconnecte: 'deconnecte' };
 // Ce qui sort d'un lot (vers la carte et l'app) : des nombres, le compte et son nom.
 async function lotCaptePublic(l) {
   const n = {};
