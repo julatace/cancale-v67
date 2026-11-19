@@ -176,7 +176,9 @@ function jugerFiche(m, n, suf, tel) {
   dit(!m.plusSeul.length, `P3 ${suf} : aucun montant ni date seulement derrière « ⋯ »`, m.plusSeul.join(' | '));
   if (!tel) dit(m.plusOuvrir === 0, `P4 ${suf} : à l'ordinateur, aucun menu « ⋯ »`, String(m.plusOuvrir));
   dit(!!m.histoire && m.histoire.vues.length <= 3 && m.histoire.toutVoir && (m.histoire.total <= 3 || m.histoire.vues.length === 3), `F7 ${suf} : l'histoire repliée à ses 3 dernières étapes (${m.histoire && m.histoire.vues.join(' → ')}) et « Tout voir »`, m.histoire);
-  if (tel) dit(m.hauteur <= 844 * 1.5 + 1, `Q2 ${suf} : la fiche entière tient sur 1,5 écran (${m.hauteur} px ≤ 1266)`);
+  // 1,5 écran ; chaque site au-delà de deux est une rangée d'information de plus (≈ 50 px), jamais cachée (F4).
+  const plafond = Math.round(844 * 1.5 + 50 * Math.max(0, ((m.sites && m.sites.n) || 0) - 2));
+  if (tel) dit(m.hauteur <= plafond + 1, `Q2 ${suf} : la fiche entière tient sur 1,5 écran${plafond > 1266 ? ' (+ une rangée par site au-delà de deux)' : ''} (${m.hauteur} px ≤ ${plafond})`);
   dit(m.deborde <= 1 && !m.hors.length && !m.rognes.length, `Q3 ${suf} : rien ne déborde, aucun texte rogné`, { page: m.deborde, hors: m.hors, rognes: m.rognes });
   if (tel) dit(!!m.toast && m.toast.zones >= 2 && m.toast.couvre === 0, `Q4 ${suf} : un message passager ne couvre ni la barre ni la photo de la fiche`, m.toast);
   if (n === '3119') dit(il('achat') && !il('achat').su && il('achat').porte && il('benefice') && !il('benefice').su, `F8 ${suf} : vendue sans achat — « Achat — » est la porte, le bénéfice dit « — » et pourquoi`, m.faits.map((x) => x.txt).join(' | '));

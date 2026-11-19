@@ -81,7 +81,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       {A && !A.double ? <Groupe titre={T.sites} pied={A.sitesManques && A.sitesManques.length ? T.pasLus(A.sitesManques.join(', ')) : ''} attrs={{ 'data-fd-sites': A.sites.length, 'data-fiche-sites': A.sites.length, 'data-fd-sites-pas-lus': A.sitesManques && A.sitesManques.length ? A.sitesManques.join(',') : undefined }}>
         {A.sites.length ? A.sites.map((s, i) => {
           const prix = s.prix != null && s.prix !== A.prixRef ? T.euros(s.prix) : null;
-          return <Rangee key={i} icone={rendre.logo(s.site)} titre={<>{T.site(s.site)}{s.compte ? <span className="n-site-compte">{' · ' + s.compte}</span> : null}</>} valeur={prix || T.etatSite(s)} valeurForte={!!prix} detailValeur={prix && s.etat === 'vendue' ? T.etatSite(s) : ''}
+          return <Rangee key={i} icone={rendre.logo(s.site)} titre={s.etat === 'vendue' ? T.site(s.site) : <>{T.site(s.site)}{s.compte ? <span className="n-site-compte">{' · ' + s.compte}</span> : null}</>} sousTitre={s.etat === 'vendue' ? s.compte || '' : ''} valeur={prix || T.etatSite(s)} valeurForte={!!prix} detailValeur={prix && s.etat === 'vendue' ? T.etatSite(s) : ''}
             fin={s.lien && s.etat !== 'vendue' ? 'chevron' : null} href={s.lien && s.etat !== 'vendue' ? s.lien : ''} attrs={{ 'data-fiche-site': s.site, 'data-fiche-site-etat': s.etat, ...(s.lien && s.etat !== 'vendue' ? { target: '_blank', rel: 'noreferrer', 'data-fiche-site-lien': '' } : {}) }}/>;
         }) : <Rangee titre={T.aucunSite} indisponible/>}
       </Groupe> : null}

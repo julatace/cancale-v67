@@ -22,8 +22,11 @@ l'essentiel d'un coup.
    les autres photos), étiquette N°, titre sur 2 lignes, UNE ligne d'état (ambre seulement s'il y a un geste) ; la grille
    de **faits** — Prix (ou « Vendue ») · Prix mini · Achat · Bénéfice (ou « Bénéfice prévu ») · Taille · En ligne (jours)
    ou Vendue le · Place · Favoris · vues (s'ils sont lus) ; les **sites et comptes** (une rangée par site, qui ouvre
-   l'annonce sur le site ; ce qui n'est pas lu est dit : « Pas lu : Leboncoin ») ; **UN bouton plein** selon l'état
-   (Imprimer le bordereau / Relier · N € / Baisser le prix / Saisir le prix d'achat) ; les **gestes en tuiles** (Prix,
+   l'annonce sur le site, sur UNE ligne : « Leboncoin · son compte », puis le prix s'il diffère, sinon l'état ; ce qui
+   n'est pas lu est dit : « Pas lu : Leboncoin ») ; **UN bouton plein** selon l'état
+   (Imprimer le bordereau / Relier · N € / Baisser le prix / Saisir le prix d'achat), la ligne qui le situe (« Bordereau
+   prêt · 7 j pour poster », « Aucune offre en 20 jours ») posée SOUS l'état, dans l'en-tête ; les **gestes** en GRILLE de
+   rangées (2 colonnes au téléphone, 3 à l'ordinateur, « Vendu ailleurs » en dernière rangée) (Prix,
    Photos, Note, Republier, Ailleurs, Dupliquer, Emballer, Bordereau, Son N°, Rappel, Certificat, Autre taille —
    seulement ceux qui ont un sens : pas de « Prix » sur une paire vendue, pas de doublon du bouton plein) ; l'**histoire**
    repliée à ses 3 dernières étapes puis « Tout voir » (le parcours entier, l'état, les frais, les infos, les
