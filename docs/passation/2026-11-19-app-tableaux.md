@@ -75,3 +75,10 @@ reste dans Paramètres → Comptes (le pied le dit).
   de cette app ⇒ « bientôt » (rien n'est envoyé) ; présents (après la fusion d'extension-utile) ⇒ l'état de l'extension.
   Baisse automatique Leboncoin : la même règle (`vinted_baisse_regle.comptes['lbc:{compte}']`), comptes Leboncoin dans le
   choix du compte quand la capacité existe. Marge par tranche et bonus de lot : « bientôt », RIEN de rangé (pas de moteur).
+- **Messages · Tous** (l'écran par défaut, `src/ecrans/FilsTous.jsx`) : à l'ordinateur, la même barre (« Choisir une action »,
+  Site sur les fils lus), avatar rond + vignette de l'article, l'article en tête du fil (N°, offre, prix mini par le N°) ; un fil
+  Vinted porte le sien (pas deux fois). Au téléphone : rien de changé (la 1re conversation reste dans la moitié haute).
+- **Bancs relancés** (build de la branche, comparés au train du moment) : `natif-coque` 132 / 5 rouges (train : 131 / 6 —
+  mêmes rouges K8b « retour sur un écran visité » et K3, aucun nouveau ; le volet de Ventes qui couvrait Achats est corrigé
+  par le train, `PagePoussee` née dans le volet) ; `design-v2-messages` 79 / 27 rouges = les 27 du train ; `messages-volets`
+  1 rouge = celui du train ; `app-tableaux` vert.
