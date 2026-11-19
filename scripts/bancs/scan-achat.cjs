@@ -203,27 +203,20 @@ const shot = async (pg, nom) => { if (SHOTS) await pg.screenshot({ path: path.jo
         await pg.waitForTimeout(300);
         e = await etat(pg);
         dit(e.ouvert && !e.fiche && !e.resultat, `${T} E « Ce n'est pas ça » ⇒ retour au scanner, aucune fiche`, e);
-        // C — n° inconnu ⇒ la phrase + Relier.
+        // C — n° inconnu ⇒ la phrase, SANS « Relier à un achat » (19 nov., Julien : « c'est à toi de le faire avec le code
+        // de retrait » — plus aucun lien achat ↔ colis posé à la main ; docs/passation/2026-11-19-colis-achat-auto.md).
         await taper(pg, INCONNU);
         e = await etat(pg);
-        dit(e.resultat === 'aucun' && e.inconnu === INCONNU && e.relier === INCONNU && /Colis inconnu/.test(e.texte), `${T} C n° inconnu ⇒ « Colis inconnu : n° …, aucun achat avec ce n° » + « Relier à un achat »`, e);
+        dit(e.resultat === 'aucun' && e.inconnu === INCONNU && /Colis inconnu/.test(e.texte), `${T} C n° inconnu ⇒ « Colis inconnu : n° …, aucun achat avec ce n° »`, e);
+        dit(!e.relier, `${T} C aucun « Relier à un achat » (décision du 19 nov.)`, e);
+        dit(!ecritures.some((w) => /^colis_suivi_/.test(w.id)), `${T} C rien n'est écrit (aucun lien posé à la main)`);
         await shot(pg, `C-inconnu-${sombre ? 'sombre' : 'clair'}`);
-        await pg.click('[data-scan-a-relier]');
-        await pg.waitForSelector(`[data-relier-colis="${INCONNU}"]`, { timeout: 10000 }).catch(() => {});
-        const feuille = await pg.evaluate(() => [...document.querySelectorAll('[data-relier-colis-achat]')].map((x) => x.getAttribute('data-relier-colis-achat')));
-        dit(feuille.includes(String(A_RELIER)) && !feuille.includes('9400'), `${T} C la feuille de choix s'ouvre sur CE n° : l'achat sans suivi proposé, aucun achat qui a déjà son n°`, feuille);
-        dit(!ecritures.some((w) => /^colis_suivi_/.test(w.id)), `${T} C rien n'est écrit avant SON toucher`);
-        await shot(pg, `C-relier-${sombre ? 'sombre' : 'clair'}`);
-        await pg.click(`[data-relier-colis-achat="${A_RELIER}"]`);
-        await pg.waitForTimeout(1500);
-        const w = ecritures.find((x) => /^colis_suivi_/.test(x.id));
-        dit(!!w && w.data && w.data.tx === String(A_RELIER) && w.data.suivi === INCONNU && w.data.relieDepuis === 'scan', `${T} C SON toucher écrit le n° comme identité de CET achat`, w);
-        // Le même n° rescanné ⇒ la fiche de cet achat (D : par la douchette).
-        await pg.evaluate((c) => window.dispatchEvent(new CustomEvent('vrm:retrouver', { detail: { depuis: 'douchette', code: c } })), INCONNU);
+        // Le n° d'un achat qui le porte (lu par l'extension) ⇒ la fiche de CET achat (D : par la douchette), par identité.
+        await pg.evaluate((c) => window.dispatchEvent(new CustomEvent('vrm:retrouver', { detail: { depuis: 'douchette', code: c } })), mr(1));
         await pg.waitForFunction(() => { const r = document.querySelector('[data-scan-r-resultat]'); return r && r.getAttribute('data-scan-r-resultat') !== 'attente'; }, null, { timeout: 20000 }).catch(() => {});
         await pg.waitForTimeout(800);
         e = await etat(pg);
-        dit(e.fiche === `achat:a:${A_RELIER}`, `${T} D le même n° (douchette) ⇒ la fiche de l'achat relié`, e);
+        dit(e.fiche === 'achat:a:9401', `${T} D un n° connu (douchette) ⇒ la fiche de SON achat (9401)`, e);
         await shot(pg, `D-relie-${sombre ? 'sombre' : 'clair'}`);
         // E — « Ranger » ⇒ l'atelier d'arrivée.
         await pg.click('[data-scan-a-ranger]');

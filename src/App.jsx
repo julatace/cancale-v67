@@ -136,8 +136,9 @@ import './design/studio-ventes.css';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVentes.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import { achatsARelier, ecritureRelierColis } from './relierColis.js';
+import { achatDuRetrait, contenuDuColis, limiteDuColis } from './contenuColis.js';
 import { numerosDeListe, codesDeListe, lienContredit } from '../api/_lib/suivis-multiples.js';
-import { listesDesSuivisVinted, liensContredits, propositionsMemeColis, clePasMeme } from './memeColis.js';
+import { listesDesSuivisVinted, liensContredits } from './memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../api/_lib/achat-arrive-relais.js';
@@ -688,7 +689,7 @@ import {marcheDuCompte as marcheEbayDuCompte, MARCHE_DEFAUT as MARCHE_EBAY_DEFAU
 import {arriveeColisEmail, arriveeColisVinted, jourLocal, texteArrivee} from '../api/_lib/arrivee-colis.js';
 import {transactionDeLaLigne, indexRecusParTransaction, recuDeLAchat, bilanRecusAchat} from '../api/_lib/recu-achat.js';
 import {codeRetraitTournure} from '../api/_lib/code-retrait-email.js';
-import {commandeDuColisRegle,commandeUnique,titreDuColis} from '../api/_lib/commande-colis.js';
+import {commandeDuColisRegle,titreDuColis} from '../api/_lib/commande-colis.js';
 import {etatRetrait, estAVerifier, urgenceTri, lieuDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, GARDE_MAX_J, gardeDe, limiteEstimee} from '../api/_lib/retrait-colis.js';
 import {aConfirmerVisibles, texteLimite, motAConfirmer} from './aConfirmer.js';
 // ⟦→ ecrans/Ebay.jsx #5⟧
@@ -861,6 +862,7 @@ import "./annonces-selection.css";
 import "./republier-main.css";
 import "./styles-annonces-coherence.css";   // (5 nov., chantier C) Annonces : barre, carte, feuille Actions
 import { colonnesColis, SITES_COLIS } from "./colisColonnes.js";
+import { chiffresRetirer, siteDuColisSorti } from "./retirerSite.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
@@ -3463,6 +3465,7 @@ const SYNC_KEYS = [
   'vrm_carte_mfa_rangee',
   // (17 nov., suivi multi-transporteurs) « Ce n'est pas le même » sur une proposition « C'est sans doute le même
   // colis » (src/memeColis.js) : { 'n°|compte:transaction': date }, posé sur SON clic, vu sur tous ses appareils.
+  // (19 nov.) Plus lu ni écrit par l'app (la proposition « même colis · Relier » est retirée) ; la clé reste ici pour que rien ne soit effacé.
   'vrm_colis_pas_meme',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
@@ -11267,6 +11270,8 @@ const offreEnAttenteDe = (conversation) => offreVintedEnAttente(conversation);
 // Si l'extension n'est pas là (mobile, pas Chrome…), vmrExtPresent() est faux et
 // l'app propose le repli « répondre sur Vinted ».
 let __vmrExtReady = false, __vmrExtVersion = '';
+// (19 nov.) Les appels du démarrage (0 · 0,6 · 1,5 · 3 · 6 s) sont-ils tous partis sans réponse ? Avant : « je lui demande ».
+let __vmrAppelsFinis = false;
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
@@ -11353,10 +11358,68 @@ if (typeof window !== 'undefined') {
     [600, 1500, 3000, 6000].forEach(ms => setTimeout(() => {
       try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
     }, ms));
+    // (19 nov.) La fenêtre de la poignée de main est passée : qui disait « Vérification… » dit maintenant ce qui est su.
+    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, 6800);
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
 const vmrExtVersion = () => __vmrExtVersion;
+// ══ « À INSTALLER » SEULEMENT SI RIEN NE PROUVE LE CONTRAIRE (19 nov.) ═══════
+// Julien, sur son Mac (photo du 19 nov.) : la coque dit « Extension à installer » et « Publier sur Leboncoin » dit
+// « Extension VRM pas détectée dans ce navigateur », alors que deux de ses Chrome donnaient signe de vie le jour même
+// (5.400 et 5.406). Reproduit (vrai Chromium, vraies extensions 5.400 · 5.406 · 5.408, banc `extension-detectee`) :
+// toutes s'annoncent, aucune n'est dite « à installer » ; la phrase ne sort que si AUCUN pont n'a parlé dans cet
+// onglet. Mais « aucun pont » couvrait deux situations que l'app sait distinguer, et elle n'en disait qu'une :
+//   · INSTALLÉE ICI, MUETTE SUR CETTE PAGE. Dans un navigateur Chromium, `chrome.runtime` n'existe dans la page QUE
+//     si une extension installée ET activée de CE profil déclare `externally_connectable` pour elle (toutes les VRM
+//     depuis la 5.171 — voir `canalExt`). Canal là + pont muet ⇒ elle est installée ici, son script n'est pas dans
+//     cette page (activée après l'ouverture de l'onglet, accès au site retiré, dossier déplacé) : le geste est
+//     « recharge la page, sinon ⟳ et l'accès au site », jamais « installe-la ». Lu SEULEMENT là où le repère est sûr
+//     (Chrome, Edge, Brave, Opera, Vivaldi, Yandex — pas Orion ni Safari, où la page peut porter un `chrome.runtime`
+//     sans extension ; le mode exemple masque `chrome`) ;
+//   · PAS ICI, MAIS VIVANTE AILLEURS : la ligne `ext_appareil_{id}` que chaque extension du compte publie (5.327).
+//     Lue une fois (ordinateur seulement, après la poignée de main, 10 min de mémoire, projection scalaire) : « elle a
+//     donné signe de vie il y a 20 min (Chrome · Mac, 5.406.0) — pas dans ce navigateur-ci ».
+// « À installer » reste le mot quand rien ne prouve le contraire. « Pas su » ne vaut pas « oui » : rien n'est promis de plus.
+const NAVS_CANAL_SUR = ['chrome', 'edge', 'brave', 'opera', 'vivaldi', 'yandex'];
+const vmrExtInstalleeIci = () => { try { return !__vmrExtReady && !!canalExt() && NAVS_CANAL_SUR.includes(boutiqueIci().nav); } catch (_) { return false; } };
+// `undefined` pas lu · `null` pas su · `[]` aucune · liste des appareils (le plus récent d'abord).
+let __extAilleurs = undefined, __extAilleursAt = 0, __extAilleursEnVol = null;
+const EXT_AILLEURS_VIVANTE_MS = 24 * 3600000, EXT_AILLEURS_MEMOIRE_MS = 10 * 60000;
+const NOMS_NAV_EXT = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
+const NOMS_SYS_EXT = { mac: 'Mac', windows: 'Windows', linux: 'Linux', iphone: 'iPhone', ipad: 'iPad', android: 'Android', chromeos: 'Chromebook' };
+function lireExtAilleurs() {
+  if (__extAilleursEnVol) return __extAilleursEnVol;
+  __extAilleursEnVol = (async () => {
+    let v = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.ext_appareil_*&select=id,ver:data->>ver,atMs:data->>atMs,nav:data->appareil->>nav,sys:data->appareil->>systeme&limit=30`, { headers: sbAuth(), cache: 'no-store' });
+      if (r.ok) { const rows = await r.json(); if (Array.isArray(rows)) v = rows.map((x) => ({ ver: /^\d+\.\d+\.\d+$/.test(String(x.ver || '')) ? String(x.ver) : '', atMs: Number(x.atMs) || 0, nav: String(x.nav || ''), sys: String(x.sys || '') })).filter((x) => x.atMs > 0).sort((a, b) => b.atMs - a.atMs); }
+    } catch (_) { v = null; }
+    __extAilleurs = v; __extAilleursAt = Date.now();
+    __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+    return v;
+  })().finally(() => { __extAilleursEnVol = null; });
+  return __extAilleursEnVol;
+}
+// À lire ? Seulement à l'ordinateur, session ouverte, aucune extension ici (ni pont, ni canal), poignée de main passée.
+const extAilleursUtile = () => typeof window !== 'undefined' && __vmrAppelsFinis && !__vmrExtReady && !vmrExtInstalleeIci() && !lireSansSouris() && !!(AUTH.session && AUTH.user) && mfaPasse();
+function veillerExtAilleurs() {
+  if (!extAilleursUtile() || __extAilleursEnVol) return;
+  if (__extAilleurs !== undefined && Date.now() - __extAilleursAt < EXT_AILLEURS_MEMOIRE_MS) return;
+  lireExtAilleurs();
+}
+// L'extension du compte la plus récemment vue ailleurs (moins de 24 h), ou null. Un CONSTAT, jamais une capacité d'ici.
+function extVivanteAilleurs() {
+  if (__vmrExtReady || !Array.isArray(__extAilleurs)) return null;
+  const x = __extAilleurs[0];
+  if (!x || !(Date.now() - x.atMs < EXT_AILLEURS_VIVANTE_MS)) return null;
+  const ou = [NOMS_NAV_EXT[x.nav] || '', NOMS_SYS_EXT[x.sys] || ''].filter(Boolean).join(' · ');
+  return { ver: x.ver, atMs: x.atMs, ou };
+}
+// (Banc `extension-detectee`) Ce que l'app SAIT de l'extension, en lecture : aucune donnée du vendeur.
+try { if (typeof window !== 'undefined') window.__vrmExtVu = () => ({ present: __vmrExtReady, version: __vmrExtVersion, canal: !!canalExt(), installeeIci: vmrExtInstalleeIci(), appelsFinis: __vmrAppelsFinis,
+  retard: __vmrExtReady ? cmpVersion(__vmrExtVersion || '0.0.0', EXT_ATTENDUE) < 0 : null, sait: { ancienne: extSait('baisseprix'), recente: extSait('repubetapes') }, ailleurs: extVivanteAilleurs() }); } catch (_) {}
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
 // (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
 // n'est pas là ou ne répond pas — jamais une supposition.
@@ -12748,7 +12811,17 @@ function raisonExtGlobale(sansSouris, opt) {
     const orionIos = mobileIci() === 'ios' && !!boutiqueOrion();
     return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur${ffAndroid ? ' — ou installe l’extension dans ce Firefox' : orionIos ? ' — ou depuis Orion, sur cet iPhone' : ''}`, role };
   }
-  if (!vmrExtPresent()) return { code: 'absente', texte: 'Extension VRM pas détectée dans ce navigateur', role };
+  if (!vmrExtPresent()) {
+    // (19 nov.) Installée ici mais muette sur cette page (voir `vmrExtInstalleeIci`) : jamais « à installer ».
+    if (vmrExtInstalleeIci()) return __vmrAppelsFinis
+      ? { code: 'muette', geste: 'recharger', ici: true, texte: `L'extension VRM est installée dans ce ${nomNavigateurIci()} mais ne répond pas sur cette page — recharge cette page ; si ça ne suffit pas, ouvre ${pageExtensionsIci()}, clique ⟳ sur VRM et vérifie dans ses détails que l'accès au site est « sur tous les sites ».` }
+      : { code: 'verif', texte: "Vérification de l'extension…" };
+    // Pas ici — mais une extension du compte a donné signe de vie ailleurs : on le dit (un constat, lu en base).
+    const ail = extVivanteAilleurs();
+    return { code: 'absente', role, ailleurs: ail, texte: ail
+      ? `Extension VRM pas détectée dans ce navigateur — celle de ton compte a donné signe de vie ${ilYaCourt(ail.atMs)}${ail.ou || ail.ver ? ` (${[ail.ou, ail.ver].filter(Boolean).join(', ')})` : ''}, mais pas dans ce navigateur-ci : ouvre VRM dans le navigateur où elle est, ou installe-la ici`
+      : 'Extension VRM pas détectée dans ce navigateur' };
+  }
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
   if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
@@ -19497,9 +19570,10 @@ function HoteRetrouver({ onAttendreSources, onChercher }) {
   }, [attendre]);
   if (!ouvert) return null;
   const fermer = () => { setOuvert(false); setCode0(''); };
-  // « Relier à un achat » : la feuille de choix d'Achats (src/relierColis.js) ; sans écran qui sait relier, Achats s'ouvre et la reprend.
-  const relier = (d) => { if (demanderRelierColis(d)) return; DEMANDE_RELIER.d = d; DEMANDE_RELIER.at = Date.now(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); } catch (_) {} };
-  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} onRelier={relier} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  // (19 nov., Julien redemande : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » depuis le
+  // scanner : un colis inconnu se dit (transporteur, n°, « Chercher »), il ne se relie plus à la main. Le lien vient de
+  // l'identité (n° de suivi lu par l'extension, conversation, code), docs/passation/2026-11-19-colis-achat-auto.md.
+  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -22679,6 +22753,8 @@ function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => onVmrExt(force), []);
   React.useEffect(() => { demarrerRelais(); }, []);
+  // (19 nov.) Aucune extension ici, à l'ordinateur : une du compte vit-elle ailleurs ? (une lecture, 10 min de mémoire)
+  React.useEffect(() => { veillerExtAilleurs(); return onVmrExt(veillerExtAilleurs); }, []);
   return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
 }
 function etatExtensionFavoris(uid,mesure=null){
@@ -23168,7 +23244,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // que s'il y a un geste à faire ici (§7) ; « pas de geste » reste gris.
   const point = aRattraper ? C.warn : st.niveau === 'ok' ? C.text : C.muted;
   const rl = etatRelais();
-  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? 'Extension à installer' : 'Lecture seule';
+  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? (st.glob && st.glob.ailleurs ? 'Extension : pas dans ce navigateur' : 'Extension à installer') : 'Lecture seule';
   // Ce que la pastille ÉCRIT (le libellé complet reste en aria-label et en titre).
   const visible = st.niveau === 'ok' && loginVinted ? loginVinted : libelle;
   // (1er nov., vendeur neuf) Avant toute installation, « Lecture seule » était la
@@ -23186,8 +23262,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
     : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
     : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
     : code === 'telephone' ? { s: '—', t: 'sur ton ordinateur' }
-    : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
-    : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'absente' ? { s: 'non', t: st.glob && st.glob.ailleurs ? `pas dans ce navigateur — celle de ton compte a donné signe de vie ${ilYaCourt(st.glob.ailleurs.atMs)}${st.glob.ailleurs.ou || st.glob.ailleurs.ver ? ` (${[st.glob.ailleurs.ou, st.glob.ailleurs.ver].filter(Boolean).join(', ')})` : ''}` : 'pas détectée dans ce navigateur' }
+    : code === 'muette' ? { s: 'non', t: st.glob && st.glob.ici ? 'installée ici, mais ne répond pas sur cette page' : 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
@@ -23320,7 +23396,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
     <div ref={boite} className="vrm-hdr-etat" style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ici={st.glob && st.glob.ici ? '1' : undefined} data-etat-ailleurs={st.glob && st.glob.ailleurs ? (st.glob.ailleurs.ver || '1') : undefined} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
@@ -25378,7 +25454,8 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
                 {m.tx && <div data-suivi-lie={m.tx} style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Relié à : {lie ? `${lie.title || 'Achat'}${lie._acc ? ` (${accName(lie._acc)})` : ''}` : `l'achat ${m.tx}`}</div>}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                   <BoutonSuivreColis transporteur={m.transporteur} suivi={m.suivi} codePostal={m.cp} enLigne/>
-                  {!m.tx && <Bouton variante="secondaire" data-suivi-relier={m.suivi} onClick={() => setRelierPour(p => p === m.id ? '' : m.id)} style={{ minHeight: 44 }}>Relier à un achat</Bouton>}
+                  {/* (19 nov., Julien : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » à la main :
+                      un lien ancien reste lu (« Relié à », « Délier ») ; aucun nouveau ne se pose ici. */}
                   {m.tx && <Bouton variante="discret" data-suivi-delier={m.suivi} onClick={async () => { const r = await ecrireSuiviManuel(m.id, { tx: null, uid: null }); if (!r.ok) setMsg(r.msg); relire(); }}>Délier</Bouton>}
                   {/* (revue du 24 oct.) « Retirer », dans l'onglet « À retirer », se lisait
                       « je l'ai retiré » : le bouton efface le SUIVI, il le dit. */}
@@ -33467,7 +33544,14 @@ const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
 // il peut le refermer, et ce choix ne vaut QUE pour la liste de colis qu'il avait sous les yeux (un colis
 // de plus ⇒ rouvert) ; l'ancien « fermé » (`'0'`) ne cache plus jamais un colis. Rien à retirer mais des
 // colis « à vérifier » ⇒ la ligne reste visible (fermée), avec leur nombre : jamais cachés.
-function RepliRetirerAchats({ children, sansLigne = false }) {
+// (19 nov., capture iPhone de Julien) `siteFiltre` (Achats · Leboncoin, eBay, Vestiaire) : la ligne disait le nombre de
+// TOUS les sites (« À retirer · 2 › » au-dessus de « À retirer · 0 ») ; sous un site, pas de ligne : la section s'ouvre et
+// sa tête dit le nombre de CE site (src/retirerSite.js), « Aucun colis {site} à retirer » quand il n'y en a pas.
+function RepliRetirerAchats({ children, sansLigne = false, siteFiltre = false }) {
+  if (siteFiltre) return <div className="vrm-achats-retirer-repli" data-retirer-repli="site">{children}</div>;
+  return <RepliRetirerAchatsTous sansLigne={sansLigne}>{children}</RepliRetirerAchatsTous>;
+}
+function RepliRetirerAchatsTous({ children, sansLigne = false }) {
   const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
   // (17 nov., nouveau design) Allumé : les passes sont compactes — « À retirer » est TOUJOURS ouvert, sans ligne de repli.
   const designV2 = useDesignV2();
@@ -37501,12 +37585,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (`commandeUnique`, api/_lib/commande-colis.js) ; deux commandes ⇒ personne. Colis → À retirer, le mode relais,
   // Ma journée (en ligne et hors ligne), les codes hors ligne et la liste publiée pour le widget le lisent ici.
   // Jamais le titre, le lieu ou la date (§5) : sans identité, la ligne reste « Colis {transporteur} ».
-  const commandeRetrait = (t) => {
-    if (!t) return null;
-    let a = null; try { a = achatDuColis(t, buysBase, indexSuivisAchats); } catch (_) { a = null; }
-    const c = pickupUnion.cmdParColis ? (pickupUnion.cmdParColis.get(colisKey(t)) || null) : null;
-    return commandeUnique(a, c);
-  };
+  // (19 nov.) La règle vit dans src/contenuColis.js (`achatDuRetrait`) : l'audit `colis-achat-auto` l'exécute.
+  const commandeRetrait = (t) => achatDuRetrait(t, { achats: buysBase, index: indexSuivisAchats,
+    jonction: t && pickupUnion.cmdParColis ? (pickupUnion.cmdParColis.get(colisKey(t)) || null) : null });
   // ── (31 oct.) LES COLIS À ALLER CHERCHER, PAR POINT RELAIS ───────────────
   // Julien : « une carte avec les colis à aller chercher par point relais, et
   // des prévisions ». Les colis DÉJÀ là : les listes de `pickupUnion` (§11 : le
@@ -37541,46 +37622,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupUnion, buysBase, indexSuivisAchats]);
-  // ── (17 nov., suivi multi-transporteurs) « C'EST SANS DOUTE LE MÊME COLIS » ET « CE LIEN NE CORRESPOND PAS » ──
-  // La voie principale est l'identité (tous les n° du trajet, extension 5.403) : rien à proposer quand elle relie.
-  // EN ATTENDANT qu'un achat ait sa liste de n° lue, une PROPOSITION seulement quand rien d'autre n'est possible
-  // (src/memeColis.js : un colis, un achat, même point, même groupe de transporteur, arrivé après l'achat, aucun
-  // autre achat en route vers ce point) — SON toucher relie. Et un lien posé à la main que la liste LUE contredit
-  // ne relie plus rien : la ligne le dit et propose « Délier ».
-  const [colisPasMeme, setColisPasMeme] = useStateCle('vrm_colis_pas_meme', () => load('vrm_colis_pas_meme', {}));
+  // ── (17 nov., suivi multi-transporteurs) « CE LIEN NE CORRESPOND PAS AU SUIVI VINTED » ──
+  // La voie de l'identité : tous les n° du trajet d'un achat (extension 5.403). Un lien posé à la main par le passé que
+  // la liste LUE contredit ne relie plus rien : la ligne le dit et propose « Délier » (src/memeColis.js, `liensContredits`).
+  // (19 nov., décision de Julien : « je ne dois pas relier l'achat au colis qui est au point relais, ça doit être
+  // automatique […] on ne doit pas avoir le bouton relier un achat ») La PROPOSITION « C'est sans doute le même colis —
+  // Relier » (un colis et un achat au même point, SON toucher reliait) n'est plus montrée : c'était encore un « Relier »
+  // sur un colis à retirer, par ressemblance (même point, même transporteur). Le colis dit « Contenu pas encore lu »
+  // (src/contenuColis.js) jusqu'à ce que l'identité relie. `vrm_colis_pas_meme` n'est plus lu ni écrit (rien n'est effacé).
   const memeColis = useMemo(() => {
     try {
-      const lieuDeAchat = (o) => { const r = relaisDe(o); if (r && r.lieu) return String(r.lieu); const e = entreeSuiviAchat(o); return e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.rue, [e.relais.cp, e.relais.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ') : ''; };
-      const transpDeAchat = (o) => { const r = relaisDe(o); const e = entreeSuiviAchat(o); return [r && r.transporteur, e && e.transporteur, ...((e && e.transporteursV) || [])].filter(Boolean); };
-      const cleAchat = (o) => `${String((o && o._acc && o._acc.vinted_user_id) || (o && o._acc) || '')}:${String(o.transaction_id)}`;
-      const lignesT = [...(pickupUnion.emailList || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'email' && x.t).map((x) => x.t)];
-      const colis = [];
-      for (const t of lignesT) {
-        if (!t || t.source === 'vinted-commande' || !suiviDeLigne(t) || commandeRetrait(t)) continue;
-        const a = arriveeColisEmail({ ...t, status: 'available' });
-        colis.push({ cle: colisKey(t), suivi: suiviDeLigne(t), transporteur: carrierKey(t.carrier) || t.carrier || '', lieu: t.lieu || '', arriveeMs: a && Number.isFinite(a.ms) ? a.ms : NaN });
-      }
-      const vus = new Set(); const achats = [];
-      for (const o of [...(pickupUnion.extra || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'vinted' && x.o).map((x) => x.o), ...(pickupUnion.aConfirmer || [])]) {
-        if (!o || o.transaction_id == null) continue; const k = cleAchat(o); if (vus.has(k)) continue; vus.add(k);
-        const e = entreeSuiviAchat(o); const r = relaisDe(o);
-        achats.push({ cle: k, o, lieu: lieuDeAchat(o), transporteurs: transpDeAchat(o), listeLue: !!(e && e.listeLue), aCode: !!(r && (codeRetrait(r.code) || r.qr)), dateMs: Date.parse(o.date || '') });
-      }
-      const enRoute = [];
-      for (const o of (buysBase || [])) { if (o && o.transaction_id != null && phaseReception(o) === 'route') { const e = entreeSuiviAchat(o); enRoute.push({ cle: cleAchat(o), lieu: e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.cp].filter(Boolean).join(', ') : '', transporteurs: transpDeAchat(o) }); } }
-      const propositions = propositionsMemeColis({ colis, achats, enRoute, pasMeme: new Set(Object.keys(colisPasMeme || {})) });
       const contredits = new Map(); for (const m of liensContredits(suivisVinted, suivisManuels)) contredits.set(normaliserSuivi(m.suivi), m);
-      return { propositions, contredits };
-    } catch (_) { return { propositions: new Map(), contredits: new Map() }; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickupUnion, buysBase, indexSuivisAchats, suivisVinted, suivisManuels, colisPasMeme]);
-  const relierMemeColis = async (t, p) => {
-    const w = ecritureRelierColis({ suivi: p.suivi, transporteur: carrierKey(t.carrier) || '' }, p.achat); if (!w) return false;
-    const r = await ecrireSuiviManuel(w.id, { ...w.patch, relieDepuis: 'proposition' });
-    if (!r.ok) return false;
-    await relireSuivisManuelsPartout(); return true;
-  };
-  const pasMemeColis = (p) => setColisPasMeme((prev) => { const u = { ...(prev || {}), [clePasMeme(p.suivi, p.cleAchat)]: new Date().toISOString() }; save('vrm_colis_pas_meme', u); return u; });
+      return { contredits };
+    } catch (_) { return { contredits: new Map() }; }
+  }, [suivisVinted, suivisManuels]);
   const delierLienContredit = async (m) => { const ok = await retirerSuiviManuel(m.id); if (ok) await relireSuivisManuelsPartout(); return ok; };
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
@@ -46900,6 +46955,35 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       L.push({ cle: 'vc:' + v.id, groupe: 'vestiaire', site: 'vestiaire', nom: 'Vente Vestiaire', num: v.num || '', etat: ['Vestiaire · ' + (v.etiquette === true ? 'bordereau sur Vestiaire' : 'pas encore de bordereau'), j == null ? '' : j < 0 ? 'date limite passée' : j === 0 ? "à poster aujourd'hui" : j === 1 ? 'à poster demain' : ''].filter(Boolean).join(' · '), ambre: j != null && j <= 1, ouvrir: true }); }
     const maintenant = Date.now();
     const photoAchat = (o) => (o ? (orderPhoto(o) || (indexSuivisAchats[String(o.transaction_id)] || {}).photo || null) : null);
+    // (19 nov., Julien : « on doit pouvoir voir il y a quoi dans chaque code de retrait, ça doit être automatique […]
+    // on ne doit pas avoir le bouton relier un achat ») LE CONTENU DE CHAQUE COLIS À RETIRER, UN SÉLECTEUR PAR CARTE
+    // (`x.contenu`, la règle de src/contenuColis.js — tous les écrans lisent celui-ci, §11) :
+    //   { etat: 'relie', tx, titre, photo, prix, compte }  l'achat relié par IDENTITÉ (n° de suivi lu sur Vinted,
+    //                                                      conversation de SA commande, code — jamais le titre) ;
+    //   { etat: 'pas-lu', raison, compte }                 rien ne relie : « Contenu pas encore lu », et le geste
+    //                                                      (« ouvre vinted.fr sur {compte} ») quand le compte du colis est su ;
+    //   { etat: 'autre-site', site, titre } · null         un achat Leboncoin / Vestiaire · rien à dire.
+    // Le prix payé est celui LU de la commande (`montantCommandeLu` : pas su ou autre devise ⇒ rien, jamais 0).
+    const plusieursComptesC = (accounts || []).length > 1;
+    const contenuCarte = ({ t = null, o = null, autre = null, site = 'vinted' } = {}) => {
+      try {
+        const p = o ? montantCommandeLu(o) : null;
+        return contenuDuColis({ ligne: t, suivi: t ? suiviDeLigne(t) : '', achat: o, autreSite: autre, site, photo: o ? photoAchat(o) : null,
+          prix: p != null && p > 0 ? montant(p) : '', compteAchat: plusieursComptesC && o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', compteColis: t ? (compteDuColisEmail(t) || '') : '' });
+      } catch (_) { return null; }
+    };
+    // (19 nov.) + ce qu'il faut pour écrire le colis en UNE RANGÉE (`rangeeRetrait(x)`, src/contenuColis.js — l'écran
+    // Achats en rangées se construira dessus) : la date limite et si elle est LUE ou ESTIMÉE (la préséance de la barre de
+    // délai : lue, puis « vers le » du transporteur, puis la garde de SON transporteur), et « un QR existe pour ce colis ».
+    const limiteCarte = ({ t = null, o = null } = {}) => {
+      try {
+        const ev = !t && o ? (etatColisVinted(o, maintenant, tpmC) || {}) : null;
+        const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
+        const est = arr && Number.isFinite(arr.ms) ? limiteEstimee({ arriveeMs: arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' }) : null;
+        return limiteDuColis({ limite: t ? t.limite : (ev && ev.limite), limiteAt: t ? t.limiteAt : (ev && ev.limiteAt), vers: t ? t.limiteVers : (ev && ev.limiteVers), estimation: est });
+      } catch (_) { return limiteDuColis({}); }
+    };
+    const qrCarte = ({ t = null, o = null } = {}) => { try { if (t) return !!qrVivant(t); const r = o ? relaisDe(o) : null; return !!(r && r.qr); } catch (_) { return false; } };
     const tpmC = transpMap;
     const dernierJour = (j) => (Number.isFinite(j) && j <= 1 ? (j <= 0 ? "dernier jour aujourd'hui" : 'dernier jour demain') : '');
     // (1er nov.) Chaque colis à retirer porte SON lieu (nom + adresse, tels que
@@ -46991,7 +47075,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47011,7 +47095,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -47028,13 +47112,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
-        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         arrivee: arriveeLueRetrait({ o }),
-        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, src: { o } }); }
+        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
       const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
@@ -55771,6 +55855,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const nEnv = !pubEnv ? null : siteColis === 'toutes' ? (Number.isFinite(pubEnv.total) ? pubEnv.total : null) : (Number.isFinite(pubEnv[siteColis]) ? pubEnv[siteColis] : null);
           const envPartiel = siteColis === 'toutes' && !!pubEnv && (pubEnv.ebay === null || pubEnv.leboncoin === null || pubEnv.vestiaire === null);
           const nRet = pubRet && Number.isFinite(pubRet.total) ? pubRet.total : null;
+          // (19 nov., capture iPhone de Julien : Achats · Leboncoin disait « À retirer · 15 · 2 d'ici demain · 15 avec code
+          // · 5 à vérifier » sur une liste VIDE — ses colis Vinted) Sous un site, les nombres de « À retirer » se comptent
+          // sur la colonne de CE site (la liste qu'on montre) ; « toutes » garde la publication. src/retirerSite.js.
+          const chRet = chiffresRetirer({ site: siteColis, pub: pubRet, union: pickupUnion, colRet, lu: tracking !== null });
+          // Les « sortis de à retirer » suivent le même filtre (le site d'un colis : celui de sa carte, jamais deviné).
+          const sortisVus = (() => { const tous = pickupUnion.sortis || []; if (!chRet.filtre) return tous;
+            const aa = indexAchatsAutresSites({ lbcVentes: (lbcVentes && lbcVentes.achats) || [], vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null });
+            return tous.filter((x) => siteDuColisSorti(x, { achatsAutres: aa, suiviDe: suiviDeLigne }) === chRet.site); })();
           // E-mails de suivi pas lus : le nombre est un plancher (« au moins », §5).
           const retPartiel = tracking === null;
           const uEnv = urgenceColis();
@@ -55952,18 +56044,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (16 nov., lot achats-qr) La ligne passe le délai qu'elle AFFICHE (`d`) : la feuille dit les mêmes jours.
             const qi = t ? qrVivant(t) : ''; if (qi) return (d) => openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t, { delai: d || delaiColisRetrait(x) });
             const relV = !t && o ? relaisDe(o) : null; return relV && relV.qr ? (d) => openQrView(ligneRetraitVinted(o), { delai: d || delaiColisRetrait(x) }) : null; };
-          // (16 nov., lot achats-qr) « Achat pas encore relié · Relier » : un colis d'e-mail (n° de suivi lu) qu'AUCUNE
-          // identité ne relie à un achat (`commandeRetrait` : n° de suivi, conversation, code — jamais le titre). Son clic
-          // choisira l'achat ; un colis déjà relié, d'un autre site, ou sans n° n'a pas ce geste.
-          const relierRetrait = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.achatAutre || (x.site && x.site !== 'vinted') || x.redirige) return null;
-            const su = suiviDeLigne(t); if (!su || commandeRetrait(t)) return null;
-            return () => { setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis({ suivi: su, transporteur: carrierKey(t.carrier) || '', cle: x.cle, nom: CARRIERS[carrierKey(t.carrier)] ? carrierName(t.carrier) : '' }); }; };
-          // (17 nov., suivi multi-transporteurs) La proposition « C'est sans doute le même colis » (en attendant la liste
-          // des n° de l'achat) et le lien posé à la main que la liste LUE contredit (`memeColis`, src/memeColis.js).
+          // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Plus de
+          // « Relier l'achat » sur un colis à retirer : chaque carte porte `contenu` (posé par `cartesColis`, la règle de
+          // src/contenuColis.js) — l'achat relié par identité, ou « pas lu » et sa raison. Aucun geste ici.
+          // (17 nov., suivi multi-transporteurs) Le lien posé à la main que la liste LUE contredit (`memeColis`,
+          // src/memeColis.js) : « Délier ». (19 nov.) Plus de proposition « même colis · Relier » (décision de Julien).
           const memeColisDe = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.horsCompte || x.redirige || (x.site && x.site !== 'vinted')) return null;
-            const c = memeColis.contredits.get(suiviDeLigne(t)); if (c) return { sorte: 'contredit', delier: () => delierLienContredit(c) };
-            const p = memeColis.propositions.get(colisKey(t)); if (!p) return null;
-            return { sorte: 'proposition', titre: (p.achat && p.achat.title) || '', tx: String(p.achat.transaction_id), relier: () => relierMemeColis(t, p), pasMeme: () => pasMemeColis(p) }; };
+            const c = memeColis.contredits.get(suiviDeLigne(t)); return c ? { sorte: 'contredit', delier: () => delierLienContredit(c) } : null; };
           const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
@@ -56016,8 +56103,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (`vrm_colis_aposter`, `vrm_colis_retirer`) ; pas lus ⇒ « — » (§5). Achats · À retirer : son chiffre, aucun plein.
               if (colisDans) {
                 const achatsSec = colisDans === 'achats';
-                const nTete = achatsSec ? nRet : nEnv;
-                const pressesTete = achatsSec ? (pubRet && Number.isFinite(pubRet.urgents) ? pubRet.urgents : 0) : colisAEnvoyerListe().filter(avantDemainColis).length;
+                const nTete = achatsSec ? chRet.n : nEnv;
+                const pressesTete = achatsSec ? chRet.urgents : colisAEnvoyerListe().filter(avantDemainColis).length;
                 const ronds = (<>
                   <Rond icone="scan" label={scanRetraitBarre ? tr('sv.scanner.retrait') : tr('sv.scanner.envoi')} titre={scanRetraitBarre ? tr('sv.scanner.retraitTitre') : tr('sv.scanner.envoiTitre')}
                     onClick={() => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi')}
@@ -56195,6 +56282,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const nD = cpt.filter((c) => c.jours != null && c.jours <= 1).length, nC = cpt.filter((c) => c.code || c.qr).length, nV = rows.filter((c) => c.horsCompte).length;
                 return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={vc.nom} data-fu-colis-retirer={String(cpt.length)} data-fu-ville={vc.cle} valeur={<>{cpt.length} colis</>} sous="à retirer"
                   cases={[{ cle: 'dernier', n: nD, l: 'd’ici demain', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
+              // (19 nov.) Un site choisi : les nombres de SA liste (src/retirerSite.js), la même règle que la ville ci-dessus.
+              if (chRet.filtre) return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={nomSite[chRet.site] || chRet.site} data-fu-colis-retirer={chRet.n == null ? '' : String(chRet.n)} data-fu-site={chRet.site}
+                valeur={chRet.n == null ? null : <>{chRet.n} colis</>} sous={chRet.n == null ? 'Je lis tes colis…' : chRet.n === 0 ? tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site }) : 'à retirer'}
+                cases={[{ cle: 'dernier', n: chRet.urgents, l: 'd’ici demain', attrs: { 'data-n': String(chRet.urgents) } }, { cle: 'code', n: chRet.prets, l: 'avec code', attrs: { 'data-n': String(chRet.prets) } }, { cle: 'verifier', n: chRet.aVerifier, l: 'à vérifier', attrs: { 'data-n': String(chRet.aVerifier) } }]}/>;
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
                 pile={nRet ? { srcs: ((parPoint && parPoint.points) || []).flatMap((p) => (p.arrives || []).filter((c) => !c.horsCompte).map((c) => c.photo)), n: nRet, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null}
@@ -56211,7 +56302,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && colisDans ? (() => {
               const m0 = new Date(); m0.setHours(0, 0, 0, 0);
               const parts = colisDans === 'achats'
-                ? [/* (14 nov., Studio) « d’ici demain » est l’ambre du grand chiffre (§7) */ ['code', pickupUnion.prets || 0, 'avec code'], ['verifier', (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length, 'à vérifier']]
+                ? [/* (14 nov., Studio) « d’ici demain » est l’ambre du grand chiffre (§7) ; (19 nov.) sous un site, ceux de SA liste (`chRet`) */ ['code', chRet.prets, 'avec code'], ['verifier', chRet.aVerifier, 'à vérifier']]
                 // (12 nov., finitions) « 15 à imprimer » sous « Tout imprimer (15) » redisait le même nombre (§7) :
                 // la case ne se dit que si elle apprend autre chose que le bouton.
                 : [['imprimer', nPrets === nLot ? 0 : nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
@@ -56255,7 +56346,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 options={[
                   { v: 'envoyer', l: 'À envoyer', n: colisDans ? null /* (14 nov., Studio) le grand chiffre de la tête le dit déjà (§7) */ : nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
                   { v: 'envoyes', l: 'Envoyés', n: nEnvoyes != null ? String(nEnvoyes) : null, data: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nEnvoyes != null ? String(nEnvoyes) : '' } },
-                  { v: 'retirer', l: 'À retirer', n: nRet != null ? `${nRet}${retPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': nRet != null ? String(nRet) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
+                  { v: 'retirer', l: 'À retirer', n: chRet.n != null ? `${chRet.n}${retPartiel && !chRet.filtre ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'retirer', 'data-colis-onglet-n': chRet.n != null ? String(chRet.n) : '', 'data-urgent': urgentRet ? '1' : '0', title: retPartiel && nRet != null ? `Au moins ${nRet} : les e-mails de suivi n'ont pas pu être lus` : undefined } },
                 ].filter((o) => !colisDans || o.v !== 'retirer')}/>}
               {/* (14 nov., refonte des listes — AJOUT 3) Au téléphone, « 15 à imprimer », « N à envoyer en priorité »,
                   « Préparer mes colis · Je dépose » et la tournée vivent dans « • À faire · N » (src/ui/AFaire.jsx) : la
@@ -56293,7 +56384,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
-                {pickupUnion.total > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
+                {(chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
                 {(() => { // (9 nov., Julien : « le statut doit être regardé très souvent ») QUAND le suivi a été lu chez
                   // le transporteur pour la dernière fois (la plus récente lecture réussie, `lu` des lignes `transp_`) —
                   // discret, une ligne ; rien lu ⇒ rien dit (jamais « à l'instant » inventé).
@@ -56304,7 +56395,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // l'explication animée (données inventées) du SEUL chemin du QR : une capture de l'app Mondial Relay
                   // posée sur le colis (« c'est que dans l'app » : ni e-mail, ni site, ni extension).
                   const comptesMr = (mrColis && Array.isArray(mrColis.comptes)) ? mrColis.comptes : [];
-                  const mrListe = (pickupUnion.emailList || []).filter(t => t && t.carrier === 'mondialrelay');
+                  // (19 nov.) Sous un site : les colis Mondial Relay de SA liste (les cartes de la colonne), pas ceux des autres sites.
+                  const mrListe = (chRet.filtre ? ((colRet && colRet.cartes) || []).filter((c) => c && !c.horsCompte).map((c) => c.src && c.src.t).filter(Boolean) : (pickupUnion.emailList || [])).filter(t => t && t.carrier === 'mondialrelay');
                   if (!comptesMr.length && !mrListe.length) return null;
                   const sansQr = mrListe.filter(t => !qrImage(t)).length;
                   return <div className="vrm-mr-bloc" data-mr-bloc="" data-mr-sans-qr={sansQr} data-mr-lu={mrColis === undefined ? 'en-cours' : mrColis === null ? 'pas-su' : 'lu'}>
@@ -56317,7 +56409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>; })()}
                 {(() => { // (23 oct.) Un compte inconnu ne fait jamais disparaître un colis : dit UNE fois, avec le geste.
                   const sans = (pickupUnion.emailList || []).filter(t => !compteDuColisEmail(t)); const n = sans.length;
-                  if (!n) return null;
+                  if (!n || !voitSite('vinted')) return null;
                   const adresseLibre = sans.some(t => Array.isArray(t.recuSur) && t.recuSur.length);
                   // (2 nov., colis clair) Ces colis SONT montrés (leurs cartes, plus bas, à
                   // retirer comme les autres) : la ligne ne parle que pour donner le geste —
@@ -56327,13 +56419,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {/* (17 nov.) LE NOUVEAU DESIGN (essai) : les codes en PASSES « Wallet » (un point = une passe, la date limite
                     au-dessus du QR, le code en grand, le QR seulement s'il existe), les achats en route en lignes iOS ; la
-                    colonne d'hier (ses gestes rares : relier, ville, redirigés) reste entière, repliée dessous. Éteint : rien ne change. */}
-                {(() => { const ancienne = (colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
-                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} relierDe={relierRetrait} memeColisDe={memeColisDe} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
-                      redirige={(colisRelaisChange(tracking, { transp: transpMap }) || []).map((r) => { const t = (tracking || []).find((l) => l && l.relaisChange && suiviDeLigne(l) === r.suivi) || { suivi: r.suivi, carrier: r.carrier, emailRecu: r.emailRecu };
+                    colonne d'hier (ses gestes rares : ville, redirigés) reste entière, repliée dessous. Éteint : rien ne change. */}
+                {(() => { // (19 nov.) Sous un site autre que Vinted : ni les achats Vinted en route, ni les colis redirigés (e-mails Vinted) — la liste
+                  // est celle de CE site, et vide se DIT pour ce site (« Aucun colis Leboncoin à retirer. »), jamais sous des chiffres d'ailleurs.
+                  const vinVu = voitSite('vinted');
+                  const enRouteSR = vinVu ? ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) : 0;
+                  const videSite = chRet.filtre && chRet.vide && enRouteSR === 0 && toutLuRet
+                    ? <p className="vrm-colis-vide" data-retraits-vide="site" data-retraits-vide-site={chRet.site}>{tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site })}</p> : null;
+                  const ancienne = (colRet && (colRet.cartes.length > 0 || enRouteSR > 0)
+                  ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={enRouteSR}
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} memeColisDe={memeColisDe} enRoute={vinVu ? ((groupesRelais && groupesRelais.sansRelais) || []) : []}
+                      redirige={(vinVu ? (colisRelaisChange(tracking, { transp: transpMap }) || []) : []).map((r) => { const t = (tracking || []).find((l) => l && l.relaisChange && suiviDeLigne(l) === r.suivi) || { suivi: r.suivi, carrier: r.carrier, emailRecu: r.emailRecu };
                         return { cle: 'r:rc:' + r.suivi, suivi: r.suivi, titre: '', nom: r.nom, adresse: r.adresse, code: r.code || '', codeDe: r.codeDe || '', transp: transporteurColis(r.carrier, r.suivi), jours: null, redirige: true, src: { t } }; })}/>
-                  : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null));
+                  : videSite || (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null));
                   if (!(designV2 && colisDans === 'achats')) return ancienne;
                   const avecColis = (parPoint.points || []).some((p) => (p.arrives || []).some((x) => x && !x.aVerifier && !x.horsCompte && !x.redirige));
                   const enRouteV2 = voitSite('vinted') ? (buysBase || []).filter((o) => phaseReception(o) === 'route').map((o) => { const e = entreeSuiviAchat(o);
@@ -56343,9 +56441,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
                   // Prêt quand les codes ET les achats sont lus ET que les passes sont là (ou qu'il n'y a rien à retirer) : une passe
                   // qui arrive après « En route » le pousserait.
-                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !(pickupUnion.total > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                    {videSite}
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
-                      aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
+                      aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
@@ -56356,18 +56455,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
-                    {ancienne ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
+                    {ancienne && ancienne !== videSite ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
                   </div></QuandLuV2>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou
                     reparti — la décision de `pickupUnion`, inchangée ; ici elle se DIT, quelques jours, hors du compte. */}
-                {(pickupUnion.sortis || []).length > 0 ? (
-                  <details className="vrm-repli" data-retraits-sortis={pickupUnion.sortis.length} style={{marginTop:12}}>
+                {sortisVus.length > 0 ? (
+                  <details className="vrm-repli" data-retraits-sortis={sortisVus.length} style={{marginTop:12}}>
                     <summary style={{minHeight:44,display:'flex',alignItems:'center',gap:6,fontSize:13,fontWeight:600,color:C.text}}>
-                      <span>Sortis de « à retirer »</span><span style={{color:C.muted,fontWeight:400}}>{` · ${pickupUnion.sortis.length} · ${SORTIS_JOURS} derniers jours`}</span>
+                      <span>Sortis de « à retirer »</span><span style={{color:C.muted,fontWeight:400}}>{` · ${sortisVus.length} · ${SORTIS_JOURS} derniers jours`}</span>
                     </summary>
                     <p style={{fontSize:12,color:C.muted,margin:'4px 0 8px',lineHeight:1.45}}>Le suivi dit qu’ils ne t’attendent plus : ils ne comptent plus. Si l’un d’eux est encore au point, montre-le au comptoir avec son n°.</p>
-                    {pickupUnion.sortis.map((x) => { const su = x.t ? suiviDeLigne(x.t) : ''; const o = x.o || null;
+                    {sortisVus.map((x) => { const su = x.t ? suiviDeLigne(x.t) : ''; const o = x.o || null;
                       const titre = (o && o.title) || (x.t && x.t.artTitle) || (su ? `Colis n°…${su.slice(-4)}` : 'Colis');
                       return <div key={x.cle} data-sorti={x.cle} data-sorti-source={x.fin.source} data-sorti-etat={x.fin.etat} data-sorti-at={Number.isFinite(x.fin.at) ? new Date(x.fin.at).toISOString().slice(0, 10) : ''} data-sorti-via={x.via || undefined}
                         style={{padding:'8px 0',borderTop:`1px solid ${C.border}`,display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
@@ -59444,6 +59543,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (`achatsARelier`, src/relierColis.js), le plus avancé d'abord. SON clic sur UNE ligne relie par le n° de
         // transaction de CETTE ligne (50 achats au même titre : le clic décide seul) ; le n° du colis est gardé
         // (`colis_suivi_*` + tx/uid) et `achatDuColis` le retrouve partout. Une écriture ratée ne change rien et le dit.
+        // (19 nov., décision de Julien) Cette feuille ne s'ouvre PLUS depuis un colis à retirer (plus de « Relier
+        // l'achat » : src/contenuColis.js) ; sa seule entrée est le scanner (« Colis inconnu · Relier à un achat »,
+        // un colis qu'il tient en main et scanne lui-même, `EV_RELIER_COLIS`).
         const liste = achatsARelier(Array.isArray(buys.items) && !buys.error ? buysBase : null, indexSuivisAchats);
         const q = String(relierEtat.q || '').trim().toLowerCase();
         const vus = liste ? liste.filter((o) => !q || String(o.title || '').toLowerCase().includes(q)).slice(0, 60) : null;
@@ -65965,7 +66067,7 @@ function AppCoeur() {
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran></AFaireHote>
       </section>);
     if(t==='achats') return (
-      <RepliRetirerAchats sansLigne={site==='vinted'}>
+      <RepliRetirerAchats sansLigne={site==='vinted'} siteFiltre={site!=='toutes'&&site!=='vinted'}>
       <section className="vrm-colis-section" data-colis-hote="achats" aria-label="À retirer">
         {/* (11 nov., revue colis) Le filtre de site d'Achats vaut pour « À retirer » (un seul filtre, comme Ventes) :
             Achats · eBay ne montre plus les colis Vinted et leurs codes (banc achats-retirer-site). Achats n'a pas

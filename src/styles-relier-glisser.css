@@ -108,3 +108,11 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
   .vrm-rg-filtres { padding: 0; }
   .vrm-rg-filtre { min-height: 32px; padding: 0 12px; font-size: 13px; }
 }
+/* (19 nov.) La recherche de chaque liste. */
+.vrm-rg-cherche { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0 2px 8px; padding: 0 12px; border-radius: 12px;
+  border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: var(--rg-carte, #fff); color: var(--rg-gris, #6e6e73); }
+.vrm-rg-cherche > input { flex: 1; min-width: 0; height: 42px; border: 0; outline: 0; background: transparent; color: var(--rg-encre, #1d1d1f); font: inherit; font-size: 16px; -webkit-appearance: none; appearance: none; }
+.vrm-rg-cherche > input::-webkit-search-cancel-button { display: none; }
+.vrm-rg-cherche:focus-within { border-color: var(--rg-accent, #0071E3); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent, #0071E3) 22%, transparent); }
+.vrm-rg-cherche-x { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: transparent; color: inherit; cursor: pointer; }
+@media (min-width: 900px) { .vrm-rg-cherche { min-height: 36px; } .vrm-rg-cherche > input { height: 34px; font-size: 14px; } }

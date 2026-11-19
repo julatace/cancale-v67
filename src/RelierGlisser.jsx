@@ -15,7 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tr, monnaie } from './i18n/index.js';
-import { appuiSuivant, vitesseBord, listesGlisser, marquerPour, achatsRelies, compterCibles, filtrerCibles, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
+import { appuiSuivant, vitesseBord, listesGlisser, marquerPour, achatsRelies, compterCibles, filtrerCibles, chercherAchats, chercherCibles, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
 import { lotDe } from './suggestionsAchat.js';
 import { FaitsAchat, NoteTailleAchats } from './FaitsAchat.jsx';   // (17 nov., lot relier-taille)
 import { faitsAchat, sansTailleLue } from './faitsAchat.js';
@@ -46,6 +46,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const [ongletTel, setOngletTel] = useState('achats');
   // (19 nov., Julien) Les filtres : à gauche « Libres · Déjà reliés », à droite « Toutes · En ligne · Vendues ».
   const [filtreA, setFiltreA] = useState('libres'), [filtreC, setFiltreC] = useState('toutes');
+  const [qA, setQA] = useState(''), [qC, setQC] = useState('');   // la recherche de chaque liste
   const [nVusA, setNVusA] = useState(60), [nVusC, setNVusC] = useState(60);
   const corpsRef = useRef(null), finA = useRef(null), finC = useRef(null), tirer = useRef(null);
   const bordDepuis = useRef(0), vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
@@ -192,9 +193,11 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const relies = useMemo(() => achatsRelies({ achats, liens }), [achats, liens]);
   const nRelies = Array.isArray(relies) ? relies.length : null;
   // « Très probable » : seulement pour la vente / l'annonce CHOISIE, et ces achats-là en tête.
-  const achatsVus = useMemo(() => (filtreA === 'relies' ? relies : marquerPour(L.achats, tresProbables, cibleChoisie)), [filtreA, relies, L.achats, tresProbables, cibleChoisie]);
+  const achatsVus = useMemo(() => chercherAchats(filtreA === 'relies' ? relies : marquerPour(L.achats, tresProbables, cibleChoisie), qA, { compteDe, marqueDe, tailleDe }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtreA, relies, L.achats, tresProbables, cibleChoisie, qA]);
   const nCibles = useMemo(() => compterCibles(L.cibles), [L.cibles]);
-  const ciblesVues = useMemo(() => filtrerCibles(L.cibles, filtreC), [L.cibles, filtreC]);
+  const ciblesVues = useMemo(() => chercherCibles(filtrerCibles(L.cibles, filtreC), qC), [L.cibles, filtreC, qC]);
   // Un choix fait (achat ou article) : la liste d'en face revient à « Libres » / garde son filtre.
   useEffect(() => { if (cibleChoisie && filtreA !== 'libres') setFiltreA('libres'); }, [cibleChoisie, filtreA]);
   const carteAchat = (x, flottante = false) => {
@@ -260,10 +263,16 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
             </div>
           ) : null}
           </div>
+          <label className="vrm-rg-cherche" data-glisser-cherche="achats">
+            <Icon name="search" size={16}/>
+            <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} value={qA} placeholder={tr('glisser.chercherAchats')} aria-label={tr('glisser.chercherAchats')}
+              onChange={(e) => { setQA(e.target.value); setNVusA(60); }}/>
+            {qA ? <button type="button" className="vrm-rg-cherche-x" aria-label={tr('glisser.effacer')} data-glisser-cherche-effacer="achats" onClick={() => { setQA(''); setNVusA(60); }}><Icon name="close" size={16}/></button> : null}
+          </label>
           <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)} data-glisser-achats-vus={Array.isArray(achatsVus) ? String(achatsVus.length) : ''}>
             {achatsVus === undefined ? <li className="vrm-rg-vide">…</li>
               : achatsVus === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
-              : !achatsVus.length ? <li className="vrm-rg-vide" data-glisser-vide="achats">{filtreA === 'relies' ? tr('glisser.aucunRelie') : tr('glisser.aucunAchat')}</li>
+              : !achatsVus.length ? <li className="vrm-rg-vide" data-glisser-vide="achats">{qA ? tr('glisser.aucuneFiltre') : filtreA === 'relies' ? tr('glisser.aucunRelie') : tr('glisser.aucunAchat')}</li>
               : achatsVus.slice(0, nVusA).map((x) => (x.relie ? (
                 <li key={'r' + x.tx}>
                   <div className="vrm-rg-carte vrm-rg-achat is-relie" data-glisser-relie={x.tx}>{carteAchat(x)}</div>
@@ -293,6 +302,12 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
             </div>
           ) : null}
           </div>
+          <label className="vrm-rg-cherche" data-glisser-cherche="cibles">
+            <Icon name="search" size={16}/>
+            <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false} value={qC} placeholder={tr('glisser.chercherCibles')} aria-label={tr('glisser.chercherCibles')}
+              onChange={(e) => { setQC(e.target.value); setNVusC(60); }}/>
+            {qC ? <button type="button" className="vrm-rg-cherche-x" aria-label={tr('glisser.effacer')} data-glisser-cherche-effacer="cibles" onClick={() => { setQC(''); setNVusC(60); }}><Icon name="close" size={16}/></button> : null}
+          </label>
           <ul className="vrm-rg-liste" ref={listeCibles} data-glisser-cibles={String(L.cibles.length)} data-glisser-cibles-vues={String(ciblesVues.length)}>
             {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li>
               : !ciblesVues.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles-filtre">{tr('glisser.aucuneFiltre')}</li>

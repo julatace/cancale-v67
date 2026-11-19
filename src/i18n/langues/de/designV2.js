@@ -72,7 +72,6 @@ export default {
   "v2.passe.qr": "Abhol-QR-Code",
   "v2.passe.codeAVenir": "Code noch nicht gelesen",
   "v2.passe.enGrand": "Vollbild",
-  "v2.passe.relier": "Kauf verknüpfen",
   "v2.passe.retire": "Abgeholt",
   "v2.passe.page": "{i} von {n}",
   "v2.passe.aucun": "Derzeit kein Paket abzuholen.",

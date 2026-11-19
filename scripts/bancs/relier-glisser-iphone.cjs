@@ -105,7 +105,8 @@ const POS = () => { const f = document.querySelector('[data-glisser-defile]'); c
   dit(D.length === 1 && D[0] === 'feuille', `${nom} · A un SEUL conteneur défile : la feuille (aucune liste qui défile dans la page)`, JSON.stringify(D));
   // B · aucune bande vide
   const B = await pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]') || document.querySelector('.vrm-rg-corps'); const r = f.getBoundingClientRect();
-    const sous = document.elementFromPoint(195, window.innerHeight - 40); const ligne = sous && sous.closest ? sous.closest('[data-glisser-achat], [data-glisser-cible]') : null;
+    // (19 nov.) Le doigt couvre ~40 px : une ligne sous l'un de ces points suffit (le point fixe tombait dans l'espace de 8 px entre deux cartes quand la recherche a décalé la liste — pas une « bande vide »).
+    const ligne = [24, 32, 40, 48, 56].some((d) => { const sous = document.elementFromPoint(195, window.innerHeight - d); return !!(sous && sous.closest && sous.closest('[data-glisser-achat], [data-glisser-cible]')); });
     return { bas: Math.round(r.bottom), vh: window.innerHeight, ligne: !!ligne }; });
   dit(B.bas >= B.vh - 2 && B.ligne, `${nom} · B aucune bande vide : la feuille va jusqu'en bas, une ligne sous le doigt en bas de l'écran`, JSON.stringify(B));
   // C · titres entiers
