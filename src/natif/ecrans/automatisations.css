@@ -37,7 +37,7 @@
   .n-au-icone { border-color: transparent; background: transparent; color: var(--n-encre-2); font: var(--n-t-corps); }
   .n-au-edition { padding: 0 var(--n-marge); }
   .n-au-zone { width: 100%; box-sizing: border-box; padding: 12px; border-radius: var(--n-r-carte); border: .5px solid var(--n-trait); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); resize: vertical; }
-  .n-au-etat { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
+  .n-au-etat { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-legende-fort); white-space: nowrap; }
   .n-au-etat-point { width: 6px; height: 6px; border-radius: var(--n-r-rond); background: currentColor; }
   .n-au-etat[data-au-etat="on"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
   .n-au-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }

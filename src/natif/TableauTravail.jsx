@@ -199,7 +199,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const fermerMenu = React.useCallback(() => setMenu(''), []);
   const basculerStatut = (cle) => setStatutsSel((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
   const basculerColonne = (cle) => setCachees((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
-  const trier = (c) => setTri((t) => (t && t.cle === c.cle ? (t.sens === 'desc' ? { cle: c.cle, sens: 'asc' } : null) : { cle: c.cle, sens: c.num ? 'desc' : 'asc' }));
+  const trier = (c) => setTri((t) => (t && t.cle === c.cle ? { cle: c.cle, sens: t.sens === 'desc' ? 'asc' : 'desc' } : { cle: c.cle, sens: c.num ? 'desc' : 'asc' }));
   const ic = (nom, t = 18) => (Icon ? <Icon name={nom} size={t}/> : null);
   const nStatuts = statutsSel.size;
   const statutDe = (l) => statuts.find((s) => s.cle === l.statut) || null;
@@ -293,7 +293,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     <div className="n-tt-cadre" data-tt-tableau="">
       <table className="n-tt-table">
         <thead><tr>
-          <th scope="col" className="n-tt-th n-tt-th-case"><input type="checkbox" className="n-tt-coche" checked={toutCoche} aria-label={tr('tableau.toutCocher')} data-tt-tout="" onChange={toutBasculer} disabled={!cochables.length}/></th>
+          <th scope="col" className="n-tt-th n-tt-th-case"><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={toutCoche} aria-label={tr('tableau.toutCocher')} data-tt-tout="" onChange={toutBasculer} disabled={!cochables.length}/></label></th>
           <th scope="col" className="n-tt-th n-tt-th-article" data-tt-th="article">{tr('tableau.colArticle')}</th>
           {colsVues.filter((c) => c.cle !== 'statut').map(enTete)}
           {colonnes.some((c) => c.cle === 'statut') && !cachees.has('statut') ? enTete(colonnes.find((c) => c.cle === 'statut')) : null}

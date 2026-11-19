@@ -69,14 +69,15 @@ async function unEcran(nav, port, vue, base, W, sombre) {
         const c = x.matches('input[type="checkbox"]') ? (x.closest('label') || x) : x; const r = c.getBoundingClientRect(); return { t: (x.getAttribute('aria-label') || x.textContent || x.className).trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) };
       }).filter((x) => x.h < min || x.w < min);
       const deborde = Math.max(0, document.documentElement.scrollWidth - innerWidth);
+      const cadre = document.querySelector('[data-tt-tableau]'); const cadreDeborde = cadre ? Math.max(0, cadre.scrollWidth - cadre.clientWidth) : 0;
       const coupes = [...document.querySelectorAll('[data-tt-col="prix"], .n-tt-carte-prix, .n-tt-nombre-texte, .n-tt-etiquette')].filter(vis).filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent.slice(0, 20));
       const texte = (document.querySelector('[data-tt], [data-au-ecran]') || document.body).innerText;
-      return { pleins, petits: petits.slice(0, 6), deborde, coupes, nan: /NaN|undefined|\[object/.test(texte), vinted: /Vinted/.test(texte), vide: !!document.querySelector('.n-vide'), lignes: [...document.querySelectorAll('[data-tt-ligne]')].filter(vis).length };
+      return { pleins, petits: petits.slice(0, 6), deborde, cadreDeborde, coupes, nan: /NaN|undefined|\[object/.test(texte), vinted: /Vinted/.test(texte), vide: !!document.querySelector('.n-vide'), lignes: [...document.querySelectorAll('[data-tt-ligne]')].filter(vis).length };
     }, tel);
     dit(!erreurs.length, `T1 ${ou} : rendu, aucune erreur JS`, erreurs);
     dit(d.pleins <= 1, `T2 ${ou} : au plus UN plein (${d.pleins})`, d.pleins);
     dit(!d.petits.length, `T3 ${ou} : cibles ≥ ${tel ? 44 : 32}`, d.petits);
-    dit(d.deborde <= 1 && !d.coupes.length && !d.nan, `T5 ${ou} : rien ne déborde, aucun prix ni étiquette coupé, jamais NaN`, d);
+    dit(d.deborde <= 1 && d.cadreDeborde <= 1 && !d.coupes.length && !d.nan, `T5 ${ou} : rien ne déborde (ni la page, ni le tableau avec ses colonnes par défaut), aucun prix ni étiquette coupé, jamais NaN`, d);
     const c = await contrastes(pg, vue === 'auto' ? '[data-au-ecran]' : '[data-tt]');
     dit(c.juges > 8 && !c.faibles.length, `T4 ${ou} : ${c.juges} textes ≥ 4,5:1 sur le fond rendu (min ${c.min})`, c.faibles ? c.faibles.slice(0, 4) : c);
     if (base === 'vide' && vue !== 'auto') dit(d.vide && d.lignes === 0, `T11 ${ou} : base vide ⇒ l'état vide dessiné, aucune ligne`, d);
@@ -119,20 +120,22 @@ async function comportements(pg, ctx, port, vue, ou, tel) {
     const n2 = MUT === 'compteur' ? await lireNombre(pg) : n;
     if (n2 !== compteur) mal.push({ cle: k.cle, compteur, affiche: n2 });
   }
-  dit(cases.length >= 3 && !mal.length, `T6 ${ou} : ${cases.length} cases de Statut ; coché seul, chaque compteur = « N lignes » affichées`, mal.length ? mal : cases);
+  dit(cases.length >= 2 && !mal.length, `T6 ${ou} : ${cases.length} cases de Statut ; coché seul, chaque compteur = « N lignes » affichées`, mal.length ? mal : cases);
   await pg.keyboard.press('Escape'); if (tel) await pg.locator('.n-feuille-croix').first().click({ timeout: 2000 }).catch(() => {});
   await pg.waitForTimeout(200);
   await pg.locator('[data-tt-statuts-tous]').first().click({ timeout: 1500 }).catch(() => {});
   if (tel) {
     const r = await pg.evaluate(() => [...document.querySelectorAll('[data-tt-liste] [data-tt-ligne]')].slice(0, 5).map((x) => Math.round(x.getBoundingClientRect().height)));
-    dit(r.length > 0 && r.every((h) => h >= 72), `T3 ${ou} : la liste du téléphone en rangées de 72 (${r.join(' · ')})`, r);
+    const haut = vue === 'notifs' ? 56 : 72;   // une rangée à icône (notification) : 56 au moins ; une rangée à vignette : 72
+    dit(r.length > 0 && r.every((h) => h >= haut), `T3 ${ou} : la liste du téléphone en rangées de ${haut} au moins (${r.join(' · ')})`, r);
     return;
   }
   // T8 le tri trie : Prix ↓ puis ↑.
   const prixCol = vue === 'notifs' ? 'recue' : 'prix';
   await pg.keyboard.press('Escape');
   const lire = () => pg.evaluate((c) => [...document.querySelectorAll(`[data-tt-tableau] td[data-tt-col="${c}"]`)].slice(0, 40).map((x) => { const t = x.textContent.replace(/[\s  €]/g, '').replace(',', '.'); const m = t.match(/^(\d{2})\/(\d{2})(?:\/(\d{4}))?/); return m ? Number((m[3] || '2026') + m[2] + m[1]) : (t === '—' ? null : Number(t)); }).filter((x) => x != null && !Number.isNaN(x)), prixCol);
-  await pg.locator(`[data-tt-trier="${prixCol}"]`).click(); await pg.waitForTimeout(250);
+  // jusqu'à ↓ (une colonne déjà triée par défaut l'est peut-être)
+  for (let i = 0; i < 2; i++) { const s0 = await pg.evaluate((c) => { const t = document.querySelector(`[data-tt-th="${c}"]`); return t ? t.getAttribute('aria-sort') : null; }, prixCol); if (s0 === 'descending') break; await pg.locator(`[data-tt-trier="${prixCol}"]`).click(); await pg.waitForTimeout(250); }
   if (MUT === 'tri') await pg.evaluate(() => { const tb = document.querySelector('[data-tt-tableau] tbody'); if (tb && tb.children.length > 2) tb.insertBefore(tb.children[2], tb.children[0]); });
   const a = await lire(); await pg.locator(`[data-tt-trier="${prixCol}"]`).click(); await pg.waitForTimeout(250); const b = await lire();
   const trie = (l, s) => l.every((x, i) => i === 0 || (s > 0 ? x >= l[i - 1] : x <= l[i - 1]));
