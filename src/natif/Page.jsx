@@ -100,31 +100,35 @@ function fleches(e) {
   if (suivant) { e.preventDefault(); suivant.focus(); }
 }
 
-// La barre se « réduit » quand le grand titre est passé dessous : un observateur, aucun écouteur de défilement,
+// La barre se « réduit » quand le grand titre est passé dessous (voir le choix du titre jugé ci-dessous),
 // et l'attribut est posé sur la barre seule (rien d'autre ne recalcule son style).
 function useTitreReduit(refBarre, refTitre) {
   React.useEffect(() => {
     const barre = refBarre.current, titre = refTitre.current;
-    if (!barre || !titre || typeof IntersectionObserver !== 'function') return undefined;
-    let obs = null;
-    const poser = () => {
-      if (obs) obs.disconnect();
-      const bas = Math.max(0, Math.round(barre.getBoundingClientRect().bottom));
-      obs = new IntersectionObserver(([x]) => {
-        const reduit = !x.isIntersecting && x.boundingClientRect.bottom <= bas + 1;
-        if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
-      }, { rootMargin: `-${bas}px 0px 0px 0px`, threshold: 0 });
-      obs.observe(titre);
+    if (!barre || !titre) return undefined;
+    // (19 nov., intégration) Le titre JUGÉ est celui qu'on VOIT : le grand titre de la coque, ou — quand l'écran pose le sien
+    // (Page natif d'Annonces, de Ventes : celui de la coque est alors caché) — le premier grand titre visible de l'écran.
+    // Un titre caché ne passe jamais « dessous » : sans ce choix, la barre se croyait réduite en haut (petit + grand titre).
+    // Lu au défilement (passif, une lecture par image), à la taille, et quand l'écran change.
+    let image = 0;
+    const vu = (e) => !!e && e.getClientRects().length > 0;
+    const verifier = () => {
+      image = 0;
+      const cible = vu(titre) ? titre : [...document.querySelectorAll('.vrm-main .n-grand-titre')].find(vu) || null;
+      const bas = barre.getBoundingClientRect().bottom;
+      // Un écran d'avant (pas de grand titre natif : un repère) pose son propre titre dessous : le petit titre attend ~48 px de défilement.
+      const marge = cible && !cible.classList.contains('n-grand-titre') ? 48 : 0;
+      const reduit = !!cible && cible.getBoundingClientRect().bottom <= bas - marge;
+      if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
     };
-    poser();
-    let t = 0;
-    const taille = () => { clearTimeout(t); t = setTimeout(poser, 150); };
-    window.addEventListener('resize', taille, { passive: true });
-    // (19 nov., intégration) La barre change de hauteur après le premier rendu (polices, zone sûre, recherche) : la marge de
-    // l'observateur était prise trop tôt et la barre se croyait « réduite » en haut de l'écran (petit titre + grand titre).
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(taille) : null;
+    const demander = () => { if (!image) image = requestAnimationFrame(verifier); };
+    demander();
+    document.addEventListener('scroll', demander, { passive: true, capture: true });
+    window.addEventListener('resize', demander, { passive: true });
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(demander) : null;
     if (ro) ro.observe(barre);
-    return () => { clearTimeout(t); window.removeEventListener('resize', taille); if (ro) ro.disconnect(); if (obs) obs.disconnect(); };
+    const t = setInterval(demander, 1500);   // l'écran change d'onglet sans défiler : relu, sans coût (une lecture)
+    return () => { if (image) cancelAnimationFrame(image); clearInterval(t); document.removeEventListener('scroll', demander, true); window.removeEventListener('resize', demander); if (ro) ro.disconnect(); };
   }, [refBarre, refTitre]);
 }
 
