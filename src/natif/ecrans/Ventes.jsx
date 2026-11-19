@@ -43,10 +43,10 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       vignette={vignette(r, Photo)}
       titre={r.titre}
       plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
-      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', r.taille ? tr('vv.taille', { t: r.taille }) : '', ech)}
+      // La date limite d'abord (jamais coupée), puis la place, puis la taille : ce qui déborde part par la fin.
+      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech, textePlace(r.place), r.taille ? tr('vv.taille', { t: r.taille }) : '')}
       ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte
-      detailValeur={textePlace(r.place) || r.transporteur || ''}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
@@ -62,7 +62,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       vignette={vignette(r, Photo)}
       titre={r.titre}
       plaque={r.num ? <Plaque numero={r.num}/> : null}
-      sousTitre={joint(r.taille ? tr('vv.taille', { t: r.taille }) : '', texteEtape(r.etapes))}
+      sousTitre={joint(texteEtape(r.etapes), r.taille ? tr('vv.taille', { t: r.taille }) : '')}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte detailValeur={r.pourToi ? tr('vv.route.pourToi') : ''}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
