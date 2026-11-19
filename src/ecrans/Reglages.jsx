@@ -2188,7 +2188,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
       // (19 nov., lot stock-etiquetage) « Méthode d'étiquetage » : qui numérote, la forme des PROCHAINS N°, l'étiquette.
       // Les seules clés écrites : CLES_METHODE (src/etiquetage/methode.js) — aucun numéro, aucun pool.
-      { id:'etiquetage', type:'panneau', nu:true, ic:'tag', lib:tr('etq.lib'), desc:tr('etq.desc'), val:valEtiquetage, data:{ 'data-reglage-etiquetage':'' },
+      { id:'etiquetage', type:'panneau', nu:true, ic:'cintre', lib:tr('etq.lib'), desc:tr('etq.desc'), val:valEtiquetage, data:{ 'data-reglage-etiquetage':'' },
         el:<EtiquetageReglage lire={lireMethodeBrute} archive={archiveNumeros()} ecrire={ecrireMethode} onNumeros={()=>{ DEMANDE_REGLAGE_SOUS.id='numeros'; try{ window.dispatchEvent(new Event('vrm:reglage-sous')); }catch(_){} }}/> },
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
