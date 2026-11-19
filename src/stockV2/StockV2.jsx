@@ -310,7 +310,13 @@ export default function StockV2({ s }) {
   const chercheVide = !s.q.trim();
   const ficheF = fiche ? s.ficheDe(fiche) : null;
   const lignes = s.lignes;
-  const nonRangees = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
+  const nonRangeesVives = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
+  // Pendant la séance, la liste « À ranger » de l'écran (sous la feuille) ne bouge pas : elle se met à jour à la fermeture
+  // (rien ne saute derrière la feuille ; mesuré au banc stock-rangement, CLS 0,16 à 1512).
+  const gel = React.useRef(null);
+  if (seanceOuverte && !gel.current) gel.current = nonRangeesVives;
+  if (!seanceOuverte && gel.current) gel.current = null;
+  const nonRangees = seanceOuverte && gel.current ? gel.current : nonRangeesVives;
   const ouvrirFiche = (l) => { if (l.cle && s.ficheDe(l.cle)) setFiche(l.cle); };
   // « À RANGER » : la rangée entière range CET article (Julien : plus de « toucher l'article, puis à droite »).
   const ligneARanger = (l) => {
@@ -379,6 +385,13 @@ export default function StockV2({ s }) {
         </Groupe>) : null}
 
       {chercheVide ? <>
+        {/* LE geste de l'écran, au-dessus de la liste qu'il range : visible au premier écran, même à 375 px en « Très grand » (pas collé
+            en bas : le Stock n'est pas un écran de la coque native). Il reste posé pendant la séance : rien ne bouge derrière la feuille. */}
+        {nPlein ? (
+          <div className="sm-bloc sm-plein">
+            <Bouton variante="plein" icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
+              onClick={() => lancer(aRangerCles)}>{tr('sm.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom })}</Bouton>
+          </div>) : null}
         {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
         {s.nombres.enLigne == null ? <p className="sm-sans" data-stock-actuelles={s.nombres.etat}>{s.nombres.attente ? tr('stock.jeLisAnnonces') : tr('sr.pasLu')}</p> : null}
         {nonRangees.length ? (
@@ -387,12 +400,6 @@ export default function StockV2({ s }) {
           </Groupe>) : null}
         {nonRangees.length > aRangerVus.length ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sm-a-ranger-tous': '' }} onClick={() => { if (tousARanger) setMax((x) => x + PAR_PAGE); else setTousARanger(true); }}>{tr('sm.voirAutres', { n: nombre(Math.min(tousARanger ? PAR_PAGE : 9999, nonRangees.length - aRangerVus.length)) })}</Bouton></div> : null}
 
-        {/* LE geste de l'écran, sous la liste qu'il range (pas collé en bas : le Stock n'est pas un écran de la coque native). */}
-        {nPlein && !seanceOuverte ? (
-          <div className="sm-bloc sm-plein">
-            <Bouton variante="plein" icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
-              onClick={() => lancer(aRangerCles)}>{tr('sm.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom })}</Bouton>
-          </div>) : null}
         {/* Meubles · Articles : les deux façons de regarder le stock. */}
         <div className="sm-bloc" data-sr-segment={vue}>
           <Segmente libelle={tr('sr.seg.label')} valeur={vue} onChange={(v) => { setVue(v); setZoom(null); }}

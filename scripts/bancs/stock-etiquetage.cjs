@@ -121,7 +121,9 @@ const regles = (pg) => pg.evaluate(() => {
   const photosLoin = document.querySelectorAll('[data-sm-tous] img').length;
   const btns = [...document.querySelectorAll('[data-sr-ecran] button, [data-sr-seance] button, .sm-case')].filter(vis).filter((b) => b.tagName === 'BUTTON');
   const petits = btns.filter((b) => { const r = b.getBoundingClientRect(); return r.height < 43.5 || r.width < 43.5; }).map((b) => (b.getAttribute('aria-label') || b.textContent || '').slice(0, 30) + ' ' + Math.round(b.getBoundingClientRect().width) + '×' + Math.round(b.getBoundingClientRect().height));
-  const pleins = [...document.querySelectorAll('[data-n-variante="plein"]')].filter(vis).length;
+  // Une feuille ouverte est l'écran du moment : on compte ses pleins à elle (celui de l'écran reste posé dessous, sous le voile).
+  const haut = document.querySelector('[data-n-feuille-couche][data-n-etat="ouverte"] .n-feuille, [data-n-feuille-couche][data-n-etat="entree"] .n-feuille') || document;
+  const pleins = [...haut.querySelectorAll('[data-n-variante="plein"]')].filter(vis).length;
   return { tuiles: tuiles.length, largeurs, lignes, petitsN, coupesN, contrN, contr, photosLoin, petits, pleins, sw: document.documentElement.scrollWidth, iw: innerWidth };
 });
 
