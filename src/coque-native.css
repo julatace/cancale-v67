@@ -21,3 +21,7 @@
 /* (19 nov. soir) Messages · Tous, à l'ordinateur : l'avatar de la personne est ROND (la vignette carrée de l'article est à droite).
    La règle d'avant (`:root:root:root:root:root body .vg-fil-ph`, sans couche) dessinait un carré : une classe de plus la passe. */
 :root:root:root:root:root body .vg-fil-ph.n-fil-avatar { border-radius: 999px; box-shadow: none; }
+
+/* (19 nov., intégration) Le titre d'une carte native (« À ENVOYER · 30 ») : une règle d'avant sans couche (`h2 { white-space:
+   normal }`) le cassait en « À » / « ENVOYER ». Rendu à ce que disent les couches (nowrap), sans valeur posée ici. */
+:is(#vrm-contenu, html) .n-carte-titre { white-space: revert-layer; }

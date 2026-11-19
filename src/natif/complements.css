@@ -78,7 +78,7 @@
   .n-carte-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--n-trait); }
   .n-carte-titres { display: flex; flex-direction: column; min-width: 0; }
   .n-carte-titre { margin: 0; font: var(--n-t-legende-fort); letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-carte-n { margin-inline-start: 8px; color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-carte-n { margin-inline-start: 6px; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .n-carte-sous { margin: 2px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
   .n-tuiles-pied { margin-top: 8px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
   .n-tuiles-pied > .n-bouton-bloc { display: flex; padding: 0 4px; }
@@ -239,10 +239,8 @@
   .n-ajout-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .n-ecran-outils { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
   /* (19 nov., intégration — planche iPhone) Le titre de carte tient sur UNE ligne (« À ENVOYER · 30 ») : une ancienne règle sans
-     couche (h2 { white-space: normal }) le cassait en « À » / « ENVOYER », écrasé par le bouton. Au téléphone, le bouton passe
+     couche (h2 { white-space: normal }) le cassait — rendu par src/coque-native.css (revert-layer) en « À » / « ENVOYER », écrasé par le bouton. Au téléphone, le bouton passe
      sous la ligne de titre quand les deux ne tiennent pas ; le sous-titre garde sa ligne. */
-  .n-carte-titre { white-space: nowrap !important; }
-  .n-carte-n { margin-inline-start: 6px !important; }
   .n-carte-n::before { content: "· "; }
   @media (max-width: 600px) {
     .n-carte-tete { flex-wrap: wrap; row-gap: 8px; }
