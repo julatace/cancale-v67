@@ -29,9 +29,9 @@ function baseRP() {
   const colis = (suivi, code, lieu, consigne) => ({ id: `email_track_mondialrelay_${suivi}`, data: { type: 'suivi', carrier: 'mondialrelay', suivi, status: 'available', statusLabel: 'Arrivé au point de retrait',
     subject: `Votre colis ${suivi} est disponible`, receivedAt: isoDans(-3 * 3600000), emailAt: isoDans(-3 * 3600000), arriveLe: isoDans(-3 * 3600000), code, code2: null, artTitle: `Paire test ${code.slice(0, 1)}`,
     lieu, limite: isoDans(4 * J).slice(0, 10), consigne, qrUrl: null, qrB64: null, account: '' } });
-  b.rows.push(colis('87000001', '111111', 'INTERMARCHE TEST\nZA DU TEST\n11111 VILLETEST', false));
-  b.rows.push(colis('87000002', '222222', 'INTERMARCHE TEST\nZA DU TEST\n11111 VILLETEST', false));
-  b.rows.push(colis('87000003', '333333', 'LOCKER 24/7 INTERMARCHE TEST\nZA DU TEST\n11111 VILLETEST', true));
+  b.rows.push(colis('87000001', '111111', 'INTERMARCHE TEST, ZA DU TEST, 11111 VILLETEST', false));
+  b.rows.push(colis('87000002', '222222', 'INTERMARCHE TEST, ZA DU TEST, 11111 VILLETEST', false));
+  b.rows.push(colis('87000003', '333333', 'LOCKER 24/7 INTERMARCHE TEST, ZA DU TEST, 11111 VILLETEST', true));
   return b;
 }
 const VUS = JSON.stringify({ v: 1, vus: { 'e:87000001': 'c', 'e:87000002': 'c' }, nouveaux: {} });
@@ -44,13 +44,14 @@ async function releve(pg) {
       codes: [...p.querySelectorAll('[data-v2-code-grand]')].map((e) => e.textContent.trim()),
       nouveaux: [...p.querySelectorAll('[data-v2-face]')].filter((f) => f.querySelector('[data-v2-nouveau]')).map((f) => f.getAttribute('data-v2-code')),
       lieu: (p.querySelector('.v2-passe-lieu b') || { textContent: '' }).textContent.trim() }));
-    const toasts = [...document.querySelectorAll('.vrm-toast')].map((t) => t.textContent.trim());
+    const toasts = (window.__toasts || []).slice();
     return { passes, toasts };
   });
 }
-async function attendrePasses(pg) {
+async function attendrePasses(pg, attendreNouveau = true) {
   let r = null;
-  for (let k = 0; k < 30; k++) { r = await releve(pg); if (r.passes.some((p) => p.codes.includes('333333'))) break; await pg.waitForTimeout(700); }
+  // Les passes arrivent avec les lectures ; « Nouveau » et le toast avec la liste publiée (un peu après) : on attend les deux.
+  for (let k = 0; k < 40; k++) { r = await releve(pg); if (r.passes.some((p) => p.codes.includes('333333')) && (!attendreNouveau || r.passes.some((p) => p.nouveaux.length))) break; await pg.waitForTimeout(700); }
   return r;
 }
 
@@ -61,7 +62,10 @@ async function attendrePasses(pg) {
   try {
     for (const W of [390, 1512]) {
       const { ctx, pg, erreurs, tel } = await ouvrir(nav, { W, sombre: false, b, url: '/?tab=achats' });
-      await pg.addInitScript((v) => { try { if (!sessionStorage.getItem('rp_init')) { localStorage.setItem('vrm_retraits_vus', v); sessionStorage.setItem('rp_init', '1'); } } catch (_) {} }, VUS);
+      await pg.addInitScript((v) => { try { localStorage.setItem('vrm_design_v2', '1'); if (!sessionStorage.getItem('rp_init')) { localStorage.setItem('vrm_retraits_vus', v); sessionStorage.setItem('rp_init', '1'); } } catch (_) {}
+        // Les toasts vus (ils partent seuls après quelques secondes) : notés au passage.
+        window.__toasts = []; const obs = new MutationObserver(() => { for (const t of document.querySelectorAll('.vrm-toast')) { const x = t.textContent.trim(); if (x && !window.__toasts.includes(x)) window.__toasts.push(x); } });
+        document.addEventListener('DOMContentLoaded', () => obs.observe(document.body, { childList: true, subtree: true })); }, VUS);
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {});
       const r = await attendrePasses(pg);
@@ -82,7 +86,7 @@ async function attendrePasses(pg) {
       const apres = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_retraits_vus') || 'null'); } catch (_) { return null; } });
       dit(!!apres && !(apres.nouveaux && apres.nouveaux['e:87000003']), `N ${W} : ouverte, la ligne n’est plus « Nouveau »`, apres && apres.nouveaux);
       await pg.reload({ waitUntil: 'domcontentloaded' }); await pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {});
-      const r2 = await attendrePasses(pg);
+      const r2 = await attendrePasses(pg, false); await pg.waitForTimeout(4000); r2.toasts = (await releve(pg)).toasts;
       dit(!r2.toasts.some((t) => /Nouveau/.test(t)) && r2.passes.every((p) => p.nouveaux.length === 0), `N ${W} : après rechargement, rien n’est réannoncé`, r2.toasts);
       dit(!erreurs.length, `${W} : aucune erreur de page`, erreurs);
       await ctx.close();

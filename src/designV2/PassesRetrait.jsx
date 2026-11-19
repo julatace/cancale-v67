@@ -44,9 +44,9 @@ function LigneRetrait({ x, Icon, Photo, aides, nouveaux }) {
     <>
       <span className="v2r-photo" aria-hidden="true">{photo || <Icon name="box" size={22}/>}</span>
       <span className="v2r-texte">
-        <span className="v2r-titre">{neuf ? <span className="v2r-nouveau" data-v2-nouveau="">{tr('v2.passe.nouveau')}</span> : null}{aides.titre(x)}{x.num ? <> <Etiquette num={x.num}/></> : null}</span>
+        <span className="v2r-titre">{aides.titre(x)}{x.num ? <> <Etiquette num={x.num}/></> : null}</span>
         <span className={'v2r-limite v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
-          {ech ? ech.t : tr('v2.passe.limiteInconnue')}{qr ? ' · QR' : ''}
+          {neuf ? <span className="v2r-nouveau" data-v2-nouveau="">{tr('v2.passe.nouveau')}</span> : null}{ech ? ech.t : tr('v2.passe.limiteInconnue')}{qr ? ' · QR' : ''}
         </span>
       </span>
       {code
