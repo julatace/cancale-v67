@@ -17,6 +17,7 @@ export { Affiche } from './Affiche.jsx';
 export { Vide } from './Vide.jsx';
 export { Attente } from './Attente.jsx';
 export { Faits, Fait } from './Faits.jsx';
+export { EnteteArticle, Photos, Herite } from './Article.jsx';
 export { Segmente } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
 export { Rangee, Vignette, Interrupteur } from './Rangee.jsx';

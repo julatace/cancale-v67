@@ -887,7 +887,16 @@ import { chiffresRetirer, siteDuColisSorti } from "./retirerSite.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
-import DansFiche from './DansFiche.jsx';
+import DansFiche, { useLigneIci } from './DansFiche.jsx';
+// (19 nov., fiche directe — « l'outil doit être pratique, pas chiant ») Les gestes rares d'une annonce (file Leboncoin, publier
+// partout, visuels, relier un achat, passeport, marquer vendue…) vivaient dans une feuille ouverte par « ⋯ » : depuis la fiche,
+// cela faisait « ⋯ » de la fiche → « ⋯ » de la ligne → le geste (trois touchers). Quand la fiche est ouverte DEPUIS cette ligne,
+// ils sont rendus à plat, à leur place dans la fiche ; dans la liste, la feuille d'avant. `rendre` n'est appelé que là où il sert.
+function MenuLigneFiche({ cle, ouvert, feuille, rendre }) {
+  const ici = useLigneIci(cle);
+  if (ici) return <div className="vrm-fiche-menu-plat" data-fiche-menu-inline="">{rendre()}</div>;
+  return ouvert ? feuille(rendre()) : null;
+}
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
@@ -19343,7 +19352,7 @@ const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Ve
 try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
 // La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
 // pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
-function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
+function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = false }) {
   const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
   const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
   const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
@@ -19408,7 +19417,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
     .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }));
   const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
-  return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
+  return <PrixPartout key={num} num={rn.cle || num} focusPrix={focusPrix} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
     onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
     onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
     onAppliquer={async ({ coches, prix, surEtat }) => {
@@ -51673,7 +51682,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
-              colis={nE ? colisJournee : []}
+              // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
+              // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
+              colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
@@ -55311,8 +55322,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestesLeboncoin')}
                       onClick={()=>setFicheMenu(String(it._acc.vinted_user_id)+'_'+String(it.id))} style={geste}><Icon name="more" size={18}/></button>
                   </div>
-                  {ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id) && (
-                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>
+                  <MenuLigneFiche cle={flAnn['data-fiche-ligne']} ouvert={ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id)}
+                    feuille={(contenu) => <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>{contenu}</SheetShell>}
+                    rendre={() => (
                   <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button,a'); if (b && !b.hasAttribute('data-fiche-place')) setTimeout(()=>setFicheMenu(null), 0); }}>
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
@@ -55349,8 +55361,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <BoutonRappel variante="geste" style={geste} cible={{ sorte: 'article', num: num || '', item: String(it.id || '') }} libelle={num ? `N°${num}` : (it.title || '')}/>
                     <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title={tr('annonces.marquerVendueRetire')} style={geste}>{tr('annonces.marquerVendue')}</button>
                   </div>
-                  </SheetShell>
-                  )}
+                    )}/>
                   {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
                       était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
                       de la fiche le montre déjà, et la raison se dit UNE fois
@@ -64134,6 +64145,7 @@ function AppCoeur() {
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
   // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
   const [prixNum,setPrixNum]=useState(null);
+  const prixFocus=useRef(false);   // (19 nov., fiche directe) « Prix partout » ouvert en touchant LA VALEUR du prix : le champ est prêt à taper
   // (14 nov., lot argent-prix) 121 « Prix d'un site à l'autre » et 114 « Remettre les prix » : deux feuilles de la coque.
   const [ecartsOuvert,setEcartsOuvert]=useState(null);
   const [remiseOuverte,setRemiseOuverte]=useState(null);
@@ -67532,6 +67544,8 @@ function AppCoeur() {
             gestes: blocVenduAilleurs(p, rn, etat),
             questions: <>{questionChezToiFiche(p.num)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
             note: <NotePaireCoque numero={p.num} variante="bloc" ajout dicter/>,
+            // (19 nov., fiche directe) La note DÉJÀ écrite est une information : sous l'en-tête, sans rien toucher (rien quand il n'y en a pas).
+            noteLue: <NotePaireCoque numero={p.num} variante="ligne"/>,
             // (15 nov., lot securite-ventes ; rangé dans la fiche D le 16 nov.) « Où vendre cet article ? » avec les infos : une paire
             // déjà VENDUE (une vente lue sous ce N°, jamais réattribué) n'a plus à choisir où se vendre.
             infos: <><InfosPaireCoque numero={p.num}/>{!(rn.ventes && [rn.ventes.vinted, rn.ventes.lbc, rn.ventes.ebay].some((l) => Array.isArray(l) && l.length)) ? <OuVendreCoque annonces={rn.annonces || []} prixC={p.resume && p.resume.siVendue ? p.resume.siVendue.prix : null} stats={numData && numData.stats ? numData.stats : null} comptes={vintedAccounts} ebay={ebayCommandes} vc={ventesVcCoque}/> : null}</>,
@@ -67547,11 +67561,55 @@ function AppCoeur() {
               for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (commandeEbayEngagee(c)) out.push({ site: 'ebay', etat: 'vendue', compte: '', date: Date.parse(c.creationDate || '') || null, prix: null });
               const st = numData && numData.stats ? numData.stats : null;
               // Le prix : celui que la règle de « Prix partout » lit, sinon le prix LU dans le dressing (la lecture la plus fraîche).
+              const msLu = (d) => { if (d == null || d === '') return undefined; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : undefined; };
+              const autreSite = (x) => { try {
+                if (x.site === 'vinted') { const a = (rn.annonces || []).find((y) => String(y.id) === String(x.id)); return { photo: a ? (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || '')) : '' }; }
+                if (x.site === 'leboncoin') { const ad = ex && ex.lbcItems ? ex.lbcItems[x.id] : null; return ad ? { photo: (Array.isArray(ad.images) && ad.images[0]) || '', depuis: msLu(ad.publieeLe), favoris: ad.stats && Number.isFinite(ad.stats.favoris) ? ad.stats.favoris : undefined, compte: ad.accountName || x.compte || '' } : {}; }
+                if (x.site === 'ebay') { const a = (rn.annoncesEbay || []).find((y) => String(y.itemId) === String(x.id)); return a ? { photo: typeof a.photo === 'string' ? a.photo : '', depuis: msLu(a.depuis), favoris: Number.isFinite(a.observateurs) ? a.observateurs : undefined } : {}; }
+                if (x.site === 'vestiaire') { const it = ex && ex.vcItems ? ex.vcItems[x.id] : null; return it ? { photo: typeof it.photo === 'string' ? it.photo : '', depuis: msLu(it.depuis) } : {}; }
+              } catch (_) {} return {}; };
               const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+              // (19 nov., fiche directe) + l'identifiant de l'annonce et son prix mini (le fait « Prix mini », tapé sur place), ses vues
+              // (lues comme les favoris), son adresse sur le site (la rangée l'ouvre) — les mêmes lectures, rien de calculé.
               for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
-                favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
+                id: String(x.id || ''), mini: x.site === 'vinted' && x.mini != null ? Math.round(x.mini * 100) : null, miniPorte: x.site === 'vinted' && !!(numeros && numeros[String(x.id)]), lien: x.lien || '',
+                // (19 nov., Julien : « tout doit être parfait sur chaque application ») L'annonce d'un AUTRE site porte son titre, sa photo,
+                // sa date de mise en ligne et ses favoris LUS (Leboncoin : `publieeLe`, `stats.favoris` ; eBay : `depuis`, observateurs) :
+                // un article sans annonce Vinted a une fiche complète. Rien d'inventé : un champ pas lu reste absent.
+                titre: x.titre || '', ...autreSite(x),
+                favoris: x.site === 'vinted' ? (st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined) : autreSite(x).favoris,
+                vues: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].vues) ? st[x.id].vues : undefined });
             } catch (_) {}
             return out; })();
+          // (19 nov., fiche directe) Ce qui n'est PAS lu est dit sous les sites (« Pas lu : Leboncoin ») : les sites que la règle
+          // de « Prix partout » nomme (`manques`), une fois les lectures en plus arrivées (`ex`), pour les plateformes qu'il montre.
+          const sitesManquesFiche = (() => { if (!p || !rn || !ex) return undefined;
+            try { const aff = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+              return sitesPrixDe(numF, rn, ex).manques.filter((m) => m !== 'le numéro' && (!aff || aff.includes(String(m).toLowerCase()))); } catch (_) { return undefined; } })();
+          // La taille : celle de la fiche de l'annonce, sinon de l'annonce lue, sinon celle écrite en fin de titre (la règle des listes).
+          const tailleFiche = (() => { if (!p) return ''; try { const f = p.idFiche && numeros ? numeros[p.idFiche] : null; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)) || (rn.annonces || [])[0] || null;
+            // (19 nov.) Un article sans annonce Vinted : la taille écrite en fin du titre de SON annonce (Leboncoin, eBay…).
+            const tf = [p.titre].concat((sitesFiche || []).map((s) => s && s.titre)).map((t) => tailleEnFin(t || '')).find(Boolean); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
+          const photosFiche = p ? (rn.annonces || []).map((a) => (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || ''))).filter(Boolean) : [];
+          // « Acheté » et « Prix mini » se tapent SUR PLACE (Julien, 19 nov. : « l'outil doit être pratique, pas chiant ») : les
+          // MÊMES écritures qu'avant — `poserPrixAchatVente` (la feuille « prix d'achat ») et `montantSeuil` (la case « accepter
+          // dès » d'Annonces) —, chacune un geste annulable, sans confirmation.
+          // (19 nov., l'ARTICLE et pas l'annonce Vinted) Un N° sans fiche d'annonce Vinted (Leboncoin seul, eBay seul…) : son prix
+          // d'achat est celui posé PAR N° (`vinted_buyprice_by_num`, le miroir qui existe déjà) — lu ici, écrit par le même geste annulable.
+          const achatParNumFiche = (() => { if (!p || p.idFiche || !rn || !rn.cle) return null; const v = (load('vinted_buyprice_by_num', {}) || {})[String(rn.cle)]; const n = Number(String(v == null ? '' : v).replace(',', '.')); return v != null && String(v).trim() !== '' && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; })();
+          const editsFiche = p && !p.double && !p.ancienNumero ? {
+            achat: !p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok' || !rn.cle) return;
+              const buy = load('vinted_buyprice_by_num', {}) || {}; const k = String(rn.cle);
+              gesteVrm(`N°${k} : acheté ${String(w.patch.buyPrice).replace('.', ',')} €`, [{ k: 'vinted_buyprice_by_num', type: 'cle', id: k, apres: String(w.patch.buyPrice), avant: buy[k] }], {}, () => { setTimeout(() => { emettreClesRelues(['vinted_buyprice_by_num']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); }
+            : p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok') return;
+              poserPrixAchatVente({ item: p.idFiche, num: String(p.num || '') }, texte); setTimeout(() => setFicheTick((t) => t + 1), 750); } : null,
+            mini: (id, texte) => { const fiches = load('vinted_annonce_numeros', {}) || {}; const f = fiches[String(id)];
+              if (!f) { toast(tr('fd.mini.sansFiche'), 'err'); return; }
+              const v = montantSeuil(texte); const n = Number(String(v).replace(',', '.'));
+              if (!(Number.isFinite(n) && n > 0)) { toast(MONTANT_ILLISIBLE); return; }
+              gesteVrm(tr('fd.mini.fait', { n: String(p.num || ''), prix: montant(n) }), [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { min: v }, avant: { min: f.min } }], {},
+                () => { setTimeout(() => { emettreClesRelues(['vinted_annonce_numeros']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); },
+          } : null;
           const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;
           const relierFiche = p && pf ? { proposition: pf.prop, onRelier: (pr) => relierAchatFiche(pf, pr),
             onAutre: async () => {
@@ -67562,10 +67620,12 @@ function AppCoeur() {
             } } : null;
           const lienF = p ? lienAchatDe(numF) : null;
           const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} sitesManques={sitesManquesFiche} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
+            siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
+            onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
-            onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
@@ -67768,7 +67828,7 @@ function AppCoeur() {
             Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
         </GardeEcran>}
         {/* (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), UN clic. (19 nov.) « Appliquer » envoie la baisse par l'extension, ou la range (HotePrixPartout). */}
-        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>setPrixNum(null)}/></GardeEcran>}
+        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} focusPrix={prixFocus.current} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>{ prixFocus.current = false; setPrixNum(null); }}/></GardeEcran>}
         {pubAil && <GardeEcran nom="publier" feuille resetKey={pubAil.num||''} onFermer={()=>setPubAil(null)}><Differe rendre={()=>{
           // (5 nov.) LE PARCOURS « PUBLIER AILLEURS » : les sites de CE N° (par identité).
           const num = pubAil.num;
