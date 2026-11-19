@@ -196,3 +196,9 @@ Elles CHANGENT des règles de CLAUDE.md : à reporter dans CLAUDE.md (§2.5, §3
    toucher (§3 inchangé : jamais de suppression automatique) ; vente annulée ⇒ démasquée ; dit dans le journal.
 4. **Envoi des colis** : OUI. « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont retirés ; le dépôt
    est constaté par le suivi du transporteur ; « Imprimer N bordereaux » imprime depuis Aujourd'hui.
+
+## DÉCISIONS DE JULIEN (19 nov. soir, « on fait tout sauf vercel » sur le plan capacité 3 000)
+- Vercel reste en Hobby (pas de Pro pour l'instant).
+- Migration 048 APPLIQUÉE le 19 nov. (index `app_data_preuve_adresse`, index BRIN `journal_ecritures_at_brin`, fonction `sauvegarde.vrm_purger_journal`, clé de service seule) — rien effacé.
+- Copies `sauvegarde.app_data_20260930` et `sauvegarde.app_data_20261002` (111 Mo) SUPPRIMÉES le 19 nov. (aucune fonction, vue ni code ne les lisait).
+- Mises en ligne regroupées : 1 à 2 « trains » par jour au lieu de 8 à 10.
