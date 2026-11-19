@@ -39,10 +39,18 @@ ni les couleurs (accent bleu VRM, étiquettes douces, ambre = un geste à faire,
 
 ## Preuves
 `scripts/bancs/app-tableaux.cjs` (harnais `outils/app-tableaux/`, vraies vues, vraies règles d'articles, données inventées) :
-1512 / 1280 / 390 tactile, clair / sombre, bases volume, vide, Leboncoin seul, Vestiaire seul — voir le résultat ci-dessous.
+1512 / 1280 / 390 tactile, clair / sombre, bases volume, vide, Leboncoin seul, Vestiaire seul : **370 verts, 0 rouge** (premier passage
+complet, puis 187 / 0 sur volume après les retouches de largeur). Mutations `compteur`, `tri`, `plein` : chacune rougit.
+Captures regardées (Annonces, Ventes, Achats, Notifications, Automatisations + Négociation, téléphone, sombre, Leboncoin seul).
+Audits : traduction 45 / 0, tdz, variables, identite, quoi-de-neuf verts. Build vert.
+`chiffres-volume` (Ventes, Achats, Annonces ; avant = `origin/claude/integration-19nov`, après = la branche) : les **12 valeurs
+publiées identiques** ; à l'écran, **aucun montant disparu** (Ventes 70 = 70) ; Achats et Annonces en montrent PLUS (le tableau
+affiche 100 lignes au lieu de 60, et tous les achats au lieu de la seule étape choisie) — d'où les écarts d'ordre et d'attributs.
+La carte « Comptes détectés et liés » (page Extension, référence 16.webp) est faite : une rangée par compte, « Lié » ; « Délier »
+reste dans Paramètres → Comptes (le pied le dit).
 
 ## Ce qui reste
-- Fiche Comptes « Comptes détectés et liés » (16.webp) et barre latérale réductible en icônes : pas faites.
+- Barre latérale réductible en icônes (16.webp) : pas faite.
 - E-mails en tableau : pas fait. Messages : pas de « Choisir une action » ni d'en-tête article N° + prix mini dans le fil.
 - Actions par site dans Annonces (baisse Leboncoin / Vestiaire, pause LBC) : le menu reste celui d'annonces-a-egalite (Vinted +
   « Publier partout ») ; les limites de chaque site sont dites une fois en pied.
