@@ -61,6 +61,7 @@
     c5_statut: { fr: "Statut", en: "Status", es: "Estado", it: "Stato", de: "Status" },
     au_active: { fr: "Activé", en: "On", es: "Activado", it: "Attivo", de: "Aktiv" },
     au_desactive: { fr: "Désactivé", en: "Off", es: "Desactivado", it: "Disattivato", de: "Aus" },
+    au_bientot: { fr: 'Bientôt', en: 'Coming soon', es: 'Próximamente', it: 'In arrivo', de: 'Demnächst' },
     au_pas_su: { fr: "Pas su", en: "Not known", es: "No se sabe", it: "Non noto", de: "Unbekannt" },
     au_pas_su_tout: { fr: "Tes réglages n’ont pas pu être lus pour l’instant.", en: "Your settings could not be read for now.", es: "Tus ajustes no se han podido leer por ahora.", it: "Per ora le tue impostazioni non sono state lette.", de: "Deine Einstellungen konnten noch nicht gelesen werden." },
     au_modifier: { fr: "Modifier dans VRM", en: "Change in VRM", es: "Cambiar en VRM", it: "Modifica in VRM", de: "In VRM ändern" },

@@ -47,16 +47,22 @@ const ANN = Array.from({ length: 10 }, (_, i) => ({ id: String(7000 + i), titre:
   taille: String(39 + (i % 6)), marque: MODELES[i % 6].split(' ')[0], etat: 'Très bon état', vues: 30 + i * 7, description: 'Portées quelques fois, boîte d’origine.', mini: i % 2 ? 45 + i : null, achat: i === 0 ? 30 : null }));
 const VEN = [['a_expedier', true], ['a_expedier', false], ['en_route', null], ['finalisee', null], ['annulee', null]].map(([etat, b], i) => ({ tx: String(91000000000 + i), conv: String(80000 + i), titre: `${MODELES[i]} 42`, prix: 60 + i * 10, photo: img('v' + i), date: T0 - i * 30 * H, etat, vendue: etat !== 'annulee', num: String(200 + i), bordereau: b }));
 const MSG = Array.from({ length: 7 }, (_, i) => ({ conv: String(60000 + i), qui: 'acheteuse_' + i, texte: i === 0 ? 'Bonjour, elle est toujours disponible ?' : 'Merci, bonne journée !', at: T0 - (i * 3 + 1) * H, nonlu: i < 2, photo: img('m' + i) }));
+const STATUTS = ['en_vente', 'en_vente', 'brouillon', 'masque', 'en_vente', 'reserve', 'vendu', 'en_vente', 'en_vente', 'brouillon'];
+const TOUTES = ANN.map((x, i) => Object.assign({}, x, { statut: STATUTS[i] }));
+VEN[0].transporteur = 'Chronopost';
+const AUTO = { offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, baisse: null };
+const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' },
-  annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN }, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
+  annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN, toutes: TOUTES, nTous: TOUTES.length, statuts: { en_vente: 5, brouillon: 2, masque: 1, reserve: 1, vendu: 1, a_confirmer: 0 } }, automatisations: AUTO, notifications: NOTIFS, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
 const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true },
   site: { id: '111', nom: 'shop_sophie', choix: 'oui', jauge: { h: 12, maxH: 50, j: 40, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 8 }, file: null } },
   secu: { niveau: 'ok', texte: 'Tout va bien sur ce compte' }, toutArrete: false,
   flux: { okAt: T0 - 3 * MIN }, liens: [{ cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }], capteCoupe: false };
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8sPfefwAHiQM0TP3mWgAAAABJRU5ErkJggg==', 'base64');
 
-async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mobile = false } = {}) {
-  const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
+async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mobile = false, orion = false } = {}) {
+  // Orion (iPhone) : le moteur WebKit n'est pas installé ici ; on joue Chromium avec l'agent et l'écran d'Orion sur iPhone.
+  const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}, orion ? { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1 Orion/1.0' } : {}));
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
@@ -82,9 +88,10 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'capteLot') rep = { ok: true, lot: null };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
+          else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
           setTimeout(() => cb && cb(rep), 0);
         } },
-      storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
+      storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { (window.__ranges = window.__ranges || []).push(copie(o)); if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
     };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -110,6 +117,16 @@ const lire = (pg) => pg.evaluate(() => {
     etape: q('[data-fav-etape]') ? q('[data-fav-etape]').getAttribute('data-fav-etape') : null, guide: q('[data-fav-guide]') ? q('[data-fav-guide]').innerText : '',
     rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
     secu: /Sécurité du compte/.test(texte), toutArreter: !!q('[data-tout-arreter]'),
+    repOk: !!q('[data-rep-etat="ok"]'),
+    chips: Array.from(r.querySelectorAll('[data-ann-statut]')).map((b) => b.getAttribute('data-ann-statut') + ':' + (b.innerText.split('·')[1] || '').trim()),
+    annVue: q('[data-vue]') ? q('[data-vue]').getAttribute('data-vue') : null,
+    lignesAnn: r.querySelectorAll('.table5 [data-annonce]').length, cartesGrille: r.querySelectorAll('.grille5 [data-annonce]').length,
+    action: q('[data-ann-action]') ? { off: q('[data-ann-action]').disabled, options: Array.from(q('[data-ann-action]').options).map((o) => o.value) } : null,
+    cols: q('[data-cols]') ? q('[data-cols]').getAttribute('data-cols').split(' ') : [],
+    coches: Array.from(r.querySelectorAll('[data-ann-sel]')).filter((c) => c.checked).length,
+    ranges: window.__ranges || [],
+    auto: Array.from(r.querySelectorAll('[data-auto-carte]')).map((x) => x.getAttribute('data-auto-carte') + ':' + x.querySelector('[data-etat]').getAttribute('data-etat')),
+    notifs: Array.from(r.querySelectorAll('[data-notif]')).map((x) => x.getAttribute('data-notif') + ':' + x.getAttribute('data-notif-statut-l')),
     parametres: !!q('[data-parametres]'), remettre: !!q('[data-parametres] [data-replacer-logo]'), details: !!q('[data-parametres] [data-detail]'),
     petits: ctl.filter((b) => b.offsetHeight < 44 && !b.closest('.outils') && !b.closest('.detail') && b.tagName !== 'INPUT').map((b) => (b.className || b.tagName) + ':' + b.offsetHeight + ':' + (b.innerText || '').slice(0, 20)),
     debord: document.documentElement.scrollWidth > window.innerWidth || (carte && carte.scrollWidth > carte.clientWidth + 1),
@@ -128,18 +145,18 @@ const montrer = async (pg, mobile) => {
   fs.mkdirSync(SORTIE, { recursive: true });
   const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SORTIE, nom + '.png') }); } catch (_) {} };
   try {
-    for (const [largeur, hauteur, mobile] of [[1512, 900, false], [390, 844, true]]) for (const scheme of ['light', 'dark']) {
-      const T = `${largeur} ${scheme}`;
+    for (const [largeur, hauteur, mobile, orion] of [[1512, 900, false, false], [390, 844, true, false], [390, 844, true, true]]) for (const scheme of (orion ? ['light'] : ['light', 'dark'])) {
+      const T = `${largeur}${orion ? ' Orion' : ''} ${scheme}`;
       console.log(`\n${T}`);
       await essaie(T, async () => {
-        const t = await ouvrir(nav, { scheme, largeur, hauteur, mobile });
+        const t = await ouvrir(nav, { scheme, largeur, hauteur, mobile, orion });
         await montrer(t.pg, mobile);
         let a = await lire(t.pg);
-        await cap(t.pg, `messages-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}messages-${largeur}-${scheme}`);
         dit(a.on && a.grand, `${T} : la carte s’ouvre en GRAND panneau`, JSON.stringify({ on: a.on, g: a.grand }));
         const large = mobile ? a.carte && a.carte.w >= largeur - 1 && a.carte.h >= hauteur - 1 : a.carte && a.carte.w >= largeur * 0.7;
         dit(large && a.carte.x >= 0 && a.carte.r <= largeur && !a.debord, `${T} : ${mobile ? 'plein écran' : '≥ 70 % de la largeur'}, dans l’écran, rien ne déborde`, JSON.stringify(a.carte));
-        dit(JSON.stringify(a.onglets) === JSON.stringify(['messages', 'annonces', 'favoris', 'ventes', 'parametres']) && a.onglet === 'messages', `${T} : Messages · Annonces · Favoris · Ventes · Paramètres, Messages d’abord`, JSON.stringify(a.onglets));
+        dit(JSON.stringify(a.onglets) === JSON.stringify(['messages', 'annonces', 'favoris', 'ventes', 'notifications', 'automatisations', 'parametres']) && a.onglet === 'messages', `${T} : Messages · Annonces · Favoris · Ventes · Notifications · Automatisations · Paramètres, Messages d’abord`, JSON.stringify(a.onglets));
         dit(!a.secu && !a.toutArreter, `${T} : plus de « Sécurité du compte » ni de « Tout arrêter »`);
         dit(a.msgs === 7, `${T} : les 7 conversations du compte de l’onglet`, a.msgs);
         await clic(t.pg, '[data-msg-nonlus]');
@@ -148,13 +165,13 @@ const montrer = async (pg, mobile) => {
         await clic(t.pg, '[data-msg-nonlus]');
         await clic(t.pg, '[data-conv-b="60000"]');
         a = await lire(t.pg);
-        await cap(t.pg, `conversation-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}conversation-${largeur}-${scheme}`);
         dit(a.convOuverte.includes('60000') && a.repondre.some((h) => /\/inbox\/60000$/.test(h)), `${T} : toucher une conversation la montre (${mobile ? 'sous la rangée' : 'volet droit'}), « Répondre sur Vinted »`, JSON.stringify({ c: a.convOuverte, r: a.repondre }));
         // Annonces : la fiche dépliée.
         await clic(t.pg, '[data-onglet-b="annonces"]');
         await clic(t.pg, '[data-fiche-b="a:7001"]');
         a = await lire(t.pg);
-        await cap(t.pg, `fiche-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}fiche-${largeur}-${scheme}`);
         const f = a.fiche || { faits: {} };
         dit(f.id === 'a:7001' && f.photos === 3 && f.desc && f.faits.num === '121' && /46/.test(f.faits.mini) && f.faits.achat === '—' && f.faits.taille === '40' && f.faits.vues === '37', `${T} : toucher une annonce déplie sa fiche : photos, N°, prix mini, taille, vues ; acheté pas su ⇒ « — »`, JSON.stringify(f));
         await clic(t.pg, '[data-fiche-b="a:7001"]');
@@ -167,17 +184,17 @@ const montrer = async (pg, mobile) => {
         await clic(t.pg, '[data-onglet-b="ventes"]');
         await clic(t.pg, '[data-fiche-b="v:91000000000"]');
         a = await lire(t.pg);
-        await cap(t.pg, `ventes-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}ventes-${largeur}-${scheme}`);
         dit(a.fiche && a.fiche.id === 'v:91000000000' && /Action requise/.test(a.fiche.faits.etat) && a.fiche.faits.bordereau === 'prêt', `${T} : une vente déplie sa fiche (état en mots clairs, bordereau)`, JSON.stringify(a.fiche));
         // Favoris : les étapes.
         await clic(t.pg, '[data-onglet-b="favoris"]');
         await t.pg.waitForTimeout(300);
         a = await lire(t.pg);
-        await cap(t.pg, `favoris-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}favoris-${largeur}-${scheme}`);
         dit(a.etape === '1' && /Coche/.test(a.guide), `${T} : Favoris · étape 1 « Choisir », la phrase qui dit quoi faire`, JSON.stringify({ e: a.etape, g: a.guide }));
         await clic(t.pg, '[data-fav-envoyer]');
         a = await lire(t.pg);
-        await cap(t.pg, `favoris-recap-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}favoris-recap-${largeur}-${scheme}`);
         dit(a.etape === '4' && a.rythme === 'normal', `${T} : étape 4 « Confirmer » : le rythme au hasard (40–90 s) par défaut`, JSON.stringify({ e: a.etape, r: a.rythme }));
         await clic(t.pg, '[data-fav-rythme-b="prudent"]');
         a = await lire(t.pg);
@@ -186,11 +203,60 @@ const montrer = async (pg, mobile) => {
         a = await lire(t.pg);
         const l = a.envoyes.find((m) => m.quoi === 'lancer');
         dit(l && l.confirme === true && l.rythme === 'prudent', `${T} : « Confirmer l’envoi » part avec SON rythme et son clic`, JSON.stringify(l));
+        // Répondre depuis le volet Messages.
+        if (!(await lire(t.pg)).on) await montrer(t.pg, mobile);
+        await clic(t.pg, '[data-onglet-b="messages"]');
+        await clic(t.pg, '[data-conv-b="60001"]');
+        await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-rep-texte="60001"]'); ta.value = 'Oui, toujours disponible'; ta.dispatchEvent(new Event('input')); });
+        await clic(t.pg, '[data-rep-envoyer="60001"]');
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}reponse-${largeur}-${scheme}`);
+        const rp = a.envoyes.find((m) => m.action === 'repondreCarte');
+        dit(rp && rp.conv === '60001' && rp.confirme === true && rp.texte === 'Oui, toujours disponible' && a.repOk, `${T} : répondre depuis le volet : SA conversation, son texte, son toucher ; « Envoyé » dit`, JSON.stringify({ rp, ok: a.repOk }));
+        // Annonces : action, statuts, colonnes, grille, cases.
+        await clic(t.pg, '[data-onglet-b="annonces"]');
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}annonces-${largeur}-${scheme}`);
+        dit(a.chips.join('|') === 'tous:10|en_vente:5|brouillon:2|masque:1|reserve:1|vendu:1' && a.annVue === 'liste' && a.lignesAnn === 5, `${T} : Annonces : statuts à compteurs (Toutes 10 · En vente 5 · Brouillon 2 · Masqué 1 · Réservé 1 · Vendu 1), « En vente » d’abord`, JSON.stringify({ c: a.chips, v: a.annVue, n: a.lignesAnn }));
+        dit(a.action && a.action.off && !a.action.options.includes('supprimer'), `${T} : « Choisir une action » grisé sans sélection, aucune suppression en série`, JSON.stringify(a.action));
+        await clic(t.pg, '[data-ann-statut="brouillon"]');
+        a = await lire(t.pg);
+        dit(a.lignesAnn === 2, `${T} : le filtre « Brouillon » ne garde que les 2 brouillons`, a.lignesAnn);
+        await clic(t.pg, '[data-ann-statut="tous"]');
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const d = r.querySelector('[data-ann-cols]'); d.open = true; const c = r.querySelector('[data-ann-col="vues"]'); c.checked = true; c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}colonnes-${largeur}-${scheme}`);
+        dit(a.cols.includes('vues') && a.ranges.some((x) => x.vrmPanneauAnnonces && x.vrmPanneauAnnonces.cols.includes('vues')), `${T} : « Colonnes ▾ » : Vues ajoutée, le choix est gardé`, JSON.stringify({ c: a.cols, r: a.ranges.slice(-1) }));
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-ann-tout]'); c.checked = true; c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        dit(a.coches === 10 && a.action && !a.action.off, `${T} : « tout » coche les 10 lignes, l’action devient possible`, JSON.stringify({ c: a.coches, a: a.action }));
+        await clic(t.pg, '[data-ann-vue="grille"]');
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}grille-${largeur}-${scheme}`);
+        dit(a.annVue === 'grille' && a.cartesGrille === 10, `${T} : la grille montre les 10 annonces`, JSON.stringify({ v: a.annVue, n: a.cartesGrille }));
+        await clic(t.pg, '[data-ann-vue="liste"]');
+        // Automatisations.
+        await clic(t.pg, '[data-onglet-b="automatisations"]');
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}automatisations-${largeur}-${scheme}`);
+        dit(a.auto.join('|') === 'favoris:off|offres:on|baisse:bientot', `${T} : Automatisations : favoris Désactivé, offres Activé, baisse « pas su » (pas livrée) — lus`, JSON.stringify(a.auto));
+        // Notifications.
+        await clic(t.pg, '[data-onglet-b="notifications"]');
+        a = await lire(t.pg);
+        await cap(t.pg, `${orion ? 'orion-' : ''}notifications-${largeur}-${scheme}`);
+        dit(a.notifs.join('|') === 'ventes:nouveau|codes:nouveau|messages:vu|refus:vu', `${T} : Notifications : 4 lignes, « nouveau » après le marqueur, « vu » avant`, JSON.stringify(a.notifs));
+        await t.pg.evaluate(() => { const s2 = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-notif-type]'); s2.value = 'codes'; s2.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(200);
+        a = await lire(t.pg);
+        dit(a.notifs.join('|') === 'codes:nouveau', `${T} : le filtre « type » garde les codes de retrait`, JSON.stringify(a.notifs));
         // Paramètres.
         if (!(await lire(t.pg)).on) await montrer(t.pg, mobile);
         await clic(t.pg, '[data-onglet-b="parametres"]');
         a = await lire(t.pg);
-        await cap(t.pg, `parametres-${largeur}-${scheme}`);
+        await cap(t.pg, `${orion ? 'orion-' : ''}parametres-${largeur}-${scheme}`);
         dit(a.parametres && a.remettre && a.details, `${T} : Paramètres : le logo (« Remettre le logo en place »), Détails replié`, JSON.stringify({ p: a.parametres, r: a.remettre, d: a.details }));
         dit(a.petits.length === 0, `${T} : cibles ≥ 44 px`, JSON.stringify(a.petits));
         await t.pg.keyboard.press('Escape');

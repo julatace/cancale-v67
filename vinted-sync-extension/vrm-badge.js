@@ -776,7 +776,7 @@
   .chip5 { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; position: relative; }
   .chip5::after { content: ''; position: absolute; inset: -4px 0; }
   .chip5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
-  .tr5 { display: grid; grid-template-columns: 44px minmax(220px, 2fr) minmax(0, calc(var(--n5, 4) * 1fr)); align-items: center; gap: 0 8px; padding: 0 8px; }
+  .tr5 { display: grid; grid-template-columns: 44px minmax(220px, 2fr) minmax(0, 5fr); align-items: center; gap: 0 8px; padding: 0 8px; }
   .tr5 .cels5 { display: grid; grid-template-columns: repeat(var(--n5, 4), minmax(56px, 1fr)); gap: 0 8px; align-items: center; }
   .th5 { min-height: 36px; font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); border-bottom: .5px solid var(--n-trait); }
   .case5 { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
@@ -1775,7 +1775,7 @@
       + carteA('offres', 'au_offres', pastilleEtat(o ? o.actif : null),
         ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null) + ligne('au_refus', o ? TU(o.refus ? 'au_oui' : 'au_non') : null),
         '?tab=messages&site=vinted&vue=offres')
-      + carteA('baisse', 'au_baisse', pastilleEtat(au.baisse ? au.baisse.actif : null), `<p class="note5">${esc(TU('au_baisse_pas_livree'))}</p>`, '?tab=annonces&site=vinted')
+      + `<section class="au5" data-auto-carte="baisse"><div class="au5-t"><h3>${esc(TU('au_baisse'))}</h3><span class="et5" data-etat="bientot">${esc(TU('au_bientot'))}</span></div><p class="note5">${esc(TU('au_baisse_pas_livree'))}</p></section>`
       + `</div>`;
   }
   // ══ 5.409 — NOTIFICATIONS (capture « Notifications » de Vintex) : le journal capté des 7 derniers jours, en tableau
