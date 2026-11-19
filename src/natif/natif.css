@@ -494,7 +494,7 @@
   /* La coque dont l'ÉCRAN défile (src/App.jsx) : la racine a la hauteur de l'écran, la barre d'onglets est sous l'écran,
      dans le flux — elle ne peut pas « flotter au milieu » pendant l'inertie d'iOS. */
   .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
-  .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
+  .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
   .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
   .n-tete-repere { height: 1px; margin-bottom: -1px; }
 

@@ -345,7 +345,7 @@ html:root { --d-r-carte: 12px !important; --d-r-tuile: 12px !important; }
 /* L'invite d'un champ (placeholder) : l'encre seconde, jamais plus pâle. */
 html body :is(input, textarea)::placeholder { color: var(--ap-gris) !important; opacity: 1 !important; }
 /* Le nombre d'un segment (« Colis 429 ») : estompé à 80 %, ou BLANC sur le pouce blanc du segment choisi. */
-html body :is(.v2-seg-n, .vrm-boite button.v2-seg-btn.is-on .v2-seg-n) { color: var(--ap-gris) !important; opacity: 1 !important; }
+html body .v2-seg-n { color: var(--ap-gris) !important; opacity: 1 !important; }
 /* Le Stock : « Cases · Places » (segmenté écrit à la main) — la piste grise, l'encre, le pouce blanc. */
 html body .sr-seg { background: var(--ap-remplir) !important; border-radius: 9px !important; box-shadow: none !important; }
 html body .sr-seg-btn { color: var(--ap-encre) !important; background: transparent !important; }
@@ -379,8 +379,8 @@ html body .v2-outils-feuille .vrm-offres-auto { background: var(--ap-remplir) !i
 /* Les puces de compte d'une feuille (portée hors de la coque) : 44 px au doigt (34 mesurés après la coque native). */
 @media (pointer: coarse) { html body .vrm-compte-puces .vrm-compte-puce { min-height: 44px !important; } }
 html body :is(.v2-seg-btn, .sr-seg-btn) > :is(.v2-seg-n, .sr-seg-n) { color: inherit !important; opacity: 1 !important; }
-/* E-mails, la nuit : le compte d'une ligne à l'encre seconde des anciens écrans (4,49:1 sur la ligne choisie). */
-html body .vrm-boite-compte-nom { color: var(--ap-gris) !important; }
+/* E-mails, la nuit : le compte d'une ligne, un cran plus encré (la ligne est estompée : 4,49:1 sur la ligne choisie). */
+html body .vrm-boite-compte-nom { color: color-mix(in srgb, var(--n-encre-2, #98989F) 70%, var(--n-encre, #FFFFFF)) !important; }
 html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
 html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: color-mix(in srgb, var(--ap-bleu) 82%, var(--ap-encre)) !important; padding-left: 0 !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
