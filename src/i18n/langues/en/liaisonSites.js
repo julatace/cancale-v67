@@ -19,6 +19,7 @@ export default {
   "lia.sur": "Same photo · sure",
   "lia.memePhoto": "Same photo · to check",
   "lia.publiee": "Posted by VRM on {site}",
+  "lia.ecritSurAnnonce": "No. written on the listing · check it",
   "lia.chercher": "No., title or size",
   "lia.relier": "Link to No. {numero}",
   "lia.aucune": "No item found.",

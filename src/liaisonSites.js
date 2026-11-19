@@ -313,6 +313,21 @@ export function construireLiaison({ autres = null, paires = null, memePhoto = nu
       const j = candidats[0].jugement;
       if (j.ok && !j.doutes.length && !j.plusieurs && !j.barre) avant = String(candidats[0].paire.id);
     }
+    // (19 nov.) Le N° ÉCRIT sur l'annonce (SKU eBay, référence Leboncoin) que les règles d'identité n'ont pas pu croire
+    // (fiche numérotée APRÈS la publication — panne du 11–18 oct. —, N° porté ailleurs…) : l'article qui porte ce N°
+    // aujourd'hui est proposé « à vérifier », jamais mis en avant, jamais relié sans SON toucher.
+    if (libre) {
+      const ecrits = [...new Set(arr(a.identites).filter((i) => i && i.sorte === 'reference').map((i) => cle(i.numero || '')).filter(Boolean))];
+      for (const x of ecrits) {
+        const ps = parNum.get(x) || [];
+        if (ps.length !== 1) continue;                                                      // aucun ou plusieurs articles sous ce N° : rien proposé
+        const paire = ps[0];
+        if (!paire || String(paire.id) === k || candidats.some((c) => c.paire === paire)) continue;
+        const jugement = jugerLien({ annonce: a, paire, autres, numerosDouteux, cle, marqueDe });
+        if (jugement.refus && jugement.refus !== 'numero-double') continue;
+        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });
+      }
+    }
     // Les pistes « publiée par VRM sur ce site » : après la photo, jamais mises en avant.
     if (libre) {
       const l = arr(objet(pistes) && pistes[a.plateforme]).map((x) => cle(x)).filter(Boolean);

@@ -19,6 +19,7 @@ export default {
   "lia.sur": "Gleiches Foto · sicher",
   "lia.memePhoto": "Gleiches Foto · zu prüfen",
   "lia.publiee": "Von VRM auf {site} eingestellt",
+  "lia.ecritSurAnnonce": "Nr. in der Anzeige · prüfen",
   "lia.chercher": "Nr., Titel oder Größe",
   "lia.relier": "Mit Nr. {numero} verknüpfen",
   "lia.aucune": "Kein Artikel gefunden.",

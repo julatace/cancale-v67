@@ -21,6 +21,7 @@ export default {
   "lia.sur": "Même photo · sûr",
   "lia.memePhoto": "Même photo · à vérifier",
   "lia.publiee": "Publiée par VRM sur {site}",
+  "lia.ecritSurAnnonce": "N° écrit sur l’annonce · à vérifier",
   "lia.chercher": "N°, titre ou taille",
   "lia.relier": "Relier à N°{numero}",
   "lia.aucune": "Aucun article trouvé.",

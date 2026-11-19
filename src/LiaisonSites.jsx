@@ -47,14 +47,15 @@ function Cote({ src, Photo, attrs = null, legende, sous = '', geste = null }) {
 }
 const EtatPhoto = ({ etat, site }) => (etat === 'sur' ? <span className="n-lia-etat" data-ton="sur" data-liaison-niveau="sur"><span className="n-lia-diode" aria-hidden="true"/>{tr('lia.sur')}</span>
   : etat === 'verifier' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="verifier"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.memePhoto')}</span>
-  : etat === 'publiee' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="publiee"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.publiee', { site })}</span> : null);
+  : etat === 'publiee' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="publiee"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.publiee', { site })}</span>
+  : etat === 'reference' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="reference"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.ecritSurAnnonce')}</span> : null);
 
 // ── La carte d'un ARTICLE candidat : la photo en grand, puis N° · prix · titre · taille · site · place. ──
 // Toucher la carte — photo comprise — RELIE : la photo n'ouvre pas la visionneuse (`data-sans-visionneuse`, src/visionneuse.js).
 function CarteCandidate({ c, annonce, Photo, focus, enCours, onRelier, refCarte }) {
   const p = c.paire;
   const t = tailleDe(p).taille, ta = tailleDe(annonce).taille;
-  const etat = c.niveau === 'sur' ? 'sur' : c.niveau === 'verifier' ? (c.raison === 'publiee' ? 'publiee' : 'verifier') : '';
+  const etat = c.niveau === 'sur' ? 'sur' : c.niveau === 'verifier' ? (c.raison === 'publiee' ? 'publiee' : c.raison === 'reference' ? 'reference' : 'verifier') : '';
   return (
     <button type="button" ref={refCarte} className="n-lia-carte" data-sans-visionneuse="" data-focus={focus ? '1' : undefined} data-liaison-candidate={p.id} data-numero={p.numero} data-niveau={etat} data-proche={String(c.proche)}
       aria-disabled={enCours ? 'true' : undefined} aria-label={tr('lia.relier', { numero: p.numero })} onClick={() => { if (!enCours) onRelier(c); }}>

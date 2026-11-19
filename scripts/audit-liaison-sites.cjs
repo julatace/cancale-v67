@@ -87,6 +87,10 @@ const MUTATIONS = {
   articleSansVinted: [R, "    if (!a || a.id == null || !SITES_LIAISON.includes(a.plateforme) || a.enVente === false) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();", "    if (true) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();"],
   sonNumeroPasUnLien: [R, "    return pr && cle(pr.numero || '') === cle(v) ? null : { numero: String(v) };", '    return null;'],
   sansArticle: [R, "  const propre = !relie && !reunie && (sansArticle || (!!pr && pr.actif !== false));", "  const propre = !relie && !reunie && (!!pr && pr.actif !== false);"],
+  // Le SKU / la référence écrite qu'aucune règle ne croit : proposée seulement, une seule.
+  refPasProposee: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });", ''],
+  refPlusieurs: [R, "        if (ps.length !== 1) continue;", "        if (!ps.length) continue;"],
+  refAvant: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });", "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement }); if (!avant) avant = String(paire.id);"],
   // Le N° donné seul par l'écran Annonces (vrm_articles_sites).
   faitsIgnores: [R, "  return nf && nf.auto && cle(nf.valeur || '') ? String(nf.valeur).trim() : '';", "  return '';"],
   faitsPasSu: [R, "  return C.lbc && C.ebay && C.vc && C.journal && C.faits ? C : null;", "  if (!C.faits) C.faits = {};\n  return C.lbc && C.ebay && C.vc && C.journal ? C : null;"],
@@ -623,6 +627,25 @@ function pixels(nom, w = 64, h = w) {
           'K2 · la relier à N°124 DEMANDE quel N° garder ; délier ensuite lui REND son N°62 (`propre`) — jamais une annonce sans N° qu’on renumérotera', { q: q.demander, apres: apres && apres.ebay['7201'], retour: retour && retour.ebay['7201'] });
         dit(L.opsRelier({ annonce: lb, paire: P124, cartes: { ...cartes, faits: undefined }, autres: r.autres, cle, marqueDe }).refus === 'pas-su' && L.opsDelier({ annonce: lb, cartes: { ...cartes, faits: undefined }, cle }).refus === 'pas-su',
           'K3 · les N° de l’écran Annonces PAS LUS ⇒ rien d’écrit (relier, délier)', '');
+      }
+      {
+        // M · eBay SANS SKU (annonces créées sur eBay ou publiées avant le 19 oct.) : jamais exclue, reliée sur SON toucher par l'identifiant d'annonce.
+        const eb = ann('eBay', 186000000001, { titre: 'Nike Air Max 90 blanche taille 42', identites: [] });
+        const r = L.construireLiaison({ autres: [eb], paires: [P124, P125], journal: {}, cle, marqueDe });
+        const e = r.parCle.get('eBay:186000000001');
+        const w = L.opsRelier({ annonce: eb, paire: P124, cartes: CARTES(), autres: [eb], cle, marqueDe, maintenant: 't' });
+        const apres = w.ops ? L.appliquerSurCartes(CARTES(), w.ops) : null;
+        dit(e && e.etat === 'aRelier' && r.file.some((x) => x.cle === 'eBay:186000000001') && apres && apres.ebay['186000000001'] && apres.ebay['186000000001'].pairId === '1001' && e.avant === null,
+          'M1 · une annonce eBay SANS SKU est dans la file, jamais mise en avant ; SON toucher pose `vrm_ebay_liens[itemId]` (pas de SKU requis)', { etat: e && e.etat, lien: apres && apres.ebay['186000000001'] });
+        // Le SKU écrit qu'aucune règle ne croit (fiche numérotée APRÈS la publication) : l'article de ce N° est PROPOSÉ « à vérifier ».
+        const er = ann('eBay', 186000000002, { titre: 'Basket', identites: [{ sorte: 'reference', numero: '125' }] });
+        const r2 = L.construireLiaison({ autres: [er], paires: [P124, P125], journal: {}, cle, marqueDe });
+        const e2 = r2.parCle.get('eBay:186000000002');
+        const c = L.candidatesPour(e2, r2.articles, { autres: r2.autres || [] });
+        dit(e2 && e2.etat === 'aRelier' && e2.avant === null && e2.candidats.some((x) => x.raison === 'reference' && x.paire.numero === '125' && x.niveau === 'verifier') && c[0] && String(c[0].paire.numero) === '125',
+          'M2 · SKU « VRM-125 » non cru : N°125 proposé EN TÊTE « à vérifier », jamais relié ni mis en avant', { c: c.slice(0, 2).map((x) => x.paire.numero), cand: e2 && e2.candidats.map((x) => x.raison) });
+        const deux = L.construireLiaison({ autres: [er], paires: [P124, P125, { ...P125, id: 1099 }], journal: {}, cle, marqueDe }).parCle.get('eBay:186000000002');
+        dit(deux && !deux.candidats.some((x) => x.raison === 'reference'), 'M2 · deux articles sous ce N° ⇒ rien proposé par le SKU', '');
       }
       {
         // L'ancien écran Leboncoin disait « pas d'article à relier » (reliée, sans N°) : ni « reliée » à un N° fantôme, ni reproposée.

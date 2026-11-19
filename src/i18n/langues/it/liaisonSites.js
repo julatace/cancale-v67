@@ -19,6 +19,7 @@ export default {
   "lia.sur": "Stessa foto · sicuro",
   "lia.memePhoto": "Stessa foto · da verificare",
   "lia.publiee": "Pubblicato da VRM su {site}",
+  "lia.ecritSurAnnonce": "N° scritto nell’annuncio · da verificare",
   "lia.chercher": "N°, titolo o taglia",
   "lia.relier": "Collega al N°{numero}",
   "lia.aucune": "Nessun articolo trovato.",
