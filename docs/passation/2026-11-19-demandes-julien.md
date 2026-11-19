@@ -50,6 +50,14 @@ point relais, code en clair dans la rangée, date limite ; toucher ⇒ le code e
 les achats en route, puis tous. Recherche à facettes : taille, prix (bornes), marque, mots du titre, vendeur, compte,
 date d'achat, date de retrait, n° de suivi, code. À l'ordinateur : liste à gauche, détail à droite.
 
+Ajout (capture iPhone, 15 h 34, Achats filtré « Leboncoin ») : « le bouton Ajouter dans Achats ne sert à rien » ⇒ RETIRÉ
+(un achat arrive tout seul par l'extension ou l'e-mail ; la saisie à la main, si elle reste, va derrière « ⋯ »). Vus sur
+la même capture : le rond « scanner » posé PAR-DESSUS « Ajouter » (deux scanners sur l'écran) ; le « ? » invisible ;
+avec le filtre Leboncoin, « À retirer · 15 · 2 d'ici demain · 15 avec code · 5 à vérifier » s'affiche mais AUCUN colis
+n'est listé ⇒ les nombres ne suivent pas le filtre, ou la liste est vide à tort (bug à mesurer : un filtre de site
+doit filtrer les nombres ET la liste, et dire « aucun colis Leboncoin à retirer » s'il n'y en a pas) ; « Mode relais »,
+« Suivi vérifié à l'instant », « Ajouter un QR Mondial Relay · 11 sans QR » : à juger avec l'audit (§2, ligne Achats).
+
 ### B. Stock et rangement, étiquetage
 « Pour chaque article, mets "à ranger maintenant" au lieu que je doive appuyer sur l'article et qu'après ce soit à
 droite. Fais une meilleure représentation du meuble, avec une animation quand je range l'article dans le meuble. Je veux
