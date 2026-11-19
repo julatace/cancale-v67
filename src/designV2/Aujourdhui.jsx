@@ -179,7 +179,8 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
   const rien = pret && n === 0 && nRet === 0;
   const premierPoint = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
-  const aVenirLu = aVenir && aVenir.valeur != null;
+  // « Argent à venir » : seulement s'il est lu ET qu'il y en a (« 0 € à venir » n'apprend rien).
+  const aVenirLu = !!aVenir && aVenir.valeur != null && aVenir.valeur > 0;
   // LES BLOCS, dans l'ORDRE DE LEUR ARRIVÉE : l'ordre voulu (à envoyer, à retirer, dernières ventes) quand tout est lu
   // ensemble ; un bloc lu plus tard se pose à la fin, jamais au-dessus d'un autre (rien ne pousse ce que l'œil lit).
   const ordreBlocs = React.useRef([]);
