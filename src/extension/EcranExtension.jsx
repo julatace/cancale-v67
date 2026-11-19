@@ -100,15 +100,16 @@ function texteJauge(j, maintenant) {
 }
 
 function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre }) {
-  const sous = [dire(c.etat.cle, c.etat.vars), c.lu ? tr('ext.lu', { age: ilYa(c.lu.at, maintenant) }) : (c.etat.cle === 'ext.compte.jamaisLu' ? '' : tr('ext.jamais'))].filter(Boolean).join(' · ');
+  const phrase = dire(c.etat.cle, c.etat.vars);
+  const lu = c.lu ? tr('ext.lu', { age: ilYa(c.lu.at, maintenant) }) : (c.etat.cle === 'ext.compte.jamaisLu' ? '' : tr('ext.jamais'));
   const total = c.gestes.length;
   return (
     <Groupe titre={`${NOMS_SITES[c.site]} · ${c.nom || '—'}`} repli={{ ouvert, onBascule, n: null }} attrs={{ 'data-ext-compte': `${c.site}:${c.id}`, 'data-ext-ouverture': c.ouverture, 'data-ext-etat': c.etat.code, 'data-ext-peut': c.peut }}>
-      <Rangee titre={sous} lignes={2} ton={c.etat.ton === 'geste' ? 'ambre' : 'neutre'} valeur={tr('ext.peut.n', { n: c.peut, total })}
+      <Rangee titre={phrase} sousTitre={lu} lignes={2} ton={c.etat.ton === 'geste' ? 'ambre' : 'neutre'} valeur={tr('ext.peut.n', { n: c.peut, total })}
         href={c.etat.geste === 'ouvrir-vinted' ? 'https://www.vinted.fr' : ''} fin={c.etat.geste === 'ouvrir-vinted' ? 'chevron' : null}
         attrs={{ 'data-ext-compte-etat': c.etat.code }}/>
       {c.etat.geste === 'reprendre' ? <Rangee titre={tr('ext.geste.reprendre')} fin="chevron" onClick={() => onReprendre(c.id)} attrs={{ 'data-ext-reprendre': c.id }}/> : null}
-      {c.site === 'vinted' ? <Rangee titre={texteJauge(c.jauge, maintenant)} attrs={{ 'data-ext-jauge': c.jauge ? `${c.jauge.n}/${c.jauge.max}` : (c.jauge === null ? 'pas-su' : 'lecture') }}/> : null}
+      {c.site === 'vinted' ? <Rangee titre={texteJauge(c.jauge, maintenant)} lignes={2} attrs={{ 'data-ext-jauge': c.jauge ? `${c.jauge.n}/${c.jauge.max}` : (c.jauge === null ? 'pas-su' : 'lecture') }}/> : null}
       {c.gestes.map((g) => <RangeeGeste key={g.cle} g={g}/>)}
       {c.etat.code === 'verification' || c.etat.code === 'captcha' ? <Pourquoi cle="ext.pourquoi.verification" id={'verif-' + c.id}/>
         : c.gestes.some((g) => g.raison === 'pause') ? <Pourquoi cle="ext.pourquoi.pause" id={'pause-' + c.id}/>
