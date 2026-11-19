@@ -1,0 +1,58 @@
+// ── src/natif/BarreLaterale.jsx — la barre latérale de l'ordinateur (≥ 1024, 240 px) ─────
+// Fond --n-fond ; l'entrée active = une pastille --n-teinte + texte --n-sur-teinte (l'accent, tenu à 4,5:1).
+// Props :
+//   tete       nœud en haut (la marque, le compte)
+//   groupes    [{ titre, entrees: [{ cle, libelle, icone, pastille, libellePastille }] }]
+//              icone : nœud (icône de l'app, taille 20)
+//   actif      la `cle` de l'entrée courante
+//   onChoisir  (cle) => …
+//   pied       nœud en bas (le compte, l'aide)
+//   libelle    le nom de la navigation
+// Clavier : ↑ ↓ passent d'une entrée à l'autre.
+// Exemple :
+//   <BarreLaterale actif={tab} onChoisir={setTab} groupes={[
+//     { entrees: [{ cle: 'aujourdhui', libelle: "Aujourd'hui", icone: <Icon name="home" size={20}/> }] },
+//     { titre: 'Plus', entrees: [{ cle: 'stock', libelle: 'Stock', icone: <Icon name="box" size={20}/> }] } ]}/>
+import React from 'react';
+import { tr } from '../i18n/index.js';
+import { cx } from './outils.js';
+import { Pastille } from './Pastille.jsx';
+
+export function BarreLaterale({ tete = null, groupes = [], actif = '', onChoisir, pied = null, libelle = '', className = '' }) {
+  const clavier = (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const toutes = [...e.currentTarget.querySelectorAll('.n-laterale-entree')];
+    const k = toutes.indexOf(document.activeElement); if (k < 0) return;
+    const s = toutes[k + (e.key === 'ArrowDown' ? 1 : -1)];
+    if (s) { e.preventDefault(); s.focus(); }
+  };
+  return (
+    <nav className={cx('n-laterale', className)} aria-label={libelle || tr('natif.nav.nom')} data-n-laterale="" onKeyDown={clavier}>
+      {tete ? <div className="n-laterale-tete">{tete}</div> : null}
+      <div className="n-laterale-liste">
+        {groupes.map((g, i) => (
+          <div className="n-laterale-groupe" key={g.titre || i}>
+            {g.titre ? <h2 className="n-laterale-titre">{g.titre}</h2> : null}
+            {g.entrees.map((o) => (
+              <button
+                key={o.cle}
+                type="button"
+                className="n-laterale-entree"
+                data-n-entree={o.cle}
+                aria-current={o.cle === actif ? 'page' : undefined}
+                onClick={() => { if (o.onChoisir) o.onChoisir(o.cle); else if (onChoisir) onChoisir(o.cle); }}
+              >
+                {o.icone ? <span className="n-laterale-icone" aria-hidden="true">{o.icone}</span> : null}
+                <span className="n-laterale-libelle">{o.libelle}</span>
+                {o.pastille ? <Pastille ton="ambre-plein" libelle={o.libellePastille || ''}>{o.pastille}</Pastille> : null}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+      {pied ? <div className="n-laterale-pied">{pied}</div> : null}
+    </nav>
+  );
+}
+
+export default BarreLaterale;
