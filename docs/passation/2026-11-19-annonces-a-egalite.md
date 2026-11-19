@@ -99,7 +99,7 @@ du coffre ; la feuille dit combien sont sortis.
 |---|---|
 | `scripts/audit-parite-sites.cjs` | 96 verts ; `--mutation=toutes` 17/17 ; rouge sur `origin/main` |
 | `scripts/audit-brouillons-a-refaire.cjs` | 16 verts ; 6/6 mutations ; rouge sur `origin/main` |
-| `scripts/bancs/annonces-egalite.cjs` | voir le rapport de la session (captures dans le scratchpad, jamais dans le dépôt) |
+| `scripts/bancs/annonces-egalite.cjs` | 179 verts (390 tactile, 1512, 1280, clair et sombre, 6 bases) ; `--prouve` 4/4 ; captures regardées (le titre coupé à 8 lettres au téléphone a été corrigé : titre sur deux lignes). Machine saturée : une 2ᵉ passe a calé sur une navigation (délai), 167 verts et aucun rouge avant. |
 | audits identite, coherence, traduction, tdz, variables, quoi-de-neuf, a-retirer-ailleurs, stock-annonces, icones, budget-lectures | verts |
 | `vite build` | vert |
 
