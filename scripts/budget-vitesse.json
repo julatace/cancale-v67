@@ -9,7 +9,7 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 1969,
+    "js": 1970,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -697,7 +697,7 @@
    "ecrans": [
     "journee"
    ],
-   "raison": "« VRM natif » (lot lisible-partout) : l'habillage « VRM » du 18 nov. (4 feuilles), le réglage « Style », le dégradé, le verre et l'encre claire de studio-verre.css retirés — 1 980 Ko mesuré sur main, 1 967 Ko ici (−13 Ko de JS+CSS compressés au démarrage) : budget 1 982 → 1 969"
+   "raison": "« VRM natif » (lot lisible-partout) : l'habillage « VRM » du 18 nov. (4 feuilles), le réglage « Style », le dégradé, le verre et l'encre claire de studio-verre.css retirés — 1 980 Ko mesuré sur main, 1 968 Ko ici (−12 Ko de JS+CSS compressés au démarrage) : budget 1 982 → 1 970"
   }
  ]
 }

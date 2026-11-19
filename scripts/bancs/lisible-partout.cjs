@@ -602,21 +602,28 @@ async function genererParametres(o) {
         if (!bon) { injoignables.push({ ecran: '(habillage)', hab, W, th, note: JSON.stringify(attr) }); console.log(`⚠️  l’habillage n’est pas posé : ${JSON.stringify(attr)}`); }
         let liste = ECRANS.filter((e) => !e.si || e.si(c));
         if (base === 'volume' && (!VOULUS.length || VOULUS.some((v) => /^param/i.test(v)))) { try { const gen = await genererParametres(o); const i = liste.findIndex((e) => e.id === 'param-securite-donnees'); liste = [...liste.slice(0, i + 1), ...gen, ...liste.slice(i + 1)]; } catch (e) { console.log('⚠️  Paramètres : sous-pages pas lues — ' + String(e.message || e).slice(0, 160)); } }
+        // Un état qui plante (onglet tué par manque de mémoire, capture trop lente sur une machine chargée) est REJOUÉ une fois
+        // sur une page neuve ; s'il plante encore, il est dit « pas joignable » — jamais compté vert.
         for (const ecran of liste.filter(veut)) {
-          try {
-            await avecDelai((async () => {
-              const tj = Date.now(); const ok = await jouer(o, ecran.etapes);
-              const la = ok && (!ecran.preuve || await o.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 3500 }).then(() => true, () => false));
-              if (!la) { injoignables.push({ ecran: ecran.id, hab, W, th, note: ok ? 'preuve absente : ' + ecran.preuve : 'une étape n’a pas pu se jouer' }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : pas joignable (${ok ? 'preuve absente' : 'étape'})`); }
-              else { const tm = Date.now(); await mesurerEtat(o, ecran); if (process.env.TEMPS) console.log(`     (jeu ${tm - tj} ms · mesure ${Date.now() - tm} ms)`); }
-              if (ecran.apres) await jouer(o, ecran.apres);
-              await remettre(o).catch(() => {});
-            })(), DELAI_ETAT, ecran.id);
-          } catch (err) {
-            injoignables.push({ ecran: ecran.id, hab, W, th, note: String(err.message || err).slice(0, 160) }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : ${String(err.message || err).slice(0, 160)}`);
-            // la page ne répond peut-être plus : on la ferme et on en rouvre une pour la suite
-            const vieux = o; o = null; await avecDelai(vieux.ctx.close(), 8000, 'fermeture').catch(() => {});
-            o = await avecDelai(ouvrirConfig(nav, c, b, false), 90000, 'réouverture');
+          for (let essai = 1; essai <= 2; essai++) {
+            try {
+              await avecDelai((async () => {
+                const tj = Date.now(); const ok = await jouer(o, ecran.etapes);
+                const la = ok && (!ecran.preuve || await o.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 3500 }).then(() => true, () => false));
+                if (!la) { injoignables.push({ ecran: ecran.id, hab, W, th, note: ok ? 'preuve absente : ' + ecran.preuve : 'une étape n’a pas pu se jouer' }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : pas joignable (${ok ? 'preuve absente' : 'étape'})`); }
+                else { const tm = Date.now(); await mesurerEtat(o, ecran); if (process.env.TEMPS) console.log(`     (jeu ${tm - tj} ms · mesure ${Date.now() - tm} ms)`); }
+                if (ecran.apres) await jouer(o, ecran.apres);
+                await remettre(o).catch(() => {});
+              })(), DELAI_ETAT, ecran.id);
+              break;
+            } catch (err) {
+              const mot = String(err.message || err).slice(0, 160);
+              if (essai === 2) { injoignables.push({ ecran: ecran.id, hab, W, th, note: mot }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : ${mot}`); }
+              else console.log(`   (${ecran.id} : ${mot} — rejoué sur une page neuve)`);
+              // la page ne répond peut-être plus : on la ferme et on en rouvre une
+              const vieux = o; o = null; if (vieux) await avecDelai(vieux.ctx.close(), 8000, 'fermeture').catch(() => {});
+              o = await avecDelai(ouvrirConfig(nav, c, b, false), 120000, 'réouverture');
+            }
           }
         }
         if (o && o.erreurs.length) console.log(`   (erreurs de page : ${[...new Set(o.erreurs)].slice(0, 3).join(' | ')})`);
