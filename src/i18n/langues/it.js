@@ -67,6 +67,7 @@ import ecran_rechliste from './it/rechliste.js';
 import ecran_studio_paires from './it/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './it/republierGuide.js';
 import ecran_republication from './it/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
+import ecran_prix_sans_manuel from './it/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './it/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './it/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './it/deuxComptes.js';   // (15 nov., lot deux-comptes)
@@ -83,6 +84,7 @@ export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_republication,
+  ...ecran_prix_sans_manuel,
   ...ecran_etageres,
   ...ecran_journee_verre,
   ...ecran_arrivee,
@@ -760,10 +762,6 @@ export default {
   "partout.entree": "Pubblica ovunque",
   "partout.exclues": {"one": "{n} annuncio scelto non è proponibile (non più online su Vinted, o senza N°).", "other": "{n} annunci scelti non sono proponibili (non più online su Vinted, o senza N°)."},
   "partout.aussiSur": "anche su {sites}",
-  "prixPartout.propose": "Proposto: confermalo tu",
-  "prixPartout.relu": "Fatto ✓ verificato",
-  "prixPartout.aMettre": "Da mettere: {prix}",
-  "prixPartout.baisser": "Abbassa su Vinted",
   "partout.val.oui": "sì",
   "partout.val.non": "no",
   "partout.val.aucune": "nessuna (mai una promozione)",

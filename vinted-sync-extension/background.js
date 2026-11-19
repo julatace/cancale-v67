@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.408.0';
+const CODE_VERSION = '5.409.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11737,7 +11737,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); }   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('prixattente', () => prixAttenteTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -13055,6 +13055,8 @@ async function visiteVintedUnPassage() {
     // 5.183 : une commande du téléphone attend peut-être — relevée à chaque
     // visite aussi (NOTRE base, pas Vinted ; ses propres gardes s'appliquent).
     relaisTick('visite').catch(() => {});
+    // 5.409 : une baisse de prix attend peut-être que Vinted soit ouvert sur ce compte (NOTRE base ; ses gardes s'appliquent).
+    prixAttenteTick('visite').catch(() => {});
     // 5.290 : les n° que le serveur ne peut pas lire chez le transporteur
     // (Mondial Relay toujours) — un passage au plus toutes les 5 min, son
     // propre budget : rien de la visite Vinted n'est consommé ni attendu.
@@ -21492,6 +21494,259 @@ async function relaisSuivreJobUn(jobId, job) {
   }
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════
+// LES PRIX EN ATTENTE (19 nov., 5.409 — capacité `prixattente`)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien (capture de son iPhone, « Changer le prix », 59 → 58) : « c'est à
+// l'extension de baisser les prix, c'est pas à moi ». Dans l'app, « Appliquer »
+// EST son clic. Quand la baisse ne peut pas partir tout de suite (iPhone sans
+// extension, pas d'onglet du site sur ce compte, plafond, pause), l'app la RANGE
+// dans SA base : une ligne `cmd_prix_{id}` = une commande = un prix = une annonce
+// (règle et forme : src/prixAttente.js, bloc recopié ci-dessous).
+// Ici, toutes les 30 s (alarme `vrm-relais`) et à chaque visite sur Vinted :
+//   · RIEN sans session VRM ; la ligne doit être à SON vendeur (`owner` et `pour`) ;
+//   · forme revérifiée (`prixAttCommande`) : une baisse seulement, confirmée ;
+//   · périmée (24 h au plus après la demande) ⇒ écrite « expirée », JAMAIS exécutée ;
+//   · deux commandes pour la même annonce ⇒ la plus récente reste, l'autre est « remplacée » ;
+//   · elle ne part que si le site est ouvert, sur le compte de l'annonce, sans pause :
+//     sinon la ligne n'est pas touchée (elle attend) ;
+//   · UNE fois : prise par une écriture conditionnelle (`attente` → `pris`) et notée
+//     dans `chrome.storage.local` (§4.9) AVANT d'agir — un service worker qui
+//     redémarre ne la rejoue jamais ;
+//   · exécutée par le chemin de baisse EXISTANT, garde-fous intacts (compte de
+//     l'onglet, prix d'avant RELU inchangé sinon rien, relu après, 45/h, plafond du
+//     jour, pause 429/403, frein, une requête à la fois) ; sur Vinted elle suit le
+//     rythme (`programme` : un geste lancé par lui qui part plus tard) ;
+//   · UNE commande au plus par passage, 25 à 90 s (au hasard) entre deux ;
+//   · un refus où rien n'est parti et qui se lève seul (plafond, pause, autre compte)
+//     ⇒ remise en attente (bornée) ; « Tout arrêter » ou une vérification ⇒ refusée, dite ;
+//   · l'issue est écrite dans la ligne (prix RELU), l'app la montre.
+// Aucune route nouvelle chez Vinted, Leboncoin ou Vestiaire. Exécuté par
+// scripts/audit-prix-attente.cjs (ce fichier, dans un vm).
+// <prix-attente-regle> — COPIE de src/prixAttente.js (scripts/audit-prix-attente.cjs --recopie). Ne pas modifier ici.
+const PRIX_ATT_MS = 24 * 3600000;             // une baisse en attente périme après 24 h
+const PRIX_ATT_PRIS_MS = 10 * 60000;          // prise sans issue depuis 10 min ⇒ « pas sûr »
+const PRIX_ATT_REPORTS = 40;                  // remise en attente au plus 40 fois (jamais une boucle sans fin)
+const PRIX_ATT_RE_ID = /^cmd_prix_[a-z0-9]{8,40}$/;
+const PRIX_ATT_SITES = ['vinted', 'leboncoin', 'vestiaire'];
+// Les refus où RIEN n'est parti et où la baisse redevient possible toute seule (le
+// bon compte ouvert, une place dans l'heure, la fin d'une pause) : elle ATTEND.
+// Tout autre refus est une issue (dite), jamais une attente.
+const PRIX_ATT_ATTENDRE = {
+  vinted: ['vinted-absent', 'vinted-autre', 'vinted-pause', 'onglet-vinted', 'absente', 'plafond', 'plafond-bordereaux', 'plafond-jour', 'quota-jour', 'discretion', 'prudence', 'frein-refus', 'stockage', 'coffre-lecture', 'modele-lecture'],
+  leboncoin: ['en-cours', 'lbc-pause', 'lbc-absent', 'autre-compte', 'entetes', 'plafond', 'stockage', 'lecture'],
+  vestiaire: ['en-cours', 'vc-pause', 'vc-absent', 'autre-compte', 'annonce-non-vue', 'entetes', 'plafond', 'stockage', 'lecture'],
+};
+// Les arrêts qu'il a posés ou qui demandent SON geste (« Tout arrêter », vérification
+// anti-robot) : jamais une attente — un arrêt est un arrêt, la baisse est refusée et dite.
+const PRIX_ATT_ARRETS = /^(tout-arrete|verification|secu-robot|secu-arret|arrete)$/;
+function prixAttCents(v) { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : NaN; }
+function prixAttAttend(site, code) {
+  const c = String(code || '');
+  if (PRIX_ATT_ARRETS.test(c)) return false;
+  if ((PRIX_ATT_ATTENDRE[site] || []).includes(c)) return true;
+  return /^secu-/.test(c);                    // un frein de la sécurité des comptes (repos, plafond du jour, espace…)
+}
+// La commande rangée, vérifiée de la MÊME façon des deux côtés. Rend
+// { site, cle, vouluC, avantC, msg } (le message du chemin de baisse) ou { refus }.
+// Une HAUSSE n'est jamais une commande (les chemins de baisse la refusent : §3).
+function prixAttCommande(d) {
+  const a = d && d.args && typeof d.args === 'object' ? d.args : {};
+  const site = String((d && d.site) || '');
+  if (!PRIX_ATT_SITES.includes(site)) return { refus: 'non-autorise' };
+  if (d.confirme !== true) return { refus: 'confirmation' };
+  const vouluC = prixAttCents(a.prix), avantC = prixAttCents(a.prixAvant);
+  if (!Number.isInteger(vouluC) || !Number.isInteger(avantC) || Math.abs(Number(a.prix) * 100 - vouluC) > 1e-6 || Math.abs(Number(a.prixAvant) * 100 - avantC) > 1e-6) return { refus: 'arguments' };
+  if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
+  if (!(vouluC < avantC)) return { refus: 'hausse' };
+  const id = String(a.id == null ? '' : a.id);
+  if (site === 'vinted') {
+    const uid = String(a.uid == null ? '' : a.uid);
+    if (!/^\d{1,20}$/.test(uid) || !/^\d{4,15}$/.test(id)) return { refus: 'arguments' };
+    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: { cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+  }
+  if (site === 'leboncoin') {
+    if (!/^\d{6,12}$/.test(id)) return { refus: 'arguments' };
+    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: { cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+  }
+  if (!/^\d{3,15}$/.test(id)) return { refus: 'arguments' };
+  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: { cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true } };
+}
+// La date après laquelle une commande ne part plus (jamais plus de 24 h après la demande).
+function prixAttFin(d) {
+  const dem = Number(d && d.demandeLe) || 0;
+  return dem ? Math.min(Number(d.expire) || dem + PRIX_ATT_MS, dem + PRIX_ATT_MS) : 0;
+}
+// Le sens de la réponse d'un chemin de baisse, pour une baisse voulue à `vouluC` centimes :
+//   fait (relu : le site MONTRE ce prix) · incertain · refuse · attendre (rien n'est parti).
+// « Le prix a changé » alors que le site montre DÉJÀ le prix voulu ⇒ fait (une commande
+// partie deux fois ne baisse jamais deux fois : la seconde lit le prix et s'arrête).
+function prixAttIssue(site, r, vouluC) {
+  if (!r || typeof r !== 'object') return { etat: 'incertain', code: 'sans-reponse', raison: '', prixVu: null };
+  const vuC = r.prixVu == null ? NaN : prixAttCents(r.prixVu);
+  const vu = Number.isInteger(vuC) ? vuC / 100 : null;
+  const raison = String(r.raison || r.error || '').slice(0, 300);
+  if (r.accepte === true) {
+    if (r.etape === 'fait') return Number.isInteger(vuC) && vuC !== vouluC ? { etat: 'incertain', code: 'ecart', raison, prixVu: vu } : { etat: 'fait', code: '', raison: '', prixVu: vu };
+    if (r.etape === 'envoye') return { etat: 'fait', code: 'envoye', raison: '', prixVu: null };     // Leboncoin : accepté, relu plus tard sur « Mes annonces »
+    if (r.etape === 'ecart') return { etat: 'incertain', code: 'ecart', raison, prixVu: vu };
+    if (r.etape === 'incertain') return { etat: 'incertain', code: 'incertain', raison, prixVu: null };
+    return { etat: 'refuse', code: String(r.code || r.etape || 'echec'), raison, prixVu: vu };
+  }
+  const code = String(r.code || '');
+  const change = code === 'prix-change' || (site === 'leboncoin' && code === 'perime');
+  if (change && Number.isInteger(vuC) && vuC === vouluC) return { etat: 'fait', code: 'deja', raison: '', prixVu: vu };
+  if (change) return { etat: 'refuse', code: 'prix-change', raison, prixVu: vu };
+  if (prixAttAttend(site, code)) return { etat: 'attendre', code, raison, prixVu: null, attendreMs: Number(r.attendreMs) > 0 ? Number(r.attendreMs) : 0 };
+  return { etat: 'refuse', code: code || 'refus', raison, prixVu: vu };
+}
+// </prix-attente-regle>
+const PRIX_ATT_VUS = 'vrmPrixAttVus';          // { [id]: { at, d?, cond?, ecrit? } }
+const PRIX_ATT_SUIVANT = 'vrmPrixAttSuivant';  // pas avant (ms) : l'espace entre deux baisses en attente
+const PRIX_ATT_LOT = 30;
+const RAISON_REFUS_PRIX_ATT = {
+  'arguments': 'commande incomplète — rien n\'est parti',
+  'non-autorise': 'site inconnu — rien n\'est parti',
+  'confirmation': 'cette baisse n\'a pas été confirmée — rien n\'est parti',
+  'hausse': 'une hausse ne part jamais en attente — rien n\'est parti',
+  'expiree': 'pas partie dans les 24 h (le site n\'a pas été ouvert sur ce compte) : rien n\'a changé',
+  'remplacee': 'remplacée par un prix plus récent pour la même annonce — rien n\'est parti',
+  'reports': 'toujours pas possible après plusieurs essais — rien n\'est parti',
+};
+async function lirePrixAttVus() {
+  try { return (await chrome.storage.local.get(PRIX_ATT_VUS))[PRIX_ATT_VUS] || {}; } catch (_) { return null; }
+}
+async function ecrirePrixAttVus(vus) {
+  const t = Date.now();
+  for (const k of Object.keys(vus)) if (t - Number((vus[k] && vus[k].at) || 0) > 2 * PRIX_ATT_MS) delete vus[k];
+  try { await chrome.storage.local.set({ [PRIX_ATT_VUS]: vus }); return true; } catch (_) { return false; }
+}
+// L'issue d'une commande : notée ICI d'abord (un redémarrage ne la perd pas), puis écrite
+// dans sa ligne. Une écriture ratée est rejouée au passage suivant (`viderPrixAttIssues`).
+async function finirPrixAtt(id, moi, d, etat, res, cond) {
+  const data = Object.assign({}, d, { etat }, res || {}, etat === 'attente' ? {} : { finiLe: Date.now() });
+  const vus = (await lirePrixAttVus()) || {};
+  vus[id] = Object.assign({}, vus[id] || {}, { at: (vus[id] && vus[id].at) || Date.now(), d: data, cond: cond || null, ecrit: false });
+  await ecrirePrixAttVus(vus);
+  const ok = await relaisEcrire(id, moi, data, cond || null);
+  if (ok === null) { noterDiag('prix_attente_issue_ecriture_ratee'); return null; }
+  const v2 = (await lirePrixAttVus()) || {};
+  // Remise en attente ÉCRITE : elle pourra être reprise (par ce navigateur ou un autre).
+  if (etat === 'attente') delete v2[id]; else v2[id] = { at: (v2[id] && v2[id].at) || Date.now(), ecrit: true };
+  await ecrirePrixAttVus(v2);
+  return ok;
+}
+async function viderPrixAttIssues(moi) {
+  const vus = await lirePrixAttVus();
+  if (!vus) return;
+  for (const id of Object.keys(vus)) {
+    const v = vus[id];
+    if (!v || v.ecrit !== false || !v.d || !PRIX_ATT_RE_ID.test(id)) continue;
+    const ok = await relaisEcrire(id, moi, v.d, v.cond || null);
+    if (ok === null) continue;
+    const v2 = (await lirePrixAttVus()) || {};
+    if (v.d.etat === 'attente') delete v2[id]; else v2[id] = { at: v.at || Date.now(), ecrit: true };
+    await ecrirePrixAttVus(v2);
+  }
+}
+// Peut-elle partir MAINTENANT de ce navigateur ? (aucune requête vers le site : le
+// compte de l'onglet, un onglet ouvert, pas de pause). « Non » ⇒ la ligne n'est pas touchée.
+async function prixAttPeutPartir(c) {
+  try {
+    if (c.site === 'vinted') {
+      if (await pauseVinted()) return false;
+      const uid = await compteConnecte('www.vinted.fr');
+      if (!uid || String(uid) !== c.uid) return false;
+      return !!(await ongletVinted());
+    }
+    const re = c.site === 'leboncoin' ? /^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr\//i : /^https:\/\/([a-z0-9-]+\.)*vestiairecollective\.com\//i;
+    if (c.site === 'leboncoin' ? await pauseLbcPrix() : await pauseVc()) return false;
+    const tabs = await chrome.tabs.query({ url: c.site === 'leboncoin' ? ['https://*.leboncoin.fr/*'] : ['https://*.vestiairecollective.com/*', 'https://vestiairecollective.com/*'] });
+    return (tabs || []).some((t) => t && re.test(String(t.url || '')));
+  } catch (_) { return false; }
+}
+// Le chemin de baisse EXISTANT de chaque site, avec ses gardes. Sur Vinted : l'écran
+// pendant la commande et le journal « ce que VRM a fait », comme une commande de l'app.
+async function prixAttExecuter(c, num) {
+  if (c.site === 'vinted') {
+    const msg = Object.assign({}, c.msg, num ? { num: String(num).slice(0, 12) } : {});
+    const r = await avecActionPlein('baisse', msg, () => baisserPrixVinted(Object.assign({}, msg, { programme: true })));
+    await journalCommande(msg, r);
+    return r;
+  }
+  if (c.site === 'leboncoin') return await baisserPrixLbc(c.msg);
+  return await baisserPrixVestiaire(c.msg);
+}
+let _prixAttEnVol = null;
+function prixAttenteTick(source) {
+  if (_prixAttEnVol) return _prixAttEnVol;
+  _prixAttEnVol = prixAttenteTickUn(source).catch(() => ({ erreur: true })).finally(() => { _prixAttEnVol = null; });
+  return _prixAttEnVol;
+}
+async function prixAttenteTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  await viderPrixAttIssues(moi);
+  const rows = await sbGet(`app_data?id=like.cmd_prix_*&meta->>etat=eq.attente&select=id,owner,data&order=id.asc&limit=${PRIX_ATT_LOT}`);
+  if (!Array.isArray(rows)) { noterDiag('prix_attente_lecture_ratee'); return { lu: false }; }
+  if (!rows.length) return { lu: true, n: 0, issues: [] };
+  const vus = await lirePrixAttVus();
+  if (vus === null) return { lu: true, saute: 'stockage' };
+  const t = Date.now();
+  const issues = [], parCle = new Map();
+  // 1. LE TRI — aucune requête vers un site : étrangères, déjà prises, mal formées, périmées, remplacées.
+  for (const row of rows) {
+    const id = String((row && row.id) || '');
+    const d = (row && row.data && typeof row.data === 'object') ? row.data : {};
+    if (!PRIX_ATT_RE_ID.test(id)) { issues.push('id'); continue; }
+    if (String(row.owner || '') !== moi || String(d.pour || '') !== moi) { noterDiag('prix_attente_autre_vendeur'); issues.push('proprietaire'); continue; }
+    if (vus[id]) { issues.push('deja'); continue; }                      // prise par ce navigateur : JAMAIS rejouée
+    if (d.etat !== 'attente') { issues.push('etat'); continue; }
+    const c = prixAttCommande(d);
+    if (c.refus) { await finirPrixAtt(id, moi, d, 'refuse', { code: c.refus, raison: RAISON_REFUS_PRIX_ATT[c.refus] || 'refusée' }, 'attente'); noterDiag('prix_attente_refus_' + c.refus); issues.push('refus:' + c.refus); continue; }
+    const dem = Number(d.demandeLe) || 0, fin = prixAttFin(d);
+    if (!dem || !fin || t > fin || dem > t + 120000) { await finirPrixAtt(id, moi, d, 'expiree', { code: 'expiree', raison: RAISON_REFUS_PRIX_ATT.expiree }, 'attente'); noterDiag('prix_attente_expiree'); issues.push('expiree'); continue; }
+    const deja = parCle.get(c.cle);
+    if (deja) {
+      const vieux = (Number(deja.d.demandeLe) || 0) <= dem ? deja : { id, d, c };
+      await finirPrixAtt(vieux.id, moi, vieux.d, 'remplacee', { code: 'remplacee', raison: RAISON_REFUS_PRIX_ATT.remplacee }, 'attente');
+      issues.push('remplacee');
+      if (vieux !== deja) continue;
+    }
+    parCle.set(c.cle, { id, d, c });
+  }
+  // 2. UNE commande au plus par passage, espacée de la précédente.
+  let suivant = 0; try { suivant = Number((await chrome.storage.local.get(PRIX_ATT_SUIVANT))[PRIX_ATT_SUIVANT]) || 0; } catch (_) { return { lu: true, saute: 'stockage', issues }; }
+  if (t < suivant && suivant - t < 10 * 60000) return { lu: true, n: rows.length, issues, attend: 'espace' };
+  const file = [...parCle.values()].sort((a, b) => (Number(a.d.demandeLe) || 0) - (Number(b.d.demandeLe) || 0));
+  for (const x of file) {
+    if (Number(x.d.pasAvant) > t) { issues.push('pas-avant'); continue; }
+    if (!(await prixAttPeutPartir(x.c))) { issues.push('attend'); continue; }
+    // LA PRISE : conditionnelle — annulée ou prise ailleurs entre-temps ⇒ elle ne part pas d'ici.
+    const dPris = Object.assign({}, x.d, { etat: 'pris', prisLe: Date.now() });
+    const pris = await relaisEcrire(x.id, moi, dPris, 'attente');
+    if (pris !== true) { issues.push(pris === null ? 'pas-su' : 'annulee'); continue; }
+    { const v = (await lirePrixAttVus()) || {}; v[x.id] = { at: Date.now() }; if (!(await ecrirePrixAttVus(v))) { issues.push('stockage'); return { lu: true, n: rows.length, issues }; } }   // AVANT d'agir
+    noterDiag('prix_attente_' + x.c.site);
+    let r = null; try { r = await prixAttExecuter(x.c, x.d.num); } catch (_) { r = null; }
+    const i = prixAttIssue(x.c.site, r, x.c.vouluC);
+    const reports = Number(x.d.reports) || 0;
+    if (i.etat === 'attendre' && reports < PRIX_ATT_REPORTS) {
+      const ms = Math.min(6 * 3600000, Math.max(60000, i.attendreMs || 0)) + tirerEntre(20000, 120000);
+      await finirPrixAtt(x.id, moi, x.d, 'attente', { reports: reports + 1, pasAvant: Date.now() + ms, attend: i.code }, 'pris');
+      issues.push('remise:' + i.code);
+    } else {
+      const etat = i.etat === 'attendre' ? 'refuse' : i.etat;
+      await finirPrixAtt(x.id, moi, dPris, etat, { code: i.etat === 'attendre' ? 'reports' : i.code, raison: i.etat === 'attendre' ? RAISON_REFUS_PRIX_ATT.reports : i.raison, prixVu: i.prixVu == null ? null : i.prixVu }, null);
+      issues.push(etat + (i.code ? ':' + i.code : ''));
+      try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'prix', uid: x.c.uid || '' })).catch(() => {}); } catch (_) {}
+    }
+    try { await chrome.storage.local.set({ [PRIX_ATT_SUIVANT]: Date.now() + tirerEntre(25000, 90000) }); } catch (_) {}
+    break;
+  }
+  return { lu: true, n: rows.length, issues };
+}
 
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc, opts = {}) {

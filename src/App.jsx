@@ -921,6 +921,7 @@ import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ImportStockReglage } (était importé en statique)
 const ImportStockReglage = aLaDemande(() => import('./composants/ImportStock.jsx').then((m) => ({ default: m.ImportStockReglage })));
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
+import { nouvelleCommandePrix, deposerPrixAttente, lirePrixAttente, annulerPrixAttente } from "./prixAttente.js";   // (19 nov., ext. 5.409) une baisse qui ne peut pas partir tout de suite ATTEND
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CreerSurVinted (était importé en statique)   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
@@ -1197,7 +1198,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.408.0';
+const EXT_ATTENDUE = '5.409.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1629,7 +1630,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { prixattente: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -19034,12 +19035,117 @@ export function enregistrerSoldeVrm({ fin, site, faites }) {
 }
 export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
-  cleNum, capVinted: extSait('republiermodif'),
+  cleNum, recettes: extra ? extra.recettes : null,
   numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
 // Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
-const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE });
+// ⚠️ (19 nov., décision de Julien : « c'est à l'extension de baisser les prix, c'est pas à moi »)
+//    « Appliquer » est SON clic : sur Vinted, Leboncoin et Vestiaire la baisse part par la commande
+//    de baisse de l'extension (une par annonce, le prix vu joint) ; quand l'extension ne peut pas
+//    agir maintenant (iPhone, autre compte, plafond, pause), elle est RANGÉE (`cmd_prix_*`,
+//    src/prixAttente.js) et part seule dès qu'un de ses navigateurs ouvre le site sur ce compte.
+//    Plus de second bouton, plus de feuille « Baisser le prix » ouverte par-dessus. Ne pas les remettre.
+const depPrixAttente = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: withOwner, conflit: SB_CONFLICT });
+const CAP_PRIX_SITE = { vinted: 'baisseprix', leboncoin: 'lbcprix', vestiaire: 'vcprix' };
+// Une extension qui sait relever les prix en attente est-elle CONNUE ? Celle de ce navigateur (le pont),
+// ou celle de l'ordinateur (son battement `relais_ext`, lu à l'ouverture de la feuille). « Pas su » ⇒ non.
+const extensionSaitAttendre = () => {
+  if (extSait('prixattente') === 'ok') return true;
+  const r = __relais;
+  return !!(r && r.ver && /^\d+\.\d+\.\d+$/.test(r.ver) && cmpVersion(r.ver, EXT_CAPACITES.prixattente) >= 0);
+};
+const envoisPrixVrm = (num) => envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE,
+  ici: (site) => extSait(CAP_PRIX_SITE[site]) === 'ok',
+  saitAttendre: extensionSaitAttendre,
+  deposer: async (c) => {
+    if (!(AUTH.user && AUTH.user.id) || !isCloudReady()) return null;
+    const cmd = nouvelleCommandePrix({ ...c, num, owner: String(AUTH.user.id), alea: Math.random().toString(36).slice(2, 10) });
+    const d = cmd ? await deposerPrixAttente(depPrixAttente(), cmd) : null;
+    if (d) suivrePrixAttente(d.id, { num, site: c.site, cle: d.data.cle });
+    return d;
+  } });
+// Les commandes rangées PENDANT cette session : relues toutes les 30 s (page visible) et au signe de
+// l'extension ; leur issue est dite UNE fois (prix relu, ou pourquoi rien n'est parti). Lecture seule.
+const __prixSuivis = new Map();   // id → { num, site, cle }
+let __prixSuiviMinuteur = null;
+async function tourPrixSuivis() {
+  if (!__prixSuivis.size) { clearInterval(__prixSuiviMinuteur); __prixSuiviMinuteur = null; return; }
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const l = await lirePrixAttente(depPrixAttente(), [...new Set([...__prixSuivis.values()].map((x) => x.cle))]);
+  if (!l) return;
+  for (const [id, info] of [...__prixSuivis]) {
+    const v = l.find((x) => x.id === id);
+    if (!v || v.etat === 'attente' || v.etat === 'pris') continue;
+    __prixSuivis.delete(id);
+    const site = NOM_SITE_PRIX[info.site] || '';
+    const eur = (n) => (n == null ? '—' : String(Math.round(n * 100) / 100).replace('.', ',') + '\u00a0€');
+    if (v.etat === 'fait') toast(tr(v.relu ? 'prixPartout.issue.faitRelu' : 'prixPartout.issue.fait', { num: info.num, site, prix: eur(v.relu ? v.prixVu : v.prix) }), 'ok');
+    else if (v.etat === 'annulee' || v.etat === 'remplacee') { /* son geste : rien à dire */ }
+    else if (v.code === 'prix-change') toast(tr('prixPartout.issue.change', { num: info.num, site, prix: eur(v.prixVu) }));
+    else if (v.etat === 'perimee') toast(tr('prixPartout.issue.perimee', { num: info.num, site }));
+    else toast(tr('prixPartout.issue.refuse', { num: info.num, site }));
+  }
+  try { window.dispatchEvent(new CustomEvent('vrm:prix-attente')); } catch (_) {}
+}
+function suivrePrixAttente(id, info) {
+  __prixSuivis.set(id, info);
+  if (!__prixSuiviMinuteur && typeof window !== 'undefined') __prixSuiviMinuteur = setInterval(tourPrixSuivis, (typeof window.__VRM_PRIX_SUIVI_MS === 'number' && window.__VRM_PRIX_SUIVI_MS > 0) ? window.__VRM_PRIX_SUIVI_MS : 30000);
+}
+const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
+// La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
+// pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
+function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
+  const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
+  const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
+  const { rn } = rechercheParNumero(num, numData, comptes);
+  const ex = extra && extra.num === num ? extra : null;
+  const lecture = !numData || !ex;
+  const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(num, rn, ex ? { ...ex, recettes } : { lbcItems: undefined, vcItems: undefined });
+  const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+  const cles = sitesVus.filter((x) => x.site !== 'ebay').map((x) => x.cle).join(',');
+  const relire = React.useCallback(async () => {
+    if (!cles) { setAtt([]); return; }
+    setAtt(await lirePrixAttente(depPrixAttente(), cles.split(',')));
+  }, [cles]);
+  useEffect(() => { relire(); }, [relire]);
+  useEffect(() => {
+    let vivant = true;
+    if (extSait('prixattente') !== 'ok') lireRelais().catch(() => {});
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_prix_recette,vc_prix_recette)&select=id,appris:data->appris`, { headers: sbAuth() });
+        if (!r.ok) return;
+        const rows = await r.json();
+        if (!vivant || !Array.isArray(rows)) return;
+        const de = (id) => { const l = rows.find((x) => x && x.id === id); return l ? l.appris === true : false; };
+        setRecettes({ leboncoin: de('lbc_prix_recette'), vestiaire: de('vc_prix_recette') });
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  }, []);
+  // Tant qu'une baisse attend ou est prise : relue toutes les 20 s (page visible), et au signe de l'extension.
+  const enCours = Array.isArray(att) && att.some((v) => v.etat === 'attente' || v.etat === 'pris');
+  useEffect(() => {
+    const maj = () => relire();
+    window.addEventListener('vrm:prix-attente', maj);
+    const t = enCours ? setInterval(() => { if (!document.hidden) relire(); }, 20000) : null;
+    return () => { window.removeEventListener('vrm:prix-attente', maj); if (t) clearInterval(t); };
+  }, [enCours, relire]);
+  const reglageP = load(CLE_PRIX_PARTOUT, null);
+  const libelles = load('vinted_account_labels', {}) || {};
+  const compteDe = (uid) => { const a = (comptes || []).find((x) => String(x.vinted_user_id) === String(uid)); return a ? (libelles[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; };
+  return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
+    onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
+    onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
+    onAppliquer={async ({ coches, prix, surEtat }) => {
+      const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: envoisPrixVrm(String(rn.cle || num)), surEtat, reglage: reglageP });
+      if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
+      relire();
+      return r;
+    }}/>;
+}
 // DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
 // sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
 // Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
@@ -63453,9 +63559,6 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
   // (11 nov.) « PUBLIER PARTOUT » : les N° des annonces Vinted (une, ou la sélection d'Annonces).
   const [pubPartout,setPubPartout]=useState(null);
-  // (11 nov. soir) La baisse PROPOSÉE sur Vinted par « Changer le prix » : la feuille « Baisser le prix »
-  // existante, sur CETTE annonce ; rien ne part avant SON clic là-bas (src/BaissePrixSerie.jsx).
-  const [baisseCoque,setBaisseCoque]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const l=(Array.isArray(d.nums)?d.nums:[]).map(x=>String(x==null?'':x).trim()).filter(x=>x&&x.length<=64).slice(0,200); if(l.length) setPubPartout({nums:l,at:Date.now()});};window.addEventListener('vrm:publier-partout',ouvrir);return()=>window.removeEventListener('vrm:publier-partout',ouvrir);},[]);
   // (11 nov., lot visuels-reseaux) « VISUEL RÉSEAUX » : { items (annonces Vinted de l'app, par identité), lot }.
   const [visuels,setVisuels]=useState(null);
@@ -67083,30 +67186,8 @@ function AppCoeur() {
           <VisuelsReseaux articles={visuels.articles} lot={visuels.lot} lirePhoto={lirePhotoVisuel} reglages={load(CLE_VISUELS,null)} onReglages={(r)=>save(CLE_VISUELS,r)}
             Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
         </GardeEcran>}
-        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><Differe rendre={()=>{
-          // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
-          const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);
-          const ex = ficheExtra && ficheExtra.num === prixNum ? ficheExtra : null;
-          const lecture = !numData || !ex;
-          const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
-          const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
-          // (11 nov. soir) « Un prix modifié dans VRM change partout » : chaque site avec SON ajustement
-          // (`vrm_partout_prix`, réglé dans « Publier partout ») ; sur Vinted, VRM PROPOSE la baisse
-          // (la feuille « Baisser le prix », son clic) ; eBay relu après (src/prixPartout.js).
-          const reglageP = load(CLE_PRIX_PARTOUT, null);
-          return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
-            onFermer={()=>setPrixNum(null)} prixDe={(site, p)=>prixParSite(site, p, reglageP)}
-            onProposer={(s, e)=>{ const fiche = (load('vinted_annonce_numeros', {}) || {})[String(s.id)] || {};
-              const delta = Math.round(((s.prix || 0) - (e.prix || 0)) * 100) / 100;
-              if (!(delta > 0)) return;
-              setBaisseCoque({ annonces: [{ id: String(s.id), uid: String(s.compte || ''), compte: (()=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===String(s.compte)); const lb=load('vinted_account_labels',{})||{}; return a ? (lb[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; })(), numero: String(fiche.numero || rn.cle || ''), titre: s.titre || '', photo: fiche.photo || '', prix: s.prix }],
-                baisse: { mode: 'eur', texte: String(delta).replace('.', ',') }, at: Date.now() }); }}
-            onAppliquer={async({ coches, prix, surEtat })=>{
-              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });
-              if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
-              return r;
-            }}/>;
-        }}/></GardeEcran>}
+        {/* (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), UN clic. (19 nov.) « Appliquer » envoie la baisse par l'extension, ou la range (HotePrixPartout). */}
+        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>setPrixNum(null)}/></GardeEcran>}
         {pubAil && <GardeEcran nom="publier" feuille resetKey={pubAil.num||''} onFermer={()=>setPubAil(null)}><Differe rendre={()=>{
           // (5 nov.) LE PARCOURS « PUBLIER AILLEURS » : les sites de CE N° (par identité).
           const num = pubAil.num;
@@ -67120,14 +67201,6 @@ function AppCoeur() {
           return <HotePublierAilleurs comptes={vintedAccounts} num={num} site={pubAil.site} sitesVus={sitesVus} manquesLecture={manquesL} lecture={lecture}
             onChoisir={(n)=>setPubAil((x)=>({ ...(x||{}), num: n }))} onFermer={()=>setPubAil(null)} onNav={setTab}/>;
         }}/></GardeEcran>}
-        {baisseCoque && <GardeEcran nom="baisse-coque" feuille resetKey={String(baisseCoque.at)} onFermer={()=>setBaisseCoque(null)}>{(()=>{
-          const vc = vintedDeChrome();
-          const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
-          return <BaissePrixSerie annonces={baisseCoque.annonces} baisseInitiale={baisseCoque.baisse} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
-            plancherDe={(a)=>plancherVente((load('vinted_annonce_numeros', {}) || {})[String(a.id)] || null)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
-            onFermer={()=>setBaisseCoque(null)} soldeOk={soldeOkVrm()} onSolde={enregistrerSoldeVrm}
-            onBaisser={(l)=>vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000)}/>;
-        })()}</GardeEcran>}
         {ecartsOuvert && <GardeEcran nom="ecarts-prix" feuille resetKey={String(ecartsOuvert)} onFermer={()=>setEcartsOuvert(null)}>
           <HoteEcartsPrix comptes={vintedAccounts} numData={numData} onFermer={()=>setEcartsOuvert(null)} onChanger={(n)=>{ setEcartsOuvert(null); setPrixNum(String(n)); }}/>
         </GardeEcran>}
