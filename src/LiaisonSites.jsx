@@ -50,12 +50,13 @@ const EtatPhoto = ({ etat, site }) => (etat === 'sur' ? <span className="n-lia-e
   : etat === 'publiee' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="publiee"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.publiee', { site })}</span> : null);
 
 // ── La carte d'un ARTICLE candidat : la photo en grand, puis N° · prix · titre · taille · site · place. ──
+// Toucher la carte — photo comprise — RELIE : la photo n'ouvre pas la visionneuse (`data-sans-visionneuse`, src/visionneuse.js).
 function CarteCandidate({ c, annonce, Photo, focus, enCours, onRelier, refCarte }) {
   const p = c.paire;
   const t = tailleDe(p).taille, ta = tailleDe(annonce).taille;
   const etat = c.niveau === 'sur' ? 'sur' : c.niveau === 'verifier' ? (c.raison === 'publiee' ? 'publiee' : 'verifier') : '';
   return (
-    <button type="button" ref={refCarte} className="n-lia-carte" data-focus={focus ? '1' : undefined} data-liaison-candidate={p.id} data-numero={p.numero} data-niveau={etat} data-proche={String(c.proche)}
+    <button type="button" ref={refCarte} className="n-lia-carte" data-sans-visionneuse="" data-focus={focus ? '1' : undefined} data-liaison-candidate={p.id} data-numero={p.numero} data-niveau={etat} data-proche={String(c.proche)}
       aria-disabled={enCours ? 'true' : undefined} aria-label={tr('lia.relier', { numero: p.numero })} onClick={() => { if (!enCours) onRelier(c); }}>
       <Photo2 src={p.photo} Photo={Photo}/>
       <EtatPhoto etat={etat} site={annonce.plateforme}/>
@@ -186,21 +187,25 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
   const lu = !!(res && res.lu);
   const duSite = (e) => !cible.site || e.annonce.plateforme === cible.site;
   const file = lu ? res.file.filter((e) => duSite(e) && !traitees.has(e.cle)) : [];
-  const aFaire = file.filter((e) => !e.plusTard), tard = file.filter((e) => e.plusTard);
+  // « Plus tard » : relu de la règle, même si l'annonce vient d'être écartée de la file par SON geste (sinon la fin l'oublie).
+  const aFaire = file.filter((e) => !e.plusTard), tard = lu ? res.file.filter((e) => duSite(e) && e.plusTard) : [];
   const contras = lu ? res.contradictions.filter((c) => !cible.site || c.plateforme === cible.site) : [];
   if (lu && total0.current == null) total0.current = aFaire.length;
   const nFaits = traitees.size;
   const total = Math.max(total0.current || 0, nFaits + aFaire.length);
 
   // L'annonce montrée : celle demandée, sinon là où il s'est arrêté, sinon la première.
+  // Une annonce DEMANDÉE absente d'un calcul d'avant l'ouverture (il a pu être fait sans elle) : on attend le calcul relancé
+  // à l'ouverture, jamais une autre annonce à sa place (sinon « Relier » d'une rangée montrerait la mauvaise annonce).
+  const ouvertA = React.useRef(Date.now());
   React.useEffect(() => {
     if (!lu || courant) return;
-    if (cible.id && cible.site) { const k = `${cible.site}:${cible.id}`; if (res.parCle.has(k)) { setCourant(k); return; } }
+    if (cible.id && cible.site) { const k = `${cible.site}:${cible.id}`; if (res.parCle.has(k)) { setCourant(k); return; } if (!(res.at >= ouvertA.current)) return; }
     if (vue !== 'file') return;
     const rep = lireReprise();
     const e = aFaire.find((x) => x.cle === rep) || aFaire[0] || null;
     if (e) setCourant(e.cle);
-  }, [lu, courant]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lu, courant, res && res.at]);   // eslint-disable-line react-hooks/exhaustive-deps
   const entree = lu && courant ? res.parCle.get(courant) || null : null;
   const dansFile = !!(entree && entree.etat === 'aRelier' && !traitees.has(entree.cle));
   React.useEffect(() => { if (dansFile) noterReprise(courant); }, [courant, dansFile]);
@@ -307,7 +312,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
   } else if (vue === 'lot') {
     corps = <div className="n-lia-colonne" data-liaison-lot={surs.length}>
       {surs.map((e) => { const c = e.candidats.find((x) => String(x.paire.id) === e.avant); const on = !!(lotCoches && lotCoches.has(e.cle)); return (
-        <label key={e.cle} className="n-lia-lot-ligne" data-liaison-lot-ligne={e.cle} data-coche={on ? '1' : '0'}>
+        <label key={e.cle} className="n-lia-lot-ligne" data-sans-visionneuse="" data-liaison-lot-ligne={e.cle} data-coche={on ? '1' : '0'}>
           <Photo2 src={e.annonce.photo} Photo={Photo}/>
           <Photo2 src={c.paire.photo} Photo={Photo}/>
           <span className="n-lia-lot-textes"><Plaque numero={c.paire.numero}/><span className="n-lia-carte-titre">{e.annonce.titre || '—'}</span><span className="n-lia-carte-sous"><span>{siteCompte(e.annonce)}</span></span></span>
@@ -347,7 +352,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
       {contras.length ? <Groupe><Rangee titre={tr('liaE.aVerifierN', { n: contras.length })} fin="chevron" ton="ambre" attrs={{ 'data-liaison-fin-contradictions': String(contras.length) }} onClick={() => setVue('contradictions')}/></Groupe> : null}
       {tard.length ? <Groupe titre={tr('lia.fin.plusTard')}>
         {tard.map((e) => <Rangee key={e.cle} vignette={vignette(e.annonce.photo)} titre={e.annonce.titre || '—'} sousTitre={siteCompte(e.annonce)} fin="chevron" attrs={{ 'data-liaison-tard': e.cle }}
-          onClick={async () => { await actions.plusTard({ annonce: e.annonce, annuler: true }); setCourant(e.cle); setVue('file'); }}/>)}
+          onClick={async () => { await actions.plusTard({ annonce: e.annonce, annuler: true }); setTraitees((m) => { const n = new Map(m); n.delete(e.cle); return n; }); setCourant(e.cle); setVue('file'); }}/>)}
       </Groupe> : null}
       {illisibles.length ? <p className="n-lia-note" data-liaison-illisibles={illisibles.join(' ')}>{tr('lia.pasLu', { sites: illisibles.join(' · ') })}</p> : null}
     </div>;
@@ -356,7 +361,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
     refCartes.current = [];
     corps = <div className="n-lia-volets">
       <aside className="n-lia-file" aria-label={tr('lia.file')} data-liaison-file={aFaire.length}>
-        <Groupe>{aFaire.map((e) => <Rangee key={e.cle} vignette={vignette(e.annonce.photo)} titre={e.annonce.titre || '—'} sousTitre={faits(e.annonce.plateforme, e.avant ? tr('lia.sur') : '')} selectionnee={e.cle === courant} attrs={{ 'data-liaison-file-ligne': e.cle }} onClick={() => setCourant(e.cle)}/>)}</Groupe>
+        <Groupe>{aFaire.map((e) => <Rangee key={e.cle} vignette={vignette(e.annonce.photo)} titre={e.annonce.titre || '—'} sousTitre={faits(e.annonce.plateforme, e.avant ? tr('lia.sur') : '')} selectionnee={e.cle === courant} attrs={{ 'data-liaison-file-ligne': e.cle, 'data-sans-visionneuse': '' }} onClick={() => setCourant(e.cle)}/>)}</Groupe>
       </aside>
       <section className="n-lia-annonce" data-liaison-annonce={entree.cle} data-liaison-site={a.plateforme}>
         <Photo2 src={a.photo} Photo={Photo} sorte="annonce"/>
