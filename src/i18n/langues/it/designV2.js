@@ -240,5 +240,7 @@ export default {
   "v2.reg.moins": "Vedi meno",
   "v2.reg.ouvrir": "Apri",
   "v2.reg.completer": "Completa i miei annunci",
-  "v2.reg.completerN": "Completa i miei annunci · {n}"
+  "v2.reg.completerN": "Completa i miei annunci · {n}",
+  "v2.jour.lecture": "lettura…",
+  "v2.alerte.retourTitre": "Reso da consegnare"
 };

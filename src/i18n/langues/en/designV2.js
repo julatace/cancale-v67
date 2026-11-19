@@ -240,5 +240,7 @@ export default {
   "v2.reg.moins": "See less",
   "v2.reg.ouvrir": "Open",
   "v2.reg.completer": "Complete my listings",
-  "v2.reg.completerN": "Complete my listings · {n}"
+  "v2.reg.completerN": "Complete my listings · {n}",
+  "v2.jour.lecture": "reading…",
+  "v2.alerte.retourTitre": "Return to drop off"
 };

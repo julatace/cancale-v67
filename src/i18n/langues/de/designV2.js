@@ -240,5 +240,7 @@ export default {
   "v2.reg.moins": "Weniger anzeigen",
   "v2.reg.ouvrir": "Öffnen",
   "v2.reg.completer": "Meine Anzeigen vervollständigen",
-  "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}"
+  "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}",
+  "v2.jour.lecture": "wird gelesen…",
+  "v2.alerte.retourTitre": "Rücksendung abzugeben"
 };

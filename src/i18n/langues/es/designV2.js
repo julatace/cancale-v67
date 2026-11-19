@@ -240,5 +240,7 @@ export default {
   "v2.reg.moins": "Ver menos",
   "v2.reg.ouvrir": "Abrir",
   "v2.reg.completer": "Completar mis anuncios",
-  "v2.reg.completerN": "Completar mis anuncios · {n}"
+  "v2.reg.completerN": "Completar mis anuncios · {n}",
+  "v2.jour.lecture": "leyendo…",
+  "v2.alerte.retourTitre": "Devolución por entregar"
 };

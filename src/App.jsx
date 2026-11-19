@@ -1109,7 +1109,8 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 // `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres → Apparence → Style) : `data-theme-style` posé dès l'import, éteint par défaut
-import AujourdhuiV2, { ChiffresDuJour } from "./designV2/Aujourdhui.jsx";
+import AujourdhuiV2 from "./natif/ecrans/Aujourdhui.jsx";   // (19 nov.) « VRM natif » : l'écran compose src/natif/
+import { poserIcone } from "./natif/index.js";
 import ARegler, { useARegler } from "./designV2/ARegler.jsx";   // (19 nov.) « À régler » : chaque chose à faire dans SON onglet
 import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
 import { chiffresAujourdhui, dernieresVentes as dernieresVentesFaites, alerteDuJour } from "./aujourdhui/modele.js";   // (19 nov.) le fond d'« Aujourd'hui » : il demande chaque chiffre à son propriétaire
@@ -33558,7 +33559,7 @@ function useSourcesCarte(liveStats) {
 // (19 nov.) « AUJOURD'HUI » ET SES CHIFFRES — Julien : « il y a d'autres choses plus intéressantes pour cet onglet ».
 // ═══════════════════════════════════════════════════════════════════════════
 // Le vendu du jour, les sept jours, le mois (Vendu · Reçu · Bénéfice) et l'argent à venir, posés sur
-// src/designV2/Aujourdhui.jsx. ⚠️ AUCUNE RÈGLE NOUVELLE (§5, un seul propriétaire par chiffre) : chaque valeur est
+// src/natif/ecrans/Aujourdhui.jsx. ⚠️ AUCUNE RÈGLE NOUVELLE (§5, un seul propriétaire par chiffre) : chaque valeur est
 // `valeurChiffre` (src/design/carteChiffres.js) sur les sources de la carte des chiffres (`useSourcesCarte` : les
 // lignes de `ventesFaites` de la coque, la ligne publiée par Ventes `vinted_urssaf_mois`, `vrm_benefice_jours`) — les
 // MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
@@ -33576,12 +33577,9 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   const jours = M.jours.map((j) => { const d = new Date(j.de); return { ...j, lettre: d.toLocaleDateString(localeCourante(), { weekday: 'narrow' }).toUpperCase(), long: majusculeJ(dateJourFr(d)),
     court: d.toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric' }) }; });
-  const chiffres = (
-    <ChiffresDuJour Icon={Icon} etat={M.etat} raison={M.raison} jours={jours} montre={M.montre} montant={somme}
-      onArgent={() => { if (onNav) onNav('compta'); }}
-      mois={{ nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
-        benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice }}/>
-  );
+  const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
+    mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
+      benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
   return <AujourdhuiV2 {...reste} chiffres={chiffres}
     aVenir={M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null}/>;
 }
@@ -51099,7 +51097,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .filter((o) => o && !isHidden(o) && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled')
               .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
               .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>) : null;
-        // ── (17 nov.) LE NOUVEAU DESIGN : « AUJOURD'HUI » (src/designV2/Aujourdhui.jsx), seulement allumé et hors premier
+        // ── (17 nov.) LE NOUVEAU DESIGN : « AUJOURD'HUI » (src/natif/ecrans/Aujourdhui.jsx depuis le 19 nov.), seulement allumé et hors premier
         //    jour (l'accueil d'un vendeur neuf reste celui d'avant). Les MÊMES sources que la grille ci-dessous : `T`
         //    (les cases, « — » quand ce n'est pas lu), `colisJournee` (le N° par identité), `listeCodesRetrait()` et
         //    `vrm_colis_retirer` (la règle `pickupUnion`), les cartes `jobs` avec LEUR geste (`avant`, `tab`). Rien n'est
@@ -62774,6 +62772,7 @@ function CaptureVentes({ uid }) {
 function CaptureAnnonces({ uid }) {
   return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
 }
+poserIcone(Icon);   // (19 nov.) « VRM natif » : les glyphes internes des composants (chevron, coche…) sont les tracés de l'app
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.

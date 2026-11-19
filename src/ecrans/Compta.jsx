@@ -58,7 +58,8 @@ import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
-import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';   // (17 nov., phase 2) Argent · Mois
+import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';
+import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
 import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
@@ -4773,6 +4774,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
         <AlertesSeuilsArgent />
         {/* (17 nov., nouveau design · phase 2) Allumé : « Mois » (src/designV2/ArgentMois.jsx) à la place des réponses, de
             « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
+        {designV2 ? <ARegler onglet="argent" Icon={Icon}/> : null}
         {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
         {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}

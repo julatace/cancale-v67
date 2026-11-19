@@ -22,24 +22,25 @@ const EVT = 'vrm:a-regler';
 
 // L'onglet d'un groupe, par son identifiant (la partie avant « : »).
 const PAR_ID = {
+  // (table de l'audit d'utilité du 19 nov., docs/design/2026-11-19-audit-utilite.md §4.1 — la suivre)
   // Ventes : ce qui part, ce qui revient, ce qui se discute.
-  'colis-limite': 'ventes', 'poste-sans-depart': 'ventes', 'ebay-ne-pas-poster': 'ventes', 'colis-en-retard': 'ventes',
-  'a-confirmer': 'ventes', 'retours-vente': 'ventes', 'retours-vente-revenus': 'ventes', 'remettre-en-vente': 'ventes',
-  'prix-achat-vente': 'ventes', 'double-vente': 'ventes', 'vestiaire-envoyer': 'ventes',
-  // Achats : ce qui arrive.
+  'colis-limite': 'ventes', 'colis-en-retard': 'ventes', 'poste-sans-depart': 'ventes', 'retours-vente': 'ventes', 'retours-vente-revenus': 'ventes',
+  'double-vente': 'ventes', 'ebay-ne-pas-poster': 'ventes', 'vestiaire-envoyer': 'ventes',
+  // Achats : ce qui arrive, ce qui reste à mettre en ligne.
+  'retrait-dernier-jour': 'achats', 'retrait-a-verifier': 'achats', 'retrait-en-verification': 'achats',
   'achats-a-numeroter': 'achats', 'atelier-arrivee': 'achats', 'atelier-attente': 'achats',
-  'retrait-a-verifier': 'achats', 'retrait-en-verification': 'achats', 'retrait-dernier-jour': 'achats',
   // Annonces.
-  'sans-numero': 'annonces', 'numeros-a-donner': 'annonces', 'numeros-republiee': 'annonces', 'numeros-en-double': 'annonces',
-  'achat-a-relier': 'annonces', 'prix-mini-manquants': 'annonces', 'prix': 'annonces', 'paires-dorment': 'annonces',
-  'quoi-republier': 'annonces', 'supprime-vinted': 'annonces', 'meme-photo': 'annonces',
+  'numeros-en-double': 'annonces', 'numeros-nouveaux': 'annonces', 'numeros-a-donner': 'annonces', 'numeros-republiee': 'annonces', 'a-confirmer': 'annonces',
+  'supprime-vinted': 'annonces', 'remettre-en-vente': 'annonces', 'paires-dorment': 'annonces', 'quoi-republier': 'annonces', 'prix': 'annonces', 'meme-photo': 'annonces',
+  // … dont les trois manques d'une annonce, réunis en UNE rangée « Compléter mes annonces » (consigne du 19 nov.).
+  'sans-numero': 'annonces', 'prix-mini-manquants': 'annonces', 'achat-a-relier': 'annonces',
   // Stock.
-  'inventaire-en-cours': 'stock', 'numeros-nouveaux': 'stock',
+  'inventaire-en-cours': 'stock',
   // Messages : la pastille de Messages (plus une rangée).
   'messages': 'messages', 'messages-ebay': 'messages', 'vestiaire-messages': 'messages', 'vestiaire-offre': 'messages', 'vestiaire-offres-reste': 'messages',
-  // Argent.
-  'urssaf': 'argent', 'cloture-annee': 'argent',
-  // « Tout va bien ? » (Paramètres).
+  // Argent : déclarer, et les ventes sans prix d'achat.
+  'urssaf': 'argent', 'dac7': 'argent', 'cloture-annee': 'argent', 'prix-achat-vente': 'argent',
+  // « Tout va bien ? » (Plus / Paramètres).
   'a-trancher': 'sante', 'emails-personne': 'sante',
 };
 // Sinon, l'écran que son geste ouvre.

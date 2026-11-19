@@ -107,9 +107,6 @@ function baseVide() {
   b.rows = b.rows.filter((r) => !/_txn_|_label_|^email_bord_|^email_track_|_conv_/.test(r.id));
   return b;
 }
-module.exports = { baseCapture, baseVolume, baseVide };
-if (require.main !== module) return;
-fs.mkdirSync(SHOTS, { recursive: true });
 
 // ── Ouvrir un écran (design allumé, zone sûre de l'iPhone à 390) ──────────────
 async function ouvrir(nav, { W, sombre, b, url = '/?tab=journee' }) {
@@ -130,19 +127,19 @@ async function attendreAujourdhui(pg) {
   for (let k = 0; k < 16 && egaux < 2; k++) { await pg.waitForTimeout(1200); const s = await pg.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.innerText : ''; }, ECRAN); if (s && s === avant) egaux++; else egaux = 0; avant = s; }
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(500);
 }
-const BARRE = '[data-n-barre-onglets], .n-onglets, .vrm-tabbar';
-const ONGLET = '[data-nav-entree]';
+const BARRE = '.n-onglets, .vrm-tabbar';
+const ONGLET = '.n-onglet, [data-nav-entree]';
 
 // Ce que l'écran montre (les data-* et les nombres rendus, jamais un libellé).
 const LIRE = (sel) => { const e = document.querySelector(sel); if (!e) return null;
   const a = (x, n) => (x ? x.getAttribute(n) : null); const q = (s) => e.querySelector(s);
   const c = q('[data-v2-bloc="chiffres"]');
-  return { blocs: [...e.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), jobs: e.querySelectorAll('[data-v2-job], [data-v2-afaire], .v2-afaire-ligne, [data-v2-regler]').length,
-    affiche: a(e, 'data-v2-affiche'), ecart: (q('[data-v2-ecart]') || { textContent: '' }).textContent.trim(), plein: a(q('[data-v2-principal]'), 'data-v2-principal'),
+  return { blocs: [...e.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), jobs: e.querySelectorAll('[data-v2-job], [data-v2-afaire], .v2-afaire-ligne, [data-v2-regler], [data-v2-regler-groupe]').length,
+    affiche: a(e, 'data-v2-affiche'), ecart: a(q('[data-v2-ecart]'), 'data-v2-ecart') || '', plein: a(q('[data-v2-principal]'), 'data-v2-principal'),
     etat: a(c, 'data-v2-chiffres'), jour: a(c, 'data-v2-jour-vendu'), jourN: a(c, 'data-v2-jour-ventes'), semaine: (a(q('[data-v2-semaine]'), 'data-v2-semaine') || '').split(','),
     mois: Object.fromEntries([...e.querySelectorAll('[data-v2-mois]')].map((m) => [m.getAttribute('data-v2-mois'), { cents: m.getAttribute('data-v2-mois-cents'), partiel: m.getAttribute('data-v2-mois-partiel') === '1', brut: m.getAttribute('data-v2-mois-brut') === '1', texte: m.textContent.trim() }])),
-    colis: e.querySelectorAll('[data-v2-colis]').length, plus: Number(a(q('[data-v2-colis-plus]'), 'data-v2-colis-plus') || 0),
-    retirer: a(q('[data-v2-groupe="retirer"] [data-v2-n]'), 'data-v2-n'), lieu: (q('[data-v2-passe-lieu]') || { textContent: '' }).textContent.trim(), code: (q('[data-v2-passe-code]') || { textContent: '' }).textContent.trim(),
+    colis: e.querySelectorAll('[data-v2-colis]').length, plus: Number(a(q('[data-v2-bande] [data-n-plus]'), 'data-n-plus') || 0),
+    retirer: a(q('[data-v2-groupe="retirer"] [data-v2-n]'), 'data-v2-n'), lieu: a(q('[data-v2-passe-lieu]'), 'data-v2-passe-lieu') || '', code: a(q('[data-v2-passe-code]'), 'data-v2-passe-code') || '',
     ventes: [...e.querySelectorAll('[data-v2-vente]')].map((v) => v.getAttribute('data-v2-vente')), avenir: a(q('[data-v2-avenir]'), 'data-v2-avenir'),
     alerte: a(q('[data-v2-alerte]'), 'data-v2-alerte'), alertes: e.querySelectorAll('[data-v2-alerte]').length, texte: e.innerText }; };
 
@@ -154,7 +151,7 @@ const DESSIN = (args) => { const [sel, selBarre, selOnglet] = args; const e = do
   const dans = (a, b) => a.l >= b.l - 0.5 && a.r <= b.r + 0.5 && a.t >= b.t - 0.5 && a.b <= b.b + 0.5;
   const out = {};
   // D1. La bande.
-  const cases = [...e.querySelectorAll('[data-v2-colis], [data-v2-colis-plus]')].filter(vis);
+  const cases = [...e.querySelectorAll('[data-v2-colis], [data-v2-bande] [data-n-plus]')].filter(vis);
   // La bande amenée au milieu de l'écran : une plaque se juge là où on la lit (pas sous la barre, pas hors de la vue).
   if (cases.length) cases[0].parentElement.scrollIntoView({ block: 'center' });
   const boites = cases.map(R); const chev = [];
@@ -163,19 +160,19 @@ const DESSIN = (args) => { const [sel, selBarre, selOnglet] = args; const e = do
   const bande = cases.length ? cases[0].parentElement : null;
   const textes = bande ? [...bande.querySelectorAll('*')].filter(vis).filter((x) => [...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((x) => { const r = document.createRange(); r.selectNodeContents(x); const q = r.getBoundingClientRect(); return { l: q.left, t: q.top, r: q.right, b: q.bottom, s: x.textContent.trim().slice(0, 12), el: x }; }) : [];
   const chevTextes = []; for (let i = 0; i < textes.length; i++) for (let j = i + 1; j < textes.length; j++) if (!textes[i].el.contains(textes[j].el) && !textes[j].el.contains(textes[i].el) && coupe(textes[i], textes[j])) chevTextes.push(textes[i].s + ' × ' + textes[j].s);
-  const plaques = bande ? [...bande.querySelectorAll('[data-v2-etiquette]')].filter(vis) : [];
+  const plaques = bande ? [...bande.querySelectorAll('.n-plaque, [data-v2-etiquette]')].filter(vis) : [];
   // Une plaque est ENTIÈRE si son contenu tient dans sa boîte, sa boîte dans sa case, sa case dans l'écran, et si le
   // point au centre de chaque chiffre est bien à elle (rien posé dessus).
-  const plaquesKo = plaques.map((p) => { const c = p.closest('[data-v2-colis]'); const b = p.querySelector('b') || p; const rb = R(b), rp = R(p), rc = c ? R(c) : null;
+  const plaquesKo = plaques.map((p) => { const c = p.closest('[data-v2-colis]'); const b = p.querySelector('.n-plaque-numero, b') || p; const rb = R(b), rp = R(p), rc = c ? R(c) : null;
     const haut = document.elementFromPoint((rb.l + rb.r) / 2, (rb.t + rb.b) / 2);
     // Le point au centre du numéro appartient à SA case (rien d'une autre case ni d'un autre bloc posé dessus).
     const okDessus = !!haut && (p.contains(haut) || (!!c && c.contains(haut)));
     const pourquoi = [!dans(rb, rp) && 'le numéro sort de sa plaque', rc && !dans(rp, rc) && 'la plaque sort de sa case', (rp.l < 0 || rp.r > innerWidth) && 'hors de l’écran', p.scrollWidth > p.clientWidth + 1 && 'rognée', !okDessus && 'recouverte'].filter(Boolean);
-    return { n: p.getAttribute('data-v2-etiquette'), ko: pourquoi.length > 0, pourquoi }; }).filter((x) => x.ko).map((x) => x.n + ' : ' + x.pourquoi.join(', '));
-  const urgences = cases.map((c) => c.querySelectorAll('.aj-case-point, [data-v2-urgence], .n-point-ambre, .v2-point').length);
+    return { n: (p.textContent || '').trim(), ko: pourquoi.length > 0, pourquoi }; }).filter((x) => x.ko).map((x) => x.n + ' : ' + x.pourquoi.join(', '));
+  const urgences = cases.map((c) => c.querySelectorAll('[data-n-urgence], [data-v2-urgence], .v2-point').length);
   out.bande = { cases: cases.length, chev, chevTextes: chevTextes.slice(0, 6), plaques: plaques.length, plaquesKo, urgencesMax: Math.max(0, ...urgences), horsBande: bande ? boites.filter((b) => !dans(b, R(bande))).length : 0 };
   // D2. La passe.
-  const lieu = e.querySelector('[data-v2-passe-lieu]'), code = e.querySelector('[data-v2-passe-code]');
+  const lieu = (() => { const r = e.querySelector('[data-v2-passe-lieu]'); return r ? (r.querySelector('.n-rangee-titre') || r) : null; })(), code = (() => { const c = e.querySelector('[data-v2-passe-code]'); return c ? (c.querySelector('.n-code-texte') ? c : c) : null; })();
   { const m = e.closest('.vrm-main, [data-n-defile]') || document.scrollingElement; if (m) m.scrollTo(0, 0); }
   if (lieu) { const cs = getComputedStyle(lieu); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3; const r = document.createRange(); r.selectNodeContents(lieu);
     out.passe = { lignes: Math.round(lieu.getBoundingClientRect().height / lh), rects: new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size, ellipse: cs.textOverflow === 'ellipsis', coupe: lieu.scrollWidth > lieu.clientWidth + 1 };
@@ -184,12 +181,12 @@ const DESSIN = (args) => { const [sel, selBarre, selOnglet] = args; const e = do
   // D3. La barre d'onglets.
   const barre = [...document.querySelectorAll(selBarre)].find(vis);
   if (barre) { const tabs = [...barre.querySelectorAll(selOnglet)].filter(vis); const ws = tabs.map((t) => Math.round(R(t).w * 10) / 10);
-    const libs = tabs.map((t) => { const l = [...t.querySelectorAll('span, b, small')].filter((x) => !x.closest('[aria-hidden="true"]') && !x.matches('.vrm-sr-seul, .n-sr') && x.children.length === 0 && x.textContent.trim().length > 1)[0]; if (!l) return null; const q = R(l); const cs = getComputedStyle(l);
+    const libs = tabs.map((t) => { const l = [...t.querySelectorAll('span, b, small')].filter((x) => !x.closest('[aria-hidden="true"]') && !x.matches('.vrm-sr-seul, .n-sr, .n-lu-seul') && x.children.length === 0 && x.textContent.trim().length > 1)[0]; if (!l) return null; const q = R(l); const cs = getComputedStyle(l);
       return { t: l.textContent.trim(), vu: q.w > 4 && q.h > 4 && Number(cs.opacity) > 0.5 && l.scrollWidth <= l.clientWidth + 1 && q.l >= R(t).l - 1 && q.r <= R(t).r + 1, px: parseFloat(cs.fontSize) }; });
     out.barre = { n: tabs.length, ws, ecart: ws.length ? Math.round((Math.max(...ws) - Math.min(...ws)) * 10) / 10 : null, libs, haut: Math.round(R(barre).t), h: tabs.map((t) => Math.round(R(t).h)), bas: Math.round(innerHeight - R(barre).b) }; }
   // D4. Les pleins, les cibles, les textes coupés, le débordement.
   const boutons = [...e.querySelectorAll('button, a[href], [role="button"]')].filter(vis);
-  out.pleins = [...document.querySelectorAll('[data-v2b="principal"], .n-bouton-plein, [data-n-bouton="plein"], .sb-btn-plein')].filter(vis).length;
+  out.pleins = [...document.querySelectorAll('[data-v2b="principal"], [data-v2-principal], [data-n-variante="plein"], .sb-btn-plein')].filter(vis).filter((x, i, l) => !l.some((y) => y !== x && y.contains(x))).length;
   out.petits = boutons.filter((b) => b.offsetWidth < 44 || b.offsetHeight < 44).map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim().slice(0, 24) + ':' + b.offsetWidth + 'x' + b.offsetHeight);
   const porteurs = [...e.querySelectorAll('*')].filter(vis).filter((x) => [...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
   out.coupes = porteurs.filter((x) => { const cs = getComputedStyle(x); return x.clientWidth > 0 && x.scrollWidth > x.clientWidth + 1 && /hidden|clip/.test(cs.overflowX) && cs.textOverflow !== 'ellipsis'; }).map((x) => x.textContent.trim().slice(0, 30));
@@ -206,7 +203,7 @@ async function contrastes(pg, sel) {
   const textes = await pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return [];
     const vis = (x) => x.getClientRects().length > 0 && getComputedStyle(x).visibility !== 'hidden';
     const out = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) { const t = n.textContent.trim(); if (t.length < 1) continue; const x = n.parentElement; if (!x || !vis(x) || x.closest('svg, [aria-hidden="true"] svg, .vrm-toasts, .vrm-sr-seul, .n-sr, [data-v2-etiquette]')) continue;
+    for (let n = w.nextNode(); n; n = w.nextNode()) { const t = n.textContent.trim(); if (t.length < 1) continue; const x = n.parentElement; if (!x || !vis(x) || x.closest('svg, [aria-hidden="true"] svg, .vrm-toasts, .vrm-sr-seul, .n-sr, .n-lu-seul, [data-v2-etiquette]') || (x.offsetWidth <= 2 && x.offsetHeight <= 2)) continue;
       if (!(e.contains(x) || x.closest('nav, header'))) continue;
       const r = document.createRange(); r.selectNodeContents(n); const q = r.getBoundingClientRect(); if (q.width < 3 || q.height < 3 || q.bottom <= 0 || q.top >= innerHeight || q.right <= 0 || q.left >= innerWidth) continue;
       const cs = getComputedStyle(x); let op = 1; for (let y = x; y; y = y.parentElement) op *= Number(getComputedStyle(y).opacity);
@@ -235,9 +232,9 @@ async function contrastes(pg, sel) {
 // Les mutations : le défaut d'hier remis DANS LA PAGE (le contrôle visé doit rougir).
 async function muter(pg) {
   if (!MUT) return;
-  const css = { bande: '[data-v2-colis] { margin-left: -34px !important; }', plaque: '[data-v2-colis] [data-v2-etiquette] { transform: translateX(46px) !important; }',
-    passe: '[data-v2-passe-lieu] { white-space: normal !important; max-width: 90px !important; }', barre: `${ONGLET}:first-child { flex: 3 1 0 !important; } :is(${BARRE}) ${ONGLET}:not(:first-child) span:not([aria-hidden]) { font-size: 0 !important; }`,
-    sous: `:is(${BARRE}) { margin-top: -70px !important; position: relative; z-index: 5; }`, contraste: `${ECRAN} [data-v2-jour-mot], ${ECRAN} [data-v2-ecart] { color: rgb(150 160 175) !important; opacity: .45 !important; }` }[MUT];
+  const css = { bande: '[data-v2-colis] { margin-left: -34px !important; }', plaque: '[data-v2-colis] .n-plaque { transform: translateX(46px) !important; }',
+    passe: '[data-v2-passe-lieu] .n-rangee-titre { white-space: normal !important; display: block !important; -webkit-line-clamp: unset !important; max-width: 90px !important; overflow: visible !important; }', barre: `${ONGLET}:first-child { flex: 3 1 0 !important; } :is(${BARRE}) ${ONGLET}:not(:first-child) span:not([aria-hidden]) { font-size: 0 !important; }`,
+    sous: `:is(${BARRE}) { margin-top: -70px !important; position: relative; z-index: 5; }`, contraste: `${ECRAN} .n-affiche-libelle, ${ECRAN} .n-rangee-sous { color: rgb(150 160 175) !important; opacity: .45 !important; }` }[MUT];
   if (css) await pg.addStyleTag({ content: css });
   if (MUT === 'plein') await pg.evaluate((s) => { const p = document.querySelector(s + ' [data-v2-principal]'); if (p) { const c = p.cloneNode(true); c.removeAttribute('data-v2-principal'); p.parentElement.appendChild(c); } }, ECRAN);
   if (MUT === 'job') await pg.evaluate((s) => { const e = document.querySelector(s); if (e) { const d = document.createElement('div'); d.setAttribute('data-v2-job', 'x'); d.textContent = 'À faire'; e.appendChild(d); } }, ECRAN);
@@ -274,7 +271,7 @@ async function unEcran(nav, nomBase, b, W, sombre) {
       const w = await pg.evaluate(LIRE, ECRAN);
       // ── LE FOND ──
       dit(w.jobs === 0 && !/À faire/.test(w.texte), `F1 ${ou} : aucun groupe « À faire » dans Aujourd’hui (décision du 19 nov.)`, { jobs: w.jobs });
-      dit(w.blocs[0] === 'chiffres' && w.blocs.includes('envoyer') && w.blocs.includes('retirer') && w.blocs.includes('ventes'), `F5 ${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — dans cet ordre`, w.blocs);
+      dit(w.blocs[0] === 'chiffres' && w.blocs[1] === 'mois' && w.blocs.includes('envoyer') && w.blocs.includes('retirer') && w.blocs.includes('ventes'), `F5 ${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — dans cet ordre`, w.blocs);
       dit(w.alertes <= 1, `F6 ${ou} : au plus UNE alerte (${w.alertes})`, w.alerte);
       if (nomBase === 'capture') {
         const A = b.attendu, X = attenduJours(A.ventes);
@@ -287,7 +284,10 @@ async function unEcran(nav, nomBase, b, W, sombre) {
         dit(w.alerte === 'poster', `F6 ${ou} : l’alerte est celle des colis à poster dont la limite est LUE`, w.alerte);
       }
       if (nomBase === 'estimee') dit(w.alerte !== 'poster', `F6 ${ou} : aucune limite lue ⇒ aucune alerte « à poster » (une date estimée ne presse jamais)`, w.alerte);
-      // ── LE DESSIN ──
+      // ── LE DESSIN ── dans l'app, il ne se juge qu'une fois la coque native branchée (`DESSIN_APP=1`) : tant que l'écran
+      // natif vit dans la coque d'hier (ses habillages `!important` repeignent boutons et barre), il est jugé SEUL, dans la coque
+      // native, par scripts/bancs/aujourdhui-natif.cjs — les mêmes mesures (`DESSIN`, `contrastes`).
+      if (!process.env.DESSIN_APP) { dit(!erreurs.length, `${ou} : aucune erreur JS`, erreurs); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-${nomBase}-${W}-${th}.png`) }); await ctx.close(); return; }
       const d = await pg.evaluate(DESSIN, [ECRAN, BARRE, ONGLET]);
       dit(d.bande.cases >= 2 && !d.bande.chev.length && !d.bande.chevTextes.length && d.bande.horsBande === 0, `D1 ${ou} : ${d.bande.cases} vignettes, aucune n’en chevauche une autre, aucun texte superposé`, d.bande);
       dit(d.bande.plaques >= 1 && !d.bande.plaquesKo.length, `D1 ${ou} : ${d.bande.plaques} plaques N°, chacune ENTIÈRE dans sa case`, d.bande.plaquesKo);
@@ -383,6 +383,9 @@ async function onglets(nav, b, sombre) {
   await ctx.close();
 }
 
+module.exports = { baseCapture, baseVolume, baseVide, LIRE, DESSIN, contrastes, ECRAN, BARRE, ONGLET };
+if (require.main !== module) return;
+fs.mkdirSync(SHOTS, { recursive: true });
 (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });

@@ -12,7 +12,7 @@
 //    C  les dernières ventes : les 5 plus récentes, par identité `plateforme:tx` (jamais deux fois, jamais sans date
 //       ni identité) ; « pas su » rend null, pas [] ;
 //    D  l'alerte : AU PLUS une ; une limite ESTIMÉE ne presse jamais ; l'ordre poster → retirer → retour ;
-//    E  « À régler » : chaque groupe va dans SON onglet (par son identifiant, sinon par l'écran de son geste) ; les
+//    E  « À régler » : chaque groupe va dans SON onglet (la table de l'audit d'utilité du 19 nov., §4.1 ; sinon l'écran de son geste) ; les
 //       trois manques d'annonce deviennent UNE rangée « Compléter » ; l'urgent d'abord ; la pastille n'ajoute pas ce
 //       qu'elle compte déjà ; le geste est celui du groupe ;
 //    F  la publication : gardée 12 h sur l'appareil, par vendeur ; sans publication ⇒ null (rien d'inventé) ;
@@ -158,11 +158,11 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
     g('sans-numero', { n: 8, tab: 'annonces' }), g('prix-mini-manquants', { n: 51 }), g('achat-a-relier', { n: 33 }), g('prix', { n: 3 }),
     g('inventaire-en-cours'), g('numeros-nouveaux', { n: 36 }), g('a-trancher'), g('urssaf', { tab: 'compta' }), g('truc-inconnu', { tab: 'garage' }), g('autre-inconnu', { tab: '' })];
   const O = Object.fromEntries(R.ONGLETS_A_REGLER.map((o) => [o, R.groupesDe(o, GROUPES).map((x) => x.id)]));
-  dit(O.ventes.join() === 'colis-limite,prix-achat-vente,litige,retours-vente,remettre-en-vente', 'E1 Ventes : colis pressés, litige de vente, retours, ventes annulées, ventes sans prix d’achat — l’urgent d’abord', O.ventes);
+  dit(O.ventes.join() === 'colis-limite,litige,retours-vente', 'E1 Ventes : colis pressés, litige de vente, retours — l’urgent d’abord', O.ventes);
   dit(O.achats.join() === 'retrait-a-verifier,litige:2,achats-a-numeroter', 'E2 Achats : colis à vérifier, litige d’achat, achats à numéroter', O.achats);
-  dit(O.stock.join() === 'inventaire-en-cours,numeros-nouveaux,truc-inconnu', 'E3 Stock : inventaire en cours, nouveaux N° à écrire (un inconnu suit l’écran de son geste)', O.stock);
-  dit(O.sante.join() === 'a-trancher,autre-inconnu' && O.argent.join() === 'urssaf' && O.messages.join() === 'messages', 'E4 « choses à trancher » derrière « Tout va bien ? », l’URSSAF dans Argent, les messages = la pastille de Messages', { sante: O.sante, argent: O.argent, messages: O.messages });
-  dit(O.annonces.join() === 'prix,completer', 'E5 Annonces : « sans numéro », « sans prix mini », « sans prix d’achat » = UNE rangée « Compléter », pas trois', O.annonces);
+  dit(O.stock.join() === 'inventaire-en-cours,truc-inconnu', 'E3 Stock : inventaire en cours (un inconnu suit l’écran de son geste)', O.stock);
+  dit(O.sante.join() === 'a-trancher,autre-inconnu' && O.argent.join() === 'prix-achat-vente,urssaf' && O.messages.join() === 'messages', 'E4 « choses à trancher » derrière « Tout va bien ? », l’URSSAF et les ventes sans prix d’achat dans Argent, les messages = la pastille de Messages', { sante: O.sante, argent: O.argent, messages: O.messages });
+  dit(O.annonces.join() === 'remettre-en-vente,prix,numeros-nouveaux,completer', 'E5 Annonces : ventes annulées à remettre en vente, prix à baisser, N° à écrire ; « sans numéro », « sans prix mini », « sans prix d’achat » = UNE rangée « Compléter », pas trois', O.annonces);
   const tous = Object.values(O).flat();
   dit(GROUPES.every((x) => tous.includes(x.id) || R.SUJETS_COMPLETER[R.racineId(x.id)]) && tous.length === GROUPES.length - 2, 'E6 aucun groupe perdu, aucun en double (19 groupes → 16 rangées + « Compléter » qui en porte 3)', tous.length);
   const comp = R.groupesDe('annonces', GROUPES, { titreCompleter: (n) => 'Compléter · ' + n }).find((x) => x.id === 'completer');
@@ -172,7 +172,7 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(fait.join() === 'sans-numero' && recu && recu.sujet === 'numero', 'E8 sans atelier « Compléter » : le geste du premier manque ; avec : `ouvrirCompleter({ sujet })`', { fait, recu });
   fait.length = 0; { const lit = R.groupesDe('ventes', GROUPES).find((x) => x.id === 'litige'); if (lit) lit.geste.faire(); }
   dit(fait.join() === 'litige', 'E9 le geste d’une rangée est LE geste du groupe (le même qu’avant)', fait);
-  dit(R.ajoutPastille('ventes', GROUPES) === 4 && R.ajoutPastille('achats', GROUPES) === 2 && R.ajoutPastille('annonces', GROUPES) === 1 && R.ajoutPastille('stock', GROUPES) === 3 && R.ajoutPastille('sante', GROUPES) === 2,
+  dit(R.ajoutPastille('ventes', GROUPES) === 2 && R.ajoutPastille('achats', GROUPES) === 2 && R.ajoutPastille('annonces', GROUPES) === 3 && R.ajoutPastille('stock', GROUPES) === 2 && R.ajoutPastille('sante', GROUPES) === 2,
     'E10 la pastille ajoute UN par groupe, sauf ce qu’elle compte déjà (colis pressés ⊂ à envoyer, à vérifier ⊂ à retirer, « Compléter » ⊂ annonces)', ['ventes', 'achats', 'annonces', 'stock', 'sante'].map((o) => R.ajoutPastille(o, GROUPES)));
   dit(R.groupesDe('ventes', []).length === 0 && R.groupesDe('ventes', null).length === 0 && R.ajoutPastille('ventes', null) === 0, 'E11 aucun groupe ⇒ aucune rangée, rien d’ajouté à la pastille');
 
@@ -211,7 +211,7 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(!/data-v2-job|data-v2-afaire|v2-afaire/.test(vue), 'S1 Aujourd’hui ne rend plus aucune rangée « À faire »');
   dit(/publierARegler\(/.test(vue), 'S2 Aujourd’hui PUBLIE ses groupes (src/designV2/aRegler.js)');
   dit(/chiffresAujourdhui\(\{/.test(app) && /alerteDuJour\(\{/.test(app) && /dernieresVentesFaites\(/.test(app), 'S3 l’app demande ses chiffres, son alerte et ses dernières ventes au modèle (aucune règle recopiée)');
-  dit(/<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
+  dit(/<ARegler onglet="argent"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8')) && /<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
     'S4 le bloc « À régler » est branché en tête de Ventes, Achats, Annonces (une ligne), du Stock et de « Tout va bien ? »');
   dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');
 
