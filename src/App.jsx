@@ -187,6 +187,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, sansAchatRelie, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
+import { trierARefaire } from "./brouillonsARefaire.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER, sansSourcesDites as sansSourcesDitesTrancher, sourcesDitesPar as sourcesDitesParTrancher } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -17170,12 +17171,15 @@ function etatARefaire(x, maintenant = Date.now()) {
   return null;
 }
 const REFAIRE_SELECT = 'id,uid:data->>uid,photo:data->photos->>0,etat:data->versBrouillon->>etat,titre:data->versBrouillon->>titre,prix:data->versBrouillon->>prix,at:data->versBrouillon->>at,majAt:data->versBrouillon->>majAt,supprime:data->versBrouillon->>supprime,publier:data->versBrouillon->>publier,peut:data->versBrouillon->>peutExister,draftId:data->versBrouillon->>draftId';
-function useBrouillonsARefaire(actif, presentes) {
+// (19 nov., src/brouillonsARefaire.js) `brouillonsVus` : les brouillons que SON dressing montre (null = pas lu) ; `lectures` :
+// la lecture du dressing de chaque compte ({ lu, complet }) ; les suppressions prouvées sont lues ici (`lireSupprimeesTous`).
+function useBrouillonsARefaire(actif, presentes, brouillonsVus = null, lectures = null) {
   const [rows, setRows] = useState(undefined);      // undefined = lecture · null = pas su · [] = lu
   // (29 oct., « elle n'a pas capté que j'avais fait passer un brouillon en ligne
   // à la main ») Ses brouillons Vinted (`vinted_brouillon_*`, scalaires) : un
   // AUTRE brouillon de la même ancienne annonce déjà mis en ligne règle la ligne.
   const [brs, setBrs] = useState(null);
+  const [supp, setSupp] = useState(null);           // Map uid → { id: iso } · null = pas su
   const [tick, setTick] = useState(0);
   const [ecartes, setEcartes] = useState(() => { const v = load(BROUILLONS_REFAIRE_ECARTES, {}); return v && typeof v === 'object' ? v : {}; });
   useEffect(() => onCloudReady(() => setEcartes((e) => (e && Object.keys(e).length) ? e : (() => { const v = load(BROUILLONS_REFAIRE_ECARTES, {}); return v && typeof v === 'object' ? v : {}; })())), []);
@@ -17187,7 +17191,9 @@ function useBrouillonsARefaire(actif, presentes) {
       try { r = await lireTout(`id=like.coffre_*&data->versBrouillon->>etat=in.(a-refaire,a-publier,mise-en-ligne-incertaine,enregistre,supprime,suppression-incertaine,brouillon-range)&select=${REFAIRE_SELECT}`, { strict: true }); } catch (_) { r = null; }
       let b = null;
       try { b = await lireTout('id=like.vinted_brouillon_*&select=id,anc:meta->>ancienId,etat:meta->>etat,it:meta->>itemId', { strict: true }); } catch (_) { b = null; }
-      if (vivant) { setRows(Array.isArray(r) ? r : null); setBrs(Array.isArray(b) ? b : null); }
+      let sp = null;
+      try { sp = await lireSupprimeesTous(); } catch (_) { sp = null; }
+      if (vivant) { setRows(Array.isArray(r) ? r : null); setBrs(Array.isArray(b) ? b : null); setSupp(sp || null); }
     })();
     const f = (e) => { const d = e && e.detail; if (d && d.type === 'maj' && d.quoi === 'brouillons') setTick((t) => t + 1); };
     window.addEventListener('vrm:ext', f);
@@ -17216,11 +17222,18 @@ function useBrouillonsARefaire(actif, presentes) {
       const prix = Number(x.prix);
       dest.push({ cle: String(x.id), uid: m[1], id: m[2], quoi, titre: String(x.titre || '').trim() || 'Annonce sans titre', prix: prix > 0 ? prix : null, photo: x.photo || '', supprime: String(x.supprime) === 'true', publier: String(x.publier) === 'true', peutExister: String(x.peut) === 'true', draftId: x.draftId || '', at: maj });
     }
-    out.sort((a, b) => (b.at || 0) - (a.at || 0));
-    out.regles = regles;
-    out.enLigne = enLigne;
-    return out;
-  }, [rows, ecartes, brs, presentes]);
+    // (19 nov., « il y en a qui ne sont même plus dans Vinted ») Ce qui n'est PLUS sur Vinted sort de la liste, par
+    // l'identifiant du brouillon : suppression PROUVÉE, ou absent d'une lecture COMPLÈTE et plus récente du dressing de
+    // son compte (src/brouillonsARefaire.js). « Pas su » reste, et c'est dit. Rien n'est supprimé du coffre.
+    const vusBr = Array.isArray(brouillonsVus) ? new Set(brouillonsVus.map((x) => String(x && x.id))) : null;
+    const tri = trierARefaire(out, { presentes: enVente, publieParAncien, brouillonsVus: vusBr, lectures, supprimees: supp });
+    const reste = tri.restent;
+    reste.sort((a, b) => (b.at || 0) - (a.at || 0));
+    reste.regles = regles;
+    reste.enLigne = enLigne;
+    reste.disparus = tri.disparus;
+    return reste;
+  }, [rows, ecartes, brs, presentes, brouillonsVus, lectures, supp]);
   const revoir = (cle) => setEcartes((e) => { const u = { ...e }; delete u[cle]; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
   const ecarter = (cle) => setEcartes((e) => { const u = { ...e, [cle]: new Date().toISOString() }; save(BROUILLONS_REFAIRE_ECARTES, u); return u; });
   return { liste, ecarter, revoir, relire: () => setTick((t) => t + 1) };
@@ -38056,7 +38069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (29 oct.) Les annonces présentes (en ligne, à confirmer, masquées) : un
   // brouillon qui y figure a été mis en ligne, à la main ou par VRM.
   const presentesIds = React.useMemo(() => { const st = new Set(); for (const l of [listings.items, listings.aConfirmer, listings.masquees]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) st.add(String(it.id)); return st; }, [listings.items, listings.aConfirmer, listings.masquees]);
-  const brRefaire = useBrouillonsARefaire(curSub === 'annonces' || actionsOpen || refaireOpen || !!repubAction, presentesIds);
+  const brRefaire = useBrouillonsARefaire(curSub === 'annonces' || actionsOpen || refaireOpen || !!repubAction, presentesIds, Array.isArray(listings.brouillons) ? listings.brouillons : null, listings.brLectures || null);
   const nRefaire = Array.isArray(brRefaire.liste) ? brRefaire.liste.length : 0;
   // (28 oct.) Refaire UN brouillon raté, sur son clic confirmé : l'extension relit
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
