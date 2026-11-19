@@ -171,7 +171,8 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
       action: g.action && ['envoi', 'enregistre', 'garde'].includes(g.etat) ? g.action : null } };
   };
   const emettre = () => { const s = instantane(); for (const f of abonnes) { try { f(s); } catch (_) {} } };
-  const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : dureePilule);
+  // (19 nov., atelier « Compléter ») `duree` : un geste peut laisser « Annuler » plus longtemps (10 s dans l'atelier).
+  const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : (g.duree || dureePilule));
   // (11 nov., lot DJ4) Seule une pilule qui porte un geste (« Annuler », « Réessayer ») se met en
   // pause sous le doigt ou la souris : « Annulation… » et « Annulé » n'ont rien à toucher, elles
   // partent toujours (mesuré au banc stock-juste : une pause posée au clic d'« Annuler » les figeait).
@@ -252,11 +253,11 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
     // Lance un geste : l'écran change TOUT DE SUITE, l'écriture part.
     // `acc` (14 nov., lot accompagnement) : le nom du geste (src/accompagnement.js §9) — la pilule
     // le porte (data-acc-apres / data-acc-echec) et propose sa suite ; rien d'autre ne change ici.
-    lancer({ texte, cles, vue, ecrire, acc = '', action = null, titre = '', sous = '' }) {
+    lancer({ texte, cles, vue, ecrire, acc = '', action = null, titre = '', sous = '', duree = 0 }) {
       const id = ++suivant;
       // (16 nov., reprise relier-glisser) `titre` / `sous` : ce que la pilule montre en deux lignes (le bénéfice après une
       // liaison) ; `texte` reste la phrase entière (lecteur d'écran, « Annuler : … »).
-      const g = { id, texte: String(texte || ''), titre: String(titre || ''), sous: String(sous || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null, acc: String(acc || ''),
+      const g = { id, texte: String(texte || ''), titre: String(titre || ''), sous: String(sous || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null, acc: String(acc || ''), duree: Number(duree) > 0 ? Number(duree) : 0,
         action: action && typeof action.faire === 'function' && action.libelle ? { libelle: String(action.libelle), faire: action.faire, cle: String(action.cle || '') } : null };
       gestes.set(id, g);
       try { vue('apres'); } catch (_) {}

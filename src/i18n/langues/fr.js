@@ -29,6 +29,7 @@ import ecran_serie_selection from './fr/serieSelection.js';   // (16 nov.) la ba
 import ecran_scan_retrouver from './fr/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './fr/liaison.js';   // (15 nov.) La liaison achat ⇄ article
+import ecran_completer from './fr/completer.js';   // (19 nov.) L'atelier « Compléter »
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './fr/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
@@ -2330,6 +2331,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_completer,
   ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,

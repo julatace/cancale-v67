@@ -187,7 +187,6 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, sansAchatRelie, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
-import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER, sansSourcesDites as sansSourcesDitesTrancher, sourcesDitesPar as sourcesDitesParTrancher } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
@@ -251,8 +250,9 @@ import { modeleSur, releveVentes } from "./ceQuiRapporte.js";
 // ⟦→ ecrans/Stats.jsx #4⟧
 import { requeteDeLaVoix, ficheDeLaVoix, ventesDuMois } from "./rechercheVocale.js";
 import { ventesAilleursPour, opsVenduAilleurs } from "./venteAilleurs.js";   // (11 nov., saisie rapide) « Vendu ailleurs »
-import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, texteDemande, FENETRE_MS as FENETRE_PRIX_MS } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
+import { ventesSansPrix, corpsDemande, txsDuLien, estNuitParis, FENETRE_MS as FENETRE_PRIX_MS } from "./prixAchatVente.js";   // (11 nov., saisie rapide) le prix d'achat demandé le jour de la vente
 import { VenduAilleurs, FeuillePrixAchat, poserDemandesPrix, abonnerDemandesPrix, lireDemandesPrix } from "./SaisieRapide.jsx";
+import { ouvrirCompleter, EVT_COMPLETER, poserCompteurs as poserCompteursCpl, abonnerCompteurs as abonnerCompteursCpl, lireCompteurs as lireCompteursCpl } from "./completer/porte.js";
 import { VOIX, PHRASES_VOIX, ecouter, annulerVoix, arreterVoix, ecouteEnCours } from "./dicteeNavigateur.js";
 import { useEtatVoix, LigneVoix } from "./composants/voix.jsx";
 import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccourcisSiri.js";
@@ -345,6 +345,8 @@ const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
 const MeilleuresSources = aLaDemande(() => import('./MeilleuresSources.jsx'));
 // (16 nov., lot relier-glisser) « Relier en glissant » : achats d'un côté, annonces / ventes sans achat de l'autre.
 const RelierGlisser = aLaDemande(() => import('./RelierGlisser.jsx'), true);
+// (19 nov., lot completer-infos) L'atelier « Compléter » : UNE porte pour ce qui manque à un article (src/completer/).
+const Completer = aLaDemande(() => import('./completer/Completer.jsx'), true);
 // (14 nov., lot messages-achats-plus) L'aide à la réponse (108, 109), les infos à partager d'une
 // paire (108), Achats en plus (111, 125, 131) et le catalogue privé (110). Récit :
 // docs/passation/2026-11-14-messages-achats-plus.md.
@@ -3374,6 +3376,7 @@ const SYNC_KEYS = [
   'vrm_annulees_reglees', 'vrm_achat_plus_tard',
   // (15 nov., liaison) « Ce n'est pas lui » : { '<article>><tx achat>': at } — ce couple n'est plus proposé.
   'vrm_liaison_refus',
+  'vrm_completer_sans',   // (19 nov.) « Je ne sais plus » de l'atelier Compléter (par article et par question)
   // (10 nov., lot BD) La NOTE PRIVÉE d'une paire ({ 'n:<N°>' | 'a:<id annonce>': { t, at } },
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
@@ -5307,8 +5310,8 @@ const _ecrivainVrm = creerEcrivainLocal({
 // `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
 // de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
 // `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
-const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null, deux = null) => _gestes.lancer({
-  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '',
+const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null, deux = null, duree = 0) => _gestes.lancer({
+  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree,
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -34765,9 +34768,7 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
 }
 
-function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null }) {
-  // (11 nov., saisie rapide) Les ventes prouvées sans prix d'achat (publiées par la coque) : Ma journée.
-  const prixAFaire = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
+function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
   const horsLigneVue = useHorsLigne();   // (11 nov.) hors ligne : pas de N° proposé à un nouvel achat (serveur seul)
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
@@ -34798,7 +34799,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { const f = () => setTrancherOuvert(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (6 nov.) Un inventaire du Stock EN COURS (src/inventaire.js) : une carte de Ma journée.
   const inventaireJournee = useInventaireEnCours(only === 'journee');
-  const aNumeroterJournee = useAchatsANumeroter(only === 'journee');   // (11 nov., lot rangement-guide) les achats retirés ou reçus, pas encore rangés
+  const aNumeroterJournee = useAchatsANumeroter(only === 'journee' || only === 'completer');   // (11 nov., lot rangement-guide) les achats retirés ou reçus, pas encore rangés
   const aFinirJournee = usePairesAFinir(only === 'journee');   // (15 nov.) les paires rangées à l'arrivée, atelier pas fini
   const atelierJournee = useAtelierJournee(only === 'journee');
   // (3 nov.) « Supprimer de Leboncoin » depuis la carte « à retirer de Leboncoin » :
@@ -39167,11 +39168,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v, manuelAt, ...changeAMain(item, avant, v, manuelAt, opts) }); recordUsed(v); await demanderPrixAchat(item, v); return;
+      updatePair(item, { numero: v, manuelAt, ...changeAMain(item, avant, v, manuelAt, opts) }); recordUsed(v); if (!opts.sansPrix) await demanderPrixAchat(item, v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); await demanderPrixAchat(item, n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); if (!opts.sansPrix) await demanderPrixAchat(item, n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length && refusHorsLigne('numero')) { updatePair(item, { numero: avant }); return; }
     if (presents.length) {
@@ -39193,7 +39194,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) } : { numero: avant });
-      if (prendre) { recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); }
+      if (prendre) { recordUsed(nextNumero); if (!opts.sansPrix) await demanderPrixAchat(item, String(nextNumero)); }
       return;
     }
     const anc = numeros[autres[0]] || {};
@@ -39203,7 +39204,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) }); recordUsed(nextNumero); if (!opts.sansPrix) await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),
@@ -43120,30 +43121,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouvrirPropositionsRepub = () => ouvrirRepubliee({
     propositions: propositionsRepub.map((pr) => ({ ...pr, candidats: (pr.candidats || []).map((c) => ({ ...c, enLigne: (listings.items || []).some((x) => String(x.id) === String(c.id)) })) })),
     onRepondre: repondreRepubliee });
-  const demanderNumerosManquants = async () => {
-    const liste = numerosADemander.slice(0, 30);
-    const deja = []; let faits = 0;
-    const pris = new Set(takenNums), prisK = new Set(takenCles); ajouterNumerosHorsEcran(pris, prisK);
-    const rappel = (ouNumeroEcrit() || ['description']).includes('description');
-    for (let i = 0; i < liste.length; i++) {
-      const it = liste[i];
-      let prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja });
-      for (;;) {
-        const desc = [`« ${String(it.title || '—')} »`, tr('nn.demande.proposition', { numero: prop }), rappel ? tr('nn.demande.rappel', { numero: prop }) : ''].filter(Boolean).join('\n');
-        const rep = await askText({ title: tr(`nn.demande.titre.${vendMots()}`, { i: i + 1, n: liste.length }), desc, value: prop, numeric: clavierNum() === 'numeric', data: 'numero-demande', ok: tr('nn.demande.ok'), cancel: tr('nn.demande.plusTard'), photo: it.photo || null });
-        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini(); return; }
-        const k = cleNum(rep);
-        if (deja.some((d) => cleNum(d) === k)) { toast(tr('nn.demande.dejaDonne', { numero: k })); prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja }); continue; }
-        await poserNumero(it, rep, '');
-        // L'écriture passe par la sauvegarde (500 ms) : on relit l'appareil juste après elle.
-        await new Promise((r) => setTimeout(r, 700));
-        const f = (load('vinted_annonce_numeros', {}) || {})[String(it.id)];
-        if (f && String(f.numero || '').trim()) { deja.push(String(f.numero)); faits++; }
-        break;
-      }
-    }
-    if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini();
-  };
+  // (19 nov., lot completer-infos) La boucle de feuilles « Donne-lui un N° » (`demanderNumerosManquants`) est retirée : la question
+  // « Son N° ? » de l'atelier « Compléter » pose le N° par la MÊME écriture (`poserNumero`), une carte à la fois.
   const apercuEcrit = useMemo(() => {
     if (!Array.isArray(listings.items)) return null;
     const lignes = listings.items.map((it) => {
@@ -44863,7 +44842,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   //    scalaires (§4.4 : jamais `select=data`), paginés (§4.5), seulement les détails côté ACHETEUR. Trois états :
   //    undefined pas encore lu · null pas su · { tx: … }. Une lecture ratée ne montre rien (jamais « pas de taille »).
   const [detailsAchats, setDetailsAchats] = useState(undefined);
-  const besoinDetailsAchats = !!(pickerFor || glisserOuvert || relierColis);
+  const besoinDetailsAchats = !!(pickerFor || glisserOuvert || relierColis || only === 'completer');
   useEffect(() => {
     if (!besoinDetailsAchats || detailsAchats !== undefined) return undefined;
     let stop = false;
@@ -45100,7 +45079,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const res = texteApresLiaison({ genre: cible.genre, prix, entree }, tr, beneficeLigneVente, texteBenefice);
     const num = cible.num || String(((cible.genre === 'annonce' ? fiches[String(cible.id)] : (cible.idf ? fiches[String(cible.idf)] : null)) || {}).numero || '');
     gesteVrm(res.texte, ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum }, null, 'achat.relier',
-      { libelle: tr('liaison.recu'), cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) }, { titre: res.titre, sous: res.sous });
+      { libelle: tr('liaison.recu'), cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) }, { titre: res.titre, sous: res.sous }, only === 'completer' ? 10000 : 0);
     return true;
   };
   const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
@@ -45181,7 +45160,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [sales.items, numeros, saleOv]);
   // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
   // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
-  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert;
+  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer';
   // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
   useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // Les articles par clé (Achats : « article proposé » sous un achat).
@@ -45282,6 +45261,63 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const w = await ecritureRelierAchat(a); if (!w) return;
     setNumeros(prev => { const u = { ...prev, [key]: { ...(prev[key] || {}), ...w } }; save('vinted_annonce_numeros', u); return u; });
   };
+
+
+  // ── (19 nov., lot completer-infos) L'ATELIER « COMPLÉTER » (src/completer/) ───────────────────────────────
+  // Julien : « trouve autre chose pour relier les achats, mettre les prix plancher minimum, mettre les prix — toutes les
+  // informations […] ça doit être beaucoup plus simple et rapide ». UNE file, une question à la fois : ce qui manque à
+  // chaque article (achat relié / prix d'achat, prix mini, prix, N°), par les règles EXISTANTES (`annSelectionnables` +
+  // `lignesManquantes`, `sansAchatRelie`, `fileVendus`, `numerosADemander`) rangées par src/completer/regles.js. L'écran
+  // est monté par la coque dans une instance à lui (`only="completer"`, `ouvrirCompleter`) ; chaque réponse est UN geste
+  // annulable 10 s (`gesteVrm`) ; relier passe par l'écriture de « Relier » (`relierGlisse`), SON toucher (§5).
+  const enCompleter = only === 'completer';
+  const [completerSans, setCompleterSans] = useStateCle('vrm_completer_sans', () => { const v = load('vrm_completer_sans', {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; });
+  const [completerTick, setCompleterTick] = useState(0);
+  const compteursCpl = React.useSyncExternalStore(abonnerCompteursCpl, lireCompteursCpl);
+  useEffect(() => { if (!enCompleter || !accounts.length) return; if (listings.items === null && !listings.loading) loadListings(); if (!fillBuyAchats.items) chargerAchats(); if (achEmails === undefined) fetchEmailAchats().then(setAchEmails); /* eslint-disable-next-line */ }, [enCompleter, accounts.length]);
+  const entreesCompleter = useMemo(() => {
+    if (!(enCompleter || only === 'journee' || only === 'annonces')) return undefined;
+    const luA = Array.isArray(listings.items) && !listings.error, luV = Array.isArray(sales.items);
+    if (!luA && !luV) return (listings.error || sales.error) ? null : undefined;
+    const fav = new Map((luA ? listings.items : []).map((it) => [String(it && it.id), Number(it && it.favourites) || 0]));
+    let neuves = [];
+    try { const portes = new Set(); for (const f of Object.values(numeros || {})) if (f && f.numero) portes.add(cleNum(f.numero)); neuves = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum); } catch (_) { neuves = []; }
+    return {
+      annonces: luA ? annSelectionnables.filter((a) => a.etat === 'en-ligne').map((a) => ({ ...a, favoris: fav.get(String(a.id)) || 0 })) : null,
+      numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; },
+      ventes: fileVendus ? fileVendus.map((x) => ({ tx: String(x.o.transaction_id), idf: x.idf, uid: String((x.o._acc && x.o._acc.vinted_user_id) || ''), titre: x.o.title || '',
+        prix: x.o.price && x.o.price.currency_code && x.o.price.currency_code !== 'EUR' ? null : (x.o.price && x.o.price.amount), photo: (x.cible && x.cible.photo) || '',
+        taille: (x.cible && x.cible.taille) || '', numero: x.fiche && x.fiche.numero ? String(x.fiche.numero) : '', compte: accounts.length > 1 && x.o._acc ? accNameOf(x.o._acc) : '', ts: x.ts })) : null,
+      fichesNeuves: neuves, sansNumero: modeNum === 'moi' ? numerosADemander.map((it) => String(it.id)) : [], sans: completerSans,
+      virgule: extSait('offrespage') === 'ok', miniActif: offresAuto === true,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enCompleter, only, listings.items, listings.error, sales.items, sales.error, annSelectionnables, fileVendus, numeros, buyByNum, completerSans, numerosADemander, modeNum, offresAuto, completerTick]);
+  // Les compteurs par sorte (src/completer/porte.js) : la MÊME règle que la file, chargée à part (hors du démarrage).
+  useEffect(() => {
+    if (entreesCompleter === undefined || cache()) return undefined;
+    if (entreesCompleter === null) { poserCompteursCpl(null); return undefined; }
+    let mort = false;
+    const id = setTimeout(() => { import('./completer/regles.js').then((m) => { if (!mort) poserCompteursCpl(m.compteurs(m.fileCompleter(entreesCompleter))); }).catch(() => {}); }, enCompleter ? 0 : 600);
+    return () => { mort = true; clearTimeout(id); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entreesCompleter]);
+  const courantCompleter = () => ({ fiches: load('vinted_annonce_numeros', {}) || {}, ventes: load('vinted_sale_overrides', {}) || {}, prixParNum: load('vinted_buyprice_by_num', {}) || {}, sans: load('vrm_completer_sans', {}) || {}, fichesNeuves: load('vrm_fiches_neuves', {}) || {} });
+  const annonceCompleter = (id) => (listings.items || []).find((x) => x && String(x.id) === String(id)) || null;
+  const ficheNeuveCompleter = (id) => { const it = annonceCompleter(id); return it ? { title: it.title || '', photo: it.photo || null, photoK: photoKey(it.photo) || null, price: it.price ?? null, size: it.size ?? null, accountId: it._acc?.vinted_user_id } : null; };
+  const gesteCompleter = (texte, ops) => gesteVrm(texte, ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum, vrm_completer_sans: setCompleterSans },
+    () => { if (ops.some((o) => o.k === 'vrm_fiches_neuves')) setTimeout(() => { emettreClesRelues(['vrm_fiches_neuves']); setCompleterTick((n) => n + 1); }, 600); }, 'completer', null, null, 10000);
+  const relierCompleter = (art, a) => relierGlisse(a, art.genre === 'vente' ? { genre: 'vente', tx: art.tx, idf: art.idf, num: art.numero } : { genre: 'annonce', id: art.id, num: art.numero });
+  const autreAchatCompleter = (art) => {
+    if (art.genre === 'vente') { const l = (fileVendus || []).find((x) => String(x.o.transaction_id) === String(art.tx)); if (l) choisirAchatVente(l, null); return; }
+    const it = annonceCompleter(art.id); if (!it) return;
+    const t = Number(it.createdTs); openPicker({ ...it, _dateRef: Number.isFinite(t) && t > 0 ? new Date(t < 1e12 ? t * 1000 : t).toISOString() : null });
+  };
+  const numeroCompleter = async (art, v) => { const it = annonceCompleter(art.id); if (it) await poserNumero(it, v, '', { sansPrix: true }); };
+  // L'achat qu'une IDENTITÉ désigne (le même fichier photo, src/prixAchatPropose.js) : proposé en tête, relié par SON toucher.
+  const achatsParPhotoCpl = useMemo(() => { if (!enCompleter || !Array.isArray(fillBuyAchats.items)) return null; const m = new Map(); for (const a of fillBuyAchats.items) { const k = a && photoKey(orderPhoto(a)); if (!k) continue; const l = m.get(k); if (l) l.push(a); else m.set(k, [a]); } return m; }, [enCompleter, fillBuyAchats.items]);
+  const identiteCompleter = (art) => { if (!achatsParPhotoCpl || !art || !art.photo) return null; const k = photoKey(art.photo); if (!k) return null;
+    return achatParIdentite({ photo: k, venteTx: art.tx || '', venteDate: art.genre === 'vente' && art.ts ? new Date(art.ts).toISOString() : null, achats: achatsParPhotoCpl.get(k) || [], cleDePhoto: (a) => photoKey(orderPhoto(a)), pris: linkedBuyIds }); };
 
   // (6 nov., vague 2) `linkBuyForKey` (le prix de l'achat tel quel, même pour un LOT) est remplacé
   // par `relierAchatCle` : l'écriture de « Relier un achat » (reçu juste, prix d'un article de lot saisi).
@@ -49760,10 +49796,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const court = `${tr('nn.notif.autre', { n: nouveauxAEcrire.length })} · ${listeNumeros(nouveauxAEcrire.map((l) => l.numero))}`;
           jobs.push({ id: 'numeros-nouveaux', n: nouveauxAEcrire.length, icon: 'pencil', color: C.text, court, detail: tr('nn.job.detail'), title: court, photos: nouveauxAEcrire.map((l) => l.photo), tab: null, prio: 0.3, action: tr('nn.job.action'), avant: ouvrirAEcrire });
         }
-        if (modeNum === 'moi' && numerosADemander.length) {
-          const court = tr('nn.demande.court.autre', { n: numerosADemander.length });   // « articles » sur Ma journée (voir plus haut)
-          jobs.push({ id: 'numeros-a-donner', n: numerosADemander.length, icon: 'pencil', color: C.warn, court, detail: tr('nn.demande.detail'), title: court, photos: numerosADemander.map((it) => it.photo || null), tab: null, prio: 0.3, action: tr('nn.demande.action'), avant: () => { demanderNumerosManquants(); } });
-        }
+        // (19 nov., décision de Julien : « l'outil doit être pratique, pas chiant » — l'app ne HARCÈLE plus) Les cartes
+        // « N articles sans numéro », « N annonces numérotées sans prix d'achat », « N annonces sans prix mini » et « N ventes
+        // sans prix d'achat » ne reviennent plus chaque jour : UNE entrée discrète, « N infos à compléter », ouvre l'atelier
+        // (src/completer/, `ouvrirCompleter`). Les compteurs par sorte : src/completer/porte.js.
         // (15 nov., src/republieTelephone.js) « N°42 republiée ? » : une nouvelle annonce a la même photo qu'une
         // annonce numérotée qui vient de disparaître (republiée dans l'app Vinted ?). Rien n'est relié sans SON clic.
         if (modeNum === 'vrm' && propositionsRepub.length) {
@@ -49776,8 +49812,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (6 nov., prix au numérotage) C'est AUSSI la carte des paires numérotées TOUTES SEULES par
         // VRM sans prix d'achat (même liste : en ligne, numérotée, ni prix ni achat) : une seule
         // carte, qui le dit ; la file porte « Saisie en série » (la porte du chiffre faux, §5).
-        { const nR = fileAchat ? aRelierJournee(fileAchat) : 0;
-          if (nR > 0) jobs.push({ id: 'achat-a-relier', n: nR, icon: 'link', color: C.text, court: tr('journee.annoncesNumeroteesSans', { n: String(nR) }), detail: tr('journee.saisisPrixRelie'), title: tr('journee.annoncesNumeroteesSans', { n: String(nR) }), tab: 'cat_annonces', prio: 3.4, avant: () => demanderVue('sansachat') }); }
+        { const nC = compteursCpl && Number.isInteger(compteursCpl.questions) ? compteursCpl.questions : 0;
+          if (nC > 0) { const court = tr('cpl.porte.titre', { n: nC });
+            jobs.push({ id: 'completer', n: nC, icon: 'pencil', color: C.text, court, detail: tr('cpl.porte.detail'), title: court, tab: null, prio: 3.4, action: tr('cpl.porte.action'), avant: () => { ouvrirCompleter(); } }); } }
         // (9 nov., « vendre plus » — retenu le 11 oct. : « plan des paires qui dorment ») Les
         // articles EN LIGNE depuis au moins le seuil choisi dans Annonces (30/60/90 j), comptés
         // par la règle du stock qui dort (`stockQuiDort`, la base de la grille). Seulement
@@ -49831,11 +49868,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // la saisie en série est juste sous l'interrupteur (`cat_msg` : Messages filtré sur Vinted,
         // là où vit Offres auto — « Tous » montre le fil unique). Neutre : rien n'est perdu, une offre
         // sans prix mini attend sa réponse. Jamais un prix proposé.
-        { const lPM = offresAuto === true && Array.isArray(listings.items) && !listings.error ? lignesPrixMiniManquants({ annonces: annSelectionnables.filter(a=>a.etat==='en-ligne'), numeros, virgule: extSait('offrespage')==='ok' }) : null;
-          const cPM = carteJourneePrixMini({ actif: offresAuto === true, lignes: lPM });
-          if (cPM) { const court = tr('prixMini.journee', { n: cPM.n });
-            jobs.push({ id: 'prix-mini-manquants', n: cPM.n, icon: 'tag', color: C.text, court, detail: tr('prixMini.journeeDetail'), title: court, photos: cPM.photos.length ? cPM.photos : null, tab: 'cat_msg', prio: 3.3, action: tr('prixMini.journeeAction'),
-              avant: () => { demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} } }); } }
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
         // (16 nov., captures de Julien) Sans ce que les cartes CI-DESSUS disent déjà (src/aTrancher.js `JOB_SOURCE`) :
@@ -49851,11 +49883,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (11 nov., saisie rapide) VENDUE SANS PRIX D'ACHAT (vente PROUVÉE de moins de 3 jours,
         // src/prixAchatVente.js) : ambre, un geste — « Saisir » ouvre la petite feuille du prix.
         // La carte reste tant que le prix est vide ; elle part dès qu'il est enregistré.
-        if (Array.isArray(prixAFaire) && prixAFaire.length) {
-          const tP = texteDemande(prixAFaire);
-          jobs.push({ id: 'prix-achat-vente', n: prixAFaire.length, icon: 'euro', color: C.warn, court: tP.title, detail: tP.body, title: tP.title, tab: 'journee', prio: 1.7, action: 'Saisir',
-            avant: () => { try { window.dispatchEvent(new CustomEvent('vrm:prix-achat-ouvrir', { detail: [] })); } catch (_) {} } });
-        }
         jobs.sort((a,b)=>a.prio-b.prio);
         // RÉSULTAT DU JOUR : les paires VENDUES aujourd'hui (pas l'argent viré,
         // qui arrive plusieurs jours après). Source = les emails de vente, la
@@ -57603,6 +57630,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}
           onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
+      {/* (19 nov., lot completer-infos) L'atelier « Compléter » : plein écran, sous la feuille « Autre achat ». */}
+      {enCompleter && completer ? <Completer demande={completer} entrees={entreesCompleter} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))}
+          liens={liensAchats} liaison={liaison} identiteDe={identiteCompleter} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''} compteDe={(a)=>accounts.length>1 && a && a._acc ? (accNameOf(a._acc)||'') : ''}
+          details={detailsAchats} horsRelier={(a)=>achatHorsRelier(a, achatsHorsRelierRes)} courant={courantCompleter} ficheNeuveDe={ficheNeuveCompleter} geste={gesteCompleter} gestes={_gestes}
+          onRelier={relierCompleter} onAutreAchat={autreAchatCompleter} onNumero={numeroCompleter} numeroPropose={()=>String(nextNumero)}
+          propositionDe={(a)=>propositionPrixAchat({ identite: { achat: a, par: 'lien' }, ventilationDe: ventilationDeTx, estLot: estLotPropose })} miniActif={offresAuto === true}
+          arrivees={aNumeroterJournee.length ? { n: aNumeroterJournee.length, ouvrir: ()=>ouvrirAtelierArrivee(aNumeroterJournee) } : null}
+          vend={vendMots()} Photo={PhotoVinted} Plaque={Numero} Retour={FermeAuRetour} onFermer={onCompleterFermer} zIndex={1290}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
         <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
@@ -65732,6 +65767,10 @@ function AppCoeur() {
   // réserve « une fois par vente » et envoie (jamais la nuit, réglages de notifications).
   // Ici rien n'est écrit : le prix n'est posé que sur SON « Enregistrer » (§2.5).
   const [prixFeuille,setPrixFeuille]=useState(()=>{ try { return txsDuLien(window.location.search); } catch (_) { return null; } });
+  // (19 nov., lot completer-infos) LA PORTE de l'atelier « Compléter » : `ouvrirCompleter({ sujet, num, lot })` (src/completer/porte.js)
+  // monte UNE instance à lui (`only="completer"`) — les mêmes lectures et les mêmes écritures que les écrans, où qu'on soit.
+  const [completerDemande,setCompleterDemande]=useState(null);
+  useEffect(()=>{ const f=(e)=>setCompleterDemande(e&&e.detail?e.detail:{ sujet:'tout', num:'', lot:false }); window.addEventListener(EVT_COMPLETER,f); return ()=>window.removeEventListener(EVT_COMPLETER,f); },[]);
   const [prixTick,setPrixTick]=useState(0);
   const [prixQuart,setPrixQuart]=useState(0);
   const [prixPreuves,setPrixPreuves]=useState(undefined);
@@ -67077,6 +67116,8 @@ function AppCoeur() {
         <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
+        {completerDemande ? <div hidden data-completer-hote=""><GardeEcran nom="completer" feuille onFermer={()=>setCompleterDemande(null)}><Comptabilite key="completer" only="completer" completer={completerDemande} onCompleterFermer={()=>setCompleterDemande(null)}
+          accounts={vintedAccounts} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid}/></GardeEcran></div> : null}
         <GardeEcran nom="lienvc" feuille><HoteLienVc comptes={vintedAccounts}/></GardeEcran>
         {visuels && <GardeEcran nom="visuels" feuille onFermer={()=>setVisuels(null)}>
           {/* (11 nov., lot visuels-reseaux) Carré 1080 et story 1080 × 1920, dessinés dans le navigateur ; rien n'est publié. */}
