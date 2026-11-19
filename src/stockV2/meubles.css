@@ -43,6 +43,10 @@
   .sm-case { position: relative; display: block; aspect-ratio: 1 / .8; min-width: 0; container-type: inline-size; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
   .sm-meuble[data-sm-affichage="plan"] .sm-case { aspect-ratio: 1 / 1; }
   .sm-meuble[data-sm-affichage="rayonnage"] .sm-case { aspect-ratio: 1 / .62; }
+  /* De loin, le meuble entier tient dans l'écran : des cases plus basses (le N° reste à sa taille). */
+  .sm-meuble[data-sm-mode="loin"] .sm-case { aspect-ratio: 1 / .62; }
+  .sm-meuble[data-sm-mode="loin"][data-sm-affichage="plan"] .sm-case { aspect-ratio: 1 / .8; }
+  .sm-meuble[data-sm-mode="loin"][data-sm-affichage="rayonnage"] .sm-case { aspect-ratio: 1 / .5; }
   button.sm-case { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 4px; }
   button.sm-case:focus-visible { outline: 3px solid var(--n-accent); outline-offset: 1px; }
   button.sm-case:disabled { cursor: default; }
@@ -74,7 +78,7 @@
   .sm-meuble[data-sm-affichage="rayonnage"] .sm-n { font-size: clamp(13px, 36cqi, 34px); }
   .sm-photo ~ .sm-etiq { position: absolute; left: 6%; bottom: 6%; min-width: 0; max-width: 88%; }
   .sm-photo ~ .sm-etiq .sm-n { font-size: clamp(13px, 22cqi, 22px); }
-  @container (max-width: 40px) { .sm-etiq { display: none; } }
+  @container (max-width: 30px) { .sm-etiq { display: none; } }
   @container (max-width: 64px) { .sm-photo { display: none; } .sm-photo ~ .sm-etiq { position: relative; left: auto; bottom: auto; } }
 
   /* La case proposée : un liseré d'accent qui respire deux fois, et le mot « Ici ». */
@@ -92,6 +96,7 @@
   .sm-defile { overflow-x: auto; overscroll-behavior-x: contain; }
   .sm-meuble[data-sm-mode="pres"] .sm-corps { min-width: calc(var(--sm-cols) * 52px); }
   .sm-meuble[data-sm-mode="pres"] { max-width: calc(var(--sm-cols) * 168px + 20px); margin-inline: auto; }
+  .sm-meuble[data-sm-mode="pres"] .sm-case { min-height: 44px; }
   .sm-meuble[data-sm-mode="loin"] { pointer-events: none; }
 
   /* ── LE STOCK ──────────────────────────────────────────────────────────── */
@@ -102,8 +107,10 @@
   .sm-carte-pad { padding: 16px; }
   .sm-ranger-fin { font: var(--n-t-second-fort); color: var(--n-accent); white-space: nowrap; }
   /* La vue d'ensemble : chaque meuble sur toute la largeur au téléphone ; côte à côte dès qu'il y a la place. */
-  .sm-tous { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-  @media (min-width: 900px) { .sm-tous { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); } }
+  .sm-tous { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; container-type: inline-size; }
+  /* Un meuble large (6 colonnes et plus) prend deux places dès qu'il y en a deux : ses N° restent lisibles de loin. */
+  @container (min-width: 740px) { .sm-tuile[data-sm-large] { grid-column: span 2; } }
+  @media (min-width: 900px) { .sm-tous { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); align-items: start; } }
   .sm-tuile { appearance: none; display: flex; flex-direction: column; gap: 12px; width: 100%; margin: 0; padding: 16px; border: 0; border-radius: var(--n-r-carte);
     background: var(--n-carte); color: var(--n-encre); font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; box-sizing: border-box;
     transition: transform var(--n-duree-appui) ease; }

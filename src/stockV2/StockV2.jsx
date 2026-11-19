@@ -262,7 +262,7 @@ function Meubles({ s, zoom, setZoom, vise }) {
     <section className="sm-tous" data-sr-places={s.meubles.length} data-sm-tous={s.meubles.length}>
       {s.meubles.length === 0 ? s.blocs.explication : null}
       {s.meubles.map((x) => { const c = s.compteMeuble(x); return (
-        <button key={x.id} type="button" className="sm-tuile" data-sr-place-ouvrir={x.id} data-sm-tuile={x.id} onClick={() => setZoom(String(x.id))}
+        <button key={x.id} type="button" className="sm-tuile" data-sr-place-ouvrir={x.id} data-sm-tuile={x.id} data-sm-large={Number(x.cols) >= 6 ? '' : undefined} onClick={() => setZoom(String(x.id))}
           aria-label={`${x.name} · ${tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}${c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}`}>
           <span className="sm-tuile-tete">
             <span className="sm-tuile-nom">{x.name}</span>

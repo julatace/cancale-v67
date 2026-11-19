@@ -14,3 +14,7 @@
 /* « Où est… » ne colle plus en haut dans le Stock natif : collé, il passait sur le segmenté Meubles · Articles et sur la
    tête du meuble zoomé (capture du banc). Le champ reste en tête de l'écran ; « ⋯ » et la barre restent joignables. */
 :is(#vrm-contenu, html) .sm-ecran .sr-cherche-ligne { position: static; }
+/* À l'ordinateur, la coque range l'écran en colonne flexible alignée au début : un écran au texte qui passe à la ligne s'y
+   rétrécit à sa largeur de contenu (mesuré : 535 px sur 1 272 pour le Stock). Le Stock prend toute la largeur qu'on lui
+   donne — c'est ce que Julien demande (« qu'il occupe toute la largeur de l'écran »). Seulement l'onglet Stock. */
+#vrm-contenu[data-ecran="garage"] { align-self: stretch; }
