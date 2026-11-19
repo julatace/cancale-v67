@@ -14,10 +14,11 @@ const { spawnSync } = require('child_process');
 const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
-const R = 'src/ebay/lienPublication.js', E = 'src/ecrans/Ebay.jsx';
+const R = 'src/ebay/lienPublication.js', E = 'src/ecrans/Ebay.jsx', D = 'api/_lib/double-vente.js';
 const MUTATIONS = {
   sansRepli: [R, '  if (!n || !fiches || typeof fiches !== \'object\') return null;', '  return null;'],
   premiere: [R, '  return ids.length === 1 ? { itemId: id, pairId: ids[0], numero: n } : null;', '  return ids.length >= 1 ? { itemId: id, pairId: ids[0], numero: n } : null;'],
+  serveurSansArticle: [D, "  if (lien && !lien.pairId && (lien.article === true || lien.propre === true) && lien.numero != null && cleNum(String(lien.numero))) return cleNum(String(lien.numero));", ''],
   ecranAncien: [E, "      try { const li = lienApresPublication({ itemId: j.itemId, pairId: (b && b.pairId) || pairId, numero: (b && b.item && b.item.numero) || (j.sku ? numDeSkuEbay(j.sku) : ''), fiches: fichesPourEbay(), cle: cleNum }); if (li) noterLienEbay(li.itemId, li.pairId, li.numero, 'publication'); } catch (_) {}",
     "      try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}"],
 };
@@ -27,7 +28,8 @@ if (MUT) {
   for (const nom of noms) {
     const [f, a, b] = MUTATIONS[nom];
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ebay-lien-'));
-    for (const g of [R, E]) { const src = path.join(RACINE, g); fs.mkdirSync(path.dirname(path.join(tmp, g)), { recursive: true }); if (fs.existsSync(src)) fs.copyFileSync(src, path.join(tmp, g)); }
+    for (const d of ['api', 'src']) fs.cpSync(path.join(RACINE, d), path.join(tmp, d), { recursive: true, filter: (s) => !/node_modules/.test(s) });
+    if (fs.existsSync(path.join(RACINE, 'package.json'))) fs.copyFileSync(path.join(RACINE, 'package.json'), path.join(tmp, 'package.json'));
     const t = fs.readFileSync(path.join(tmp, f), 'utf8');
     if (!t.includes(a)) { console.log(`❓ mutation ${nom} : texte introuvable`); continue; }
     fs.writeFileSync(path.join(tmp, f), t.replace(a, b));
@@ -62,6 +64,12 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
     const ecran = fs.readFileSync(path.join(RACINE, E), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     dit(/lienApresPublication\(\{ itemId: j\.itemId, pairId: \(b && b\.pairId\) \|\| pairId/.test(ecran) && /noterLienEbay\(li\.itemId, li\.pairId, li\.numero, 'publication'\)/.test(ecran),
       'B1 · l’écran eBay pose le lien par cette règle à la publication (le N° est celui envoyé à l’instant)', '');
+    // Le serveur (notification de double vente, app fermée) lit le lien vers un article SANS Vinted comme l'app (`numEbayLu`).
+    const DV = await import(path.join(RACINE, 'api', '_lib', 'double-vente.js'));
+    const a0 = { itemId: '187654321098', sku: '', depuis: '2026-11-01T10:00:00Z' };
+    dit(DV.numeroAnnonceEbay(a0, null, fiches, { 187654321098: { numero: '61', article: true, at: 1 } }) === '61' && DV.numeroAnnonceEbay(a0, null, fiches, { 187654321098: { numero: '62', propre: true } }) === '62'
+      && DV.numeroAnnonceEbay(a0, null, fiches, { 187654321098: { numero: '63' } }) === '',
+      'C1 · le serveur lit un lien eBay vers un article sans Vinted (`article` / `propre`) ; un N° nu sans marque n’est pas un lien', '');
   } catch (e) { dit(false, 'la règle du lien de publication existe (src/ebay/lienPublication.js)', String(e && e.message).slice(0, 160)); }
   console.log(`\n${ko ? '❌' : '✅'} audit-ebay-lien-publication : ${ko ? ko + ' rouge(s) sur ' + n : n + ' contrôles verts'}`);
   process.exit(ko ? 1 : 0);

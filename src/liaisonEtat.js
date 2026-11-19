@@ -5,6 +5,7 @@
 // ── POUR LES AUTRES ÉCRANS (la fiche d'un article, « Aujourd'hui », la barre) ──────────────
 //   import { ouvrirRelierAnnonces, ouvrirLiaison, compteurLiaisonLu, etatLienLu, abonnerLiaison, demanderLiaison } from './liaisonEtat.js';
 //   ouvrirRelierAnnonces({ site, id })          // = ouvrirLiaison({ site, id })
+//   ouvrirLiaison({ site: 'Leboncoin', article: { id, numero } })   // depuis la fiche d'un article : « Relier à Leboncoin »
 //   ouvrirLiaison()                              // le parcours, là où il s'est arrêté
 //   ouvrirLiaison({ site: 'Leboncoin' })         // la file d'un site
 //   ouvrirLiaison({ site: 'eBay', id: '12345' }) // UNE annonce (reliée : son lien, sa preuve, « Délier »)
@@ -30,7 +31,8 @@ export const etatLienLu = (site, id) => { const e = etat && etat.lu && etat.parC
 export const EVT_OUVRIR_LIAISON = 'vrm:liaison-ouvrir';
 export const EVT_CHARGER_LIAISON = 'vrm:liaison-charger';
 const emettre = (nom, detail) => { try { window.dispatchEvent(new CustomEvent(nom, { detail })); } catch (_) { /* hors navigateur */ } };
-export function ouvrirLiaison({ site = null, id = null, vue = null } = {}) { emettre(EVT_OUVRIR_LIAISON, { site, id: id == null ? null : String(id), vue }); }
+// `article` : { id, numero } — le sens inverse (depuis la fiche d'un article : « Relier à {site} ») : cet article proposé en tête.
+export function ouvrirLiaison({ site = null, id = null, vue = null, article = null } = {}) { emettre(EVT_OUVRIR_LIAISON, { site, id: id == null ? null : String(id), vue, article: article && article.id != null ? { id: String(article.id), numero: String(article.numero || '') } : null }); }
 // Le même, sous le nom que les écrans d'annonces attendent : `ouvrirRelierAnnonces({ site, id })`.
 export const ouvrirRelierAnnonces = ouvrirLiaison;
 // Demander le calcul (au plus un toutes les 2 min côté app, sauf `force`).

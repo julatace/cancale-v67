@@ -27413,6 +27413,7 @@ async function annoncesAutresMemePhoto() {
         const idsL = [];
         if (liens[id] != null && String(liens[id]).trim()) idsL.push({ sorte: 'lien', numero: cleNum(liens[id]) });
         for (const r0 of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '', numeroEcritLbc(ad)]) { const k0 = cleNum(r0); const t0 = k0 ? numeroExterne(k0, id, 'lbcAnnonces') : ''; if (t0 && !idsL.some((x) => x.sorte === 'reference' && x.numero === t0)) idsL.push({ sorte: 'reference', numero: t0 }); }
+        if (ad.vrmPubliee && cleNum(ad.vrmPubliee)) idsL.push({ sorte: 'publication', numero: cleNum(ad.vrmPubliee) });
         autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
           photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '',
           prix: Number(ad.price) > 0 ? Number(ad.price) : null, identites: idsL, enVente: true });
@@ -27595,42 +27596,12 @@ const lireCarteLiaison = (k) => {
   try { const v = JSON.parse(t); return v && typeof v === 'object' && !Array.isArray(v) ? v : undefined; } catch (_) { return undefined; }
 };
 // Ses paires Vinted présentes et les pistes de publication : src/liaisonDonnees.js (chargé avec le parcours, hors démarrage).
-// « Elle n'est pas sur Vinted » (Leboncoin) : SON N°, par LA règle des numéros — `prochainLibre` sur TOUS les
-// numéros déjà servis (la même récolte que `numeroterVestiaire`), après le plus haut, jamais un trou, jamais un
-// N° d'archive ; le pool d'abord (append-only : un N° donné reste servi, même si le geste est annulé).
-// Il numérote lui-même ⇒ aucun N° neuf (`sans-numero`). Une lecture qui manque ⇒ `pas-su`, rien n'est donné.
-async function donnerNumeroLiaison() {
-  if (numeroEcritActif()) return { refus: 'sans-numero' };
-  if (!numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
-  const [jl, jv, jr] = await Promise.all([
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
-    lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
-  ]);
-  if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr) || !numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
-  if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) return { refus: 'pas-su' };
-  const pris = new Set(), prisK = new Set();
-  const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
-  const L0 = jl[0] || {}, V0 = jv[0] || {};
-  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
-  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
-  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
-  Object.values((L0.liens && typeof L0.liens === 'object') ? L0.liens : {}).forEach(add);
-  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
-  for (const it of Object.values((L0.items && typeof L0.items === 'object') ? L0.items : {})) if (it && it.ref) add(it.ref);
-  for (const v of Object.values((V0.ventes && typeof V0.ventes === 'object') ? V0.ventes : {})) if (v && v.ref) add(v.ref);
-  ajouterNumerosHorsEcran(pris, prisK);
-  const servis = new Set(prisK);
-  const numero = prochainLibre(pris, prisK, prefixeNumeros());
-  const ep = entreePool(numero);
-  if (ep == null || servis.has(cleNum(numero))) return { refus: 'pas-su' };
-  const pool = (load('vinted_used_numeros', []) || []).slice();
-  if (!pool.map(cleNum).includes(cleNum(ep))) { pool.push(ep); save('vinted_used_numeros', pool.sort(triPool)); emettreClesRelues(['vinted_used_numeros']); }
-  return { numero, servis };
-}
+// « Elle n'est que sur ce site » (Leboncoin) : SON N° — `donnerNumero` de src/liaisonDonnees.js (chargé avec le parcours,
+// exécuté par scripts/audit-liaison-numero.cjs avec la vraie `prochainLibre`) ; ce qu'il lit et écrit lui est passé ici.
 // Les règles et les gestes, chargés à la demande (une fois), avec ce que l'app sait lire et écrire.
 let _liaisonVrm = null;
-const liaisonVrm = () => (_liaisonVrm || (_liaisonVrm = Promise.all([import('./liaisonActions.js'), import('./liaisonDonnees.js')]).then(([m, dd]) => { const D = dd.creerDonneesLiaison({ load, lireAnnoncesVintedEnLigne, chezMoiProposables, chezMoiEntrees, placesAnnonces, ouDansMeubles, lireBaseRelue, SUPABASE_URL }); return m.creerLiaison({
+const liaisonVrm = () => (_liaisonVrm || (_liaisonVrm = Promise.all([import('./liaisonActions.js'), import('./liaisonDonnees.js')]).then(([m, dd]) => { const D = dd.creerDonneesLiaison({ load, lireAnnoncesVintedEnLigne, chezMoiProposables, chezMoiEntrees, placesAnnonces, ouDansMeubles, lireBaseRelue, SUPABASE_URL,
+    numeroEcritActif, numerotationPermise, isCloudReady, lireEnVol, CLES_ECRITURE_NUMEROS, saveTimers: _saveTimers, cleNum, numerosReserves, ajouterNumerosHorsEcran, prochainLibre, prefixeNumeros, entreePool, save, triPool, emettreClesRelues }); return m.creerLiaison({
   pret: () => isCloudReady(), proprio: () => (AUTH.user && AUTH.user.id) || '',
   lireCarte: lireCarteLiaison,
   geste: (texte, ops, apres, options) => gesteVrm(texte, ops, { vrm_vc_liens: vcSetter('vrm_vc_liens') }, (sens) => {
@@ -27645,7 +27616,7 @@ const liaisonVrm = () => (_liaisonVrm || (_liaisonVrm = Promise.all([import('./l
   douteux: () => lireNumerosAmbigus(),
   numerosConnus: () => { const s = new Set(); const add = (v) => { const c = cleNum(v); if (c) s.add(c); }; Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((f) => add(f && f.numero)); Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((f) => add(f && f.numero)); return s.size ? s : null; },
   numeroVcDe: (id) => carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)] || '',
-  donnerNumero: donnerNumeroLiaison, refuserPhoto: refuserMemePhoto,
+  donnerNumero: D.donnerNumero, refuserPhoto: refuserMemePhoto,
   cleNum, marqueDe: extractBrand, tr, publier: publierLiaison, lire: lireLiaison,
 }); }).catch((e) => { _liaisonVrm = null; throw e; })));
 let _liaisonAttente = false;
@@ -27667,6 +27638,9 @@ const ACTIONS_LIAISON = {
   pasCellesCi: (x) => liaisonVrm().then((L) => L.pasCellesCi(x)),
   verifier: (x) => liaisonVrm().then((L) => L.verifier(x)),
   charger: (force) => { chargerLiaison(force === true); },
+  // (19 nov.) Après SON lien eBay, sur SON clic CONFIRMÉ : « VRM-{n°} » écrit comme SKU chez eBay (route existante `sku`,
+  // qui refuse un N° ambigu de la remise à zéro). Le lien tient alors tout seul. Aucun appel sans ce clic.
+  ecrireSku: async ({ itemId, numero, compte }) => { try { const { j } = await appelEbay({ action: 'sku', itemId: String(itemId), numero: String(numero), ...corpsCompteEbay(compte || 'principal') }); _fichesEbayMemo.at = 0; return j && j.ok ? { ok: true, sku: j.sku || '' } : { ok: false, raison: (j && j.error) || '' }; } catch (_) { return { ok: false, raison: '' }; } },
 };
 const LiaisonSitesParesseux = aLaDemandeFeuille(() => import('./LiaisonSites.jsx'));
 // L'hôte du parcours, monté une fois dans la coque : `ouvrirLiaison(…)` (src/liaisonEtat.js), l'ancien
@@ -27674,7 +27648,7 @@ const LiaisonSitesParesseux = aLaDemandeFeuille(() => import('./LiaisonSites.jsx
 function LiaisonCoque() {
   const [cible, setCible] = React.useState(null);
   React.useEffect(() => {
-    const ouvrir = (e) => { const d = (e && e.detail) || {}; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, n: Date.now() }); chargerLiaison(true); };
+    const ouvrir = (e) => { const d = (e && e.detail) || {}; const art = d.article && d.article.id != null ? { id: String(d.article.id), numero: String(d.article.numero || '') } : null; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, article: art, n: Date.now() }); chargerLiaison(true); };
     const parVc = (e) => { const d = e && e.detail; if (d && d.sens === 'vc' && d.id != null) ouvrir({ detail: { site: 'Vestiaire', id: String(d.id) } }); };
     window.addEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.addEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.addEventListener('vrm:lien-vc', parVc);
     return () => { window.removeEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.removeEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.removeEventListener('vrm:lien-vc', parVc); };
@@ -27748,7 +27722,9 @@ function GesteLienVcVinted({ it, num, style }) {
 function HoteLienVc({ comptes }) {
   const [cible, setCible] = React.useState(null);
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (!d || d.sens !== 'vinted' || d.id == null) return; setCible({ ...d, id: String(d.id) }); };   // (19 nov.) sens 'vc' : le parcours « Relier mes annonces » (LiaisonCoque)
+    // (19 nov.) Le sens inverse (« Relier à Vestiaire » depuis la fiche Vinted) : LE parcours « Relier mes annonces », sur Vestiaire,
+    // cet article proposé en tête de chaque annonce (son N° tapé) — les mêmes gardes, SON toucher relie. L'ancienne feuille n'est plus ouverte.
+    const f = (e) => { const d = e && e.detail; if (!d || d.sens !== 'vinted' || d.id == null) return; ouvrirLiaison({ site: 'Vestiaire', article: { id: String(d.id), numero: String(d.num || '') } }); };   // (19 nov.) sens 'vc' : le parcours « Relier mes annonces » (LiaisonCoque)
     window.addEventListener('vrm:lien-vc', f);
     return () => window.removeEventListener('vrm:lien-vc', f);
   }, []);
@@ -60244,6 +60220,8 @@ const numeroLbcIdentite = (v, items, liens) => {
   if (!ad) return '';
   const ks = new Set();
   for (const r of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '', numeroEcritLbc(ad)]) { const k = cleNum(r); if (k) ks.add(numeroExterne(k, iid, 'lbcAnnonces')); }
+  // (19 nov., ext. 5.409) L'annonce que VRM a créée garde le N° de sa paire (`lbc_publiees`) : une identité, d'après la coupure.
+  if (ad.vrmPubliee) { const kp = cleNum(ad.vrmPubliee); if (kp) ks.add(kp); }
   ks.delete('');
   return ks.size === 1 ? [...ks][0] : '';
 };
@@ -60674,10 +60652,15 @@ function lbcListingsSession() {
 async function lbcListingsLire() {
   try {
     // (31 oct.) Projetée (§4.4) : les deux champs lus, jamais `select=data`.
-    const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures`);
+    // (19 nov., ext. 5.409) Avec `lbc_publiees` : l'annonce que VRM a CRÉÉE (son identifiant, rendu par Leboncoin au
+    // dépôt) et le N° de la paire — une identité (§5), portée par l'annonce (`vrmPubliee`), lue par `numeroLbcIdentite`.
+    const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_listings,lbc_publiees)&select=id,items:data->items,lectures:data->lectures,publiees:data->publiees`);
     if (!Array.isArray(rows)) return null;
-    const d = rows[0] || {};
-    _lbcAnnoncesSession = { t: Date.now(), items: d.items || {}, lectures: d.lectures || {} };
+    const d = rows.find((x) => x && x.id === 'lbc_listings') || {};
+    const pub = (rows.find((x) => x && x.id === 'lbc_publiees') || {}).publiees;
+    const items = d.items && typeof d.items === 'object' ? d.items : {};
+    if (pub && typeof pub === 'object') for (const [id, e] of Object.entries(pub)) { const ad = items[id]; const n = e && e.numero != null ? String(e.numero).trim() : ''; if (ad && typeof ad === 'object' && n) items[id] = { ...ad, vrmPubliee: n }; }
+    _lbcAnnoncesSession = { t: Date.now(), items, lectures: d.lectures || {} };
     return _lbcAnnoncesSession;
   } catch (_) { return null; }
 }
