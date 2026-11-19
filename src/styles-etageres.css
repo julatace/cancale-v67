@@ -137,8 +137,8 @@
    Dans la couche `vrm-studio` (posée AVANT `vrm-premium`, index.html) : son !important passe devant le
    `top: 0 !important` de styles-refonte-ms.css (couche vrm-premium). */
 @layer vrm-studio {
-  .vrm-main:has(> .vrm-barre-haut) [data-stock-recherche] { top: 74px !important; }
-  .vrm-main:has(> .vrm-barre-haut) [data-stock-place-barre] { top: 146px !important; }
+  .vrm-main[data-vrm-d2] [data-stock-recherche] { top: 74px !important; }
+  .vrm-main[data-vrm-d2] [data-stock-place-barre] { top: 146px !important; }
 }
 /* (15 nov.) Les sites et le compte, sur la case : une plaque en haut à gauche (logos 14 px, pseudo 11 px tronqué),
    la même matière que la plaque du N° (jetons du studio). */

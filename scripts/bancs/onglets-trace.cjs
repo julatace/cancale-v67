@@ -87,7 +87,49 @@ function lireTrace(tampon) {
   return { thread: avecThread, cpu: { ecran: ecran ? ms(zones.ecran) : null, utile: utile ? ms(zones.utile) : null, tout: ms(zones.tout) }, mur: { utile: utile ? ms(mur.utile) : null, tout: ms(mur.tout) },
     ecran_ms: ecran ? Math.round((ecran.ts - tap.ts) / 1000) : null, utile_ms: utile ? Math.round((utile.ts - tap.ts) / 1000) : null,
     compte: { ...compte, longues_ms: Math.round(compte.longues_ms), plusLongue: Math.round(compte.plusLongue) },
-    invalidations: process.env.INVALIDATIONS ? resumerInvalidations(ev, tap) : undefined };
+    invalidations: process.env.INVALIDATIONS ? resumerInvalidations(ev, tap) : undefined,
+    gros: process.env.INVALIDATIONS ? grosRecalculs(fil, tap) : undefined,
+    selecteurs: process.env.SELECTEURS ? coutSelecteurs(ev, tap) : undefined };
+}
+// Le bout de code d'un cadre de pile (build minifié : le nom ne dit rien, le code si).
+const SOURCES = new Map();
+function bout(url, ligne, col) {
+  try {
+    const f = path.join(DIST, new URL(url).pathname); if (!SOURCES.has(f)) SOURCES.set(f, fs.readFileSync(f, 'utf8').split('\n'));
+    const l = SOURCES.get(f)[ligne] || ''; return l.slice(Math.max(0, col - 60), col + 110).replace(/\s+/g, ' ');
+  } catch (_) { return ''; }
+}
+// INVALIDATIONS=1 : les plus gros recalculs de style et les mises en page FORCÉES (par du script), avec la pile et,
+// pour un recalcul, ce qui a rendu le document « sale » juste avant (les `:has` qui invalident un sous-arbre entier).
+function grosRecalculs(fil, tap) {
+  const n = (e) => (e.args && (e.args.elementCount != null ? e.args.elementCount : (e.args.beginData && e.args.beginData.elementCount))) || 0;
+  const pile = (e) => ((e.args && e.args.beginData && e.args.beginData.stackTrace) || []).slice(0, 4).map((f) => ({ f: f.functionName || '', ou: String(f.url || '').split('/').pop().replace(/-[A-Za-z0-9_-]{8}\.js$/, '') + ':' + f.lineNumber + ':' + f.columnNumber, code: bout(f.url, f.lineNumber, f.columnNumber) }));
+  const styles = fil.filter((e) => e.name === 'UpdateLayoutTree');
+  const out = [];
+  for (const g of [...styles].sort((a, b) => n(b) - n(a)).slice(0, 3)) {
+    const i = styles.indexOf(g); const debut = i > 0 ? styles[i - 1].ts + (styles[i - 1].dur || 0) : tap.ts;
+    const avant = fil.filter((e) => e.ts >= debut && e.ts < g.ts + (g.dur || 0));
+    const par = new Map();
+    for (const e of avant) { if (e.name !== 'StyleInvalidatorInvalidationTracking' && e.name !== 'StyleRecalcInvalidationTracking') continue; const d = (e.args && e.args.data) || {}; if (e.name === 'StyleRecalcInvalidationTracking' && !d.subtree && !/has/i.test(d.reason || '')) continue; const k = (d.reason || '') + ' · ' + (d.nodeName || '') + (d.subtree ? ' · sous-arbre' : ''); par.set(k, (par.get(k) || 0) + 1); }
+    out.push({ quoi: 'style', a_ms: Math.round((g.ts - tap.ts) / 1000), elements: n(g), ms: Math.round((g.dur || 0) / 1000), force: pile(g).length > 0, pile: pile(g), causes: [...par].sort((a, b) => b[1] - a[1]).slice(0, 8) });
+  }
+  for (const g of fil.filter((e) => e.name === 'Layout').sort((a, b) => (b.dur || 0) - (a.dur || 0)).slice(0, 3)) out.push({ quoi: 'page', a_ms: Math.round((g.ts - tap.ts) / 1000), ms: Math.round((g.dur || 0) / 1000), force: pile(g).length > 0, pile: pile(g) });
+  return out;
+}
+// SELECTEURS=1 : le coût de chaque sélecteur pendant les recalculs de ce toucher (évènements « SelectorStats » de Blink).
+// Le chronométrage par sélecteur ALOURDIT le recalcul : ces temps se comparent ENTRE EUX (parts), pas à une mesure sans.
+function coutSelecteurs(ev, tap) {
+  const par = new Map(); let total = 0;
+  for (const e of ev) {
+    if (e.name !== 'SelectorStats' || e.pid !== tap.pid || e.ts < tap.ts) continue;
+    const l = e.args && e.args.selector_stats && e.args.selector_stats.selector_timings; if (!Array.isArray(l)) continue;
+    for (const s of l) { const us = Number(s['elapsed (us)']) || 0; total += us; const k = String(s.selector || ''); const o = par.get(k) || { us: 0, essais: 0, touches: 0, rejets: 0 }; o.us += us; o.essais += Number(s.match_attempts) || 0; o.touches += Number(s.match_count) || 0; o.rejets += Number(s.fast_reject_count) || 0; par.set(k, o); }
+  }
+  const liste = [...par].map(([sel, o]) => ({ sel, ...o })).sort((a, b) => b.us - a.us);
+  const has = liste.filter((x) => /:has\(/.test(x.sel));
+  const somme = (l) => Math.round(l.reduce((a, x) => a + x.us, 0) / 100) / 10;
+  return { total_ms: Math.round(total / 100) / 10, selecteurs: liste.length, has_ms: somme(has), has_n: has.length, essais: liste.reduce((a, x) => a + x.essais, 0), touches: liste.reduce((a, x) => a + x.touches, 0),
+    top: liste.slice(0, 60).map((x) => ({ ms: Math.round(x.us / 100) / 10, essais: x.essais, touches: x.touches, sel: x.sel.slice(0, 220) })), tous: process.env.SELECTEURS === 'tous' ? liste.map((x) => [Math.round(x.us), x.essais, x.touches, x.sel]) : undefined };
 }
 // INVALIDATIONS=1 : ce qui a demandé un recalcul de style (catégorie invalidationTracking) — par raison et par sélecteur.
 function resumerInvalidations(ev, tap) {
@@ -128,6 +170,8 @@ const SUITES = { court: [['1er', ['annonces', 'achats', 'ventes', 'compta', 'jou
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  // GARDES=journee,achats,ventes,annonces,compta : essaie une autre liste d'écrans gardés sur le même build (src/ecransGardes.jsx).
+  if (process.env.GARDES) await ctx.addInitScript((l) => { window.__VRM_ECRANS_GARDABLES = l; window.__VRM_MAX_GARDES = Math.max(4, l.length); }, process.env.GARDES.split(','));
   await ctx.addInitScript((RENDUS) => {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
     window.__ev = []; window.__lt = []; window.__saves = [];
@@ -173,7 +217,9 @@ const SUITES = { court: [['1er', ['annonces', 'achats', 'ventes', 'compta', 'jou
   await calme(3000, 90000);
   const charge0 = os.loadavg()[0];
   console.log(`démarrage ${Date.now() - t0} ms · ${reqs.filter((r) => r.m === 'GET').length} lectures · charge ${charge0.toFixed(1)} sur ${os.cpus().length} cœurs · processeur ×${CPU}`);
-  const CATS = ['devtools.timeline', 'blink.user_timing', 'v8.execute', 'disabled-by-default-devtools.timeline'].concat(process.env.INVALIDATIONS ? ['disabled-by-default-devtools.timeline.invalidationTracking'] : []);
+  const CATS = ['devtools.timeline', 'blink.user_timing', 'v8.execute', 'disabled-by-default-devtools.timeline']
+    .concat(process.env.INVALIDATIONS ? ['disabled-by-default-devtools.timeline.invalidationTracking', 'disabled-by-default-devtools.timeline.stack'] : [])
+    .concat(process.env.SELECTEURS ? ['disabled-by-default-blink.debug'] : []);
   let n = 0;
   const pas = async (passage, id) => {
     const depuis = (await ecranIci()).e; const i0 = reqs.length;
@@ -189,7 +235,9 @@ const SUITES = { court: [['1er', ['annonces', 'achats', 'ventes', 'compta', 'jou
         requestAnimationFrame(z); };
       requestAnimationFrame(z);
     }, { id, depuis });
-    if (process.env.PROFIL) await cdp.send('Profiler.start'); else await b.startTracing(pg, { categories: CATS });
+    // DEUXIEME=1 : les premiers passages ne sont pas tracés (une trace à invalidations d'un premier montage pèse 200 Mo).
+    const sansTrace = process.env.DEUXIEME && passage === '1er';
+    if (process.env.PROFIL) await cdp.send('Profiler.start'); else if (!sansTrace) await b.startTracing(pg, { categories: CATS });
     let par = 'barre';
     if (BARRE[id]) await pg.locator(`.vrm-tabbar .vrm-tab[data-nav-entree="${BARRE[id]}"]`).first().tap();
     else {
@@ -206,7 +254,7 @@ const SUITES = { court: [['1er', ['annonces', 'achats', 'ventes', 'compta', 'jou
     const fin = Date.now() + 40000; while (Date.now() < fin && !(await pg.evaluate(() => window.__utile != null).catch(() => false))) await attendre(100);
     await calme(1500, 20000);
     let tampon = Buffer.from('[]');
-    if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); profils.push({ de: depuis, vers: id, ...agreger(profile) }); } else tampon = await b.stopTracing();
+    if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); profils.push({ de: depuis, vers: id, ...agreger(profile) }); } else if (!sansTrace) tampon = await b.stopTracing();
     const m1 = await metriques();
     if (process.env.TRACES) { try { fs.mkdirSync(process.env.TRACES, { recursive: true }); fs.writeFileSync(path.join(process.env.TRACES, `${String(n).padStart(2, '0')}-${depuis}-${id}.json`), tampon); } catch (_) {} }
     const t = lireTrace(tampon);
@@ -222,6 +270,8 @@ const SUITES = { court: [['1er', ['annonces', 'achats', 'ventes', 'compta', 'jou
       lectures: reqs.slice(i0).filter((x) => x.m === 'GET').length, trace: t };
     const c = t && t.cpu.utile, tt = t && t.cpu.tout;
     console.log(`${passage} ${String(depuis).padEnd(8)} → ${id.padEnd(8)} ${r.meme ? 'gardé  ' : 'remonté'} | fil jusqu’à utile ${c ? String(c.total).padStart(6) : '     —'} ms (script ${c ? c.script : '—'} · style ${c ? c.style : '—'} · page ${c ? c.page : '—'} · peinture ${c ? c.peinture : '—'}) · jusqu’au calme ${tt ? tt.total : '—'} ms | ${t ? t.compte.styles : '—'} recalculs, ${t ? t.compte.elements : '—'} éléments restylés (le plus gros ${t ? t.compte.plusGrandStyle : '—'}) | ${r.rendus == null ? '' : r.rendus + ' rendus de Comptabilite (' + r.montages + ' montages) · '}${r.lectures} lectures · ${r.noeuds} nœuds | mur : réponse ${r.reponse ?? '—'} · écran ${r.ecran ?? '—'} · utile ${r.utile ?? '—'} ms · tâches longues ${r.longues} ms${r.saves ? ' | écrit : ' + r.saves : ''}`);
+    if (t && t.gros) for (const g of t.gros) console.log(`      ${g.quoi === 'style' ? 'recalcul de ' + g.elements + ' éléments' : 'mise en page'} · ${g.ms} ms · à +${g.a_ms} ms · ${g.force ? 'FORCÉ par ' + g.pile.map((f) => (f.f || '?') + '@' + f.ou).join(' ← ') : 'à l’image'}${g.causes && g.causes.length ? ' | sale par : ' + g.causes.map(([k, c]) => c + '× ' + k).join(' ; ') : ''}${g.force && g.pile[0] ? '\n        code : ' + g.pile.slice(0, 2).map((f) => f.code).join('\n        code : ') : ''}`);
+    if (t && t.selecteurs) console.log(`      sélecteurs : ${t.selecteurs.total_ms} ms chronométrés sur ${t.selecteurs.selecteurs} sélecteurs (${t.selecteurs.essais} essais, ${t.selecteurs.touches} touches) · dont :has ${t.selecteurs.has_ms} ms sur ${t.selecteurs.has_n}`);
     return r;
   };
   const res = []; const vus = new Set(['journee']);

@@ -1,6 +1,8 @@
 import {preparerMessageFavori} from './favorisVinted.js';
 import {VARIANTES_MAX,variantesARanger} from './variantesMessage.js';
-const BASE={message:'',variantes:[],pourcentage:null,offreMode:null,offreValeur:null,arrondi:false,intervalleMinutes:6,intervalleMaxMinutes:null};
+// (19 nov., ext. 5.409) `rythme` : 'normal' (40–90 s au hasard, le défaut — sa décision), 'prudent' (2–4 min), 'perso' (ses minutes).
+export const RYTHMES_REGLAGE=Object.freeze(['normal','prudent','perso']);
+const BASE={message:'',variantes:[],pourcentage:null,offreMode:null,offreValeur:null,arrondi:false,intervalleMinutes:6,intervalleMaxMinutes:null,rythme:'normal'};
 function identite({uid,owner,ownerActuel}) {
   if(!owner||ownerActuel()!==owner||!/^\d{1,20}$/.test(String(uid||'')))throw Error('Le compte et la session doivent être confirmés.');
   return `vrm_favoris_reglages_${uid}`;
@@ -30,7 +32,8 @@ export function offreFavori({pourcentage=null,offreMode=null,offreValeur=null,ar
   if(mode==='prix'&&!(v>=1&&v<=99999))throw Error('Le prix de l’offre doit être d’au moins 1\u00a0€.');
   return {pourcentage:null,offreMode:mode,offreValeur:v,arrondi:arrondi===true};
 }
-export function validerReglagesFavoris({message='',variantes=[],pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null}) {
+export function validerReglagesFavoris({message='',variantes=[],pourcentage=null,offreMode=null,offreValeur=null,arrondi=false,intervalleMinutes,intervalleMaxMinutes=null,rythme='normal'}) {
+  if(!RYTHMES_REGLAGE.includes(rythme))throw Error('Choisis un rythme : au hasard (40 à 90 s), plus prudent (2 à 4 min), ou tes minutes.');
   if(typeof message!=='string')throw Error('Le message doit être du texte.');
   // (12 nov., ext. 5.369) Ses AUTRES versions du message (2 à 5) : VRM en tire une au
   // hasard à chaque envoi, jamais celle du message précédent. Vides retirées.
@@ -57,7 +60,7 @@ export function validerReglagesFavoris({message='',variantes=[],pourcentage=null
   if(m.erreur)throw Error(m.erreur);
   if(!m.message)throw Error('Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.');
   if(autres.length&&!message.trim())throw Error('Écris d’abord la 1re version du message.');
-  return {version:1,message:texte.trim(),...(autres.length?{variantes:autres.map(v=>v.trim())}:{}),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,envoisActifs:false};
+  return {version:1,message:texte.trim(),...(autres.length?{variantes:autres.map(v=>v.trim())}:{}),...o,intervalleMinutes:Number(intervalle),intervalleMaxMinutes:max,rythme,envoisActifs:false};
 }
 export async function lireReglagesFavoris(opts) {
   const id=identite(opts),{owner,ownerActuel,base,headers,fetcher=fetch}=opts;
@@ -68,7 +71,7 @@ export async function lireReglagesFavoris(opts) {
   if(!Array.isArray(rows)||rows.length>1||rows.some(x=>x?.owner!==owner||x.id!==id))throw Error('Les réglages ne confirment pas le compte attendu.');
   if(!rows.length)return {...BASE,enregistres:false};
   const d=rows[0].data;
-  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!(d.offreMode==null||['pct','euros','prix'].includes(d.offreMode))||!(d.offreValeur==null||typeof d.offreValeur==='number')||!(d.arrondi==null||typeof d.arrondi==='boolean')||!Number.isInteger(d.intervalleMinutes)||!(d.intervalleMaxMinutes==null||Number.isInteger(d.intervalleMaxMinutes))||!(d.variantes==null||Array.isArray(d.variantes)&&d.variantes.every(v=>typeof v==='string')))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
+  if(d?.version!==1||d.envoisActifs!==false||typeof d.message!=='string'||!(d.pourcentage===null||Number.isInteger(d.pourcentage))||!(d.offreMode==null||['pct','euros','prix'].includes(d.offreMode))||!(d.offreValeur==null||typeof d.offreValeur==='number')||!(d.arrondi==null||typeof d.arrondi==='boolean')||!Number.isInteger(d.intervalleMinutes)||!(d.intervalleMaxMinutes==null||Number.isInteger(d.intervalleMaxMinutes))||!(d.rythme==null||RYTHMES_REGLAGE.includes(d.rythme))||!(d.variantes==null||Array.isArray(d.variantes)&&d.variantes.every(v=>typeof v==='string')))throw Error('Le format des réglages enregistrés doit être vérifié avant de les remplacer.');
   return {...validerReglagesFavoris(d),enregistres:true};
 }
 export async function sauverReglagesFavoris(opts,reglages) {

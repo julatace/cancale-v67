@@ -98,7 +98,7 @@ const juge = (m, r) => {
   await calme(60000);
   const charge = os.loadavg()[0].toFixed(1);
   console.log(`démarrage ${Date.now() - t0} ms · charge de la machine ${charge} sur ${os.cpus().length} cœurs`);
-  const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar .vrm-tab[data-nav-entree]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-nav-entree')));
+  const onglets = await pg.evaluate(() => [...document.querySelectorAll(':is(.vrm-tabbar .vrm-tab, [data-n-onglets] .n-onglet)[data-nav-entree]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-nav-entree')));
   console.log('onglets : ' + onglets.join(', '));
   // Les lignes lues EN DOUBLE (chasse aux bugs, 17 nov.) : chacune au plus une fois par changement d'onglet.
   const SUIVIES = { avis_bas: /id=eq\.vrm_avis_bas&/, reserves: /id=eq\.panel_num_reserves&/ };
@@ -113,7 +113,7 @@ const juge = (m, r) => {
       const z = () => { if (window.__utile != null) return; const d = document.getElementById('vrm-demarrage'); const m = document.querySelector('.vrm-app-shell > .vrm-main'); const e = m && m.getAttribute('data-ecran'); const a = e && e !== depuis && [...document.querySelectorAll(`[data-attente-ecran="${e}"]`)].find((x) => x.getClientRects().length && !x.closest('.vrm-attente-cache'));
         if (!d && a && /pret|plafond/.test(a.getAttribute('data-attente') || '')) { window.__utile = performance.now() - window.__g0; return; } requestAnimationFrame(z); };
       requestAnimationFrame(z); }, depuis);
-    await pg.locator(`.vrm-tabbar .vrm-tab[data-nav-entree="${id}"]`).first().tap();
+    await pg.locator(`:is(.vrm-tabbar .vrm-tab, [data-n-onglets] .n-onglet)[data-nav-entree="${id}"]`).first().tap();
     const fin = Date.now() + fenetre; while (Date.now() < fin && !(await pg.evaluate(() => window.__utile != null))) await attendre(100);
     await attendre(700);
     return pg.evaluate(() => { const g0 = window.__g0; const ev = window.__ev.filter((e) => e.s >= g0 - 5); const par = new Map(); for (const e of ev) par.set(e.id, Math.max(par.get(e.id) || 0, e.d));
@@ -127,7 +127,7 @@ const juge = (m, r) => {
   // Chaque paire, dans les deux sens : aller sur A (sans mesure), puis toucher B (mesuré).
   for (const a of onglets) for (const bb of onglets) {
     if (a === bb) continue;
-    await pg.locator(`.vrm-tabbar .vrm-tab[data-nav-entree="${a}"]`).first().tap();
+    await pg.locator(`:is(.vrm-tabbar .vrm-tab, [data-n-onglets] .n-onglet)[data-nav-entree="${a}"]`).first().tap();
     { const f = Date.now() + 20000; while (Date.now() < f && !(await ecranIci()).pret) await attendre(150); } await calme(8000);
     const r = await toucher(bb, 15000); res.paires.push({ de: a, vers: bb, ...r });
     const txt = `réponse ${r.reponse ?? '—'} ms · utile ${r.utile ?? '—'} ms · longues ${r.longues} ms`;

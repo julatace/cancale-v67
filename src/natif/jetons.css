@@ -1,0 +1,125 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   « VRM natif » — LES JETONS (19 nov. 2026, contrat : docs/design/NATIF.md §1)
+   Le SEUL endroit où une couleur, une taille de texte, un rayon ou une durée
+   du design natif est écrit. Tout le reste lit `var(--n-*)`.
+   • UNE couche : `@layer vrm-natif`. Aucun `!important`. Aucun `:has()`.
+   • Clair par défaut ; sombre = le CHOIX de l'app (`vinted_dark` ⇒
+     `data-theme="dark"` posé sur la racine par index.html / App.jsx).
+   • Les jetons « dérivés » (bas du bloc) ne sont pas dans le tableau du
+     contrat : ils existent parce qu'une paire du tableau ne tient pas 4,5:1
+     (l'accent sur la teinte) ou qu'un état n'y est pas nommé (indisponible,
+     enfoncé, voile). Ils sont mesurés par le banc `natif-galerie`.
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  :root {
+    /* ── couleurs du contrat ── */
+    --n-fond: #F2F2F7;
+    --n-carte: #FFFFFF;
+    --n-carte-2: #F2F2F7;
+    --n-trait: rgb(60 60 67 / .18);
+    --n-encre: #111114;
+    --n-encre-2: #6C6C70;
+    --n-encre-3: #8E8E93;
+    --n-accent: #0068D6;
+    --n-plein: #0068D6;
+    --n-sur-plein: #FFFFFF;
+    --n-teinte: rgb(0 104 214 / .12);
+    --n-ambre: #8A4B00;
+    --n-ambre-fond: #FFF4DD;
+    --n-doublon: #D70015;
+
+    /* ── dérivés (mesurés) ── */
+    --n-sur-teinte: #0057B8;          /* texte SUR --n-teinte (l'accent n'y fait que 4,0:1) */
+    --n-sur-ambre: #FFFFFF;           /* texte sur --n-ambre plein (pastille d'onglet) */
+    --n-sur-doublon: #FFFFFF;         /* texte sur --n-doublon plein */
+    --n-inactif: #DEDEE3;             /* fond d'un bouton indisponible */
+    --n-sur-inactif: #5E5E63;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
+    --n-inverse: #1C1C1E;             /* fond du toast */
+    --n-sur-inverse: #FFFFFF;
+    --n-appui: rgb(17 17 20 / .08);   /* voile posé sur une rangée enfoncée (8 %) */
+    --n-barre: rgb(249 249 251 / .86);/* barre de titre / d'onglets, sous le flou */
+    --n-voile: rgb(0 0 0 / .40);      /* derrière une feuille */
+    --n-ombre: 0 8px 30px rgb(0 0 0 / .12);   /* la feuille et le volet, rien d'autre */
+    --n-flou: saturate(180%) blur(20px);      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-squelette: rgb(60 60 67 / .10);
+    --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
+    --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
+
+    /* ── typographie (contrat : 7 tailles, 3 graisses) ── */
+    --n-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
+    --n-t-affiche: 700 48px/52px var(--n-police);
+    --n-t-grand: 700 34px/41px var(--n-police);
+    --n-t-section: 700 22px/28px var(--n-police);
+    --n-t-barre: 600 17px/22px var(--n-police);
+    --n-t-corps: 400 17px/22px var(--n-police);
+    --n-t-corps-fort: 600 17px/22px var(--n-police);
+    --n-t-second: 400 15px/20px var(--n-police);
+    --n-t-second-fort: 600 15px/20px var(--n-police);
+    --n-t-legende: 400 13px/18px var(--n-police);
+    --n-t-legende-fort: 600 13px/18px var(--n-police);
+    --n-t-onglet: 600 10px/12px var(--n-police);   /* le libellé de la barre d'onglets, nulle part ailleurs */
+
+    /* ── mesures (grille de 4) ── */
+    --n-marge: 16px;
+    --n-r-carte: 12px;
+    --n-r-bouton: 12px;
+    --n-r-plein: 14px;
+    --n-r-plaque: 8px;
+    --n-r-vignette: 10px;
+    --n-r-rond: 999px;
+    --n-cible: 44px;
+    --n-h-plein: 50px;
+    --n-h-barre: 44px;
+    --n-h-onglets: 49px;
+    --n-l-laterale: 240px;
+    --n-l-liste: clamp(380px, 36vw, 520px);   /* la colonne de liste, à l'ordinateur en trois volets */
+    --n-haut-sur: env(safe-area-inset-top, 0px);
+    --n-bas-sur: env(safe-area-inset-bottom, 0px);
+
+    /* ── mouvement ── */
+    --n-courbe: cubic-bezier(.32, .72, 0, 1);
+    --n-duree: 250ms;
+    --n-duree-lente: 300ms;
+    --n-duree-appui: 80ms;
+  }
+
+  @media (min-width: 430px) {
+    :root { --n-marge: 20px; }
+  }
+
+  :root[data-theme="dark"] {
+    --n-fond: #000000;
+    --n-carte: #1C1C1E;
+    --n-carte-2: #2C2C2E;
+    --n-trait: rgb(84 84 88 / .60);
+    --n-encre: #FFFFFF;
+    --n-encre-2: #98989F;
+    --n-encre-3: #636366;
+    --n-accent: #409CFF;
+    --n-plein: #0068D6;
+    --n-sur-plein: #FFFFFF;
+    --n-teinte: rgb(64 156 255 / .20);
+    --n-ambre: #FFB340;
+    --n-ambre-fond: rgb(255 179 64 / .16);
+    --n-doublon: #FF453A;
+
+    --n-sur-teinte: #7DBBFF;
+    --n-sur-ambre: #1C1300;
+    --n-sur-doublon: #1A0000;
+    --n-inactif: #3A3A3C;
+    --n-sur-inactif: #AEAEB2;
+    --n-inverse: #F2F2F7;
+    --n-sur-inverse: #111114;
+    --n-appui: rgb(255 255 255 / .10);
+    --n-barre: rgb(22 22 24 / .86);
+    --n-voile: rgb(0 0 0 / .56);
+    --n-ombre: 0 8px 30px rgb(0 0 0 / .40);
+    --n-squelette: rgb(120 120 128 / .24);
+    --n-curseur: #5A5A5E;
+    --n-pouce: #FFFFFF;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root { --n-duree: 1ms; --n-duree-lente: 1ms; }
+  }
+}

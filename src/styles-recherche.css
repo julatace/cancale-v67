@@ -97,5 +97,5 @@ html body [data-cible-eclaire][data-cible-eclaire]:not(#_):not(#_) {
      élément collé : la bande se couvre du fond (une ombre pleine, sans rien
      intercepter), le contenu ne passe plus au-dessus de la barre. */
   .vrm-main > .vrm-barre-haut { box-shadow: 0 -32px 0 0 var(--vrm-bg, #FFFFFF); }
-  .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 72px; }
+  .vrm-main[data-vrm-d2] { scroll-padding-top: 72px; }
 }

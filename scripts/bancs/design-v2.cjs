@@ -123,8 +123,8 @@ async function telephone(nav, sombre, b, sigs) {
       qr: document.querySelectorAll('.vrm-colis-retirer [data-rp-a-qr="1"]').length,
       attr: document.documentElement.getAttribute('data-design'),
       // (17 nov.) Plus de disque « + », réglage éteint aussi ; ses gestes, chacun à sa place.
-      disque: !!document.querySelector('[data-sb-disque], .sb-disque'), onglets: document.querySelectorAll('.vrm-tabbar > .vrm-tab').length,
-      loupe: !!document.querySelector('button[data-recherche-loupe]'), publier: !!document.querySelector('[data-geste-disque="publier"] button'),
+      disque: !!document.querySelector('[data-sb-disque], .sb-disque'), onglets: document.querySelectorAll('[data-n-onglets] > .n-onglet').length,
+      loupe: !!document.querySelector('[data-recherche-loupe]'), publier: !!document.querySelector('[data-geste-disque="publier"] button'),
       imprimer: !!document.querySelector('[data-sj-imprimer], [data-imprimer-prets]'), ajouterAchat: !!document.querySelector('[data-achat-hors-ajouter], [data-achats-hors-entete]') }), SIGNATURE.toString());
     x.sig = sig; avant[id] = x;
     if (!sombre) sigs[id] = x.sig;
@@ -132,7 +132,7 @@ async function telephone(nav, sombre, b, sigs) {
     dit(!x.disque && x.onglets === 5, `D éteint · ${id} : aucun disque « + », cinq onglets (${th})`, x);
     if (id === 'journee') {
       dit(x.loupe && x.imprimer, `D éteint · Ma journée : Chercher (la loupe) et Imprimer N à un toucher (${th})`, x);
-      await pg.locator('button[data-recherche-loupe]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(700);
+      await pg.locator('[data-recherche-loupe]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(700);
       dit(await pg.evaluate(() => !!document.querySelector('[data-recherche-scanner]')), `D éteint : Scanner = l’icône dans le champ de recherche (${th})`);
     }
     if (id === 'annonces') dit(x.publier, `D éteint · Annonces : Publier sur la ligne du titre (${th})`, x);
@@ -157,18 +157,15 @@ async function telephone(nav, sombre, b, sigs) {
     const ap = pg.locator('[data-sous-ouvrir="apparence"]').first();
     await ap.waitFor({ timeout: 30000 }).catch(() => {});
     if (await ap.count()) { await ap.click().catch(() => {}); await pg.waitForTimeout(900); }
-    const bt = pg.locator('[data-design-v2-bouton]').first();
-    const vu = await bt.count();
-    if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
-    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Ancien design » décoché : le nouveau design (${th})`, { vu, ...etat });
-    // « Ancien design » coché : retour à l'apparence d'avant, tout de suite, et après un rechargement.
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const ancien = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
+    // (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : « Ancien design » et « Style » ne sont plus des réglages.
+    // R juge leur ABSENCE, et qu'un « 0 » rangé hier sur l'appareil ne ramène plus l'apparence d'avant.
+    const vu = await pg.locator('[data-design-v2-bouton], [data-style]').count();
+    dit(vu === 0, `R Paramètres → Apparence : plus de réglage « Ancien design » ni « Style » (${th})`, { vu });
+    await pg.evaluate(() => { localStorage.setItem('vrm_design_v2', '0'); localStorage.removeItem('vrm_banc_dom_ancien'); sessionStorage.setItem('banc_defaut_v2', '1'); });
+    const lu = await pg.evaluate(() => { const v = localStorage.getItem('vrm_design_v2'); localStorage.removeItem('vrm_design_v2'); return v; });
     await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
     const apres = await pg.evaluate(() => document.documentElement.getAttribute('data-design'));
-    dit(ancien.ls === '0' && ancien.attr === null && apres === null, `R « Ancien design » coché : l’apparence d’avant, gardée après rechargement (${th})`, { ...ancien, apres });
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(400); }
+    dit(lu === '0' && apres === 'v2', `R un « Ancien design » rangé hier ne compte plus : le design unique (${th})`, { lu, apres });
   }
   await ctx.close();
   // LE DÉFAUT : sans aucun choix posé, le nouveau design est ALLUMÉ (Julien, 17 nov. soir : « publie le design »).
@@ -184,30 +181,37 @@ async function telephone(nav, sombre, b, sigs) {
 
   // Aujourd'hui.
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await allumer(pg);
-  const j = await pg.evaluate(() => { const bar = document.querySelector('.vrm-tabbar'); const br = bar && bar.getBoundingClientRect();
+  const j = await pg.evaluate(() => { const bar = document.querySelector('[data-n-onglets]'); const br = bar && bar.getBoundingClientRect();
     const po = document.querySelector('[data-v2-pouce]'); const pr = po && po.getBoundingClientRect(); const pl = document.querySelector('[data-v2-principal]');
     return { ecran: !!document.querySelector('[data-v2-ecran="aujourdhui"]'), ancien: !!document.querySelector('.sj-journee'),
-      onglets: [...document.querySelectorAll('.vrm-tabbar > .vrm-tab')].map((t) => t.getAttribute('data-nav-entree')), libs: [...document.querySelectorAll('.vrm-tabbar .vrm-nav-label')].map((l) => l.textContent.trim()),
-      badges: document.querySelectorAll('.vrm-tabbar [data-badge-nav]').length, disque: !!document.querySelector('[data-sb-disque]'),
+      onglets: [...document.querySelectorAll('[data-n-onglets] > .n-onglet')].map((t) => t.getAttribute('data-nav-entree')), libs: [...document.querySelectorAll('[data-n-onglets] .n-onglet-libelle')].map((l) => l.textContent.trim()),
+      badges: document.querySelectorAll('[data-n-onglets] .n-onglet-pastille').length, disque: !!document.querySelector('[data-sb-disque]'),
       affiche: (document.querySelector('[data-v2-affiche]') || { getAttribute: () => null }).getAttribute('data-v2-affiche'),
       bande: document.querySelectorAll('[data-v2-colis]').length, ret: (document.querySelector('[data-v2-groupe="retirer"] [data-v2-n]') || { getAttribute: () => null }).getAttribute('data-v2-n'),
       plein: pl ? pl.getAttribute('data-v2-principal') : null, pleinTexte: pl ? pl.textContent.trim() : '', pouce: pr && br ? { bas: Math.round(pr.bottom), barre: Math.round(br.top) } : null,
       afaire: document.querySelectorAll('[data-v2-job]').length, gestes: document.querySelectorAll('[data-v2-job] [data-v2b]').length }; });
   dit(j.ecran && !j.ancien, 'J Aujourd’hui remplace Ma journée', j);
-  dit(j.onglets.join() === 'journee,paires,achats,ventes,compta' && !j.disque, `B barre : ${j.libs.join(' · ')} — aucun disque « + »`, j);
+  // ⚠️ (19 nov., décision de Julien — « VRM natif », docs/design/NATIF.md §2) La barre est la barre NATIVE (`[data-n-onglets]`) :
+  // Aujourd'hui · Annonces · Ventes · Achats · Argent (le Stock est dans « Plus »). La coque entière : banc natif-coque.cjs.
+  dit(j.onglets.join() === 'journee,annonces,ventes,achats,compta' && !j.disque, `B barre : ${j.libs.join(' · ')} — aucun disque « + »`, j);
   dit(j.libs[0] === 'Aujourd’hui' && j.libs.includes('Achats'), 'B Aujourd’hui et Achats sont dans la barre, avec leur libellé', j.libs);
   dit(j.affiche != null && j.affiche === avant.journee.env, `J le chiffre en affiche (${j.affiche}) = la case « À envoyer » d’avant (${avant.journee.env})`, { v2: j.affiche, avant: avant.journee.env });
   dit(j.bande === Math.min(12, Number(j.affiche) || 0), `J la bande porte ${j.bande} paires (= le chiffre, au plus 12)`, j.bande);
   dit(String(j.ret || '0') === String(avant.journee.ret || '0'), `J « À retirer » (${j.ret}) = la case d’avant (${avant.journee.ret})`, { v2: j.ret, avant: avant.journee.ret });
   dit(j.plein && /\d/.test(j.pleinTexte) && j.pleinTexte.includes(j.plein), `J le plein dit son nombre : « ${j.pleinTexte} »`, j);
-  dit(j.pouce && j.pouce.bas <= j.pouce.barre - 4, 'J le plein est au pouce, AU-DESSUS de la barre du bas', j.pouce);
-  dit(j.afaire > 0 && j.gestes <= j.afaire, `J « À faire » : ${j.afaire} groupes, UN geste au plus chacun`, j);
+  // (19 nov., Julien : « entre Vintex et celui-là ») le plein « Imprimer N bordereaux » est dans l'en-tête de la carte « À envoyer ».
+  dit(j.plein != null, 'J le plein est dans l’en-tête d’« À envoyer »', j);
+  // (19 nov., décision de Julien : « ça doit être rangé dans les onglets dédiés justement à ça ») « À faire » QUITTE
+  // Aujourd'hui : chaque groupe est en tête de SON onglet (« À régler », banc aujourdhui-propre). Ici : plus aucun.
+  dit(j.afaire === 0, `J plus de liste « À faire » sur Aujourd’hui (${j.afaire}) — décision du 19 nov.`, j);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390-${th}.png`) });
   // Le bas du contenu, défilé tout en bas, reste au-dessus du plein (la marge est posée).
   const bas = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); m.scrollTo(0, m.scrollHeight); await new Promise((r) => setTimeout(r, 400));
-    const e = document.querySelector('.v2-ecran'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.children].filter((x) => !x.matches('[data-v2-pouce]') && x.getClientRects().length); const der = enf[enf.length - 1];
-    const po = pp.getBoundingClientRect(); return { der: Math.round(der.getBoundingClientRect().bottom), pouce: Math.round(po.top) }; });
-  dit(!!bas && bas.der <= bas.pouce, 'J défilé en bas, le dernier groupe passe au-dessus du plein (rien de caché)', bas);
+    // (19 nov.) L'écran est natif (src/natif/ecrans/Aujourdhui.jsx) : ses groupes portent `data-v2-bloc` (les colonnes
+    // s'effacent au téléphone, `display: contents` : on mesure les groupes eux-mêmes).
+    const e = document.querySelector('[data-v2-ecran="aujourdhui"]'); const pp = document.querySelector('[data-v2-pouce]'); if (!e) return null; const enf = [...e.querySelectorAll('[data-v2-bloc]')].filter((x) => x.getClientRects().length); if (!enf.length) return null;
+    return { der: Math.round(Math.max(...enf.map((x) => x.getBoundingClientRect().bottom))), pouce: pp ? Math.round(pp.getBoundingClientRect().top) : null }; });
+  dit(!!bas && (bas.pouce == null || bas.der <= bas.pouce), 'J défilé en bas, le dernier groupe passe au-dessus d’un plein collé (rien de caché)', bas);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-bas-390-${th}.png`) });
   await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0));
   await mesurerEcran(pg, 'Aujourd’hui', true);
@@ -316,7 +320,7 @@ async function ordinateur(nav, sombre, b) {
   console.log(`\n── 1512 · ${th}`);
   const { ctx, pg, erreurs } = await ouvrir(nav, { W: 1512, sombre, b, url: '/?tab=journee' }); await allumer(pg);
   const r = await pg.evaluate(() => { const pl = document.querySelector('[data-v2-principal]'); const t = document.querySelector('.v2-titre'); const q = pl && pl.getBoundingClientRect(), tq = t && t.getBoundingClientRect();
-    return { rail: !!document.querySelector('.vrm-sidebar'), plein: q ? { haut: Math.round(q.top), droite: Math.round(innerWidth - q.right), titre: tq ? Math.round(tq.top) : null } : null, disque: !!document.querySelector('[data-sb-disque]') }; });
+    return { rail: !!document.querySelector('[data-n-laterale]'), plein: q ? { haut: Math.round(q.top), droite: Math.round(innerWidth - q.right), titre: tq ? Math.round(tq.top) : null } : null, disque: !!document.querySelector('[data-sb-disque]') }; });
   dit(r.rail && !r.disque, 'N 1512 : la colonne de gauche, pas de disque', r);
   dit(r.plein && r.plein.haut < 200, 'N 1512 : le plein est EN HAUT (sur la ligne du titre), à droite', r.plein);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-1512-${th}.png`) });

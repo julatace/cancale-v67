@@ -9,7 +9,7 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 1982,
+    "js": 2005,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -691,6 +691,13 @@
     "journee"
    ],
    "raison": "train du 18 nov. : republication parfaite (ext. 5.408, #1257 : l'étape de chaque paire dans l'app) — 1 968,98 Ko mesuré ici, un peu plus de 1 969 en CI : budget 1 970"
+  },
+  {
+   "date": "2026-11-19",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "« VRM natif » (lot lisible-partout) : l'habillage « VRM » du 18 nov. (4 feuilles), le réglage « Style », le dégradé, le verre et l'encre claire de studio-verre.css retirés — 1 980 Ko mesuré sur main, 1 968 Ko ici (−12 Ko de JS+CSS compressés au démarrage) : budget 1 982 → 1 970"
   }
  ]
 }

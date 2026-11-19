@@ -45,6 +45,7 @@ import { ConnexionEbayGuidee, RetourConnexionEbay, EtatJetonEbay } from '../ebay
 // (10 nov., lot S) La facture Pro d'une commande eBay (src/FactureAutres.jsx), chargée à la demande.
 import { DEPS_FACTURE, MicDictee, DEMANDE_RETOUR_EBAY, lireComptesEbay, montantRecuEbay } from '../App.jsx';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
+import { lienApresPublication } from '../ebay/lienPublication.js';   // (19 nov.) le lien posé à la publication, par identité
 import { motsInsecables } from '../motsInsecables.jsx';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { BarreOutils, Filtres } from '../ui/index.js';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
@@ -358,6 +359,7 @@ async function lireBrouillonsEbay() {
     const it = rows[0] && rows[0].items;
     const out = (it && typeof it === 'object' && !Array.isArray(it)) ? it : {};
     // Un brouillon publié garde l'IDENTITÉ de sa paire (`pairId`) et son annonce.
+    // (19 nov.) Un brouillon relu plus tard : sa paire seulement (son N° a pu changer de fiche depuis — panne du 11–18 oct.).
     try { for (const b of Object.values(out)) { const iid = b && ((b.programme && b.programme.itemId) || b.itemId); if (b && b.pairId && iid) noterLienEbay(iid, b.pairId, b.numero, 'brouillon'); } } catch (_) {}
     return out;
   } catch (_) { return null; }
@@ -1305,7 +1307,9 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
       // Ce qu'eBay a fait de la règle (relue après l'ajout), et ce qu'il signale.
       const mo = offre ? messageOffreCreation(j.offre, offre) : null;
       const avert = Array.isArray(j.avertissements) ? j.avertissements.filter(Boolean).map(String) : [];
-      try { const pid = (b && b.pairId) || pairId; if (j.itemId && pid) noterLienEbay(j.itemId, pid, b && b.item && b.item.numero, 'publication'); } catch (_) {}
+      // (19 nov.) Le lien est posé par IDENTITÉ même quand l'écran a perdu la paire : LA fiche qui porte le N° envoyé en SKU
+      // (une seule), sinon rien — src/ebay/lienPublication.js (mesuré : 0 lien « publication » sur ses annonces).
+      try { const li = lienApresPublication({ itemId: j.itemId, pairId: (b && b.pairId) || pairId, numero: (b && b.item && b.item.numero) || (j.sku ? numDeSkuEbay(j.sku) : ''), fiches: fichesPourEbay(), cle: cleNum }); if (li) noterLienEbay(li.itemId, li.pairId, li.numero, 'publication'); } catch (_) {}
       // (11 nov.) L'annonce SPONSORISÉE (éteinte par défaut) : sur ce même clic
       // confirmé, la promotion « coût par vente » est posée chez eBay (Marketing
       // API, `promouvoir`) ; un refus ne défait pas l'annonce et se dit.
@@ -1487,7 +1491,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
               {nVinted === 0 && (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Pas de photo : rouvre l'annonce sur Vinted, ou ajoute-les ci-dessous."}</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? tr('lbcPhotos.enCours') : tr('photosFond.aucuneOuAjoute')}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
@@ -1497,7 +1501,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               ) : photosEtat && photosEtat.raison ? (
                 <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
               ) : pairSel.nPhotos != null && nVinted < pairSel.nPhotos ? (
-                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>Seulement {nVinted} photo{nVinted > 1 ? 's' : ''} captée{nVinted > 1 ? 's' : ''} sur {pairSel.nPhotos} : rouvre l'annonce sur Vinted.</div>
+                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>{tr('photosFond.partielles', { n: nVinted, total: pairSel.nPhotos })}</div>
               ) : (
                 <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ses photos Vinted sont reprises dans « Photos », juste en dessous.</div>
               )}

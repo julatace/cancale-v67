@@ -65,7 +65,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(!balayage.length, 'B3 aucun balayage au doigt qui change d\'onglet dans la coque', balayage.map((m) => m[0].slice(0, 80)).join(' | '));
   // B4
   dit(/overscrollBehaviorX:'none'/.test(app), 'B4 <main> : overscroll-behavior-x none (l\'écran ne bouge jamais de côté)');
-  dit(/<main className="vrm-main"[\s\S]{0,4000}?touchAction:'pan-y pinch-zoom'/.test(app), 'B4 <main> : touch-action pan-y pinch-zoom (un glisser de côté n\'est jamais une « page précédente » du navigateur)');
+  dit(/(<main|<Natif\.CoqueEcran) className="vrm-main"[\s\S]{0,4000}?touchAction:'pan-y pinch-zoom'/.test(app), 'B4 <main> : touch-action pan-y pinch-zoom (un glisser de côté n\'est jamais une « page précédente » du navigateur)');
 
   console.log(`\n${ok} ✅  ${ko} ❌`);
   process.exit(ko ? 1 : 0);

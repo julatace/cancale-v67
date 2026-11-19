@@ -424,10 +424,6 @@ button.sb-rangee { cursor: pointer; }
 html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: scale(.94); transform-origin: 50% 30%; transition: transform 360ms var(--sb-courbe); }
 body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 360ms var(--sb-courbe); }
 /* L'ondulation : un anneau de lumière part de la pastille touchée (560 ms) ; le contenu glisse de 12 px en fondu. */
-.sb-onde { position: fixed; z-index: 70; pointer-events: none; border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0) 78%, rgb(255 255 255 / .55) 92%, rgb(255 255 255 / 0) 100%);
-  transform: scale(.04); opacity: 1; animation: sb-onde var(--sb-e-onde) var(--sb-courbe) forwards; }
-:root[data-theme="dark"] .sb-onde { background: radial-gradient(closest-side, rgb(140 190 255 / 0) 0%, rgb(140 190 255 / 0) 78%, rgb(140 190 255 / .30) 92%, rgb(140 190 255 / 0) 100%); }
 @keyframes sb-onde { to { transform: scale(1); opacity: 0; } }
 .vrm-main[data-sb-entree] { animation: sb-entree 320ms var(--sb-courbe) both; }
 @keyframes sb-entree { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
@@ -542,93 +538,26 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   }
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: var(--sb-encre) !important; }
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche):active { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; opacity: 1 !important; }
-  :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; font-size: 19px !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; }
 
   /* La barre du bas : verre dépoli, à 12 des bords, posée sur la page (le contenu passe dessous). */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
-    position: relative !important; z-index: 60 !important; align-items: stretch !important;   /* `display` reste celui de la coque : `none` quand le clavier est ouvert */
-    height: 64px !important; min-height: 64px !important; padding: 0 6px !important; box-sizing: border-box !important;
-    margin: calc(-64px - max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) 12px max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important;   /* elle ne prend AUCUNE place : la page passe dessous */
-    border: 0 !important; border-radius: var(--sb-r-barre) !important;
-    background: var(--sb-verre) !important; background-image: none !important;
-    -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
-    box-shadow: var(--sb-verre-bord), 0 18px 34px -18px rgb(var(--sb-o) / .45) !important; overflow: visible !important;
-  }
-  :root[data-theme="dark"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { box-shadow: var(--sb-verre-bord), 0 18px 34px -14px rgb(0 0 0 / .9) !important; }
   /* Le fondu du bord bas (132 px) sous la barre : la liste s'efface au lieu de buter. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before {
-    content: "" !important; display: block !important; position: absolute !important; z-index: -1 !important; pointer-events: none !important;
-    left: -12px !important; right: -12px !important; bottom: calc(-1 * max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; height: 132px !important;
-    background: linear-gradient(to bottom, color-mix(in oklab, var(--sb-bas) 0%, transparent), var(--sb-bas) 78%) !important; border: 0 !important;
-  }
   /* La page garde la place de la barre (elle défile dessous, la dernière ligne reste atteignable). */
-  :root:root:root body .vrm-app-shell > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
+  /* (19 nov., intégration) Pas dans la coque native : son écran défile AU-DESSUS de la barre d'onglets, ces 120 px y retenaient
+     le plein collant de Ventes au milieu de la liste. */
+  :root:root:root body .vrm-app-shell:not(.n-coque) > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
   /* Les onglets : icône 21, libellé 10,5/600 ; l'actif à l'encre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab {
-    flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px !important;
-    padding: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 64px !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { width: 46px !important; height: 30px !important; display: grid !important; place-items: center !important; color: var(--sb-encre-2) !important; transition: color var(--sb-e-diode) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic svg { width: 21px !important; height: 21px !important; stroke-width: 1.5 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 600 10.5px/1 var(--sb-police-texte) !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: none !important; }
   /* La pastille ENFONCÉE de l'espace actif (46 × 30) et sa diode : elle glisse d'un onglet à l'autre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille-ancre { position: absolute !important; left: 0 !important; top: 0 !important; width: 0 !important; height: 0 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille {
-    display: block !important; position: absolute !important; left: 0 !important; z-index: 0 !important; pointer-events: none !important;
-    border-radius: 15px !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; border: 0 !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille::after {
-    content: "" !important; position: absolute !important; top: 4px !important; right: 6px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-    background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab > * { position: relative; z-index: 1; }
   /* L'éventail ouvert : la barre (et son disque devenu « × ») reste AU-DESSUS du voile. */
-  :root:root:root[data-sb-eventail] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { z-index: 9402 !important; }
   /* Le disque : la cinquième place, au centre (72 px), monté de 16 px. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque {
-    flex: 0 0 60px !important; width: 60px !important; height: 60px !important; min-height: 60px !important; margin: -16px 6px 0 !important; padding: 0 !important;
-    border: 0 !important; border-radius: 50% !important; background: var(--sb-touche-fond) !important; color: var(--sb-encre) !important;
-    box-shadow: var(--sb-touche-ombre), 0 10px 22px -10px rgb(var(--sb-o) / .55) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
   /* Les pastilles de nombre : l'encre (un geste en attente), cerclées du verre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--sb-encre) !important; color: var(--sb-porcelaine) !important; box-shadow: 0 0 0 2px var(--sb-haut) !important; top: -3px !important; left: calc(100% - 12px) !important; }
   /* (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre en bas ») CINQ onglets et le disque.
      « Aujourd'hui », le plus long, prend un peu plus de place ; le libellé suit la largeur (10,5 px à 390, 9 px au
      plus étroit) ; disque et bords resserrés : chaque cible reste ≥ 44 px jusqu'à 320 px (banc barre-achats). */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { padding: 0 4px !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[data-nav-entree="journee"] { flex-grow: 1.25 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: clamp(9px, 2.72vw, 10.5px) !important; letter-spacing: -.01em !important; white-space: nowrap !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { margin: -16px 2px 0 !important; }
-  @media (max-width: 360px) {
-    :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { margin-left: 8px !important; margin-right: 8px !important; }
-    :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { flex-basis: 56px !important; width: 56px !important; height: 56px !important; min-height: 56px !important; }
-  }
 }
 
 /* ── 7.9 L'ORDINATEUR : la navigation en verre à gauche, l'actif enfoncé avec sa diode ── */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
-  :root:root:root body .vrm-app-shell .vrm-sidebar.vrm-sidebar {
-    background: var(--sb-verre) !important; background-image: none !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
-    border: 0 !important; border-radius: var(--sb-r-barre) !important; box-shadow: var(--sb-verre-bord), 0 18px 34px -24px rgb(var(--sb-o) / .45) !important; color: var(--sb-encre) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button { border-radius: var(--sb-r-touche) !important; color: var(--sb-encre-2) !important; font-family: var(--sb-police-texte) !important; font-weight: 600 !important; background: transparent !important; box-shadow: none !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button svg { color: inherit !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button[aria-current="page"] { color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-nav-indicateur.vrm-nav-indicateur {
-    background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; border-radius: var(--sb-r-touche) !important; border: 0 !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-nav-indicateur.vrm-nav-indicateur::after {
-    content: "" !important; position: absolute !important; top: 7px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-    background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
-  }
   /* Sans indicateur mesuré (entrée hors de la vue), l'entrée garde son propre creux. */
-  :root:root:root body .vrm-app-shell .vrm-sidebar:not([data-indicateur]) .vrm-rail-button[aria-current="page"] { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-section-label) { color: var(--sb-encre-2) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-sidebar-mot { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.04em !important; color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-pied, .vrm-nav-compte) { background: transparent !important; box-shadow: none !important; }
   /* La barre de recherche collée en haut du contenu : la lumière du haut, en verre (plus un aplat posé dessus). */
   :root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut {
     background: color-mix(in oklab, var(--sb-haut) 74%, transparent) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
@@ -652,12 +581,10 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   .sb-btn-plein, .sb-touche, .sb-rond, .sb-lien, .sb-tuile, .sb-avant, .sb-segment > *, .sb-disque > svg { transition: opacity 150ms ease, background-color 150ms ease !important; transform: none !important; }
   .sb-btn-plein:active, .sb-touche:active, .sb-rond:active { transform: none !important; }
   .sb-lame { animation: sb-fondu 180ms ease-out both !important; animation-delay: 0ms !important; }
-  .sb-onde { display: none !important; animation: none !important; }
   .vrm-main[data-sb-entree] { animation: sb-fondu 180ms ease-out both !important; }
   html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }
   body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: none !important; }
   .sb-diode, [class*="sb-"]::after { animation: none !important; }
-  .vrm-tab-pastille { transition: none !important; }
 }
 
 /* (15 nov., rouges-connus) La barre du bas flotte AU-DESSUS du contenu (64 px à 20 px du bas, le disque monté de 16) :

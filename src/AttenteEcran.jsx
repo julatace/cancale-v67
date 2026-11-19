@@ -31,6 +31,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { Squelette } from './Squelette.jsx';
+import { rafraichirDrapeaux } from './drapeauxRacine.js';
 
 export const PLAFOND_ATTENTE_MS = 2500;
 // Avec un instantané à montrer, l'écran vrai attend ses données jusqu'à ce plafond.
@@ -70,6 +71,10 @@ export function useAttenteComplete() {
 // ne remonte pas le squelette — l'écran revient avec ce qu'il a en mémoire et se
 // complète en place (les lectures en cache se reposent dans les millisecondes qui suivent).
 const VUS = new Set();
+
+// (19 nov.) Avant que l'écran se MESURE (ses effets de mise en page passent après celui-ci, placé devant lui) : les
+// drapeaux de racine (src/drapeauxRacine.js) sont à jour — les règles « cet écran porte tel bloc » s'appliquent déjà.
+function DrapeauxAvantMesure() { React.useLayoutEffect(() => { rafraichirDrapeaux(); }); return null; }
 
 export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', instantane = null, plafondInstantaneMs = PLAFOND_INSTANTANE_MS, children }) {
   const recus = React.useRef({});
@@ -114,6 +119,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   const ctx = React.useMemo(() => ({ signaler, oublier, plafond, tout }), [signaler, oublier, plafond, tout]);
   const manquent = visible ? [] : attendus.filter((n) => !la(n));
   return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : (avecInstantane ? 'instantane' : 'attente')} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined} data-attente-instantane={vuInstantane.current ? '1' : undefined}>
+    <DrapeauxAvantMesure/>
     {/* L'instantané prend le cadre de l'écran prêt (`vrm-attente-pret` : mêmes marges), sans fondu. */}
     {!visible && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
     {/* Remplacé EN PLACE : après un instantané, l'écran vrai arrive sans fondu (rien ne « réapparaît »). */}

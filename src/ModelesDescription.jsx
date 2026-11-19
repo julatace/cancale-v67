@@ -4,6 +4,7 @@
 // insère le modèle (variables remplacées) au curseur.
 import React from 'react';
 import { lireModeles, remplirModele, insererDans, nouveauModele, VARIABLES } from './modelesDescription.js';
+import { tr } from './i18n/index.js';
 import './styles-annonces-outils.css';
 
 export function MesModeles({ modeles, onChange, confirmer }) {
@@ -63,9 +64,14 @@ export function InsererModele({ modeles, valeur, surChange, champ, vars }) {
     surChange(r.texte);
     setTimeout(() => { try { if (el) { el.focus(); el.setSelectionRange(r.curseur, r.curseur); } } catch (_) {} }, 0);
   };
+  // (19 nov., photo de son Mac : une puce « {taille} · {marque} · {N°} » affichée brute) Un modèle sans nom porte
+  // sa première ligne pour nom : la puce montre alors ce qui SERA inséré pour cet article (« 39,5 · Adidas · 234 »),
+  // et une variable sans valeur se lit en clair (« taille »), jamais entre accolades. Un libellé dit ce que sont ces puces.
+  const lisible = (m) => (/[{}]/.test(m.nom) ? remplirModele(m.nom, vars || {}).replace(/\{\s*([^{}]+?)\s*\}/g, '$1') : m.nom);
   return (
-    <div className="vrm-ao-chips" role="group" aria-label="Mes modèles" data-inserer-modele={liste.length}>
-      {liste.map((m) => <button key={m.id} type="button" className="vrm-ao-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => inserer(m)} data-inserer={m.id}>{m.nom}</button>)}
+    <div className="vrm-ao-chips" role="group" aria-label={tr('modeles.inserer')} data-inserer-modele={liste.length}>
+      <span className="vrm-ao-chips-libelle" data-inserer-libelle="">{tr('modeles.inserer')}</span>
+      {liste.map((m) => <button key={m.id} type="button" className="vrm-ao-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => inserer(m)} data-inserer={m.id} title={m.texte.slice(0, 200)}>{lisible(m)}</button>)}
     </div>
   );
 }

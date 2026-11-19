@@ -136,7 +136,7 @@
    de haut), une seconde barre au bord de la fenêtre, l'île partait avec. Toutes
    largeurs désormais : <main> est le seul à défiler, sur toutes les coques. */
 .vrm-app-shell .vrm-main { position: relative; }
-html:has(.vrm-app-shell), html:has(.vrm-app-shell) body { overflow: hidden; overscroll-behavior: none; }
+html[data-vrm-d29], html[data-vrm-d29] body { overflow: hidden; overscroll-behavior: none; }
 @media (max-width: 767px) {
   /* Total partiel (un compte pas lu) : « ≥ » devant le montant. Le montant
      n'est JAMAIS caché (28 oct. : une règle visait un mot « au moins » qui

@@ -234,7 +234,7 @@ html body .vrm-act .vrm-act-pb a { color: var(--vrm-accent-texte, #0066CC); }
    3,6:1 sur la carte sombre, banc fusion-app F6). Dans l'écran Annonces et ses
    feuilles, le texte bleu est le bleu « lien » (`--vrm-accent-texte`), lisible dans
    les deux thèmes — par la variable, comme Compta (styles-compta-claire). */
-.vrm-main:has(.vrm-annbar), .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+.vrm-main[data-vrm-d25], .vrm-main .vrm-sel, .vrm-act, .vrm-fiche-menu { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
 
 
 /* ── 7. « N NOUVEAUX N° POSÉS PAR VRM » : la liste dépliée sous la ligne d'avis ── */

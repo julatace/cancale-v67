@@ -91,7 +91,9 @@ export async function notifierModeration({ maintenant = Date.now() } = {}) {
   // Seulement SES comptes, et jamais un compte qu'il a retiré (« ne plus lui en parler »).
   const noirs = new Set(((retires[0] && Array.isArray(retires[0].u)) ? retires[0].u : []).map(String));
   const noms = new Map(comptes.filter((c) => c && c.vinted_user_id != null && !noirs.has(String(c.vinted_user_id))).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
-  const evts = (evenementsDesLignes(rows) || []).filter((e) => noms.has(e.compte));
+  // (19 nov., lot compte-bloque) « compte fermé » (banni) est annoncé par _lib/compte-bloque-notif.js
+  // (« Vinted a bloqué … », avec la question) : une seule notification par blocage, jamais deux.
+  const evts = (evenementsDesLignes(rows) || []).filter((e) => noms.has(e.compte) && e.s !== 'banni');
   const actif = await pushCategorieActive(CAT_MODERATION);
   let reserves = [];
   const r = await modifierMemoire((d) => {

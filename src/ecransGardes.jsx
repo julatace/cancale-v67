@@ -226,7 +226,10 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
   const [, forcer] = React.useState(0);
   const e = etat.current;
   if (e.cle !== cle) { e.liste = []; e.dernier = null; e.cle = cle; PRETS.clear(); }
-  const gardable = ECRANS_GARDABLES.includes(ecran);
+  // (19 nov.) Un banc de mesure peut essayer une autre liste sur le MÊME build (`window.__VRM_ECRANS_GARDABLES`, onglets-trace GARDES=…).
+  const gardables = (typeof window !== 'undefined' && Array.isArray(window.__VRM_ECRANS_GARDABLES)) ? window.__VRM_ECRANS_GARDABLES : ECRANS_GARDABLES;
+  const maxGardes = (typeof window !== 'undefined' && window.__VRM_MAX_GARDES > 0) ? window.__VRM_MAX_GARDES : MAX_GARDES;
+  const gardable = gardables.includes(ecran);
   // Décidé UNE fois par changement d'écran (rendu rejoué ⇒ même décision).
   if (e.dernier !== ecran) {
     const parti = e.liste.find((x) => x.tab === e.dernier);
@@ -238,7 +241,7 @@ export function EcransGardes({ ecran, cle = '', pret = true, children }) {
       if (!ici) e.liste.push({ tab: ecran, cle: ecran + '#' + (++e.n), quitte: 0, gen: generation });
       PRETS.delete(ecran);
       // Au-delà de MAX_GARDES, le plus anciennement quitté part (l'ordre de la liste ne bouge pas).
-      while (e.liste.length > MAX_GARDES) {
+      while (e.liste.length > maxGardes) {
         const v = e.liste.filter((x) => x.tab !== ecran).sort((a, b) => a.quitte - b.quitte)[0];
         e.liste = e.liste.filter((x) => x !== v); PRETS.delete(v.tab);
       }

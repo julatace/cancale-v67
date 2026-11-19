@@ -140,6 +140,8 @@
     <h1>Connexion à VRM</h1>
   </div>
   <div id="auth"></div>
+  <!-- 5.409 (19 nov., « des infos à l'intérieur qui ne servent à rien ») : le diagnostic technique des favoris passe derrière « Détails », replié. -->
+  <details id="details-diag" style="margin-top:16px"><summary style="min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600">Détails</summary>
   <section id="parcours-favoris" hidden style="border-top:1px solid var(--bord);margin-top:16px;padding-top:12px">
     <h2 style="font-size:14px;margin:0 0 8px">Diagnostic des favoris</h2>
     <p>Enregistre ton parcours : cloche → notification → conversation. Aucun clic automatique, aucune saisie ni contenu de message enregistré.</p>
@@ -152,6 +154,7 @@
     <button id="parcours-copier" type="button" disabled>Copier le rapport</button>
     <button id="parcours-effacer" type="button" disabled>Effacer le rapport</button>
   </section>
+  </details>
   <script src="vrm-ui.js"></script>
   <script src="popup.js"></script>
   <script src="parcours-popup.js"></script>

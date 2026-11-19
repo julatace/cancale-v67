@@ -58,6 +58,8 @@ export const REGISTRE_JOURS = 60;
 export const CLE_PHOTOS_VRM = 'vrm_photos_vrm';               // { [empreinte]: { n, src, uid, at } }
 export const CLE_EMPREINTES_FICHES = 'vrm_empreintes_fiches'; // { [idAnnonce]: { n, h: [empreinte], uid, at } }
 export const CLE_REPUB_REPONSES = 'vrm_republie_reponses';    // { [nouvelId]: { choix: 'non', anciens: [id], at } }
+// Une disparue vue en ligne au moins ce temps APRÈS la création de la nouvelle annonce : elles ont coexisté.
+export const MARGE_COEXISTENCE_MS = 10 * 60e3;
 export const CLE_REPUB_ATTENTE = 'vrm_republie_attente';      // { [nouvelId]: iso — la première fois vue sans N° }
 const EMPREINTES_PAR_FICHE = 4;
 
@@ -145,7 +147,7 @@ export function disparuesDuCompte({ uid, fiches, presentes, vus, lu, vendue = ()
     if (P.has(String(id)) || (remplacees && remplacees.has(String(id))) || vendue(String(id), f) || sortie(String(id), f)) continue;
     const t = Date.parse((vus && vus[id]) || '');
     if (!Number.isFinite(t) || Number(lu) < t + MARGE_DISPARUE_MS || Number(lu) - t > DISPARUE_RECENTE_MS) continue;
-    out.push({ id: String(id), numero: str(f.numero), title: str(f.title), photo: f.photo || null, uid: u });
+    out.push({ id: String(id), numero: str(f.numero), title: str(f.title), photo: f.photo || null, uid: u, vuLe: t });
   }
   return out;
 }
@@ -183,8 +185,13 @@ export function decisionRepublie(x = {}) {
     return { action: 'proposer', candidats: cands, raison: 'deux-numeros' };
   }
   // 3. Aucune disparue sur ce compte : rien ne change.
-  const D = Array.isArray(x.disparues) ? x.disparues : [];
-  if (!D.length) return { action: 'neuf', raison: 'aucune-disparue' };
+  // (19 nov., mesuré en lecture seule : 9 annonces d'un compte sans N°, toutes « en attente » depuis la même minute, dont 4
+  // en ligne depuis 6 à 10 jours.) Une annonce republiée dans l'app Vinted est CRÉÉE après la suppression de l'ancienne : une
+  // disparue encore VUE en ligne (`vuLe`) après la mise en ligne de la nouvelle (`creee`, la date de l'annonce) ne peut pas être
+  // son origine — les deux étaient en ligne ensemble. Elle ne la fait ni attendre ni proposer. Date inconnue ⇒ rien n'est écarté.
+  const creee = Number(x.creee);
+  const D = (Array.isArray(x.disparues) ? x.disparues : []).filter((d) => !(d && Number.isFinite(creee) && creee > 0 && Number.isFinite(d.vuLe) && d.vuLe >= creee + MARGE_COEXISTENCE_MS));
+  if (!D.length) return { action: 'neuf', raison: Array.isArray(x.disparues) && x.disparues.length ? 'creee-avant' : 'aucune-disparue' };
   const depuis = Date.parse(str(x.depuis)); const t0 = Number.isFinite(depuis) ? depuis : now;
   const jusqua = t0 + ATTENTE_REPUB_MS;
   const attendre = () => (now < jusqua ? { action: 'attendre', jusqua, raison: 'empreintes' } : { action: 'neuf', raison: 'attente-finie' });

@@ -295,3 +295,38 @@ lien écrit ») mais ce banc est rouge en masse (45) dans cet environnement, À 
 des appels d'authentification sortent vers la production (garde réseau) : panne du banc, pas de ce lot ; à reprendre.
 `design-v2` : 18 rouges (taille de « Afficher le QR » et du sélecteur de site, contrastes d'Aujourd'hui) hors de ce que
 ce lot touche ; non comparés à main.
+
+## 11. Le correctif d'extension du §5, fait (version partagée 5.409.0 — zips, manifeste et `CODE_VERSION` laissés au coordinateur)
+
+`vinted-sync-extension/background.js` (capacité `suivicolis: '5.409.0'` dans `EXT_CAPACITES`, fonction `noterAchatsExpedies`) :
+
+1. **Budget des colis.** Le n° de suivi d'un achat EXPÉDIÉ sans n° (rangs 0 et 1 de `rangSuivi`, et le nouveau rang −1)
+   est lu en classe `suivicolis` : tout le budget de lecture (20/h), comme les codes. La prudence (refus de Vinted
+   < 24 h) l'arrête comme toute lecture de fond. Les autres achats (déjà numérotés, pas encore expédiés) restent en
+   classe « suivi ». `SUIVI_MAX_HEURE` 6 et 3 par visite : inchangés.
+2. **L'ordre de la visite.** `capterSuivisAchats` est appelé juste après `capterRetraits` (avant les preuves
+   de confirmation, les versements et les relevés) ; un seul appel par visite. Le passage de fond (`tickVersements`,
+   onglet vinted.fr ouvert, 20 min) le lit aussi, en premier, quand il en reste, que ce n'est pas su, ou qu'un achat
+   vient de passer à « expédié ».
+3. **En tête de file.** À chaque capture RANGÉE de « Mes commandes » (achats : voie passive, voie serveur, moisson),
+   `noterAchatsExpedies` note les achats qui passent à « expédié » (ou vus déjà expédiés pour la première fois) dans
+   `vrmSuiviAFaire` ; ils sont lus en premier (rang −1), sans attendre les 3 h d'une lecture faite quand ils n'étaient
+   que payés. Aucune requête Vinted dans la capture. Bornes : 7 jours, 100 par compte.
+4. **La part du suivi.** `suivi` entre dans `lecteursPrioritaires` (au plus 3) ; `capterSuivisAchats` note ce qui lui
+   reste à lire (`noterLecturesDues(uid, 'suivi', …)`, achats expédiés sans n° seulement). Les rattrapages de fond
+   (versements au-delà de leur part, import, photos, relecture) s'arrêtent avant ; « pas su » ⇒ 3 réservées.
+5. **Diagnostic par navigateur.** Les clés de lecture (`suivi_*`, `lecture_*`, `versement_laisse*`, `import_*`) sont
+   aussi comptées dans CE navigateur, par jour (aujourd'hui + hier, `vrmDiagNav`), et publiées dans SA ligne
+   `ext_appareil_{id}` (`diag`). Nouvelles clés : `suivi_lu_colis`, `suivi_lu_autre`, `suivi_refus_{colis|autre}_{code}`,
+   `suivi_a_faire_note`.
+
+Garde-fous inchangés : compte de l'onglet (`gardeLecture`), budget de lecture global 20/h (`compterLecture`), pause
+429/403, une requête à la fois, prudence.
+
+Preuves : `node scripts/audit-suivi-colis-ext.cjs` (le vrai background.js dans `_fond-vm`, réponses inventées à la
+forme mesurée de `journey_summary`) — 14 verts ; `--prouve` : témoin vert, 9 mutations rouges ; sur le background.js
+d'`origin/main` : 8 rouges. `node scripts/mesure-famine-suivi.cjs` : 3 suivis lus dans les 14 cas (avant : 0 dès 7
+lectures dans l'heure). Audits mis à jour pour la nouvelle part (13 → 16 réservées « pas su ») : budget-lectures,
+suivi-vinted, import-depart, versements-auto, versement-rapide, photos-etalees, photos-comptes, avis-vinted (ancre).
+Rouges ATTENDUS tant que la version n'est pas montée : coherence (seuil 5.409.0 > manifeste 5.408.0), extension-zip et
+preuve-vente (5.408.0 change de contenu). `enligne` : 6 rouges identiques sur l'arbre d'avant (déjà là).

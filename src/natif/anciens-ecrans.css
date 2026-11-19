@@ -1,0 +1,402 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE STYLE UNIQUE DES ANCIENS ÉCRANS (19 nov., décision « VRM natif » : docs/design/NATIF.md).
+   Julien : « je veux quelque chose de drastique, nouveau, totalement différent ». UN seul design ; plus de réglage
+   « Style », plus d'« Ancien design », plus d'habillage « VRM » (18 nov.), plus de dégradé bleu ni de verre.
+
+   Tant qu'un écran n'est pas réécrit avec les composants de src/natif/, il est au moins dans les COULEURS, la TYPO,
+   les RAYONS et les FONDS du natif : cette feuille fait lire aux familles de jetons d'hier (`--sb-*` du studio,
+   `--sv-*` du verre, `--v2-*`, `--d-*`, `--sbp-*`, `--sj-*`, `--vv-*`, `--vj-*`) les jetons `--n-*`. C'est l'ancien
+   style « Apple » (src/designV2/theme-apple.css, 18 nov.), devenu INCONDITIONNEL : plus aucun `data-theme-style`.
+
+   OÙ ELLE VIT DANS LA CASCADE : la couche `n-anciens`, nommée la PREMIÈRE dans index.html. Pour une déclaration
+   `!important`, la couche nommée la première gagne (CSS Cascade 5) : elle passe devant ce qui reste des feuilles
+   d'hier et devant les styles en ligne. Les écrans NEUFS (classes `n-*`) n'ont pas besoin d'elle et ne la lisent pas.
+
+   À RETIRER AU FUR ET À MESURE : chaque écran réécrit en natif rend ses règles d'ici inutiles (les sections 10 et 14
+   — barre d'onglets, tête — partent avec la coque d'hier, src/natif/Coque.jsx les remplace).
+   Contrôle : scripts/bancs/lisible-partout.cjs (contraste sur les pixels, clair et sombre, 390 / 1512 / 1280).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer n-anciens {
+
+
+/* ══ 1. LES JETONS — ceux du natif (src/natif/jetons.css, `--n-*`), la valeur du contrat en repli tant que la
+   fondation n'est pas fusionnée. Les `--ap-*` sont les ALIAS que lisent les règles ci-dessous (leur nom d'hier). ══ */
+html {
+  --ap-fond: var(--n-fond, #F2F2F7);
+  --ap-carte: var(--n-carte, #FFFFFF);
+  --ap-carte-2: var(--n-carte-2, #F2F2F7);
+  --ap-remplir: rgb(118 118 128 / .12);              /* le remplissage d'iOS (piste d'un segmenté, champ) : pas de jeton natif */
+  --ap-filet: var(--n-trait, rgb(60 60 67 / .18));
+  --ap-encre: var(--n-encre, #111114);
+  /* L'encre seconde du natif tient 4,5:1 sur la carte et sur le fond ; les anciens écrans la posent AUSSI sur un remplissage
+     gris (champ de recherche, puce, repli : #E3E3E8) où elle tombait à 4,09:1 (banc lisible-partout). Ici, 15 % d'encre en plus. */
+  --ap-gris: color-mix(in srgb, var(--n-encre-2, #6C6C70) 85%, var(--n-encre, #111114));
+  --ap-muet: var(--n-encre-3, #8E8E93);              /* jamais du texte : chevrons, icônes muettes */
+  --ap-bleu: var(--n-accent, #0068D6);
+  --ap-bleu-vif: #007AFF;                            /* ce qui n'est pas du texte : interrupteur, coche */
+  --ap-bleu-appui: #0058B8;
+  --ap-bleu-teinte: #0058B8;                         /* le texte d'un bouton teinté (≥ 4,5:1 sur la teinte) */
+  --ap-plein: var(--n-plein, #0068D6);
+  --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
+  --ap-teinte: var(--n-teinte, rgb(0 104 214 / .12));
+  --ap-ambre: var(--n-ambre, #8A4B00);
+  --ap-ambre-fond: var(--n-ambre-fond, #FFF4DD);
+  --ap-ambre-point: #FF9500;
+  --ap-matiere: rgb(249 249 249 / .94);
+  --ap-flou: saturate(180%) blur(20px);
+  --ap-ombre-wallet: 0 8px 30px rgb(0 0 0 / .12);
+  --ap-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  --ap-fond: var(--n-fond, #000000);
+  --ap-carte: var(--n-carte, #1C1C1E);
+  --ap-carte-2: var(--n-carte-2, #2C2C2E);
+  --ap-remplir: rgb(118 118 128 / .24);
+  --ap-filet: var(--n-trait, rgb(84 84 88 / .60));
+  --ap-encre: var(--n-encre, #FFFFFF);
+  --ap-gris: color-mix(in srgb, var(--n-encre-2, #98989F) 85%, var(--n-encre, #FFFFFF));
+  --ap-muet: var(--n-encre-3, #636366);
+  --ap-bleu: var(--n-accent, #409CFF);
+  --ap-bleu-vif: #0A84FF;
+  --ap-bleu-appui: #0058B8;
+  --ap-bleu-teinte: #7DBBFF;
+  --ap-plein: var(--n-plein, #0068D6);
+  --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
+  --ap-teinte: var(--n-teinte, rgb(64 156 255 / .20));
+  --ap-ambre: var(--n-ambre, #FFB340);
+  --ap-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
+  --ap-ambre-point: #FF9F0A;
+  --ap-matiere: rgb(22 22 24 / .90);
+  --ap-ombre-wallet: 0 8px 30px rgb(0 0 0 / .5);
+  color-scheme: dark;
+}
+
+/* Les jetons des familles d'hier suivent les nôtres (sur la racine ; les conteneurs du verre relisent --sv-*). */
+html:root {
+  /* Le verre (src/design/studio-verre.css) : plus de dégradé ni de verre, un fond plat et des cartes pleines. */
+  --sv-haut: var(--ap-fond) !important; --sv-milieu: var(--ap-fond) !important; --sv-bas: var(--ap-fond) !important;
+  --sv-reflet: transparent !important; --sv-reflet-2: transparent !important;
+  --sv-colle: var(--ap-fond) !important; --sv-brume: var(--ap-fond) !important;
+  --sv-verre: var(--ap-carte) !important; --sv-verre-2: var(--ap-carte) !important;
+  --sv-verre-barre: var(--ap-matiere) !important;
+  --sv-verre-fin: var(--ap-remplir) !important; --sv-verre-fin-bord: transparent !important;
+  --sv-bord: transparent !important; --sv-flou: none !important;   /* aucun flou dans le contenu (contrat §1) : les deux barres lisent --ap-flou */
+  --sv-ombre: none !important;
+  --sv-encre: var(--ap-encre) !important; --sv-encre-2: var(--ap-gris) !important;
+  --sv-lien: var(--ap-bleu) !important; --sv-ambre: var(--ap-ambre) !important;
+  /* « L'encre claire posée sur le fond » : le fond est clair le jour, elle redevient l'encre. */
+  --sv-clair: var(--ap-encre) !important; --sv-clair-2: var(--ap-gris) !important;
+  --sv-clair-lien: var(--ap-bleu) !important; --sv-clair-ambre: var(--ap-ambre) !important;
+  --sv-feuille: var(--ap-fond) !important; --sv-feuille-bord: transparent !important;
+  --sv-onglet: var(--ap-gris) !important;
+  --sv-porcelaine: var(--ap-carte) !important; --sv-porcelaine-2: var(--ap-carte) !important;
+
+  /* Le studio (src/design/studio.css). */
+  --sb-haut: var(--ap-fond) !important; --sb-aplat: var(--ap-fond) !important; --sb-bas: var(--ap-fond) !important; --sb-halo: transparent !important;
+  --sb-porcelaine: var(--ap-carte) !important; --sb-porcelaine-2: var(--ap-carte) !important;
+  --sb-porcelaine-degrade: linear-gradient(var(--ap-carte), var(--ap-carte)) !important;
+  --sb-creux: var(--ap-remplir) !important; --sb-socle: var(--ap-fond) !important;
+  --sb-verre: var(--ap-matiere) !important; --sb-verre-plan: var(--ap-carte) !important; --sb-verre-flou: none !important;
+  --sb-puits: var(--ap-remplir) !important; --sb-puits-ombre: none !important;
+  --sb-encre: var(--ap-encre) !important; --sb-encre-2: var(--ap-gris) !important;
+  --sb-diode: var(--ap-bleu-vif) !important; --sb-lien: var(--ap-bleu) !important;
+  --sb-ambre: var(--ap-ambre) !important; --sb-ambre-point: var(--ap-ambre-point) !important;
+  --sb-o: 0 0 0 !important;
+  --sb-ombre-pose: none !important; --sb-ombre-plan: none !important;
+  --sb-ombre-avant: 0 12px 40px -12px rgb(0 0 0 / .28) !important;
+  --sb-verre-bord: none !important;
+  --sb-touche-fond: var(--ap-carte) !important; --sb-touche-ombre: none !important;
+  --sb-enfonce: none !important; --sb-grave: none !important; --sb-grave-texte: none !important;
+  --sb-plein-fond: var(--ap-plein) !important; --sb-plein-encre: var(--ap-sur-plein) !important; --sb-plein-ombre: none !important;
+  --sb-r-tuile: 12px !important; --sb-r-plan: 12px !important; --sb-r-plateau: 10px !important;
+  --sb-r-champ: 10px !important; --sb-r-touche: 10px !important; --sb-r-vignette: 10px !important;
+  --sb-police-affiche: var(--ap-police) !important; --sb-police-texte: var(--ap-police) !important;
+
+  /* Les familles d'avant (--d-*, --vrm-*, --p-*, --w-*, --fu-*). */
+  --d-fond: var(--ap-fond) !important; --d-fond-atelier: var(--ap-fond) !important; --vrm-bg: var(--ap-fond) !important;
+  --p-fond: var(--ap-fond) !important; --fu-fond: var(--ap-fond) !important; --w-fond: var(--ap-fond) !important; --bx-sol: var(--ap-fond) !important;
+  --d-carte: var(--ap-carte) !important; --fu-carte: var(--ap-carte) !important; --p-carte: var(--ap-carte) !important;
+  --w-carte: var(--ap-carte) !important; --vrm-surface: var(--ap-carte) !important;
+  --d-accent: var(--ap-bleu) !important; --vrm-accent: var(--ap-bleu) !important; --d-accent-texte: var(--ap-bleu) !important;
+  --d-remplir: var(--ap-remplir) !important;
+  --d-ombre-carte: none !important;
+
+  /* La v2 (src/designV2/design-v2.css) : le bouton plein devient le bleu (texte blanc), la coque claire. */
+  --v2-bouton-r: 12px !important;
+  --v2-plein-fond: var(--ap-plein) !important; --v2-plein-fond-appui: var(--ap-bleu-appui) !important; --v2-plein-texte: var(--ap-sur-plein) !important;
+  --v2-page-texte: var(--ap-encre) !important; --v2-page-muet: var(--ap-gris) !important; --v2-page-ambre: var(--ap-ambre) !important;
+  --v2-teinte-fond: var(--ap-teinte) !important; --v2-teinte-fond-appui: color-mix(in srgb, var(--ap-bleu-vif) 22%, transparent) !important;
+  --v2-teinte-texte: var(--ap-bleu) !important; --v2-lien: var(--ap-bleu) !important;
+  --v2-danger: var(--ap-ambre) !important;
+  --v2-anneau: 0 0 0 3px color-mix(in srgb, var(--ap-bleu-vif) 45%, transparent) !important;
+  --v2-muet: var(--ap-gris) !important;
+  --v2-carte: var(--ap-carte) !important; --v2-feuille-fond: var(--ap-fond) !important;
+  --v2-carte-ombre: none !important;
+  --v2-filet: var(--ap-filet) !important; --v2-socle: var(--ap-fond) !important;
+  --v2-ambre: var(--ap-ambre) !important; --v2-ambre-point: var(--ap-ambre-point) !important;
+  /* L'étiquette N° kraft : gardée, plus calme (moins saturée). */
+  --v2-kraft: #F1EADC !important; --v2-kraft-encre: #2E2619 !important; --v2-kraft-doux: #6B5C44 !important;
+  --v2-kraft-bord: rgb(46 38 25 / .16) !important; --v2-kraft-trou: var(--ap-carte) !important;
+}
+html[data-theme="dark"]:root {
+  --sb-puits: var(--ap-remplir) !important;
+  --sb-ombre-avant: 0 0 0 .5px rgb(255 255 255 / .08), 0 12px 40px -12px rgb(0 0 0 / .9) !important;
+  --v2-socle: var(--ap-carte-2) !important; --sb-socle: var(--ap-carte-2) !important;
+  --v2-kraft: #34302A !important; --v2-kraft-encre: #EFE6D6 !important; --v2-kraft-doux: #C4B69E !important;
+  --v2-kraft-bord: rgb(239 230 214 / .18) !important;
+}
+/* Les familles posées sur un CONTENEUR (pas la racine) : les Paires (studio-paires.css) et Ma journée (studio-journee.css). */
+html :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"], .sj-journee) {
+  --sbp-haut: var(--ap-fond) !important; --sbp-bas: var(--ap-fond) !important; --sbp-aplat: var(--ap-fond) !important;
+  --sbp-feuille: var(--ap-carte) !important; --sbp-feuille2: var(--ap-carte) !important; --sbp-creux: var(--ap-remplir) !important;
+  --sbp-socle: var(--sb-socle) !important; --sbp-plan: var(--ap-carte) !important; --sbp-puits: var(--ap-remplir) !important; --sbp-puits-sh: none !important;
+  --sbp-k-bg: var(--ap-carte) !important; --sbp-k-sh: none !important; --sbp-k-in: none !important; --sbp-pl-sh: none !important; --sbp-pl-ts: none !important;
+  --sbp-om-pose: none !important; --sbp-om-tuile: none !important; --sbp-halo: transparent !important;
+  --sbp-affiche: var(--ap-police) !important; --sbp-texte: var(--ap-police) !important;
+  --sj-k-bg: var(--ap-carte) !important; --sj-k-sh: none !important; --sj-k-in: none !important; --sj-pl-sh: none !important;
+  --sj-puits: var(--ap-remplir) !important; --sj-puits-sh: none !important; --sj-socle: var(--sb-socle) !important; --sj-fond: none !important;
+}
+/* Les conteneurs du verre qui RE-déclarent leurs jetons (sv-ecrans, encre claire, porcelaine des feuilles) les relisent
+   sur --sv-* : rien à refaire. La nuit, une carte DANS une feuille monte d'un cran (#2C2C2E sur #1C1C1E, comme iOS). */
+html[data-theme="dark"] :is(.vrm-fs, .sb-feuille, .vrm-fs-cadre, [role="dialog"], [role="alertdialog"], .vrm-confirm, .v2-feuille) {
+  --sv-feuille: var(--ap-carte) !important; --v2-feuille-fond: var(--ap-carte) !important;
+}
+
+/* ══ 2. LE FOND : plat, aucun dégradé (le banc l'exige) ══════════════════════ */
+html, html body { background: var(--ap-fond) !important; background-image: none !important; }
+html body .vrm-app-shell, html body .vrm-main, html body .sj-journee { background-image: none !important; }
+/* La conversation en plein écran repeignait la lumière du studio (un halo) : l'aplat de la page. */
+html body .vrm-chat-panel { background: var(--ap-fond) !important; background-image: none !important; }
+
+/* ══ 3. LA POLICE DU SYSTÈME, l'échelle d'Apple ══════════════════════════════ */
+html body, html body :where(*):not(code, pre, kbd, samp, svg, svg *) { font-family: var(--ap-police) !important; }
+html body { -webkit-font-smoothing: antialiased; }
+/* Large Title 34/700 ; il se replie en titre 17/600 dans la tête au défilement (.is-defile, styles-coque.css). */
+html body :is(.v2-titre, .sb-ecran-titre, .vrm-screen-head h1, .vrm-set-tete h1) { font-size: 34px !important; font-weight: 700 !important; letter-spacing: .011em !important; line-height: 41px !important; color: var(--ap-encre) !important; }
+html body .vrm-app-header .vrm-hdr-titre { font-size: 17px !important; font-weight: 600 !important; letter-spacing: -.02em !important; color: var(--ap-encre) !important; }
+html body .vrm-app-header.is-defile { background: var(--ap-matiere) !important; -webkit-backdrop-filter: var(--ap-flou) !important; backdrop-filter: var(--ap-flou) !important; box-shadow: inset 0 -.5px 0 var(--ap-filet) !important; }
+/* Les en-têtes de section, à la manière d'iOS : 13 px, capitales, gris, posés au-dessus du groupe. */
+html body :is(.vrm-ios-groupe-titre, .vrm-set-groupe > .vrm-set-titre, .vrm-fu-titre-section, .sb-surtitre) {
+  font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: uppercase !important; letter-spacing: .02em !important;
+  color: var(--ap-gris) !important; margin-left: 16px !important; }
+html body .v2-groupe-titre { font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: uppercase !important; letter-spacing: .02em !important; color: var(--ap-gris) !important; margin: 0 16px 8px !important; }
+html body .v2-groupe-titre .v2-groupe-n { color: var(--ap-gris) !important; font-weight: 400 !important; }
+html body :is(.vrm-ios-groupe-pied, .vrm-set-groupe > .vrm-set-pied) { font-size: 13px !important; line-height: 18px !important; color: var(--ap-gris) !important; margin-left: 16px !important; margin-right: 16px !important; }
+
+/* ══ 4. LES CARTES GROUPÉES : blanches, pleines, rayon 12, sans ombre ni bord ══ */
+html body .vrm-main :is(.sb-tuile, .sb-plan, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
+  .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-carte, .vrm-reglages-groupe,
+  .vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section,
+  .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-guide.vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte,
+  .vrm-statistiques-premium > .vrm-stats-repli, .vrm-skeleton-element, .vrm-sq-carte:not(.is-sombre),
+  .v2-liste, .v2-liste-annonces[data-v2-ligne="A"], .v2-liste-annonces[data-v2-ligne="C"], .v2-erreur) {
+  background: var(--ap-carte) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important;
+  border-radius: 12px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+/* Une tuile posée (filtre choisi) : le remplissage d'iOS, sans creux ni relief. */
+html body .vrm-main .sb-tuile:is([aria-pressed="true"], .is-actif) { background: var(--ap-teinte) !important; box-shadow: inset 0 0 0 1.5px var(--ap-bleu-vif) !important; }
+
+/* ══ 5. LES RANGÉES : la table d'iOS (44 px au moins, séparateur fin décalé de 16 px) ══ */
+html body :is(.vrm-ios-rangee, div.v2-ligne, .v2l-a) { min-height: 44px; }
+html body :is(.vrm-ios-carte, .v2-liste, .v2-liste-annonces) > * + * { background-image: linear-gradient(var(--ap-filet), var(--ap-filet)) !important; background-size: calc(100% - 16px) .5px !important; background-position: right top !important; background-repeat: no-repeat !important; border-top: 0 !important; }
+html body :is(.vrm-ios-titre, .v2l-titre) { font-size: 17px !important; color: var(--ap-encre) !important; }
+html body :is(.vrm-ios-detail, .v2l-sous) { font-size: 15px !important; color: var(--ap-gris) !important; }
+html body .vrm-ios-valeur:not([data-ton]) { color: var(--ap-gris) !important; }
+html body .vrm-ios-chevron { color: rgb(60 60 67 / .3) !important; }
+html[data-theme="dark"] body .vrm-ios-chevron { color: rgb(235 235 245 / .3) !important; }
+html body :is(.v2l:active, button.v2-rangee:active) { background-color: var(--ap-remplir) !important; }
+html body .v2l-photo-a, html body .v2l-photo-c, html body .v2-vignette { border-radius: 10px !important; }
+
+/* ══ 6. LES BOUTONS d'iOS : plein bleu (UN par écran), teinté, simple ══════════ */
+html body button.v2b-principal { background: var(--ap-plein) !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
+html body button.v2b-principal:active:not([aria-disabled="true"]) { background: var(--ap-bleu-appui) !important; filter: none !important; }
+html body button.v2b-secondaire { background: var(--ap-teinte) !important; color: var(--ap-bleu) !important; }
+html body button.v2b-texte { color: var(--ap-bleu) !important; }
+html body .v2b-hote-plein .v2b-raison { color: var(--ap-gris) !important; }
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire { background: var(--ap-plein) !important; background-image: none !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { background: var(--ap-teinte) !important; background-image: none !important; color: var(--ap-bleu) !important; box-shadow: none !important; border: 0 !important; border-radius: 12px !important; }
+
+/* ══ 7. LE CONTRÔLE SEGMENTÉ d'iOS : piste grise, pouce blanc et son ombre ════ */
+html body .v2-seg, html body .vrm-seg { background: var(--ap-remplir) !important; box-shadow: none !important; border-radius: 9px !important; padding: 2px !important; }
+html body button.v2-seg-btn, html body .vrm-seg .vrm-seg-btn { color: var(--ap-encre) !important; border-radius: 7px !important; font-weight: 400 !important; background: transparent !important; }
+html body button.v2-seg-btn.is-on, html body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme="dark"] body button.v2-seg-btn.is-on, html[data-theme="dark"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #636366 !important; color: #FFFFFF !important; }
+
+/* ══ 8. LES INTERRUPTEURS d'iOS (51 × 31) — le bleu, le seul accent ═══════════ */
+html body .vrm-ios-switch[aria-checked="true"]::before { background: var(--ap-bleu-vif) !important; }
+html body .vrm-switch[aria-checked="true"] { --vrm-sw: var(--ap-bleu-vif) !important; }
+
+/* ══ 9. LES FEUILLES : le fond groupé, la poignée, le ressort (inchangé) ═════════ */
+html body :is(.vrm-fs, .sb-feuille) { background: var(--sv-feuille) !important; background-image: none !important; border-top: 0 !important; box-shadow: 0 -10px 40px rgb(0 0 0 / .18) !important; border-radius: 12px 12px 0 0; }
+html body .v2-feuille { background: var(--v2-feuille-fond) !important; border-radius: 12px 12px 0 0 !important; }
+html body :is(.vrm-fs .vrm-fs-poignee, .v2-feuille-poignee) { background: rgb(60 60 67 / .3) !important; width: 36px !important; height: 5px !important; border-radius: 3px !important; }
+html[data-theme="dark"] body :is(.vrm-fs .vrm-fs-poignee, .v2-feuille-poignee) { background: rgb(235 235 245 / .3) !important; }
+html body .vrm-fs-voile, html body .v2-voile { background: rgb(0 0 0 / .4) !important; }
+html body .vrm-fs .vrm-fs-croix-rond { background: var(--ap-remplir) !important; border: 0 !important; color: var(--ap-gris) !important; }
+
+/* ══ 10. LA BARRE D'ONGLETS : la seule matière translucide (systemChromeMaterial) ══ */
+html body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
+  --b-actif: var(--ap-bleu-teinte) !important; --b-gris: var(--ap-gris) !important; --b-fond: var(--ap-matiere) !important;
+  background: var(--ap-matiere) !important; background-image: none !important;
+  -webkit-backdrop-filter: var(--ap-flou) !important; backdrop-filter: var(--ap-flou) !important;
+  box-shadow: inset 0 .5px 0 var(--ap-filet) !important; border-color: transparent !important; }
+html body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { display: none !important; }
+html body .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--ap-gris) !important; }
+html body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--ap-bleu-teinte) !important; }
+html body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, html body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { background: transparent !important; }
+/* La pastille rouge d'iOS est réservée par §7 à deux paires sous un N° : celle de la barre reste ambre (le geste à faire). */
+html body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: #FF9500 !important; color: #1A1100 !important; box-shadow: none !important; }
+/* La barre collée d'une liste (recherche) : le fond, sans verre. */
+html body :is(.vrm-annbar, .vrm-achats-barre) { background-image: none !important; }
+
+/* ══ 11. LES PASSES « WALLET » (codes de retrait, N° à poser) : pleine largeur, rayon 16, une ombre douce ══ */
+html body .v2-passe { border-radius: 16px !important; box-shadow: var(--ap-ombre-wallet) !important; background: var(--ap-carte) !important; }
+html body .v2-passe-tete { background: #1C1C1E !important; color: #FFFFFF !important; }
+html[data-theme="dark"] body .v2-passe-tete { background: #3A3A3C !important; }
+html[data-theme="dark"] body .v2-passe { background: var(--ap-carte-2) !important; }
+html body .v2-ticket-code { letter-spacing: .04em !important; }
+html body .v2-ticket-perfo::after { background: radial-gradient(circle at 0 50%, var(--ap-fond) 7px, transparent 7.5px), radial-gradient(circle at 100% 50%, var(--ap-fond) 7px, transparent 7.5px) !important; }
+html body button.v2-rangee.v2-passe-mini { border-radius: 16px !important; box-shadow: var(--ap-ombre-wallet) !important; }
+
+/* ══ 12. L'ÉTIQUETTE N° KRAFT : gardée, plus petite et plus calme ═══════════ */
+html body .v2-etiquette { height: 20px !important; padding: 2px 7px 0 11px !important; line-height: 16px !important; box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord) !important; }
+html body .v2-etiquette b { font-size: 13px !important; font-weight: 600 !important; }
+html body .v2-etiquette small { font-size: 10px !important; font-weight: 400 !important; }
+html body .v2-etiquette .v2-etiquette-oeillet { left: 4px !important; width: 3px !important; height: 3px !important; margin-top: -1.5px !important; }
+html body .v2-etiquette.is-moyen { height: 24px !important; padding: 3px 9px 0 13px !important; }
+html body .v2-etiquette.is-moyen b { font-size: 15px !important; }
+html body .v2-etiquette.is-grand { height: 32px !important; padding: 5px 11px 0 17px !important; }
+html body .v2-etiquette.is-grand b { font-size: 19px !important; }
+html body .v2-etiquette.is-double { box-shadow: inset 0 0 0 2px var(--sb-doublon, #B8261A) !important; }
+
+/* ══ 13. Le reste du verre : tout ce qui gardait un dégradé ou un bord blanc ═══ */
+html body .vrm-main .vrm-colis-section [data-bords-faits] { background: var(--ap-carte) !important; box-shadow: none !important; }
+html body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 8px 30px -8px rgb(0 0 0 / .3) !important; }
+/* ══ 14. LES PASTILLES « FUMÉES » du verre (posées sur le bleu, texte blanc) : le remplissage gris d'iOS, l'encre.
+   Liste tirée des feuilles de src/design/ (fond rgb(10 38 76) ou rgb(8 28 56)) ; une pastille oubliée sortirait blanche
+   sur gris : le banc (contraste) la nomme. ══ */
+html body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche),
+html body .vv-seg,
+html body .vv-hero-ronds .sb-rond,
+html body .sb-tete[data-sb-tete="achats"] .sb-rond,
+html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button,
+html body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein,
+html body .vrm-fs.vg-av .vrm-fs-croix-rond,
+html body .vrm-pm .vg-pm-retour,
+html body .vg-ms-vues,
+html body .vg-ms-onglet,
+html body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer),
+html body .vrm-chat-panel .vrm-chat-jour,
+html body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer),
+html body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button,
+html body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic,
+html body .vrm-fp .vg-fp-plus > summary {
+  background: var(--ap-remplir) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; color: var(--ap-encre) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) *,
+html body .vv-seg *,
+html body .vv-hero-ronds .sb-rond *,
+html body .sb-tete[data-sb-tete="achats"] .sb-rond *,
+html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button *,
+html body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein *,
+html body .vrm-fs.vg-av .vrm-fs-croix-rond *,
+html body .vrm-pm .vg-pm-retour *,
+html body .vg-ms-vues *,
+html body .vg-ms-onglet *,
+html body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) *,
+html body .vrm-chat-panel .vrm-chat-jour *,
+html body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer) *,
+html body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button *,
+html body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic *,
+html body .vrm-fp .vg-fp-plus > summary * { color: inherit !important; }
+
+/* ══ 15. LES CONTRÔLES SEGMENTÉS écrits à la main par écran (Ventes, Paires, Messages) : piste grise, pouce blanc ══ */
+html body :is(.vv-seg-b, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn, .vg-ms-vues > button) { color: var(--ap-encre) !important; background: transparent !important; box-shadow: none !important; border-radius: 7px !important; font-weight: 400 !important; }
+html body :is(.vv-seg, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein, .vg-ms-vues) { border-radius: 9px !important; padding: 2px !important; }
+html body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) {
+  background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; border-color: transparent !important;
+  box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme="dark"] body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) { background: #636366 !important; color: #FFFFFF !important; }
+html body .vv-seg-n:not(.is-ambre) { background: var(--ap-remplir) !important; color: inherit !important; }
+html body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(118 118 128 / .12) !important; }
+html[data-theme="dark"] body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(255 255 255 / .16) !important; }
+
+/* ══ 16. Ventes (ventes-verre.css) : la coche et la touche prennent le bleu et la carte ══ */
+html body { --vv-plein: var(--ap-plein) !important; --vv-plein-t: var(--ap-sur-plein) !important; --vv-touche: var(--ap-carte) !important; --vv-touche-b: transparent !important;
+  --vv-seg-on: #FFFFFF !important; --vv-ligne: var(--ap-filet) !important; --vv-stp-vide: var(--ap-carte) !important; }
+html[data-theme="dark"] body { --vv-seg-on: #636366 !important; }
+
+/* ══ 17. Les titres que le verre écrivait en blanc à la main, et le bleu teinté ══ */
+html body .vrm-tache > .vrm-tache-tete h1 { color: var(--ap-encre) !important; font-family: var(--ap-police) !important; font-weight: 700 !important; letter-spacing: .011em !important; }
+html body :is(button.v2b-secondaire, .vrm-app-shell .vrm-b.vrm-b-secondaire, .vrm-fs .vrm-b.vrm-b-secondaire) { color: var(--ap-bleu-teinte) !important; }
+
+/* ══ 18. Ma journée (verre-journee.css) : le plein bleu, les touches grises, la semaine en barres grises (le jour choisi en bleu) ══ */
+html body { --vj-plein: var(--ap-plein) !important; --vj-plein-t: var(--ap-sur-plein) !important; --vj-plein-ombre: none !important;
+  --vj-touche: var(--ap-remplir) !important; --vj-touche-bord: transparent !important; --vj-libre: transparent !important; --vj-libre-bord: var(--ap-filet) !important;
+  --vj-ac: var(--ap-bleu-vif) !important; --vj-pastille: var(--ap-remplir) !important; --vj-site: var(--ap-carte) !important; }
+html body .sj-journee .vrm-jv2-barre { background: #D1D1D6 !important; }
+html[data-theme="dark"] body .sj-journee .vrm-jv2-barre { background: #48484A !important; }
+html body .sj-journee :is(.vrm-fu-jour[data-choisi] .vrm-jv2-barre, .vrm-jv2-jour[aria-pressed="true"] .vrm-jv2-barre) { background: var(--ap-bleu-vif) !important; }
+/* Les rayons d'hier (cartes 20–22 px) : 12, comme une liste groupée d'iOS. */
+html:root { --d-r-carte: 12px !important; --d-r-tuile: 12px !important; }
+
+/* ══ 19. CE QUE LE BANC A NOMMÉ (19 nov., scripts/bancs/lisible-partout.cjs) : des encres écrites pour le verre ══ */
+/* L'invite d'un champ (placeholder) : l'encre seconde, jamais plus pâle. */
+html body :is(input, textarea)::placeholder { color: var(--ap-gris) !important; opacity: 1 !important; }
+/* Le nombre d'un segment (« Colis 429 ») : estompé à 80 %, ou BLANC sur le pouce blanc du segment choisi. */
+html body .v2-seg-n { color: var(--ap-gris) !important; opacity: 1 !important; }
+/* Le Stock : « Cases · Places » (segmenté écrit à la main) — la piste grise, l'encre, le pouce blanc. */
+html body .sr-seg { background: var(--ap-remplir) !important; border-radius: 9px !important; box-shadow: none !important; }
+html body .sr-seg-btn { color: var(--ap-encre) !important; background: transparent !important; }
+html body .sr-seg-btn :is(span, b, small) { color: inherit !important; }
+html body .sr-seg-btn:is([aria-pressed="true"], [aria-selected="true"], .is-on) { background: var(--ap-carte) !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme="dark"] body .sr-seg-btn:is([aria-pressed="true"], [aria-selected="true"], .is-on) { background: #636366 !important; }
+/* L'heure d'une bulle : sur MA bulle (bleue) elle est blanche, sur l'autre à l'encre seconde (le verre l'écrivait #3F5468 partout). */
+html body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: var(--ap-gris) !important; opacity: 1 !important; }
+html body .vrm-chat-panel .vrm-bulle-moi .vrm-bulle .vrm-bulle-h { color: #FFFFFF !important; }
+/* Un bouton discret posé sur un remplissage gris : le bleu du texte teinté (≥ 4,5:1). */
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled) { color: var(--ap-bleu-teinte) !important; }
+/* La feuille « Plateformes » : chaque site fait 44 px au doigt. */
+html body .v2-feuille-corps .vrm-filtres > button[data-site] { min-height: 44px !important; min-width: 44px !important; }
+/* Un champ de recherche d'écran : le remplissage d'iOS, sans ombre ni verre (il flottait avec une ombre portée). */
+html body .vrm-main .vrm-champ-recherche { background: var(--ap-remplir) !important; background-image: none !important; box-shadow: none !important; border-color: transparent !important; border-radius: 10px !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* L'aide : le numéro d'une étape — une pastille pleine, blanc dessus (à l'encre sur le bleu : 3,55:1 ; les suivantes étaient grises). */
+html body .vrm-aide-etape-n { background: var(--ap-plein) !important; color: var(--ap-sur-plein) !important; }
+/* Le Stock, « comment ranger » : le numéro d'une étape, à l'encre (le film baisse l'étape à venir à .7 : à l'encre seconde
+   sur sa pastille grise, 2,77:1 mesuré). */
+html body .vrm-sx-etape > b { color: var(--n-encre, #111114) !important; }
+/* La feuille « Plateformes » : le logo d'un site sans compte relié était à 45 % (2,02:1 mesuré) — il reste lisible, à l'encre seconde ; « aucun compte relié » est dit dans son titre. */
+html body .vrm-sel-sites > button[data-sans-compte][aria-pressed="false"] .vrm-ss-in { opacity: 1 !important; color: var(--ap-gris) !important; }
+/* Cibles au doigt : « À compléter » de la feuille des outils (34 px de haut), « Tout » des périodes (43 px de large). */
+html body .v2-outils-feuille .vrm-outils-vers { min-height: 44px !important; }
+/* La feuille « ⋯ » d'Annonces : le tri, « À compléter » et « Régler par paire » gardaient le cadre noir carré du
+   navigateur (déjà sur main) — le remplissage et le rayon du natif, sans bord ; « Régler par paire » est un lien. */
+html body .v2-outils-feuille :is(button.vrm-outils-vers, .v2-ann-menu-tri select) { border: 0 !important; border-radius: 10px !important; background: var(--ap-remplir) !important; color: var(--ap-encre) !important; box-shadow: none !important; }
+html body .v2-outils-feuille .v2-ann-menu-tri select { padding: 0 10px !important; }
+html body .v2-outils-feuille .vrm-offres-auto { background: var(--ap-remplir) !important; border-color: transparent !important; box-shadow: none !important; }
+/* « Qui dorment », les modes : le nombre d'un segment suit l'encre de son segment (gris sur le pouce de la nuit : 2,51:1). */
+/* Les puces de compte d'une feuille (portée hors de la coque) : 44 px au doigt (34 mesurés après la coque native). */
+@media (pointer: coarse) { html body .vrm-compte-puces .vrm-compte-puce { min-height: 44px !important; } }
+html body :is(.v2-seg-btn, .sr-seg-btn) > :is(.v2-seg-n, .sr-seg-n) { color: inherit !important; opacity: 1 !important; }
+/* E-mails, la nuit : le compte d'une ligne, un cran plus encré (la ligne est estompée : 4,49:1 sur la ligne choisie). */
+html body .vrm-boite-compte-nom { color: color-mix(in srgb, var(--n-encre-2, #98989F) 70%, var(--n-encre, #FFFFFF)) !important; }
+html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
+html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: color-mix(in srgb, var(--ap-bleu) 82%, var(--ap-encre)) !important; padding-left: 0 !important; }
+html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
+/* Achats à l'ordinateur : « Calculette » était rogné dans sa propre boîte. */
+@media (min-width: 1024px) { html body .vrm-achats-filtres > [data-achats-calculette] { width: auto !important; max-width: none !important; overflow: visible !important; white-space: nowrap !important; flex: none !important; padding: 0 14px 0 12px !important; gap: 6px !important; justify-content: center !important; } }
+/* La barre d'un e-mail ouvert : aucun flou dans le contenu. */
+html body .vrm-boite-lecture-barre { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--ap-carte) !important; }
+/* « Qui dorment » : la case à cocher d'une ligne fait 44 px de large au doigt (36 mesurés). */
+html body .vrm-qd-coche-zone { min-width: 44px !important; justify-content: center !important; }
+/* MA bulle et le bouton principal d'un e-mail : le plein du natif, blanc dessus (la nuit, le blanc tombait à 3,65:1 sur #0A84FF,
+   et à 1:1 — blanc sur blanc — sur « Voir le colis à retirer »). */
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle.vrm-bulle { background: var(--ap-plein) !important; background-image: none !important; color: var(--ap-sur-plein) !important; border-color: transparent !important; }
+html body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi > .vrm-bulle .vrm-bulle-t { color: var(--ap-sur-plein) !important; }
+html body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-principal { background: var(--ap-plein) !important; background-image: none !important; color: var(--ap-sur-plein) !important; border-color: transparent !important; box-shadow: none !important; }
+html body :is(.vrm-boite, .vrm-boite-feuille) .vrm-boite-principal * { color: inherit !important; }
+/* La connexion : « CGU », « CGV » font 44 px de large au doigt ; « Se connecter avec l'iPhone » sur son remplissage. */
+html body .vrm-cx-boite > nav > a { display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 44px !important; }
+html body .vrm-cx-boite .vrm-cx-qr > summary { color: var(--ap-bleu-teinte) !important; }
+}

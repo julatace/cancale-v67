@@ -368,6 +368,14 @@
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
   // l'annonce à la paire que VRM vient de préparer dans cet onglet (le fond
   // n'accepte que l'onglet du dépôt). Une écriture 2xx sur un chemin d'article.
+  // Un libellé lu sous un nom CONNU seulement (objet { title | name | label } ou texte) ; les trois niveaux, ou rien.
+  function categorieDeReponseVc(o) {
+    if (!o || typeof o !== 'object') return null;
+    const lib = (v) => { const x = v && typeof v === 'object' ? (v.title != null ? v.title : v.name != null ? v.name : v.label) : v; return typeof x === 'string' && x.trim() && x.length <= 80 ? x.replace(/\s+/g, ' ').trim() : ''; };
+    const de = (noms) => { for (const n of noms) { const t = lib(o[n]); if (t) return t; } return ''; };
+    const r = { univers: de(['universe', 'univers', 'depositUniverse']), categorie: de(['category', 'categorie', 'depositCategory']), sous: de(['subCategory', 'sub_category', 'subcategory', 'depositSubCategory']) };
+    return r.univers && r.categorie && r.sous ? r : null;
+  }
   function notePublication(url, methode, statut, texte) {
     try {
       if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || !(statut >= 200 && statut < 300)) return;
@@ -375,9 +383,22 @@
       if (!/product|listing|draft|item|article/i.test(u.pathname) || /search|like|recommend|cart|basket|order/i.test(u.pathname)) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       const cand = obj && (obj.data && typeof obj.data === 'object' ? obj.data : obj);
+      // (19 nov., 5.409) Ce que le dépôt dit de L'ARTICLE (formes mesurées dans `vc_recon`) : l'identifiant numérique du
+      // brouillon (`/product-drafts/{n}`, `productDraftId`, `preduct.id`) et les fichiers des photos envoyées
+      // (`photos[].path`). Le fond s'en sert pour retrouver l'annonce publiée dans « Mes annonces » par IDENTITÉ
+      // (même identifiant ou même fichier photo) — jamais par son titre.
+      try {
+        const mB = /\/product-drafts\/(\d{5,12})(?:\/|$)/.exec(u.pathname);
+        const b0 = mB ? mB[1] : (cand && cand.productDraftId != null ? String(cand.productDraftId) : (cand && cand.preduct && cand.preduct.id != null ? String(cand.preduct.id) : ''));
+        const ph = cand && Array.isArray(cand.photos) ? cand.photos.map((x) => (x && typeof x.path === 'string' ? x.path.slice(0, 300) : '')).filter(Boolean).slice(0, 12) : [];
+        if (/^\d{5,12}$/.test(b0) || ph.length) post({ kind: 'vcdepotinfo', brouillon: /^\d{5,12}$/.test(b0) ? b0 : '', photos: ph });
+      } catch (_) {}
       const id = cand && (cand.id != null ? cand.id : (cand.productId != null ? cand.productId : cand.product_id));
       if (id == null || !/^[\w-]{1,40}$/.test(String(id))) return;
-      post({ kind: 'vcpublie', productId: String(id), chemin: normChemin(sansId(u.pathname)), methode: String(methode).toUpperCase() });
+      // (19 nov., 5.409, publier-agent) LA CATÉGORIE ENREGISTRÉE, si la réponse du dépôt la porte (univers › catégorie ›
+      // sous-catégorie, libellés du site) ; une forme qui ne la porte pas ⇒ rien (« posée, pas relue », jamais devinée).
+      const categorie = categorieDeReponseVc(cand);
+      post({ kind: 'vcpublie', productId: String(id), chemin: normChemin(sansId(u.pathname)), methode: String(methode).toUpperCase(), ...(categorie ? { categorie } : {}) });
     } catch (_) {}
   }
 

@@ -29,7 +29,8 @@ import JaugeActions, { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, heureFr } from './jaugeActions.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
-import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth } from './App.jsx';
+import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth, load, save, onCloudReady } from './App.jsx';
+import NegociationPaliers from './NegociationPaliers.jsx';   // (19 nov., ext. 5.409) la négociation par paliers
 import PrixMiniManquants from './PrixMiniManquants.jsx';
 import { tr, localeCourante } from './i18n/index.js';
 import './offres-auto.css';
@@ -248,6 +249,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
         {setRefusVariantes ? <AutresVersions nom="refus" premier={refusMsg} variantes={refusVariantes} onChange={setRefusVariantes} extOk={variantesOk}/> : null}
         {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
       </div>
+      <NegociationPaliers load={load} save={save} onCloudReady={onCloudReady} askConfirm={askConfirm}/>
     </section>
   );
 }

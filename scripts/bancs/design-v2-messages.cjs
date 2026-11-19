@@ -15,13 +15,15 @@ require('./_porte-banc.cjs');
 //    M2. au plus 1 bouton plein ; M3. cibles ≥ 44 ; M4. rien de tronqué sans « … » (et le nom de groupe entier) ;
 //    M5. l'AIR : rangée ≥ 64, texte à ≥ 20 px du bord de sa carte, 32 entre deux groupes, 12 du titre à la carte,
 //        ≥ 12 entre deux boutons voisins ; M6. CLS du chargement = 0 (à 0,001 près) ;
-//    E1. les nombres des segments de la boîte = ceux des pastilles de la boîte d'hier (réglage éteint, même base) ;
+//    E1. les nombres des segments de la boîte = ceux que la ROUTE compte (même réponse) — (19 nov., lot emails-mail)
+//        l'écran E-mails n'a plus de version « éteinte » : la référence d'hier (les pastilles) n'existe plus ;
 //    E2. chaque segment montre les e-mails de SA rubrique ; « À traiter » = les « à vérifier » (3), jamais cachés ;
-//    E3. une rangée reliée par identité porte l'étiquette N° LUE dans l'e-mail ; un code se copie ; un geste par rangée ;
+//    E3. une rangée reliée par identité porte l'étiquette N° LUE dans l'e-mail ; un code se copie ; (19 nov.) le geste
+//        est dans la LECTURE (« Ce que VRM a compris »), plus un bouton par rangée — jamais deux gestes dans une rangée ;
 //    E4. « Ranger » (glisser à gauche) : l'e-mail reste, replié dans « Rangés », les nombres ne bougent pas ;
 //    E5. les e-mails à rattacher : une section calme, « C'est à moi » rejoue le BON e-mail (POST de SON id) ;
 //    A8. la confirmation partagée en très grand texte : le plein lisible en entier, au-dessus de « Annuler ».
-//  Éteint : la signature DOM de Messages et d'E-mails = celle du même banc lancé sur le build d'avant
+//  Éteint : la signature DOM de Messages (seulement : E-mails n'a plus qu'un dessin depuis le 19 nov.) = celle du même banc lancé sur le build d'avant
 //  (`SIGNATURE_AVANT=…/signature-eteint.json`, écrite par chaque passage dans SHOTS).
 //  `MUTATION=melange` (groupes mélangés), `MUTATION=ordre` (ordre inversé dans un groupe), `MUTATION=air` (rangée
 //  serrée) : la preuve que les contrôles rougissent. Chemins déduits de __dirname.
@@ -172,7 +174,11 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
     const r = (e) => e && e.getBoundingClientRect(); const hr = r(h), cr = r(c);
     return { titre: !!h, cloche: !!c, memeLigne: !!(hr && cr && Math.abs((hr.top + hr.bottom) / 2 - (cr.top + cr.bottom) / 2) < 24), segs: document.querySelectorAll('.vrm-main .v2-seg').length, anciens: document.querySelectorAll('.vrm-main .vrm-messages-sections, .vrm-main .vrm-fav-zones, .vrm-main .vrm-msg-bar').length,
       premiere: (() => { const x = document.querySelector('[data-v2-conv]'); return x ? Math.round(x.getBoundingClientRect().top) : null; })() }; });
-  if (W !== 1512) dit(tete.titre && tete.cloche && tete.memeLigne, `${nom} : le grand titre et la cloche sur une ligne`, tete);
+  // (19 nov., intégration — « VRM natif ») La coque native n'a plus de cloche dans la tête d'écran : la ligne du haut porte
+  // Messages et la photo du profil (« Plus » → Notifications), le grand titre est dessous (contrat NATIF.md). Jugé : le titre, et
+  // la ligne d'actions de la coque au-dessus de lui ; l'ancienne tête (cloche à côté du titre) reste acceptée.
+  const coqueNat = await pg.evaluate(() => { const h = document.querySelector('[data-v2-msg-titre] h1'), a = document.querySelector('[data-n-coque-plus]'); if (!h || !a) return null; return { actionsAuDessus: a.getBoundingClientRect().bottom <= h.getBoundingClientRect().top + 2 }; });
+  if (W !== 1512) dit(tete.titre && ((tete.cloche && tete.memeLigne) || !!(coqueNat && coqueNat.actionsAuDessus)), `${nom} : le grand titre, avec la cloche sur sa ligne ou les actions de la coque native au-dessus`, { ...tete, coqueNat });
   const segM = await pg.evaluate(() => { const g = document.querySelector('.v2m-tete .v2-seg'); if (!g) return null; const cs = getComputedStyle(g); return { deborde: g.scrollWidth > g.clientWidth + 1, fondu: /gradient/.test(cs.maskImage || cs.webkitMaskImage || '') }; });
   dit(segM && (!segM.deborde || segM.fondu), `${nom} : le segmenté tient dans la largeur, ou défile avec un fondu`, segM);
   dit(tete.segs === 1 && tete.anciens === 0, `${nom} : UN segmenté (Conversations · Offres · Favoris), plus les rangées d’hier`, tete);
@@ -188,7 +194,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
     const fil = await pg.evaluate(() => ({ bulles: document.querySelectorAll('.vrm-bulle').length, moi: (() => { const x = document.querySelector('.vrm-bulle-moi .vrm-bulle'); return x ? getComputedStyle(x).backgroundColor : ''; })(), champ: !!document.querySelector('.vrm-chat-panel textarea, .vrm-chat-panel input[type="text"]') || [...document.querySelectorAll('.vrm-chat-panel a, .vrm-chat-panel button')].some((x) => /Répondre sur Vinted/.test(x.textContent || '')) }));
     const tf = await pg.evaluate(() => { const e = document.querySelector('.vrm-chat-head-s'); if (!e) return null; const cs = getComputedStyle(e); return { coupe: e.scrollHeight > e.clientHeight + 1, ellipse: [...e.querySelectorAll('*'), e].some((x) => getComputedStyle(x).textOverflow === 'ellipsis' && x.scrollWidth > x.clientWidth + 1), lignes: Math.round(e.clientHeight / parseFloat(cs.lineHeight)) }; });
     dit(tf && !tf.coupe && !tf.ellipse, `${nom} : la tête du fil (paire · compte) n’est pas coupée`, tf);
-    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
+    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255|0, 104, 214|64, 156, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
     await pg.screenshot({ path: path.join(SHOTS, `fil-${nom}.png`) });
   }
   dit(!erreurs.length, `${nom} : aucune erreur de page`, erreurs.slice(0, 3));
@@ -200,26 +206,33 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
   await pg.waitForSelector('[data-boite-email]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(2500); await sansToasts(pg);
   const segs = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => [b.getAttribute('data-boite-rubrique-v2'), b.getAttribute('data-boite-n')])));
-  if (ancien) dit(['colis', 'ventes', 'achats', 'tout'].every((k) => segs[k] != null && segs[k] === ancien[k]) && segs.atraiter === ancien.atraiter, `${nom} E1 : les nombres des segments = les pastilles de la boîte d’hier`, { v2: segs, hier: ancien });
-  const m = await pg.evaluate((f) => eval('(' + f + ')')('[data-v2-mail-tete], [data-v2-mail-outils], .vrm-boite-liste'), MESURE.toString());
+  // E1 (19 nov.) : les nombres des segments = ceux que la route compte sur la vue « Tout » (la même réponse, relue ici).
+  const route = await pg.evaluate(async () => { try { const r = await fetch('/api/email-rattacher?mode=journal&page=0&parPage=50'); const j = await r.json(); const c = j.compteurs || {}, p = c.parRubrique || {}; const complet = !c.plus;
+    return { tout: complet ? String(c.sur) : null, colis: complet ? String(p.colis) : null, ventes: complet ? String(p.ventes) : null, achats: complet ? String(p.achats) : null, atraiter: c.aVerifier > 0 ? String(c.aVerifier) : null }; } catch (_) { return null; } });
+  void ancien;
+  dit(!!route && ['colis', 'ventes', 'achats', 'tout', 'atraiter'].every((k) => (segs[k] == null ? null : segs[k]) === route[k]), `${nom} E1 : les nombres des segments = ceux que la route compte`, { segs, route });
+  const m = await pg.evaluate((f) => eval('(' + f + ')')('[data-v2-mail-tete], [data-boite-liste]'), MESURE.toString());
   dit(m.zones >= 2 && m.pleins <= 1, `${nom} E : au plus 1 bouton plein (${m.pleins})`);
   dit(m.zones >= 2 && !m.petites.length, `${nom} E : cibles ≥ 44 px`, m.petites.slice(0, 6));
   dit(m.zones >= 2 && !m.tronques.length && !m.coupes.length, `${nom} E : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
-  const seg = await pg.evaluate(() => { const g = document.querySelector('[data-v2-mail-seg]'); if (!g) return null; const cs = getComputedStyle(g); return { deborde: g.scrollWidth > g.clientWidth + 1, fondu: /gradient/.test(cs.maskImage || cs.webkitMaskImage || ''),
-    compteSousTitre: !!document.querySelector('[data-v2-mail-compte]') && !document.querySelector('.vrm-boite-ligne-outils select'), selectionnerSeul: !!document.querySelector('.vrm-serie-entree') }; });
-  dit(seg && (!seg.deborde || seg.fondu) && seg.compteSousTitre && !seg.selectionnerSeul, `${nom} E : filtres en puces (fondu s’ils débordent), compte sous le titre, « Sélectionner » dans « ⋯ »`, seg);
+  // (19 nov.) Le segmenté en haut, sur toute la largeur, sans débordement ; le compte dans la barre (ordinateur) ou dans « ⋯ »
+  // (téléphone) ; « Sélectionner » dans « ⋯ ».
+  const seg = await pg.evaluate(() => { const g = document.querySelector('.n-mail-seg'); if (!g) return null; const h = document.querySelector('[data-v2-mail-tete]');
+    return { deborde: g.scrollWidth > g.clientWidth + 1, pleine: h ? g.getBoundingClientRect().width >= h.getBoundingClientRect().width - 1 : false,
+      compte: !!document.querySelector('[data-v2-mail-compte] select, [data-v2-mail-compte-feuille] select, [data-v2-mail-plus]'), selectionnerSeul: !!document.querySelector('.vrm-serie-entree') }; });
+  dit(seg && !seg.deborde && seg.pleine && seg.compte && !seg.selectionnerSeul, `${nom} E : segmenté pleine largeur sans débordement, compte dans la barre ou « ⋯ », « Sélectionner » dans « ⋯ »`, seg);
   const paE = await pg.evaluate((f) => eval('(' + f + ')')(), PASTILLE.toString());
   dit(!paE.sur, `${nom} E : la pastille « Mis à jour » ne couvre pas le titre${paE.vue ? '' : ' (pas montrée)'}`, paE);
   const cls = await pg.evaluate(() => window.__cls || 0);
   dit(cls <= 0.001, `${nom} E : CLS du chargement = ${cls.toFixed(4)}`, await pg.evaluate(() => window.__clsSrc || []));
   // E3 : l'étiquette N° = le N° LU (bordereau, vente), le code se copie, un geste par rangée sans code.
   const e3 = await pg.evaluate(() => { const faux = []; let vus = 0, gestes = 0, codes = 0;
-    for (const li of document.querySelectorAll('.vrm-boite-item')) { const b = li.querySelector('[data-boite-email]'); if (!b) continue; const n = b.getAttribute('data-v2-num'); const et = li.querySelector('[data-v2-etiquette]');
+    for (const li of document.querySelectorAll('.n-mail-item')) { const b = li.querySelector('[data-boite-email]'); if (!b) continue; const n = b.getAttribute('data-v2-num'); const et = li.querySelector('[data-v2-etiquette]');
       if (n) { vus++; if (!et || et.getAttribute('data-v2-etiquette') !== n) faux.push(b.getAttribute('data-boite-email').slice(16, 22)); }
       if (li.querySelector('[data-v2-mail-action]')) gestes++; if (li.querySelector('[data-boite-code-copier]')) codes++;
       if (li.querySelectorAll('[data-v2-mail-action]').length > 1) faux.push('deux gestes'); }
     return { vus, faux, gestes, codes }; });
-  dit(e3.vus >= 5 && !e3.faux.length && e3.gestes >= 3 && e3.codes >= 3, `${nom} E3 : étiquette N° lue (${e3.vus}), codes copiables (${e3.codes}), un geste par rangée (${e3.gestes})`, e3);
+  dit(e3.vus >= 5 && !e3.faux.length && e3.gestes === 0 && e3.codes >= 3, `${nom} E3 : étiquette N° lue (${e3.vus}), codes copiables (${e3.codes}), aucun bouton de geste dans les rangées (le geste est dans la lecture)`, e3);
   await pg.screenshot({ path: path.join(SHOTS, `emails-${nom}.png`) });
   // E2 : chaque segment montre SA rubrique ; « À traiter » = les 3 « à vérifier ».
   if (W === 390 && !sombre && !grand) {
@@ -235,7 +248,7 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
     await pg.click('[data-boite-rubrique-v2="tout"]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(1800);
     // E4 : glisser à gauche range ; l'e-mail reste (replié dans « Rangés »), les nombres ne bougent pas.
     const avant = await pg.evaluate(() => ({ n: document.querySelectorAll('[data-boite-email]').length, segs: [...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => b.getAttribute('data-boite-n')).join(',') }));
-    const cible = await pg.evaluate(() => { const b = document.querySelector('.vrm-boite-liste [data-boite-email]'); if (!b) return { id: '', x: 0, y: 0 }; const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-boite-email'), x: r.left + r.width * 0.7, y: r.top + r.height / 2 }; });
+    const cible = await pg.evaluate(() => { const b = document.querySelector('[data-boite-liste] [data-boite-email]'); if (!b) return { id: '', x: 0, y: 0 }; const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-boite-email'), x: r.left + r.width * 0.7, y: r.top + r.height / 2 }; });
     // Le glisser au doigt : des PointerEvent « touch » (ceux qu'écoute la rangée), vers la gauche.
     await pg.evaluate(async (c) => { const b = document.querySelector(`[data-boite-email="${c.id}"]`); if (!b) return; const ev = (t, x) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 7, isPrimary: true, clientX: x, clientY: c.y, button: 0 }));
       ev('pointerdown', c.x); for (let k = 1; k <= 8; k++) { ev('pointermove', c.x - k * 18); await new Promise((r) => setTimeout(r, 16)); } ev('pointerup', c.x - 144); }, cible);
@@ -263,7 +276,8 @@ async function pastillesHier(nav) {
 }
 
 async function eteint(nav, sigs) {
-  for (const [id, url, attente] of [['messages', '/?tab=cat_msg', '[data-conv]'], ['emails', '/?tab=emails', '[data-boite-email]']]) {
+  // (19 nov., lot emails-mail) E-mails n'a plus de dessin « éteint » (un seul écran, natif) : seule la signature de Messages.
+  for (const [id, url, attente] of [['messages', '/?tab=cat_msg', '[data-conv]']]) {
     const { ctx, pg } = await ouvrirEcran(nav, { W: 390, sombre: false, url, v2: false });
     await pg.waitForSelector(attente, { timeout: 40000 }).catch(() => {});
     sigs[id] = await signatureStable(pg);
@@ -274,7 +288,7 @@ async function eteint(nav, sigs) {
   }
   if (SIG_AVANT && fs.existsSync(SIG_AVANT)) {
     const ref = JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8'));
-    for (const id of ['messages', 'emails']) {
+    for (const id of ['messages']) {
       const a = ref[id] || [], c = sigs[id] || []; let i = 0; while (i < a.length && i < c.length && a[i] === c[i]) i++;
       dit(a.length > 20 && a.length === c.length && i === a.length, `éteint : ${id} a le DOM d’avant (${c.length} nœuds)`, i < Math.max(a.length, c.length) ? { n: [a.length, c.length], ecart: i, avant: a[i], ici: c[i] } : undefined);
     }
@@ -313,7 +327,7 @@ async function reglePure() {
     if (process.env.SEULEMENT === 'eteint') { await eteint(nav, sigs); throw new Error('seulement éteint'); }
     if (process.env.SEULEMENT === 'messages') { await messages(nav, { W: 390, sombre: false, nom: '390-clair' }); throw new Error('seulement messages (390 clair)'); }
     await reglePure().catch((e) => dit(false, 'règle pure : ' + String(e && e.message || e).slice(0, 200)));
-    const hier = await pastillesHier(nav);
+    const hier = null;   // (19 nov.) plus de boîte « d’hier » : E1 compare à la route
     await messages(nav, { W: 390, sombre: false, nom: '390-clair' });
     await messages(nav, { W: 390, sombre: true, nom: '390-sombre' });
     await messages(nav, { W: 375, sombre: false, grand: true, nom: '375-tres-grand' });

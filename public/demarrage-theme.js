@@ -9,7 +9,7 @@
 (function () {
   // Le haut du dégradé de l'écran de démarrage (clair, bleu-nuit) : `--sv-haut` de src/design/studio-verre.css
   // (16 nov., intégration : l'écran de chargement reprend les valeurs FINALES du verre, plus la proposition 9).
-  var BOOT_CLAIR = '#2563A8', BOOT_NUIT = '#133460';
+  var BOOT_CLAIR = '#F2F2F7', BOOT_NUIT = '#000000';   // (19 nov., « VRM natif ») le fond de la page, `--n-fond` (plus le haut du dégradé bleu)
   function lire(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function sombreAuDemarrage(mode, ancien, heure, systeme) {
     if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : 'clair';
@@ -31,8 +31,6 @@
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', d ? BOOT_NUIT : BOOT_CLAIR);
     document.documentElement.setAttribute('data-vrm-boot', '');
-    // (18 nov.) Le style « Apple » (src/designV2/style.js, `vrm_style`) : posé avant le premier rendu, le fond groupé dès l'ouverture.
-    try { if (localStorage.getItem('vrm_style') === 'apple') { document.documentElement.setAttribute('data-theme-style', 'apple'); if (m) m.setAttribute('content', d ? '#000000' : '#F2F2F7'); } } catch (e) {}
   } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   // « Recharger » de l'écran de démarrage (au-delà de 8 s) : avant tout JavaScript de l'app (c'est quand
   // elle ne vient pas qu'on le touche). Il OUBLIE la coquille gardée par le service worker (la page `/`,
