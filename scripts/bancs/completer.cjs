@@ -58,34 +58,41 @@ const etat = (pg) => pg.evaluate(() => {
   const c = document.querySelector('[data-cp-carte]'); const q = document.querySelector('[data-cp-question]');
   return { ouvert: !!document.querySelector('[data-completer]'), vue: (document.querySelector('[data-completer]') || { getAttribute: () => '' }).getAttribute('data-cp-vue'), carte: c ? c.getAttribute('data-cp-carte') : '',
     question: q ? q.getAttribute('data-cp-question') : '', mode: q ? q.getAttribute('data-cp-mode') : '', progres: (document.querySelector('[data-cp-progres]') || { getAttribute: () => '' }).getAttribute('data-cp-progres'),
-    achats: [...document.querySelectorAll('[data-cp-carte] [data-cp-achat]')].map((e) => ({ tx: e.getAttribute('data-cp-achat'), prix: e.querySelector('[data-cp-achat-prix]').getAttribute('data-cp-achat-prix'), niveau: e.getAttribute('data-cp-niveau') })),
+    achats: [...document.querySelectorAll('[data-cp-carte] [data-cp-achat]')].map((e) => ({ tx: e.getAttribute('data-cp-achat'), prix: e.getAttribute('data-cp-achat-prix'), niveau: e.getAttribute('data-cp-niveau') })),
     puces: [...document.querySelectorAll('[data-cp-carte] [data-cp-puce]')].map((e) => ({ id: e.getAttribute('data-cp-puce'), valeur: e.getAttribute('data-cp-puce-valeur'), sous: e.getAttribute('data-cp-puce-sous') === '1' })),
     suivante: (document.querySelector('[data-cp-suivante]') || { getAttribute: () => '' }).getAttribute('data-cp-suivante'), fin: !!document.querySelector('[data-cp-fin]'),
     bandeau: (document.querySelector('[data-cp-bandeau]') || { getAttribute: () => '' }).getAttribute('data-cp-bandeau') || '' };
 });
 // La forme de l'écran courant : pleins, cibles, débords, textes coupés, contrastes.
 const forme = (pg) => pg.evaluate(() => {
-  const R = document.querySelector('[data-completer]'); if (!R) return null;
+  const P = document.querySelector('[data-completer]'); if (!P) return null;
+  const feuille = [...document.querySelectorAll('[data-n-feuille-couche][data-n-etat="ouverte"]')].pop() || null;
+  const racines = [feuille || P, ...document.querySelectorAll('.n-toast')];
+  const tous = (sel) => racines.flatMap((r) => [...r.querySelectorAll(sel)]);
   const vis = (e) => { if (e.closest('.is-suivante')) return false; const r = e.getBoundingClientRect(); const s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
   const W = window.innerWidth, H = window.innerHeight;
-  const pleins = [...R.querySelectorAll('.vrm-cp-plein')].filter(vis).length;
-  const petits = [...R.querySelectorAll('button, input[type="text"]')].filter(vis).filter((e) => !e.closest('.vrm-cp-grille')).map((e) => { const r = e.getBoundingClientRect(); return { r, e }; })
-    .filter(({ r }) => r.height < 43.5 || r.width < 43.5).map(({ r, e }) => `${e.className.split(' ')[0]} ${Math.round(r.width)}×${Math.round(r.height)}`);
-  const hors = [...R.querySelectorAll('button, img, h2, p, .vrm-cp-affiche, .vrm-cp-photo')].filter(vis).filter((e) => !e.closest('.vrm-cp-lot-liste') && !e.closest('.vrm-cp-grille') && !e.closest('.vrm-cp-file')).map((e) => ({ r: e.getBoundingClientRect(), e }))
-    .filter(({ r }) => r.left < -0.5 || r.right > W + 0.5 || r.top < -0.5 || r.bottom > H + 0.5).map(({ r, e }) => `${e.className.split(' ')[0] || e.tagName} ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.right)},${Math.round(r.bottom)}`);
-  const coupes = [...R.querySelectorAll('.vrm-cp-q, .vrm-cp-rangee-valeur, .vrm-cp-puce-val, .vrm-cp-plein, .vrm-cp-texte, .vrm-cp-teinte, .vrm-cp-progres-n, .vrm-cp-affiche-n, .vrm-cp-fait dd, .vrm-cp-segment, .vrm-cp-feuille-titre')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.className.split(' ')[0] + ' « ' + e.textContent.trim().slice(0, 30) + ' »');
+  const nom = (e) => (typeof e.className === 'string' && e.className.split(' ')[0]) || e.tagName;
+  const defile = (e) => !!e.closest('.n-feuille-corps, .vrm-cp-grille, .vrm-cp-file');
+  const pleins = tous('[data-n-variante="plein"]').filter(vis).length;
+  const petits = tous('button, a, input[type="text"]').filter(vis).filter((e) => !e.closest('.vrm-cp-grille') && !e.classList.contains('n-feuille-poignee')).map((e) => ({ r: e.getBoundingClientRect(), e }))
+    .filter(({ r }) => r.height < 43.5 || r.width < 43.5).map(({ r, e }) => `${nom(e)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+  const hors = tous('button, img, h1, h2, p, .vrm-cp-affiche, .vrm-cp-photo').filter(vis).filter((e) => !defile(e)).map((e) => ({ r: e.getBoundingClientRect(), e }))
+    .filter(({ r }) => r.left < -0.5 || r.right > W + 0.5 || r.top < -0.5 || r.bottom > H + 0.5).map(({ r, e }) => `${nom(e)} ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.right)},${Math.round(r.bottom)}`);
+  const coupes = tous('.vrm-cp-q, .n-rangee-valeur, .vrm-cp-puce-val, .n-bouton-libelle, .n-barre-centre, .vrm-cp-affiche-n, .n-fait-valeur, .n-segmente-libelle, .n-feuille-titre, .n-plaque').filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => nom(e) + ' « ' + e.textContent.trim().slice(0, 30) + ' »');
   // Le contraste se juge sur le fond RENDU : les calques translucides (bouton teinté) sont composés jusqu'au premier fond opaque.
   const rgba = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return null; const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const lum = ({ r, g, b }) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const fondDe = (e) => { const couches = []; for (let x = e; x; x = x.parentElement) { const c = rgba(getComputedStyle(x).backgroundColor); if (c && c.a > 0) { couches.push(c); if (c.a >= 1) break; } }
     let f = { r: 255, g: 255, b: 255 }; for (const c of couches.reverse()) f = { r: c.r * c.a + f.r * (1 - c.a), g: c.g * c.a + f.g * (1 - c.a), b: c.b * c.a + f.b * (1 - c.a) }; return f; };
-  const faibles = [...R.querySelectorAll('.vrm-cp-q, .vrm-cp-titre, .vrm-cp-fait dt, .vrm-cp-fait dd, .vrm-cp-texte, .vrm-cp-teinte, .vrm-cp-rangee-titre, .vrm-cp-rangee-sous, .vrm-cp-rangee-valeur, .vrm-cp-puce-regle, .vrm-cp-puce-val, .vrm-cp-puce-note, .vrm-cp-plein, .vrm-cp-t, .vrm-cp-progres-n, .vrm-cp-progres-s, .vrm-cp-toast-txt, .vrm-cp-legende, .vrm-cp-nom, .vrm-cp-lot-prix, .vrm-cp-segment, .vrm-cp-ligne, .vrm-cp-affiche-note')]
-    .filter(vis).filter((e) => !e.disabled && e.textContent.trim()).map((e) => { const t = rgba(getComputedStyle(e).color); if (!t) return null; const fd = fondDe(e); const a = lum({ r: t.r * t.a + fd.r * (1 - t.a), g: t.g * t.a + fd.g * (1 - t.a), b: t.b * t.a + fd.b * (1 - t.a) }), b = lum(fd);
-      const c = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); return c < 4.5 ? `${e.className.split(' ')[0]} ${c.toFixed(2)}` : null; }).filter(Boolean);
-  const ph = R.querySelector('[data-cp-carte] .vrm-cp-photo img'); const rp = ph ? ph.getBoundingClientRect() : null;
-  return { pleins, petits: [...new Set(petits)], hors, coupes, faibles: [...new Set(faibles)], photo: rp ? { h: Math.round(rp.height), w: Math.round(rp.width), charge: ph.complete && ph.naturalWidth > 0 } : null,
-    zone: W < 600 ? [...R.querySelectorAll('button, img, h2, .vrm-cp-affiche')].filter(vis).filter((e) => !e.closest('.vrm-cp-lot-liste')).map((e) => ({ r: e.getBoundingClientRect(), e })).filter(({ r }) => r.top < 46.5 || r.bottom > H - 33.5).map(({ r, e }) => `${e.className.split(' ')[0] || e.tagName} ${Math.round(r.top)}–${Math.round(r.bottom)}`) : null,
-    defileX: document.documentElement.scrollWidth > W + 1, plaque: !!R.querySelector('[data-cp-carte] .vrm-cp-plaque .vrm-num'), titre: (R.querySelector('[data-cp-carte] [data-cp-titre]') || { textContent: '' }).textContent };
+  const texteDirect = (e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+  const faibles = tous('*').filter((e) => texteDirect(e) && vis(e) && !e.closest('[aria-disabled="true"], :disabled, .vrm-cp-photo')).map((e) => { const st = getComputedStyle(e); const t = rgba(st.color); if (!t || Number(st.opacity) === 0) return null; const fd = fondDe(e);
+    const a = lum({ r: t.r * t.a + fd.r * (1 - t.a), g: t.g * t.a + fd.g * (1 - t.a), b: t.b * t.a + fd.b * (1 - t.a) }), b = lum(fd); const c = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    return c < 4.5 ? `${nom(e)} « ${e.textContent.trim().slice(0, 18)} » ${c.toFixed(2)}` : null; }).filter(Boolean);
+  const tailles = [...new Set(tous('*').filter((e) => texteDirect(e) && vis(e)).map((e) => { const st = getComputedStyle(e); return Math.round(parseFloat(st.fontSize)) + '/' + st.fontWeight; }))].filter((x) => !/^(13|15|17|22|34)\/(400|600|700)$/.test(x));
+  const ph = P.querySelector('[data-cp-carte] .vrm-cp-photo img'); const rp = ph ? ph.getBoundingClientRect() : null;
+  return { pleins, petits: [...new Set(petits)], hors, coupes, faibles: [...new Set(faibles)], tailles, photo: rp ? { h: Math.round(rp.height), w: Math.round(rp.width), charge: ph.complete && ph.naturalWidth > 0 } : null,
+    zone: W < 600 ? tous('button, img, h1, h2, .vrm-cp-affiche').filter(vis).filter((e) => !defile(e)).map((e) => ({ r: e.getBoundingClientRect(), e })).filter(({ r }) => r.top < 46.5 || r.bottom > H - 33.5).map(({ r, e }) => `${nom(e)} ${Math.round(r.top)}–${Math.round(r.bottom)}`) : null,
+    defileX: document.documentElement.scrollWidth > W + 1, plaque: !!P.querySelector('[data-cp-carte] .vrm-cp-plaque .n-plaque'), titre: (P.querySelector('[data-cp-carte] [data-cp-titre]') || { textContent: '' }).textContent };
 });
 const jugerForme = (f, tag, quoi) => {
   if (f && f.zone) dit(!f.zone.length, `F ${tag} ${quoi} : rien dans la zone sûre (haut 47 px, bas 34 px)`, f.zone);
@@ -94,6 +101,7 @@ const jugerForme = (f, tag, quoi) => {
   dit(f && !f.hors.length && !f.defileX, `F ${tag} ${quoi} : rien hors de l'écran, aucun défilement horizontal`, f && f.hors);
   dit(f && !f.coupes.length, `F ${tag} ${quoi} : aucun texte coupé`, f && f.coupes);
   dit(f && !f.faibles.length, `F ${tag} ${quoi} : contrastes ≥ 4,5:1`, f && f.faibles);
+  dit(f && !f.tailles.length, `F ${tag} ${quoi} : tailles 13 · 15 · 17 · 22 · 34, graisses 400 / 600 / 700`, f && f.tailles);
 };
 const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet: 'tout', num: '', lot: false, ...d } })), d);
 
@@ -165,7 +173,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           // 2. la vente 6200002 : aucun achat proposé ⇒ le pavé : 4, 0, OK.
           dit(e.mode === 'pave' && !e.achats.length, `J ${tag} : sans achat proposé, le pavé est là tout de suite`, e);
           await attendre(300); jugerForme(await forme(pg), tag, 'carte « pavé »'); if (theme === 'clair') await shot('carte-pave');
-          await toucher('[data-cp-carte] [data-cp-touche="4"]'); await toucher('[data-cp-carte] [data-cp-touche="0"]'); await toucher('[data-cp-carte] [data-cp-ok]'); await fini('prix tapé', 'v:6200002');
+          await toucher('[data-cp-carte] [data-cp-touche="4"]'); await toucher('[data-cp-carte] [data-cp-touche="0"]'); await toucher('[data-cp-ok]'); await fini('prix tapé', 'v:6200002');
           ov = await local(pg, 'vinted_sale_overrides');
           dit(ov && ov['6200002'] && ov['6200002'].buyPrice === '40,00' && !ov['6200002'].buyFromId, `J ${tag} : « 40 » tapé ⇒ 40,00 € sur la vente 6200002, aucun achat relié`, ov && ov['6200002']);
           // 3. la vente 6200003 : « Je ne sais plus ».
@@ -173,7 +181,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           ov = await local(pg, 'vinted_sale_overrides'); const sans = await local(pg, 'vrm_completer_sans');
           dit(!(ov && ov['6200003']) && sans && sans['v:6200003|achat'], `J ${tag} : « Je ne sais plus » ⇒ noté, AUCUN prix écrit`, { ov: ov && ov['6200003'], sans });
           // 4. la vente 6200004 : 3, 5, OK.
-          await toucher('[data-cp-carte] [data-cp-touche="3"]'); await toucher('[data-cp-carte] [data-cp-touche="5"]'); await toucher('[data-cp-carte] [data-cp-ok]'); await fini('prix tapé', 'v:6200004');
+          await toucher('[data-cp-carte] [data-cp-touche="3"]'); await toucher('[data-cp-carte] [data-cp-touche="5"]'); await toucher('[data-cp-ok]'); await fini('prix tapé', 'v:6200004');
           // 5. N°101 (favoris) : achat proposé, puis le prix mini par une puce.
           await pg.waitForFunction(() => document.querySelectorAll('[data-cp-carte] [data-cp-achat]').length > 0, null, { timeout: 8000 }).catch(() => {});
           e = await etat(pg);
@@ -211,8 +219,8 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
               const id = e.carte.slice(2);
               fiches = await local(pg, 'vinted_annonce_numeros');
               const pose = fiches[id] && fiches[id].min;
-              await pg.waitForSelector('[data-cp-annuler]', { timeout: 4000 }).catch(() => {});
-              await toucher('[data-cp-annuler]');
+              await pg.waitForSelector('[data-cp-bandeau] .n-toast-action', { timeout: 4000 }).catch(() => {});
+              await toucher('[data-cp-bandeau] .n-toast-action');
               await pg.waitForFunction((c) => { const x = document.querySelector('[data-cp-carte]'); return x && x.getAttribute('data-cp-carte') === c; }, e.carte, { timeout: 8000 }).catch(() => {});
               await attendre(900);
               fiches = await local(pg, 'vinted_annonce_numeros');
@@ -238,24 +246,24 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           await toucher('[data-cp-plus-tard]'); await attendre(200);
           // Il ferme, il rouvre : il reprend où il s'est arrêté.
           const avantFermer = (await etat(pg)).carte;
-          await toucher('[data-cp-fermer]'); await attendre(300);
+          await toucher('[data-completer] .n-barre-retour'); await attendre(300);
           dit(!(await etat(pg)).ouvert, `J ${tag} : « × » ferme l'atelier`);
           await ouvrirPorte(pg, {}); await pg.waitForSelector('[data-cp-carte]', { timeout: 20000 }).catch(() => {});
           dit((await etat(pg)).carte === avantFermer, `J ${tag} : rouvert, il reprend où il s'était arrêté`, { avantFermer, apres: (await etat(pg)).carte });
           // « Ce qui reste », par sorte.
-          await toucher('[data-cp-progres]'); await pg.waitForSelector('[data-cp-reste]', { timeout: 4000 }).catch(() => {});
-          const reste = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-cp-reste] [data-cp-sujet]')].map((b) => [b.getAttribute('data-cp-sujet'), b.querySelector('b').textContent])));
+          await toucher('[data-cp-reste-ouvrir]'); await pg.waitForSelector('[data-cp-reste] [data-cp-sujet]', { timeout: 4000 }).catch(() => {});
+          const reste = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-cp-reste] [data-cp-sujet]')].map((b) => [b.getAttribute('data-cp-sujet'), b.getAttribute('data-cp-n')])));
           dit(reste.mini === '45' && reste.achat === '31' && reste.anciennes === '2', `J ${tag} : « Ce qui reste » par sorte (45 prix mini, 31 prix d'achat, 2 ventes anciennes)`, reste);
           await attendre(350); jugerForme(await forme(pg), tag, '« Ce qui reste »'); if (theme === 'clair') await shot('ce-qui-reste');
-          await pg.locator('.vrm-cp-voile').first().tap({ position: { x: 30, y: 80 } }).catch(() => {}); await attendre(250);
-          await toucher('[data-cp-fermer]'); await attendre(300);
+          await toucher('[data-cp-reste] .n-feuille-croix'); await attendre(450);
+          await toucher('[data-completer] .n-barre-retour'); await attendre(300);
 
           // ── L : la règle en lot — ouvrir, « −15 % », « Poser N » ──
           const tL0 = await touchers();
           await ouvrirPorte(pg, { sujet: 'mini' });
           await pg.waitForSelector('[data-cp-lot]', { timeout: 20000 }).catch(() => {});
           dit((await etat(pg)).vue === 'lot', `L ${tag} : l'entrée « prix mini » ouvre la règle en lot`, await etat(pg));
-          await toucher('[data-cp-regle="p15"]'); await attendre(250);
+          await pg.locator('[data-cp-lot] .vrm-cp-regles [role="radio"]').nth(1).tap(); await attendre(250);
           const ap = await pg.evaluate(() => [...document.querySelectorAll('[data-cp-lot-ligne]')].map((l) => ({ id: l.getAttribute('data-cp-lot-ligne'), mini: l.getAttribute('data-cp-lot-mini'), coche: l.getAttribute('data-cp-lot-coche'), ecartee: l.getAttribute('data-cp-lot-ecartee') || '' })));
           const attendu = (id) => String(Math.floor(prixDe(Number(id) - 51000) * 0.85));
           dit(ap.length === 45 && ap.every((l) => l.mini === attendu(l.id)), `L ${tag} : l'aperçu ligne par ligne (45 annonces), prix − 15 % à l'euro du dessous`, ap.filter((l) => l.mini !== attendu(l.id)).slice(0, 4));
@@ -264,7 +272,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           jugerForme(await forme(pg), tag, 'règle en lot'); await shot('regle-en-lot');
           // Décocher la première, poser.
           const premiere = ap.find((l) => l.coche === '1');
-          await pg.locator(`[data-cp-lot-ligne="${premiere.id}"] input`).first().tap().catch(() => {});
+          await pg.locator(`[data-cp-lot-ligne="${premiere.id}"]`).first().tap().catch(() => {}); await attendre(150);
           const nPoser = Number(await pg.getAttribute('[data-cp-lot-poser]', 'data-cp-lot-poser'));
           const avantLot = await local(pg, 'vinted_annonce_numeros');
           await toucher('[data-cp-lot-poser]'); await attendre(900);
@@ -272,15 +280,15 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           const cochees = ap.filter((l) => l.coche === '1' && l.id !== premiere.id);
           dit(nPoser === cochees.length && cochees.every((l) => fiches[l.id].min === l.mini) && !fiches[premiere.id].min && sousAchat.every((l) => !fiches[l.id].min),
             `L ${tag} : « Poser ${nPoser} » écrit exactement l'aperçu ; la décochée et les « sous l'achat » ne sont pas écrites`, { nPoser, n: cochees.length, dec: fiches[premiere.id] });
-          await pg.waitForSelector('[data-cp-annuler]', { timeout: 4000 }).catch(() => {});
-          await toucher('[data-cp-annuler]'); await attendre(1200);
+          await pg.waitForSelector('[data-cp-bandeau] .n-toast-action', { timeout: 4000 }).catch(() => {});
+          await toucher('[data-cp-bandeau] .n-toast-action'); await attendre(1200);
           fiches = await local(pg, 'vinted_annonce_numeros');
           dit(JSON.stringify(fiches) === JSON.stringify(avantLot), `L ${tag} : « Annuler » en bloc ⇒ l'état d'avant, exactement`);
           // Les 3 touchers : ouvrir, choisir, poser.
-          await toucher('[data-cp-fermer]'); await attendre(300);
+          await toucher('[data-completer] .n-barre-retour'); await attendre(300);
           const tL1 = await touchers();
           await ouvrirPorte(pg, { sujet: 'mini' }); await pg.waitForSelector('[data-cp-lot]', { timeout: 20000 }).catch(() => {});
-          await toucher('[data-cp-regle="p15"]'); await toucher('[data-cp-lot-poser]'); await attendre(900);
+          await pg.locator('[data-cp-lot] .vrm-cp-regles [role="radio"]').nth(1).tap(); await toucher('[data-cp-lot-poser]'); await attendre(900);
           const tL2 = await touchers();
           fiches = await local(pg, 'vinted_annonce_numeros');
           const restants = ap.filter((l) => !fiches[l.id].min).length;
@@ -306,14 +314,17 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           const geo = await pg.evaluate(() => { const f = document.querySelector('[data-cp-file]'), c = document.querySelector('[data-cp-carte]'); return f && c ? { file: f.getBoundingClientRect().right, carte: c.getBoundingClientRect().left, n: f.getAttribute('data-cp-file') } : null; });
           dit(geo && geo.file <= geo.carte && geo.n === '55', `O ${tag} : la file (55) à gauche, la carte à droite`, geo);
           // Le filtre « Toutes · En ligne · Vendues » (la même attente que « Relier achats et ventes »).
-          await pg.locator('[data-cp-progres]').first().click(); await pg.waitForSelector('[data-cp-reste]', { timeout: 4000 }).catch(() => {});
-          await pg.locator('[data-cp-genre="vente"]').first().click(); await attendre(250);
-          const gV = await pg.evaluate(() => ({ tout: (document.querySelector('[data-cp-reste] [data-cp-sujet="tout"] b') || {}).textContent, mini: !!document.querySelector('[data-cp-reste] [data-cp-sujet="mini"]'), file: document.querySelector('[data-cp-file]').getAttribute('data-cp-file') }));
-          await pg.locator('[data-cp-genre="annonce"]').first().click(); await attendre(250);
-          const gA = await pg.evaluate(() => ({ tout: (document.querySelector('[data-cp-reste] [data-cp-sujet="tout"] b') || {}).textContent, achat: (document.querySelector('[data-cp-reste] [data-cp-sujet="achat"] b') || {}).textContent }));
+          await pg.locator('[data-cp-reste-ouvrir]').first().click(); await pg.waitForSelector('[data-cp-reste] [data-cp-sujet]', { timeout: 4000 }).catch(() => {});
+          const genre = (k) => pg.locator('[data-cp-reste] .n-segmente [role="radio"]').nth(k).click();
+          const nDe = (s) => pg.evaluate((s) => { const e = document.querySelector(`[data-cp-reste] [data-cp-sujet="${s}"]`); return e ? e.getAttribute('data-cp-n') : null; }, s);
+          await genre(2); await attendre(300);
+          const gV = { tout: await nDe('tout'), mini: (await nDe('mini')) != null, file: await pg.getAttribute('[data-cp-file]', 'data-cp-file') };
+          await genre(1); await attendre(300);
+          const gA = { tout: await nDe('tout'), achat: await nDe('achat') };
           dit(gV.tout === '4' && !gV.mini && gV.file === '4' && gA.tout === '51' && gA.achat === '33', `O ${tag} : le filtre « Vendues » (4) / « En ligne » (51, dont 33 sans prix d'achat)`, { gV, gA });
           await attendre(200); await shot('ordinateur-ce-qui-reste');
-          await pg.locator('[data-cp-genre="tous"]').first().click(); await attendre(150); await pg.keyboard.press('Escape'); await attendre(200);
+          await genre(0); await attendre(200); await pg.locator('[data-cp-reste] .n-feuille-croix').first().click(); await attendre(450);
+          await pg.locator('[data-completer]').first().focus().catch(() => {});
           await pg.keyboard.press('1');
           await pg.waitForFunction(() => { const x = document.querySelector('[data-cp-carte]'); return x && x.getAttribute('data-cp-carte') === 'v:6200002'; }, null, { timeout: 8000 }).catch(() => {});
           let ov = await local(pg, 'vinted_sale_overrides');
@@ -328,6 +339,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           dit((await etat(pg)).carte === 'v:6200004', `O ${tag} : Tab = plus tard (la question suivante), rien d'écrit`, await etat(pg));
           await attendre(300); jugerForme(await forme(pg), tag, 'carte'); await shot('ordinateur');
           // La grille.
+          await pg.locator('[data-cp-reste-ouvrir]').first().click(); await pg.waitForSelector('[data-cp-grille-ouvrir]', { timeout: 4000 }).catch(() => {});
           await pg.locator('[data-cp-grille-ouvrir]').first().click().catch(() => {});
           await pg.waitForSelector('[data-cp-grille]', { timeout: 6000 }).catch(() => {});
           const champ = pg.locator('[data-cp-case="a:51001|mini"]').first();
@@ -337,7 +349,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           await attendre(200); await shot('ordinateur-grille');
           await pg.keyboard.press('Escape'); await attendre(200);
           dit((await etat(pg)).vue === 'cartes', `O ${tag} : Échap revient aux cartes`);
-          await pg.locator('[data-cp-progres]').first().focus().catch(() => {}); await pg.keyboard.press('Escape'); await attendre(300);
+          await pg.locator('[data-completer]').first().focus().catch(() => {}); await pg.keyboard.press('Escape'); await attendre(400);
           dit(!(await etat(pg)).ouvert, `O ${tag} : Échap ferme l'atelier`);
         }
         const err = [...journal.erreurs, ...journal.console.filter((x) => !/favicon|manifest|ServiceWorker|service worker/i.test(x))];

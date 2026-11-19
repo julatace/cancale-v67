@@ -5310,8 +5310,9 @@ const _ecrivainVrm = creerEcrivainLocal({
 // `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
 // de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
 // `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
+let _dureeProchainGeste = 0;   // (19 nov.) l'atelier « Compléter » : « Annuler » 10 s pour le geste lancé juste après
 const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null, deux = null, duree = 0) => _gestes.lancer({
-  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree,
+  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree: duree || (() => { const d = _dureeProchainGeste; _dureeProchainGeste = 0; return d; })(),
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -39089,7 +39090,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (num) setBuyByNum(prev => { const u = { ...prev, [num]: w.patch.buyPrice }; save('vinted_buyprice_by_num', u); return u; });
     return w;
   };
+  // (19 nov., atelier « Compléter ») L'atelier pose SA question « Payée combien ? » juste après le N° : pas de feuille en double.
+  const sansFeuillePrix = useRef(false);
   const demanderPrixAchat = async (item, numeroPose) => {
+    if (sansFeuillePrix.current) return;
     if (!prixADemander(effEntry(item), buyOf(item))) return;   // prix connu ou achat relié
     // Une suggestion d'achat (la règle de « Sans achat relié » : marque ET taille,
     // achat antérieur à la mise en ligne) est PROPOSÉE à côté du champ, jamais posée
@@ -39168,11 +39172,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: 'Oui, le même article', cancel: `Non — N°${nextNumero}`,
       });
       const v = meme ? n : String(nextNumero);
-      updatePair(item, { numero: v, manuelAt, ...changeAMain(item, avant, v, manuelAt, opts) }); recordUsed(v); if (!opts.sansPrix) await demanderPrixAchat(item, v); return;
+      updatePair(item, { numero: v, manuelAt, ...changeAMain(item, avant, v, manuelAt, opts) }); recordUsed(v); await demanderPrixAchat(item, v); return;
     }
     // ⚠️ C'EST ICI qu'on écrit le numéro (le champ ne valide qu'à la sortie,
     //    cf. `ChampSaisie` — il n'écrit plus à chaque frappe).
-    if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); if (!opts.sansPrix) await demanderPrixAchat(item, n); return; }
+    if (!autres.length) { updatePair(item, { numero: n, manuelAt, ...changeAMain(item, avant, n, manuelAt, opts) }); recordUsed(n); await demanderPrixAchat(item, n); return; }
     const presents = (porteursNum[cle] || []).filter(p => String(p.id) !== moi);
     if (presents.length && refusHorsLigne('numero')) { updatePair(item, { numero: avant }); return; }
     if (presents.length) {
@@ -39194,7 +39198,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ok: `Prendre le N°${nextNumero}`, cancel: 'Annuler',
       });
       updatePair(item, prendre ? { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) } : { numero: avant });
-      if (prendre) { recordUsed(nextNumero); if (!opts.sansPrix) await demanderPrixAchat(item, String(nextNumero)); }
+      if (prendre) { recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); }
       return;
     }
     const anc = numeros[autres[0]] || {};
@@ -39204,7 +39208,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       desc: `Il était sur « ${anc.title || 'un autre article'} », qui n'est plus en ligne.\n\nEst-ce bien le MÊME article qui te revient (litige, retour, annulation) ?\n\nSi oui, il reprend son prix d'achat et ses infos. Si c'est un autre article, prends le N°${nextNumero} : un numéro ne se réattribue jamais.`,
       ok: 'Oui, le même article revient', cancel: `Non — N°${nextNumero}`,
     });
-    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) }); recordUsed(nextNumero); if (!opts.sansPrix) await demanderPrixAchat(item, String(nextNumero)); return; }
+    if (!meme) { updatePair(item, { numero: String(nextNumero), manuelAt, ...changeAMain(item, avant, String(nextNumero), manuelAt, opts) }); recordUsed(nextNumero); await demanderPrixAchat(item, String(nextNumero)); return; }
     setNumeros(prev => {
       const u = { ...prev }; const a = u[autres[0]] || {};
       u[moi] = { ...(u[moi] || {}),
@@ -45077,9 +45081,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (cible.genre === 'vente' && cible.o) { const o = cible.o; prix = o.price && o.price.currency_code && o.price.currency_code !== 'EUR' ? null : (o.price && o.price.amount); entree = { ...(effEntry(o) || {}), ...w }; }
     else { const f = fiches[String(cible.id)] || ficheNeuve || {}; const pv = it && it.price != null ? it.price : f.price; prix = pv && typeof pv === 'object' ? pv.amount : pv; entree = { ...f, ...w }; }
     const res = texteApresLiaison({ genre: cible.genre, prix, entree }, tr, beneficeLigneVente, texteBenefice);
+    if (only === 'completer') _dureeProchainGeste = 10000;
     const num = cible.num || String(((cible.genre === 'annonce' ? fiches[String(cible.id)] : (cible.idf ? fiches[String(cible.idf)] : null)) || {}).numero || '');
     gesteVrm(res.texte, ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum }, null, 'achat.relier',
-      { libelle: tr('liaison.recu'), cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) }, { titre: res.titre, sous: res.sous }, only === 'completer' ? 10000 : 0);
+      { libelle: tr('liaison.recu'), cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) }, { titre: res.titre, sous: res.sous });
     return true;
   };
   const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
@@ -45313,7 +45318,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const it = annonceCompleter(art.id); if (!it) return;
     const t = Number(it.createdTs); openPicker({ ...it, _dateRef: Number.isFinite(t) && t > 0 ? new Date(t < 1e12 ? t * 1000 : t).toISOString() : null });
   };
-  const numeroCompleter = async (art, v) => { const it = annonceCompleter(art.id); if (it) await poserNumero(it, v, '', { sansPrix: true }); };
+  const numeroCompleter = async (art, v) => { const it = annonceCompleter(art.id); if (!it) return; sansFeuillePrix.current = true; try { await poserNumero(it, v, ''); } finally { sansFeuillePrix.current = false; } };
   // L'achat qu'une IDENTITÉ désigne (le même fichier photo, src/prixAchatPropose.js) : proposé en tête, relié par SON toucher.
   const achatsParPhotoCpl = useMemo(() => { if (!enCompleter || !Array.isArray(fillBuyAchats.items)) return null; const m = new Map(); for (const a of fillBuyAchats.items) { const k = a && photoKey(orderPhoto(a)); if (!k) continue; const l = m.get(k); if (l) l.push(a); else m.set(k, [a]); } return m; }, [enCompleter, fillBuyAchats.items]);
   const identiteCompleter = (art) => { if (!achatsParPhotoCpl || !art || !art.photo) return null; const k = photoKey(art.photo); if (!k) return null;
@@ -57637,10 +57642,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onRelier={relierCompleter} onAutreAchat={autreAchatCompleter} onNumero={numeroCompleter} numeroPropose={()=>String(nextNumero)}
           propositionDe={(a)=>propositionPrixAchat({ identite: { achat: a, par: 'lien' }, ventilationDe: ventilationDeTx, estLot: estLotPropose })} miniActif={offresAuto === true}
           arrivees={aNumeroterJournee.length ? { n: aNumeroterJournee.length, ouvrir: ()=>ouvrirAtelierArrivee(aNumeroterJournee) } : null}
-          vend={vendMots()} Photo={PhotoVinted} Plaque={Numero} Retour={FermeAuRetour} onFermer={onCompleterFermer} zIndex={1290}/> : null}
+          vend={vendMots()} Photo={PhotoVinted} Icon={Icon} onFermer={onCompleterFermer}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
-        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+        <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:only==='completer'?18500:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
           <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('relierTout.titreFeuille')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et

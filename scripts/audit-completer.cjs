@@ -62,11 +62,12 @@ const MUTS = {
   'ecran-deux-ecritures': ['src/completer/Completer.jsx', "    ecrire(r, ops); noter(a, 'achat', r, {", "    ecrire(r, ops); ecrire(r, ops); noter(a, 'achat', r, {"],
   'ecran-attend-l-app': ['src/completer/Completer.jsx', "    setRepondues((r) => new Set(r).add(a.cle + '|' + q));\n", ''],
   'ecran-annuler-sans-retour': ['src/completer/Completer.jsx', "if (e === 'annulation' || e === 'annule' || e === 'echec' || e === 'echec-annulation') {", "if (e === 'jamais') {"],
-  'ecran-style-en-ligne': ['src/completer/Completer.jsx', '<header className="vrm-cp-barre">', '<header className="vrm-cp-barre" style={{ height: 44 }}>'],
+  'ecran-style-en-ligne': ['src/completer/Completer.jsx', '<div className="vrm-cp-scene" data-cp-scene="">', '<div className="vrm-cp-scene" data-cp-scene="" style={{ height: 400 }}>'],
+  'ecran-hors-natif': ['src/completer/Completer.jsx', "<PagePoussee ouverte titre={titrePage}", "<div title={titrePage}"],
   'app-carte-revenue': ['src/App.jsx', "jobs.push({ id: 'completer', n: nC,", "jobs.push({ id: 'prix-mini-manquants', n: nC,"],
   'app-ecran-au-demarrage': ['src/App.jsx', "const Completer = aLaDemande(() => import('./completer/Completer.jsx'), true);", "import Completer from './completer/Completer.jsx';"],
   'app-annuler-5s': ['src/App.jsx', "'completer', null, null, 10000);", "'completer', null, null, 0);"],
-  'app-numero-redemande': ['src/App.jsx', "if (it) await poserNumero(it, v, '', { sansPrix: true });", "if (it) await poserNumero(it, v, '');"],
+  'app-numero-redemande': ['src/App.jsx', "    if (sansFeuillePrix.current) return;\n", ''],
 };
 if (process.argv.includes('--prouve')) {
   let n = 0;
@@ -337,17 +338,21 @@ async function principal() {
     'S2 une seule porte (`ouvrirCompleter`) ; les compteurs publiés par la MÊME règle que la file');
   const cartes = ["id: 'prix-mini-manquants'", "id: 'achat-a-relier'", "id: 'numeros-a-donner'", "id: 'prix-achat-vente'"].filter((x) => app.includes(x));
   dit(!cartes.length && (app.match(/id: 'completer'/g) || []).length === 1 && /avant: \(\) => \{ ouvrirCompleter\(\); \}/.test(app), 'S3 Ma journée : les quatre cartes « N sans … » retirées (décision du 19 nov.), UNE entrée « à compléter »', cartes);
-  dit(/'completer', null, null, 10000\)/.test(app) && /only === 'completer' \? 10000 : 0\)/.test(app) && /duree: Number\(duree\) > 0/.test(sansCommentaires(lire('src/gesteAnnulable.js'))) && M.DUREE_ANNULER === 10000,
+  dit(/'completer', null, null, 10000\)/.test(app) && /if \(only === 'completer'\) _dureeProchainGeste = 10000;/.test(app) && /duree: Number\(duree\) > 0/.test(sansCommentaires(lire('src/gesteAnnulable.js'))) && M.DUREE_ANNULER === 10000,
     'S4 chaque réponse (et chaque liaison) est annulable 10 s, par le moteur des gestes');
   const nRelier = (ecran.match(/\bonRelier\(/g) || []).length, nRelierCarte = (ecran.match(/\bonRelier\(a, c\.achat\)/g) || []).length;
   dit(nRelier === 2 && nRelierCarte === 2 && /relierGlisse\(a, art\.genre === 'vente' \? \{ genre: 'vente', tx: art\.tx, idf: art\.idf/.test(app), 'S5 relier = SON toucher sur UNE rangée : l’achat de cette rangée, l’identité de l’article (l’écriture de « Relier »)', { nRelier, nRelierCarte });
   dit(!/askConfirm|window\.confirm|\bconfirm\(/.test(ecran), 'S6 aucune confirmation dans l’atelier (« Annuler » suffit)');
   dit(!/\bstyle=\{/.test(ecran) && !/!important/.test(sansCommentaires(lire('src/completer/completer.css'))) && !/:has\(/.test(lire('src/completer/completer.css')), 'S10 design natif : aucun style en ligne, aucun `!important`, aucun `:has()`');
+  const css = sansCommentaires(lire('src/completer/completer.css'));
+  dit(/from '\.\.\/natif\/index\.js'/.test(ecran) && /<PagePoussee ouverte/.test(ecran) && (ecran.match(/<Feuille /g) || []).length === 2 && /<Toast /.test(ecran) && /<Rangee /.test(ecran) && /<Faits /.test(ecran) && /<Segmente /.test(ecran)
+    && !/#[0-9a-fA-F]{3,8}\b|rgb\(/.test(css) && !/font-size:/.test(css) && !/box-shadow|gradient|backdrop-filter/.test(css),
+    'S12 une page poussée du natif : PagePoussee, Feuille ×2, Toast, Rangee, Faits, Segmente ; la feuille de style n’écrit ni couleur, ni taille, ni ombre');
   const gestesParReponse = ['poserPrixAchat', 'poserMini', 'poserPrix', 'neSaitPlus'].map((nom) => { const m = new RegExp('const ' + nom + ' = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\};').exec(ecran); return m ? (m[1].match(/\becrire\(/g) || []).length + (m[1].match(/\bgeste\(/g) || []).length : -1; });
   dit(gestesParReponse.every((x) => x === 1) && /const ecrire = \(texte, ops\) => apresPeinture\(\(\) => geste\(texte, ops\)\);/.test(ecran), 'S7 une réponse = UNE écriture (un seul geste par réponse)', gestesParReponse);
   dit(/setRepondues\(\(r\) => new Set\(r\)\.add\(a\.cle \+ '\|' \+ q\)\);/.test(ecran) && /!repondues\.has\(a\.cle \+ '\|' \+ q\)/.test(ecran) && /if \(e === 'annulation' \|\| e === 'annule' \|\| e === 'echec' \|\| e === 'echec-annulation'\) \{ setRepondues\(/.test(ecran),
     'S11 aucune attente : la réponse fait avancer tout de suite, l’écriture part après la carte suivante ; « Annuler » ou un refus ⇒ l’article revient');
-  dit(/'vrm_completer_sans',/.test(app) && /poserNumero\(it, v, '', \{ sansPrix: true \}\)/.test(app) && (app.match(/if \(!opts\.sansPrix\) await demanderPrixAchat\(/g) || []).length === 4,
+  dit(/'vrm_completer_sans',/.test(app) && /sansFeuillePrix\.current = true; try \{ await poserNumero\(it, v, ''\); \} finally \{ sansFeuillePrix\.current = false; \}/.test(app) && /const demanderPrixAchat = async \(item, numeroPose\) => \{\s*if \(sansFeuillePrix\.current\) return;/.test(app),
     'S8 « Je ne sais plus » est synchronisé ; le N° passe par `poserNumero` (ses garde-fous), sans redemander le prix d’achat');
   dit(/prixCertains\(\{ entrees: liees/.test(ecran) && /par: 'lien'/.test(app), 'S9 le prix certain vient de l’achat qu’il a relié (`par: \'lien\'`), jamais d’une proposition');
 
