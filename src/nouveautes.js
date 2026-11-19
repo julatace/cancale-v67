@@ -28,6 +28,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (19 nov., ext. 5.409) docs/passation/2026-11-19-extension-utile.md
+  { id: 'negociation-paliers', date: '2026-11-19', titre: 'Contre-offres par paliers, jamais sous le plancher', phrase: 'Une offre trop basse reçoit une contre-offre, palier par palier.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-vinted', date: '2026-11-19', titre: 'Un grand panneau VRM sur Vinted', phrase: 'Messages, annonces, favoris, ventes : tout dans l’onglet Vinted.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'arrivee-capte', date: '2026-11-19', titre: 'Ce que l’extension a capté, à ton arrivée', phrase: 'Ventes, codes, messages : une feuille les dit, chacun mène à l’élément.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (19 nov., photo du Mac de Julien : « Extension à installer » alors qu'elle vit dans un autre Chrome) docs/passation/2026-11-19-vite-et-sans-bug.md
   { id: 'page-extension', date: '2026-11-19', titre: 'Une page pour l’extension et tes comptes', phrase: 'Compte ouvert, ce que VRM peut faire, et pourquoi : en clair.', tab: 'extension', pour: 'tous', mode: 'tous' },

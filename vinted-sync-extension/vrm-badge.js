@@ -1775,6 +1775,11 @@
       + carteA('offres', 'au_offres', pastilleEtat(o ? o.actif : null),
         ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null) + ligne('au_refus', o ? TU(o.refus ? 'au_oui' : 'au_non') : null),
         '?tab=messages&site=vinted&vue=offres')
+      + carteA('paliers', 'au_paliers', pastilleEtat(au.paliers ? au.paliers.actif : null),
+        ligne('au_paliers_pcts', au.paliers ? au.paliers.paliers.map((x) => x + ' %').join(' · ') : null)
+        + ligne('au_paliers_plancher', au.paliers ? (au.paliers.remiseMax ? TU('au_plancher_remise', { r: au.paliers.remiseMax }) : TU('au_plancher_mini')) : null)
+        + ligne('au_messages', au.paliers ? (au.paliers.messages ? TU('au_versions', { n: au.paliers.messages }) : TU('au_pas_de_message')) : null),
+        '?tab=messages&site=vinted&vue=offres')
       + `<section class="au5" data-auto-carte="baisse"><div class="au5-t"><h3>${esc(TU('au_baisse'))}</h3><span class="et5" data-etat="bientot">${esc(TU('au_bientot'))}</span></div><p class="note5">${esc(TU('au_baisse_pas_livree'))}</p></section>`
       + `</div>`;
   }
