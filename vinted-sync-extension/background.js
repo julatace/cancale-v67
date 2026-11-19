@@ -4305,6 +4305,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const ok = await rangerVcAnnonces({ liens: { [pid]: String(p.ad.numero || '') } });
             sendResponse({ ok: ok === true }); return;
           }
+          // (19 nov., 5.409) L'identifiant numérique du brouillon et les fichiers des photos du dépôt EN COURS (cet onglet).
+          if (msg.action === 'vcDepotInfo') {
+            const b0 = /^\d{5,12}$/.test(String(msg.brouillon || '')) ? String(msg.brouillon) : '';
+            const ph = Array.isArray(msg.photos) ? msg.photos.map(clePhotoDepotVc).filter(Boolean) : [];
+            const photos = [...new Set([...(Array.isArray(p.photosDepot) ? p.photosDepot : []), ...ph])].slice(0, 24);
+            await chrome.storage.local.set({ vrmPendingVc: { ...p, brouillon: b0 || p.brouillon || '', photosDepot: photos } });
+            sendResponse({ ok: true }); return;
+          }
           // 5.236 : la CONFIRMATION vue par vc-depot.js après son clic « Publier »
           // (sans booster). Seulement là : la paire est notée publiée.
           if (msg.action === 'publiee') {
@@ -4313,6 +4321,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const g2 = await chrome.storage.local.get('vrmPendingVc');
             const pid = g2 && g2.vrmPendingVc && g2.vrmPendingVc.productId;
             if (pid) await rangerVcAnnonces({ liens: { [pid]: String(p.ad.numero || '') } });
+            try { await retenirPublieeVc({ productId: pid || '', brouillon: g2 && g2.vrmPendingVc && g2.vrmPendingVc.brouillon, photos: g2 && g2.vrmPendingVc && g2.vrmPendingVc.photosDepot, numero: p.ad.numero }); } catch (_) {}
             await chrome.storage.local.set({ vrmPendingVc: null });
             await majCmd('vc:' + p.ad.id, { etape: 'fait', tabId: null, raison: null });
             notifierApp({ type: 'maj', quoi: 'vestiaire' });
@@ -4642,6 +4651,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             //    (`nonMarquee`) et `publierDepuisApp` ne relance pas sans elle.
             const marque = await markLbcPosted(msg.id);
             if (marque !== true) noterDiag('lbc_marque_ratee');
+            // (19 nov., 5.409) L'annonce CRÉÉE garde son identifiant avec le N° de la paire (`lbc_publiees`) : l'app la relie par lui.
+            try { await garderPublieeLbc({ source: msg.id, numero: msg.numero, tabId: sender && sender.tab ? sender.tab.id : null }); } catch (_) { noterDiag('lbc_publiee_ratee'); }
             // Publiée depuis une commande de l'app : l'app le sait tout de suite.
             const jid = 'lbc:' + String(msg.id);
             if ((await lireCmds())[jid]) await majCmd(jid, { etape: 'fait', nonMarquee: marque !== true ? true : null });
@@ -4749,7 +4760,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           // Le catalogue Leboncoin (codes de catégorie/marque/taille/état) : sa
           // propre ligne, une place par endpoint, rien ne peut l'évincer.
-          if (msg.action === 'lbcCatalogue' && msg.body) { await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
+          if (msg.action === 'lbcCatalogue' && msg.body) { try { await noterAnnonceLbcCreee(msg.url, msg.body, sender); } catch (_) {} await storeLbcCatalogue(msg.url, String(msg.body).slice(0, LBC_CATALOGUE_MAX), !!msg.coupe || String(msg.body).length > LBC_CATALOGUE_MAX); sendResponse({ ok: true }); return; }
           // ⚠️ LA FORME DE CE QUI PART VERS LEBONCOIN — chemins de clés et types,
           //    JAMAIS les valeurs (son titre, sa description, son prix ne
           //    quittent pas sa page). C'est ce qui dit quels champs le dépôt
@@ -27407,6 +27418,46 @@ function rangerVcAnnonces(patch) {
   _vcAnnoncesChaine = run.then(() => {}, () => {});
   return run;
 }
+// ── L'ANNONCE VESTIAIRE PUBLIÉE PAR VRM, RETROUVÉE PAR IDENTITÉ (19 nov., 5.409) ──
+// Mesuré le 19 nov. : les 3 liens de publication étaient rangés sous l'identifiant du brouillon IA (36 caractères,
+// `ai-product-drafts`), alors que « Mes annonces » liste l'annonce sous son identifiant NUMÉRIQUE (8 chiffres) : aucun ne
+// se rattachait. À la confirmation, la publication est retenue (chrome.storage.local, 30 jours) avec l'identifiant
+// numérique du brouillon et les FICHIERS de ses photos ; à la lecture suivante de « Mes annonces », l'annonce qui porte le
+// MÊME identifiant ou le MÊME fichier photo — et elle seule — reçoit le lien `liens[id] = N°`. Deux annonces possibles, ou
+// aucune ⇒ rien (l'app la laisse « à vérifier »). Jamais un titre, jamais une ressemblance (§5).
+function clePhotoDepotVc(url) {
+  const raw = String(url || '').split('?')[0].split('#')[0];
+  const f = raw.split('/').filter(Boolean).pop() || '';
+  const k = f.replace(/\.(jpe?g|png|webp|gif|avif)$/i, '').toLowerCase();
+  return k.length >= 8 && /[0-9]/.test(k) ? k : '';
+}
+async function retenirPublieeVc({ productId = '', brouillon = '', photos = [], numero = '' } = {}) {
+  const n = String(numero == null ? '' : numero).trim();
+  const b0 = /^\d{5,12}$/.test(String(brouillon || '')) ? String(brouillon) : '';
+  const ph = (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x).slice(0, 24);
+  if (!n || (!b0 && !ph.length)) return false;
+  const g = await chrome.storage.local.get('vrmVcPubliees');
+  const l = (Array.isArray(g && g.vrmVcPubliees) ? g.vrmVcPubliees : []).filter((x) => x && Date.now() - (x.at || 0) < 30 * 86400000).slice(-40);
+  l.push({ productId: String(productId || '').slice(0, 40), brouillon: b0, photos: ph, numero: n, at: Date.now() });
+  await chrome.storage.local.set({ vrmVcPubliees: l });
+  return true;
+}
+// Pure : les liens à poser pour les publications retenues, d'après les annonces lues (`lus` : { id: fiche }).
+function liensPublieesVc(publiees, lus, liens) {
+  const out = {}, faites = new Set();
+  for (const x of (Array.isArray(publiees) ? publiees : [])) {
+    if (!x || !x.numero) continue;
+    const photos = new Set(Array.isArray(x.photos) ? x.photos : []);
+    const cands = Object.entries(lus || {}).filter(([id, f]) => (x.brouillon && id === x.brouillon) || (photos.size && f && photos.has(clePhotoDepotVc(f.photo))));
+    if (cands.length !== 1) continue;
+    const id = cands[0][0];
+    const deja = liens && liens[id] != null ? String(liens[id]) : '';
+    if (deja && deja !== String(x.numero)) { faites.add(x); continue; }   // l'annonce porte déjà un AUTRE N° : jamais réécrit
+    if (!deja && !out[id]) out[id] = String(x.numero);
+    faites.add(x);
+  }
+  return { liens: out, faites };
+}
 async function rangerVcAnnoncesMaintenant(patch) {
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
   if (rows === null) return false;
@@ -27439,6 +27490,16 @@ async function rangerVcAnnoncesMaintenant(patch) {
     // (5.299) Compte de la lecture PAS SU : une annonce rangée sous un compte
     // reste (on ne sait pas si c'est le même) ; une annonce sans compte suit la
     // règle d'avant. Les annonces des pages déjà lues de la même liste restent.
+    // (19 nov., 5.409) Une publication de VRM retrouvée par identité (brouillon ou fichier photo) reçoit son lien.
+    try {
+      const g = await chrome.storage.local.get('vrmVcPubliees');
+      const pubs = Array.isArray(g && g.vrmVcPubliees) ? g.vrmVcPubliees : [];
+      if (pubs.length) {
+        const r = liensPublieesVc(pubs, lus, data.liens);
+        for (const [k, v] of Object.entries(r.liens)) { data.liens[k] = v; change = true; }
+        if (r.faites.size) await chrome.storage.local.set({ vrmVcPubliees: pubs.filter((x) => !r.faites.has(x)) });
+      }
+    } catch (_) {}
     if (entier) { const garde = {}; for (const [k, v] of Object.entries(data.items)) if ((complets && complets.has(k)) || (v && autreCompteVc(v.compte, compte))) garde[k] = v; data.items = Object.assign(garde, lus); }
     else data.items = Object.assign(data.items, lus);
     data.complet = entier; data.total = total; data.capturedAt = maintenant; change = true;
@@ -31151,6 +31212,39 @@ async function writePosted(d) {
 async function markLbcPosted(id) {
   const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.add(String(id));
   return (await writePosted({ ids: [...s], limit: d.limit, plan: d.plan })) === true;
+}
+// ── L'ANNONCE LEBONCOIN CRÉÉE PAR VRM, ET SON N° (19 nov., 5.409) ─────────────
+// Mesuré le 19 nov. (`lbc_catalogue`) : la soumission `api/adsubmit/v2/classifieds` répond
+// `{ status: 'created', ad_id: <identifiant de l'annonce>, … }`. Dans l'onglet du dépôt
+// seulement, cet identifiant est gardé (chrome.storage.local : un worker meurt à 30 s) ; à la
+// page de confirmation du MÊME onglet, il est rangé avec le N° de la paire dans `lbc_publiees`
+// (l'extension n'écrit jamais `main`) — l'app relie l'annonce par cette identité (§5).
+// Lecture ratée ⇒ rien d'écrit ; un identifiant déjà rangé sous un AUTRE N° n'est jamais réécrit.
+async function noterAnnonceLbcCreee(url, body, sender) {
+  if (!/\/api\/adsubmit\/v\d+\/classifieds/i.test(String(url || ''))) return false;
+  let o = null; try { o = JSON.parse(String(body || '')); } catch (_) { return false; }
+  const adId = o && o.ad_id != null ? String(o.ad_id) : '';
+  if (!o || String(o.status || '') !== 'created' || !/^\d{6,15}$/.test(adId)) return false;
+  const tabId = sender && sender.tab && sender.tab.id != null ? sender.tab.id : null;
+  if (tabId == null) return false;
+  await chrome.storage.local.set({ vrmLbcCreee: { adId, at: Date.now(), tabId } });
+  return true;
+}
+async function garderPublieeLbc({ source, numero, tabId } = {}) {
+  const n = String(numero == null ? '' : numero).trim();
+  if (!n || !/^[A-Za-z]{0,3}\d{1,6}$/.test(n) || tabId == null) return false;
+  const g = await chrome.storage.local.get('vrmLbcCreee');
+  const c = g && g.vrmLbcCreee;
+  if (!c || c.tabId !== tabId || !(Date.now() - c.at < 15 * 60 * 1000) || !/^\d{6,15}$/.test(String(c.adId || ''))) return false;
+  const rows = await sbGet('app_data?id=eq.lbc_publiees&select=publiees:data->publiees');
+  if (rows === null) return false;                                   // lecture ratée : rien d'écrit
+  const pub = Object.assign({}, (rows && rows[0] && rows[0].publiees && typeof rows[0].publiees === 'object') ? rows[0].publiees : {});
+  const deja = pub[c.adId];
+  if (deja && String(deja.numero || '') !== n) { noterDiag('lbc_publiee_autre_numero'); return false; }
+  pub[c.adId] = { numero: n, source: String(source == null ? '' : source).slice(0, 40), at: new Date().toISOString() };
+  const ok = (await supabaseUpsert('app_data', [{ id: 'lbc_publiees', data: { publiees: pub, updatedAt: new Date().toISOString() } }], 'id')) === true;
+  if (ok) { await chrome.storage.local.set({ vrmLbcCreee: null }); notifierApp({ type: 'maj', quoi: 'lbc' }); }
+  return ok;
 }
 async function unmarkLbcPosted(id) {
   const d = await readPostedData(); if (d.echec) return false; const s = new Set(d.ids); s.delete(String(id));

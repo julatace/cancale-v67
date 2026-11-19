@@ -47,14 +47,15 @@ function Cote({ src, Photo, attrs = null, legende, sous = '', geste = null }) {
 }
 const EtatPhoto = ({ etat, site }) => (etat === 'sur' ? <span className="n-lia-etat" data-ton="sur" data-liaison-niveau="sur"><span className="n-lia-diode" aria-hidden="true"/>{tr('lia.sur')}</span>
   : etat === 'verifier' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="verifier"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.memePhoto')}</span>
-  : etat === 'publiee' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="publiee"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.publiee', { site })}</span> : null);
+  : etat === 'publiee' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="publiee"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.publiee', { site })}</span>
+  : etat === 'reference' ? <span className="n-lia-etat" data-ton="ambre" data-liaison-niveau="reference"><span className="n-lia-point" aria-hidden="true"/>{tr('lia.ecritSurAnnonce')}</span> : null);
 
 // ── La carte d'un ARTICLE candidat : la photo en grand, puis N° · prix · titre · taille · site · place. ──
 // Toucher la carte — photo comprise — RELIE : la photo n'ouvre pas la visionneuse (`data-sans-visionneuse`, src/visionneuse.js).
 function CarteCandidate({ c, annonce, Photo, focus, enCours, onRelier, refCarte }) {
   const p = c.paire;
   const t = tailleDe(p).taille, ta = tailleDe(annonce).taille;
-  const etat = c.niveau === 'sur' ? 'sur' : c.niveau === 'verifier' ? (c.raison === 'publiee' ? 'publiee' : 'verifier') : '';
+  const etat = c.niveau === 'sur' ? 'sur' : c.niveau === 'verifier' ? (c.raison === 'publiee' ? 'publiee' : c.raison === 'reference' ? 'reference' : 'verifier') : '';
   return (
     <button type="button" ref={refCarte} className="n-lia-carte" data-sans-visionneuse="" data-focus={focus ? '1' : undefined} data-liaison-candidate={p.id} data-numero={p.numero} data-niveau={etat} data-proche={String(c.proche)}
       aria-disabled={enCours ? 'true' : undefined} aria-label={tr('lia.relier', { numero: p.numero })} onClick={() => { if (!enCours) onRelier(c); }}>
@@ -171,6 +172,7 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
   const [traitees, setTraitees] = React.useState(() => new Map()); // clé ⇒ heure du geste (l'écran avance sans attendre la relecture)
   const [lotCoches, setLotCoches] = React.useState(null);        // Set des clés cochées dans la relecture du lot
   const [lotVu, setLotVu] = React.useState(false);
+  const [skuArme, setSkuArme] = React.useState(false), [skuFait, setSkuFait] = React.useState('');   // « Écrire VRM-N° sur eBay »
   const total0 = React.useRef(null);
   const refFinLot = React.useRef(null), refRacine = React.useRef(null);
   const refCartes = React.useRef([]);
@@ -202,15 +204,19 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
     if (!lu || courant) return;
     if (cibleEnAttente.current) { const k = `${cible.site}:${cible.id}`; if (res.parCle.has(k)) { cibleEnAttente.current = false; setCourant(k); return; } if (!(res.at >= ouvertA.current)) return; cibleEnAttente.current = false; }
     if (vue !== 'file') return;
+    // Depuis la fiche d'un article : d'abord une annonce que la photo rapproche de LUI.
+    const art = cible.article ? String(cible.article.id) : '';
     const rep = lireReprise();
-    const e = aFaire.find((x) => x.cle === rep) || aFaire[0] || null;
+    const e = (art && aFaire.find((x) => x.candidats.some((c) => String(c.paire.id) === art))) || aFaire.find((x) => x.cle === rep) || aFaire[0] || null;
     if (e) setCourant(e.cle);
   }, [lu, courant, res && res.at]);   // eslint-disable-line react-hooks/exhaustive-deps
   const entree = lu && courant ? res.parCle.get(courant) || null : null;
   const dansFile = !!(entree && entree.etat === 'aRelier' && !traitees.has(entree.cle));
   React.useEffect(() => { if (dansFile) noterReprise(courant); }, [courant, dansFile]);
   const haut = () => { const el = refRacine.current && refRacine.current.closest('.n-poussee'); if (el) el.scrollTop = 0; };
-  React.useEffect(() => { setQ(''); setSansTaille(false); setLimite(PAR_PAGE); setQuestion(null); setFocus(-1); haut(); }, [courant, vue]);
+  // Depuis la fiche d'un article : son N° est « tapé » (il passe en tête des candidates, sans rien relier) ; effaçable.
+  React.useEffect(() => { setSkuArme(false); setSkuFait(''); }, [courant]);
+  React.useEffect(() => { setQ(cible.article && cible.article.numero ? String(cible.article.numero) : ''); setSansTaille(false); setLimite(PAR_PAGE); setQuestion(null); setFocus(-1); haut(); }, [courant, vue]);
 
   const tailleAnnonce = entree ? tailleDe(entree.annonce).taille : '';
   const puceTaille = !!tailleAnnonce && !sansTaille && !q.trim();
@@ -327,6 +333,9 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
     // Une annonce reliée, ou « que sur ce site » : son lien, sa preuve, « Délier ».
     const a = entree.annonce;
     const article = res.articles.find((p) => cleEgale(p.numero, entree.numero) && String(p.id) !== entree.cle) || null;
+    // eBay relié, sans SKU qui dise ce N° : écrire « VRM-{n°} » chez eBay — proposé, deux touchers (le second confirme).
+    const skuPropose = a.plateforme === 'eBay' && entree.etat === 'relie' && !!entree.numero && typeof actions.ecrireSku === 'function' && skuFait !== 'ok'
+      && !(a.identites || []).some((i) => i && i.sorte === 'reference' && cleEgale(i.numero, entree.numero));
     corps = <div className="n-lia-colonne" data-liaison-fiche={entree.cle} data-etat={entree.etat}>
       <section className="n-lia-bloc">
         <Face>
@@ -339,6 +348,10 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
         </p>
         <div className="n-lia-gestes">
           {entree.etat === 'relie' ? <Bouton variante="texte" large indisponible={enCours} attrs={{ 'data-liaison-delier': a.id }} onClick={async () => { setEnCours(true); try { const r = await actions.delier({ annonce: a }); if (r && r.refus) setQuestion({ sorte: 'refus', c: null, paire: { numero: entree.numero }, r }); } finally { setEnCours(false); } }}>{tr('lia.c.delier')}</Bouton> : null}
+          {skuPropose ? <Bouton variante={skuArme ? 'teinte' : 'texte'} large indisponible={enCours} attrs={{ 'data-liaison-sku': a.id, 'data-arme': skuArme ? '1' : '0' }}
+            onClick={async () => { if (!skuArme) { setSkuArme(true); return; } setEnCours(true); try { const r = await actions.ecrireSku({ itemId: a.id, numero: entree.numero, compte: a.compte }); setSkuFait(r && r.ok ? 'ok' : (r && r.raison) || tr('lia.sku.refus')); } finally { setEnCours(false); setSkuArme(false); } }}>
+            {skuArme ? tr('lia.sku.confirmer', { sku: 'VRM-' + entree.numero }) : tr('lia.sku.ecrire', { sku: 'VRM-' + entree.numero })}</Bouton> : null}
+          {skuFait ? <p className="n-lia-legende-sous" data-liaison-sku-fait={skuFait === 'ok' ? '1' : '0'}>{skuFait === 'ok' ? tr('lia.sku.fait', { sku: 'VRM-' + entree.numero }) : skuFait}</p> : null}
           {entree.etat === 'propre' ? <Bouton variante="texte" large indisponible={enCours} attrs={{ 'data-liaison-reprendre': a.id }} onClick={() => actions.propre({ annonce: a, annuler: true })}>{tr('lia.fin.reprendre')}</Bouton> : null}
           {entree.etat === 'aVerifier' ? <Bouton large attrs={{ 'data-liaison-voir-contradictions': '' }} onClick={() => setVue('contradictions')}>{tr('lia.c.titre')}</Bouton> : null}
         </div>
