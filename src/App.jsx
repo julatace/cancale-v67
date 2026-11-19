@@ -11267,6 +11267,8 @@ const offreEnAttenteDe = (conversation) => offreVintedEnAttente(conversation);
 // Si l'extension n'est pas là (mobile, pas Chrome…), vmrExtPresent() est faux et
 // l'app propose le repli « répondre sur Vinted ».
 let __vmrExtReady = false, __vmrExtVersion = '';
+// (19 nov.) Les appels du démarrage (0 · 0,6 · 1,5 · 3 · 6 s) sont-ils tous partis sans réponse ? Avant : « je lui demande ».
+let __vmrAppelsFinis = false;
 // Qui veut savoir quand l'extension se manifeste (l'écran Réglages, l'accueil) :
 // la détection est asynchrone, un composant déjà affiché doit se redessiner.
 const __vmrExtSubs = new Set();
@@ -11353,10 +11355,68 @@ if (typeof window !== 'undefined') {
     [600, 1500, 3000, 6000].forEach(ms => setTimeout(() => {
       try { if (!__vmrExtReady) window.postMessage({ __vmr: 'ping' }, '*'); } catch (_) {}
     }, ms));
+    // (19 nov.) La fenêtre de la poignée de main est passée : qui disait « Vérification… » dit maintenant ce qui est su.
+    setTimeout(() => { __vmrAppelsFinis = true; if (!__vmrExtReady) __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} }); }, 6800);
   } catch (_) {}
 }
 const vmrExtPresent = () => __vmrExtReady;
 const vmrExtVersion = () => __vmrExtVersion;
+// ══ « À INSTALLER » SEULEMENT SI RIEN NE PROUVE LE CONTRAIRE (19 nov.) ═══════
+// Julien, sur son Mac (photo du 19 nov.) : la coque dit « Extension à installer » et « Publier sur Leboncoin » dit
+// « Extension VRM pas détectée dans ce navigateur », alors que deux de ses Chrome donnaient signe de vie le jour même
+// (5.400 et 5.406). Reproduit (vrai Chromium, vraies extensions 5.400 · 5.406 · 5.408, banc `extension-detectee`) :
+// toutes s'annoncent, aucune n'est dite « à installer » ; la phrase ne sort que si AUCUN pont n'a parlé dans cet
+// onglet. Mais « aucun pont » couvrait deux situations que l'app sait distinguer, et elle n'en disait qu'une :
+//   · INSTALLÉE ICI, MUETTE SUR CETTE PAGE. Dans un navigateur Chromium, `chrome.runtime` n'existe dans la page QUE
+//     si une extension installée ET activée de CE profil déclare `externally_connectable` pour elle (toutes les VRM
+//     depuis la 5.171 — voir `canalExt`). Canal là + pont muet ⇒ elle est installée ici, son script n'est pas dans
+//     cette page (activée après l'ouverture de l'onglet, accès au site retiré, dossier déplacé) : le geste est
+//     « recharge la page, sinon ⟳ et l'accès au site », jamais « installe-la ». Lu SEULEMENT là où le repère est sûr
+//     (Chrome, Edge, Brave, Opera, Vivaldi, Yandex — pas Orion ni Safari, où la page peut porter un `chrome.runtime`
+//     sans extension ; le mode exemple masque `chrome`) ;
+//   · PAS ICI, MAIS VIVANTE AILLEURS : la ligne `ext_appareil_{id}` que chaque extension du compte publie (5.327).
+//     Lue une fois (ordinateur seulement, après la poignée de main, 10 min de mémoire, projection scalaire) : « elle a
+//     donné signe de vie il y a 20 min (Chrome · Mac, 5.406.0) — pas dans ce navigateur-ci ».
+// « À installer » reste le mot quand rien ne prouve le contraire. « Pas su » ne vaut pas « oui » : rien n'est promis de plus.
+const NAVS_CANAL_SUR = ['chrome', 'edge', 'brave', 'opera', 'vivaldi', 'yandex'];
+const vmrExtInstalleeIci = () => { try { return !__vmrExtReady && !!canalExt() && NAVS_CANAL_SUR.includes(boutiqueIci().nav); } catch (_) { return false; } };
+// `undefined` pas lu · `null` pas su · `[]` aucune · liste des appareils (le plus récent d'abord).
+let __extAilleurs = undefined, __extAilleursAt = 0, __extAilleursEnVol = null;
+const EXT_AILLEURS_VIVANTE_MS = 24 * 3600000, EXT_AILLEURS_MEMOIRE_MS = 10 * 60000;
+const NOMS_NAV_EXT = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
+const NOMS_SYS_EXT = { mac: 'Mac', windows: 'Windows', linux: 'Linux', iphone: 'iPhone', ipad: 'iPad', android: 'Android', chromeos: 'Chromebook' };
+function lireExtAilleurs() {
+  if (__extAilleursEnVol) return __extAilleursEnVol;
+  __extAilleursEnVol = (async () => {
+    let v = null;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.ext_appareil_*&select=id,ver:data->>ver,atMs:data->>atMs,nav:data->appareil->>nav,sys:data->appareil->>systeme&limit=30`, { headers: sbAuth(), cache: 'no-store' });
+      if (r.ok) { const rows = await r.json(); if (Array.isArray(rows)) v = rows.map((x) => ({ ver: /^\d+\.\d+\.\d+$/.test(String(x.ver || '')) ? String(x.ver) : '', atMs: Number(x.atMs) || 0, nav: String(x.nav || ''), sys: String(x.sys || '') })).filter((x) => x.atMs > 0).sort((a, b) => b.atMs - a.atMs); }
+    } catch (_) { v = null; }
+    __extAilleurs = v; __extAilleursAt = Date.now();
+    __vmrExtSubs.forEach(fn => { try { fn(); } catch (_) {} });
+    return v;
+  })().finally(() => { __extAilleursEnVol = null; });
+  return __extAilleursEnVol;
+}
+// À lire ? Seulement à l'ordinateur, session ouverte, aucune extension ici (ni pont, ni canal), poignée de main passée.
+const extAilleursUtile = () => typeof window !== 'undefined' && __vmrAppelsFinis && !__vmrExtReady && !vmrExtInstalleeIci() && !lireSansSouris() && !!(AUTH.session && AUTH.user) && mfaPasse();
+function veillerExtAilleurs() {
+  if (!extAilleursUtile() || __extAilleursEnVol) return;
+  if (__extAilleurs !== undefined && Date.now() - __extAilleursAt < EXT_AILLEURS_MEMOIRE_MS) return;
+  lireExtAilleurs();
+}
+// L'extension du compte la plus récemment vue ailleurs (moins de 24 h), ou null. Un CONSTAT, jamais une capacité d'ici.
+function extVivanteAilleurs() {
+  if (__vmrExtReady || !Array.isArray(__extAilleurs)) return null;
+  const x = __extAilleurs[0];
+  if (!x || !(Date.now() - x.atMs < EXT_AILLEURS_VIVANTE_MS)) return null;
+  const ou = [NOMS_NAV_EXT[x.nav] || '', NOMS_SYS_EXT[x.sys] || ''].filter(Boolean).join(' · ');
+  return { ver: x.ver, atMs: x.atMs, ou };
+}
+// (Banc `extension-detectee`) Ce que l'app SAIT de l'extension, en lecture : aucune donnée du vendeur.
+try { if (typeof window !== 'undefined') window.__vrmExtVu = () => ({ present: __vmrExtReady, version: __vmrExtVersion, canal: !!canalExt(), installeeIci: vmrExtInstalleeIci(), appelsFinis: __vmrAppelsFinis,
+  retard: __vmrExtReady ? cmpVersion(__vmrExtVersion || '0.0.0', EXT_ATTENDUE) < 0 : null, sait: { ancienne: extSait('baisseprix'), recente: extSait('repubetapes') }, ailleurs: extVivanteAilleurs() }); } catch (_) {}
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
 // (c'est le but) : elle le lui demande par le pont. Renvoie null si l'extension
 // n'est pas là ou ne répond pas — jamais une supposition.
@@ -12748,7 +12808,17 @@ function raisonExtGlobale(sansSouris, opt) {
     const orionIos = mobileIci() === 'ios' && !!boutiqueOrion();
     return { code: 'telephone', relais: rl.niveau, mobile: mobileIci(), texte: `Depuis ton ordinateur${ffAndroid ? ' — ou installe l’extension dans ce Firefox' : orionIos ? ' — ou depuis Orion, sur cet iPhone' : ''}`, role };
   }
-  if (!vmrExtPresent()) return { code: 'absente', texte: 'Extension VRM pas détectée dans ce navigateur', role };
+  if (!vmrExtPresent()) {
+    // (19 nov.) Installée ici mais muette sur cette page (voir `vmrExtInstalleeIci`) : jamais « à installer ».
+    if (vmrExtInstalleeIci()) return __vmrAppelsFinis
+      ? { code: 'muette', geste: 'recharger', ici: true, texte: `L'extension VRM est installée dans ce ${nomNavigateurIci()} mais ne répond pas sur cette page — recharge cette page ; si ça ne suffit pas, ouvre ${pageExtensionsIci()}, clique ⟳ sur VRM et vérifie dans ses détails que l'accès au site est « sur tous les sites ».` }
+      : { code: 'verif', texte: "Vérification de l'extension…" };
+    // Pas ici — mais une extension du compte a donné signe de vie ailleurs : on le dit (un constat, lu en base).
+    const ail = extVivanteAilleurs();
+    return { code: 'absente', role, ailleurs: ail, texte: ail
+      ? `Extension VRM pas détectée dans ce navigateur — celle de ton compte a donné signe de vie ${ilYaCourt(ail.atMs)}${ail.ou || ail.ver ? ` (${[ail.ou, ail.ver].filter(Boolean).join(', ')})` : ''}, mais pas dans ce navigateur-ci : ouvre VRM dans le navigateur où elle est, ou installe-la ici`
+      : 'Extension VRM pas détectée dans ce navigateur' };
+  }
   // ⚠️⚠️ PLUSIEURS AVANT TOUT LE RESTE (5.165) : « mets à jour » ou « recharge »
   //    seraient faux — il vient de mettre à jour, et l'ancienne répond encore.
   if (__vmrPlusieurs) return { code: 'plusieurs', geste: 'extensions', texte: textePlusieurs() };
@@ -22679,6 +22749,8 @@ function useExtVivante() {
   const [, force] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => onVmrExt(force), []);
   React.useEffect(() => { demarrerRelais(); }, []);
+  // (19 nov.) Aucune extension ici, à l'ordinateur : une du compte vit-elle ailleurs ? (une lecture, 10 min de mémoire)
+  React.useEffect(() => { veillerExtAilleurs(); return onVmrExt(veillerExtAilleurs); }, []);
   return { present: vmrExtPresent(), etat: etatAgissant(), jobs: __vmrJobs };
 }
 function etatExtensionFavoris(uid,mesure=null){
@@ -23168,7 +23240,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // que s'il y a un geste à faire ici (§7) ; « pas de geste » reste gris.
   const point = aRattraper ? C.warn : st.niveau === 'ok' ? C.text : C.muted;
   const rl = etatRelais();
-  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? 'Extension à installer' : 'Lecture seule';
+  const libelle = st.niveau === 'ok' ? (st.relais ? 'Actions via ton ordinateur' : st.exception ? 'Actions possibles · sauf publier' : 'Actions possibles') : st.niveau === 'verif' ? 'Vérification…' : code === 'absente' ? (st.glob && st.glob.ailleurs ? 'Extension : pas dans ce navigateur' : 'Extension à installer') : 'Lecture seule';
   // Ce que la pastille ÉCRIT (le libellé complet reste en aria-label et en titre).
   const visible = st.niveau === 'ok' && loginVinted ? loginVinted : libelle;
   // (1er nov., vendeur neuf) Avant toute installation, « Lecture seule » était la
@@ -23186,8 +23258,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
     : code === 'telephone' && rl.niveau === 'retard' ? { s: 'non', t: `sur ton ordinateur — version ${rl.ver || '?'}, trop ancienne pour agir pour ton téléphone` }
     : code === 'telephone' && rl.niveau === 'passu' ? { s: '…', t: "sur ton ordinateur — pas su (la base n'a pas répondu)" }
     : code === 'telephone' ? { s: '—', t: 'sur ton ordinateur' }
-    : code === 'absente' ? { s: 'non', t: 'pas détectée dans ce navigateur' }
-    : code === 'muette' ? { s: 'non', t: 'ne répond pas' }
+    : code === 'absente' ? { s: 'non', t: st.glob && st.glob.ailleurs ? `pas dans ce navigateur — celle de ton compte a donné signe de vie ${ilYaCourt(st.glob.ailleurs.atMs)}${st.glob.ailleurs.ou || st.glob.ailleurs.ver ? ` (${[st.glob.ailleurs.ou, st.glob.ailleurs.ver].filter(Boolean).join(', ')})` : ''}` : 'pas détectée dans ce navigateur' }
+    : code === 'muette' ? { s: 'non', t: st.glob && st.glob.ici ? 'installée ici, mais ne répond pas sur cette page' : 'ne répond pas' }
     : code === 'plusieurs' ? { s: 'non', t: `deux extensions VRM répondent${(__vmrPlusieurs || []).filter((x) => x && x !== '?').length >= 2 ? ' (' + __vmrPlusieurs.join(' et ') + ')' : ''}` }
     // La version à installer est dite UNE fois, sur le bouton juste dessous
     // (revue du 9 octobre : « 5.163.0 » écrit trois fois dans le panneau).
@@ -23320,7 +23392,7 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
     <div ref={boite} className="vrm-hdr-etat" style={{ position: 'relative', flexShrink: 0 }}>
-      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
+      <button type="button" className="vrm-etat-pastille" aria-label={nomPastille} data-etat-relais={st.relais ? 'vivant' : (rl.niveau !== 'hors' ? rl.niveau : undefined)} data-etat-actions={st.niveau} data-etat-code={code} data-etat-ici={st.glob && st.glob.ici ? '1' : undefined} data-etat-ailleurs={st.glob && st.glob.ailleurs ? (st.glob.ailleurs.ver || '1') : undefined} data-etat-ton={ton} data-etat-exception={st.exception ? 'publication' : undefined} onClick={() => setOuvert((o) => !o)}
         aria-expanded={ouvert ? 'true' : 'false'}
         title={st.relais ? `Actions via ton ordinateur · ${loginVinted}` : st.niveau === 'ok' ? `Actions Vinted possibles, au nom de ${loginVinted}${st.exception ? ` — sauf publier sur Leboncoin : ${st.exception.texte}` : ''}` : st.glob ? st.glob.texte : ''}
         style={{ '--etat-ton': point, display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: `1px solid ${bd}`, borderRadius: 999,
