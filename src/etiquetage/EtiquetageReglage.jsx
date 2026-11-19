@@ -52,8 +52,8 @@ export default function EtiquetageReglage({ lire, archive = '', ecrire, onNumero
         </Groupe>) : null}
       {refus ? <p className="etq-refus" role="alert" data-etiquetage-refus={refus}>{tr('etq.refus.' + refus, { l: archive })}</p> : null}
       <Groupe titre={tr('etq.support.titre')}>
-        <Rangee titre={tr('etq.support.main')} sousTitre={tr('etq.support.main.sous')} fin={coche(m.support === 'main')} onClick={() => appliquer({ support: 'main' })} attrs={{ 'data-etiquetage-choix': 'support:main' }}/>
-        <Rangee titre={tr('etq.support.imprimee')} sousTitre={tr('etq.support.imprimee.sous')} fin={coche(m.support === 'imprimee')} onClick={() => appliquer({ support: 'imprimee' })} attrs={{ 'data-etiquetage-choix': 'support:imprimee' }}/>
+        <Rangee titre={tr('etq.support.main')} sousTitre={tr('etq.support.main.sous')} sousLignes={2} fin={coche(m.support === 'main')} onClick={() => appliquer({ support: 'main' })} attrs={{ 'data-etiquetage-choix': 'support:main' }}/>
+        <Rangee titre={tr('etq.support.imprimee')} sousTitre={tr('etq.support.imprimee.sous')} sousLignes={2} fin={coche(m.support === 'imprimee')} onClick={() => appliquer({ support: 'imprimee' })} attrs={{ 'data-etiquetage-choix': 'support:imprimee' }}/>
       </Groupe>
       {m.support === 'imprimee' ? (
         <Groupe titre={tr('etq.format.titre')}>

@@ -58,7 +58,7 @@ export default {
   "etq.support.main.sous": "With a marker, on the box or shelf.",
   "etq.support.imprimee.sous": "VRM prints the number large, in your format.",
   "etq.format.titre": "Label format",
-  "etq.format.50x30": "50 × 30 mm · label printer",
+  "etq.format.50x30": "50 × 30 mm · label maker",
   "etq.format.62x29": "62 × 29 mm · roll",
   "etq.format.a4-24": "A4 sheet · 24 labels",
   "etq.format.titreArticle": "Add the start of the title",

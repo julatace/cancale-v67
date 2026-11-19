@@ -58,7 +58,7 @@ export default {
   "etq.support.main.sous": "Col pennarello, sulla scatola o sullo scaffale.",
   "etq.support.imprimee.sous": "VRM stampa il numero in grande, nel tuo formato.",
   "etq.format.titre": "Formato dell'etichetta",
-  "etq.format.50x30": "50 × 30 mm · stampante per etichette",
+  "etq.format.50x30": "50 × 30 mm · etichettatrice",
   "etq.format.62x29": "62 × 29 mm · rotolo",
   "etq.format.a4-24": "Foglio A4 · 24 etichette",
   "etq.format.titreArticle": "Aggiungi l'inizio del titolo",

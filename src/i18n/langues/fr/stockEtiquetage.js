@@ -58,7 +58,7 @@ export default {
   "etq.support.main.sous": "Au feutre, sur le carton ou l'étagère.",
   "etq.support.imprimee.sous": "VRM imprime le N° en grand, à ton format.",
   "etq.format.titre": "Format de l'étiquette",
-  "etq.format.50x30": "50 × 30 mm · imprimante d'étiquettes",
+  "etq.format.50x30": "50 × 30 mm · étiqueteuse",
   "etq.format.62x29": "62 × 29 mm · rouleau",
   "etq.format.a4-24": "Planche A4 · 24 étiquettes",
   "etq.format.titreArticle": "Ajouter le début du titre",

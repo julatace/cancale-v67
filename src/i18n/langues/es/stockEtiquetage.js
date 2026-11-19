@@ -58,7 +58,7 @@ export default {
   "etq.support.main.sous": "Con rotulador, en la caja o la estantería.",
   "etq.support.imprimee.sous": "VRM imprime el número en grande, en tu formato.",
   "etq.format.titre": "Formato de la etiqueta",
-  "etq.format.50x30": "50 × 30 mm · impresora de etiquetas",
+  "etq.format.50x30": "50 × 30 mm · etiquetadora",
   "etq.format.62x29": "62 × 29 mm · rollo",
   "etq.format.a4-24": "Hoja A4 · 24 etiquetas",
   "etq.format.titreArticle": "Añadir el inicio del título",
