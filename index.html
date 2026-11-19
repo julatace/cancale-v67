@@ -268,7 +268,9 @@
        gauche, et le chiffre cliquable « Coût d'achat » a mis son étiquette, son
        nombre et sa légende SUR UNE SEULE LIGNE. Une hauteur plancher suffit :
        le navigateur centre le contenu tout seul. */
-    button, a.vrm-btn {
+    /* (19 nov.) Les composants « VRM natif » (classes `n-*`, src/natif/) portent leurs tailles dans la couche
+       `vrm-natif` : une règle hors couche les écrase (bouton plein de 50 px rendu à 34). `:where` : même spécificité. */
+    button:where(:not([class^="n-"], [class*=" n-"])), a.vrm-btn {
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
@@ -280,7 +282,7 @@
       transition: background-color .11s ease, border-color .11s ease, color .11s ease, box-shadow .11s ease, filter .11s ease;
     }
     /* Les boutons qui ne portent qu'une icône restent compacts. */
-    button[aria-label] { min-height: 30px; }
+    button[aria-label]:where(:not([class^="n-"], [class*=" n-"])) { min-height: 30px; }
 
     /* ⚠️ UNE RANGÉE DE PASTILLES : elle DÉFILE sur téléphone, elle REVIENT À
        LA LIGNE sur ordinateur. Sur mobile, laisser retourner à la ligne faisait

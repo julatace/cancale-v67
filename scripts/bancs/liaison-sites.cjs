@@ -195,7 +195,7 @@ const lire = (pg) => pg.evaluate(() => {
   const textes = [...R.querySelectorAll('*')].filter((e) => visible(e) && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1) && !e.closest('[aria-disabled="true"]'));
   const faibles = textes.map((e) => ({ c: Math.round(contraste(e) * 100) / 100, t: e.textContent.trim().slice(0, 30), k: e.className })).filter((x) => x.c < 4.5);
   const petits = textes.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 13).map((e) => e.className);
-  const cibles = [...R.querySelectorAll('button, a, input, label.n-lia-lot-ligne')].filter(visible).map((e) => { const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), k: e.className || e.tagName }; }).filter((x) => x.h < 44 || x.w < 44);
+  const cibles = [...R.querySelectorAll('button, a, input, label.n-lia-lot-ligne')].filter(visible).filter((e) => { const l = e.tagName === 'INPUT' && e.closest('label'); if (!l) return true; const r = l.getBoundingClientRect(); return r.height < 44 || r.width < 44; }).map((e) => { const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), k: e.className || e.tagName }; }).filter((x) => x.h < 44 || x.w < 44);
   const cartes = [...R.querySelectorAll('[data-liaison-candidate]')].map((c) => {
     const ph = c.querySelector('.n-lia-photo'), im = c.querySelector('img'); const rp = ph.getBoundingClientRect();
     const boites = [...c.children].map((x) => x.getBoundingClientRect()).filter((r) => r.height > 0);
