@@ -83,4 +83,41 @@ suivent la même règle (`echeanceJ` : « à vérifier » pour une estimée).
 - Sur le build de `origin/main` (`BANC_DIST`), 390 clair : **20 rouges, 4 verts** (7 chevauchements dans la bande,
   8 plaques hors de leur case, textes superposés, « 3 pas encore prêt », cibles de 36 px, « 15 » blanc sur blanc).
 
-(Les chiffres après l'écran natif et les mutations du banc sont à la fin de ce fichier.)
+## Après l'écran natif (19 nov., fin d'après-midi)
+
+- **L'écran** est `src/natif/ecrans/Aujourdhui.jsx`, composé seulement de composants natifs (aucun style en ligne, aucune
+  classe à lui). Ajoutés à `src/natif/` : `Barres` (7 barres jointives, ≥ 46 px chacune à 390), `Vignettes` (chaque case
+  SA plaque, « +N » mesuré), `CodeRetrait`, `Colonnes` (trois colonnes à 1280 et 1512 : les chiffres · À envoyer et
+  À retirer · Dernières ventes ; effacées au téléphone ; le plein se pose à droite, à sa largeur).
+- **Le plein « Imprimer N bordereaux » IMPRIME** (audit d'utilité) : il demande `'imprimer'` et le moteur des bordereaux
+  de Ventes fait le geste de SON plein (`imprimerLot()` : l'aperçu de ce qui part d'office, puis « Imprimer ») ; la
+  feuille du choix seulement s'il n'y a rien d'office. Contrôle `S6` de `audit-aujourdhui` (rouge sur le code d'avant).
+- L'alerte tient sur une ligne : « 2 pressés · 1 j de retard » (5 langues).
+- **Budget de démarrage** : l'écran, son modèle (`src/aujourdhui/Branche.jsx` + `modele.js`), le bloc « À régler » et
+  les composants natifs avec leur CSS partent dans des morceaux chargés à la demande ; la publication « À régler »
+  (pastilles) reste au démarrage (`src/designV2/useARegler.js`). 11 clés `v2.*` devenues mortes retirées.
+  `audit-poids-demarrage` : **1982 Ko ≤ 1982** (1996 avant ce lot de chargement).
+
+### Chiffres
+
+- `node scripts/audit-aujourdhui.cjs` : **46 verts, 0 rouge**.
+- `node scripts/bancs/aujourdhui-natif.cjs` (le vrai écran dans la vraie coque native, 390 zone sûre / 1512 / 1280,
+  clair et sombre, bases capture, volume, vide, attente, plus « À régler ») : **270 verts, 0 rouge**.
+- `node scripts/bancs/aujourdhui-propre.cjs` (l'APP rendue, bases capture / estimée / volume / vide, 390 / 1512 / 1280,
+  clair et sombre) : **160 verts, 0 rouge**.
+- Audits traduction, tdz, variables, studio, composants, icones, violet, rouge-doublon, csp, quoi-de-neuf : verts.
+- Le contrôle de contraste ne juge plus un texte transparent (le titre réduit de la barre) ni RECOUVERT (une rangée sous
+  le plein collé) : c'est le fond de ce qui le recouvre qu'il lisait.
+
+### Ce qui reste (à l'intégration de « VRM natif »)
+
+- **Dans la coque d'aujourd'hui** (l'ancienne), les feuilles d'habillage non rangées en couche (`design-v2.css`,
+  `interface/vrm-*.css`, `studio*.css`) passent DEVANT `@layer vrm-natif` : le plein y sort gris, les barres et les
+  `Faits` dans des cases grises (vu sur les captures du banc de l'app). Les composants n'y sont pour rien : cela
+  disparaît quand la coque native remplace l'ancienne et que les habillages sont retirés (décision du 19 nov.). Ne pas
+  « corriger » avec des `!important` dans `src/natif/`.
+- Les bancs de l'ANCIEN design (studio-journee, journee-retours, journee-coherence, accompagnement, fiabilite-auto) voient
+  `vrm_design_v2 = '0'` (`_garde-reseau.cjs`) : l'ancienne Ma journée et sa liste « À faire » y sont inchangées ; ils
+  partiront avec l'ancien design.
+- « À régler » est calculé par Aujourd'hui puis publié (limite connue ci-dessus) : à sortir dans un sélecteur partagé.
+
