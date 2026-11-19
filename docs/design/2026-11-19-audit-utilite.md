@@ -11,9 +11,10 @@ Ce document dit **ce qui entre dans la refonte « VRM natif »** (`docs/design/N
 code de l'app n'est modifié ici. Rien n'est supprimé des données : « retirer » veut dire « ne plus le montrer » (la
 valeur enregistrée reste). Les refus de CLAUDE.md §3 sont tenus (voir §8).
 
-**État de ce document : version 1, provisoire sur les comptes d'éléments** (la machine partagée était saturée : le
-banc n'a relevé en entier qu'Aujourd'hui et Ventes au téléphone ; le reste vient de la lecture du code — c'est dit à
-chaque endroit). L'outil est `scripts/inventaire-gestes.cjs` ; son relevé complet remplacera les « lu dans le code ».
+**État de ce document : version 2.** Le banc a relevé les 26 écrans à 390 et 1512 px **à l'ouverture** (ce qui se
+touche sans rien déplier : 770 éléments au téléphone, 983 à l'ordinateur — `2026-11-19-inventaire-gestes.md`). Ce qui
+est derrière un toucher (feuilles, « ⋯ », sections) n'a été relevé au banc que pour Aujourd'hui et Ventes (machine
+partagée saturée) ; pour les autres écrans cette partie vient de la lecture du code — c'est dit à chaque endroit.
 
 ---
 
@@ -140,7 +141,7 @@ Sortes : **GARDER** · **FUSIONNER** · **DÉPLACER** · **AUTOMATISER** · **RE
 l'app rendue ; « code » = lu dans le code et les textes (à confirmer par le relevé complet).
 
 ### 4.1 Aujourd'hui — « voir ce que j'ai vendu et ce que je dois porter ou aller chercher »
-Relevé au banc (téléphone, base inventée de volume) : **35 éléments à l'ouverture**, et jusqu'à 60 de plus selon ce
+Relevé au banc (téléphone, base inventée de volume) : **44 éléments à l'ouverture**, et jusqu'à 60 de plus selon ce
 qu'on déplie. 23 % des ouvertures.
 
 | élément (libellé relevé) | verdict | pourquoi / où |
@@ -184,7 +185,7 @@ Où vont les 34 sortes de lignes d'« À faire » (lues dans le code, `jobs.push
 - **Plus** : emails-personne (E-mails), inventaire-en-cours (Stock), a-trancher (dissous).
 
 ### 4.2 Ventes — « préparer et envoyer mes colis, les suivre jusqu'au paiement »
-Relevé au banc (téléphone) : **35 éléments à l'ouverture, 133 avec les feuilles**. 25 % des ouvertures.
+Relevé au banc (téléphone) : **37 éléments à l'ouverture, 133 avec les feuilles**. 25 % des ouvertures.
 
 | élément | verdict | pourquoi / où |
 |---|---|---|
@@ -205,7 +206,7 @@ Relevé au banc (téléphone) : **35 éléments à l'ouverture, 133 avec les feu
 | « Aide : Ventes » | RETIRER | Plus › Aide |
 
 ### 4.3 Annonces — « mes articles en ligne : les trouver, voir comment ils se portent, agir »
-Lu dans le code (371 textes pour cet écran ; relevé au banc à venir). 14 % des ouvertures.
+Banc : 48 éléments à l'ouverture (56 dans la vue Republier, dont 25 réglages) ; le reste lu dans le code (371 textes). 14 % des ouvertures.
 
 | élément | verdict | pourquoi / où |
 |---|---|---|
@@ -227,7 +228,7 @@ Lu dans le code (371 textes pour cet écran ; relevé au banc à venir). 14 % de
 | « {x} € qui dorment », bande de chiffres | RETIRER | un chiffre sans geste ; le nombre est dans le segment |
 
 ### 4.4 Achats — « aller chercher mes colis et faire entrer les articles en stock »
-Lu dans le code (374 textes). 11 % des ouvertures.
+Banc : 47 éléments à l'ouverture (13 réglages et filtres) ; le reste lu dans le code (374 textes). 11 % des ouvertures.
 
 | élément | verdict | pourquoi / où |
 |---|---|---|
@@ -457,9 +458,12 @@ Quatre décisions lui reviennent (elles changent une règle qu'il a posée) :
   touche (écran, chemin, touchers depuis l'ouverture, libellé, sorte, zone, `data-*`, nombre d'exemplaires), touche
   chaque gabarit une fois et relève ce qui apparaît. Sorties : `docs/design/inventaire-gestes.json` et
   `docs/design/2026-11-19-inventaire-gestes.md`.
-- **Relevé au banc à ce jour** : Aujourd'hui et Ventes au téléphone (les chiffres cités). La machine partagée était
-  saturée (charge 28 à 36, pages tombées faute de mémoire) : le relevé complet des 26 écrans × 2 largeurs est à
-  relancer (`npm run build && node scripts/inventaire-gestes.cjs`).
+- **Relevé au banc** : les 26 écrans, 390 et 1512, à l'ouverture (`PROFONDEUR=0`, 404 s sous verrou) : 1 753 lignes.
+  Les plus chargés à l'ouverture au téléphone : À trancher 58, Republier 56, Statistiques 56, E-mails 56, Annonces 48,
+  Achats 47, Aujourd'hui 44. Paramètres à l'ordinateur : 96. Avec les feuilles (`PROFONDEUR=1`) : Aujourd'hui et
+  Ventes seulement ; à relancer pour les autres (`flock … env PROFONDEUR=2 node scripts/inventaire-gestes.cjs`,
+  compter 2 à 7 minutes par écran). ⚠️ La ligne « fiche » (6 éléments) n'est pas fiable : la fiche ne s'est pas
+  ouverte sur la base du banc (N° demandé absent) ; « Inventaire (ancien écran) » redirige vers Aujourd'hui.
 - **Lu dans le code** : le reste — 3 933 `onClick`, 9 518 textes français, 207 confirmations, 80 réglages, 109 phrases
   d'explication permanentes, 367 fichiers d'écran. Ces nombres disent la taille du tas, pas l'usage.
 - **Ce que ni le banc ni le code ne disent** : les états rares (base vide, extension absente, eBay et Vestiaire
