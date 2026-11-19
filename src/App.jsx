@@ -54470,7 +54470,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {/* (11 nov., décision C10 — Julien : « tranche ») L'ancien bloc « Annonces à compléter » est
                       FONDU dans la vue d'Annonces « À compléter » (un seul endroit, une seule règle :
                       src/annoncesACompleter.js) ; ici, une ligne qui y mène. */}
-                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
+                  {!noAcc && !designV2 && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
                   </div>
                   {[
                     /* ⚠️ (11 nov., lot DJ4 — Julien, mot pour mot : « L'inventaire physique n'est pas fiable.
