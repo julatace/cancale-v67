@@ -47,9 +47,10 @@ const ETATS = ['enligne', 'apublier', 'dorment'];
 const etatMot = (e) => tr('egalite.etatAnnonce.' + e);
 
 // Ce que dit la 2e ligne d'une rangée : « 42 · Leboncoin · atelier-nord » (un site) ou « 42 · sur 3 sites ».
-function sousDe(a, nomSite, filtreSite) {
+function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
   const bouts = [];
   if (a.taille) bouts.push(tr('egalite.taille', { t: a.taille }));
+  bouts.push(tr('egalite.achete', { p: a.achat != null ? euros(a.achat) : '—' }));
   const ann = filtreSite && filtreSite !== 'tous' ? a.annonces.filter((x) => x.site === filtreSite) : a.annonces;
   if (a.sites.length > 1 && (!filtreSite || filtreSite === 'tous')) bouts.push(tr('egalite.surSites', { n: a.sites.length }));
   else { const x = ann[0] || a.annonces[0]; bouts.push(nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')); }
@@ -175,9 +176,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const rangee = (a) => {
     const grise = A && !cochable(a);
     return <Rangee key={a.cle} vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
-      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site)} ton={a.aRelier ? 'ambre' : 'neutre'}
+      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton={a.aRelier ? 'ambre' : 'neutre'}
       valeur={a.prix != null ? euros(a.prix) : null} valeurForte
-      detailValeur={tr('egalite.ligneFaits', { mini: a.prixMini != null ? euros(a.prixMini) : '—', achat: a.achat != null ? euros(a.achat) : '—' })}
+      detailValeur={tr('egalite.mini', { p: a.prixMini != null ? euros(a.prixMini) : '—' })}
       fin={A ? (sel.has(a.cle) ? 'coche' : <span className="n-eg-case" aria-hidden="true"/>) : 'chevron'} selectionnee={A ? sel.has(a.cle) : ouvert === a.cle}
       indisponible={!!grise} raison={grise ? tr('egalite.selection.pasPour', { site: nomSite(a.annonces[0].site) }) : ''} onClick={() => ouvrir(a)}
       actions={A ? null : [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }]}

@@ -74,7 +74,7 @@ const MESURE = () => {
   r.relier = [...document.querySelectorAll('[data-eg-article]')].filter((e) => /Relier à Vinted/.test(e.textContent)).length;
   r.th = [...document.querySelectorAll('[data-eg-th]')].map((e) => e.getAttribute('data-eg-th'));
   r.lignes = [...document.querySelectorAll('tr[data-eg-article]')].slice(0, 40).map((tr) => [...tr.querySelectorAll('[data-eg-col]')].map((td) => ({ c: td.getAttribute('data-eg-col'), v: td.textContent.trim().length > 0 })));
-  r.rangees = [...document.querySelectorAll('.n-rangee[data-eg-article], [data-eg-article].n-rangee, [data-eg-liste] [data-eg-article]')].slice(0, 40).map((e) => ({ faits: /mini .+ · acheté .+/.test(e.textContent), prix: /€|—/.test(e.textContent) }));
+  r.rangees = [...document.querySelectorAll('.n-rangee[data-eg-article], [data-eg-article].n-rangee, [data-eg-liste] [data-eg-article]')].slice(0, 40).map((e) => ({ faits: /mini \S/.test(e.textContent) && /acheté \S/.test(e.textContent), prix: /€|—/.test(e.textContent) }));
   r.nRangees = document.querySelectorAll('[data-eg-article]').length;
   return r;
 };

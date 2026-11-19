@@ -15,6 +15,8 @@ export default {
   "egalite.vues": { one: "{n} visualizzazione", other: "{n} visualizzazioni" },
   "egalite.ligneFaits": "min {mini} · acquistato {achat}",
   "egalite.jours": { one: "{n} g", other: "{n} g" },
+  "egalite.mini": "min {p}",
+  "egalite.achete": "acquistato {p}",
   "egalite.numeroCourt": "N°{n}",
   "egalite.placeCase": "casella {i}",
   "egalite.touteLaFiche": "Tutta la scheda",
