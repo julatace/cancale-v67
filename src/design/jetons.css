@@ -177,8 +177,10 @@
 
 /* ── 12. LES DÉFAUTS DU NAVIGATEUR portent la palette (craft-floor : « browser surfaces ») ──
    Spécificité nulle (`:where`) : n'importe quelle règle d'un écran l'emporte encore. */
-:where(.vrm-app-shell) a { color: var(--fu-lien); }
-:where(.vrm-app-shell) button { color: inherit; background-color: var(--fu-remplir); }
+:where(.vrm-app-shell) a:not(:where([class^="n-"], [class*=" n-"])) { color: var(--fu-lien); }
+/* (19 nov., « VRM natif ») Hors couche, ce défaut battait les composants natifs (`@layer vrm-natif`) : le plein de Ventes
+   sortait gris, les rangées aussi. Les boutons natifs (classes `n-…`) gardent leurs propres couleurs. */
+:where(.vrm-app-shell) button:not(:where([class^="n-"], [class*=" n-"])) { color: inherit; background-color: var(--fu-remplir); }
 :where(.vrm-app-shell) ::selection { background: rgba(0,113,227,.22); }
 /* Les jours de la semaine sur la carte sombre : lisibles (0,5 tombait à 4,1:1). */
 :root:root body .vrm-app-shell .vrm-fu-jour > span { color: var(--fu-sur-sombre-2) !important; }

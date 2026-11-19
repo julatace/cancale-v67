@@ -20,6 +20,10 @@
 //   ton          'ambre' ⇒ le sous-titre est en ambre (un geste à faire, une date limite LUE proche)
 //   selectionnee vrai ⇒ fond teinté (l'élément ouvert dans le volet de détail, à l'ordinateur)
 //   indisponible vrai ⇒ ne se touche pas ; `raison` remplace le sous-titre et dit pourquoi
+//   selection    { cochee, onChange(bool), libelle, indisponible } ⇒ UNE CASE à gauche (44 × 44), à côté du corps (jamais dedans) :
+//                la cocher ne touche pas la rangée, toucher la rangée ne la coche pas (Ventes : les colis cochés pour l'impression).
+//                `indisponible` : la case est grisée et ne se coche pas (pas de bordereau).
+//   note         une 3e ligne, 13/18 gris, sur toute la largeur (« Étagère A · r1 c3 · Mondial Relay ») — elle passe à la ligne
 //   className, attrs (data-* de l'écran)
 // Exemple :
 //   <Rangee vignette={<Vignette src={photo} alt=""/>} titre="Nike Air Max 90 Triple White" lignes={2}
@@ -35,12 +39,15 @@ import { tr } from '../i18n/index.js';
 import { cx, mouvementReduit } from './outils.js';
 import { Glyphe } from './icones.jsx';
 
-export function Vignette({ src = '', alt = '', taille = 56, icone = null, className = '' }) {
+// `image` (ajout du 19 nov.) : un nœud qui dessine la photo lui-même (l'app passe sa <PhotoVinted> : sans référent,
+// relais de l'extension quand l'adresse Vinted a expiré) ; il remplit le cadre, la photo absente reste l'icône.
+export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
   const t = taille === 44 ? 44 : 56;
+  if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
-    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" draggable="false" onError={() => setRate(true)}/>;
+    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>;
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>
@@ -71,7 +78,7 @@ const VITESSE = 0.35;    // px/ms : un coup sec ouvre ou referme, quelle que soi
 
 export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
   pastille = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
-  indisponible = false, raison = '', className = '', attrs = null }) {
+  indisponible = false, raison = '', selection = null, note = '', className = '', attrs = null }) {
   const idAide = React.useId();
   const refRangee = React.useRef(null), refCorps = React.useRef(null), refActions = React.useRef(null);
   const geste = React.useRef(null), avaleClic = React.useRef(false);
@@ -195,6 +202,7 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
           </span>
         ) : null}
         {detailValeur ? <span className="n-rangee-detail">{detailValeur}</span> : null}
+        {note ? <span className="n-rangee-note">{note}</span> : null}
       </span>
       {finNoeud ? <span className="n-rangee-fin">{finNoeud}</span> : null}
       {aActions ? <span className="n-lu-seul" id={idAide}>{tr('natif.rangee.aideActions')}</span> : null}
@@ -230,8 +238,16 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
       data-n-selection={selectionnee ? '1' : undefined}
       data-n-touche={onClick || href || interrupteur ? '1' : undefined}
       data-n-balayage={aActions ? '1' : undefined}
+      data-n-case={selection ? '1' : undefined}
       {...(attrs || {})}
     >
+      {selection ? (
+        <label className="n-rangee-case" data-n-indisponible={selection.indisponible ? '1' : undefined}>
+          <input type="checkbox" className="n-case" checked={!!selection.cochee && !selection.indisponible} disabled={!!selection.indisponible} aria-label={selection.libelle || undefined}
+            onChange={(e) => { if (!selection.indisponible && selection.onChange) selection.onChange(e.target.checked); }} {...(selection.attrs || {})}/>
+          <span className="n-case-dessin" aria-hidden="true"><Glyphe nom="check" taille={14}/></span>
+        </label>
+      ) : null}
       {aActions ? (
         <div className="n-rangee-actions" ref={refActions} aria-hidden={ouverte ? undefined : 'true'}>
           {actions.map((a) => (

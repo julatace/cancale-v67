@@ -172,4 +172,28 @@ la rangée d'annonce 6 (« N° » de la plaque à 4,39:1, flou), Ventes 4.
 
 ## 6. Preuves
 
-‹PREUVES›
+Relevés du 19 nov. après-midi (machine partagée saturée : base `leger`, un banc à la fois sous `/tmp/vrm-banc-*.lock`) :
+
+| relevé | build | résultat |
+|---|---|---|
+| avant (origin/main, habillage « VRM », 390 + 1512 clair) | `dist-avant` | ❌ 73 états, **352 défauts de ce lot**, 388 aux autres (Chromium tué à 1512 : 10 états) |
+| après, 390 + 1512 clair | ce lot avant la coque | ✅ 127 états, **0** (après les 2 derniers correctifs ; 10 au relevé précédent) |
+| après, 390 + 1512 sombre | ce lot avant la coque | ❌ 4 (segment de « Qui dorment », lien de la feuille « ⋯ ») → corrigés |
+| mutation `MUTATION=blanc` (Annonces, Achats, Argent, Messages, 390) | ce lot | ❌ 6 rouges (titres blancs sur la page) : le banc sait rougir |
+| **fusion de la coque native** (`claude/natif-fondation` 58415065e), 390 + 1512 clair | 92b3bc9cf → a0fe763b1 | 24 → ✅ **0** (121 états) : puces de compte des feuilles à 44 px, lien « Régler par paire » ; la barre de titre / les onglets / la barre latérale `n-*` comptés à la coque |
+| fusion, 390 + 1512 sombre | a0fe763b1 → d546dedcd | 6 (nombre d'un segment choisi, compte d'un e-mail) → ✅ **0** (121 états) |
+| fusion, 390 + 1512 clair, relevé final | d546dedcd | 1 : le « ? » de Paramètres à 1512 « rien de dessiné » — la capture le montre bien dessiné (icône pas encore peinte au moment de la mesure) |
+
+⚠️ **À 390 en SOMBRE, les captures sont CLAIRES** (avant comme après la coque) alors que `data-theme="dark"` est posé à
+l'ouverture ; à 1512 le sombre est bien sombre. Soit le banc perd le thème au téléphone, soit l'app : **à vérifier
+sur l'iPhone de Julien en mode sombre**. Le verdict « sombre » à 390 ne vaut donc pas preuve.
+
+Audits relancés (verts) : studio, composants, icones, violet, rouge-doublon (après correctif R7 : le cadre d'un N° en
+doublon lit `--sb-doublon`), csp, tdz, variables, quoi-de-neuf, coherence, traduction, poids-demarrage (1 967 Ko ≤ 1 970).
+Bancs : `verre` 632 ✅ / 48 ❌ — les 48 étaient tous des champs au remplissage d'iOS, V2 corrigé (voir §5) ;
+`design-v2` 166 ✅ / 4 ❌ (Aujourd'hui, autre chantier) ; `design-v2-annonces` 65 ✅ / 6 ❌ (mesures de défilement et
+CLS d'une machine saturée, « Affichage » pas touché à temps — la feuille l'a, capture regardée). `design-v2-argent`,
+`-messages`, `studio-coque`, `studio-reste`, `garde-ecrans` : pas relancés (file des bancs de 13 agents ; à refaire).
+
+Le banc après la coque native : la cloche, la loupe, le profil et l'état de l'extension ne s'ouvrent plus (« pas
+joignable » : leurs sélecteurs visent l'ancienne coque) — à mettre à jour avec la fondation.
