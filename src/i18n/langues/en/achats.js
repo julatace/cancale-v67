@@ -364,7 +364,11 @@ export default {
   "achats.qr.afficherAria": "Show the pickup QR code full size",
   "achats.suivi.copierAria": "Tracking no. {su} — tap to copy",
   "achats.suivi.copie": "copied",
-  "achats.relier.pasRelie": "Purchase not linked yet",
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
+  "achats.contenu.pasLu": "Contents not read yet",
+  "achats.contenu.pasLuCompte": "Contents not read yet · open vinted.fr on {compte}",
+  "achats.contenu.paye": "Paid {prix}",
+  "achats.contenu.payeCompte": "Paid {prix} · {compte}",
   "achats.relier.bouton": "Link",
   "achats.relier.titre": "Which purchase is in this parcel?",
   "achats.relier.aide": "Pick the purchase: you link it, VRM never guesses. The tracking number is kept for this purchase.",

@@ -364,7 +364,11 @@ export default {
   "achats.qr.afficherAria": "Mostra il QR di ritiro in grande",
   "achats.suivi.copierAria": "N. di tracking {su}: tocca per copiarlo",
   "achats.suivi.copie": "copiato",
-  "achats.relier.pasRelie": "Acquisto non ancora collegato",
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
+  "achats.contenu.pasLu": "Contenuto non ancora letto",
+  "achats.contenu.pasLuCompte": "Contenuto non ancora letto · apri vinted.fr con {compte}",
+  "achats.contenu.paye": "Pagato {prix}",
+  "achats.contenu.payeCompte": "Pagato {prix} · {compte}",
   "achats.relier.bouton": "Collega",
   "achats.relier.titre": "Quale acquisto c'è in questo pacco?",
   "achats.relier.aide": "Scegli l’acquisto: sei tu a collegarlo, VRM non indovina nulla. Il numero di tracking resta associato a questo acquisto.",

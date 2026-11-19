@@ -364,7 +364,11 @@ export default {
   "achats.qr.afficherAria": "Afficher le QR de retrait en grand",
   "achats.suivi.copierAria": "N° de suivi {su} — touche pour le copier",
   "achats.suivi.copie": "copié",
-  "achats.relier.pasRelie": "Achat pas encore relié",
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
+  "achats.contenu.pasLu": "Contenu pas encore lu",
+  "achats.contenu.pasLuCompte": "Contenu pas encore lu · ouvre vinted.fr sur {compte}",
+  "achats.contenu.paye": "Payé {prix}",
+  "achats.contenu.payeCompte": "Payé {prix} · {compte}",
   "achats.relier.bouton": "Relier",
   "achats.relier.titre": "Quel achat est dans ce colis ?",
   "achats.relier.aide": "Choisis l’achat : c’est toi qui relies, VRM ne devine rien. Le n° de suivi est gardé pour cet achat.",

@@ -72,7 +72,6 @@ export default {
   "v2.passe.qr": "Pickup QR code",
   "v2.passe.codeAVenir": "code not read yet",
   "v2.passe.enGrand": "Full screen",
-  "v2.passe.relier": "Link the purchase",
   "v2.passe.retire": "I picked it up",
   "v2.passe.page": "{i} of {n}",
   "v2.passe.aucun": "No parcel to pick up for now.",
