@@ -655,9 +655,9 @@
   top: 6px !important; left: 24px !important; right: auto !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
 
-:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
+:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
 
-:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
+:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
 
 /* ── 3.4 LA PHOTO DU COMPTE porte le point d'état « Actions Vinted » (ambre = un geste, gris = lecture) ── */
 :root:root body .vrm-app-shell .vrm-hdr-profil { position: relative !important; }
@@ -691,10 +691,10 @@
     transition: background-color var(--d-m-moyen) ease-out, border-color var(--d-m-moyen) ease-out !important;
   }
   /* Ma journée garde sa barre ENCRE, d'un bloc avec sa carte héros (styles-visuel-2.css) : ces règles ne la touchent pas. */
-  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header { background: var(--vrm-bg, var(--d-fond)) !important; }
-  :root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { --vrm-hdr-anneau: #1d1d1f; }
+  :root:root body .vrm-app-shell:not([data-vrm-d11]):not(._) > .vrm-app-header.vrm-app-header { background: var(--vrm-bg, var(--d-fond)) !important; }
+  :root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header { --vrm-hdr-anneau: #1d1d1f; }
   /* Au défilement : le matériau translucide (§4) et un filet d'un demi-pixel. */
-  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header.is-defile {
+  :root:root body .vrm-app-shell:not([data-vrm-d11]):not(._) > .vrm-app-header.vrm-app-header.is-defile {
     background: var(--d-materiau) !important; -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
     border-bottom-color: var(--d-materiau-filet) !important;
   }
@@ -760,7 +760,7 @@
   }
   :root:root body .vrm-maj.vrm-maj .vrm-maj-oui { margin-left: auto !important; min-height: 36px !important; font-size: 13px !important; }
   /* La place de la ligne est rendue par la page (rien n'est couvert). */
-  html:has(.vrm-maj) body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
+  html[data-vrm-d37] body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
 }
 
 
@@ -792,11 +792,11 @@
    l'air AUTOUR des blocs se resserre (aucun bloc retiré, aucune cible sous 44 px) : sélecteur 4/0, grand titre
    sans marge haute ni basse, rangée des sites 0/4, bande de chiffres 4 au-dessus ; Stock 8 au-dessus. */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
-  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) > .vrm-paires-selecteur { padding-top: var(--d-e-1, 4px) !important; padding-bottom: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache > .vrm-tache-tete { padding-top: 0 !important; padding-bottom: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache-filtres > .vrm-filtre-site { margin-top: 0 !important; margin-bottom: 4px !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) :has(> .vrm-fu-bande) { padding-top: 4px !important; }
-  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) .vrm-ms-stock { padding-top: var(--d-e-2, 8px) !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-vrm-d38] > .vrm-paires-selecteur { padding-top: var(--d-e-1, 4px) !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] .vrm-tache > .vrm-tache-tete { padding-top: 0 !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] .vrm-tache-filtres > .vrm-filtre-site { margin-top: 0 !important; margin-bottom: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] :has(> .vrm-fu-bande) { padding-top: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-vrm-d38] .vrm-ms-stock { padding-top: var(--d-e-2, 8px) !important; }
 }
 
 } /* fin §3 COQUE (@layer vrm-premium) */

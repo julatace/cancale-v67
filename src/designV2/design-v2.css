@@ -16,10 +16,11 @@
   --v2-plein-fond: #FFFFFF;
   --v2-plein-fond-appui: #DCE6F1;
   --v2-plein-texte: #0C1D30;
-  /* Le texte posé SUR LA COQUE (le bleu du verre, src/design/studio-verre.css) : blanc ; dans une carte : l'encre. */
-  --v2-page-texte: var(--sv-clair, #FFFFFF);
-  --v2-page-muet: rgb(255 255 255 / .88);
-  --v2-page-ambre: var(--sv-clair-ambre, #FFF1C0);
+  /* Le texte posé SUR LA PAGE suit le fond de la page (19 nov., « VRM natif » : il était BLANC, pour le bleu du verre —
+     blanc sur clair dès que le fond a changé). L'encre du natif, jour et nuit. */
+  --v2-page-texte: var(--n-encre, #111114);
+  --v2-page-muet: var(--n-encre-2, #6C6C70);
+  --v2-page-ambre: var(--n-ambre, #8A4B00);
   --v2-teinte-fond: rgb(0 96 204 / .10);
   --v2-teinte-fond-appui: rgb(0 96 204 / .18);
   --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
@@ -39,9 +40,9 @@
   --v2-e-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);   /* un ressort court, à peine (aucun rebond visible) */
 }
 :root[data-theme="dark"] {
-  --v2-page-texte: #F2F7FD;
-  --v2-page-muet: #B9C8D8;
-  --v2-page-ambre: #F2B65E;
+  --v2-page-texte: var(--n-encre, #FFFFFF);
+  --v2-page-muet: var(--n-encre-2, #98989F);
+  --v2-page-ambre: var(--n-ambre, #FFB340);
   --v2-plein-fond: #EAF2FB;
   --v2-plein-fond-appui: #C9D9EA;
   --v2-plein-texte: #06111F;
@@ -231,6 +232,11 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 .v2-passe-sans { font-size: 15px; color: var(--v2-muet); padding: 10px 0; }
 .v2-passe-paire { align-self: stretch; display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: .5px solid var(--v2-filet); }
 .v2-passe-titre { flex: 1; min-width: 0; font-size: 15px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (19 nov.) Ce qu'il y a DANS le colis, sous le titre : « Payé 24,00 € · compte » (achat relié par identité) ou
+   « Contenu pas encore lu · ouvre vinted.fr sur … » — une ligne discrète, jamais un bouton (src/contenuColis.js). */
+.v2-passe-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.v2-passe-quoi > .v2-passe-titre { flex: none; }
+.v2-passe-dedans { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }   /* la couleur : `.v2-muet` (celle que chaque habillage donne déjà au texte discret d'une passe) */
 .v2-passe-gestes { align-self: stretch; display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; }
 .v2-passe-pages { text-align: center; font-size: 13px; color: var(--v2-muet); padding: 0 0 12px; font-variant-numeric: tabular-nums; }
 
@@ -272,8 +278,8 @@ html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-pl
 html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
 html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
-html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
 
 /* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
    Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
@@ -303,7 +309,7 @@ html[data-design="v2"] body button.v2-ann-relier { appearance: none; border: 0 !
   touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: flex !important; align-items: center; }
 html[data-design="v2"] body button.v2-ann-relier:active { opacity: .6; }
 /* La place du plein au pouce, sous la dernière annonce. */
-@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main:has(.v2-ann-segment) .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
+@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main[data-vrm-d20] .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
 
 /* ══ 8. LA RANGÉE D'ANNONCE (src/designV2/LigneAnnonce.jsx) — dessins A · B · C ════════════════════════════════
    Grille de 8 px, gouttières 16 ; une hauteur par dessin ; chiffres tabulaires ; photo recadrée pareil partout. */
@@ -395,6 +401,9 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
 .v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
 .v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
+/* (19 nov., intégration) Le rond « retrouver » ne se pose plus sur « Ajouter » : la ligne du titre lui garde sa place. */
+.v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne { padding-right: 60px; box-sizing: border-box; }
+.v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne h1 { padding-right: 0; }
 /* Le « ? » de l'écran, sur la coque : à l'encre de la coque (il était gris foncé sur le bleu). */
 .v2-sous-titre .vrm-phrase-ecran, .v2-sous-titre .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
 .v2-ann-menu-affichage { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 8px; font-size: 15px; font-weight: 600; }
@@ -415,7 +424,7 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 :root[data-theme="dark"] .v2-plaque { background: #22385A; color: #EAF2FB; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22); }
 :root[data-theme="dark"] .v2-plaque small { color: #B9C8D8; }
 /* Le « ? » sur la coque bleue, le jour : blanc (la règle d'hier le peignait gris foncé ; sa feuille est un portail, hors du filtre). */
-:root:not([data-theme="dark"]) .v2-aide { filter: brightness(0) invert(1); }
+/* (19 nov., « VRM natif ») Le « ? » était forcé en BLANC le jour par un filtre (pour le fond bleu du verre) : sur le fond clair il prend l'encre seconde, comme partout. */
 .v2-aide { display: inline-flex; align-items: center; }
 /* Annonces au téléphone : la cloche posée sur la ligne du titre ⇒ la place à droite de « Publier ». */
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 52px; } }
@@ -545,7 +554,7 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
    SUR le grand titre. Elle passe au-dessus de la barre du bas, centrée (dans la couche de sa règle d'hier). */
 @layer vrm-verre {
   @media (max-width: 760px) {
-    :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
+    :root:root:root:root:root body[data-vrm-d21] .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
   }
 }
 /* Grand texte (Paramètres → Taille du texte, jusqu'à ×1,36) et 375 px : rien de rogné, aucun mot coupé.
@@ -656,7 +665,7 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 /* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
 :root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
 @media (max-width: 1023px) {
-  html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
+  html[data-design="v2"] body[data-vrm-d19] .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
   .v2-ecran[data-v2-plein="1"] { padding-bottom: var(--v2-pile-bas); }
 }
 /* A4. En route : le titre sur toute la largeur (2 lignes au plus), le prix seul à droite. */
@@ -669,7 +678,7 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 /* A6. « Mis à jour à … » ne se pose plus sur le grand titre : allumé au téléphone, elle descend au-dessus de la barre. */
 @media (max-width: 1023px) {
   html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
-  html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
+  html[data-design="v2"] body[data-vrm-d19] .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
 }
 /* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
 @media (min-width: 1024px) {
@@ -732,7 +741,7 @@ html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-
 html body .v2-sous-titre { gap: var(--v2-air-boutons); }
 html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
 /* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
-html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }
+html[data-design="v2"] body[data-vrm-d22] .vrm-main .vrm-market-space { display: none !important; }
 /* L'ordinateur : le plein sur la ligne du titre, À GAUCHE du « Scanner » (44 + 12) — il le couvrait (banc T, 1512). */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .v2-aujourdhui:has([data-v2-scanner]) .v2-pouce { right: calc(32px + 44px + var(--v2-air-boutons, 12px)); }

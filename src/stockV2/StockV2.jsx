@@ -22,6 +22,7 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { BoutonV2, BoutonIconeV2 } from '../designV2/BoutonV2.jsx';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import LigneGlissable from '../LigneGlissable.jsx';
+import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire — ici, plus dans Aujourd'hui
 import { Etiquette } from '../designV2/Signature.jsx';   // l'étiquette N° kraft partagée du nouveau design
 import { MQ_ORDINATEUR } from '../coque.js';
 import { attrsFicheLigne, ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la rangée ouvre LA fiche
@@ -375,6 +376,7 @@ export default function StockV2({ s }) {
       </div>
       {/* UNE ligne : plateforme · compte (les filtres d'avant, dans sa feuille). */}
       {s.filtres ? <div className="v2-sous-titre sr-sous-titre"><MenuPlateforme id="stock" Icon={Icon} Retour={s.Retour} libelle={s.filtres.libelle} sous={s.filtres.sous}>{s.filtres.corps}</MenuPlateforme></div> : null}
+      <ARegler onglet="stock" Icon={Icon}/>
       {s.blocs.horsLigne}
 
       {/* « Où est… » : le champ (photo et voix dedans) et « ⋯ ». */}

@@ -68,11 +68,11 @@
 }
 
 /* ── 0. LE FOND des écrans Fusion (le reste de l'app garde le sien) ───────── */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
-html body .vrm-app-shell:has(.vrm-main .vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d5] { background-color: var(--fu-fond) !important; }
+html body .vrm-app-shell[data-vrm-d6]:not(._) { background-color: var(--fu-fond) !important; }
 /* (3 nov.) En sombre, la règle Vitrine `:root[data-theme="dark"] .vrm-app-shell .vrm-main` gagnait :
    page #000000, bandes #000 autour — deux noirs côte à côte. Même fond partout. */
-:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) { background-color: var(--fu-fond) !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main[data-vrm-d5] { background-color: var(--fu-fond) !important; }
 /* (5 nov., chantier A) Les chiffres alignés vont aux NOMBRES de l'écran (grand chiffre, cases,
    montants : leurs règles ci-dessous), plus à tout l'écran — le texte n'en hérite plus. */
 
@@ -339,14 +339,14 @@ html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-groupe-titre, html body .vrm-
 /* ── 6. COLIS ─────────────────────────────────────────────────────────────── */
 html body .vrm-app-shell .vrm-main .vrm-colis-carte > .vrm-colis-frise { margin: 14px 0 2px !important; position: relative; }
 /* Les cartes de colis : blanches, rayon 20, ombre très douce, la frise sous l'en-tête. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] {
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] {
   border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: var(--fu-ombre) !important; padding: 14px !important;
 }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: 10px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo { width: 60px !important; height: 60px !important; border-radius: var(--fu-r-photo) !important; border: 0 !important; background: var(--fu-case) !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre { font: 600 15px/1.3 var(--vrm-police) !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-num { background: var(--fu-encre) !important; color: var(--fu-carte) !important; border: 0 !important; border-radius: 6px !important; padding: 1px 7px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte :is(.vrm-colis-sec, .vrm-colis-ter) { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; min-height: 44px !important; font: 600 15px/1 var(--vrm-police) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: 10px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo { width: 60px !important; height: 60px !important; border-radius: var(--fu-r-photo) !important; border: 0 !important; background: var(--fu-case) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre { font: 600 15px/1.3 var(--vrm-police) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-num { background: var(--fu-encre) !important; color: var(--fu-carte) !important; border: 0 !important; border-radius: 6px !important; padding: 1px 7px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte :is(.vrm-colis-sec, .vrm-colis-ter) { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; min-height: 44px !important; font: 600 15px/1 var(--vrm-police) !important; }
 @media (min-width: 768px) {
   html body .vrm-app-shell .vrm-main .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte { flex-wrap: wrap !important; }
   html body .vrm-app-shell .vrm-main .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte > .vrm-colis-frise { flex: 1 1 100% !important; order: 20; margin: 6px 0 0 !important; }
@@ -679,35 +679,35 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] .vrm-rangee-bord
    et période, ni raison commune des boutons grisés. Le titre et la date au-dessus. */
 .vrm-fu-date-tete { display: block; font: 600 13px/1.3 var(--vrm-police); color: var(--fu-gris); margin: 0 0 2px; }
 .vrm-fu-date-tete::first-letter { text-transform: uppercase; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-platform-summary, [data-vinted-majournee], [data-fraicheur-ventes], [data-raison-bord], .vrm-sales-search-group, .vrm-mobile-sales-intro, .vrm-sales-workbar .vrm-cp, .vrm-sales-workbar [class*="vrm-cp"]) { display: none !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-vinted-majournee] { display: none !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) div:has(> [data-vinted-majournee]) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) :is([data-raison-bord], .vrm-aide, .vrm-colis-groupe .vrm-aide) { display: none !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-tache-tete h1, html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head h1, html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-screen-head h1 {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] :is(.vrm-platform-summary, [data-vinted-majournee], [data-fraicheur-ventes], [data-raison-bord], .vrm-sales-search-group, .vrm-mobile-sales-intro, .vrm-sales-workbar .vrm-cp, .vrm-sales-workbar [class*="vrm-cp"]) { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-vinted-majournee] { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] div:has(> [data-vinted-majournee]) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) :is([data-raison-bord], .vrm-aide, .vrm-colis-groupe .vrm-aide) { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] .vrm-tache-tete h1, html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head h1, html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-screen-head h1 {
   font: 700 34px/1.1 var(--vrm-police) !important; letter-spacing: -.03em !important; margin: 0 !important;
 }
 /* La barre de travail de Ventes : les filtres et « Outils » restent (des boutons) ; ni recherche ni période. */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-sales-workbar > :not(.vrm-filtres-et-outils):not([class*="outils"]):not(.vrm-menu-flottant):not(.vrm-menu-voile) { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] .vrm-sales-workbar > :not(.vrm-filtres-et-outils):not([class*="outils"]):not(.vrm-menu-flottant):not(.vrm-menu-voile) { display: none !important; }
 /* (3 nov.) ⚠️ Au téléphone le menu « Outils » s’ouvre SOUS la barre (enfant direct de la barre) : il ne doit
    jamais tomber sous la règle qui range la barre, sinon recherche et période sont introuvables (banc `mobile`). */
 .vrm-fu-ventes .vrm-fu-case[aria-pressed="true"] { background: rgba(255,255,255,.22); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
 
 /* ══ 14. COLIS = LA MAQUETTE FusionColis ══ */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head { display: block !important; margin: 0 0 14px !important; padding: 0 !important; border: 0 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head :is(.vrm-tete-row, .vrm-screen-head-titre) { display: block !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-screen-head-titre > span[aria-hidden] { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head h1 { display: block !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head { display: block !important; margin: 0 0 14px !important; padding: 0 !important; border: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head :is(.vrm-tete-row, .vrm-screen-head-titre) { display: block !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-screen-head-titre > span[aria-hidden] { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head h1 { display: block !important; }
 /* Ce que la maquette ne montre pas */
 /* (9 nov., banc colis-fiables) Les notes EXPLICATIVES sont retirées ; la note « N colis sont arrivés sur une
    adresse reliée à aucun compte » porte un GESTE (« Paramètres → Comptes liés ») : elle reste (2 nov., §2.7). */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) :is(.vrm-filtre-site:not([data-selecteur-logos]), [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note:not([data-pickup-sans-compte]), [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-outils { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) :is(.vrm-filtre-site:not([data-selecteur-logos]), [data-emballer-ouvrir], [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage], .vrm-colis-note:not([data-pickup-sans-compte]), [data-colis-filtre-note], .vrm-colis-groupe) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-outils { display: none !important; }
 /* Le sélecteur « J'envoie · 3 / Je reçois · 2 » */
 /* (5 nov., chantier A) Le segmenté lui-même — piste, segments, actif — est la règle unique de styles-coque.css. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg { margin: 0 0 4px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-n { color: inherit !important; font-weight: 600 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-n::before { content: '· '; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg { margin: 0 0 4px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-n { color: inherit !important; font-weight: 600 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-n::before { content: '· '; }
 /* L'en-tête d'un transporteur */
 .vrm-fu-groupe-transp { display: flex; align-items: center; gap: 10px; padding: 16px 2px 2px; }
 .vrm-fu-groupe-transp:first-child { padding-top: 4px; }
@@ -716,41 +716,41 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 .vrm-fu-groupe-transp h3 { margin: 0; flex: 1 1 auto; min-width: 0; font: 700 17px/1.2 var(--vrm-police); letter-spacing: -.01em; color: var(--fu-encre); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fu-groupe-transp > span:last-child { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); flex: none; }
 /* La carte d'un colis */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] { padding: 14px !important; border-radius: 20px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { align-items: center !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre { font: 600 17px/1.3 var(--vrm-police) !important; -webkit-line-clamp: 1 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte :is(.vrm-colis-prix, .vrm-colis-masquer) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) .vrm-colis-titre + * { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) div:has(> .vrm-colis-num) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-dates] { font: 600 13px/1.3 var(--vrm-police) !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 600 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] { padding: 14px !important; border-radius: 20px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { align-items: center !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre { font: 600 17px/1.3 var(--vrm-police) !important; -webkit-line-clamp: 1 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte :is(.vrm-colis-prix, .vrm-colis-masquer) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) .vrm-colis-titre + * { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) div:has(> .vrm-colis-num) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-dates] { font: 600 13px/1.3 var(--vrm-police) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 600 !important; }
 /* Dans une carte de colis Vinted, la rangée du bordereau devient LE bouton rond de la maquette,
    en haut à droite (le même bouton, cliquable tel quel) ; le transporteur est l'en-tête du groupe.
    (La carte Vestiaire, hors des groupes, garde sa rangée puce + bordereau.) */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) { position: relative !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord {
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) { position: relative !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord {
   position: absolute !important; top: 22px !important; right: 14px !important; width: auto !important; flex: none !important; gap: 0 !important; z-index: 1;
 }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord > .vrm-puce-transp { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: none !important; width: 44px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) {
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-colis-actions > .vrm-rangee-bord > .vrm-puce-transp { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord > :not(.vrm-puce-transp) { flex: none !important; width: 44px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) {
   width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border-radius: 50% !important; font-size: 0 !important; gap: 0 !important; justify-content: center !important;
 }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) :is(.vrm-lib-long, .vrm-lib-court) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) svg { width: 20px !important; height: 20px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord [data-bouton-bord]:not([data-bouton-bord="pdf"]) > button { background: var(--fu-case) !important; color: var(--fu-encre) !important; border: 0 !important; opacity: 1 !important; filter: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord [data-bouton-bord] > :not(button) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 56px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) :is(.vrm-lib-long, .vrm-lib-court) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord :is(button, a) svg { width: 20px !important; height: 20px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord [data-bouton-bord]:not([data-bouton-bord="pdf"]) > button { background: var(--fu-case) !important; color: var(--fu-encre) !important; border: 0 !important; opacity: 1 !important; filter: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord [data-bouton-bord] > :not(button) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 56px !important; }
 .vrm-fu-rond { all: unset; box-sizing: border-box; flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--fu-case); color: var(--fu-encre); cursor: default; align-self: center; }
 .vrm-fu-rond.is-pret { background: var(--fu-bleu); color: #fff; cursor: pointer; transition: transform 140ms cubic-bezier(.23,1,.32,1); }
 .vrm-fu-rond.is-pret:active { transform: scale(.94); }
 .vrm-fu-rond:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions { margin-top: 10px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions :is(.vrm-colis-sec, .vrm-colis-ter) { min-height: 44px !important; font-size: 13px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise { margin-top: 12px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) .vrm-colis-actions > :is([data-geste="imprime"], [data-geste="suivre"], [data-colis-suivre]) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions { justify-content: flex-end !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions > * { flex: 0 0 auto !important; min-width: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions { margin-top: 10px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions :is(.vrm-colis-sec, .vrm-colis-ter) { min-height: 44px !important; font-size: 13px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise { margin-top: 12px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte:not([data-colis-aucun]) .vrm-colis-actions > :is([data-geste="imprime"], [data-geste="suivre"], [data-colis-suivre]) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions { justify-content: flex-end !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions > * { flex: 0 0 auto !important; min-width: 0 !important; }
 
 /* ══ 15. COMPTA = LA MAQUETTE FusionCompta ══ */
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran > .vrm-screen-head { display: block !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
@@ -780,7 +780,7 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 :root[data-theme="dark"] .vrm-fu-compta .vrm-fu-declaration { background: rgba(255,159,10,.14); color: #ffb340; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { display: flex !important; flex-direction: column !important; gap: 12px !important; }
 @media (min-width: 900px) { html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta { display: grid !important; grid-template-columns: 1fr 1fr; } html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta > .vrm-fu-declaration { grid-column: 1 / -1; } }
-html body .vrm-app-shell .vrm-main:has(.vrm-finance-page.vrm-fu-ecran) .vrm-rubriques { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d9]:not(._) .vrm-rubriques { display: none !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta-cases .vrm-fu-case b { font-size: 17px !important; letter-spacing: -.02em; }
 .vrm-fu-compta .vrm-fu-barres { height: 118px; gap: 12px; }
 .vrm-fu-compta .vrm-fu-barre { gap: 6px; }
@@ -789,27 +789,27 @@ html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-fu-compta
 .vrm-fu-compta .vrm-fu-panneau-tete h3 { font-size: 17px; }
 .vrm-fu-compta .vrm-fu-anneau svg { width: 122px; height: 122px; }
 /* Le bouton rond de la carte Colis passe devant la règle à classes répétées (rayon 12). */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] { border-radius: 50% !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) .vrm-rangee-bord button.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire.vrm-colis-primaire[data-imprime] { border-radius: 50% !important; }
 
 /* ══ 16. AUCUNE FONCTION PERDUE : « … » (2 nov., 22 h 30) ══ */
 .vrm-fu-plus { all: unset; box-sizing: border-box; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--fu-encre); cursor: pointer; flex: none; }
 .vrm-fu-plus:focus-visible { outline: 2px solid var(--fu-bleu); outline-offset: 2px; }
 .vrm-fu-plus[aria-expanded="true"] { background: var(--fu-case); }
 /* Colis : les outils de l'en-tête, rangés tant que « … » n'est pas touché */
-:root:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) :is(.vrm-colis-outils, [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: none !important; }
-:root[data-colis-outils] body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) :is([data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: revert !important; }
-:root[data-colis-outils] body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-outils { display: flex !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row { display: flex !important; align-items: flex-end !important; justify-content: space-between !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: flex !important; }
+:root:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) :is(.vrm-colis-outils, [data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: none !important; }
+:root[data-colis-outils] body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) :is([data-tout-generer], [data-tg-bilan], [data-imprimante-reglage]) { display: revert !important; }
+:root[data-colis-outils] body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-outils { display: flex !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row { display: flex !important; align-items: flex-end !important; justify-content: space-between !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row > div:not(.vrm-screen-head-titre) { display: flex !important; }
 /* Carte d'un colis Vinted : les gestes sous la frise n'apparaissent qu'au « … » ; « Relier » / « Poser le N° » restent (quand il le faut), en pilule discrète. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not([data-plus-ouvert]) .vrm-colis-actions > :not(.vrm-rangee-bord):not([data-geste="relier"]):not([data-geste="poser-num"]) { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun])[data-plus-ouvert] .vrm-colis-actions > :is([data-geste="imprime"], [data-geste="suivre"], [data-colis-suivre]) { display: inline-flex !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) { min-height: 32px !important; padding: 0 12px !important; border-radius: 999px !important; border: 0 !important; background: var(--fu-case) !important; color: var(--fu-gris) !important; font: 600 13px/1 var(--vrm-police) !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-fu-plus-carte { position: absolute; right: 64px; top: 22px; color: var(--fu-gris); }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 104px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not([data-plus-ouvert]) .vrm-colis-actions > :not(.vrm-rangee-bord):not([data-geste="relier"]):not([data-geste="poser-num"]) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun])[data-plus-ouvert] .vrm-colis-actions > :is([data-geste="imprime"], [data-geste="suivre"], [data-colis-suivre]) { display: inline-flex !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) { min-height: 32px !important; padding: 0 12px !important; border-radius: 999px !important; border: 0 !important; background: var(--fu-case) !important; color: var(--fu-gris) !important; font: 600 13px/1 var(--vrm-police) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-fu-plus-carte { position: absolute; right: 64px; top: 22px; color: var(--fu-gris); }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child { padding-right: 104px !important; }
 /* (3 nov.) La carte Vestiaire a son « … » comme les autres (la même carte pour tous les sites). */
 /* La carte n'a plus de gestes visibles : sa rangée d'actions ne prend pas de place quand elle est vide. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not([data-plus-ouvert]) .vrm-colis-actions:not(:has(> [data-geste="relier"], > [data-geste="poser-num"])) { margin-top: 0 !important; min-height: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not([data-plus-ouvert]) .vrm-colis-actions:not(:has(> [data-geste="relier"], > [data-geste="poser-num"])) { margin-top: 0 !important; min-height: 0 !important; }
 .vrm-fu-vente-taille { font: 400 12px/1.3 var(--vrm-police); color: #6e6e73; white-space: nowrap; }
 :root[data-theme="dark"] .vrm-fu-vente-taille { color: #98989d; }
 .vrm-fu-apres { display: flex; }
@@ -843,8 +843,8 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-syn
 
 /* (3 nov.) « Outils » a la forme des filtres voisins (pilule, même hauteur, même filet),
    au lieu d'un carré gris décalé vers le haut. */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-filtres-et-outils { align-items: center !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-filtres-et-outils > .vrm-outils-ventes > button {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] .vrm-filtres-et-outils { align-items: center !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] .vrm-filtres-et-outils > .vrm-outils-ventes > button {
   min-height: 44px !important; border-radius: 999px !important; border: 1px solid var(--vrm-line) !important;
   background: var(--vrm-bg) !important; color: var(--vrm-ink) !important; font-weight: 600 !important; box-shadow: none !important; margin: 0 !important;
 }
@@ -853,35 +853,35 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) .vrm-filtres-et-outils > 
    composants (marges 50/54/58 px, chevrons à trois hauteurs, « Vérifier » flottant).
    Ici une seule liste groupée façon Réglages : même retrait, même hauteur, un filet entre
    deux lignes, titre puis valeur grise dessous, chevron à droite centré. Rien n'est retiré. */
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] { gap: 0 !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 { margin: 0 4px 8px !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] { gap: 0 !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > h3 { margin: 0 4px 8px !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details {
   margin: 0 !important; padding: 0 16px !important; border: 0 !important; border-radius: 0 !important;
   background: var(--fu-carte) !important; box-shadow: none !important;
   border-top: 1px solid var(--fu-filet) !important;
 }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details { border-top: 0 !important; border-radius: 16px 16px 0 0 !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details:last-child { border-radius: 0 0 16px 16px !important; padding-bottom: 0 !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > h3 + details:last-child { border-radius: 12px !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > h3 + details { border-top: 0 !important; border-radius: 16px 16px 0 0 !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details:last-child { border-radius: 0 0 16px 16px !important; padding-bottom: 0 !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > h3 + details:last-child { border-radius: 12px !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details > summary {
   display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; gap: 2px !important;
   min-height: 56px !important; padding: 10px 28px 10px 0 !important; margin: 0 !important;
   position: relative !important; list-style: none !important; cursor: pointer;
   font: 600 15px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; text-align: left !important;
 }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary::-webkit-details-marker { display: none; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary :is(b, .vrm-va-titre) { font: inherit !important; color: inherit !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary > span {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details > summary::-webkit-details-marker { display: none; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details > summary :is(b, .vrm-va-titre) { font: inherit !important; color: inherit !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details > summary > span {
   display: block !important; margin: 0 !important; font: 400 13px/1.35 var(--vrm-police) !important; color: var(--fu-gris) !important; white-space: normal !important;
 }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details > summary::after {
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details > summary::after {
   content: "" !important; position: absolute !important; right: 4px !important; top: 50% !important; left: auto !important; bottom: auto !important;
   width: 7px !important; height: 7px !important; margin: -5px 0 0 !important; background: none !important;
   border: 0 !important; border-right: 2px solid var(--fu-gris3) !important; border-bottom: 2px solid var(--fu-gris3) !important;
   transform: rotate(-45deg) !important; opacity: 1 !important; transition: transform .2s ease;
 }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details[open] > summary::after { transform: rotate(45deg) !important; }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] > details[open] { padding-bottom: 14px !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details[open] > summary::after { transform: rotate(45deg) !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] [data-ventes-controles] > details[open] { padding-bottom: 14px !important; }
 
 /* (3 nov., Julien : « j'aime pas trop cet endroit », capture sur ordinateur) La barre de
    recherche collée était BLANCHE sur une page grise, et le texte qui défilait passait dessous
@@ -894,11 +894,11 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) [data-ventes-controles] >
     box-shadow: 0 -32px 0 0 var(--vrm-bg, #fff), 0 1px 0 0 var(--vrm-hair, rgba(0,0,0,.08)) !important;
     padding-bottom: 8px !important; margin-bottom: 0 !important;
   }
-  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) > .vrm-barre-haut {
+  html body .vrm-app-shell .vrm-main[data-vrm-d5] > .vrm-barre-haut {
     background-color: color-mix(in srgb, var(--fu-fond) 84%, transparent) !important;
     box-shadow: 0 -32px 0 0 var(--fu-fond), 0 1px 0 0 var(--fu-filet) !important;
   }
-  html body .vrm-app-shell .vrm-main:has(> .vrm-barre-haut) { scroll-padding-top: 84px; }
+  html body .vrm-app-shell .vrm-main[data-vrm-d2] { scroll-padding-top: 84px; }
   /* Ma journée sur ordinateur : la maquette FusionJournee à la largeur d'une colonne
      lisible (720 px), centrée — la tête sombre puis UNE liste « À faire ». */
   html body .vrm-app-shell .vrm-day-layout.vrm-fu-journee { max-width: var(--vrm-largeur-journee, 720px) !important; margin-inline: auto !important; width: 100% !important; grid-template-columns: minmax(0, 1fr) !important; }
@@ -926,9 +926,9 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task.
 /* « Vendus ailleurs » : titre 600 comme les autres lignes. */
 html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre { font-weight: 600 !important; font-size: 15px !important; }
 /* Sombre (#10) : fond #000, cartes #1C1C1E, la carte du mois se détache d'un filet clair. */
-:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) :is(.vrm-day-task, .vrm-bilan-sync, .vrm-sale-row[data-fu-forme], [data-bord-card], [data-ventes-controles] > details) { background: #1c1c1e !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main[data-vrm-d5] :is(.vrm-day-task, .vrm-bilan-sync, .vrm-sale-row[data-fu-forme], [data-bord-card], [data-ventes-controles] > details) { background: #1c1c1e !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-fu-ecran [data-fu-carte]) { box-shadow: 0 0 0 1px rgba(255,255,255,.08) !important; }
-:root[data-theme="dark"] body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran) :is(.vrm-ledger-photo-empty, .vrm-sale-photo, .vrm-fu-vignette) { background-color: #2c2c2e !important; }
+:root[data-theme="dark"] body .vrm-app-shell .vrm-main[data-vrm-d5] :is(.vrm-ledger-photo-empty, .vrm-sale-photo, .vrm-fu-vignette) { background-color: #2c2c2e !important; }
 /* Ordinateur (#13) : étiquettes ≥ 13 px, notes en 13 px. */
 @media (min-width: 768px) {
   html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-day-task .vrm-day-task-note { font-size: 13px !important; }
@@ -941,9 +941,9 @@ html body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-va-titre 
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   /* (3 nov.) Sauf la messagerie en volets (liste · fil · fiche) : à 760 px le fil n'avait plus que 100 px. */
   /* (5 nov.) Et jamais une couche plein écran (role=dialog|alertdialog) : voir jetons.css §9. */
-  html body .vrm-app-shell .vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) { max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
+  html body .vrm-app-shell .vrm-main[data-vrm-d5]:not([data-vrm-d10]) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) { max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important; }
 }
-html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, [data-ventes-entete-cols]) { display: none !important; }
+html body .vrm-app-shell .vrm-main[data-vrm-d8] :is(.vrm-ledger-heading, [data-ventes-entete-cols]) { display: none !important; }
 
 /* ══ 18. CRITIQUE DU 3 NOV. (#2) — au téléphone, la barre du haut ne redit pas le titre ══
    Sur les quatre écrans Fusion : ni tuile logo, ni titre centré (le grand titre est juste
@@ -952,8 +952,8 @@ html body .vrm-app-shell .vrm-main:has(.vrm-fu-ventes) :is(.vrm-ledger-heading, 
 @media (max-width: 767px) {
   html body .vrm-app-shell .vrm-app-header :is(.vrm-header-logo, .vrm-hdr-entreprise, .vrm-hdr-titre) { display: none !important; }
   html body .vrm-app-shell .vrm-app-header { background: var(--fu-fond) !important; box-shadow: none !important; border-bottom: 0 !important; justify-content: flex-end !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header { background: #1d1d1f !important; }
-  html body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) .vrm-app-header .vrm-header-actions :is(button, a) { color: rgba(255,255,255,.85) !important; background: transparent !important; }
+  html body .vrm-app-shell[data-vrm-d11]:not(._) .vrm-app-header { background: #1d1d1f !important; }
+  html body .vrm-app-shell[data-vrm-d11]:not(._) .vrm-app-header .vrm-header-actions :is(button, a) { color: rgba(255,255,255,.85) !important; background: transparent !important; }
 }
 
 /* ══ 19. CRITIQUE DU 3 NOV. (#5) — une carte de vente, deux commandes ══ */
@@ -1026,20 +1026,20 @@ html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 44px !i
    La carte Vestiaire, eBay et Leboncoin = la carte Vinted (règles ci-dessus, sans exception) ;
    un colis sans bordereau lisible : le même rond, neutre, la phrase en infobulle et pour le lecteur
    d'écran. « Envoyés » : la même matière de carte, la vignette 60 / rayon 14 de Ventes. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord {
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord {
   width: 44px !important; height: 44px !important; flex: none !important; border-radius: 50% !important; display: grid !important; place-items: center !important;
   background: var(--fu-case) !important; color: var(--fu-gris2) !important; font-size: 0 !important; padding: 0 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord > .vrm-lib-long { display: none !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord svg { width: 20px !important; height: 20px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo :is(img, picture) { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoye { border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: var(--fu-ombre) !important; padding: 14px !important; }
-:root[data-theme="dark"] body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoye { background: #1c1c1e !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise { margin: 12px 0 0 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoyes .vrm-colis-grille { gap: 10px !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-sec { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord > .vrm-lib-long { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord svg { width: 20px !important; height: 20px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo :is(img, picture) { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye { border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: var(--fu-ombre) !important; padding: 14px !important; }
+:root[data-theme="dark"] body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye { background: #1c1c1e !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise { margin: 12px 0 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoyes .vrm-colis-grille { gap: 10px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-sec { border: 0 !important; background: var(--fu-case) !important; color: var(--fu-encre) !important; border-radius: 12px !important; }
 /* La carte Vestiaire dit, comme Vinted, l'urgence seule (la date de vente et le n° de suivi sont dans le récapitulatif). */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte[data-vc-colis] :is(.vrm-colis-vendue, [data-vc-colis-transport]) { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-vc-colis] :is(.vrm-colis-vendue, [data-vc-colis-transport]) { display: none !important; }
 /* (3 nov.) « Vendus ailleurs » au même gabarit que les lignes en photos : tuile neutre 44 / rayon 10,
    icône grise ; « Vérifier » en pilule neutre (le bleu reste au seul geste principal). */
 :root body .vrm-app-shell .vrm-main .vrm-day-layout.vrm-fu-journee .vrm-bilan-sync[data-vendus-ailleurs] > summary::before {
@@ -1117,8 +1117,8 @@ html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-
 /* (3 nov., Julien : « beaucoup trop brouillon ») Sous Colis → À retirer, plus de bandeaux de texte : l'état du
    suivi Vinted et la réception des e-mails vivent dans Paramètres → E-mails ; « Suivre un colis par son n° »
    s'ouvre par le « … » de Colis (les outils). Les colis repartis restent (cartes courtes). */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] :is([data-suivi-vinted-etat], .vrm-achats > details) { display: none !important; }
-html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] [data-suivis-manuels] { display: none !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] :is([data-suivi-vinted-etat], .vrm-achats > details) { display: none !important; }
+html:not([data-colis-outils]) body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] [data-suivis-manuels] { display: none !important; }
 /* Point : la ligne « nom · adresse », dessous la puce du transporteur et le nombre ; titre d'un colis sur 2 lignes. */
 .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete { flex-wrap: wrap; row-gap: 4px; }
 .vrm-rpf-point:not(.vrm-rpf-verifier) > .vrm-rpf-tete > .vrm-rpf-ident { flex: 1 1 100%; }
@@ -1213,9 +1213,9 @@ html body .vrm-carte-feuille .vrm-carte-place { min-height: 56px !important; }
 /* Le titre d'un colis à retirer tient sur UNE ligne (ellipse). */
 .vrm-rpf .vrm-rpf-titre { display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; -webkit-line-clamp: unset !important; }
 /* (3 nov.) Sous « À retirer », les cartes courtes (repartis) suivent la liste sans grand vide. */
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-retirer { margin-bottom: 0 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] > * { padding-top: 0 !important; }
-html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] .vrm-repartis-courts { margin-top: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-retirer { margin-bottom: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] > * { padding-top: 0 !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) [data-colis-retraits="outils"] .vrm-repartis-courts { margin-top: 0 !important; }
 /* ══ 24. 3 NOV., 13 h 02 — « À RETIRER » EN SECTIONS (Julien : « tu dois mieux SÉPARER ») ══
    Un titre de section sobre (17/700, le nombre en gris), 28 px d'air entre les sections ; « À retirer
    aujourd'hui » seule en ambre discret ; une carte par point (en-tête sur un fond légèrement différent). */
@@ -1356,8 +1356,8 @@ html body .vrm-fs.vrm-carte-feuille { background: var(--fu-fond, #f2f2f7); color
 :root:root body .vrm-app-shell .vrm-day-layout.vrm-fu-journee .vrm-fu-jour > b { position: relative; }
 /* Le calendrier de la feuille « Modifier » (ChoixPeriode, au doigt une feuille à lui) passe AU-DESSUS
    de la feuille (z 20000) — la règle d'avant visait l'ancien voile `.vrm-carte-voile`. */
-body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-voile { z-index: 20001 !important; }
-body:has(.vrm-fs.vrm-carte-feuille) .vrm-cal-feuille { z-index: 20002 !important; }
+body[data-vrm-d12]:not(._) .vrm-cal-voile { z-index: 20001 !important; }
+body[data-vrm-d12]:not(._) .vrm-cal-feuille { z-index: 20002 !important; }
 html body .vrm-va-feuille.vrm-bilan-sync > button { margin: 0 0 12px; }
 
 /* ── (11 nov., lot DJ3) « TOUT IMPRIMER » EN TROIS TEMPS (feuille `.vrm-tip`) ─────────────────────────

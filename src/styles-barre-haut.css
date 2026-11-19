@@ -36,7 +36,7 @@
 /* Sous la barre, la rangée du titre n'a plus à laisser la place de l'île :
    l'action de l'écran (« Imprimer les N prêts ») se range au bord droit. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
-  .vrm-main:has(> .vrm-barre-haut) :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
+  .vrm-main[data-vrm-d2] :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
 }
 
 /* ── (5 nov., chantier H — revue 2.32) Le logo d'un SITE dans la navigation :

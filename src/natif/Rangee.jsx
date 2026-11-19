@@ -3,6 +3,7 @@
 // Props :
 //   titre        le texte principal (17/22) — 1 ligne, ou `lignes={2}` pour un titre d'annonce
 //   sousTitre    15/20 gris, une ligne (« N° 124 · 42 · en ligne »)
+//   sousLignes   2 ⇒ le sous-titre peut passer à la ligne (une phrase d'état qu'on ne coupe pas : « En attente : partira dès que… ») — ajout du 19 nov.
 //   valeur       à droite, 17/22 (un prix, un état court) ; `valeurForte` ⇒ en encre et 600
 //   detailValeur sous la valeur, 13/18 gris (« il y a 2 j »)
 //   vignette     <Vignette src=… /> (56 par défaut, `taille={44}` pour la rangée de 56)
@@ -19,6 +20,10 @@
 //   ton          'ambre' ⇒ le sous-titre est en ambre (un geste à faire, une date limite LUE proche)
 //   selectionnee vrai ⇒ fond teinté (l'élément ouvert dans le volet de détail, à l'ordinateur)
 //   indisponible vrai ⇒ ne se touche pas ; `raison` remplace le sous-titre et dit pourquoi
+//   selection    { cochee, onChange(bool), libelle, indisponible } ⇒ UNE CASE à gauche (44 × 44), à côté du corps (jamais dedans) :
+//                la cocher ne touche pas la rangée, toucher la rangée ne la coche pas (Ventes : les colis cochés pour l'impression).
+//                `indisponible` : la case est grisée et ne se coche pas (pas de bordereau).
+//   note         une 3e ligne, 13/18 gris, sur toute la largeur (« Étagère A · r1 c3 · Mondial Relay ») — elle passe à la ligne
 //   className, attrs (data-* de l'écran)
 // Exemple :
 //   <Rangee vignette={<Vignette src={photo} alt=""/>} titre="Nike Air Max 90 Triple White" lignes={2}
@@ -34,16 +39,19 @@ import { tr } from '../i18n/index.js';
 import { cx, mouvementReduit } from './outils.js';
 import { Glyphe } from './icones.jsx';
 
-export function Vignette({ src = '', alt = '', taille = 56, icone = null, className = '' }) {
+// `image` (ajout du 19 nov.) : un nœud qui dessine la photo lui-même (l'app passe sa <PhotoVinted> : sans référent,
+// relais de l'extension quand l'adresse Vinted a expiré) ; il remplit le cadre, la photo absente reste l'icône.
+export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
-  const t = taille === 44 ? 44 : 56;
+  const t = taille === 44 ? 44 : taille === 48 ? 48 : 56;   // (19 nov. soir) 48 : la vignette d'un tableau de travail
+  if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
-    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" draggable="false" onError={() => setRate(true)}/>;
+    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>;
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>
-      {icone || <Glyphe nom="image" taille={t === 44 ? 20 : 24}/>}
+      {icone || <Glyphe nom="image" taille={t === 56 ? 24 : 20}/>}
     </span>
   );
 }
@@ -68,9 +76,9 @@ let _fermerOuverte = null;
 const SEUIL = 10;        // px avant de décider que c'est un balayage (et pas un défilement)
 const VITESSE = 0.35;    // px/ms : un coup sec ouvre ou referme, quelle que soit la position
 
-export function Rangee({ titre, sousTitre = '', valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
+export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
   pastille = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
-  indisponible = false, raison = '', className = '', attrs = null }) {
+  indisponible = false, raison = '', selection = null, note = '', className = '', attrs = null }) {
   const idAide = React.useId();
   const refRangee = React.useRef(null), refCorps = React.useRef(null), refActions = React.useRef(null);
   const geste = React.useRef(null), avaleClic = React.useRef(false);
@@ -190,10 +198,11 @@ export function Rangee({ titre, sousTitre = '', valeur = null, valeurForte = fal
         {plaque || sous ? (
           <span className="n-rangee-sous" data-n-ton={ton} data-n-seul={detailValeur ? undefined : '1'} data-n-raison={indisponible && raison ? '1' : undefined}>
             {plaque}
-            {sous ? <span className="n-rangee-sous-texte">{sous}</span> : null}
+            {sous ? <span className="n-rangee-sous-texte" data-n-lignes={sousLignes === 2 ? '2' : undefined}>{sous}</span> : null}
           </span>
         ) : null}
         {detailValeur ? <span className="n-rangee-detail">{detailValeur}</span> : null}
+        {note ? <span className="n-rangee-note">{note}</span> : null}
       </span>
       {finNoeud ? <span className="n-rangee-fin">{finNoeud}</span> : null}
       {aActions ? <span className="n-lu-seul" id={idAide}>{tr('natif.rangee.aideActions')}</span> : null}
@@ -229,8 +238,16 @@ export function Rangee({ titre, sousTitre = '', valeur = null, valeurForte = fal
       data-n-selection={selectionnee ? '1' : undefined}
       data-n-touche={onClick || href || interrupteur ? '1' : undefined}
       data-n-balayage={aActions ? '1' : undefined}
+      data-n-case={selection ? '1' : undefined}
       {...(attrs || {})}
     >
+      {selection ? (
+        <label className="n-rangee-case" data-n-indisponible={selection.indisponible ? '1' : undefined}>
+          <input type="checkbox" className="n-case" checked={!!selection.cochee && !selection.indisponible} disabled={!!selection.indisponible} aria-label={selection.libelle || undefined}
+            onChange={(e) => { if (!selection.indisponible && selection.onChange) selection.onChange(e.target.checked); }} {...(selection.attrs || {})}/>
+          <span className="n-case-dessin" aria-hidden="true"><Glyphe nom="check" taille={14}/></span>
+        </label>
+      ) : null}
       {aActions ? (
         <div className="n-rangee-actions" ref={refActions} aria-hidden={ouverte ? undefined : 'true'}>
           {actions.map((a) => (

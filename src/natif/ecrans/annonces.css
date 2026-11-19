@@ -1,0 +1,44 @@
+/* ── src/natif/ecrans/annonces.css — l'écran Annonces (19 nov.) : le TABLEAU de l'ordinateur, la tête, la saisie.
+   Les composants de src/natif/ dessinent tout le reste. Jetons seulement : aucune couleur, aucune taille en dur. */
+@layer vrm-natif {
+  .n-eg-tete { display: flex; flex-direction: column; gap: 12px; padding: 0 var(--n-marge) 12px; }
+  .n-eg-outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; min-height: var(--n-cible); }
+  .n-eg-phrase { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-eg-case { display: block; width: 22px; height: 22px; border-radius: var(--n-r-rond); border: 2px solid var(--n-encre-3); box-sizing: border-box; }
+  .n-eg-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .n-eg-table { width: 100%; border-collapse: collapse; table-layout: auto; font-variant-numeric: tabular-nums; }
+  .n-eg-th { text-align: left; padding: 10px 12px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; border-bottom: 1px solid var(--n-trait); }
+  .n-eg-th[data-eg-th="prix"], .n-eg-th[data-eg-th="prixMini"], .n-eg-th[data-eg-th="achat"], .n-eg-th[data-eg-th="benefice"], .n-eg-th[data-eg-th="depuis"] { text-align: right; }
+  .n-eg-tr { cursor: pointer; outline: none; }
+  .n-eg-tr + .n-eg-tr .n-eg-td { border-top: 1px solid var(--n-trait); }
+  .n-eg-tr:hover .n-eg-td, .n-eg-tr:focus-visible .n-eg-td { background: var(--n-appui); }
+  .n-eg-tr[data-eg-choisie="1"] .n-eg-td { background: var(--n-teinte); }
+  /* (19 nov., intégration) Sur le voile du survol (8 %), l'encre seconde tombait à 4,43:1 : 15 % d'encre en plus, comme les anciens écrans. */
+  .n-eg-tr:is(:hover, :focus-visible, [data-eg-choisie="1"]) :is(.n-eg-article-sous, .n-eg-td[data-eg-vide="1"] .n-eg-valeur) { color: color-mix(in srgb, var(--n-encre-2) 85%, var(--n-encre)); }
+  .n-eg-tr[data-eg-grise="1"] { cursor: default; }
+  .n-eg-tr[data-eg-grise="1"] .n-eg-article-titre { color: var(--n-encre-2); }
+  .n-eg-td { padding: 8px 12px; height: 56px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); white-space: nowrap; }
+  .n-eg-td[data-eg-col="prix"], .n-eg-td[data-eg-col="prixMini"], .n-eg-td[data-eg-col="achat"], .n-eg-td[data-eg-col="benefice"], .n-eg-td[data-eg-col="depuis"] { text-align: right; }
+  .n-eg-td[data-eg-col="prix"] .n-eg-valeur, .n-eg-td[data-eg-col="prix"] .n-eg-cellule { font: var(--n-t-second-fort); }
+  .n-eg-td-case { width: 44px; padding-right: 0; }
+  .n-eg-td-article { display: flex; align-items: center; gap: 12px; white-space: normal; min-width: 0; max-width: 420px; }
+  .n-eg-article { display: flex; flex-direction: column; min-width: 0; }
+  .n-eg-article-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-eg-article-sous { display: block; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-eg-sites { display: block; }
+  .n-eg-arelier { display: block; font: var(--n-t-legende); color: var(--n-ambre); }
+  .n-eg-valeur { color: var(--n-encre); }
+  .n-eg-td[data-eg-vide="1"] .n-eg-valeur { color: var(--n-encre-2); }
+  .n-eg-cellule { appearance: none; border: 0; background: none; margin: -6px -8px; padding: 6px 8px; min-width: 44px; min-height: 36px; border-radius: var(--n-r-plaque); font: var(--n-t-second); color: var(--n-encre); cursor: pointer; text-align: inherit; }
+  .n-eg-td[data-eg-vide="1"] .n-eg-cellule { color: var(--n-accent); }
+  .n-eg-cellule:hover, .n-eg-cellule:focus-visible { background: var(--n-teinte); outline: none; }
+  .n-eg-coche { width: 20px; height: 20px; accent-color: var(--n-plein); }
+
+  .n-eg-cible { margin: 0 0 12px; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-eg-champ { display: flex; align-items: center; gap: 12px; background: var(--n-carte-2); border-radius: var(--n-r-carte); padding: 0 16px; min-height: 50px; }
+  .n-eg-champ-nom { font: var(--n-t-corps); color: var(--n-encre-2); }
+  .n-eg-entree { flex: 1; min-width: 0; border: 0; background: none; outline: none; text-align: right; font: var(--n-t-corps-fort); color: var(--n-encre); min-height: var(--n-cible); font-variant-numeric: tabular-nums; }
+  .n-eg-entree::placeholder { color: var(--n-encre-2); }
+  .n-eg-refus { margin: 12px 0 0; font: var(--n-t-second); color: var(--n-ambre); }
+}

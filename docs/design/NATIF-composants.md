@@ -180,3 +180,35 @@ dessin (voir `outils/natif-galerie/galerie.jsx`), sinon les glyphes sont vides �
 
 Une API ne se casse plus : on **ajoute** une prop (avec sa valeur par défaut), on ne renomme rien, on ne change pas le
 sens d'une valeur. Un besoin qui manque : ajoute-le dans `src/natif/`, montre-le dans la galerie, garde le banc vert.
+
+## Ajoutés pour « Aujourd'hui » (19 nov., `src/natif/complements.css`)
+
+**Barres** — une petite série (les 7 jours), dans une `<Affiche>` : `<Barres libelle="Les sept derniers jours" barres={[{ cle, lettre, libelle, valeur }]} choisie={6} onChoisir={setJour}/>` ; `valeur: null` = pas su (piste vide). Chaque barre est une cible ≥ 44.
+
+**Vignettes** — la bande des colis : `<Vignettes elements={[{ cle, src, numero, presse, libelle, onClick }]} total={8} libellePlus={(n) => …} onPlus={…}/>` ; chaque case a SA plaque, au plus un point ambre ; ce qui ne tient pas devient « +N » (mesuré).
+
+**CodeRetrait** — `<CodeRetrait code="416362" onClick={ouvrir} libelle="Voir les codes de retrait"/>` : le code en grand, centré.
+
+**Colonnes** / **Colonne** — à l'ordinateur, des colonnes de 320 au moins (trois à 1280 et 1512) ; au téléphone elles
+s'effacent et les groupes se suivent dans l'ordre écrit. Rends `<Colonnes>` directement dans `<Page>` : son plein se pose
+alors à droite, à sa largeur.
+```jsx
+<Page titre="Aujourd'hui" plein={…}><Colonnes><Colonne>…</Colonne><Colonne>…</Colonne></Colonnes></Page>
+```
+
+## Ajouté le 19 nov. soir : le TABLEAU DE TRAVAIL (`src/natif/TableauTravail.jsx`, `src/natif/tableau.css`, NATIF.md §2 bis)
+
+Une liste d'écran (Annonces, Ventes, Achats, Notifications) à l'ordinateur : barre de titre (pastille du compte, « Mis à jour
+il y a … », ⟳), barre d'outils (« Choisir une action ▾ », recherche, **Statut ▾** à cases et compteurs, filtres de l'écran,
+`outilsPlus`), « N articles », liste ⇄ grille, **Colonnes ▾** (mémorisé par écran, `vrm_tableau_{id}`, cet appareil), tableau
+(case, vignette 48, colonnes triables, Statut en étiquette douce, ⋯), sélection ⇒ barre « N sélectionnés · {Action} » (LE plein).
+Au téléphone : les rangées de 72 (§4). Présentationnel : l'écran passe des lignes déjà faites (`statut`, `texte`, `attrs`) et des
+colonnes `{ cle, libelle, num, tri(l), rendu(l), defaut }`. **Les compteurs du filtre Statut sont comptés sur les lignes reçues
+après la recherche** : coché seul, un statut affiche exactement son compteur (banc `app-tableaux` T6).
+```jsx
+<TableauTravail id="ventes" titre="Ventes" lignes={lignes} statuts={[{ cle: 'envoyer', libelle: 'À envoyer', ton: 'ambre' }]}
+  colonnes={[{ cle: 'prix', libelle: 'Prix', num: true, tri: (l) => l.prix, rendu: (l) => euros(l.prix) }, { cle: 'statut', libelle: 'Statut' }]}
+  actions={[{ cle: 'imprimer', libelle: 'Imprimer les bordereaux', pour: (l) => l.statut === 'envoyer' }]} onAction={(cle, ls) => …}/>
+```
+Un écran en tableau prend toute la largeur (`ECRANS_TABLEAU` dans src/App.jsx : pas de troisième volet) ; sa `<PagePoussee
+className="n-tt-fiche">` s'ouvre en panneau à droite. Les contrôles d'un tableau passent par le pont `src/coque-native.css`.

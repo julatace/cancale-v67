@@ -157,18 +157,15 @@ async function telephone(nav, sombre, b, sigs) {
     const ap = pg.locator('[data-sous-ouvrir="apparence"]').first();
     await ap.waitFor({ timeout: 30000 }).catch(() => {});
     if (await ap.count()) { await ap.click().catch(() => {}); await pg.waitForTimeout(900); }
-    const bt = pg.locator('[data-design-v2-bouton]').first();
-    const vu = await bt.count();
-    if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
-    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Ancien design » décoché : le nouveau design (${th})`, { vu, ...etat });
-    // « Ancien design » coché : retour à l'apparence d'avant, tout de suite, et après un rechargement.
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(500); }
-    const ancien = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
+    // (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : « Ancien design » et « Style » ne sont plus des réglages.
+    // R juge leur ABSENCE, et qu'un « 0 » rangé hier sur l'appareil ne ramène plus l'apparence d'avant.
+    const vu = await pg.locator('[data-design-v2-bouton], [data-style]').count();
+    dit(vu === 0, `R Paramètres → Apparence : plus de réglage « Ancien design » ni « Style » (${th})`, { vu });
+    await pg.evaluate(() => { localStorage.setItem('vrm_design_v2', '0'); localStorage.removeItem('vrm_banc_dom_ancien'); sessionStorage.setItem('banc_defaut_v2', '1'); });
+    const lu = await pg.evaluate(() => { const v = localStorage.getItem('vrm_design_v2'); localStorage.removeItem('vrm_design_v2'); return v; });
     await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
     const apres = await pg.evaluate(() => document.documentElement.getAttribute('data-design'));
-    dit(ancien.ls === '0' && ancien.attr === null && apres === null, `R « Ancien design » coché : l’apparence d’avant, gardée après rechargement (${th})`, { ...ancien, apres });
-    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(400); }
+    dit(lu === '0' && apres === 'v2', `R un « Ancien design » rangé hier ne compte plus : le design unique (${th})`, { lu, apres });
   }
   await ctx.close();
   // LE DÉFAUT : sans aucun choix posé, le nouveau design est ALLUMÉ (Julien, 17 nov. soir : « publie le design »).
@@ -203,12 +200,16 @@ async function telephone(nav, sombre, b, sigs) {
   dit(String(j.ret || '0') === String(avant.journee.ret || '0'), `J « À retirer » (${j.ret}) = la case d’avant (${avant.journee.ret})`, { v2: j.ret, avant: avant.journee.ret });
   dit(j.plein && /\d/.test(j.pleinTexte) && j.pleinTexte.includes(j.plein), `J le plein dit son nombre : « ${j.pleinTexte} »`, j);
   dit(j.pouce && j.pouce.bas <= j.pouce.barre - 4, 'J le plein est au pouce, AU-DESSUS de la barre du bas', j.pouce);
-  dit(j.afaire > 0 && j.gestes <= j.afaire, `J « À faire » : ${j.afaire} groupes, UN geste au plus chacun`, j);
+  // (19 nov., décision de Julien : « ça doit être rangé dans les onglets dédiés justement à ça ») « À faire » QUITTE
+  // Aujourd'hui : chaque groupe est en tête de SON onglet (« À régler », banc aujourdhui-propre). Ici : plus aucun.
+  dit(j.afaire === 0, `J plus de liste « À faire » sur Aujourd’hui (${j.afaire}) — décision du 19 nov.`, j);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390-${th}.png`) });
   // Le bas du contenu, défilé tout en bas, reste au-dessus du plein (la marge est posée).
   const bas = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); m.scrollTo(0, m.scrollHeight); await new Promise((r) => setTimeout(r, 400));
-    const e = document.querySelector('.v2-ecran'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.children].filter((x) => !x.matches('[data-v2-pouce]') && x.getClientRects().length); const der = enf[enf.length - 1];
-    const po = pp.getBoundingClientRect(); return { der: Math.round(der.getBoundingClientRect().bottom), pouce: Math.round(po.top) }; });
+    // (19 nov.) L'écran est natif (src/natif/ecrans/Aujourdhui.jsx) : ses groupes portent `data-v2-bloc` (les colonnes
+    // s'effacent au téléphone, `display: contents` : on mesure les groupes eux-mêmes).
+    const e = document.querySelector('[data-v2-ecran="aujourdhui"]'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.querySelectorAll('[data-v2-bloc]')].filter((x) => x.getClientRects().length); if (!enf.length) return null;
+    const po = pp.getBoundingClientRect(); return { der: Math.round(Math.max(...enf.map((x) => x.getBoundingClientRect().bottom))), pouce: Math.round(po.top) }; });
   dit(!!bas && bas.der <= bas.pouce, 'J défilé en bas, le dernier groupe passe au-dessus du plein (rien de caché)', bas);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-bas-390-${th}.png`) });
   await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0));
@@ -231,7 +232,9 @@ async function telephone(nav, sombre, b, sigs) {
   dit(String(nFaces) === String(avant.journee.ret), `A ${nFaces} colis en passes = « À retirer » de Ma journée d’avant (${avant.journee.ret})`, { faces: nFaces, avant: avant.journee.ret });
   dit(a.qr <= avant.achats.qr && a.qr <= nFaces, `A QR seulement s’il existe (${a.qr} ici, ${avant.achats.qr} lignes « QR » avant)`, a);
   dit(a.limiteAvantQr, 'A la date limite est AU-DESSUS du QR');
-  dit(a.passes.every((p) => p.n < 2) || a.pages.some((t) => /1/.test(t)), 'A plusieurs colis au même point : « 1 sur N », on glisse de code en code', a.pages);
+  dit(a.pages.length === 0 && a.passes.every((p) => p.n === p.faces), 'A plusieurs colis au même point : tous les codes visibles en liste, plus de « 1 sur N » (19 nov.)', a);
+  { const vis = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-face] [data-v2-code-grand]')].every((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }));
+    dit(vis, 'A chaque code du point a une taille à l’écran (aucun caché derrière un défilement de côté)'); }
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-390-${th}.png`) });
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-plein-390-${th}.png`), fullPage: false });
   await mesurerEcran(pg, 'Achats', true);

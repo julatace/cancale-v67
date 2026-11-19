@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import '../../src/design/studio.css';
 import '../../src/design/studio-verre.css';
 import { BoutonV2, BoutonIconeV2 } from '../../src/designV2/BoutonV2.jsx';
-import Aujourdhui from '../../src/designV2/Aujourdhui.jsx';
+import Aujourdhui from '../../src/natif/ecrans/Aujourdhui.jsx';
 import { ajouterSourceApp } from '../../src/i18n/index.js';
 import frApp from '../../src/i18n/langues/fr/designV2.js';
 ajouterSourceApp(frApp);   // la partie « app » du français, comme App.jsx (seulement les textes du nouveau design)

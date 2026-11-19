@@ -62,8 +62,18 @@ const listeHorsLigne = () => ({
   // est retiré par Vite après `generateBundle` — le nommer ferait un 404 au rangement).
   writeBundle(o, bundle) {
     const dir = o.dir || 'dist';
-    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f) && existsSync(join(dir, f))).map((f) => '/' + f).sort();
-    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers }));
+    // (19 nov., capacite-3000) LA LANGUE DU VENDEUR SEULE. Les dictionnaires anglais, espagnol,
+    // italien, allemand (≈ 670 Ko compressés à eux quatre) étaient rangés chez TOUT le monde à
+    // chaque déploiement. Ils sont rangés à part (`langues`) : le service worker ne prend que
+    // ceux de la langue que la page lui dit (public/sw.js, `langueHorsLigne`) ; en français, aucun.
+    const langueDe = (c) => { const m = c && c.facadeModuleId && /[\\/]src[\\/]i18n[\\/]langues[\\/](en|es|it|de)(?:-accueil)?\.js$/.exec(c.facadeModuleId); return m ? m[1] : null; };
+    const fichiers = [], langues = {};
+    for (const f of Object.keys(bundle).sort()) {
+      if (!/^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) || EXCLU_HORS_LIGNE.test(f) || !existsSync(join(dir, f))) continue;
+      const l = langueDe(bundle[f]);
+      if (l) (langues[l] = langues[l] || []).push('/' + f); else fichiers.push('/' + f);
+    }
+    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers, langues }));
   },
 });
 

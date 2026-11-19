@@ -49,7 +49,8 @@ export default function AlerteModeration({ comptes = [] }) {
     return () => { mort = true; };
   }, [aDisparue, vendues]);
   if (!Array.isArray(rows)) return null;                      // en cours ou pas su : rien
-  const liste = alertesActives(rows, { vu, maintenant, vendues: vendues || null }).filter((e) => !uids.size || uids.has(e.compte));
+  // (19 nov., lot compte-bloque) « compte fermé » a sa carte à lui, avec la question (src/CompteBloque.jsx).
+  const liste = alertesActives(rows, { vu, maintenant, vendues: vendues || null }).filter((e) => (!uids.size || uids.has(e.compte)) && e.s !== 'banni');
   if (!liste.length) return null;
   const fiches = load('vinted_annonce_numeros', {}) || {};
   const labels = load('vinted_account_labels', {}) || {};

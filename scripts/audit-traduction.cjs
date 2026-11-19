@@ -35,6 +35,8 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
+  ['src/BoiteEmails.jsx', ['Compris', 'Lecture', 'Ligne', 'Pile', 'ARelier', 'Quarantaine', 'MessageOrigine', 'PuceCode']],   // (19 nov., emails-mail) E-mails comme Mail
   ['src/communaute/Accompagnement.jsx', ['*']],
   ['src/communaute/CoucouCarte.jsx', ['*']],   // (17 nov., carte-coucou) le coucou de la carte   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
@@ -80,6 +82,7 @@ const MIGRES = [
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
+  ['src/PrixPartout.jsx', ['*']],   // (19 nov.) « Changer le prix » en UN geste (prix-sans-manuel)
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],
@@ -102,6 +105,8 @@ const MIGRES = [
   ['src/composants/ChampRecherche.jsx', ['*']],
   ['src/LitigesEnCours.jsx', ['*']],
   ['src/LigneFraicheur.jsx', ['*']],
+  // (19 nov., lot completer-infos) L'atelier « Compléter ».
+  ['src/completer/Completer.jsx', ['*']],
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;

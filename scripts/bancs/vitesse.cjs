@@ -191,6 +191,9 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+  // (19 nov., capacite-3000) `opts.pendant(pg, t0)` : ce qu'un banc observe PENDANT l'ouverture
+  // (captures en série du banc chargement-propre). Lancé avant le chargement, jamais attendu ici.
+  const pendant = opts.pendant ? opts.pendant(pg, t0) : null;
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   let utile = null;
   try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile = Date.now() - t0; } catch (_) {}
@@ -267,10 +270,12 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
   // page rechargée dans le même onglet (ce que l'app a rangé elle-même, localStorage,
   // sessionStorage, est là). Mesurée à part, jusqu'au calme, avec ses fichiers.
   let deuxieme = null, reqPremier = req;
+  const observe1 = pendant ? await Promise.resolve(pendant).catch(() => null) : null;
   if (opts.deuxieme) {
     reqPremier = req.slice();
     fige = false; req.length = 0; servis = []; t0 = Date.now();
     const errs2 = []; pg.on('pageerror', (e) => errs2.push(e.message));
+    const pendant2 = opts.pendant ? opts.pendant(pg, t0, 'deuxieme') : null;
     await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
     let utile2 = null;
     try { await pg.waitForFunction(attendre, null, { timeout: RESEAU ? 120000 : 30000, polling: 50 }); utile2 = Date.now() - t0; } catch (_) {}
@@ -281,11 +286,12 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
       if (opts.fenetre && Date.now() - t0 > opts.fenetre.auPlus) break;
     }
     const lu2 = await pg.evaluate(() => ({ tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: document.body.innerText })).catch(() => ({ tombe: true, texte: '' }));
-    deuxieme = { req: req.slice(), utile: utile2, errs: errs2, lu: lu2, fichiers: servis.slice(), heros: [] };
+    deuxieme = { req: req.slice(), utile: utile2, errs: errs2, lu: lu2, fichiers: servis.slice(), heros: [], observe: pendant2 ? await Promise.resolve(pendant2).catch(() => null) : null };
   }
   if (opts.capture) await pg.screenshot({ path: opts.capture }).catch(() => {});   // (17 nov.) la capture à regarder (francais-differe CAPTURES=dossier)
+  const apres = opts.apres ? await opts.apres(pg).catch(() => null) : null;
   await ctx.close();
-  return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme };
+  return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme, observe: observe1, apres };
 }
 
 function bilan(nom, r) {
