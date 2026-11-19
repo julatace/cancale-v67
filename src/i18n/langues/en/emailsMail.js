@@ -74,7 +74,7 @@ export default {
   "relier.adresse.off": "Your address is turned off: nothing is filed. Turn it back on in Settings → My e-mails.",
   "relier.copierAdresse": "Copy my VRM address",
   "relier.copierVinted": "Copy “vinted”",
-  "relier.copie": "Copied ✓",
+  "relier.copie": "Copied",
   "relier.copieKo": "Select it and copy it",
   "relier.compte.titre": "For which account?",
   "relier.compte.boite": "Inbox of {login}:",

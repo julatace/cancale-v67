@@ -634,6 +634,13 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           {choixFeuille.map(([k, l, n, on]) => <Rangee key={k} titre={l} valeur={n != null && n > 0 ? String(n) : undefined} fin={on ? 'coche' : undefined} attrs={{ 'data-v2-mail-choix': k, 'aria-pressed': on ? 'true' : 'false' }}
             onClick={() => { if (k === 'nonlus') setNonLus((v) => !v); else { setNonLus(false); setAVerif(false); setRubrique(rubrique === k ? '' : k); } setOuvert(''); setFeuille(false); }}/>)}
         </Groupe>
+        {choixCompte ? <label className="n-mail-compte-feuille" data-v2-mail-compte-feuille="">
+          <span className="n-mail-sr">{tr('ventes.compte4')}</span>
+          <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); setFeuille(false); }} aria-label={tr('ventes.compte4')}>
+            <option value="">{tr('achats.tousComptes')}</option>
+            {(adresses || []).map((a) => <option key={a.adresse} value={a.adresse}>{libelleCompte(a)}</option>)}
+          </select>
+        </label> : null}
         <Groupe>
           {lusSus && nNonLus > 0 ? <Rangee titre={filtreActif ? tr('emails.marquerCeuxCi') : tr('emails.toutMarquerLu')} attrs={{ 'data-boite-tout-lu': '' }} onClick={() => { toutMarquerLu(); setFeuille(false); }}/> : null}
           {!serie.actif && serie.total && ordreSerie.length > 1 ? <Rangee titre={tr('v2.mail.selectionner')} attrs={{ 'data-v2-mail-choix': 'selectionner' }} onClick={() => { setFeuille(false); serie.ouvrir(); }}/> : null}

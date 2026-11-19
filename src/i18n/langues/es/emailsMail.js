@@ -74,7 +74,7 @@ export default {
   "relier.adresse.off": "Tu dirección está desactivada: no se archiva nada. Reactívala en Ajustes → Mis correos.",
   "relier.copierAdresse": "Copiar mi dirección VRM",
   "relier.copierVinted": "Copiar «vinted»",
-  "relier.copie": "Copiado ✓",
+  "relier.copie": "Copiado",
   "relier.copieKo": "Selecciónala y cópiala",
   "relier.compte.titre": "¿Para qué cuenta?",
   "relier.compte.boite": "Bandeja de {login}:",

@@ -74,7 +74,7 @@ export default {
   "relier.adresse.off": "Il tuo indirizzo è disattivato: non si archivia nulla. Riattivalo in Impostazioni → Le mie e-mail.",
   "relier.copierAdresse": "Copia il mio indirizzo VRM",
   "relier.copierVinted": "Copia «vinted»",
-  "relier.copie": "Copiato ✓",
+  "relier.copie": "Copiato",
   "relier.copieKo": "Selezionalo e copialo",
   "relier.compte.titre": "Per quale account?",
   "relier.compte.boite": "Casella di {login}:",

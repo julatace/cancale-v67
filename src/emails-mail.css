@@ -6,6 +6,16 @@
    l'ambre seulement pour un geste proche ou « à vérifier », jamais de rouge. Cibles ≥ 44.
    Même couche que les composants (`@layer vrm-natif`) ; aucun `!important`, aucun `:has()`.
    ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+/* Le pont (même principe que src/coque-native.css, 19 nov.) : `:where(.vrm-app-shell) button { background: … }` et
+   les règles de champs d'avant sont SANS couche et gagnent sur toute couche. Ici, sans couche et sans AUCUNE valeur,
+   `all: revert-layer` renvoie les contrôles de l'écran à la couche `vrm-natif` (ce fichier, les composants natifs).
+   Exceptions : les pièces d'avant gardées telles quelles (`.vrm-pv` : choix du compte, sa vérification ; `.vrm-boite` :
+   l'ancienne scène quand l'adresse VRM n'est pas ouverte). */
+:is(.n-mail, .n-mail-feuille, .n-relier) :is(button, input, select, textarea, a):not(.vrm-pv *, .vrm-boite *) {
+  all: revert-layer;
+}
+#vrm-contenu .n-mail-cherche input { background: transparent !important; box-shadow: none !important; }
+#vrm-contenu .n-mail-compte-choix select { background: var(--n-carte) !important; border: 0 !important; box-shadow: none !important; color: var(--n-encre) !important; }
 @layer vrm-natif {
   .n-mail { color: var(--n-encre); font: var(--n-t-corps); padding: 0 var(--n-marge) 24px; min-width: 0; box-sizing: border-box; }
   .n-mail *, .n-mail-feuille * { box-sizing: border-box; }
@@ -49,7 +59,8 @@
     border: 0; border-radius: 0; background: var(--n-carte); color: var(--n-encre); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
   .n-mail-ligne[data-appui="1"], .n-mail-ligne:active { box-shadow: inset 0 0 0 999px var(--n-appui); }
   @media (hover: hover) { .n-mail-ligne:hover { box-shadow: inset 0 0 0 999px var(--n-appui); } }
-  .n-mail-ligne[aria-current="true"] { box-shadow: inset 0 0 0 999px var(--n-teinte); }
+  .n-mail-item[data-ouvert="1"] { box-shadow: inset 0 0 0 999px var(--n-teinte); }
+  .n-mail-item[data-ouvert="1"] > .n-mail-ligne { background: transparent; }
   .n-mail-point { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: transparent; }
   .n-mail-point[data-boite-point="1"] { background: var(--n-accent); }
   .n-mail-marque { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: var(--n-carte-2); color: var(--n-encre-2); flex: 0 0 auto; }
@@ -69,7 +80,7 @@
   .n-mail-quoi { flex: 0 0 auto; font-weight: 600; color: var(--n-encre-2); }
   .n-mail-compris .n-plaque { flex: 0 0 auto; }
   .n-mail-essentiel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .n-mail-geste { flex: 0 0 auto; font-weight: 600; color: var(--n-encre); }
+  .n-mail-geste { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre); }
   .n-mail-geste[data-ambre="1"] { color: var(--n-ambre); }
   .n-mail-ligne[data-boite-rien="1"] .n-mail-sujet { color: var(--n-encre-2); }
   .n-mail-item:not([data-pas-lu]) .n-mail-de { font-weight: 600; }
@@ -202,6 +213,18 @@
   @media (min-width: 1024px) {
     .n-mail { padding: 0 24px 32px; }
   }
+  /* Au téléphone : la rangée garde l'essentiel — le compte se choisit dans « ⋯ », le code reste copiable mais compact. */
+  @media (max-width: 599px) {
+    .n-mail-compte, .n-mail-outils .n-mail-compte-choix, .n-mail-code-ic { display: none; }
+    .n-mail-code { padding: 0 10px; margin-right: 10px; font: var(--n-t-second-fort); letter-spacing: .02em; }
+    .n-mail-seg .n-segmente-n { display: none; }
+  }
+  @media (min-width: 600px) { .n-mail-compte-feuille { display: none; } }
+  /* Deux volets : la colonne de la liste est étroite, la rangée y garde l'essentiel comme au téléphone. */
+  .n-mail-boite[data-deux-volets="1"] :is(.n-mail-compte, .n-mail-code-ic) { display: none; }
+  .n-mail-boite[data-deux-volets="1"] .n-mail-code { padding: 0 10px; margin-right: 10px; font: var(--n-t-second-fort); letter-spacing: .02em; }
+  .n-mail-compte-feuille { display: block; padding: 0 16px; }
+  .n-mail-compte-feuille select { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); }
   @media (prefers-reduced-motion: reduce) {
     .n-mail-pile-chevron { transition: none; }
   }

@@ -74,7 +74,7 @@ export default {
   "relier.adresse.off": "Deine Adresse ist deaktiviert: Nichts wird abgelegt. Aktiviere sie unter Einstellungen → Meine E-Mails.",
   "relier.copierAdresse": "Meine VRM-Adresse kopieren",
   "relier.copierVinted": "„vinted“ kopieren",
-  "relier.copie": "Kopiert ✓",
+  "relier.copie": "Kopiert",
   "relier.copieKo": "Markiere und kopiere sie",
   "relier.compte.titre": "Für welches Konto?",
   "relier.compte.boite": "Postfach von {login}:",

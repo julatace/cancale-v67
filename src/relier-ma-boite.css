@@ -2,7 +2,9 @@
    Jetons du natif seulement (src/natif/jetons.css) : une carte, une étape, UN plein en bas. Les captures
    sont DESSINÉES (une fenêtre neutre « exemple »), muettes pour le lecteur d'écran. Pas d'ombre, pas de
    dégradé ; l'ambre seulement pour « pas encore reçu ». Mouvement réduit : rien ne bouge. */
-.n-relier { --n-relier-l: 560px; display: grid; gap: 12px; max-width: var(--n-relier-l); margin: 0 auto; padding: 0 0 24px; color: var(--n-encre); font: var(--n-t-corps); }
+@layer vrm-natif {
+
+.n-relier { --n-relier-l: 560px; display: grid; gap: 12px; max-width: var(--n-relier-l); margin: 0; padding: 0 0 24px; color: var(--n-encre); font: var(--n-t-corps); }
 .n-relier * { box-sizing: border-box; }
 .n-relier-carte { background: var(--n-carte); border-radius: 12px; padding: 20px 16px; display: grid; gap: 14px; min-width: 0; }
 .n-relier-ecran { animation: n-relier-entree .26s cubic-bezier(.32,.72,0,1) both; }
@@ -96,7 +98,7 @@
 .n-relier-fini .vrm-pv-etat, .n-relier .vrm-pv-etat { text-align: left; width: 100%; }
 
 /* Le pied : LE plein, puis « Retour ». */
-.n-relier-pied { display: grid; gap: 4px; padding: 0 0 8px; }
+.n-relier-pied { display: grid; gap: 4px; padding: 12px 16px 8px; border-radius: 12px; background: var(--n-carte); }
 .n-relier-pied .n-bouton-bloc { width: 100%; }
 .n-relier-plein-lien { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; border-radius: 14px; background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-corps-fort); text-decoration: none; -webkit-tap-highlight-color: transparent; }
 .n-relier-plein-lien:active { filter: brightness(.92); }
@@ -105,4 +107,5 @@
 @media (prefers-reduced-motion: reduce) {
   .n-relier-ecran, .n-relier-fleche, .n-relier-sc-curseur, .n-relier-roue { animation: none; }
   .n-relier-barre i { transition: none; }
+}
 }

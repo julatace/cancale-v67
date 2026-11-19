@@ -74,7 +74,7 @@ export default {
   "relier.adresse.off": "Ton adresse est désactivée : rien n’est rangé. Réactive-la dans Paramètres → Mes e-mails.",
   "relier.copierAdresse": "Copier mon adresse VRM",
   "relier.copierVinted": "Copier « vinted »",
-  "relier.copie": "Copié ✓",
+  "relier.copie": "Copié",
   "relier.copieKo": "Sélectionne-la et copie-la",
   "relier.compte.titre": "Pour quel compte ?",
   "relier.compte.boite": "Boîte de {login} :",
