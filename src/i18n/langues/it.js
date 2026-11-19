@@ -73,6 +73,7 @@ import ecran_prix_sans_manuel from './it/prixSansManuel.js';   // (19 nov.) « C
 import ecran_memePhoto from './it/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './it/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './it/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_compteBloque from './it/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './it/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
@@ -2322,6 +2323,7 @@ export default {
   ...ecran_memePhoto,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
+  ...ecran_compteBloque,
   ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,

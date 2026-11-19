@@ -6080,6 +6080,11 @@ function noterEtatCompte(uid, json) {
       const recent = avant && avant.etat === etat && !proChange && avant.at && (maintenant - Date.parse(avant.at)) < 3600000;
       if (recent) return false;                     // rien de neuf : pas d'écriture (égress)
       comptes[k] = { etat, at: etatGarde ? avant.at : new Date(maintenant).toISOString(), preuve };
+      // 5.409 (compte bloqué) : `depuis` = l'heure où l'état a CHANGÉ (un épisode de blocage) ;
+      // gardé tant que l'état ne change pas. Un « passu » ne touche à rien (`etatGarde`).
+      { const change = !avant || avant.etat !== etat; const d0 = avant && typeof avant.depuis === 'string' ? avant.depuis : null;
+        const depuis = change ? (etatGarde ? d0 : new Date(maintenant).toISOString()) : d0;
+        if (depuis) comptes[k].depuis = depuis; }
       if (typeof proNeuf === 'boolean') { comptes[k].pro = proNeuf; comptes[k].proAt = (proChange || !avant || !avant.proAt) ? new Date(maintenant).toISOString() : avant.proAt; }
       const ok = await supabaseUpsert('app_data', [{ id: ETAT_COMPTE_ROW, data: { comptes, majAt: new Date(maintenant).toISOString() } }], 'id');
       noterDiag(ok === false ? 'etat_compte_ecriture_ratee' : `etat_compte_${etat}`);
@@ -6087,11 +6092,131 @@ function noterEtatCompte(uid, json) {
       // 5.350 : l'alerte « Vinted a fermé le compte » (une fois par fermeture) ; rouvert ⇒ elle se ferme.
       if (ok !== false && etat === 'banni' && !etatGarde && (!avant || avant.etat !== 'banni')) noterCompteModeration(k, 'banni', {});
       if (ok !== false && etat === 'actif' && avant && avant.etat === 'banni') noterCompteModeration(k, 'actif', {});
+      // 5.409 : bloqué ⇔ débloqué ⇒ la pause relue tout de suite, et la notification (le serveur relit tout).
+      if (ok !== false && (!avant || avant.etat !== etat) && (etat === 'banni' || (avant && avant.etat === 'banni'))) {
+        try { await chrome.storage.local.remove(CB_MEMOIRE); } catch (_) {}
+        signalerCompteBloque(true).catch(() => {});
+      }
       return ok !== false;
     } catch (_) { return false; }
   });
   chaineEtatCompte = fait.catch(() => false);
   return fait;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPTE BLOQUÉ PAR VINTED : SES ANNONCES EN PAUSE, SUR SON CHOIX (19 nov., 5.409)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « je veux que ça demande pour mettre en suspens les annonces et que ça
+// les remette si jamais le compte est débloqué ». La PREUVE est le profil
+// (`noterEtatCompte` : `is_account_banned`), jamais un 403 ni une absence. Son
+// choix est `main.vrm_comptes_bloques` (écrit par l'app, sur SON toucher) ; ici on
+// le LIT seulement. En pause (bloqué prouvé ET « pause » pour ce blocage) : aucun
+// geste AUTOMATIQUE sur ce compte Vinted (offres auto, baisses, favoris en série,
+// republication, relances) — `garde`, `gardeStricte` (série) et `secuGeste`
+// (mode ≠ clic) refusent et le DISENT. Débloqué (profil relu « actif ») ⇒ la pause
+// tombe d'elle-même, rien à rallumer : aucun réglage n'a été changé. Leboncoin,
+// eBay et Vestiaire ne passent jamais ici. Le plafond de 50/h ne bouge pas.
+// Lecture : 2 min en mémoire (`vrmPauseBloque`) ; base muette ⇒ le dernier lu ;
+// jamais lu ⇒ pas de pause (« pas su » ne retire rien). La règle est recopiée de
+// src/compteBloque.js (`node scripts/audit-compte-bloque.cjs --recopie`).
+const CB_CLE = 'vrm_comptes_bloques';
+const CB_MEMOIRE = 'vrmPauseBloque';
+const CB_A_SIGNALER = 'vrmCompteBloqueASignaler';
+const CB_GARDE_MS = 2 * 60 * 1000;
+// <compte-bloque-regle>
+const CB_CHOIX = ['pause', 'garder', 'plus_tard'];
+const CB_PLUS_TARD_MS = 24 * 3600 * 1000;
+function cbTs(v) { const t = Date.parse(String(v || '')); return Number.isFinite(t) ? t : null; }
+// L'état lu par l'extension, ou null (pas su). Seuls « banni » et « actif » sont des verdicts.
+function cbEtatLu(etat) {
+  if (!etat || typeof etat !== 'object') return null;
+  return etat.etat === 'banni' || etat.etat === 'actif' ? etat : null;
+}
+// Le choix vaut-il pour CE blocage ? Un choix clos (`fin` : il a lu « débloqué »)
+// ne vaut plus jamais ; un épisode différent (ext. 5.409 : `depuis`) non plus.
+function cbChoixVaut(choix, etat) {
+  if (!choix || typeof choix !== 'object' || !CB_CHOIX.includes(choix.choix)) return false;
+  if (choix.fin) return false;
+  const ep = etat && typeof etat.depuis === 'string' && etat.depuis ? etat.depuis : null;
+  if (choix.episode && ep && String(choix.episode) !== ep) return false;
+  return true;
+}
+// EN PAUSE : bloqué PROUVÉ (« banni » lu) ET son choix « pause » pour ce blocage.
+// Pas su ⇒ pas en pause (on ne retire rien d'un total sur un doute).
+function cbEnPause(choix, etat) {
+  const e = cbEtatLu(etat);
+  return !!(e && e.etat === 'banni' && cbChoixVaut(choix, e) && choix.choix === 'pause');
+}
+// Ce que l'app montre pour un compte :
+//   'passu'    rien de lu ⇒ rien ;
+//   'question' bloqué, aucun choix pour ce blocage (ou « plus tard » d'il y a 24 h) ⇒ LA question ;
+//   'pause' · 'garder' · 'plus_tard' bloqué, son choix ;
+//   'remis'    débloqué (actif lu APRÈS son choix « pause ») et pas encore dit ⇒ « N annonces remises » ;
+//   'normal'   actif, rien à dire.
+function cbPhase(choix, etat, maintenant) {
+  const e = cbEtatLu(etat);
+  if (!e) return 'passu';
+  if (e.etat === 'banni') {
+    if (!cbChoixVaut(choix, e)) return 'question';
+    const t = cbTs(choix.at);
+    if (choix.choix === 'plus_tard' && (t == null || maintenant - t >= CB_PLUS_TARD_MS)) return 'question';
+    return choix.choix;
+  }
+  if (choix && typeof choix === 'object' && choix.choix === 'pause' && !choix.fin) {
+    const ta = cbTs(e.at), tc = cbTs(choix.at);
+    if (ta != null && tc != null && ta >= tc) return 'remis';
+  }
+  return 'normal';
+}
+// </compte-bloque-regle>
+async function lirePauseComptes() {
+  let mem = null;
+  try { mem = (await chrome.storage.local.get(CB_MEMOIRE))[CB_MEMOIRE] || null; } catch (_) { mem = null; }
+  if (mem && Date.now() - Number(mem.at) < CB_GARDE_MS) return mem;
+  let m = null, rows = null;
+  try { m = await lireMain([CB_CLE]); } catch (_) { m = null; }
+  try { rows = await sbGet(`app_data?id=eq.${ETAT_COMPTE_ROW}&select=c:data->comptes`); } catch (_) { rows = null; }
+  if (m === null || !Array.isArray(rows)) { noterDiag('compte_bloque_lecture_ratee'); return mem; }   // pas su : le dernier lu (ou rien)
+  const choix = m[CB_CLE] && typeof m[CB_CLE] === 'object' ? m[CB_CLE] : {};
+  const etats = rows[0] && rows[0].c && typeof rows[0].c === 'object' ? rows[0].c : {};
+  const lu = { at: Date.now(), choix, etats };
+  try { await chrome.storage.local.set({ [CB_MEMOIRE]: lu }); } catch (_) {}
+  return lu;
+}
+async function pauseCompteBloqueDit(uid) {
+  const k = String(uid == null ? '' : uid);
+  if (!/^\d{1,20}$/.test(k)) return null;
+  const lu = await lirePauseComptes();
+  if (!lu || !lu.choix || !lu.etats) return null;
+  if (!cbEnPause(lu.choix[k], lu.etats[k])) return null;
+  noterDiag('compte_bloque_pause_refus');
+  return { ok: false, code: 'compte-bloque', error: "Vinted a bloqué ce compte et tu as mis ses annonces en pause : VRM ne fait rien d'automatique dessus tant qu'il n'est pas débloqué" };
+}
+// La notification « Vinted a bloqué … » / « … est débloqué » : le serveur relit tout
+// (`/api/push`, action `comptebloque`), une fois par blocage. Une marque locale tient
+// l'envoi tant qu'il n'a pas abouti ; le cron du matin et du soir est le filet.
+async function signalerCompteBloque(neuf) {
+  try {
+    if (neuf) await chrome.storage.local.set({ [CB_A_SIGNALER]: Date.now() });
+    const en = Number((await chrome.storage.local.get(CB_A_SIGNALER))[CB_A_SIGNALER] || 0);
+    if (!en) return false;
+    if (Date.now() - en > 3 * 864e5) { await chrome.storage.local.remove(CB_A_SIGNALER); return false; }
+    const s = await authToken();
+    if (!s || !s.access_token) { noterDiag('compte_bloque_push_sans_session'); return false; }
+    let status = 0;
+    try {
+      const ctrl = new AbortController(); const tm = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(COMPTE_PUSH_URL, { method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ action: 'comptebloque' }) });
+      clearTimeout(tm); status = r.status;
+    } catch (_) { status = 0; }
+    const fini = (status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 429);
+    if (fini) await chrome.storage.local.remove(CB_A_SIGNALER);
+    noterDiag(status >= 200 && status < 300 ? 'compte_bloque_push_envoye' : `compte_bloque_push_${fini ? 'refus' : 'ko'}_${status || 'reseau'}`);
+    return fini && status < 300;
+  } catch (_) { return false; }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -13161,6 +13286,7 @@ async function visiteVintedUnPassage() {
     // 5.331 : un « compte relié » resté en attente (réseau, session absente) repart ici.
     await envoyerComptesSignales();
     await signalerModeration(false);   // 5.350 : une alerte de modération dont l'envoi a échoué repart
+    await signalerCompteBloque(false); // 5.409 : « Vinted a bloqué / débloqué » dont l'envoi a échoué repart
     await capterConfirmations(uid);
     // ⚠️ APRÈS la moisson : les ventes « finalisées » viennent d'être captées.
     // On relit le détail de celles dont on n'a pas encore la date de versement
@@ -17371,6 +17497,8 @@ function secuEntetes(res) {
 async function secuGeste(pf, compte, sorte, mode, opts = {}) {
   const cle = secuCle(pf, compte);
   if (!cle) return null;                       // compte illisible : les gardes d'avant décident (elles refusent)
+  // (5.409) Vinted, compte bloqué et en pause sur SON choix : aucun geste automatique (un clic, lui, passe).
+  if (pf === 'vinted' && mode !== 'clic') { const cb = await pauseCompteBloqueDit(compte); if (cb) return cb; }
   // L'heure de la décision : jamais AVANT la fin d'une attente déjà faite (un minuteur
   // réveillé un peu tôt ne doit pas refaire attendre le même geste).
   let horloge = Date.now();
@@ -18274,6 +18402,8 @@ async function gardeStricte(uid, acc, opts = {}) {
   // (5.366) Vinted a demandé une vérification anti-robot sur CE compte : plus rien ne part,
   // pas même une lecture, jusqu'à une lecture normale de sa page (`secuLectureNormale`).
   { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }
+  // (5.409) Compte bloqué par Vinted, ses annonces en pause (SON choix) : une SÉRIE ne part pas.
+  if (opts.sorte || (opts.secu && opts.secu.mode && opts.secu.mode !== 'clic')) { const cb = await pauseCompteBloqueDit(uid); if (cb) return cb; }
   // Vinted a demandé de ralentir : même un clic attend (5.162). On le DIT.
   const pause = await pauseVinted();
   if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
@@ -22092,6 +22222,7 @@ async function masquerAilleursTickUn() {
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc, opts = {}) {
   { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }   // (5.366) vérification anti-robot en cours : rien
+  { const cb = await pauseCompteBloqueDit(uid); if (cb) return cb; }     // (5.409) compte bloqué, annonces en pause : rien d'automatique
   const pause = await pauseVinted();
   if (pause) return { ok: false, code: 'vinted-pause', error: raisonPauseVinted(pause) };
   const actif = await compteConnecte(acc && acc.domain);
