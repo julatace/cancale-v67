@@ -87,12 +87,16 @@ const MUTATIONS = {
   articleSansVinted: [R, "    if (!a || a.id == null || !SITES_LIAISON.includes(a.plateforme) || a.enVente === false) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();", "    if (true) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();"],
   sonNumeroPasUnLien: [R, "    return pr && cle(pr.numero || '') === cle(v) ? null : { numero: String(v) };", '    return null;'],
   sansArticle: [R, "  const propre = !relie && !reunie && (sansArticle || (!!pr && pr.actif !== false));", "  const propre = !relie && !reunie && (!!pr && pr.actif !== false);"],
+  // Le N° donné seul par l'écran Annonces (vrm_articles_sites).
+  faitsIgnores: [R, "  return nf && nf.auto && cle(nf.valeur || '') ? String(nf.valeur).trim() : '';", "  return '';"],
+  faitsPasSu: [R, "  return C.lbc && C.ebay && C.vc && C.journal && C.faits ? C : null;", "  if (!C.faits) C.faits = {};\n  return C.lbc && C.ebay && C.vc && C.journal ? C : null;"],
+  retourEbay: [R, "annonce.plateforme === 'Leboncoin' ? propre : { numero: propre, propre: true };", "annonce.plateforme === 'Leboncoin' ? propre : undefined;"],
   // « Pas sur Vinted ».
   numeroServi: [R, "  if (n && servis && (servis instanceof Set ? servis.has(n) : arr(servis).map((x) => cle(x)).includes(n))) return { refus: 'numero-servi', numero: n };\n", ''],
   // La relecture.
   verifAutre: [R, "  return cle(entree.numero) === cle(attendu || '') ? 'verifie' : 'autre';", "  return 'verifie';"],
   // Les gestes.
-  gestePasPret: [A, "  const cartes = () => (pret() ? { lbc: lireCarte(CLES_LIENS.Leboncoin), ebay: lireCarte(CLES_LIENS.eBay), vc: lireCarte(CLES_LIENS.Vestiaire), journal: lireCarte(CLE_LIAISON) } : { lbc: undefined, ebay: undefined, vc: undefined, journal: undefined });", "  const cartes = () => ({ lbc: lireCarte(CLES_LIENS.Leboncoin) || {}, ebay: lireCarte(CLES_LIENS.eBay) || {}, vc: lireCarte(CLES_LIENS.Vestiaire) || {}, journal: lireCarte(CLE_LIAISON) || {} });"],
+  gestePasPret: [A, "  const cartes = () => (pret() ? { lbc: lireCarte(CLES_LIENS.Leboncoin), ebay: lireCarte(CLES_LIENS.eBay), vc: lireCarte(CLES_LIENS.Vestiaire), journal: lireCarte(CLE_LIAISON), faits: lireCarte(CLE_FAITS) } : { lbc: undefined, ebay: undefined, vc: undefined, journal: undefined, faits: undefined });", "  const cartes = () => ({ lbc: lireCarte(CLES_LIENS.Leboncoin) || {}, ebay: lireCarte(CLES_LIENS.eBay) || {}, vc: lireCarte(CLES_LIENS.Vestiaire) || {}, journal: lireCarte(CLE_LIAISON) || {}, faits: lireCarte(CLE_FAITS) || {} });"],
   gesteSeul: [A, '      publier(etat);\n', "      publier(etat);\n      for (const e of res.file) if (e.avant) relier({ annonce: e.annonce, paire: e.candidats[0].paire, preuve: 'photo-sure' });\n"],
   gesteDuree: [A, 'export const DUREE_ANNULER_LIEN = 10000;', 'export const DUREE_ANNULER_LIEN = 1000;'],
   // Le câblage de l'app : un lien posé tout seul au chargement.
@@ -452,7 +456,7 @@ function pixels(nom, w = 64, h = w) {
 
       // ── H · les gestes (src/liaisonActions.js), avec des lectures qui échouent ──
       const fabrique = (o = {}) => {
-        const stock = { vrm_lbc_liens: {}, vrm_ebay_liens: {}, vrm_vc_liens: {}, vrm_liaison_sites: {}, ...(o.stock || {}) };
+        const stock = { vrm_lbc_liens: {}, vrm_ebay_liens: {}, vrm_vc_liens: {}, vrm_liaison_sites: {}, vrm_articles_sites: {}, ...(o.stock || {}) };
         const journalGestes = [];
         let etat = null;
         const m = o.monde || (() => { const x = monde(); addV(x, 1001, 124, 'paire-124'); addA(x, 'Leboncoin', 5001, 'paire-124~bruit'); mesurer(x, 'Leboncoin', 5001, 'paire-124~bruit', 1001, 'paire-124'); return x; })();
@@ -596,6 +600,29 @@ function pixels(nom, w = 64, h = w) {
         const retour = d.ops ? L.appliquerSurCartes(apres, d.ops) : null;
         dit(d.ops && retour.lbc['6001'] === '53' && retour.journal['lien:Leboncoin:6001'] === undefined, 'J4 · délier lui REND son N°53 (jamais une annonce sans N°, jamais un N° neuf)', retour);
         dit(L.opsPropre({ annonce: lb, numero: '54', cartes, servis: new Set(), cle }).refus === 'identite', 'J4 · elle a déjà SON N° : « que sur ce site » ne lui en donne jamais un deuxième', '');
+      }
+      {
+        // K · le N° que l'écran Annonces a donné SEUL à une annonce (src/articles/numerosSites.js : `vrm_articles_sites`, auto) :
+        // c'est le SIEN (son carton), pas un lien — jamais « reliée », jamais effacé par « Délier ».
+        const faits = { 'Leboncoin:7101': { numero: { valeur: '61', auto: true, at: 't', ecrit: null } }, 'eBay:7201': { numero: { valeur: '62', auto: true, at: 't', ecrit: null } } };
+        const lb = ann('Leboncoin', 7101, { relie: true, numero: '61', identites: [{ sorte: 'lien', numero: '61' }] });
+        const eb = ann('eBay', 7201, { relie: true, numero: '62', identites: [] });
+        const cartes = { lbc: { 7101: '61' }, ebay: { 7201: { numero: '62', propre: true, at: 't' } }, vc: {}, journal: {}, faits };
+        const r = L.construireLiaison({ autres: [lb, eb], paires: [P124], journal: {}, faits, cle, marqueDe });
+        const el = r.parCle.get('Leboncoin:7101'), ee = r.parCle.get('eBay:7201');
+        dit(el && el.etat !== 'relie' && el.numeroSite === '61' && ee && ee.etat !== 'relie' && ee.numeroSite === '62',
+          'K1 · un N° donné seul par l’écran Annonces (Leboncoin, eBay) est le SIEN : l’annonce n’est pas « reliée » à un autre article', { el: el && [el.etat, el.numeroSite], ee: ee && [ee.etat, ee.numeroSite] });
+        dit(L.opsDelier({ annonce: lb, cartes, cle }).refus === 'ecrit-sur-le-site' && L.opsDelier({ annonce: eb, cartes, cle }).refus === 'ecrit-sur-le-site',
+          'K1 · « Délier » ne retire jamais le N° d’une annonce (Leboncoin, eBay) : rien à délier', '');
+        const q = L.opsRelier({ annonce: lb, paire: P124, cartes, autres: r.autres, cle, marqueDe });
+        const w = L.opsRelier({ annonce: eb, paire: P124, cartes, autres: r.autres, cle, marqueDe, accepte: { garder: '124' }, maintenant: 't2' });
+        const apres = w.ops ? L.appliquerSurCartes(cartes, w.ops) : null;
+        const d = apres ? L.opsDelier({ annonce: { ...eb, numero: '124' }, cartes: { ...apres, faits }, cle }) : {};
+        const retour = d.ops ? L.appliquerSurCartes({ ...apres, faits }, d.ops) : null;
+        dit(q.demander === 'numero' && apres && apres.ebay['7201'].pairId === '1001' && retour && retour.ebay['7201'] && retour.ebay['7201'].numero === '62' && retour.ebay['7201'].propre === true && !retour.ebay['7201'].pairId,
+          'K2 · la relier à N°124 DEMANDE quel N° garder ; délier ensuite lui REND son N°62 (`propre`) — jamais une annonce sans N° qu’on renumérotera', { q: q.demander, apres: apres && apres.ebay['7201'], retour: retour && retour.ebay['7201'] });
+        dit(L.opsRelier({ annonce: lb, paire: P124, cartes: { ...cartes, faits: undefined }, autres: r.autres, cle, marqueDe }).refus === 'pas-su' && L.opsDelier({ annonce: lb, cartes: { ...cartes, faits: undefined }, cle }).refus === 'pas-su',
+          'K3 · les N° de l’écran Annonces PAS LUS ⇒ rien d’écrit (relier, délier)', '');
       }
       {
         // L'ancien écran Leboncoin disait « pas d'article à relier » (reliée, sans N°) : ni « reliée » à un N° fantôme, ni reproposée.

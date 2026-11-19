@@ -174,12 +174,22 @@ export const vintedDe = (article) => (!article ? '' : article.vinted != null ? S
 // Une annonce Leboncoin à qui VRM a donné SON N° (« que sur ce site ») le porte dans la carte des
 // liens (`vrm_lbc_liens`, l'identité que toute l'app lit) : l'app la dit donc « reliée ». Le journal
 // (`propre:… .numero`) dit que ce N° est le SIEN : elle n'est reliée à aucun AUTRE article.
-export function annonceLue(a, journal, cle = cleDefaut) {
-  if (!a || a.plateforme !== 'Leboncoin' || !a.relie) return a;
-  const pr = objet((objet(journal) || {})[cleJournal('propre', a)]);
-  const n = pr ? cle(pr.numero || '') : '';
+// (19 nov.) Le N° que l'annonce porte À ELLE SEULE : celui que le parcours lui a donné (« que sur ce site », journal) ou
+// celui que l'écran Annonces lui a donné tout seul (src/articles/numerosSites.js : `vrm_articles_sites[« Site:id »].numero`,
+// `auto`). Ce N° n'est un lien vers AUCUN autre article : ni « reliée », ni déliable (délier lui retirerait son carton).
+export function numeroPropre({ journal = {}, faits = {} } = {}, plateforme, id, cle = cleDefaut) {
+  const k = `${plateforme}:${id}`;
+  const pr = objet((objet(journal) || {})[cleJournal('propre', k)]);
+  if (pr && cle(pr.numero || '')) return String(pr.numero).trim();
+  const f = objet((objet(faits) || {})[k]), nf = f && objet(f.numero);
+  return nf && nf.auto && cle(nf.valeur || '') ? String(nf.valeur).trim() : '';
+}
+export function annonceLue(a, journal, cle = cleDefaut, faits = {}) {
+  if (!a || !['Leboncoin', 'eBay'].includes(a.plateforme) || !a.relie) return a;
+  const propre = numeroPropre({ journal, faits }, a.plateforme, a.id, cle);
+  const n = propre ? cle(propre) : '';
   if (!n || cle(a.numero || '') !== n) return a;
-  return { ...a, relie: false, numero: '', numeroSite: String(pr.numero).trim(), identites: arr(a.identites).filter((i) => !(i && i.sorte === 'lien' && cle(i.numero || '') === n)).concat([{ sorte: 'vrm', numero: n }]) };
+  return { ...a, relie: false, numero: '', numeroSite: propre, identites: arr(a.identites).filter((i) => !(i && i.sorte === 'lien' && cle(i.numero || '') === n)).concat([{ sorte: 'vrm', numero: n }]) };
 }
 
 // ── JUGER UN LIEN (avant tout toucher qui relie, et ENCORE à l'écriture) ─────────────
@@ -254,11 +264,11 @@ export function jugerLien({ annonce, paire, autres = [], numerosDouteux = null, 
 //              ambigu, avant: idArticle | null }
 //   `avant` : la SEULE candidate mise en avant — « même photo · sûr », unique, sans aucun doute,
 //   sans refus, sans deuxième N°. Jamais posée sur une ressemblance, jamais reliée sans son toucher.
-export function construireLiaison({ autres = null, paires = null, memePhoto = null, journal = {}, numerosDouteux = null, numerosConnus = null, cle = cleDefaut, marqueDe = null, pistes = null } = {}) {
+export function construireLiaison({ autres = null, paires = null, memePhoto = null, journal = {}, faits = {}, numerosDouteux = null, numerosConnus = null, cle = cleDefaut, marqueDe = null, pistes = null } = {}) {
   const vide = { lu: false, entrees: [], file: [], relies: [], propres: [], articles: [], contradictions: [], compteur: { aRelier: 0, surs: 0, aVerifier: 0, plusTard: 0, contradictions: 0 }, parCle: new Map() };
   if (!Array.isArray(autres) || !Array.isArray(paires)) return vide;
   const J = objet(journal) || {};
-  autres = autres.map((a) => annonceLue(a, J, cle));
+  autres = autres.map((a) => annonceLue(a, J, cle, faits));
   const articles = articlesDe({ paires, autres, cle });
   const parId = new Map(), parNum = new Map();
   for (const p of articles) {
@@ -281,7 +291,7 @@ export function construireLiaison({ autres = null, paires = null, memePhoto = nu
       if (cs.length) photo.set(x.id, { ambigu: true, candidats: cs });
     }
   }
-  const litiges = contradictions({ autres, paires, journal: J, numerosConnus, cle, marqueDe });
+  const litiges = contradictions({ autres, paires, journal: J, faits, numerosConnus, cle, marqueDe });
   const enLitige = new Set(); for (const c of litiges) for (const a of c.annonces) enLitige.add(cleAnnonce(a));
   const entrees = [];
   for (const a of autres) {
@@ -384,8 +394,10 @@ export function numerosPris(autres, plateforme, cle = cleDefaut) {
 // l'une `undefined` / `null` ⇒ PAS SU ⇒ refus 'pas-su', RIEN n'est écrit.
 const carteLue = (c) => (c === undefined || c === null ? null : objet(c) || null);
 function cartesLues(cartes) {
-  const C = { lbc: carteLue(cartes && cartes.lbc), ebay: carteLue(cartes && cartes.ebay), vc: carteLue(cartes && cartes.vc), journal: carteLue(cartes && cartes.journal) };
-  return C.lbc && C.ebay && C.vc && C.journal ? C : null;
+  const C = { lbc: carteLue(cartes && cartes.lbc), ebay: carteLue(cartes && cartes.ebay), vc: carteLue(cartes && cartes.vc), journal: carteLue(cartes && cartes.journal),
+    // Les N° donnés par l'écran Annonces (`vrm_articles_sites`) : passés ⇒ ils doivent être LUS (pas su ⇒ rien) ; absents ⇒ aucun.
+    faits: cartes && 'faits' in cartes ? carteLue(cartes.faits) : {} };
+  return C.lbc && C.ebay && C.vc && C.journal && C.faits ? C : null;
 }
 // Le lien POSÉ DANS VRM pour cette annonce (vers un article partagé), ou null. Le N° qu'une
 // annonce Leboncoin porte à elle seule (« que sur ce site », rangé comme son lien) n'en est pas un.
@@ -393,8 +405,8 @@ const dejaLie = (plateforme, id, C, cle) => {
   if (plateforme === 'Leboncoin') {
     const v = C.lbc[String(id)];
     if (v == null || !String(v).trim()) return null;
-    const pr = objet(C.journal[cleJournal('propre', `Leboncoin:${id}`)]);
-    return pr && cle(pr.numero || '') === cle(v) ? null : { numero: String(v) };
+    const propre = numeroPropre(C, 'Leboncoin', id, cle);
+    return propre && cle(propre) === cle(v) ? null : { numero: String(v) };
   }
   if (plateforme === 'eBay') { const v = objet(C.ebay[String(id)]); return v && (v.pairId || (v.article === true && cle(v.numero || ''))) ? v : null; }
   return lienDe(C.vc, id);
@@ -428,7 +440,7 @@ export function opsRelier({ annonce, paire, preuve = 'recherche', cartes, autres
   const C = cartesLues(cartes);
   if (!C) return { refus: 'pas-su' };
   if (!annonce || annonce.id == null || !paire) return { refus: 'identite' };
-  annonce = annonceLue(annonce, C.journal, cle);
+  annonce = annonceLue(annonce, C.journal, cle, C.faits);
   const id = String(annonce.id), k = cleAnnonce(annonce);
   const deja = dejaLie(annonce.plateforme, id, C, cle);
   if (deja) return { refus: 'annonce-reliee', numero: cle(deja.numero || '') };
@@ -477,8 +489,8 @@ export function opsDelier({ annonce, cartes, cle = cleDefaut } = {}) {
   if (deja) {
     const brut = annonce.plateforme === 'Leboncoin' ? C.lbc[id] : annonce.plateforme === 'eBay' ? C.ebay[id] : C.vc[id];
     // Une annonce Leboncoin qui portait SON N° avant le lien le reprend ; sinon le lien disparaît.
-    const pr = objet(C.journal[cleJournal('propre', k)]);
-    const retour = annonce.plateforme === 'Leboncoin' && pr && cle(pr.numero || '') ? String(pr.numero).trim() : undefined;
+    const propre = annonce.plateforme === 'Vestiaire' ? '' : numeroPropre(C, annonce.plateforme, id, cle);
+    const retour = !propre ? undefined : annonce.plateforme === 'Leboncoin' ? propre : { numero: propre, propre: true };
     ops.push({ k: CLES_LIENS[annonce.plateforme], type: 'cle', id, apres: retour, avant: brut });
   }
   if (lienJ) ops.push({ k: CLE_LIAISON, type: 'cle', id: cleJournal('lien', k), apres: undefined, avant: lienJ });
@@ -501,7 +513,7 @@ export function opsPropre({ annonce, numero = '', cartes, servis = null, annuler
   const C = cartesLues(cartes);
   if (!C) return { refus: 'pas-su' };
   if (!annonce || annonce.id == null) return { refus: 'identite' };
-  annonce = annonceLue(annonce, C.journal, cle);
+  annonce = annonceLue(annonce, C.journal, cle, C.faits);
   const id = String(annonce.id), k = cleAnnonce(annonce);
   const dejaPr = objet(C.journal[cleJournal('propre', k)]);
   if (annuler) return dejaPr ? { ops: [{ k: CLE_LIAISON, type: 'cle', id: cleJournal('propre', k), apres: dejaPr.numero ? { ...dejaPr, actif: false } : undefined, avant: dejaPr }], numero: '' } : { refus: 'identite' };
@@ -569,9 +581,9 @@ export function verifierLien({ entree, attendu, cle = cleDefaut } = {}) {
 //   'prix'          : annonce reliée, écart de prix fort ;
 //   'orphelin'      : annonce reliée à un N° qu'AUCUN article connu ne porte (N° lus seulement).
 // `journal['garde:<id>']` : il a dit « garder » — le cas ne revient plus.
-export function contradictions({ autres = [], paires = [], journal = {}, numerosConnus = null, cle = cleDefaut, marqueDe = null } = {}) {
+export function contradictions({ autres = [], paires = [], journal = {}, faits = {}, numerosConnus = null, cle = cleDefaut, marqueDe = null } = {}) {
   const J = objet(journal) || {};
-  autres = arr(autres).map((a) => annonceLue(a, J, cle));
+  autres = arr(autres).map((a) => annonceLue(a, J, cle, faits));
   const parNum = new Map();
   for (const p of arr(paires)) { const k = p ? cle(p.numero || '') : ''; if (k && !parNum.has(k)) parNum.set(k, p); }
   const connus = numerosConnus instanceof Set ? numerosConnus : null;
