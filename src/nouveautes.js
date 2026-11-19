@@ -31,6 +31,14 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'liaison-sites-guidee', date: '2026-11-19', titre: 'Relie tes annonces, photo contre photo', phrase: 'Leboncoin, eBay, Vestiaire : touche le bon article, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/passation/2026-11-19-natif-fondation.md
   { id: 'coque-native', date: '2026-11-19', titre: 'Une nouvelle barre, comme sur iPhone', phrase: 'Cinq onglets en bas ; le reste derrière ta photo.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « reconnaître absolument tous les types de code de retrait », « je dois voir quand un nouveau QR ou colis est détecté ») docs/passation/2026-11-19-retraits-parfaits.md
+  { id: 'retraits-parfaits', date: '2026-11-19', titre: 'Nouveau code de retrait : VRM te prévient', phrase: 'Consigne ou comptoir dit, colis retirés relus, codes de casier lus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (19 nov., photo du Mac de Julien : « Extension à installer » alors qu'elle vit dans un autre Chrome) docs/passation/2026-11-19-vite-et-sans-bug.md
+  { id: 'extension-ou-elle-est', date: '2026-11-19', titre: 'VRM dit où est ton extension', phrase: 'Installée ici mais muette, ou vivante dans un autre navigateur : dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») docs/passation/2026-11-19-colis-achat-auto.md
+  // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
+  { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'interface-vrm-bleu-nuit', date: '2026-11-18', titre: 'VRM adopte le design de l’aperçu', phrase: 'Bleu nuit, nouveaux boutons, photos des colis et factures visibles.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil
   { id: 'style-apple', date: '2026-11-18', titre: 'Essaie le style Apple', phrase: 'Paramètres → Apparence → Style : fond gris clair, cartes blanches.', tab: 'settings', pour: 'tous', mode: 'tous' },

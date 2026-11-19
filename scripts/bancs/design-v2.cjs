@@ -231,7 +231,9 @@ async function telephone(nav, sombre, b, sigs) {
   dit(String(nFaces) === String(avant.journee.ret), `A ${nFaces} colis en passes = « À retirer » de Ma journée d’avant (${avant.journee.ret})`, { faces: nFaces, avant: avant.journee.ret });
   dit(a.qr <= avant.achats.qr && a.qr <= nFaces, `A QR seulement s’il existe (${a.qr} ici, ${avant.achats.qr} lignes « QR » avant)`, a);
   dit(a.limiteAvantQr, 'A la date limite est AU-DESSUS du QR');
-  dit(a.passes.every((p) => p.n < 2) || a.pages.some((t) => /1/.test(t)), 'A plusieurs colis au même point : « 1 sur N », on glisse de code en code', a.pages);
+  dit(a.pages.length === 0 && a.passes.every((p) => p.n === p.faces), 'A plusieurs colis au même point : tous les codes visibles en liste, plus de « 1 sur N » (19 nov.)', a);
+  { const vis = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-face] [data-v2-code-grand]')].every((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }));
+    dit(vis, 'A chaque code du point a une taille à l’écran (aucun caché derrière un défilement de côté)'); }
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-390-${th}.png`) });
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-plein-390-${th}.png`), fullPage: false });
   await mesurerEcran(pg, 'Achats', true);

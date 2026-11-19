@@ -36,6 +36,8 @@ const MUTS = {
   'relies-melanges': ['src/relierGlisser.js', "tousAchatsLibresDetail({ achats, liens }).pris.map(", "tousAchatsLibresDetail({ achats, liens }).liste.map("],
   'filtre-cibles-inerte': ['src/relierGlisser.js', "filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;", "cs;"],
   'badge-sans-choix': ['src/RelierGlisser.jsx', '{x.pour && !flottante ? <span className="vrm-rg-propose"', '{x.propose && !flottante ? <span className="vrm-rg-propose"'],
+  'cherche-un-mot': ['src/relierGlisser.js', "return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.every((m) => foin.includes(m)); });", "return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.some((m) => foin.includes(m)); });"],
+  'cherche-cibles-inerte': ['src/relierGlisser.js', "return cs.filter((c) => { const f = foin(c); return mots.every((m) => f.includes(m)); });", "return cs;"],
   'annuler-perd': ['src/relierGlisser.js', "avant: { buyPrice: f.buyPrice, buyFromId: f.buyFromId, buyFrom: f.buyFrom } });", "avant: {} });"],
   'sans-identite': ['src/relierGlisser.js', "  if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];", "  if (!cible || !w) return [];"],
   'vibre-partout': ['src/relierGlisser.js', "  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}\n  return false;", '  return true;'],
@@ -144,9 +146,16 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(NC && NC.toutes === 2 && NC.annonce === 1 && NC.vente === 1, 'L12 les cibles comptées : toutes, en ligne, vendues', JSON.stringify(NC));
   const FC = typeof G.filtrerCibles === 'function' ? [G.filtrerCibles(cibles, 'annonce'), G.filtrerCibles(cibles, 'vente'), G.filtrerCibles(cibles, 'toutes')] : null;
   dit(FC && FC[0].length === 1 && FC[0][0].key === 'a:10' && FC[1].length === 1 && FC[1][0].key === 'v:77' && FC[2].length === 2, 'L13 le filtre « En ligne » ne garde que les annonces, « Vendues » que les ventes', JSON.stringify(FC && FC.map((l) => l.map((c) => c.key))));
+  // La recherche (19 nov.) : chaque mot doit être dans la ligne.
+  const LA = (L.achats || []);
+  const CA = typeof G.chercherAchats === 'function' ? [G.chercherAchats(LA, 'samba 40'), G.chercherAchats(LA, 'samba 42'), G.chercherAchats(LA, ''), G.chercherAchats(LA, 'ASICS')] : null;
+  dit(CA && CA[0].length === 1 && CA[0][0].tx === '4' && CA[1].length === 0 && CA[2].length === LA.length && CA[3].length === 1 && CA[3][0].tx === '5', 'L16 recherche des achats : « samba 40 » ⇒ cet achat seul ; « samba 42 » ⇒ rien (TOUS les mots) ; vide ⇒ tout ; sans la casse', JSON.stringify(CA && CA.map((l) => l.map((x) => x.tx))));
+  const CC = typeof G.chercherCibles === 'function' ? [G.chercherCibles(cibles, '215'), G.chercherCibles(cibles, 'n°215'), G.chercherCibles(cibles, 'dunk noir'), G.chercherCibles(cibles, 'vendue'), G.chercherCibles(cibles, 'dunk 40'), G.chercherCibles(cibles, '')] : null;
+  dit(CC && CC[0].length === 1 && CC[0][0].key === 'a:10' && CC[1].length === 1 && CC[2].length === 1 && CC[2][0].key === 'v:77' && CC[3].length === 1 && CC[3][0].key === 'v:77' && CC[4].length === 0 && CC[5].length === 2, 'L17 recherche des ventes et annonces : par N°, « n°215 », mots du titre, « vendue » ; tous les mots exigés', JSON.stringify(CC && CC.map((l) => l.map((c) => c.key))));
   { const src = fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8');
     dit(/\{x\.pour && !flottante \? <span className="vrm-rg-propose"/.test(src) && !/\{x\.propose && !flottante/.test(src), 'L14 (écran) la marque « Très probable » dépend de la cible CHOISIE (`pour`), plus de `propose`');
-    dit(/data-glisser-filtre-achats=/.test(src) && /data-glisser-filtre-cibles=/.test(src), 'L15 (écran) les deux filtres sont rendus'); }
+    dit(/data-glisser-filtre-achats=/.test(src) && /data-glisser-filtre-cibles=/.test(src), 'L15 (écran) les deux filtres sont rendus');
+    dit(/data-glisser-cherche="achats"/.test(src) && /data-glisser-cherche="cibles"/.test(src), 'L18 (écran) une recherche par liste'); }
   if (H) H.publierHorsRelier(null);
 
   // ── P · la phrase ──

@@ -6,10 +6,13 @@
 //  ne gardait que le premier. Scène INVENTÉE de la même forme (dépôt public) :
 //    1. AVEC la liste des n° (extension 5.403 : `suivisVinted`, `suivisLusAt`) ⇒ UNE ligne, au nom de
 //       l'article, avec le code du colis Chronopost (et son QR) ; aucune ligne « Code sur Vinted » ;
-//    2. SANS la liste (ligne d'avant) ⇒ DEUX lignes + « C'est sans doute le même colis — Relier » sur le colis
-//       Chronopost ; rien n'est relié avant SON toucher (aucune écriture) ; après le toucher ⇒ UNE ligne ;
-//    3. sans la liste, DEUX achats au même point ⇒ aucune proposition ;
-//    4. « Ce n'est pas le même » ⇒ la proposition disparaît, les deux lignes restent ;
+//    2. SANS la liste (ligne d'avant) ⇒ DEUX lignes, et — (19 nov., décision de Julien : « je ne dois pas relier
+//       l'achat au colis qui est au point relais, ça doit être automatique […] on ne doit pas avoir le bouton relier
+//       un achat ») — PLUS de « C'est sans doute le même colis — Relier » : le colis Chronopost dit « Contenu pas
+//       encore lu · ouvre vinted.fr sur compte_a », rien à toucher, aucune écriture ; dès que la liste est lue
+//       (scène 1), l'identité relie seule ;
+//    3. sans la liste, DEUX achats au même point ⇒ aucune proposition non plus ;
+//    4. (retirée le 19 nov. avec la proposition : plus de « Ce n'est pas le même ») ;
 //    5. liste LUE qui contredit un lien posé à la main ⇒ « Ce lien ne correspond pas au suivi Vinted — délier ? »,
 //       « Délier » retire le lien.
 //  Scènes 1 et 2 en 390 tactile et 1512, clair et sombre ; 3 à 5 en 390 clair. `BANC_PORT`, `BANC_DIST`, `SHOTS=dossier`.
@@ -151,7 +154,9 @@ const lire = (pg) => pg.evaluate(() => {
   const contr = [...document.querySelectorAll('[data-rp-lien-contredit]')].filter(vis);
   const R = (e) => e ? e.getBoundingClientRect() : null;
   const b = prop[0] && prop[0].querySelector('[data-rp-meme-relier]');
-  return { lignes, prop: prop.map((p) => ({ txt: p.innerText.replace(/\s+/g, ' ').trim(), achat: p.getAttribute('data-rp-meme-achat'), h: b ? Math.round(R(b).height) : 0 })), contredit: contr.map((c) => c.innerText.replace(/\s+/g, ' ').trim()) };
+  const cont = [...document.querySelectorAll('[data-rp-contenu]')].filter(vis).map((c) => ({ etat: c.getAttribute('data-rp-contenu'), raison: c.getAttribute('data-rp-contenu-raison'), compte: c.getAttribute('data-rp-contenu-compte'), txt: c.textContent.replace(/\s+/g, ' ').trim(), toucher: c.querySelectorAll('button, a').length }));
+  const relier = [...document.querySelectorAll('[data-rp-meme-relier], [data-rp-pas-meme], [data-rp-relier-ouvrir], [data-rp-relier]')].filter(vis).length;
+  return { cont, relier, lignes, prop: prop.map((p) => ({ txt: p.innerText.replace(/\s+/g, ' ').trim(), achat: p.getAttribute('data-rp-meme-achat'), h: b ? Math.round(R(b).height) : 0 })), contredit: contr.map((c) => c.innerText.replace(/\s+/g, ' ').trim()) };
 });
 const ecran = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.evaluate(() => { const l = document.querySelector('.vrm-rpf-ligne[data-cc-carte]'); if (l) l.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `multi-${nom}.png`) }); };
 
@@ -178,16 +183,11 @@ const ecran = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { rec
       await essaie(nom, async () => {
         const m = await lire(o2.pg); await ecran(o2.pg, `sans-liste-${nom}`);
         dit(m.lignes.length === 2, `${nom} : deux lignes tant que rien ne les relie`, m.lignes.map((l) => l.titre).join(' | '));
-        dit(m.prop.length === 1 && /sans doute le même colis/.test(m.prop[0].txt) && /Baskets montantes/.test(m.prop[0].txt) && m.prop[0].achat === String(TX), `${nom} : « C'est sans doute le même colis que « Baskets… » — Relier »`, JSON.stringify(m.prop));
-        dit(m.prop.length === 1 && m.prop[0].h >= 44, `${nom} : « Relier » se touche au doigt (44 px)`, m.prop[0] && m.prop[0].h);
-        dit(!o2.ecrits.some((id) => /^colis_suivi_/.test(id)), `${nom} : rien n'est relié avant SON toucher`, o2.ecrits.join(' '));
-        await o2.pg.locator('[data-rp-meme-relier]').first().click();
-        await o2.pg.waitForFunction(() => document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]').length === 1, null, { timeout: 15000 }).catch(() => {});
-        await o2.pg.waitForTimeout(500);
-        const m2 = await lire(o2.pg); await ecran(o2.pg, `apres-relier-${nom}`);
-        dit(o2.ecrits.includes(`colis_suivi_chronopost_${N2}`), `${nom} : son toucher range le lien (colis_suivi_chronopost_…, avec la transaction)`, o2.ecrits.join(' '));
-        dit(m2.lignes.length === 1 && /Baskets montantes/.test(m2.lignes[0].titre) && m2.lignes[0].code && !m2.lignes[0].surVinted, `${nom} : après le toucher, UNE ligne au nom de l'article, avec le code`, JSON.stringify(m2.lignes));
-        dit(!m2.prop.length, `${nom} : plus de proposition`);
+        // (19 nov., décision de Julien) Avant : la proposition « même colis — Relier », son toucher rangeait le lien. Désormais : aucun geste.
+        dit(!m.prop.length && m.relier === 0, `${nom} : plus de « C'est sans doute le même colis — Relier » (ni « Ce n'est pas le même »)`, JSON.stringify({ prop: m.prop, relier: m.relier }));
+        const pl = m.cont.filter((c) => c.etat === 'pas-lu');
+        dit(pl.length === 1 && pl[0].raison === 'ouvrir-vinted' && pl[0].compte === 'compte_a' && /Contenu pas encore lu/.test(pl[0].txt) && /vinted\.fr sur compte_a/.test(pl[0].txt) && pl[0].toucher === 0, `${nom} : le colis Chronopost dit « Contenu pas encore lu · ouvre vinted.fr sur compte_a », rien à toucher`, JSON.stringify(m.cont));
+        dit(!o2.ecrits.some((id) => /^colis_suivi_/.test(id)), `${nom} : aucun lien écrit`, o2.ecrits.join(' '));
       });
       dit(!o2.errs.length, `${nom} : aucune erreur`, o2.errs.join(' | ').slice(0, 200));
       await o2.ctx.close();
@@ -196,17 +196,7 @@ const ecran = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { rec
     console.log('\n— 3. Deux achats au même point (sans liste)');
     { const o = await ouvrir(b, vp, false, 'deuxAchats');
       await essaie('3', async () => { const m = await lire(o.pg); await ecran(o.pg, 'deux-achats');
-        dit(m.lignes.length === 3 && !m.prop.length, 'deux candidats : aucune proposition', `${m.lignes.length} lignes, ${m.prop.length} proposition(s)`); });
-      dit(!o.errs.length, 'aucune erreur', o.errs.join(' | ').slice(0, 200)); await o.ctx.close(); }
-    console.log('\n— 4. « Ce n’est pas le même »');
-    { const o = await ouvrir(b, vp, false, 'sansListe');
-      await essaie('4', async () => {
-        await o.pg.locator('[data-rp-pas-meme]').first().click(); await o.pg.waitForTimeout(600);
-        const m = await lire(o.pg); await ecran(o.pg, 'pas-le-meme');
-        dit(!m.prop.length && m.lignes.length === 2, 'la proposition disparaît, les deux lignes restent', `${m.lignes.length} lignes, ${m.prop.length}`);
-        dit(!o.ecrits.some((id) => /^colis_suivi_/.test(id)), 'aucun lien rangé', o.ecrits.join(' '));
-        dit(await o.pg.evaluate(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vrm_colis_pas_meme') || '{}')).length === 1; } catch (_) { return false; } }), '« pas le même » est mémorisé');
-      });
+        dit(m.lignes.length === 3 && !m.prop.length && m.relier === 0, 'deux candidats : aucune proposition, aucun geste « Relier »', `${m.lignes.length} lignes, ${m.prop.length} proposition(s)`); });
       dit(!o.errs.length, 'aucune erreur', o.errs.join(' | ').slice(0, 200)); await o.ctx.close(); }
     console.log('\n— 5. La liste LUE contredit un lien posé à la main');
     { const o = await ouvrir(b, vp, false, 'contredit');

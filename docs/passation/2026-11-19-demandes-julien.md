@@ -50,6 +50,14 @@ point relais, code en clair dans la rangée, date limite ; toucher ⇒ le code e
 les achats en route, puis tous. Recherche à facettes : taille, prix (bornes), marque, mots du titre, vendeur, compte,
 date d'achat, date de retrait, n° de suivi, code. À l'ordinateur : liste à gauche, détail à droite.
 
+Ajout (capture iPhone, 15 h 34, Achats filtré « Leboncoin ») : « le bouton Ajouter dans Achats ne sert à rien » ⇒ RETIRÉ
+(un achat arrive tout seul par l'extension ou l'e-mail ; la saisie à la main, si elle reste, va derrière « ⋯ »). Vus sur
+la même capture : le rond « scanner » posé PAR-DESSUS « Ajouter » (deux scanners sur l'écran) ; le « ? » invisible ;
+avec le filtre Leboncoin, « À retirer · 15 · 2 d'ici demain · 15 avec code · 5 à vérifier » s'affiche mais AUCUN colis
+n'est listé ⇒ les nombres ne suivent pas le filtre, ou la liste est vide à tort (bug à mesurer : un filtre de site
+doit filtrer les nombres ET la liste, et dire « aucun colis Leboncoin à retirer » s'il n'y en a pas) ; « Mode relais »,
+« Suivi vérifié à l'instant », « Ajouter un QR Mondial Relay · 11 sans QR » : à juger avec l'audit (§2, ligne Achats).
+
 ### B. Stock et rangement, étiquetage
 « Pour chaque article, mets "à ranger maintenant" au lieu que je doive appuyer sur l'article et qu'après ce soit à
 droite. Fais une meilleure représentation du meuble, avec une animation quand je range l'article dans le meuble. Je veux
@@ -119,3 +127,79 @@ faire, pas à moi. »
 - Lot du 16 nov. (finitions + Stock v4) : gardé sur `claude/integration-16nov-finitions-stock-v4`, non appliqué.
 - App Store : il faut un compte Apple Developer (99 $/an) et son Mac relié (Xcode) ; Apple relit 1 à 2 jours ; pas de
   paiement Stripe dans l'app iPhone, « Se connecter avec Apple » si Google reste, suppression du compte dans l'app.
+
+### G. « Publier partout » : une fiche complète par article, traduite pour chaque site
+Julien : « je vais pouvoir transvaser une annonce de Vinted, Leboncoin, eBay à Vestiaire Collective, mais je veux être sûr
+que pour chaque article, peu importe ce que c'est, ça publie au bon endroit dans la bonne catégorie, même si les
+catégories ne sont pas les mêmes » — « pour chaque article que je publie sur Vinted, ça enregistre la catégorie […] et
+il faut également que ça enregistre couleur, matériaux, pointure, description, absolument tout ».
+Existant (mesuré dans le code) : l'extension lit déjà sur l'annonce Vinted `catalog_id`, `brand_id`/`brand`, `size_id`,
+`size_title`, `status_id`, `color1_id`/`color2_id`/`color_ids`, `package_size_id`, `is_unisex`, mesures, `item_attributes`
+(background.js ~7812 et 13483) ; `src/correspondances.js` traduit la CATÉGORIE Vinted → Leboncoin (18 sûres / 5 à
+demander), Vestiaire (7 / 14), eBay (suggestion de l'API) ; réponses retenues dans `vrm_correspondances`.
+À construire :
+1. UNE FICHE ARTICLE NEUTRE gardée par VRM pour chaque article (quel que soit le site d'origine) : catégorie VRM,
+   genre, marque, pointure (EU, jamais convertie), état, couleur(s), matière(s), dimensions, titre, description,
+   photos, prix, prix mini — remplie à la LECTURE de l'annonce (Vinted, et aussi Leboncoin, eBay, Vestiaire), jamais
+   devinée ; un champ pas lu reste vide et se demande une fois.
+2. Des TABLES PAR CHAMP et par site, dans les DEUX sens (catégorie, état, couleur, matière, marque, pointure), tirées
+   des listes que chaque site sert ; pas sûr ⇒ demandé une fois, retenu ; un site qui refuse (marque hors liste
+   Vestiaire) ⇒ « pas vendable sur ce site », jamais forcé.
+3. Publier n'importe quel sens (Leboncoin → Vestiaire sans Vinted) ; rien ne part sans catégorie ni champ obligatoire
+   sûr ; RELECTURE après publication (la catégorie enregistrée par le site = la voulue, sinon dit).
+4. Un tableau de couverture : pour chaque catégorie présente dans le stock, sûre / à demander / impossible, par site.
+Dépend de `annonces-a-egalite` (l'article central). Extension probablement touchée (lecture des fiches Leboncoin /
+eBay / Vestiaire) ⇒ dans la version unique 5.409.
+G bis (même jour) : « il faut un agent totalement intelligent capable de poster, peu importe ; s'il y a un doute il
+regarde, et s'il ne trouve pas il demande l'information à l'utilisateur ; 100 % autonome et intelligent. »
+Décision : UN geste « Publier sur… » (un article ou une sélection) ; l'agent remplit tout seul chaque champ de chaque
+site depuis la fiche article, dans cet ordre de confiance : (1) tables vérifiées ; (2) ses réponses passées
+(retenues par catégorie et par marque) ; (3) ce qui est LU sur le site cible (listes de valeurs du formulaire,
+suggestion de catégorie eBay) ; PAS D'IA (Julien, même jour : « tu n'intègres pas d'IA, mais tu fais un agent 100 % autonome, sans IA ») :
+uniquement des règles, des tables, ce qui est lu et ce qu'il a déjà répondu ; il apprend de chaque réponse. Doute restant ⇒ UNE question groupée par article
+(toutes les inconnues sur un écran, choix du site, réponse retenue). Publie, RELIT, et dit le résultat ; un échec dit
+pourquoi et quoi faire. Garde-fous de l'extension inchangés (son geste, compte de l'onglet, plafonds, une à la fois).
+G ter : « c'est l'extension qui va publier dans tous les cas » — l'agent prépare et décide des champs dans l'app ;
+la PUBLICATION part toujours de l'extension (onglet du site, compte de l'onglet, plafonds), comme aujourd'hui.
+
+### H. Le lien extension ↔ application, compréhensible par n'importe quel vendeur
+Julien : « améliore le lien entre l'extension et l'application : on ne sait pas quand ton compte Vinted est ouvert,
+quelles actions on peut faire, on ne sait rien ; des fois c'est marqué [qu'il y a] trop [d'onglets / de comptes]
+ouverts, vraiment pas clair du tout ; beaucoup mieux accompagné : le vendeur doit comprendre, pour que je n'aie pas trop
+de questions de leur part. »
+À construire : UN endroit unique « Extension » (dans « Plus », et la pastille de la coque y mène), en phrases simples :
+- par navigateur : l'extension est-elle là, à jour, branchée à CE compte VRM (pastille correctifs `vite-et-sans-bug` :
+  « pas dans ce navigateur », « ne répond pas sur cette page ») ;
+- par compte de chaque site : « Vinted · shop_x — ouvert dans ce Chrome · lu il y a 3 min » / « pas ouvert : ouvre
+  vinted.fr connecté à shop_x » ; quel onglet sert à quoi ;
+- CE QUE VRM PEUT FAIRE MAINTENANT pour ce compte, en liste verte / grise avec la raison du gris (« baisser un prix :
+  oui · publier : oui · lire les codes : oui · messages aux favoris : non, Vinted n'est pas ouvert ») ;
+- chaque message d'état réécrit en une phrase + le geste (« deux comptes Vinted sont ouverts dans ce Chrome : VRM
+  n'agit que sur celui de l'onglet actif — garde un seul compte par navigateur »), jamais un terme technique ;
+- un pas-à-pas d'installation et de premier branchement qui vérifie chaque étape en direct (« extension vue ✓ »,
+  « compte Vinted vu ✓ ») ; une aide « Pourquoi ? » d'une ligne par état.
+Mesure d'abord, en prod, les états réellement rencontrés (lignes `ext_appareil_*`, `actions_compte_*`, rapports) et les
+libellés actuels (inventaire de l'audit d'utilité) ; extension probablement touchée ⇒ version unique 5.409.
+
+## DÉCISIONS DE JULIEN (19 nov., réponse « 1 oui, 2 oui, 3 oui, 4 oui » aux questions de l'audit d'utilité §8)
+Elles CHANGENT des règles de CLAUDE.md : à reporter dans CLAUDE.md (§2.5, §3) à l'intégration, avec cette date.
+1. **Baisse de prix par règle automatique** : OUI. Une règle posée une fois (ex. « −5 % tous les 14 jours sans vente,
+   jamais sous le prix mini »), appliquée par l'extension seule, dans ses plafonds (45/h, réserve 5, baisses
+   irrégulières, arrêt au 1er captcha, prudence), journal « Ce que VRM a fait », éteinte par défaut, réglage par compte.
+   Jamais sous le prix mini ; sans prix mini, jamais sous achat + 10 % ; sans achat connu ni prix mini : pas de baisse.
+2. **Prix d'achat posé seul** : OUI. Le montant du REÇU de CET achat (son n° de transaction) est posé quand l'achat
+   reçoit son N° (ou quand il est relié par identité) ; jamais deviné ; un LOT n'est jamais divisé (demandé) ; une
+   saisie de Julien n'est jamais écrasée ; dit une fois (« prix d'achat repris du reçu »). Remplace §2.5 « il saisit
+   les prix d'achat lui-même ».
+3. **Vendue ailleurs ⇒ masquer seul sur Vinted** : OUI. Une paire dont la vente est PROUVÉE sur un autre site est
+   MASQUÉE (réversible) sur Vinted par l'extension, compte de l'onglet, dans les plafonds ; la SUPPRESSION reste son
+   toucher (§3 inchangé : jamais de suppression automatique) ; vente annulée ⇒ démasquée ; dit dans le journal.
+4. **Envoi des colis** : OUI. « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont retirés ; le dépôt
+   est constaté par le suivi du transporteur ; « Imprimer N bordereaux » imprime depuis Aujourd'hui.
+
+## DÉCISIONS DE JULIEN (19 nov. soir, « on fait tout sauf vercel » sur le plan capacité 3 000)
+- Vercel reste en Hobby (pas de Pro pour l'instant).
+- Migration 048 APPLIQUÉE le 19 nov. (index `app_data_preuve_adresse`, index BRIN `journal_ecritures_at_brin`, fonction `sauvegarde.vrm_purger_journal`, clé de service seule) — rien effacé.
+- Copies `sauvegarde.app_data_20260930` et `sauvegarde.app_data_20261002` (111 Mo) SUPPRIMÉES le 19 nov. (aucune fonction, vue ni code ne les lisait).
+- Mises en ligne regroupées : 1 à 2 « trains » par jour au lieu de 8 à 10.
+- Messages aux favoris (Julien, 19 nov. soir : « 4 min c'est peut-être beaucoup, on garde toujours le temps aléatoire ») : attente aléatoire 40–90 s par défaut + temps d'écriture ; choix « Plus prudent » 2–4 min ; plafonds inchangés (15/h favoris, 50/h, jour). Livré avec l'extension 5.409 (chantier extension-utile).
