@@ -3473,7 +3473,7 @@ const SYNC_KEYS = [
   // (19 nov., lot compte-bloque) SON choix pour un compte bloqué par Vinted (pause / garder / plus tard), écrit sur SON toucher, lu par l'extension 5.409 (src/compteBloque.js).
   'vrm_comptes_bloques',
   'vrm_numeros_a_ecrire',   // (19 nov.) les N° neufs donnés par VRM, à écrire sur les cartons (Stock), vidés sur SON « C'est écrit »
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vinted_offres_nego','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vinted_offres_paliers','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -20657,12 +20657,19 @@ const ECRANS_NATIFS = new Set(['annonces', 'ventes', 'automatisations']);
 // (le tableau ne tient pas dans une colonne de 520) ; sa fiche s'ouvre en panneau à droite (`.n-tt-fiche`).
 const ECRANS_TABLEAU = new Set(['annonces', 'automatisations']);
 const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: null });
+// (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
+// un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
+const SITES_COQUE = { v: ['vinted'] };
+const choisirSiteTache = (tache, site) => { try { window.dispatchEvent(new CustomEvent('vrm:site-tache', { detail: { tache, site } })); } catch (_) {} };
+const NOMS_SITES_COQUE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire', toutes: '' };
+const filtreSiteTableau = (tache, site) => { const l = (SITES_COQUE.v || []).filter((x) => x !== 'toutes'); return l.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: site, onChange: (v) => choisirSiteTache(tache, v),
+  options: l.map((x) => ({ cle: x, libelle: NOMS_SITES_COQUE[x] || x })) }] : []; };
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
 const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
   onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
 const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
-function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null }) {
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null, reduite = false, onReduire = null }) {
   useProfilVendeur(); useEcransVusTick();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -20682,7 +20689,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null 
   ];
   const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
-    <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }}
+    <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }} reduite={reduite} onReduire={onReduire} icone={<Icon name="menu" size={20}/>}
       tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
       pied={uid ? (<>
         {boiteOutils}
@@ -36823,7 +36830,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
   // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur, la liste d'Achats est le TABLEAU DE TRAVAIL (src/natif/ecrans/AchatsTableau.jsx).
-  const ordiAchats = Natif.useOrdinateur() && only === 'achats';
+  const ordiCompta = Natif.useOrdinateur();
+  const ordiAchats = ordiCompta && only === 'achats';
   const [filtreAchatsT, setFiltreAchatsT] = useState({ compte: '', periode: 'tout' });
   // (31 oct., soir — Julien : « que dans les deux onglets il n'y ait pas la même
   // chose ») DEUX ÉCRANS sur les mêmes lectures (§11, aucune copie) :
@@ -49192,6 +49200,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (5 nov., revue 3.8) Un fil en panne a SON « Réessayer » : l'icône de relecture se tait. */}
               {!openConv.error&&<button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>}
             </TeteFil>
+            {/* (19 nov. soir) L'ARTICLE en tête du fil : photo, N°, prix, prix mini — par IDENTITÉ (`paireDeConv`, l'item de la
+                transaction), jamais par le titre ; sans article relié, rien. */}
+            {(()=>{ if(openConv.loading||openConv.error) return null; const pcA=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation); const fA=ficheDeConv(pcA,openConv.acc); if(!fA) return null;
+              return <div className="n-fil-article" data-fil-article={fA.item!=null?String(fA.item):''}>
+                <span className="n-fil-article-photo">{fA.photo?<PhotoVinted src={fA.photo} alt="" loading="lazy"/>:<Icon name="image" size={20}/>}</span>
+                <span className="n-fil-article-texte"><span className="n-fil-article-titre">{fA.titre||''}</span>
+                  <span className="n-fil-article-sous">{[fA.num?'N°'+fA.num:'', fA.prix!=null?prix(fA.prix,fA.devise):'', fA.mini!=null?tr('egalite.mini',{p:prix(fA.mini,'EUR')}):tr('tableau.msg.sansMini')].filter(Boolean).join(' · ')}</span></span>
+              </div>; })()}
             {openConv.refreshing&&<div className="vrm-chat-note vrm-chat-read" role="status" data-fil-actualisation style={{color:C.muted}}>Actualisation de la conversation…</div>}
             {openConv.refreshError&&<div className="vrm-chat-note vrm-chat-read" role="alert" data-fil-actualisation-erreur style={{color:C.text}}><span>{openConv.refreshError} <a href={`https://www.vinted.fr/inbox/${openConv.convId}`} target="_blank" rel="noreferrer">Ouvrir sur Vinted ↗</a></span></div>}
             {!openConv.loading&&!openConv.error&&(()=>{const suivi0=suiviNegociationVinted(openConv.conversation,openConv.acc?.vinted_user_id,etatOffreVinted);const suivi=suivi0&&suivi0.libelle==='Offre reçue'&&offrePartieDuFil(openConv)?{libelle:'Annonce plus en vente',detail:'Elle n’est plus dans ton dressing : cette offre ne peut plus être acceptée.'}:suivi0;return suivi?<div className="vrm-chat-negociation-etat" role="status" title={suivi.detail}><b>{suivi.libelle}</b>{suivi.libelle==='Prix accepté'&&<small>Paiement pas encore confirmé.</small>}</div>:null;})()}
@@ -54335,6 +54351,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '' };
             });
             const filtresA = [
+              ...filtreSiteTableau('achats', 'vinted'),
               ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreAchatsT.compte || 'tous', onChange: (v) => setFiltreAchatsT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
                 options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((x) => ({ cle: x, libelle: x }))] }] : []),
               { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreAchatsT.periode, onChange: (v) => setFiltreAchatsT((f) => ({ ...f, periode: v })),
@@ -55960,6 +55977,23 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
+        {/* (19 nov. soir, NATIF.md §2 bis) La barre d'outils des listes, à l'ordinateur : « Choisir une action ▾ » (les gestes d'hier du
+            « ⋯ » : filtres, mise à jour, réponses rapides) et le filtre Site (le même choix que le menu de plateforme). Au téléphone :
+            le « ⋯ » d'hier, la 1re conversation reste dans la moitié haute. */}
+        {designV2 && ordiCompta ? <div className="n-msg-outils" data-msg-outils-tableau="">
+          <select className="n-au-choix" aria-label={tr('tableau.choisirAction')} value="" data-msg-action="" onChange={(e)=>{ const v=e.target.value; e.target.value='';
+              if(v==='maj') loadConvs(true); else if(v==='rapides') setFeuilleQR(true); else if(v) { setMessageFilter(v); setConvMax(40); } }}>
+            <option value="">{tr('tableau.choisirAction')}</option>
+            <option value="unread">{tr('tableau.msg.nonLues')}</option>
+            <option value="repondre">{tr('tableau.msg.aRepondre')}</option>
+            <option value="offres">{tr('tableau.msg.offres')}</option>
+            <option value="all">{tr('tableau.msg.toutes')}</option>
+            <option value="maj">{tr('v2.msg.maj')}</option>
+            <option value="rapides">{tr('v2.msg.rapides')}</option>
+          </select>
+          {filtreSiteTableau('messages', 'vinted').map((f)=><select key={f.cle} className="n-au-choix" aria-label={f.libelle} value={f.valeur} data-msg-site="" onChange={(e)=>f.onChange(e.target.value)}>
+            {f.options.map((o)=><option key={o.cle} value={o.cle}>{o.libelle}</option>)}</select>)}
+        </div> : null}
         {designV2 ? <div className="v2m-outils" data-v2-msg-outils="">{/* (17 nov., nouveau design) la recherche + « ⋯ » (filtres, mise à jour, réponses rapides) : une ligne. */}
           <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label={tr('v2.msg.chercher')} placeholder={tr('v2.msg.chercherPh')} micro data-msg-recherche=""/>
           <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.msg.plus')} actif={messageFilter!=='all'} onClick={()=>setFeuilleMsgV2(true)} attrs={{'data-v2-msg-plus':''}}/>
@@ -64421,6 +64455,9 @@ function AppCoeur() {
   // (19 nov., « VRM natif ») Trois volets à l'ordinateur pour un écran natif (ECRANS_NATIFS) : la fente du détail, et ce
   // que la coque dit aux pages (`ContexteCoque`). Un écran d'avant : pas de détail, le contexte reste figé (aucun rendu de plus).
   const [fenteDetail, setFenteDetail] = React.useState(null);
+  // (19 nov. soir) La barre latérale réduite aux icônes : un confort de CET appareil (jamais synchronisé).
+  const [lateraleReduite, setLateraleReduite] = React.useState(() => { try { return localStorage.getItem('vrm_laterale_reduite') === '1'; } catch (_) { return false; } });
+  const poserLateraleReduite = (v) => { setLateraleReduite(!!v); try { localStorage.setItem('vrm_laterale_reduite', v ? '1' : '0'); } catch (_) {} };
   // Ventes · Terminées garde la liste d'avant (sa fiche s'ouvre ailleurs) : deux volets, pas de détail vide à droite.
   const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab) && !ECRANS_TABLEAU.has(tab) && !(tab === 'ventes' && ongletColis === 'toutes'));
   const contexteCoque = React.useMemo(() => (troisVolets ? { titreRendu: true, voletDetail: fenteDetail, ordinateur: true } : CONTEXTE_COQUE_NATIVE), [troisVolets, fenteDetail]);
@@ -64800,6 +64837,9 @@ function AppCoeur() {
     s.add('vestiaire');
     return s;
   },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
+  SITES_COQUE.v = sitesPresents ? [...sitesPresents] : ['vinted'];
+  React.useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.tache !== tab || !d.site) return; setPlatSub(d.site); retenirFiltre(d.tache, d.site, true); };
+    window.addEventListener('vrm:site-tache', f); return () => window.removeEventListener('vrm:site-tache', f); }, [tab]);
   // (11 nov., lot états vides) AUCUN COMPTE RELIÉ, PROUVÉ : la liste des comptes Vinted lue et vide, les
   // lignes Leboncoin/Vestiaire/eBay lues et absentes, aucun compte eBay au registre. Les cases de la carte
   // ne disent alors plus « lecture… » à l'infini (rien ne sera jamais lu) mais « aucun compte relié ».
@@ -67734,14 +67774,14 @@ function AppCoeur() {
     <SansCompteCarte.Provider value={sansAucunCompte}>
     {/* (19 nov., « VRM natif ») La racine est celle de la coque native. ⚠️ Plus AUCUN attribut qui dépend de l'onglet ici
         (`data-espace` reste sur <main>, dont le contenu change de toute façon) : changer d'onglet ne restyle plus la coque. */}
-    <Natif.CoqueRacine className="vrm-app-shell" defile="ecran" attrs={{ 'data-tablette': (ordi && tablette) || undefined, style: {...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'} }}
+    <Natif.CoqueRacine className="vrm-app-shell" defile="ecran" attrs={{ 'data-tablette': (ordi && tablette) || undefined, 'data-n-reduite': (ordi && lateraleReduite) ? '1' : undefined, style: {...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'} }}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
+      {ordi ? <LateraleNative reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
         outils={<>
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}

@@ -8,8 +8,8 @@
 //          le mode automatique s'allume là où VRM dit le risque (Messages → Favoris), l'arrêt passe par `auto_stop` ;
 //        - Offres reçues : `vinted_offres_auto` (allumé après `confirmerOffresAuto`, la MÊME question qu'Annonces),
 //          le refus `vinted_offre_refus_msg` + `vinted_offre_refus_variantes` (la garde `erreurMessageAuto`) ;
-//          la négociation par paliers : `vinted_offres_nego` (src/automatisations/negociation.js) — RANGÉE, pas exécutée
-//          (« bientôt » : le moteur ne fait pas encore de contre-offre ; rien n'est envoyé) ;
+//          la négociation par paliers : `vinted_offres_paliers` (src/negociationPaliers.js — la MÊME règle et la MÊME forme que le
+//          moteur de l'extension, `palierContreOffre`, 5.409 `contreoffres`) ; éteinte par défaut, l'allumer DEMANDE ;
 //        - Baisse par règle : `vinted_baisse_regle` (`avecRegle`, paliers 5/10/15 % · 7/14/30 j) ;
 //        - Vendue ailleurs ⇒ masquée : décision du 19 nov., toujours active (lecture seule) ;
 //        - Republication programmée : l'atelier Republier (lecture : programmations en attente).
@@ -18,13 +18,17 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import Automatisations, { SectionAuto, MessagesAuto, ReglageAuto, ChoixAuto, ChampNombre, PhraseAuto } from '../natif/ecrans/Automatisations.jsx';
+import { Interrupteur } from '../natif/Rangee.jsx';
 import { lireReglagesFavoris, sauverReglagesFavoris } from '../reglagesFavoris.js';
 import { resumeOffre } from '../favorisEcran.js';
 import { requeteJsonBornee } from '../requeteJsonBornee.js';
+import { nomCompteLie } from '../comptesLies.js';
 import { erreurMessageAuto } from '../messageSur.js';
 import { REGLE_CLE, MASQUER_CLE, PALIERS_PCT, PALIERS_JOURS, regleDuCompte, avecRegle } from '../reglesAuto.js';
-import { CLE_NEGO, ARRONDIS, negoLue, negoARanger, apercuNego } from './negociation.js';
-import { load, save, toast, AUTH, sbAuth, SUPABASE_URL, Icon, confirmerOffresAuto } from '../App.jsx';
+import { CLE_PALIERS, reglagesPaliers, plancherDe, apercuPaliers } from '../negociationPaliers.js';
+import { load, save, toast, AUTH, sbAuth, SUPABASE_URL, Icon, confirmerOffresAuto, askConfirm, EXT_CAPACITES, extSait, useComptesAutresSites } from '../App.jsx';
+// Ce que l'extension sait faire : une capacité absente de la table de CETTE app (le moteur pas encore livré) vaut « absente ».
+const capacite = (k) => (EXT_CAPACITES && EXT_CAPACITES[k] ? extSait(k) : 'absente');
 
 const allerA = (q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} };
 const variantesLues = (v) => (Array.isArray(v) ? v.map((t) => String(t || '')) : []);
@@ -52,7 +56,7 @@ export default function BranchementAutomatisations({ accounts = [] }) {
   const [uid, setUid] = React.useState(() => (comptes[0] ? comptes[0].uid : ''));
   React.useEffect(() => { if (!uid && comptes[0]) setUid(comptes[0].uid); }, [comptes.length]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [tic, setTic] = React.useState(0);
-  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if ([REGLE_CLE, 'vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', CLE_NEGO, MASQUER_CLE].includes(k)) setTic((t) => t + 1); };
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if ([REGLE_CLE, 'vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', CLE_PALIERS, MASQUER_CLE].includes(k)) setTic((t) => t + 1); };
     window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const choixCompte = comptes.length > 1 ? { valeur: uid, options: comptes.map((c) => ({ cle: c.uid, libelle: c.nom })), onChange: setUid } : null;
   const nomCompte = (comptes.find((c) => c.uid === uid) || {}).nom || '';
@@ -126,14 +130,18 @@ export default function BranchementAutomatisations({ accounts = [] }) {
   // ── 2. OFFRES REÇUES (Vinted) : acceptation, refus, négociation par paliers ──────────────────────────────────────────
   const offresActif = load('vinted_offres_auto', false) === true;
   const [brRefus, setBrRefus] = React.useState(null);
-  const [nego, setNego] = React.useState(() => negoLue(load(CLE_NEGO, null)));
+  // La négociation par paliers : le réglage TEL QUE le moteur le lit (`reglagesPaliers`), ses messages avec leur interrupteur.
+  const palLu = () => reglagesPaliers(load(CLE_PALIERS, null));
+  const versBrouillon = (r) => ({ actif: r.actif, remiseMax: r.remiseMax == null ? '' : String(r.remiseMax), paliers: [...r.paliers], messages: r.messages.map((t) => ({ texte: t, actif: true })), arrondi: r.arrondi });
+  const [nego, setNego] = React.useState(() => versBrouillon(palLu()));
   React.useEffect(() => {
     setBrRefus([String(load('vinted_offre_refus_msg', '') || ''), ...variantesLues(load('vinted_offre_refus_variantes', []))].filter((t) => t.trim()).map((t) => ({ texte: t, actif: true })));
-    setNego(negoLue(load(CLE_NEGO, null)));
-  }, [tic]);
+    setNego(versBrouillon(palLu()));
+  }, [tic]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const negoARanger = (n) => reglagesPaliers({ actif: n.actif, remiseMax: n.remiseMax === '' ? null : Number(n.remiseMax), paliers: n.paliers, messages: n.messages.filter((m) => m.actif).map((m) => m.texte), arrondi: n.arrondi });
   const refusLus = [String(load('vinted_offre_refus_msg', '') || ''), ...variantesLues(load('vinted_offre_refus_variantes', []))].filter((t) => t.trim());
   const modifieRefus = !!brRefus && JSON.stringify(brRefus.filter((m) => m.actif).map((m) => m.texte)) !== JSON.stringify(refusLus);
-  const modifieNego = JSON.stringify(negoARanger(nego)) !== JSON.stringify(negoARanger(negoLue(load(CLE_NEGO, null))));
+  const modifieNego = JSON.stringify(negoARanger(nego)) !== JSON.stringify(palLu());
   const [errRefus, setErrRefus] = React.useState('');
   const enregistrerOffres = () => {
     if (modifieRefus && brRefus) {
@@ -142,12 +150,22 @@ export default function BranchementAutomatisations({ accounts = [] }) {
       if (risque) { setErrRefus(String(risque)); return false; }
       save('vinted_offre_refus_msg', actifs[0] || ''); save('vinted_offre_refus_variantes', actifs.slice(1));
     }
-    if (modifieNego) save(CLE_NEGO, negoARanger(nego));
+    if (modifieNego) {
+      const risque = nego.messages.filter((m) => m.actif).map((m) => erreurMessageAuto(m.texte)).find(Boolean);
+      if (risque) { setErrRefus(String(risque)); return false; }
+      save(CLE_PALIERS, negoARanger(nego));
+    }
     setErrRefus(''); setTic((t) => t + 1); return true;
   };
-  const apercu = apercuNego(nego, 100);
-  // La contre-offre automatique n'existe pas encore dans le moteur (extension) : l'écran le dit, rien n'est envoyé.
-  const contreOffreSue = false;
+  // Allumer la négociation DEMANDE (une contre-offre part sans lui) ; l'éteindre, non.
+  const basculerNego = async (v) => {
+    if (v && !(await askConfirm({ title: tr('auto.nego.allumerTitre'), desc: tr('auto.nego.allumerDesc'), ok: tr('auto.nego.allumerOk'), cancel: tr('egalite.pauseLbc.annuler') }))) return;
+    setNego((n) => ({ ...n, actif: v }));
+  };
+  const negoR = negoARanger(nego);
+  const apercu = apercuPaliers(100, plancherDe(100, null, negoR.remiseMax == null ? 15 : negoR.remiseMax), negoR) || { chaine: [100], plancher: null };
+  // La contre-offre par paliers : le moteur de l'extension (`contreoffres`, 5.409). Absente de cette app ⇒ « bientôt », rien n'est envoyé.
+  const capContre = capacite('contreoffres');
   const itemOffres = {
     cle: 'offres', titre: tr('auto.offres.titre'), sous: tr('auto.offres.sous'), icone: 'chat', actif: offresActif, modifie: modifieRefus || modifieNego,
     onglets: [{ cle: 'config', libelle: tr('auto.onglet.config') }, { cle: 'nego', libelle: tr('auto.onglet.nego') }],
@@ -156,35 +174,29 @@ export default function BranchementAutomatisations({ accounts = [] }) {
       ? { libelle: modifieRefus || modifieNego ? tr('auto.enregistrer') : tr('auto.arreter'), onClick: () => { if (modifieRefus || modifieNego) { if (enregistrerOffres()) toast(tr('auto.enregistre')); return; } save('vinted_offres_auto', false); setTic((t) => t + 1); toast(tr('auto.arrete')); } }
       : { libelle: tr('auto.demarrer'), onClick: async () => { if ((modifieRefus || modifieNego) && !enregistrerOffres()) return; if (!(await confirmerOffresAuto())) return; save('vinted_offres_auto', true); setTic((t) => t + 1); toast(tr('auto.demarre')); } },
     detail: (onglet) => (onglet === 'nego' ? <>
-      <PhraseAuto ton={contreOffreSue ? 'neutre' : 'ambre'}>{contreOffreSue ? tr('auto.nego.pret') : tr('auto.nego.bientot')}</PhraseAuto>
+      <PhraseAuto ton={capContre === 'ok' ? 'neutre' : 'ambre'}>{capContre === 'ok' ? tr('auto.nego.pret') : capContre === 'absente' ? tr('auto.nego.bientot') : tr('auto.nego.ext', { v: (EXT_CAPACITES && EXT_CAPACITES.contreoffres) || '' })}</PhraseAuto>
       {sites(['vinted'], ['vestiaire'])}
       <SectionAuto titre={tr('auto.nego.prix')} attrs={{ 'data-au-section': 'nego' }}>
-        <ReglageAuto libelle={tr('auto.nego.marge')} phrase={tr('auto.nego.margePhrase')}><ChampNombre valeur={String(nego.marge)} libelle={tr('auto.nego.marge')} unite="%" min={1} max={90} onChange={(v) => setNego((n) => ({ ...n, marge: Number(v) || 1 }))} attrs={{ 'data-au-marge': '' }}/></ReglageAuto>
+        <ReglageAuto libelle={tr('auto.nego.actif')} phrase={tr('auto.nego.actifPhrase')}><Interrupteur actif={nego.actif} libelle={tr('auto.nego.actif')} onChange={basculerNego} attrs={{ 'data-au-nego-actif': nego.actif ? '1' : '0' }}/></ReglageAuto>
+        <ReglageAuto libelle={tr('auto.nego.marge')} phrase={tr('auto.nego.margePhrase')}><ChampNombre valeur={nego.remiseMax} libelle={tr('auto.nego.marge')} unite="%" min={0} max={89} onChange={(v) => setNego((n) => ({ ...n, remiseMax: v === '0' ? '' : v }))} attrs={{ 'data-au-marge': '' }}/></ReglageAuto>
+        <PhraseAuto>{tr('auto.nego.mini')}</PhraseAuto>
         <ReglageAuto libelle={tr('auto.nego.paliers')} phrase={tr('auto.nego.paliersPhrase')}/>
         <div className="n-au-paliers" data-au-paliers={String(nego.paliers.length)}>
           {nego.paliers.map((p, i) => <div key={i} className="n-au-palier" data-au-palier={i}>
-            <ChampNombre valeur={String(p.pct)} libelle={tr('auto.nego.palier', { n: i + 1 })} unite="%" min={1} max={100} onChange={(v) => setNego((n) => ({ ...n, paliers: n.paliers.map((q, j) => (j === i ? { ...q, pct: Number(v) || 1 } : q)) }))}/>
-            <input className="n-au-palier-message" value={p.message} placeholder={tr('auto.nego.message')} aria-label={tr('auto.nego.message')} onChange={(e) => setNego((n) => ({ ...n, paliers: n.paliers.map((q, j) => (j === i ? { ...q, message: e.target.value.slice(0, 300) } : q)) }))}/>
+            <ChampNombre valeur={String(p)} libelle={tr('auto.nego.palier', { n: i + 1 })} unite="%" min={1} max={100} onChange={(v) => setNego((n) => ({ ...n, paliers: n.paliers.map((q, j) => (j === i ? (Number(v) || 1) : q)) }))}/>
             <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.nego.retirer', { n: i + 1 })} onClick={() => setNego((n) => ({ ...n, paliers: n.paliers.filter((_, j) => j !== i) }))}>✕</button>
           </div>)}
-          {nego.paliers.length < 6 ? <span><button type="button" className="n-tt-bouton" data-au-ajouter-palier="" onClick={() => setNego((n) => ({ ...n, paliers: [...n.paliers, { pct: 100, message: '' }] }))}>＋ {tr('auto.nego.ajouterPalier')}</button></span> : null}
+          {nego.paliers.length < 6 ? <span><button type="button" className="n-tt-bouton" data-au-ajouter-palier="" onClick={() => setNego((n) => ({ ...n, paliers: [...n.paliers, 100] }))}>＋ {tr('auto.nego.ajouterPalier')}</button></span> : null}
         </div>
-        <p className="n-au-apercu" data-au-apercu={[apercu.prix, ...apercu.etapes].join('>') + '|' + apercu.plancher}>{tr('auto.nego.apercu', { suite: [apercu.prix, ...apercu.etapes].join(' → '), plancher: apercu.plancher })}</p>
-        <PhraseAuto>{tr('auto.nego.mini')}</PhraseAuto>
-        <ReglageAuto libelle={tr('auto.nego.tranches')} phrase={tr('auto.nego.tranchesPhrase')}/>
-        <div className="n-au-paliers">{nego.tranches.map((t, i) => <div key={i} className="n-au-palier">
-          <span className="n-au-reglage-phrase">{tr('auto.nego.jusqua')}</span><ChampNombre valeur={String(t.jusqua)} libelle={tr('auto.nego.jusqua')} unite="€" min={1} max={100000} onChange={(v) => setNego((n) => ({ ...n, tranches: n.tranches.map((q, j) => (j === i ? { ...q, jusqua: Number(v) || 1 } : q)) }))}/>
-          <ChampNombre valeur={String(t.marge)} libelle={tr('auto.nego.marge')} unite="%" min={1} max={90} onChange={(v) => setNego((n) => ({ ...n, tranches: n.tranches.map((q, j) => (j === i ? { ...q, marge: Number(v) || 1 } : q)) }))}/>
-          <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.nego.retirerTranche')} onClick={() => setNego((n) => ({ ...n, tranches: n.tranches.filter((_, j) => j !== i) }))}>✕</button></div>)}
-          {nego.tranches.length < 6 ? <span><button type="button" className="n-tt-bouton" onClick={() => setNego((n) => ({ ...n, tranches: [...n.tranches, { jusqua: 50, marge: n.marge }] }))}>＋ {tr('auto.nego.ajouterTranche')}</button></span> : null}</div>
-        <ReglageAuto libelle={tr('auto.nego.lot')} phrase={tr('auto.nego.lotPhrase')}/>
-        <div className="n-au-paliers">{nego.lots.map((l, i) => <div key={i} className="n-au-palier">
-          <ChampNombre valeur={String(l.articles)} libelle={tr('auto.nego.lotArticles')} unite={tr('auto.nego.articles')} min={2} max={20} onChange={(v) => setNego((n) => ({ ...n, lots: n.lots.map((q, j) => (j === i ? { ...q, articles: Number(v) || 2 } : q)) }))}/>
-          <ChampNombre valeur={String(l.plus)} libelle={tr('auto.nego.lotPlus')} unite="%" min={1} max={50} onChange={(v) => setNego((n) => ({ ...n, lots: n.lots.map((q, j) => (j === i ? { ...q, plus: Number(v) || 1 } : q)) }))}/>
-          <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.nego.retirerLot')} onClick={() => setNego((n) => ({ ...n, lots: n.lots.filter((_, j) => j !== i) }))}>✕</button></div>)}
-          {nego.lots.length < 4 ? <span><button type="button" className="n-tt-bouton" onClick={() => setNego((n) => ({ ...n, lots: [...n.lots, { articles: 2, plus: 5 }] }))}>＋ {tr('auto.nego.ajouterLot')}</button></span> : null}</div>
-        <ReglageAuto libelle={tr('auto.nego.arrondi')}><ChoixAuto libelle={tr('auto.nego.arrondi')} valeur={nego.arrondi} options={ARRONDIS.map((a) => ({ cle: a, libelle: tr('auto.nego.arrondi.' + a) }))} onChange={(v) => setNego((n) => ({ ...n, arrondi: v }))}/></ReglageAuto>
+        <p className="n-au-apercu" data-au-apercu={apercu.chaine.join('>') + '|' + (apercu.plancher == null ? '' : apercu.plancher)}>{apercu.plancher == null ? tr('auto.nego.sansPlancher') : tr('auto.nego.apercu', { suite: apercu.chaine.join(' → '), plancher: apercu.plancher })}</p>
+        <ReglageAuto libelle={tr('auto.nego.arrondi')}><ChoixAuto libelle={tr('auto.nego.arrondi')} valeur={nego.arrondi ? 'unite' : 'aucun'} options={['unite', 'aucun'].map((a) => ({ cle: a, libelle: tr('auto.nego.arrondi.' + a) }))} onChange={(v) => setNego((n) => ({ ...n, arrondi: v === 'unite' }))}/></ReglageAuto>
       </SectionAuto>
+      <SectionAuto titre={tr('auto.messages')} phrase={tr('auto.nego.messagesPhrase')} attrs={{ 'data-au-section': 'nego-messages' }}>
+        <MessagesAuto messages={nego.messages} etiquette={tr('auto.nego.contre')} erreur={errRefus}
+          onModifier={(i, t) => setNego((n) => ({ ...n, messages: n.messages.map((m, j) => (j === i ? { ...m, texte: t } : m)) }))} onSupprimer={(i) => setNego((n) => ({ ...n, messages: n.messages.filter((_, j) => j !== i) }))}
+          onBasculer={(i, v) => setNego((n) => ({ ...n, messages: n.messages.map((m, j) => (j === i ? { ...m, actif: v } : m)) }))} onAjouter={(t) => setNego((n) => ({ ...n, messages: [...n.messages, { texte: t, actif: true }] }))}/>
+      </SectionAuto>
+      <SectionAuto titre={tr('auto.nego.plus')}><PhraseAuto ton="ambre">{tr('auto.nego.tranchesBientot')}</PhraseAuto></SectionAuto>
     </> : <>
       {sites(['vinted'])}
       <SectionAuto titre={tr('auto.messages')} phrase={tr('auto.offres.messagesPhrase')} attrs={{ 'data-au-section': 'messages' }}>
@@ -203,19 +215,29 @@ export default function BranchementAutomatisations({ accounts = [] }) {
   };
 
   // ── 3. BAISSE PAR RÈGLE (Vinted, par compte) ─────────────────────────────────────────────────────────────────────────
-  const regle = uid ? regleDuCompte(load(REGLE_CLE, null), uid) : null;
+  // (19 nov. soir) La MÊME règle pour un compte Leboncoin (`comptes['lbc:{compte}']`, lue par l'extension 5.409 `baisselbc` :
+  // la baisse part par `baisserPrixLbc`, recette apprise, prix relu, sécurité). Vestiaire : pas de moteur ⇒ « bientôt ».
+  const [autres] = useComptesAutresSites(true);
+  const comptesLbc = Array.isArray(autres && autres.leboncoin) ? autres.leboncoin.map((c) => ({ uid: 'lbc:' + String(c.id), nom: tr('auto.site.leboncoin') + ' · ' + nomCompteLie(c) })) : [];
+  const capLbc = capacite('baisselbc');
+  const comptesBaisse = [...comptes, ...(capLbc === 'absente' ? [] : comptesLbc)];
+  const [uidB, setUidB] = React.useState('');
+  const uidBaisse = comptesBaisse.some((c) => c.uid === uidB) ? uidB : (comptesBaisse[0] ? comptesBaisse[0].uid : '');
+  const baisseLbc = uidBaisse.startsWith('lbc:');
+  const regle = uidBaisse ? regleDuCompte(load(REGLE_CLE, null), uidBaisse) : null;
   const [brRegle, setBrRegle] = React.useState(null);
-  React.useEffect(() => { setBrRegle(regle ? { pct: regle.pct, jours: regle.jours } : null); }, [uid, tic]);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { setBrRegle(regle ? { pct: regle.pct, jours: regle.jours } : null); }, [uidBaisse, tic]);   // eslint-disable-line react-hooks/exhaustive-deps
   const modifieRegle = !!(regle && brRegle && (brRegle.pct !== regle.pct || brRegle.jours !== regle.jours));
-  const poserRegle = (maj) => { save(REGLE_CLE, avecRegle(load(REGLE_CLE, null), uid, maj)); setTic((t) => t + 1); };
+  const poserRegle = (maj) => { save(REGLE_CLE, avecRegle(load(REGLE_CLE, null), uidBaisse, maj)); setTic((t) => t + 1); };
   const itemBaisse = {
-    cle: 'baisse', titre: tr('auto.baisse.titre'), sous: tr('auto.baisse.sous'), icone: 'tag', actif: uid ? regle.actif : null, compte: choixCompte, modifie: modifieRegle,
+    cle: 'baisse', titre: tr('auto.baisse.titre'), sous: tr('auto.baisse.sous'), icone: 'tag', actif: uidBaisse ? regle.actif : null, modifie: modifieRegle,
+    compte: comptesBaisse.length > 1 ? { valeur: uidBaisse, options: comptesBaisse.map((c) => ({ cle: c.uid, libelle: c.nom })), onChange: setUidB } : null,
     reinitialiser: () => setTic((t) => t + 1),
-    plein: uid && brRegle ? (regle.actif
+    plein: uidBaisse && brRegle ? (regle.actif
       ? { libelle: modifieRegle ? tr('auto.enregistrer') : tr('auto.arreter'), onClick: () => { if (modifieRegle) { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.enregistre')); } else { poserRegle({ actif: false }); toast(tr('auto.arrete')); } } }
-      : { libelle: tr('auto.demarrer'), onClick: () => { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.demarre')); } }) : null,
-    detail: () => (!uid || !brRegle ? <PhraseAuto ton="ambre">{tr('auto.sansCompte')}</PhraseAuto> : <>
-      {sites(['vinted'], ['leboncoin', 'vestiaire'])}
+      : { libelle: tr('auto.demarrer'), indisponible: baisseLbc && capLbc !== 'ok', raison: baisseLbc && capLbc !== 'ok' ? tr('auto.baisse.extLbc', { v: (EXT_CAPACITES && EXT_CAPACITES.baisselbc) || '' }) : '', onClick: () => { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.demarre')); } }) : null,
+    detail: () => (!uidBaisse || !brRegle ? <PhraseAuto ton="ambre">{tr('auto.sansCompte')}</PhraseAuto> : <>
+      {sites(capLbc === 'absente' ? ['vinted'] : ['vinted', 'leboncoin'], capLbc === 'absente' ? ['leboncoin', 'vestiaire'] : ['vestiaire'])}
       <SectionAuto titre={tr('auto.ciblage')} attrs={{ 'data-au-section': 'ciblage' }}>
         <ReglageAuto libelle={tr('auto.baisse.pct')} phrase={tr('auto.baisse.pctPhrase')}><ChoixAuto libelle={tr('auto.baisse.pct')} valeur={brRegle.pct} options={PALIERS_PCT.map((p) => ({ cle: p, libelle: '−' + p + ' %' }))} onChange={(v) => setBrRegle((b) => ({ ...b, pct: Number(v) }))} attrs={{ 'data-au-baisse-pct': '' }}/></ReglageAuto>
         <ReglageAuto libelle={tr('auto.baisse.plancher')} phrase={tr('auto.baisse.plancherPhrase')}/>
