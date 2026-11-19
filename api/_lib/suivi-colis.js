@@ -28,6 +28,7 @@
 import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais, colisPerdu } from './etat-colis-email.js';
 import { listeDeLigne, listesParAchat, lienContredit } from './suivis-multiples.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
+import { codeDeForme } from './forme-code-retrait.js';
 import { etatRetrait, lieuDepuisExtrait, lieuLisibleDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
 import { preuveDeLigne, preuveDeTransp, contredit, lectureEnRetard, etatProuve } from './etat-colis.js';
@@ -58,7 +59,7 @@ export { sensDeLigne, SUJET_SORTANT, SUJET_ENTRANT, SELECT_TRANSP_META, ligneTra
 //   · un retour ou un retrait écrits dans le SUJET ⇒ reparti, retiré ;
 //   · un sujet « disponible » avec son n° ⇒ à retirer (un ancien bug du parseur).
 // Pure. Accepte la ligne entière (`data`) ou ses scalaires (`ligneDeMeta`).
-const codeLu = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
+const codeLu = (v) => codeDeForme(v);   // (19 nov.) api/_lib/forme-code-retrait.js
 const aUnQr = (d) => !!(d && (d.qrB64 || d.qrUrl || d.qrType));
 export function relireLigneSuivi(d) {
   if (!d || typeof d !== 'object') return d;

@@ -125,6 +125,8 @@ import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 // ⟦→ ecrans/Reglages.jsx #3⟧
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import { sorteRetrait } from "./retraitSorte.js";   // (19 nov., retraits parfaits) consigne ou comptoir
+import { comparerRetraits, texteAnnonce, CLE_RETRAITS_VUS } from "./retraitsNouveaux.js";   // (19 nov.) « nouveau code de retrait » en direct
 import { preuvesTransporteur, fusionnerPreuves } from "./friseTransporteur.js";   // (17 nov.) la frise d'une vente : le transporteur tranche
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
 import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../api/_lib/suivi-commandes.js';
@@ -1661,7 +1663,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { publierfiche: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3274,7 +3276,6 @@ const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
   'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
-  'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
@@ -3329,6 +3330,7 @@ const SYNC_KEYS = [
   // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
   'vrm_partout_params',
   'vrm_correspondances',   // (15 nov.) SES réponses « quelle catégorie chez Leboncoin / Vestiaire / eBay ? », par catégorie Vinted
+  'vrm_agent_publier',     // (19 nov.) l'agent « Publier sur… » : SES réponses (par article, catégorie VRM, marque) et les envois à relire (src/publier/agent.js)
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -8909,7 +8911,10 @@ const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banni
 // récupérer » — une lettre puis cinq chiffres. On accepte donc au plus deux
 // lettres majuscules devant 3 à 10 chiffres ; « suivant » n'a aucun chiffre, il
 // reste écarté.
-const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
+// (19 nov., retraits parfaits) LA forme est api/_lib/forme-code-retrait.js (+ les codes alphanumériques mêlés « 6A4B2C ») ;
+// recopiée ici, en une ligne autonome (des audits extraient `codeRetrait` seul), et comparée à l'originale sur un corpus
+// par scripts/audit-retraits-parfaits.cjs (§11 : une copie vérifiée, jamais réécrite à la main sans lui).
+const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) || /^(?=(?:[A-HJ-NP-Z]*\d){2})(?=\d*[A-HJ-NP-Z])[A-HJ-NP-Z0-9]{5,10}$/.test(c) ? c : ''; };
 // L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
 // URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
 // ⚠️ LE VRAI PICKUP PASS EST SERVI PAR UN GÉNÉRATEUR (22 août).
@@ -37908,6 +37913,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes) || avantC.uid !== uidC) save('vrm_codes_hors_ligne', { at: Date.now(), vu: Date.now(), uid: uidC, codes });
         else if (!(Date.now() - (Number(avantC.vu) || 0) < 300000)) save('vrm_codes_hors_ligne', { ...avantC, vu: Date.now() });
       }
+      // (19 nov., retraits parfaits — Julien : « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été
+      // détecté ») CE QUI EST NOUVEAU dans la liste comptée, par identité (src/retraitsNouveaux.js) : un colis jamais vu
+      // sur cet appareil, un QR ou un code qui arrive sur un colis déjà là. La 1re fois, rien n'est annoncé. Toast une
+      // fois, la ligne marquée « nouveau » jusqu'à ce qu'il l'ouvre. Par appareil (une commodité, `localStorage`).
+      try {
+        const idsC = new Set(codes.map((c) => c.id));
+        const tous = codes.slice();
+        for (const t of pickupUnion.emailList) { const id = identRetraitEmail(t); if (!idsC.has(id)) tous.push({ id, code: '', qr: false, compte: true, lieu: (cleanLieu(t.lieu).nom || '').trim(), carrier: t.carrier || '' }); }
+        for (const o of pickupUnion.extra) { const id = identRetraitVinted(o); if (!idsC.has(id)) { const r = colisRelais[String((o && o.transaction_id) || '')] || null; tous.push({ id, code: '', qr: false, compte: true, lieu: nomPointRetrait(cleanLieu(r && r.lieu)) || '', carrier: (r && r.transporteur) || '' }); } }
+        let avantN = null; try { avantN = JSON.parse(localStorage.getItem(CLE_RETRAITS_VUS) || 'null'); } catch (_) { avantN = null; }
+        const { etat, annonces } = comparerRetraits(avantN, tous, Date.now());
+        try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(etat)); } catch (_) {}
+        if (annonces.length) {
+          const t = texteAnnonce(annonces, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
+          if (t) toast(t, 'info');
+          try { window.dispatchEvent(new CustomEvent('vrm:retraits-nouveaux', { detail: { cles: annonces.map((a) => a.cle) } })); } catch (_) {}
+        }
+      } catch (_) {}
     } catch (_) {}
   }, [pickupUnion, tracking, buys.items, colisRelaisLu, suivisVinted, suivisManuels, transpMap]);
 
@@ -42608,7 +42631,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
           continue;
         }
-        if (!['ventes', 'achats', 'annonces', 'suivi', 'transp'].includes(q.quoi)) continue;
+        // (19 nov., retraits parfaits) Un e-mail de colis rangé par le serveur (n'importe quelle boîte) : les suivis sont
+        // relus — seulement s'ils l'ont déjà été sur cet appareil (`_rowCache`) ; la liste « à retirer » se refait et le
+        // nouveau colis / code / QR est annoncé (toast, ligne « nouveau »). Une relecture par signal, au plus.
+        if (q.quoi === 'colis') { if (!deja.has('colis') && (_rowCache.has('email_track') || tracking != null)) { deja.add('colis'); lireSuivis({ force: true }); } continue; }
+        if (!['ventes', 'achats', 'annonces', 'suivi', 'transp', 'retrait'].includes(q.quoi)) continue;
         // Une relecture des ventes couvre tous les comptes touchés (leurs lignes viennent d'être oubliées).
         if ((q.quoi === 'ventes' || q.quoi === 'achats') && deja.has(q.quoi)) continue;
         deja.add(q.quoi);
@@ -47288,6 +47315,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     };
     const codeDesSources = (sc, repli) => (sc && sc.code ? (sc.code.desaccord ? '' : (codeRetrait(sc.code.code) || repli || '')) : (repli || ''));
     const champsSources = (sc) => (sc ? { sources: sc.marques, verifieMs: sc.verifieMs, verifiePar: sc.verifiePar || null, codeSur: !!(sc.code && sc.code.sur), codeSources: (sc.code && sc.code.sources) || [], codesDesaccord: (sc.code && sc.code.desaccord) || null, codeRemplace: (sc.code && sc.code.remplace) || null } : {});
+    // (19 nov., retraits parfaits) CONSIGNE OU COMPTOIR (src/retraitSorte.js) : le lieu de CE colis, le drapeau de SON
+    // e-mail, le libellé du transporteur de SON n° — jamais un autre colis. Le point s'en sert (deux endroits) et la ligne le dit.
+    const libelleTranspDe = (k) => { try { const tr = k && tpmC && typeof tpmC.get === 'function' ? tpmC.get(normaliserSuivi(k)) : null; return (tr && tr.libelle) || ''; } catch (_) { return ''; } };
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const scE = sourcesCarte({ t, o: a || (pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || null }); const code = codeDesSources(scE, scE && scE.code && scE.code.desaccord ? '' : codeDeLigne(t));
@@ -47297,7 +47327,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47317,7 +47347,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
+        ...lu, sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -47329,7 +47359,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
+        ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', sorte: sorteRetrait({ lieu: x.kind === 'email' ? (x.t && x.t.lieu) : (relaisDe(x.o) || {}).lieu, nom: lu.lieuNom, consigne: x.kind === 'email' ? (x.t && x.t.consigne) : (relaisDe(x.o) || {}).consigne, libelleTransp: libelleTranspDe(suX) }), transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
@@ -54530,7 +54560,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {/* (11 nov., décision C10 — Julien : « tranche ») L'ancien bloc « Annonces à compléter » est
                       FONDU dans la vue d'Annonces « À compléter » (un seul endroit, une seule règle :
                       src/annoncesACompleter.js) ; ici, une ligne qui y mène. */}
-                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
+                  {!noAcc && !designV2 && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
                   </div>
                   {[
                     /* ⚠️ (11 nov., lot DJ4 — Julien, mot pour mot : « L'inventaire physique n'est pas fiable.

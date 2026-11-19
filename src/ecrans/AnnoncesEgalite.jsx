@@ -36,8 +36,11 @@ const ACTIONS = [
   { cle: 'enLigne', libelle: 'egalite.action.enLigne', icone: 'play', etats: ['brouillon'], robot: true },
   { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'] },
   { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true },
+  // (19 nov., publier-agent) « Publier sur… » : l'agent sans IA remplit chaque site depuis la fiche article neutre (src/publier/).
+  { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
 const cleActionTr = { recreer: 'republier', main: 'main', versBrouillon: 'versBrouillon', enLigne: 'enLigne', baisser: 'baisser', partout: 'partout' };
+const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'));
 const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
@@ -109,6 +112,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
+  const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
@@ -148,7 +152,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     return { ok: true };
   };
   const actions = ACTIONS.map((A) => ({
-    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
+    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
     pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
@@ -157,6 +161,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     },
   }));
   const onAction = (k, choisis) => {
+    if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
     const sel = choisis.map(vintedDe).filter(Boolean).map((v) => ({ uid: v.compte, id: v.id }));
     if (!sel.length) { toast(tr('egalite.action.vintedSeul')); return; }
@@ -190,6 +195,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     ],
   };
   return (
+    <>
     <VueAnnonces travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
@@ -197,5 +203,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
       onEcranSite={onEcranSite} limites={limites} manque={manque}
       euros={(n) => fmt(n)} depuisTexte={(ms) => tr('egalite.jours', { n: Math.max(0, Math.floor((Date.now() - ms) / JOUR)) })} nomSite={nomSite} Icon={Icon}/>
+    {agent ? <React.Suspense fallback={null}><PublierAgent ouverte articles={agent} onRetour={() => setAgent(null)}/></React.Suspense> : null}
+    </>
   );
 }

@@ -54,6 +54,25 @@ Une fiche ou un atelier = une page poussée (retour ‹ en haut à gauche, balay
 texte `--n-accent`), liste 380–520, détail (la fiche) qui prend le reste, borné à 760. Sans sélection : état vide
 dessiné. UNE recherche, en tête de la liste. Clavier : ↑ ↓ Entrée Échap, ⌘K / « / » pour chercher.
 
+## 2 bis. Les listes « tableau de travail » (Julien, 19 nov. soir : « mêmes fonctionnalités, même rendu grosso modo, j'aime bien ce style, les options proposées »)
+
+Référence de STRUCTURE (pas de marque, pas de couleurs) : un outil de vendeur en tableaux clairs. Chaque écran de liste
+(Annonces, Ventes, Achats, Messages, Notifications, E-mails) a, de haut en bas :
+- **Barre de titre** : titre, pastille du compte (ou « Tous les comptes »), à droite « Mis à jour il y a 1 min » + ⟳.
+- **Barre d'outils** : « Choisir une action ▾ » (les gestes en série permis de l'écran ; rien de destructif en série),
+  recherche, **Statut ▾** (cases à cocher AVEC leur nombre : En vente 12, Brouillon 1, Masqué 1, Vendu 52…), filtres
+  propres à l'écran (site, compte, période « 7 jours »), à droite liste ⇄ grille et **Colonnes ▾** (cases, mémorisé).
+- **« N articles »** au-dessus du tableau.
+- **Tableau** (≥ 1024) : case | vignette 48 + titre (+ sous-titre d'état en gris) | colonnes chiffrées alignées à droite,
+  triables (↑↓ dans l'en-tête) | Statut en étiquette douce | ⋯. Rangée 64–72, filets fins, fond blanc, pas d'ombre.
+  Au téléphone : la même liste en rangées 72 (§4), barre d'outils réduite (action ▾, loupe, filtre).
+- **Messages** : deux volets (liste avec avatar, pseudo, « il y a 10 min », vignette de l'article ; filtre « Non lus · N »),
+  volet vide dessiné « Choisis une conversation ».
+- **Automatisations** (Paramètres → Automatisations, et dans l'extension) : liste des automatismes avec état
+  « Activé / Désactivé » ; détail en sections MESSAGES (plusieurs messages, un au hasard ; ✎ 🗑 interrupteur ; « + Ajouter »),
+  CIBLAGE, DÉLAIS ; en bas « Réinitialiser » (texte) et un plein « Démarrer ».
+- États en étiquettes douces neutres ; ambre = à faire ; jamais de rouge ni de vert vif (rouge = doublon de N° seul).
+
 ## 3. Composants (`src/natif/`, un fichier par composant, classes `n-*`)
 
 `Page` (titre, actions, recherche, plein collé) · `Groupe` (en-tête, pied) + `Rangee` (vignette | icône, titre 1–2
