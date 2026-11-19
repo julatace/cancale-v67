@@ -143,7 +143,12 @@ site** (`vrmBadgePos[vinted|leboncoin|vestiaire|ebay]`, chrome.storage.local), e
   variables, fonctions-api, quoi-de-neuf, violet, rouge-doublon, extension-feuille, carte-listes, popup-capte,
   carte-extension, extension-ui, garde-fous-capture, discretion, securite-comptes, et les 12 audits favoris.
 - Build : vert.
-- Banc `scripts/bancs/grand-panneau.cjs` (vrai vrm-badge.js + vrm-ui.js, 390 tactile et 1512, clair et sombre).
+- `scripts/audit-arrivee-capte.cjs` (vrai background.js + règles de l'app) : 14/14 ; rouge sur l'arbre d'avant (3) ;
+  `--prouve` 4/4 (journal coupé, doublon, marqueur ignoré, lien sans identité).
+- Banc `scripts/bancs/grand-panneau.cjs` (vrai vrm-badge.js + vrm-ui.js, 390 tactile et 1512, clair et sombre) :
+  **76/76**, captures regardées (Messages deux volets, fiche dépliée au téléphone, Favoris étape 1 et étape 4 avec le
+  rythme, Paramètres). Corrigé après lecture des captures : onglets coupés à 390 (« Mess… »), engrenage sans nom dans
+  la barre latérale, lien « Messages › » de la petite carte redit sous le panneau, « N° N° 121 », étapes sur 3 lignes.
 
 ## Ce qui reste (honnête)
 - Pages **Notifications** (tableau filtrable) et **Automatisations** (messages multiples, ciblage, délais, offres
@@ -152,6 +157,7 @@ site** (`vrmBadgePos[vinted|leboncoin|vestiaire|ebay]`, chrome.storage.local), e
   ligne dans Annonces : pas faits.
 - Répondre DANS le panneau (il faut le fil complet et la file d'envoi) ; transporteur dans Ventes.
 - Langue de l'extension réglable (elle suit la langue du navigateur) : lien vers VRM seulement.
-- Banc de rendu de la feuille d'arrivée (app) : règles couvertes par l'audit pur ? — non : seulement exécutée à la
-  main ; un banc dédié reste à écrire.
+- Banc de RENDU de la feuille d'arrivée dans l'app (390/1512, clair/sombre) : pas écrit — ses règles et le journal
+  sont exécutés par `audit-arrivee-capte`, le rendu ne l'est pas encore.
+- Banc Orion iPhone du panneau : pas joué (le banc tactile 390 l'approche).
 - Régénérer les zips 5.409 à l'intégration.
