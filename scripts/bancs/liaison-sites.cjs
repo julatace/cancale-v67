@@ -324,11 +324,18 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           // Deux « sûres » : l'annonce eBay 2001 mesurée aussi.
           sc.LIGNES.find((r) => r.id === 'photo_meme_verif').data.payload.couples[`ebay|2001|${cleDe(uE('P2vig'))}#111|9002|${cleDe(uV('P2'))}`] = { ...fineP1, v: 1, at: iso(1) };
           const { ctx, pg, errs } = await ouvrir(b, vp, sc, { sombre, tab: 'leboncoin', images: F });
-          const e = await pg.evaluate(() => { const x = document.querySelector('[data-liaison-entree="Leboncoin"]'); const o = x && x.querySelector('[data-liaison-ouvrir]'); return x ? { n: x.getAttribute('data-n'), h: o ? Math.round(o.getBoundingClientRect().height) : 0, ancien: !!document.querySelector('.vrm-lbc-choix') } : null; });
-          dit(e && e.n === '3' && e.h >= 44, `${T} L1 Annonces → Leboncoin : UNE ligne « 3 annonces à relier » (≥ 44 px)`, JSON.stringify(e));
-          const bouton = await pg.locator('[data-lbc-relier-vinted="5002"]').count();
-          if (bouton) { await toucher(pg, tel, '[data-lbc-relier-vinted="5002"]'); const ok = await attendreAnnonce(pg, 'Leboncoin:5002'); const anc = await pg.locator('.vrm-lbc-choix').count();
-            dit(ok && anc === 0, `${T} L1 « Relier » d’une rangée Leboncoin ouvre LE parcours sur cette annonce — l’ancienne feuille « Relier à Vinted » n’existe plus`, JSON.stringify({ ok, anc }));
+          // (19 nov., intégration) Les rangées d'annonces appartiennent à l'écran « Annonces à égalité » : il ouvre le parcours par
+          // `ouvrirLiaison({ site, id })` — rejoué ici tel quel. Le parcours s'ouvre sur CETTE annonce ; l'ancienne feuille n'existe plus.
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: 'Leboncoin', id: '5002' } })));
+          { const ok = await attendreAnnonce(pg, 'Leboncoin:5002'); const anc = await pg.locator('.vrm-lbc-choix').count();
+            dit(ok && anc === 0, `${T} L1 ouvrirLiaison({ site, id }) ouvre LE parcours sur cette annonce — l’ancienne feuille « Relier à Vinted » n’existe plus`, JSON.stringify({ ok, anc }));
+            await toucher(pg, tel, '[data-liaison] .n-barre-retour'); await pg.waitForTimeout(600); }
+          // Le sens inverse : « Relier à Vestiaire » depuis la fiche Vinted de la N°301 (`vrm:lien-vc`, sens 'vinted') ⇒ LE parcours,
+          // sur Vestiaire, la N°301 EN TÊTE (son N° tapé) — rien n'est relié sans son toucher, l'ancienne feuille ne s'ouvre pas.
+          await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:lien-vc', { detail: { sens: 'vinted', id: '9004', num: '301', titre: 'x' } })));
+          { const ok = await attendreAnnonce(pg, 'Vestiaire:vc-9'); await pg.waitForTimeout(500); const m4 = await lire(pg);
+            const ancVc = await pg.locator('.vrm-lvc-feuille, [data-lien-vc-feuille]').count();
+            dit(ok && m4.cartes[0] && m4.cartes[0].numero === '301' && ancVc === 0 && !((await stock(pg, 'vrm_vc_liens')) || {})['vc-9'], `${T} L4 « Relier à Vestiaire » depuis la fiche Vinted ⇒ le parcours, la N°301 en tête, rien relié`, JSON.stringify({ ok, c: m4.cartes.slice(0, 2).map((c) => c.numero), ancVc }));
             await toucher(pg, tel, '[data-liaison] .n-barre-retour'); await pg.waitForTimeout(600); }
           await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: {} })));
           await attendreAnnonce(pg, 'Leboncoin:5001'); await pg.waitForTimeout(500);

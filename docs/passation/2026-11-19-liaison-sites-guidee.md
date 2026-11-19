@@ -192,6 +192,14 @@ de l'annonce.
 
 ## 8. Ce qui reste
 
+- **Après la fusion de `claude/integration-19nov`** (19 nov. au soir) : banc `liaison-sites` **244 verts** (L1 rejoue
+  `ouvrirLiaison({ site, id })`, que l'écran « Annonces à égalité » appelle — les rangées sont à lui ; L4 : le sens inverse) ;
+  audits liaison-sites (103), liaison-numero (13), publiees-sites (19), ebay-lien-publication (8) et la batterie habituelle verts.
+  Rouges qui ne viennent pas de ce chantier : budget du démarrage **2 009 Ko pour 1 970** (le budget a été abaissé sur la
+  branche d'intégration) ; `a-retirer-ailleurs` T0 (« Ouvrir Vestiaire ↗ » repeint en blanc par une règle d'avant,
+  `.vrm-fu-carte :is(a, button…)`) ; `garde-ecrans` (la navigation que le banc cherche est remplacée par la coque native).
+- Le build a besoin de `NODE_OPTIONS=--max-old-space-size=6144` sur cette machine (sinon « heap out of memory »).
+
 - **Budget du démarrage** : 1 981 Ko (≤ 1 982) avant d'amener `main` le 19 nov. au soir ; **1 985 Ko** après (37 commits de
   `main` + la fondation native, pas encore sur `main`). Les lectures du parcours (`pairesVintedLiaison`, `pistesLiaison`) sont
   sorties d'App.jsx vers `src/liaisonDonnees.js` (chargé avec le parcours) ; ce qui reste au démarrage est l'hôte
