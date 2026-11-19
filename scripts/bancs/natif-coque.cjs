@@ -40,6 +40,8 @@ let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 500) : '')); } return c; };
 const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(2600); };
 const ONGLETS = ['journee', 'annonces', 'ventes', 'achats', 'compta'];
+// La clé d'un onglet de la barre (data-n-onglet) : « Annonces » est l'entrée « paires » de l'app (ID_PAIRES), qui ouvre l'écran annonces.
+const CLE_BARRE = (id) => (id === 'annonces' ? 'paires' : id);
 const PLUS = ['garage', 'messages', 'emails', 'sante', 'notifications', 'settings', 'communaute', 'profil', 'montants'];
 const LATERALE = [...ONGLETS, 'garage', 'messages', 'emails', 'sante', 'notifications', 'settings', 'communaute'];
 
@@ -81,7 +83,7 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     return { ordre: tabs.map((x) => x.getAttribute('data-nav-entree')), larg: tabs.map((x) => Math.round(x.getBoundingClientRect().width * 10) / 10), haut: tabs.map((x) => Math.round(x.getBoundingClientRect().height)),
       libelles: tabs.map((x) => { const l = x.querySelector('.n-onglet-libelle'); if (!l) return null; const r = document.createRange(); r.selectNodeContents(l); const tw = r.getBoundingClientRect().width, lw = l.getBoundingClientRect().width; return { t: l.textContent, entier: tw <= lw + 1 && lw > 4 && getComputedStyle(l).visibility !== 'hidden' }; }) };
   });
-  dit(k1 && k1.ordre.join(',') === ONGLETS.join(','), `K1 ${t} : les 5 onglets dans l’ordre`, k1 && k1.ordre);
+  dit(k1 && k1.ordre.join(',') === ONGLETS.map(CLE_BARRE).join(','), `K1 ${t} : les 5 onglets dans l’ordre`, k1 && k1.ordre);
   dit(k1 && Math.max(...k1.larg) - Math.min(...k1.larg) <= 1 && Math.min(...k1.larg) >= 44 && Math.min(...k1.haut) >= 44, `K1 ${t} : même largeur, cibles ≥ 44 (${k1 && k1.larg.join('/')} × ${k1 && Math.min(...k1.haut)})`, k1);
   dit(k1 && k1.libelles.every((l) => l && l.entier), `K1 ${t} : chaque libellé visible et entier`, k1 && k1.libelles);
   // K2
@@ -136,11 +138,11 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   // K5 + K6 (onglets)
   for (const id of ONGLETS) {
     const n0 = erreurs.length;
-    await pg.locator(`[data-n-onglet="${id}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
     await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
     await pg.waitForTimeout(900);
     const r = await pg.evaluate(() => { const a = document.querySelector('[data-n-onglets] .n-onglet[aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a && a.getAttribute('data-n-onglet'), c: a ? window.__contraste(a.querySelector('.n-onglet-libelle')) : 0 }; });
-    dit(r.ecran === id && r.actif === id && r.c >= 4.5 && erreurs.length === n0, `K5/K6 ${t} : ${id} s’ouvre, son onglet s’allume (contraste ${r.c})`, { ...r, erreurs: erreurs.slice(n0) });
+    dit(r.ecran === id && r.actif === CLE_BARRE(id) && r.c >= 4.5 && erreurs.length === n0, `K5/K6 ${t} : ${id} s’ouvre, son onglet s’allume (contraste ${r.c})`, { ...r, erreurs: erreurs.slice(n0) });
     if (id === 'ventes' && !sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-ventes.png') });
   }
   erreursTout.push(...erreurs);
@@ -200,7 +202,12 @@ async function k8(pg, t, modele, tactile) {
   const pire = tdur.length ? Math.max(...tdur) : 0;
   const elements = style.map((e) => (e.args && e.args.elementCount) || (e.args && e.args.data && e.args.data.elementCount) || 0);
   const maxEl = elements.length ? Math.max(...elements) : 0;
-  dit(style.length > 0 && pire <= 50 && maxEl <= 3000, `K8 ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus (${style.length} tâches)`, { pire, maxEl, n: style.length });
+  // Ce que pèse l'écran montré (un écran gardé qui revient se recalcule lui-même : c'est le moteur des écrans gardés) et le document.
+  const tailles = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length > 0; const m = document.querySelector('.vrm-main');
+    return { document: document.getElementsByTagName('*').length, ecran: m ? [...m.getElementsByTagName('*')].filter(vis).length : 0 }; });
+  const top = style.map((e, i) => [Math.round(tdur[i] * 10) / 10, elements[i]]).sort((a, b) => b[0] - a[0]).slice(0, 4);
+  dit(style.length > 0 && pire <= 50 && maxEl <= Math.min(3000, tailles.ecran + 600) && maxEl < tailles.document * 0.6,
+    `K8 ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus (écran montré ${tailles.ecran}, document ${tailles.document})`, { pire, maxEl, n: style.length, top, ...tailles });
 }
 
 (async () => {
