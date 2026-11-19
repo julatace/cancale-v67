@@ -165,9 +165,7 @@ html[data-design="v2"] .vrm-boite .v2e-quarantaine-phrase { color: var(--v2-muet
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); scroll-padding-inline: 0 32px; }
   html[data-design="v2"] body .vrm-boite button.v2-seg-btn { border-radius: 999px !important; background: var(--v2-socle) !important; padding: 0 16px !important; }
   html[data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on { background: var(--sv-encre, #0C1D30) !important; color: #FFFFFF !important; box-shadow: none !important; }
-  html[data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on .v2-seg-n { color: rgb(255 255 255 / .82) !important; }
   :root[data-theme="dark"][data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on { background: #EAF2FB !important; color: #06111F !important; }
-  :root[data-theme="dark"][data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on .v2-seg-n { color: #24364C !important; }
   /* 5. La tête du fil : le titre de la paire et le compte sur deux lignes au besoin (plus « Nike Samba O… »). */
   html[data-design="v2"] body .vrm-chat-head-s { white-space: normal !important; overflow: hidden !important; text-overflow: clip !important; display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-height: 1.3 !important; }
   html[data-design="v2"] body .vrm-chat-head-s > * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; display: inline !important; }

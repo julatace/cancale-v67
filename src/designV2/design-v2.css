@@ -16,10 +16,11 @@
   --v2-plein-fond: #FFFFFF;
   --v2-plein-fond-appui: #DCE6F1;
   --v2-plein-texte: #0C1D30;
-  /* Le texte posé SUR LA COQUE (le bleu du verre, src/design/studio-verre.css) : blanc ; dans une carte : l'encre. */
-  --v2-page-texte: var(--sv-clair, #FFFFFF);
-  --v2-page-muet: rgb(255 255 255 / .88);
-  --v2-page-ambre: var(--sv-clair-ambre, #FFF1C0);
+  /* Le texte posé SUR LA PAGE suit le fond de la page (19 nov., « VRM natif » : il était BLANC, pour le bleu du verre —
+     blanc sur clair dès que le fond a changé). L'encre du natif, jour et nuit. */
+  --v2-page-texte: var(--n-encre, #111114);
+  --v2-page-muet: var(--n-encre-2, #6C6C70);
+  --v2-page-ambre: var(--n-ambre, #8A4B00);
   --v2-teinte-fond: rgb(0 96 204 / .10);
   --v2-teinte-fond-appui: rgb(0 96 204 / .18);
   --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
@@ -39,9 +40,9 @@
   --v2-e-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);   /* un ressort court, à peine (aucun rebond visible) */
 }
 :root[data-theme="dark"] {
-  --v2-page-texte: #F2F7FD;
-  --v2-page-muet: #B9C8D8;
-  --v2-page-ambre: #F2B65E;
+  --v2-page-texte: var(--n-encre, #FFFFFF);
+  --v2-page-muet: var(--n-encre-2, #98989F);
+  --v2-page-ambre: var(--n-ambre, #FFB340);
   --v2-plein-fond: #EAF2FB;
   --v2-plein-fond-appui: #C9D9EA;
   --v2-plein-texte: #06111F;
@@ -420,7 +421,7 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 :root[data-theme="dark"] .v2-plaque { background: #22385A; color: #EAF2FB; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22); }
 :root[data-theme="dark"] .v2-plaque small { color: #B9C8D8; }
 /* Le « ? » sur la coque bleue, le jour : blanc (la règle d'hier le peignait gris foncé ; sa feuille est un portail, hors du filtre). */
-:root:not([data-theme="dark"]) .v2-aide { filter: brightness(0) invert(1); }
+/* (19 nov., « VRM natif ») Le « ? » était forcé en BLANC le jour par un filtre (pour le fond bleu du verre) : sur le fond clair il prend l'encre seconde, comme partout. */
 .v2-aide { display: inline-flex; align-items: center; }
 /* Annonces au téléphone : la cloche posée sur la ligne du titre ⇒ la place à droite de « Publier ». */
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 52px; } }
