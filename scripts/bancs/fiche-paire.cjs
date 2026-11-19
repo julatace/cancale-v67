@@ -113,13 +113,18 @@ async function fiche(pg, n) {
   await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), n);
   await pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 });
   for (let i = 0; i < 60; i++) { const l = await pg.evaluate(() => (document.querySelector('[data-fiche-paire]') || { getAttribute: () => '1' }).getAttribute('data-fiche-lecture-en-cours')); if (l === '0') break; await pg.waitForTimeout(250); }
+  // (19 nov., fiche directe — Julien : « je dois cliquer sur la paire puis cliquer sur les points pour avoir des
+  // informations ») L'histoire complète (le parcours étape par étape) vit sous l'histoire repliée de la fiche : « Tout
+  // voir » la déplie, sur la fiche même. Le banc l'ouvre comme lui, puis lit les mêmes `data-fiche-etape`.
+  await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fd-tout-voir][aria-expanded="false"]'); if (b) (b.querySelector('button') || b).click(); });
+  await pg.waitForTimeout(400);
   return lire(pg);
 }
 const lire = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-fiche-paire]'); if (!el) return null;
   const at = (s, a) => { const x = el.querySelector(s); return x ? x.getAttribute(a) : null; };
   return {
-    num: el.getAttribute('data-fiche-paire'), grand: (el.querySelector('[data-fiche-grand-num]') || {}).textContent || '',
+    num: el.getAttribute('data-fiche-paire'), grand: ((el.querySelector('[data-fiche-grand-num]') || {}).textContent || '').replace(/^\s*N°\s*/, ''),   // (19 nov.) la plaque native écrit « N° 117 »
     achat: at('[data-fiche-resume-achat]', 'data-fiche-resume-achat'), vente: at('[data-fiche-resume-vente]', 'data-fiche-resume-vente'),
     benef: at('[data-fiche-resume-benefice]', 'data-fiche-resume-benefice'), partiel: at('[data-fiche-resume-benefice]', 'data-fiche-benefice-partiel'),
     benefTxt: (el.querySelector('[data-fiche-resume-benefice]') || {}).innerText || '',
