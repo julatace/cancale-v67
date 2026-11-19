@@ -53,3 +53,22 @@ Une seule version pour tout le train (capacités `prixattente` `baisseregle` `ma
 `etatici` `captejournal` `publierfiche` `listesvinted` `lbcformulaire` `vcrelu`). Zips NON commités ; à régénérer à la mise
 en ligne : `node scripts/zip-extension.cjs` (⇒ `public/VRM-extension.zip` en un dossier, `VRM-Orion.xpi`, `VRM-Orion.zip`,
 `VRM-Orion-dossier.zip`, notice Orion). `audit-coherence`, `audit-extension-zip` verts avec les zips régénérés.
+
+## 5. Après la première version de ce récit (fusions du soir)
+
+`extension-utile` (17/n, paliers `vinted_offres_paliers` lus des deux côtés, `audit-negociation-paliers` vert), `app-tableaux`
+(ede325ab6, `vinted_offres_nego` disparu), `liaison-sites-guidee` (91b688325), `emails-mail` (82d45cf9c), `stock-etiquetage`
+(d9675c0b9), `aujourdhui-propre` (603e7da68), `fiche-directe` (916befb81, la fiche refaite). Tables de capacités : union.
+
+Corrigé dans le train ce soir : la recherche s'ouvre aussi sur les écrans à trois volets à l'ordinateur (Ventes, Annonces :
+pas de barre du haut, son panneau gardé posé au-dessus — garde-ecrans P5) ; Annonces natif sort les annonces d'un compte
+bloqué EN PAUSE (compte-bloque D) ; tout écran d'avant prend toute la largeur à l'ordinateur (pas seulement le Stock), les
+trois volets gardent la leur ; « Ouvrir Vestiaire ↗ » à l'encre du lien ; Messages en très grand texte : break-word ;
+bancs remis à l'écran d'aujourd'hui : colis-achat-auto (l'échafaudage `vrm_banc_dom_ancien` le mettait sur l'ancien
+écran ; + toucher la ligne ⇒ le code en grand), design-v2-messages (actions de la coque au-dessus du titre, accent natif),
+natif-coque K3 (sans objet quand l'écran tient sans défiler).
+
+Restent (dits, pas cachés) : natif-coque K8b (tâche de style 75–90 ms au retour sur un écran gardé ; mesuré aussi sur main,
+chantier vite-et-sans-bug) ; design-v2-messages à 375 très grand texte (la colonne du nom se resserre : pseudos et
+extraits coupés en milieu de mot) et « éteint » sans référence (l'ancien design n'existe plus) ; E-mails 1512 CLS 0,019
+(le segmenté reçoit ses nombres après le premier rendu) — vus sur la passe précédente du banc.
