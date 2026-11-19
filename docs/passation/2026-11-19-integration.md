@@ -45,7 +45,7 @@ Déjà là : branche de session (codes de retrait en liste, colis sans « Relier
 Mesuré (`audit-poids-demarrage`) : **2 008 Ko** après toutes les fusions. Chargés à la demande : la feuille « Depuis ta
 dernière visite », les tableaux Ventes/Achats, Ventes natif, l'accueil des nouveaux ⇒ **1 994 Ko**. Les lots du jour
 ajoutent ~24 Ko répartis dans App.jsx (aucun écran hors des 5 onglets ne les porte seul) : budget relevé de 1 970 à
-**2 000 Ko** (`scripts/budget-vitesse.json`). Après aujourdhui-propre (3e passe) : **1 997 Ko**.
+**2 000 Ko** (`scripts/budget-vitesse.json`). Après aujourdhui-propre (3e passe) : **1 997 Ko** ; après extension-utile (17/n), liaison guidée (91b688325) et stock-etiquetage : **2 002 Ko** — rien d'autre ne se charge à la demande sans le sortir d'un module partagé (MemePhoto essayé : 0 Ko gagné) ⇒ budget **2 005 Ko**.
 
 ## 4. Extension 5.409.0
 
