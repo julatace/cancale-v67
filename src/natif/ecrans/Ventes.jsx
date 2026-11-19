@@ -190,13 +190,11 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
         {ouverte ? <DetailVente r={ouverte} g={g} Icon={Icon} Generer={Generer}/> : <Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>}
       </PagePoussee>
       <Feuille ouverte={feuilleGestes} onFermer={() => setFeuilleGestes(false)} titre={tr('v2v.outils.titre')} detente="moitie" detentes={['moitie', 'pleine']}>
+        {/* (19 nov., décision de Julien « 4 oui ») « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont RETIRÉS :
+            le dépôt est constaté par le suivi du transporteur (aExpedier, statut lu). Restent le format, le choix du lot, le scanner. */}
         <Groupe attrs={{ 'data-vn-outils': '' }}>
             <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vv.format')} valeur={tr('impr.format.' + E.format)} fin="chevron" onClick={fg(g.format)} attrs={{ 'data-impr-format': E.format }}/>
             <Rangee icone={<Icon name="check" size={22}/>} titre={E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1' }}/>
-            {E.aPreparer ? <Rangee icone={<Icon name="box" size={22}/>} titre={tr('v2v.outils.preparer')} fin="chevron" onClick={fg(g.preparer)} attrs={{ 'data-vn-outil': 'preparer' }}/> : null}
-            {E.aPreparer ? <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('v2v.outils.deposer')} fin="chevron" onClick={fg(g.deposer)} attrs={{ 'data-vn-outil': 'deposer' }}/> : null}
-            {E.aPreparer ? <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2v.outils.tournee')} fin="chevron" onClick={fg(g.tournee)} attrs={{ 'data-vn-outil': 'tournee' }}/> : null}
-            {E.aEmballer ? <Rangee icone={<Icon name="box" size={22}/>} titre={tr('v2v.outils.emballer')} fin="chevron" onClick={fg(g.emballer)} attrs={{ 'data-vn-outil': 'emballer' }}/> : null}
             <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('sv.scanner.envoi')} fin="chevron" onClick={fg(g.scanner)} attrs={{ 'data-vn-outil': 'scanner' }}/>
         </Groupe>
       </Feuille>
