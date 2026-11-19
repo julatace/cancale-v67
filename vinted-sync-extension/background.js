@@ -5634,6 +5634,8 @@ function infosDuCompte(d, uid, ids) {
     if (num) o.numero = num;
     else if (d.ecrit && it && it.numEcrit && it.numEcrit.etat === 'lu' && it.numEcrit.cle) { o.numero = String(it.numEcrit.cle); o.ecrit = true; }
     if (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') o.buyPrice = String(f.buyPrice);
+    // 5.409 (le grand panneau) : le prix mini d'acceptation posé à côté du N° (`vinted_annonce_numeros[id].min`) ; pas posé ⇒ rien.
+    if (f && Number(f.min) > 0 && Number(f.min) < 1e6) o.mini = Math.round(Number(f.min) * 100) / 100;
     if (num && d.buyByNum[num] != null && String(d.buyByNum[num]).trim() !== '') o.buyNum = String(d.buyByNum[num]);
     // La date de mise en ligne, dans l'ordre de l'écran Annonces (`listedAgeDays`) :
     // « Ajouté il y a… » lu sur la page, puis la date Vinted du dressing.
@@ -20612,7 +20614,15 @@ async function carteListes(msg, sender) {
     const liste = (aConfirmer ? r.aConfirmer : r.enLigne).slice();
     const infos = infosDuCompte(d, u, liste.map((it) => String(it.id)));
     const ligne = (it) => { const inf = infos[String(it.id)] || {}; const dep = Number(inf.depuis) || null;
-      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep }; };
+      // 5.409 (le grand panneau, « dès qu'on clique sur un élément, le grand déroulé ») : ce que le dressing RANGÉ
+      // porte déjà — taille, marque, état, vues, photos (vinted.net seulement), prix mini et achat posés par lui.
+      // Rien n'est lu pour ça ; un champ absent n'est pas envoyé (« pas su » ⇒ la fiche n'écrit rien).
+      const txt = (v, n) => (v == null ? '' : String(typeof v === 'object' ? (v.title || v.name || '') : v).slice(0, n));
+      const photos = (Array.isArray(it.photos) ? it.photos : []).map((p) => String((p && (p.url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url))) || '')).filter((u) => /^https:\/\/[\w.-]*vinted\.net\//.test(u)).slice(0, 8);
+      const achat = Number(String(inf.buyPrice != null ? inf.buyPrice : inf.buyNum != null ? inf.buyNum : '').replace(',', '.'));
+      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep,
+        taille: txt(it.size_title || it.size, 30), marque: txt(it.brand_title || it.brand, 40), etat: txt(it.status, 40), vues: Number.isFinite(Number(it.view_count)) ? Number(it.view_count) : null,
+        description: txt(it.description, 600), photos, mini: Number(inf.mini) > 0 ? Number(inf.mini) : null, achat: achat > 0 && achat < 1e6 ? achat : null }; };
     const lignes = liste.map(ligne).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
     annonces = { lu: isFinite(capL) ? capL : null, aConfirmer, total: lignes.length, liste: lignes.slice(0, CARTE_LISTE_MAX) };
     // Lue il y a plus d'une heure ⇒ relue, dans le budget de LECTURE, depuis l'onglet.
@@ -20635,6 +20645,16 @@ async function carteListes(msg, sender) {
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
   }
+  // ── 5.409 : les messages du compte de l'onglet (la boîte RANGÉE `harvest_{uid}_inbox`, ses 40 plus récentes
+  //    conversations ; jamais un autre compte). Pas su ⇒ `null` (« — », dit) ; aucune requête Vinted pour ça.
+  let messages = null;
+  const lm = await sbGet(`app_data?id=eq.harvest_${u}_inbox&select=cap:data->>capturedAt,${idxCarte('c', 'data->payload->conversations', CARTE_LISTE_MAX)}`);
+  if (lm !== null) {
+    const r0 = (lm && lm[0]) || null;
+    const cs = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['c' + i]).filter((x) => x && typeof x === 'object' && /^[1-9]\d{0,19}$/.test(String(x.id == null ? '' : x.id))) : [];
+    const ph = (x) => { const v = String((x && Array.isArray(x.item_photos) && x.item_photos[0] && x.item_photos[0].url) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(v) ? v : ''; };
+    messages = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, liste: cs.map((x) => ({ conv: String(x.id), qui: String((x.opposite_user && x.opposite_user.login) || '').slice(0, 40), texte: String(x.description || '').slice(0, 160), at: Date.parse(x.updated_at || '') || null, nonlu: x.unread === true, photo: ph(x) })).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)) };
+  }
   // ── les autres comptes (lecture seule)
   let autres = null;
   if (msg && msg.tous === true) {
@@ -20651,7 +20671,7 @@ async function carteListes(msg, sender) {
       }
     }
   }
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, autres, fenetre: o.fenetre };
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
