@@ -334,6 +334,26 @@ const shot = async (pg, nom) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
         dit(errs.length === 0, `${T} E aucune erreur de page`, errs.slice(0, 2));
         await ctx.close();
       });
+      // ── F. (19 nov., décision 1) La baisse par règle : éteinte par défaut, un toucher l'allume, ses deux choix apparaissent ──
+      await essaie(T + ' F', async () => {
+        const { ctx, pg, errs } = await rendre(b, vp, { sombre, pont: { version: VERSION, reponse: 'fait', delai: 300 } });
+        await ouvrir(pg, '134');
+        const avant = await pg.evaluate(() => { const g = document.querySelector('[data-prix-regle="111"]'); return g ? g.getAttribute('data-prix-regle-actif') : null; });
+        dit(avant === '0', `${T} F la baisse automatique du compte est là, ÉTEINTE par défaut`, avant);
+        await pg.evaluate(() => { const g = document.querySelector('[data-prix-regle="111"]'); if (g) g.scrollIntoView({ block: 'center' }); });
+        await pg.click('[data-prix-regle="111"] .n-rangee-corps');
+        await pg.waitForFunction(() => { const g = document.querySelector('[data-prix-regle="111"]'); return g && g.getAttribute('data-prix-regle-actif') === '1'; }, null, { timeout: 5000 }).catch(() => {});
+        const m = await mesurer(pg);
+        await pg.evaluate(() => { const g = document.querySelector('[data-prix-regle="111"]'); if (g) g.scrollIntoView({ block: 'center' }); });
+        await shot(pg, `F-${N}-regle`);
+        const apres = await pg.evaluate(() => { const g = document.querySelector('[data-prix-regle="111"]'); return g ? { actif: g.getAttribute('data-prix-regle-actif'), segments: g.querySelectorAll('.n-segmente').length } : null; });
+        dit(apres && apres.actif === '1' && apres.segments === 2, `${T} F un toucher l’allume ; « −5 / −10 / −15 % » et « 7 / 14 / 30 j » apparaissent`, apres);
+        if (m) { dit(m.chevauchements.length === 0 && m.coupes.length === 0, `${T} F rien ne se chevauche ni n’est coupé`, m.chevauchements.concat(m.coupes).slice(0, 3)); dit(m.pleins === 1, `${T} F toujours UN seul plein`); }
+        const cmds = await pg.evaluate(() => (window.__cmds || []).filter((c) => /Prix|prix/.test(c.cmd)).length);
+        dit(cmds === 0 && pg.ecrits.posts.length === 0, `${T} F allumer la règle n’envoie aucune baisse depuis l’app (c’est l’extension qui l’applique)`);
+        dit(errs.length === 0, `${T} F aucune erreur de page`, errs.slice(0, 2));
+        await ctx.close();
+      });
       // ── D. Quatre sites, prix longs : rien ne se chevauche ──
       await essaie(T + ' D', async () => {
         const { ctx, pg, errs } = await rendre(b, vp, { sombre, pont: { version: VERSION, reponse: 'fait', delai: 300 } });
