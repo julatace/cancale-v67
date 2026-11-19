@@ -269,7 +269,10 @@ export async function routeFavoris(req,res){
           }
         }
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
-        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
+        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre,
+          // (19 nov., 5.409) Le rythme : celui choisi pour CET envoi (étape « Rythme » de la carte), sinon ses réglages ;
+          // absent (réglages d'avant) ⇒ « normal » (40–90 s au hasard, sa décision) ; `perso` ⇒ ses minutes.
+          rythme:['normal','prudent'].includes(c.rythme)?c.rythme:p.rythme==='perso'?null:p.rythme==='prudent'?'prudent':'normal'});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
