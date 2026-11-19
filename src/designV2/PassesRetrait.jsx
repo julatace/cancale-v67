@@ -17,7 +17,7 @@ import './retraits-liste.css';
 
 // 19 nov. (Julien : « il y a 4 colis, j'ai un seul code ») : plus de carrousel « 1 sur 4 » qui cachait 3 codes sur 4.
 // Une passe = un point ; DEDANS, une ligne par colis avec SON code en grand, tous visibles d'un coup.
-// Toucher la ligne ⇒ le code (et le QR s'il existe) en plein écran pour le comptoir. Pas de « Relier » ici :
+// (Un <div role="button"> : les anciennes couches peignent tout <button> d'un fond clair.) Toucher la ligne ⇒ le code (et le QR s'il existe) en plein écran pour le comptoir. Pas de « Relier » ici :
 // un colis se relie seul à son achat (n° de suivi, code), jamais par un bouton.
 function LigneRetrait({ x, Icon, Photo, aides }) {
   const [fait, setFait] = React.useState(false);
@@ -50,7 +50,7 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
   return (
     <RangeeFaite fait={fait} onFin={fin} className="v2r-ligne" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '', 'data-v2-code-etat': rg.codeEtat, 'data-v2-qr-dispo': rg.qr ? '1' : '0', 'data-v2-limite-jour': rg.limite.jour || '', 'data-v2-limite-source': rg.limite.source, 'data-v2-titre-de': rg.titreDe || '', 'data-v2-transporteur': rg.transporteur.cle || '' }}>
       {ouvrir && (!codesEnConflit || qr)
-        ? <button type="button" className="v2r-haut" onClick={ouvrir} data-v2-en-grand="" data-v2-rangee="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</button>
+        ? <div role="button" tabIndex={0} className="v2r-haut" onClick={ouvrir} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrir(); } }} data-v2-en-grand="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</div>
         : <div className="v2r-haut">{corps}</div>}
       <div className="v2r-gestes">
         <button type="button" className="v2r-retire" onClick={() => setFait(true)} data-v2-retire="" data-v2b="texte">{tr('v2.passe.retire')}</button>
