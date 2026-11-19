@@ -40,6 +40,7 @@ html[data-theme-style="apple"]:root:root:root:root:root:root:root:root body .vrm
   font-family: var(--fd-police) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd::before { content: none !important; display: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd:focus { outline: none !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-cadre { position: relative; min-height: 100%; box-sizing: border-box; background: var(--fd-fond); display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root:root body .fd-fond { display: none; }
 
@@ -171,7 +172,7 @@ html[data-theme-style="apple"]:root:root:root:root:root:root:root:root body .vrm
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile[aria-pressed="true"] { border-color: var(--fd-encre) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-ic { display: grid; place-items: center; color: var(--fd-encre) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-ic svg { color: currentColor !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-l { max-width: 100%; overflow-wrap: anywhere; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-l { max-width: 100%; overflow-wrap: break-word; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-vue { padding: 12px 16px; }
 
 /* ══ 8. L'HISTOIRE : repliée à ses trois dernières étapes, puis « Tout voir » ══ */
@@ -245,7 +246,7 @@ html[data-theme-style="apple"]:root:root:root:root:root:root:root:root body .vrm
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-corps { padding: 4px 20px 24px; }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-faits { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-fait.is-large { grid-column: span 2; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-tuiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-tuiles { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 @media (hover: hover) and (pointer: fine) {
   :root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-tuile, .fd-rond):hover { border-color: var(--fd-encre-2) !important; }

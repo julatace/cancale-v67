@@ -144,7 +144,7 @@ function mesurerFiche() {
     texte: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
     pleins: pleins.map((b) => ({ txt: b.innerText.trim(), vu: dansEcran(b), ...R(b) })),
     action: (f.querySelector('[data-fd-action]') || { getAttribute: () => '' }).getAttribute('data-fd-action'),
-    tuiles: [...f.querySelectorAll('[data-fd-tuile]')].filter(vis).map((t) => ({ k: t.getAttribute('data-fd-tuile'), page: horsPlus(t), h: Math.round(t.getBoundingClientRect().height) })),
+    tuiles: [...f.querySelectorAll('[data-fd-tuile]')].map((t) => ({ k: t.getAttribute('data-fd-tuile'), page: horsPlus(t) && vis(t), h: Math.round(t.getBoundingClientRect().height) })),
     histoire: (() => { const e = f.querySelector('[data-fd-histoire]'); return e ? { etat: e.getAttribute('data-fd-histoire'), vues: [...e.querySelectorAll('[data-fiche-hist-etape]')].filter(vis).map((x) => x.getAttribute('data-fiche-hist-etape')), total: Number((e.querySelector('[data-fiche-hist]') || { getAttribute: () => 0 }).getAttribute('data-fiche-hist')), toutVoir: !!e.querySelector('[data-fd-tout-voir]') } : null; })(),
     plusOuvrir: [...f.querySelectorAll('[data-fd-plus-ouvrir]')].filter(vis).length,
     plusSeul: plus ? montants(texte(plus)).filter((x) => !tPage.replace(/\s+/g, ' ').includes(x)) : [],
@@ -172,7 +172,7 @@ function jugerFiche(m, n, suf, tel) {
   if (m.action) dit(m.pleins.length === 1 && m.pleins[0].vu, `F5 ${suf} : le bouton principal (« ${m.pleins[0] && m.pleins[0].txt} ») est au premier écran`, m.pleins);
   dit(m.pleins.length <= 1, `Q1 ${suf} : un seul plein`, m.pleins.map((x) => x.txt).join(' | '));
   dit(m.faits.filter((x) => !x.su).every((x) => /—/.test(x.txt) && x.txt.replace(/—/g, '').trim().split(' ').length >= 2) && !m.zeros.length, `F6 ${suf} : un fait pas su s'écrit « — » avec sa raison, jamais 0`, m.faits.filter((x) => !x.su).map((x) => x.txt).join(' | '));
-  dit(m.tuiles.length === 0 || m.tuiles.every((t) => t.page), `P2 ${suf} : les gestes (${m.tuiles.map((t) => t.k).join(', ')}) sont SUR la fiche, pas derrière « ⋯ »`, m.tuiles.filter((t) => !t.page).map((t) => t.k).join(','));
+  dit(m.tuiles.length > 0 && m.tuiles.every((t) => t.page), `P2 ${suf} : les gestes (${m.tuiles.map((t) => t.k).join(', ')}) sont SUR la fiche, pas derrière « ⋯ »`, m.tuiles.filter((t) => !t.page).map((t) => t.k).join(','));
   dit(!m.plusSeul.length, `P3 ${suf} : aucun montant ni date seulement derrière « ⋯ »`, m.plusSeul.join(' | '));
   if (!tel) dit(m.plusOuvrir === 0, `P4 ${suf} : à l'ordinateur, aucun menu « ⋯ »`, String(m.plusOuvrir));
   dit(!!m.histoire && m.histoire.vues.length <= 3 && m.histoire.toutVoir && (m.histoire.total <= 3 || m.histoire.vues.length === 3), `F7 ${suf} : l'histoire repliée à ses 3 dernières étapes (${m.histoire && m.histoire.vues.join(' → ')}) et « Tout voir »`, m.histoire);
@@ -214,6 +214,7 @@ async function unToucher(nav, chemin, W, sombre) {
     await pg.waitForTimeout(2200); await fermerToasts(pg);
     if (chemin === 'recherche') { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '3102' }))); await pg.waitForSelector('[data-tout-annonce]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600); }
     const sel = chemin === 'recherche' ? '[data-tout-annonce]' : '[data-fiche-ligne]';
+    await pg.waitForSelector(sel + (chemin === 'recherche' ? '' : '[data-fl-num]'), { timeout: 20000, state: 'attached' }).catch(() => {}); await pg.waitForTimeout(600);
     // La rangée VISIBLE (celle qu'un doigt atteint) et le N° qu'elle porte, par identité.
     const chercher = ([sel, rech]) => { for (const e of document.querySelectorAll(sel)) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
       const x = Math.min(innerWidth - 8, r.left + Math.min(r.width * 0.5, 190)), y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); if (!t || !e.contains(t)) continue;
