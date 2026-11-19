@@ -288,11 +288,12 @@ export function construireLiaison({ autres = null, paires = null, memePhoto = nu
     if (!a || a.id == null || !SITES_LIAISON.includes(a.plateforme)) continue;
     const k = cleAnnonce(a);
     const lien = objet(J[cleJournal('lien', k)]);
-    const relie = !!(a.relie || cle(a.numero || ''));
+    // « Reliée » = elle désigne un N°. Une annonce dite « pas d'article à relier » par l'ancien écran Leboncoin (reliée, sans N°) : « que sur ce site ».
+    const relie = !!cle(a.numero || ''), sansArticle = !!a.relie && !relie;
     // Deux articles réunis sous le N° de CETTE annonce : elle garde son N° (rien ne change sur son site), le journal le dit.
     const reunie = !relie && !!lien && !!cle(a.numeroSite || '') && cle(lien.numero || '') === cle(a.numeroSite || '');
     const pr = objet(J[cleJournal('propre', k)]);
-    const propre = !relie && !reunie && !!pr && pr.actif !== false;
+    const propre = !relie && !reunie && (sansArticle || (!!pr && pr.actif !== false));
     const libre = !relie && !reunie && !propre;
     const ph = libre ? photo.get(k) : null;
     // Chaque candidate porte SON jugement (la carte montre une taille différente en ambre, sans phrase).
