@@ -95,13 +95,14 @@ const ECRANS = [
   { id: 'journee-semaine', groupe: 'Aujourd’hui', etapes: [{ aller: '?tab=semaine' }], preuve: '.vrm-main' },
   { id: 'journee-a-trancher', groupe: 'Aujourd’hui', etapes: [{ aller: '?tab=trancher' }], preuve: '.vrm-main' },
   // ── Annonces ──
-  { id: 'annonces', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }], preuve: '[data-v2l], .vrm-fiche-photo, [data-fiche-photo]' },
-  { id: 'annonces-detaille', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ ls: ['vrm_annonces_affichage', '"C"'] }, { aller: '?tab=journee' }, { aller: '?tab=annonces&site=vinted' }], preuve: '[data-v2l]', apres: [{ ls: ['vrm_annonces_affichage', '"A"'] }] },
-  { id: 'annonces-dorment', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="sleeping"]' }], preuve: '[data-v2-seg="sleeping"][aria-selected="true"]' },
-  { id: 'annonces-a-publier', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="brouillons"]' }], preuve: '[data-v2-seg="brouillons"][aria-selected="true"]' },
-  { id: 'annonces-menu', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '.vrm-annbar-bouton[aria-expanded]' }], preuve: '.vrm-annbar-bouton[aria-expanded="true"], [role="dialog"], .vrm-fs' },
-  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-vue-selection]', ou: [{ clic: '.vrm-annbar-bouton[aria-expanded]' }, { clic: '[role="dialog"] button:has-text("Sélectionner"), .v2-feuille button:has-text("Sélectionner")' }] }], preuve: '.vrm-sel, [data-sel-consigne], [data-vue-selection][aria-pressed="true"]' },
-  { id: 'annonces-plateformes', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-menu="annonces"]' }], preuve: '[data-v2-menu="annonces"][aria-expanded="true"], [role="dialog"]' },
+  // (19 nov., intégration) Annonces est l'écran natif « à égalité » (src/natif/ecrans/Annonces.jsx, `data-eg-*`) ; l'ancien reste en repli.
+  { id: 'annonces', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }], preuve: '[data-eg-liste], [data-eg-tableau], [data-v2l], .vrm-fiche-photo, [data-fiche-photo]' },
+  { id: 'annonces-detaille', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ ls: ['vrm_annonces_affichage', '"C"'] }, { aller: '?tab=journee' }, { aller: '?tab=annonces&site=vinted' }], preuve: '[data-eg-liste], [data-eg-tableau], [data-v2l], .vrm-fiche-photo, [data-fiche-photo]', apres: [{ ls: ['vrm_annonces_affichage', '"A"'] }] },
+  { id: 'annonces-dorment', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-tete] .n-segmente-choix:nth-of-type(3), [data-v2-seg="sleeping"]' }], preuve: '[data-eg-etat="dorment"], [data-v2-seg="sleeping"][aria-selected="true"]' },
+  { id: 'annonces-a-publier', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-tete] .n-segmente-choix:nth-of-type(2), [data-v2-seg="brouillons"]' }], preuve: '[data-eg-etat="apublier"], [data-v2-seg="brouillons"][aria-selected="true"]' },
+  { id: 'annonces-menu', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-actions], .vrm-annbar-bouton[aria-expanded]' }], preuve: '[data-eg-menu-actions], .vrm-annbar-bouton[aria-expanded="true"], [role="dialog"], .vrm-fs' },
+  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-actions], [data-vue-selection]' }, { clic: '[data-eg-action]', facultatif: true }], preuve: '[data-eg-selection], .vrm-sel, [data-sel-consigne], [data-vue-selection][aria-pressed="true"]' },
+  { id: 'annonces-plateformes', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-filtre], [data-v2-menu="annonces"]' }], preuve: '[data-eg-menu-sites], [data-v2-menu="annonces"][aria-expanded="true"], [role="dialog"]' },
   { id: 'annonces-republier', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&vue=republier' }], preuve: '.vrm-main' },
   { id: 'annonces-leboncoin', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=leboncoin' }], preuve: '.vrm-main' },
   { id: 'annonces-ebay', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=ebay' }], preuve: '.vrm-main' },
@@ -215,7 +216,7 @@ function collecter(o) {
   const texteVu = (b) => { const tw = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); while (tw.nextNode()) { const n = tw.currentNode; if (!/\S/.test(n.nodeValue)) continue; const p = n.parentElement; if (!p || p.closest('svg')) continue; const r = p.getBoundingClientRect(); const c = cs(p); if (r.width > 2 && r.height > 2 && c.visibility !== 'hidden' && c.clip !== 'rect(0px, 0px, 0px, 0px)' && c.clipPath !== 'inset(50%)' && (parse(c.webkitTextFillColor || c.color) || [0, 0, 0, 1])[3] > 0.05) return true; } return false; };
 
   const out = { textes: [], icones: [], geo: [], n: { textes: 0, inter: 0 }, haut: document.documentElement.scrollHeight };
-  const barre = o.tel ? [...document.querySelectorAll('.vrm-tabbar, [data-v2-barre], nav.v2-barre')].find((b) => b.getClientRects().length && cs(b).visibility !== 'hidden') : null;
+  const barre = o.tel ? [...document.querySelectorAll('[data-n-onglets], .vrm-tabbar, [data-v2-barre], nav.v2-barre')].find((b) => b.getClientRects().length && cs(b).visibility !== 'hidden') : null;
   const rb = barre ? barre.getBoundingClientRect() : null;
 
   // ── Les textes ──

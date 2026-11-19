@@ -542,7 +542,9 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   /* La barre du bas : verre dépoli, à 12 des bords, posée sur la page (le contenu passe dessous). */
   /* Le fondu du bord bas (132 px) sous la barre : la liste s'efface au lieu de buter. */
   /* La page garde la place de la barre (elle défile dessous, la dernière ligne reste atteignable). */
-  :root:root:root body .vrm-app-shell > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
+  /* (19 nov., intégration) Pas dans la coque native : son écran défile AU-DESSUS de la barre d'onglets, ces 120 px y retenaient
+     le plein collant de Ventes au milieu de la liste. */
+  :root:root:root body .vrm-app-shell:not(.n-coque) > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
   /* Les onglets : icône 21, libellé 10,5/600 ; l'actif à l'encre. */
   /* La pastille ENFONCÉE de l'espace actif (46 × 30) et sa diode : elle glisse d'un onglet à l'autre. */
   /* L'éventail ouvert : la barre (et son disque devenu « × ») reste AU-DESSUS du voile. */

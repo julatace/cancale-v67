@@ -80,6 +80,12 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   const t = `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`;
   // K8_SEUL=1 : la seule mesure du changement d'onglet (pour la comparer à un build d'AVANT, qui n'a pas la coque native).
   if (process.env.K8_SEUL) { await k8(pg, t, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true); await ctx.close(); return; }
+  // K2_SEUL=1 : seulement « rien sous la barre », écran par écran, première visite puis écran gardé (vite, pour un correctif).
+  if (process.env.K2_SEUL) { for (const tour of ['1re visite', 'écran gardé']) for (const id of ONGLETS) {
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(900); await k2bas(pg, `${t} · ${id} (${tour})`, tour === '1re visite' ? `bas-390-${id}${sombre ? '-sombre' : ''}.png` : ''); }
+    await ctx.close(); return; }
   // K1
   const k1 = await pg.evaluate(() => {
     const bar = document.querySelector('[data-n-onglets]'); if (!bar) return null;
@@ -148,6 +154,14 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     const r = await pg.evaluate(() => { const a = document.querySelector('[data-n-onglets] .n-onglet[aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a && a.getAttribute('data-n-onglet'), c: a ? window.__contraste(a.querySelector('.n-onglet-libelle')) : 0 }; });
     dit(r.ecran === id && r.actif === CLE_BARRE(id) && r.c >= 4.5 && erreurs.length === n0, `K5/K6 ${t} : ${id} s’ouvre, son onglet s’allume (contraste ${r.c})`, { ...r, erreurs: erreurs.slice(n0) });
     if (id === 'ventes' && !sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-ventes.png') });
+    await k2bas(pg, `${t} · ${id} (1re visite)`, nomBase === 'volume' && !sombre ? `bas-390-${id}.png` : '');
+  }
+  // K2 bis — les écrans GARDÉS (revenus tels quels) : la même mesure au retour, défilés jusqu'en bas.
+  for (const id of ONGLETS) {
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(700);
+    await k2bas(pg, `${t} · ${id} (écran gardé)`, '');
   }
   erreursTout.push(...erreurs);
   await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);
@@ -188,6 +202,51 @@ async function ordinateur(nav, b, W, sombre, nomBase, erreursTout) {
   erreursTout.push(...erreurs);
   if (W === 1512) await k8(pg, t, ':is([data-n-laterale], .vrm-sidebar) [data-nav-entree="%s"]', false);
   await ctx.close();
+}
+
+// K2 (chaque écran) : l'écran montré, défilé jusqu'EN BAS (jusqu'à ce que sa hauteur ne bouge plus) : aucun texte, aucun
+// contrôle de l'écran — même `position: fixed` / `sticky` — ne recouvre la barre d'onglets ; sa dernière rangée finit
+// au-dessus d'elle. (Capture de Julien du 19 nov. : « le flou du bas mange la dernière rangée ».)
+async function k2bas(pg, t, capture) {
+  const r = await pg.evaluate(async () => {
+    const bar = document.querySelector('[data-n-onglets]'), main = document.querySelector('.vrm-main'); if (!bar || !main) return null;
+    let h = -1; for (let i = 0; i < 6 && main.scrollHeight !== h; i++) { h = main.scrollHeight; main.scrollTop = main.scrollHeight; await new Promise((ok) => setTimeout(ok, 350)); }
+    const rb = bar.getBoundingClientRect();
+    // Montré : rendu, sa PROPRE visibilité (un enfant peut redevenir visible sous un parent caché), aucune opacité nulle au-dessus.
+    const raisons = {}; let vus = 0;
+    const montre = (e) => { if (!e.getClientRects().length) return false; if (getComputedStyle(e).visibility === 'hidden') { raisons.vis = (raisons.vis || 0) + 1; return false; } for (let x = e; x && x !== main; x = x.parentElement) { const s = getComputedStyle(x); if (s.display === 'none' || +s.opacity === 0 || x.hidden || x.hasAttribute('data-ecran-cache')) { const k = s.display === 'none' ? 'none' : +s.opacity === 0 ? 'opacite:' + (x.className && typeof x.className === 'string' ? x.className.split(' ')[0] : x.tagName) : 'cache'; raisons[k] = (raisons[k] || 0) + 1; return false; } } return true; };
+    const sous = [];
+    let dernier = 0;
+    for (const e of main.querySelectorAll('*')) {
+      if (e.closest('svg') && e.tagName.toLowerCase() !== 'svg') continue;
+      const controle = e.matches('button, a[href], input, select, textarea, [role="button"]');
+      const texte = [...e.childNodes].some((n) => n.nodeType === 3 && /\S/.test(n.nodeValue));
+      if (!controle && !texte && !e.matches('img, svg')) continue;
+      // Le rectangle VISIBLE : coupé par chaque ancêtre qui rogne (overflow ≠ visible), <main> compris — sauf un élément fixe,
+      // que rien ne rogne. Un élément rogné par <main> sous son bord n'est pas peint : il n'est pas « sous la barre ».
+      const q = (() => { const b = e.getBoundingClientRect(); let t = b.top, bo = b.bottom, l = b.left, ri = b.right, par = '';
+        if (getComputedStyle(e).position !== 'fixed') for (let x = e.parentElement; x; x = x.parentElement) { const s = getComputedStyle(x);
+          if (s.position === 'fixed') break;
+          // Chaque axe pour lui-même : `overflow-x: clip` ne rogne pas en hauteur.
+          // `display: contents` (les hôtes des écrans gardés) n'a pas de boîte : il ne rogne rien.
+          const c = s.display !== 'contents' && (s.overflowX !== 'visible' || s.overflowY !== 'visible') ? x.getBoundingClientRect() : null;
+          if (c && s.overflowY !== 'visible') { if (c.top > t || c.bottom < bo) par = (typeof x.className === 'string' && x.className.split(' ')[0]) || x.tagName; t = Math.max(t, c.top); bo = Math.min(bo, c.bottom); }
+          if (c && s.overflowX !== 'visible') { l = Math.max(l, c.left); ri = Math.min(ri, c.right); }
+          if (x === main) break; }
+        return { top: t, bottom: bo, left: l, right: ri, width: ri - l, height: bo - t, par, brut: b.height }; })();
+      if (q.width < 3 || q.height < 3) { if (q.par && q.brut >= 3) raisons['rogne:' + q.par] = (raisons['rogne:' + q.par] || 0) + 1; continue; }
+      if (q.bottom <= q.top || q.right <= 0 || q.left >= innerWidth) continue;
+      if (!montre(e)) continue;
+      vus++;
+      if (q.bottom > dernier && q.top < innerHeight) dernier = q.bottom;
+      if (q.bottom > rb.top + 1 && q.top < rb.bottom) sous.push(`${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.split(/\s+/)[0] : ''} « ${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 30)} » ${Math.round(q.top)}→${Math.round(q.bottom)} (${getComputedStyle(e).position})`);
+    }
+    const out = { barre: Math.round(rb.top), dernier: Math.round(dernier), sous: sous.slice(0, 5), n: sous.length, hauteur: main.scrollHeight, vus, raisons };
+    return out;
+  });
+  if (capture) await pg.screenshot({ path: path.join(SHOTS, capture) });
+  await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
+  dit(r && r.vus > 0 && r.n === 0 && r.dernier <= r.barre + 0.5, `K2 ${t} : défilé jusqu’en bas, la dernière rangée finit à ${r && r.dernier} ≤ barre ${r && r.barre}, rien dessous (${r && r.vus} éléments vus ; écartés ${JSON.stringify(r && r.raisons)})`, r);
 }
 
 // K8 : le retour sur un écran DÉJÀ visité, sous trace Chrome. Temps de THREAD des tâches de style, éléments restylés.
@@ -245,7 +304,7 @@ async function k8(pg, t, modele, tactile) {
   try {
     const casTel = MUT ? [[false, 'volume']] : [[false, 'volume'], [true, 'volume'], [false, 'vide']];
     for (const [sombre, nom] of casTel) { console.log(`\nTéléphone 390 · ${sombre ? 'sombre' : 'clair'} · base ${nom}`); await telephone(nav, nom === 'vide' ? vide : volume, sombre, nom, erreurs); }
-    if (MUT !== 'dessous' && MUT !== 'largeur') {
+    if (MUT !== 'dessous' && MUT !== 'largeur' && process.env.SEUL !== 'tel') {   // SEUL=tel : le téléphone seulement
       const casOrdi = MUT ? [[1512, false, 'volume']] : [[1512, false, 'volume'], [1512, true, 'volume'], [1280, false, 'volume'], [1512, false, 'vide']];
       for (const [W, sombre, nom] of casOrdi) { console.log(`\nOrdinateur ${W} · ${sombre ? 'sombre' : 'clair'} · base ${nom}`); await ordinateur(nav, nom === 'vide' ? vide : volume, W, sombre, nom, erreurs); }
     }
