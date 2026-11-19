@@ -68,6 +68,7 @@ import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './de/republierGuide.js';
 import ecran_republication from './de/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_liaisonSites from './de/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './de/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './de/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_favorisSites from './de/favorisSites.js';   // (15 nov., lot favoris-sites)
@@ -2319,6 +2320,7 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_favorisSites,

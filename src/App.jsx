@@ -954,9 +954,11 @@ import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétab
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 // (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
 import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
+import { publierLiaison, lireLiaison, ouvrirLiaison, EVT_OUVRIR_LIAISON, EVT_CHARGER_LIAISON, CLE_LIAISON } from "./liaisonEtat.js";   // (19 nov.) « Relier mes annonces » : les règles et les gestes arrivent à la demande
+import { LigneLiaison, texteLiaison, useLiaison } from "./LiaisonEntree.jsx";
 import { VERSION_FINE } from "./photoFine.js";
-import { publierMemePhoto, lireMemePhoto, ouvrirMemePhoto } from "./memePhotoEtat.js";
-import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, useMemePhoto } from "./MemePhoto.jsx";
+import { publierMemePhoto, lireMemePhoto, EVT_OUVRIR_MEME_PHOTO } from "./memePhotoEtat.js";
+import { LigneMemePhotoNumero } from "./MemePhoto.jsx";
 import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
@@ -1043,7 +1045,7 @@ import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
 import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT, rangerSessionOnglets, lireSessionOnglets } from "./sessionOnglets.js";
 import { modifierLigneCas, ecrireDifference } from "./ligneCas.js";
 import { fabriquerModifierCle } from "./modifierCle.js";
-import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps, appliquerOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
 import "./styles-corbeille.css";
@@ -3406,6 +3408,9 @@ const SYNC_KEYS = [
   'vrm_ebay_liens',
   // (15 nov., lot meme-photo) Ses « Ce n'est pas la même » : { 'Site:annonce|N°': date }, écrits sur SON toucher.
   'vrm_meme_photo_non',
+  // (19 nov., liaison guidée) Le journal du parcours « Relier mes annonces » (src/liaisonSites.js) : la preuve et la date
+  // de chaque lien posé ('lien:Site:id'), « plus tard », « pas sur Vinted », « garder » — écrits sur SON toucher seulement.
+  'vrm_liaison_sites',
   // (15 nov., lot deux-comptes) « Ce n'est pas la même paire » et les annonces ouvertes pour être retirées (src/deuxComptes.js).
   'vrm_deux_comptes_non', 'vrm_deux_comptes_retraits',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
@@ -5308,7 +5313,7 @@ const _ecrivainVrm = creerEcrivainLocal({
 // de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
 // `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
 const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null, deux = null) => _gestes.lancer({
-  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '',
+  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree: (deux && deux.duree) || 0,
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -27189,7 +27194,7 @@ async function defaireVc(productId) {
 // `photo_emprunte_{uid}` (Vinted, extension 5.358), `photo_empreinte_lbc` / `_vc` (extension 5.384),
 // `photo_empreinte_ebay` (calculées ICI, dans la page : `empreintesEbayPage`). Projections seulement
 // (§4.4), lecture ratée ⇒ `null` (« pas vérifié », jamais « rien à relier »).
-// ⚠️ §5 : la photo PROPOSE, SON toucher relie. `relierParPhoto` pose le MÊME lien que ses gestes
+// ⚠️ §5 : la photo PROPOSE, SON toucher relie. Le parcours « Relier mes annonces » (plus bas) pose le MÊME lien que ses gestes
 // à la main (`vrm_lbc_liens` · `vrm_ebay_liens` · `vrm_vc_liens`) : l'identité que lisent déjà le
 // retrait ailleurs, les ventes croisées et la garde des offres. Un N° d'avant la remise à zéro
 // garde sa règle (`numeroExterne`) : le N° posé est celui de la fiche Vinted, tel quel.
@@ -27240,8 +27245,14 @@ async function annoncesAutresMemePhoto() {
         const id = String(ad.id);
         if (!siens.has(idCompteLbcApp(ad.account || ad.lbcUser || '')) && !(liens[id] != null && String(liens[id]).trim())) continue;
         const n = numeroLbcIdentite({ itemId: ad.id }, ls.items, liens);
+        // (19 nov., liaison guidée) TOUTES les identités lues (le lien posé, chaque référence écrite, traduite par la
+        // remise à zéro) : deux qui désignent deux N° = un lien qui se contredit, montré, jamais tranché seul.
+        const idsL = [];
+        if (liens[id] != null && String(liens[id]).trim()) idsL.push({ sorte: 'lien', numero: cleNum(liens[id]) });
+        for (const r0 of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '', numeroEcritLbc(ad)]) { const k0 = cleNum(r0); const t0 = k0 ? numeroExterne(k0, id, 'lbcAnnonces') : ''; if (t0 && !idsL.some((x) => x.sorte === 'reference' && x.numero === t0)) idsL.push({ sorte: 'reference', numero: t0 }); }
         autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
-          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });
+          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '',
+          prix: Number(ad.price) > 0 ? Number(ad.price) : null, identites: idsL, enVente: true });
       }
     }
   } catch (_) { illisibles.push('Leboncoin'); }
@@ -27254,8 +27265,14 @@ async function annoncesAutresMemePhoto() {
       for (const a of lu.items || []) {
         if (!a || a.itemId == null || /(ended|sold|inactive|supprim)/i.test(String(a.listingStatus || a.status || ''))) continue;
         const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
+        const idsE = [];
+        { const le = lienEbay(a.itemId); const fe = le ? fichesPourEbay()[le.pairId] : null; if (fe && fe.numero != null && String(fe.numero).trim()) idsE.push({ sorte: 'lien', numero: cleNum(fe.numero) });
+          const la = le ? null : (load(LIENS_EBAY, {}) || {})[String(a.itemId)]; if (la && !la.pairId && la.article === true && cleNum(la.numero)) idsE.push({ sorte: 'lien', numero: cleNum(la.numero) });
+          const ke = numDeSkuEbay(a.sku); const te = ke ? numeroExterne(ke, a.itemId, 'ebayAnnonces', null) : ''; if (te) idsE.push({ sorte: 'reference', numero: te }); }
+        const pe = Number(String(a.price == null ? '' : a.price).replace(',', '.'));
         autres.push({ plateforme: 'eBay', id: String(a.itemId), compte: a._compte || 'principal', compteNom: a._compteNom || '', titre: a.title || '', photo: a.photo || null,
-          lien: /^\d+$/.test(String(a.itemId)) ? 'https://www.ebay.fr/itm/' + a.itemId : null, relie: !!n, numero: n || '' });
+          lien: /^\d+$/.test(String(a.itemId)) ? 'https://www.ebay.fr/itm/' + a.itemId : null, relie: !!n, numero: n || '',
+          prix: pe > 0 && (!a.currency || a.currency === 'EUR') ? pe : null, identites: idsE, enVente: true });
       }
     }
   } catch (_) { illisibles.push('eBay'); }
@@ -27266,10 +27283,17 @@ async function annoncesAutresMemePhoto() {
     else {
       const d = rows[0] || {}, liens = vcCarte('vrm_vc_liens');
       for (const [id, it] of Object.entries((d.items && typeof d.items === 'object') ? d.items : {})) {
-        if (!it || typeof it !== 'object' || etatAnnonceVcBrut(it, false, d.capturedAt) === 'retiree') continue;
+        const ev = it && typeof it === 'object' ? etatAnnonceVcBrut(it, false, d.capturedAt) : 'retiree';
+        if (ev === 'retiree' || ev === 'vendue') continue;
         const relie = !vcReliable({ productId: id, item: it, liensPub: d.liens || {}, liens, cleNum });
+        const idsV = [];
+        { const lv = lienDe(liens, id); if (lv) idsV.push({ sorte: 'lien', numero: cleNum(lv.numero) });
+          const pv = cleNum((d.liens || {})[String(id)] || ''); if (pv) idsV.push({ sorte: 'publication', numero: pv });
+          const rv = cleNum(it.ref || ''); if (rv) idsV.push({ sorte: 'reference', numero: rv }); }
+        const nVrm = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)] || '';
         autres.push({ plateforme: 'Vestiaire', id: String(id), compte: String(it.compte || ''), compteNom: 'Vestiaire', titre: String(it.titre || ''), photo: it.photo || null, lien: null, relie,
-          numero: relie ? (numVcAnnonce(id, it, d.liens || {}, numerosVcEffectifs()) || '') : '' });
+          numero: relie ? (numVcAnnonce(id, it, d.liens || {}, numerosVcEffectifs()) || '') : '',
+          prix: it.prix && Number(it.prix.valeur) > 0 && (!it.prix.devise || it.prix.devise === 'EUR') ? Number(it.prix.valeur) : null, identites: idsV, enVente: ev === 'en-ligne' ? true : null, numeroSite: nVrm ? String(nVrm) : '' });
       }
     }
   } catch (_) { illisibles.push('Vestiaire'); }
@@ -27359,7 +27383,7 @@ async function chargerMemePhoto(force = false) {
     const empreintes = empV && empS ? { vinted: Object.fromEntries(Object.entries(empV).map(([cc, v]) => [cc.replace(/^vinted:/, ''), v])), ...empS } : null;
     let douteux = new Set(); try { douteux = lireNumerosAmbigus(); } catch (_) {}
     const res = propositionsMemePhoto({ vinted, autres: ext.autres, empreintes, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cle: cleNum, verifs });
-    const etat = { ...res, illisibles: ext.illisibles, vinted, at: Date.now() };
+    const etat = { ...res, illisibles: ext.illisibles, vinted, autres: ext.autres, at: Date.now() };
     _memePhotoAt = Date.now();
     publierMemePhoto(etat);
     // eBay : les photos sans empreinte se calculent ICI, puis tout est relu une fois.
@@ -27371,41 +27395,9 @@ async function chargerMemePhoto(force = false) {
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // Un lien posé, défait, ou un « pas la même » (ici ou sur un autre appareil) : tout est relu.
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireMemePhoto()) setTimeout(() => chargerMemePhoto(true), 50); });
-}
-// RELIER, sur SON toucher (proposition ou choix dans un cas ambigu). Le N° est celui de la
-// fiche Vinted ; `vintedId` l'annonce Vinted de cette fiche. Rend true si le lien est posé.
-async function relierParPhoto({ annonce, numero, vintedId }) {
-  if (!isCloudReady()) { toast(tr('memePhoto.pasPret')); return false; }
-  const n = String(numero || '').trim(), id = String((annonce && annonce.id) || '');
-  if (!n || !id) return false;
-  const relu = () => { _memePhotoAt = 0; setTimeout(() => chargerMemePhoto(true), 50); };
-  if (annonce.plateforme === 'Leboncoin') {
-    const avant = (load('vrm_lbc_liens', {}) || {})[id];
-    if (avant != null && String(avant).trim()) { toast(tr('memePhoto.dejaRelie')); return false; }
-    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: 'vrm_lbc_liens', type: 'cle', id, apres: n, avant }], {}, (sens) => {
-      try { const l = { ...(load('vrm_lbc_liens', {}) || {}) }; if (sens === 'apres') l[id] = n; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale('vrm_lbc_liens', l); } catch (_) {}
-      relu();
-    });
-    return true;
-  }
-  if (annonce.plateforme === 'eBay') {
-    if (!vintedId) return false;
-    const avant = (load(LIENS_EBAY, {}) || {})[id];
-    if (avant && avant.pairId) { toast(tr('memePhoto.dejaRelie')); return false; }
-    const lien = { pairId: String(vintedId), numero: n, at: Date.now(), par: 'photo' };
-    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: LIENS_EBAY, type: 'cle', id, apres: lien, avant }], {}, (sens) => {
-      try { const l = { ...(load(LIENS_EBAY, {}) || {}) }; if (sens === 'apres') l[id] = lien; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale(LIENS_EBAY, l); } catch (_) {}
-      _fichesEbayMemo.at = 0; relu();
-    });
-    return true;
-  }
-  if (annonce.plateforme === 'Vestiaire') {
-    if (!vintedId) return false;
-    const ok = await relierVc({ productId: id, item: String(vintedId), numVinted: n, titre: annonce.titre });
-    if (ok) relu();
-    return ok;
-  }
-  return false;
+  // (19 nov., liaison guidée) Le même signal relit le parcours (un lien posé ou défait ici, ou sur un autre appareil).
+  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_LIAISON, CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireLiaison()) setTimeout(() => chargerLiaison(true), 120); });
+  window.addEventListener(EVT_CHARGER_LIAISON, (e) => { chargerLiaison(!!(e && e.detail && e.detail.force)); });
 }
 // « Ce n'est pas la même » : rangé par identité (site:annonce|N°), la proposition ne revient
 // plus pour ce couple. Annulable 5 s, comme ses autres gestes.
@@ -27421,11 +27413,158 @@ function refuserMemePhoto({ annonce, numero }) {
 // La photo d'une annonce, quel que soit son site (Vestiaire : son propre lecteur).
 const photoMemePhoto = (src) => (/vestiairecollective\./i.test(String(src || '')) ? <PhotoVc src={src} style={{ width: '100%', height: '100%' }}/> : <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>);
 const chargerMemePhotoUI = (force) => { chargerMemePhoto(force === true); };
-// L'hôte de la feuille « Même photo · à relier », monté une fois dans la coque.
-function MemePhotoCoque() {
-  return <MemePhotoHote charger={chargerMemePhotoUI} SheetShell={SheetShell} Photo={photoMemePhoto} onRelier={relierParPhoto} onRefuser={refuserMemePhoto}
-    extension={extSait('memephoto') === 'retard' ? 'retard' : 'ok'} versionExt={EXT_CAPACITES.memephoto.replace(/\.0$/, '')}
-    extensionSure={extSait('memephotosure') === 'ok' ? 'ok' : 'retard'} versionSure={EXT_CAPACITES.memephotosure.replace(/\.0$/, '')}/>;
+// ══ « RELIER MES ANNONCES » — LE PARCOURS GUIDÉ ENTRE VINTED ET LES AUTRES SITES (19 nov.) ══════════
+// Julien : « la liaison des articles entre les différentes applications […] ça doit être irréprochable.
+// Il ne peut pas y avoir d'erreur » — et « l'outil doit être pratique, pas chiant ».
+// UN parcours (src/LiaisonSites.jsx) remplace les entrées éparpillées (feuille « même photo », « Relier à
+// Vinted » de Leboncoin, « Relier » de Vestiaire) : elles y mènent toutes. Les RÈGLES (gardes, file,
+// contradictions) : src/liaisonSites.js ; les GESTES : src/liaisonActions.js — chargés à la demande, ils
+// reçoivent d'ici ce qui touche la base et le stockage (`deps`). Ce qui est publié : src/liaisonEtat.js.
+// ⚠️ §5 : rien n'est relié sans SON toucher. Les seules portes vers `relier` sont `ACTIONS_LIAISON`,
+// passées au parcours ; le calcul (`chargerLiaison`) ne relie rien (`audit-liaison-sites` I3-I5).
+// ⚠️ Lire-fusionner-réécrire : chaque geste part des cartes COURANTES (`lireCarteLiaison` : `undefined` =
+// pas su ⇒ refus) et s'écrit par `gesteVrm` (une sous-valeur par clé, annulable 10 s).
+const lireCarteLiaison = (k) => {
+  if (!isCloudReady()) return undefined;                                   // avant le nuage : pas su
+  if (k === 'vrm_vc_liens' && _vcMem[k] !== undefined) return _vcMem[k];      // la copie en mémoire d'un geste Vestiaire en route
+  let t; try { t = localStorage.getItem(k); } catch (_) { return undefined; }
+  if (t == null) return {};
+  try { const v = JSON.parse(t); return v && typeof v === 'object' && !Array.isArray(v) ? v : undefined; } catch (_) { return undefined; }
+};
+// Ses paires Vinted PRÉSENTES qui portent un N° : en ligne (la lecture de `lireAnnoncesVintedEnLigne`, celle de
+// l'écran eBay et de la coque, §11) ou « toujours chez moi ». `paires: null` = pas su (aucun compte lisible).
+async function pairesVintedLiaison() {
+  let comptes = []; try { comptes = load('vinted_accounts', []) || []; } catch (_) { comptes = []; }
+  if (!Array.isArray(comptes)) return { paires: null, toutesLues: false, sansNumero: 0 };
+  // Aucun compte Vinted relié : c'est SU (pas « pas su ») — ses annonces des autres sites se relient entre elles.
+  if (!comptes.length) return { paires: [], toutesLues: true, sansNumero: 0 };
+  const lu = await lireAnnoncesVintedEnLigne(comptes);
+  if (!lu.enLigne) return { paires: null, toutesLues: false, sansNumero: 0 };
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  let chezMoi = new Set(); try { chezMoi = chezMoiProposables(fiches, chezMoiEntrees(fiches, lu.enLigne)); } catch (_) { chezMoi = new Set(); }
+  const login = (uid) => { const a = comptes.find((x) => String(x && x.vinted_user_id) === String(uid)); return (a && a.login) || ''; };
+  const pl = placesAnnonces();
+  const out = [], vus = new Set(); let sansNumero = 0;
+  for (const id0 of [...lu.enLigne, ...chezMoi]) {
+    const id = String(id0); if (vus.has(id)) continue; vus.add(id);
+    const f = fiches[id] || {};
+    const numero = f.numero != null ? String(f.numero).trim() : '';
+    if (!numero) { sansNumero++; continue; }
+    const uid = lu.compte[id] || String(f.accountId || '');
+    const ou = ouDansMeubles(numero, pl.meubles, pl.slots);
+    const pf = Number(f.price);
+    out.push({ id, numero, titre: f.title || lu.titre[id] || '', photo: (typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url)) || lu.couv[id] || null,
+      taille: lu.taille[id] || f.size || '', prix: lu.prix[id] != null ? lu.prix[id] : (pf > 0 ? pf : null), marque: lu.marque[id] || '', compte: uid, compteNom: login(uid),
+      place: ou ? [ou.meuble && ou.meuble.name, ou.libelle].filter(Boolean).join(' · ') : '', enLigne: lu.enLigne.has(id) });
+  }
+  return { paires: out, toutesLues: lu.toutesLues === true, sansNumero };
+}
+// Les paires que VRM a PUBLIÉES sur un site (marque de publication), dont l'annonce créée n'a pas été gardée par
+// son identifiant : un fait (jamais une ressemblance), montré « à vérifier » quand aucune annonce lue ne porte
+// leur N° (la règle `construireLiaison` filtre celles qui en ont une). Lecture ratée ⇒ null (aucune piste).
+async function pistesLiaison() {
+  try {
+    const r = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=in.(vinted_lbc_posted,vc_listings)&select=id,ids:data->ids,liens:data->liens`);
+    if (!Array.isArray(r)) return null;
+    const fiches = load('vinted_annonce_numeros', {}) || {};
+    const out = { Leboncoin: [], Vestiaire: [], eBay: [] };
+    for (const l of r) {
+      if (l && l.id === 'vinted_lbc_posted') for (const id of (Array.isArray(l.ids) ? l.ids : [])) { const f = fiches[String(id)]; if (f && f.numero != null && String(f.numero).trim()) out.Leboncoin.push(String(f.numero)); }
+      if (l && l.id === 'vc_listings' && l.liens && typeof l.liens === 'object') for (const n of Object.values(l.liens)) if (n != null && String(n).trim()) out.Vestiaire.push(String(n));
+    }
+    return out;
+  } catch (_) { return null; }
+}
+// « Elle n'est pas sur Vinted » (Leboncoin) : SON N°, par LA règle des numéros — `prochainLibre` sur TOUS les
+// numéros déjà servis (la même récolte que `numeroterVestiaire`), après le plus haut, jamais un trou, jamais un
+// N° d'archive ; le pool d'abord (append-only : un N° donné reste servi, même si le geste est annulé).
+// Il numérote lui-même ⇒ aucun N° neuf (`sans-numero`). Une lecture qui manque ⇒ `pas-su`, rien n'est donné.
+async function donnerNumeroLiaison() {
+  if (numeroEcritActif()) return { refus: 'sans-numero' };
+  if (!numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
+  const [jl, jv, jr] = await Promise.all([
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
+    lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
+  ]);
+  if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr) || !numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
+  if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) return { refus: 'pas-su' };
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
+  const L0 = jl[0] || {}, V0 = jv[0] || {};
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values((L0.liens && typeof L0.liens === 'object') ? L0.liens : {}).forEach(add);
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  for (const it of Object.values((L0.items && typeof L0.items === 'object') ? L0.items : {})) if (it && it.ref) add(it.ref);
+  for (const v of Object.values((V0.ventes && typeof V0.ventes === 'object') ? V0.ventes : {})) if (v && v.ref) add(v.ref);
+  ajouterNumerosHorsEcran(pris, prisK);
+  const servis = new Set(prisK);
+  const numero = prochainLibre(pris, prisK, prefixeNumeros());
+  const ep = entreePool(numero);
+  if (ep == null || servis.has(cleNum(numero))) return { refus: 'pas-su' };
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  if (!pool.map(cleNum).includes(cleNum(ep))) { pool.push(ep); save('vinted_used_numeros', pool.sort(triPool)); emettreClesRelues(['vinted_used_numeros']); }
+  return { numero, servis };
+}
+// Les règles et les gestes, chargés à la demande (une fois), avec ce que l'app sait lire et écrire.
+let _liaisonVrm = null;
+const liaisonVrm = () => (_liaisonVrm || (_liaisonVrm = import('./liaisonActions.js').then((m) => m.creerLiaison({
+  pret: () => isCloudReady(), proprio: () => (AUTH.user && AUTH.user.id) || '',
+  lireCarte: lireCarteLiaison,
+  geste: (texte, ops, apres, options) => gesteVrm(texte, ops, { vrm_vc_liens: vcSetter('vrm_vc_liens') }, (sens) => {
+    // L'écran relit tout de suite : la copie locale de chaque clé porte déjà le geste (ou son inverse).
+    try { for (const k of clesDe(ops)) if (k !== 'vrm_vc_liens') ecrireCopieLocale(k, appliquerOps(load(k, {}) || {}, ops, sens, k)); } catch (_) {}
+    _fichesEbayMemo.at = 0; _memePhotoAt = 0;
+    if (typeof apres === 'function') { try { apres(sens); } catch (_) {} }
+  }, '', null, { duree: (options && options.duree) || 0 }),
+  memePhoto: (force) => Promise.resolve(chargerMemePhoto(force === true)),
+  annoncesAutres: () => annoncesAutresMemePhoto(),
+  pairesVinted: pairesVintedLiaison, pistes: pistesLiaison,
+  douteux: () => lireNumerosAmbigus(),
+  numerosConnus: () => { const s = new Set(); const add = (v) => { const c = cleNum(v); if (c) s.add(c); }; Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((f) => add(f && f.numero)); Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((f) => add(f && f.numero)); return s.size ? s : null; },
+  numeroVcDe: (id) => carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)] || '',
+  donnerNumero: donnerNumeroLiaison, refuserPhoto: refuserMemePhoto,
+  cleNum, marqueDe: extractBrand, tr, publier: publierLiaison, lire: lireLiaison,
+})).catch((e) => { _liaisonVrm = null; throw e; })));
+let _liaisonAttente = false;
+function chargerLiaison(force = false) {
+  // Les fiches et les liens viennent du nuage : avant lui, on attend (une fois), jamais un calcul sur du vide.
+  if (!isCloudReady()) { if (!_liaisonAttente) { _liaisonAttente = true; onCloudReady(() => { _liaisonAttente = false; chargerLiaison(force); }); } return Promise.resolve(null); }
+  if (!AUTH.user?.id) return Promise.resolve(null);
+  return liaisonVrm().then((L) => L.charger(force === true)).catch(() => null);
+}
+// Les SEULES portes vers une écriture de lien : passées au parcours, appelées sur SON toucher.
+const ACTIONS_LIAISON = {
+  relier: (x) => liaisonVrm().then((L) => L.relier(x)),
+  relierLot: (x) => liaisonVrm().then((L) => L.relierLot(x)),
+  remplacer: (x) => liaisonVrm().then((L) => L.remplacer(x)),
+  delier: (x) => liaisonVrm().then((L) => L.delier(x)),
+  plusTard: (x) => liaisonVrm().then((L) => L.plusTard(x)),
+  propre: (x) => liaisonVrm().then((L) => L.propre(x)),
+  garder: (x) => liaisonVrm().then((L) => L.garder(x)),
+  pasCellesCi: (x) => liaisonVrm().then((L) => L.pasCellesCi(x)),
+  verifier: (x) => liaisonVrm().then((L) => L.verifier(x)),
+  charger: (force) => { chargerLiaison(force === true); },
+};
+const LiaisonSitesParesseux = aLaDemandeFeuille(() => import('./LiaisonSites.jsx'));
+// L'hôte du parcours, monté une fois dans la coque : `ouvrirLiaison(…)` (src/liaisonEtat.js), l'ancien
+// `ouvrirMemePhoto(site)` et le « Relier » d'une annonce Vestiaire (`vrm:lien-vc`, sens 'vc') l'ouvrent.
+function LiaisonCoque() {
+  const [cible, setCible] = React.useState(null);
+  React.useEffect(() => {
+    const ouvrir = (e) => { const d = (e && e.detail) || {}; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, n: Date.now() }); chargerLiaison(true); };
+    const parVc = (e) => { const d = e && e.detail; if (d && d.sens === 'vc' && d.id != null) ouvrir({ detail: { site: 'Vestiaire', id: String(d.id) } }); };
+    window.addEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.addEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.addEventListener('vrm:lien-vc', parVc);
+    return () => { window.removeEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.removeEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.removeEventListener('vrm:lien-vc', parVc); };
+  }, []);
+  if (!cible) return null;
+  const fermer = () => setCible(null);
+  return <GardeEcran nom="liaison" feuille onFermer={fermer}>
+    <LiaisonSitesParesseux key={cible.n} cible={cible} actions={ACTIONS_LIAISON} Photo={photoMemePhoto} onFermer={fermer} FermeAuRetour={FermeAuRetour}
+      extensionSure={extSait('memephotosure') === 'ok' ? 'ok' : 'retard'} versionSure={EXT_CAPACITES.memephotosure.replace(/\.0$/, '')}/>
+  </GardeEcran>;
 }
 // Les N° à barrer (une liaison a remplacé un N° déjà donné), jusqu'à « C'est écrit ».
 function BlocBarrerVc({ titres = {} }) {
@@ -27490,7 +27629,7 @@ function GesteLienVcVinted({ it, num, style }) {
 function HoteLienVc({ comptes }) {
   const [cible, setCible] = React.useState(null);
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (!d || !['vc', 'vinted'].includes(d.sens) || d.id == null) return; setCible({ ...d, id: String(d.id) }); };
+    const f = (e) => { const d = e && e.detail; if (!d || d.sens !== 'vinted' || d.id == null) return; setCible({ ...d, id: String(d.id) }); };   // (19 nov.) sens 'vc' : le parcours « Relier mes annonces » (LiaisonCoque)
     window.addEventListener('vrm:lien-vc', f);
     return () => window.removeEventListener('vrm:lien-vc', f);
   }, []);
@@ -38342,7 +38481,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [empreintesPhotos, setEmpreintesPhotos] = useState(undefined);
   const [photosComptesOuvert, setPhotosComptesOuvert] = useState(false);
   // (15 nov., lot meme-photo) « Même photo · à relier » (src/memePhoto.js), lu par Ma journée.
-  const memePhotoJ = useMemePhoto(only === 'journee' || only === 'annonces' ? chargerMemePhotoUI : null);
+  const liaisonJ = useLiaison(only === 'journee' || only === 'annonces');   // (19 nov.) LE compteur « N annonces à relier » (src/liaisonEtat.js)
   const relireEmpreintes = React.useCallback(() => { const owner = AUTH.user?.id; lireEmpreintesPhotos().then((e) => { if (AUTH.user?.id === owner) setEmpreintesPhotos(e); }); }, []);
   useEffect(() => { if (AUTH.user?.id && cleComptes) relireEmpreintes(); }, [cleComptes, relireEmpreintes]);
   const photosComptes = useMemo(() => {
@@ -50609,7 +50748,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES : une carte AMBRE, seulement s'il y en a.
               const photosDouble = (photosComptes && photosComptes.groupes.length ? photosComptes.groupes : []).filter((g) => !g.annonces.every((a) => (a.plateforme || 'vinted') !== 'vinted' || idsDeuxComptes.has(String(a.id))));
               // (15 nov., lot meme-photo) UNE annonce d'ailleurs à la photo d'une paire Vinted : une carte AMBRE, seulement s'il y en a.
-              const memeJ = texteMemePhoto(memePhotoJ);
+              const memeJ = texteLiaison(liaisonJ);
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
               const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length || deuxComptesJ.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'meme-photo': memeJ.n ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
@@ -50708,10 +50847,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               };
               const carteMemePhoto = () => {
-                const l = memePhotoJ && memePhotoJ.lu ? [...memePhotoJ.propositions, ...memePhotoJ.ambigus.filter((x) => x.raison !== 'sans-numero')] : [];
+                const l = liaisonJ && liaisonJ.lu ? liaisonJ.file.filter((x) => !x.plusTard) : [];
                 return (
-                  <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.id).join(' ')} data-n={String(memeJ.n)}
-                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirMemePhoto(null)}>
+                  <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.cle).join(' ')} data-journee-liaison="" data-n={String(memeJ.n)}
+                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
                     <PileVignettes srcs={l.map((x) => x.annonce.photo)} n={memeJ.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{memeJ.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="meme-photo">{memeJ.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
@@ -54099,7 +54238,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {k:'deux-comptes', icon:'alert', lab:tr('deuxComptes.outil'), n:deuxComptes ? deuxComptes.groupes.length : 0, desc:tr('deuxComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setFeuilleDeuxComptes(true); }},
                     {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     /* (15 nov., lot meme-photo) Une annonce d'ailleurs avec la photo d'une paire Vinted : la feuille « à relier ». */
-                    {k:'meme-photo', icon:'image', lab:tr('memePhoto.outil'), n:texteMemePhoto(memePhotoJ).n, desc:tr('memePhoto.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirMemePhoto(null); }},
+                    {k:'meme-photo', icon:'image', lab:tr('liaE.outil'), n:texteLiaison(liaisonJ).n, desc:tr('liaE.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirLiaison(); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:tr('annonces.cadreGuidePrise'), on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'seance-photo', icon:'camera', lab:tr('atelier.seance.titre'), desc:tr('atelier.seance.outil'), on:()=>{ setAnnToolsOpen(false); ouvrirAtelier('seance'); }},
                     /* (14 nov., lot messages-achats-plus, 110) Une sélection en un lien, lecture seule, révocable, qui expire. */
@@ -60279,6 +60418,9 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   const fiches = fichesPourEbay();
   const lien = id ? lienEbay(id) : null;
   if (lien) { const f = fiches[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : null; }
+  // (19 nov., « Vinted n'est pas le pivot ») Un lien vers un ARTICLE qui n'a pas d'annonce Vinted, posé sur SON toucher dans
+  // « Relier mes annonces » : { numero, article: true } (src/liaisonSites.js `opPorter`). Son N° est celui de l'article.
+  if (id) { let la = null; try { la = (load(LIENS_EBAY, {}) || {})[id]; } catch (_) { la = null; } const na = la && !la.pairId && la.article === true ? cleNum(la.numero) : ''; if (na && NUM_OK.test(na)) return na; }
   // (7 nov.) Il numérote lui-même : un SKU qui est SON numéro (« 123 », « B125 »,
   // « N° 123 ») compte comme « VRM-123 » — avec les mêmes gardes (une seule fiche le
   // porte, déjà avant la publication). Éteint : le SKU strict « VRM-… » seul.
@@ -65927,7 +66069,7 @@ function AppCoeur() {
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
         : t==='annonces' ? <>
             {/* (14 nov.) « Publier sur Vestiaire » : le « + » de la barre de la liste (Vestiaire.jsx). */}
-            <LigneMemePhoto site="Vestiaire" charger={chargerMemePhotoUI}/>
+            <LigneLiaison site="Vestiaire"/>
             <AnnoncesVestiaire/>
             <PublierVestiaire comptes={vintedAccounts}/>
             <Card style={{padding:16}}>
@@ -66169,7 +66311,7 @@ function AppCoeur() {
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
           {/* (14 nov.) « Publier sur Leboncoin » : le « + » de la barre de la liste (Leboncoin.jsx), plus une carte en tête. */}
-          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneMemePhoto site="Leboncoin" charger={chargerMemePhotoUI}/><LeboncoinScreen/></>)}
+          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneLiaison site="Leboncoin"/><LeboncoinScreen/></>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div>
@@ -66225,7 +66367,7 @@ function AppCoeur() {
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
           {sec==='offres'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
-          {sec==='annonces'&&!baseKO&&<LigneMemePhoto site="eBay" charger={chargerMemePhotoUI}/>}
+          {sec==='annonces'&&!baseKO&&<LigneLiaison site="eBay"/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.
@@ -66892,8 +67034,8 @@ function AppCoeur() {
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
-      {/* (15 nov., lot meme-photo) « Même photo · à relier » : la feuille, ouverte par Ma journée, Annonces → Outils, les écrans des sites et la fiche. */}
-      {AUTH.user && <MemePhotoCoque/>}
+      {/* (19 nov.) « Relier mes annonces » : LE parcours, ouvert par chaque entrée (rangées des sites, Annonces → Outils, la fiche, « même photo »). */}
+      {AUTH.user && <LiaisonCoque/>}
       {AUTH.user && <RattrapageNumerosRanges/>}
       {/* (15 nov.) L'atelier « achat arrivé → en ligne » prend l'événement de « Ranger cet achat » (sa première partie). */}
       {AUTH.user && <AtelierArriveeCoque/>}
