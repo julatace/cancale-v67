@@ -147,7 +147,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const toutCocher = () => { const tous = liste.filter(cochable); setSel((s) => (tous.every((a) => s.has(a.cle)) ? new Set() : new Set(tous.map((a) => a.cle)))); };
   const quitter = () => { setAction(null); setSel(new Set()); };
   const lancer = () => { if (!A || !jugement.ok) return; const c = choisis; quitter(); if (onAction) onAction(A.cle, c); };
-  const ouvrir = (a) => { if (A) basculer(a); else setOuvert(a.cle); };
+  // (19 nov., fiche directe — Julien : « je dois cliquer sur la paire puis […] pour avoir des informations ») UN toucher : un
+  // article qui a son N° ouvre LA fiche complète (`onFiche`) ; sans N°, la fiche courte d'ici (il n'a pas encore de fiche).
+  const ouvrir = (a) => { if (A) basculer(a); else if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); };
   const saisir = (a, champ) => setSaisie({ article: a, champ });
   const articleOuvert = ouvert ? liste.find((a) => a.cle === ouvert) || null : null;
   const nSite = (s) => (comptes && comptes[s] ? comptes[s][filtre.etat] : null);
@@ -237,7 +239,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     return (
       <>
         <AnnoncesTableau articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
-          actions={actionsTableau} onAction={onAction} onOuvrir={(a) => setOuvert(a.cle)} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche}
+          actions={actionsTableau} onAction={onAction} onOuvrir={(a) => { if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); }} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche}
           plein={onPublier ? <Bouton variante="plein" onClick={onPublier} attrs={{ 'data-eg-publier': '' }}>{tr('egalite.publier')}</Bouton> : null}
           haut={aReglerHaut} pied={[manque, ...limites].filter(Boolean).join(' ')} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
         <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>

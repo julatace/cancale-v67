@@ -66,7 +66,10 @@ function phrase(e, s, compteDe) {
   return null;
 }
 
-export default function PrixPartout({ num, focusPrix = false, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null, regles = null, onRegle = null }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null, regles = null, onRegle = null, focusPrix = false }) {
+  // (19 nov., fiche directe) Ouvert en touchant LA VALEUR du prix : le champ reçoit le focus après la feuille (qui le prend au montage).
+  const champPrixRef = React.useRef(null);
+  React.useEffect(() => { if (!focusPrix) return undefined; const t = setTimeout(() => { try { if (champPrixRef.current) champPrixRef.current.focus(); } catch (_) {} }, 120); return () => clearTimeout(t); }, [focusPrix]);
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -146,7 +149,7 @@ export default function PrixPartout({ num, focusPrix = false, sites = [], manque
       <label className="pp-champ">
         <span>{tr('prixPartout.nouveau')}</span>
         <span className="pp-champ-saisie">
-          <input inputMode="decimal" autoComplete="off" autoFocus={focusPrix || undefined} enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } }}
+          <input ref={champPrixRef} inputMode="decimal" autoComplete="off" autoFocus={focusPrix || undefined} enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } }}
             disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
           <b aria-hidden="true">€</b>
         </span>

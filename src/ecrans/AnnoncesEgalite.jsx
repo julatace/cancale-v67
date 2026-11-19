@@ -234,6 +234,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
+      // (19 nov., fiche directe) Un toucher sur un article numéroté ouvre SA fiche complète (par son N°, l'identité de l'article).
+      onFiche={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } }}
       onEcranSite={onEcranSite} limites={limites} manque={manque}
       euros={(n) => fmt(n)} depuisTexte={(ms) => tr('egalite.jours', { n: Math.max(0, Math.floor((Date.now() - ms) / JOUR)) })} nomSite={nomSite} Icon={Icon}/>
     {agent ? <React.Suspense fallback={null}><PublierAgent ouverte articles={agent} onRetour={() => setAgent(null)}/></React.Suspense> : null}

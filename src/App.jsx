@@ -583,6 +583,7 @@ const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ defa
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
 const Inventory = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Inventory })));
 import { createPortal, flushSync } from "react-dom";
+import { useZoneMessages } from './natif/zoneMessages.js';   // (19 nov., fiche directe) les messages DANS la fiche, jamais par-dessus
 // (5 nov., chantier B) Les composants partagés et l'écriture unique des euros (docs/passation/2026-11-05-chantier-b.md).
 import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from "./format.js";
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
@@ -20267,9 +20268,13 @@ function Toaster() {
     };
   }, []);
   React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
-  return (
-    <div className="vrm-toasts" data-toasts-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px))'}),zIndex:Z_MESSAGES,
-      display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'0 14px',pointerEvents:'none'}}
+  // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
+  // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
+  const zoneFiche = useZoneMessages();
+  const dansFiche = !!zoneFiche;   // (la fiche elle-même compte comme une feuille ouverte : `enHaut` y est toujours vrai)
+  const pile = (
+    <div className="vrm-toasts" data-toasts-place={dansFiche ? 'fiche' : enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="false" style={{...(dansFiche ? {position:'relative'} : {position:'fixed',left:0,right:0,...(enHaut ? {top:'calc(12px + env(safe-area-inset-top))'} : {bottom:'max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px))'}),zIndex:Z_MESSAGES}),
+      display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:dansFiche ? 0 : '0 14px',pointerEvents:'none'}}
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = true; suspendre(); } }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = false; suspendre(); } }}
       onFocus={() => { raisons.current.focus = true; suspendre(); }}
@@ -20292,6 +20297,7 @@ function Toaster() {
       <AccHote/>
     </div>
   );
+  return dansFiche ? createPortal(pile, zoneFiche) : pile;
 }
 
 function TopProgress() {
@@ -64323,7 +64329,7 @@ function AppCoeur() {
       for(const r of lu.lignes){ const p=(r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) enLigne.add(String(it.id)); } }
       // (1er nov.) Vues et favoris de chaque annonce lue (la fiche d'une paire) :
       // un nombre seulement s'il est écrit, jamais un 0 deviné.
-      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:(Number.isFinite(it.view_count)&&it.view_count>0)?it.view_count:null,favoris:fav,prix:it.price!=null?it.price:null}; } }   /* (13 nov.) `prix` : le prix LU, pour « si vendue » de la fiche */
+      stats={}; crees={}; for(const r of lstRows){ const p=(r&&r.data&&r.data.payload)||{}; for(const it of (p.items||[])){ if(!it||it.id==null) continue; { const c=dateMiseEnLigneMs({ createdTs: Number.isFinite(it.created_at_ts) ? it.created_at_ts : (Number.isFinite(it.createdTs) ? it.createdTs : (it.photo && it.photo.high_resolution && Number.isFinite(it.photo.high_resolution.timestamp) ? it.photo.high_resolution.timestamp : null)), id: it.id }, null); if (c != null) crees[String(it.id)] = c; } const fav=Number.isFinite(it.favourite_count)?it.favourite_count:(Number.isFinite(it.favourites_count)?it.favourites_count:null); stats[String(it.id)]={vues:(Number.isFinite(it.view_count)&&it.view_count>0)?it.view_count:null,favoris:fav,prix:it.price!=null?it.price:null,photos:Array.isArray(it.photos)?it.photos.map((x)=>(typeof x==='string'?x:(x&&(x.url||x.full_size_url))||'')).filter((u)=>/^https:\/\//.test(u)).slice(0,12):undefined}; }   /* (19 nov. soir) `photos` : toutes les photos de l'annonce, le carrousel de la fiche */ }   /* (13 nov.) `prix` : le prix LU, pour « si vendue » de la fiche */
       for(const l of lu.aConfirmer.values()) for(const it of (l||[])) aConfirmer.add(String(it.id));
       // 22 oct. : les masquées par Vinted — la même règle que l'écran Annonces (`<masquees-regle>`).
       const supp=await lireSupprimeesTous();
@@ -67676,7 +67682,12 @@ function AppCoeur() {
           const tailleFiche = (() => { if (!p) return ''; try { const f = p.idFiche && numeros ? numeros[p.idFiche] : null; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)) || (rn.annonces || [])[0] || null;
             // (19 nov.) Un article sans annonce Vinted : la taille écrite en fin du titre de SON annonce (Leboncoin, eBay…).
             const tf = [p.titre].concat((sitesFiche || []).map((s) => s && s.titre)).map((t) => tailleEnFin(t || '')).find(Boolean); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
-          const photosFiche = p ? (rn.annonces || []).map((a) => (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || ''))).filter(Boolean) : [];
+          // (19 nov. soir, fiche produit) TOUTES les photos de l'article : celles de ses annonces Vinted (la vignette et la série
+          // `photos` quand elle est lue), puis celles de ses annonces des autres sites — une fois chacune, dans cet ordre.
+          const photosFiche = p ? [...new Set([].concat(...(rn.annonces || []).map((a) => [typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || '')]
+            .concat(Array.isArray(a.photos) ? a.photos.map((x) => (typeof x === 'string' ? x : (x && (x.url || (x.full_size_url)))) || '') : [])
+            .concat(numData && numData.stats && numData.stats[String(a.id)] && Array.isArray(numData.stats[String(a.id)].photos) ? numData.stats[String(a.id)].photos : []))).concat((sitesFiche || []).map((x) => (x && typeof x.photo === 'string' ? x.photo : '')))
+            .filter((u) => /^https:\/\//.test(u)))] : [];
           // « Acheté » et « Prix mini » se tapent SUR PLACE (Julien, 19 nov. : « l'outil doit être pratique, pas chiant ») : les
           // MÊMES écritures qu'avant — `poserPrixAchatVente` (la feuille « prix d'achat ») et `montantSeuil` (la case « accepter
           // dès » d'Annonces) —, chacune un geste annulable, sans confirmation.

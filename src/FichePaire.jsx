@@ -223,9 +223,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const rares = A ? A.gestes.filter((t) => RARES.includes(t)).map(geste) : [];
   // L'HISTOIRE : ses étapes en mots (l'achat relié dit son vendeur, sa date, son prix).
   // (19 nov.) Le montant (sinon la date) à droite de l'étape, le reste dessous : une étape sans autre détail tient sur une ligne.
-  const lignesHist = A ? A.histoire.map((l) => { const montant = l.montant != null ? eur(l.montant) : '', date = l.at != null ? dateFd(l.at) : '';
-    return { cle: l.cle, ambre: l.ton === 'am', titre: l.libre || tr(l.titre), valeur: montant || date,
-      reste: [l.vendeur ? tr('fd.h.vendeur', { nom: l.vendeur }) : '', montant ? date : '', l.compte || '', l.sites && l.sites.length ? l.sites.map((x) => NOM_SITE_FD[x] || x).join(', ') : '', l.detail ? tr(l.detail, { n: l.n }) : ''].filter(Boolean).join(' · ') }; }) : [];
+  // (19 nov. soir) La frise : la date à gauche, le titre et son montant, le reste dessous.
+  const lignesHist = A ? A.histoire.map((l) => ({ cle: l.cle, ambre: l.ton === 'am', titre: l.libre || tr(l.titre), date: l.at != null ? dateFd(l.at) : '', montant: l.montant != null ? eur(l.montant) : '',
+    reste: [l.vendeur ? tr('fd.h.vendeur', { nom: l.vendeur }) : '', l.compte || '', l.sites && l.sites.length ? l.sites.map((x) => NOM_SITE_FD[x] || x).join(', ') : '', l.detail ? tr(l.detail, { n: l.n }) : ''].filter(Boolean).join(' · ') })) : [];
   // « Tout voir » : le détail d'avant, posé tel quel sous l'histoire ouverte — rien n'est supprimé, rien n'est derrière « ⋯ ».
   const toutVoir = p ? (<>
     {!double && r && r.detail && !faits.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
@@ -276,6 +276,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     etat: (e) => tr(e.court, e.vars), libelle: (k) => tr(k), raison: (k) => tr(k), site: (s) => NOM_SITE_FD[s] || s, pasLus: (s) => tr('fd.sites.pasLus', { sites: s }),
     etatSite: (s) => (s.etat === 'vendue' ? (s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue')) : tr('fd.sites.enLigne')),
     euros: eur, signe, date: dateFd, jours: (n) => tr('fd.f.jours', { n }),
+    // (19 nov. soir) la fiche produit : « Ajouter » d'une valeur qui manque, les pastilles, le tableau, les colonnes des sites.
+    ajouter: tr('fd.ajouter'), relier: tr('fd.relierCourt'), choisirAction: tr('fd.actions.choisir'), actionsCourt: tr('fd.actions.court'), infos: tr('fd.infos.titre'),
+    court: (k) => tr('fd.court.' + (k === 'si-vendue' ? 'benefice' : k)), photoN: (i, n) => tr('fd.photo.n', { i, n }),
+    col: { site: tr('fd.col.site'), compte: tr('fd.col.compte'), prix: tr('fd.col.prix'), vues: tr('fd.col.vues'), favoris: tr('fd.col.favoris'), etat: tr('fd.col.etat') },
     // Les `data-*` d'avant restent sur leur fait (résumé achat / bénéfice / si vendue, état « prix-achat »).
     attrsFait: (f) => (f.cle === 'achat' ? { 'data-fiche-resume-achat': f.cents == null ? '' : f.cents, ...(f.cents == null ? { 'data-fiche-saisir-achat': '' } : {}), ...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {}) }
       : f.cle === 'benefice' ? { 'data-fiche-resume-benefice': f.cents == null ? '' : f.cents, 'data-fiche-benefice-partiel': f.partiel ? '1' : undefined, 'data-fiche-raison-benef': f.brut || undefined }
