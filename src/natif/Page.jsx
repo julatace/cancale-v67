@@ -182,6 +182,11 @@ export function PagePoussee({ ouverte = true, titre = '', onRetour, libelleRetou
   const coque = React.useContext(ContexteCoque);
   const volet = coque && coque.voletDetail ? coque.voletDetail : null;
   const ref = React.useRef(null), geste = React.useRef(null), avant = React.useRef(null);
+  // (19 nov., intégration) Un détail né dans le volet de droite n'en sort JAMAIS en page plein écran : quand son écran est
+  // quitté (écran gardé, monté mais caché : sa page ne se re-rend pas, seul ce détail lit le contexte), la coque retire le volet — il se tait (vu : le volet de Ventes couvrait Achats
+  // et la barre latérale à l'ordinateur). Il revient avec son volet.
+  const neVolet = React.useRef(false);
+  if (volet) neVolet.current = true;
   const refRetour = useDernier(onRetour);
   const [monte, setMonte] = React.useState(ouverte);
   const [etat, setEtat] = React.useState(ouverte ? 'entree' : 'sortie');
@@ -243,6 +248,7 @@ export function PagePoussee({ ouverte = true, titre = '', onRetour, libelleRetou
   };
 
   if (!monte) return null;
+  if (!volet && neVolet.current && typeof matchMedia === 'function' && matchMedia('(min-width: 1024px)').matches) return null;
   const cible = volet || portailNatif(); if (!cible) return null;
   return createPortal(
     <div
