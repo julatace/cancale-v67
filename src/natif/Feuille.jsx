@@ -7,6 +7,7 @@
 //   detente    'auto' (la hauteur du contenu, défaut) | 'moitie' | 'pleine'
 //   detentes   ['moitie', 'pleine'] ⇒ la poignée fait passer de l'une à l'autre (glisser, ou Entrée sur la poignée)
 //   action     nœud en haut à gauche : UN <Bouton variante="texte">Annuler</Bouton> (rare ; la croix suffit)
+//   terminer   texte du geste en haut à droite À LA PLACE de la croix (« Terminé » : une feuille de réglages, 19 nov.)
 //   pied       nœud collé en bas de la feuille : LE <Bouton variante="plein">…</Bouton> de la feuille
 //   className, attrs
 // Ce qu'elle fait seule : portail (un nœud gardé, rien n'est inséré sous <body> à l'ouverture), voile,
@@ -30,7 +31,7 @@ import { Glyphe } from './icones.jsx';
 const DUREE_SORTIE = 300;
 const ORDRE = ['moitie', 'pleine'];
 
-export function Feuille({ ouverte = true, onFermer, titre = '', detente = 'auto', detentes = null, action = null, pied = null, className = '', attrs = null, children }) {
+export function Feuille({ ouverte = true, onFermer, titre = '', detente = 'auto', detentes = null, action = null, terminer = '', pied = null, className = '', attrs = null, children }) {
   const idTitre = React.useId();
   const ref = React.useRef(null), refVoile = React.useRef(null), geste = React.useRef(null), avant = React.useRef(null);
   const refFermer = useDernier(onFermer);
@@ -148,9 +149,11 @@ export function Feuille({ ouverte = true, onFermer, titre = '', detente = 'auto'
             <div className="n-feuille-gauche" onPointerDown={(e) => e.stopPropagation()}>{action}</div>
             {titre ? <h2 className="n-feuille-titre" id={idTitre}>{titre}</h2> : <span/>}
             <div className="n-feuille-droite">
-              <button type="button" className="n-feuille-croix" aria-label={tr('natif.fermer')} onClick={fermer} onPointerDown={(e) => e.stopPropagation()}>
-                <Glyphe nom="close" taille={16}/>
-              </button>
+              {terminer
+                ? <button type="button" className="n-bouton n-feuille-terminer" data-n-variante="texte" onClick={fermer} onPointerDown={(e) => e.stopPropagation()}>{terminer}</button>
+                : <button type="button" className="n-feuille-croix" aria-label={tr('natif.fermer')} onClick={fermer} onPointerDown={(e) => e.stopPropagation()}>
+                  <Glyphe nom="close" taille={16}/>
+                </button>}
             </div>
           </div>
         </div>
