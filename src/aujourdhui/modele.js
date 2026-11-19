@@ -137,3 +137,82 @@ export function alerteDuJour({ aPoster = [], urgentsRetrait = null, retours = []
 }
 
 export const _interne = { JOUR_MS };
+
+// ── (19 nov., Julien : « applique ce que tu proposes ») LES CARTES EN PLUS D'AUJOURD'HUI — toujours sans règle neuve ──
+
+// LA COURBE DES 30 JOURS : le vendu de chaque jour (heure locale, minuit → minuit), le plus ancien d'abord, aujourd'hui
+// en dernier ; chaque valeur DEMANDÉE à `valeur('vendu', { de, a })` (= `valeurChiffre`, `ventesFaites`). Pas su ⇒ null.
+export function trenteJours(maintenant = Date.now()) {
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const out = [];
+  for (let k = 29; k >= 0; k--) {
+    const d = new Date(minuit); d.setDate(d.getDate() - k);
+    const f = new Date(d); f.setDate(f.getDate() + 1);
+    out.push({ de: d.getTime(), a: f.getTime(), cle: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, auj: k === 0 });
+  }
+  return out;
+}
+export function courbe30({ valeur, maintenant = Date.now() }) {
+  return trenteJours(maintenant).map((j) => {
+    const p = { de: j.de, a: j.a, label: '' };
+    const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
+    return { ...j, v: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+  });
+}
+
+// PAR COMPTE ET PAR SITE (la règle de « Quel compte vend le mieux » : les lignes de « Vendu », un compte Vinted = son
+// identifiant de connexion, les autres sites par plateforme). Chaque nombre est DEMANDÉ au propriétaire avec la
+// sélection de la ligne (`valeur(id, période, sel)` = `valeurChiffre` sur { site, compte }). Rangé par CA, le plus fort
+// d'abord ; une ligne sans vente dans la période n'est pas montrée. Lignes pas lues ⇒ null (pas su).
+const SITE_DE_PLATEFORME = { Vinted: 'vinted', Vestiaire: 'vestiaire', Leboncoin: 'leboncoin', eBay: 'ebay' };
+export function parCompteEtSite({ lignes, valeur, periodes = PERIODES_STATS }) {
+  if (!Array.isArray(lignes)) return null;
+  const vus = new Map();
+  for (const l of lignes) {
+    if (!l || !SITE_DE_PLATEFORME[l.plateforme]) continue;
+    const vinted = l.plateforme === 'Vinted' && l.compte;
+    const cle = vinted ? 'vinted|' + l.compte : SITE_DE_PLATEFORME[l.plateforme];
+    if (!vus.has(cle)) vus.set(cle, { cle, nom: vinted ? String(l.compte) : l.plateforme, site: l.plateforme, sel: { site: SITE_DE_PLATEFORME[l.plateforme], compte: vinted ? { login: String(l.compte) } : null, periode: null } });
+  }
+  const out = {};
+  for (const p of periodes) {
+    out[p] = [...vus.values()].map((x) => {
+      const V = valeur('vendu', p, x.sel) || {}, N = valeur('ventes', p, x.sel) || {};
+      return { cle: x.cle, nom: x.nom, site: x.site, v: V.valeur == null ? null : V.valeur, vp: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+    }).filter((r) => (r.n || 0) > 0 || (r.v || 0) > 0).sort((a, b) => (b.v || 0) - (a.v || 0) || (b.n || 0) - (a.n || 0));
+  }
+  return out;
+}
+
+// CE QUE VRM A FAIT AUJOURD'HUI : les gestes ACCEPTÉS (résultat « ok ») notés au journal (`journal_vrm_*`, lus par la
+// route du journal, src/securiteCompte.js), depuis minuit, comptés par famille. Journal pas lu ⇒ null ; rien ⇒ [].
+export const FAMILLES_VRM = [['baisses', ['baisse_prix']], ['favoris', ['favori', 'favori_offre']], ['offres', ['offre_acceptee']],
+  ['republications', ['republication']], ['bordereaux', ['bordereau']], ['messages', ['message_envoye']], ['offresFaites', ['offre_faite']]];
+export function vrmDuJour(evenements, maintenant = Date.now()) {
+  if (!Array.isArray(evenements)) return null;
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const du = evenements.filter((e) => e && e.resultat === 'ok' && Date.parse(String(e.at || '')) >= minuit.getTime() && Date.parse(String(e.at || '')) <= maintenant + 60000);
+  return FAMILLES_VRM.map(([cle, types]) => ({ cle, n: du.filter((e) => types.includes(e.type)).length })).filter((x) => x.n > 0);
+}
+
+// SUR TES ANNONCES AUJOURD'HUI : ce que l'extension a CAPTÉ depuis minuit (`capte_journal_*`, une entrée par identité :
+// src/capteNotif/arrivee.js `fusionner`), compté par sorte. Les favoris ne sont pas dans ce journal : null (pas su).
+export function capteDuJour(entrees, maintenant = Date.now()) {
+  if (!Array.isArray(entrees)) return null;
+  const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+  const du = entrees.filter((e) => e && Number(e.t) >= minuit.getTime());
+  const n = (s) => du.filter((e) => e.s === s).length;
+  return { favoris: null, offres: n('offres'), messages: n('messages'), ventes: n('ventes') };
+}
+
+// LES CARTES D'AUJOURD'HUI, cochées et ordonnées par lui (`vrm_aujourdhui_cartes`, synchronisé). Par défaut : les
+// chiffres, À envoyer, À retirer, la courbe, les dernières ventes. Une carte inconnue est ignorée ; une carte connue
+// absente de l'ordre se pose à la fin (une carte ajoutée plus tard n'est jamais perdue).
+export const CARTES_AUJOURDHUI = ['chiffres', 'envoyer', 'retirer', 'courbe', 'ventes', 'comptes', 'annonces', 'vrm'];
+export const CARTES_DEFAUT = ['chiffres', 'envoyer', 'retirer', 'courbe', 'ventes'];
+export function cartesChoisies(brut) {
+  const ok = brut && typeof brut === 'object' && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
+  const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];
+  const montrees = ok && Array.isArray(brut.montrees) ? brut.montrees.filter((x) => CARTES_AUJOURDHUI.includes(x)) : CARTES_DEFAUT;
+  return { ordre, montrees: new Set(montrees) };
+}

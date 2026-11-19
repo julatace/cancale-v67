@@ -60,7 +60,7 @@ async function muter(pg) {
   const css = { bande: '[data-v2-colis] { margin-left: -34px; }', plaque: '[data-v2-colis] .n-plaque { transform: translateX(46px); }',
     passe: '[data-v2-passe-lieu] .n-rangee-titre { white-space: normal; display: block; max-width: 90px; overflow: visible; }',
     barre: '.n-onglet:first-child { flex: 3 1 0; min-width: 160px; } .n-onglet:not(:first-child) .n-onglet-libelle { font-size: 0; }',
-    sous: '.n-onglets { transform: translateY(-90px); }', contraste: '.n-affiche-libelle, .n-rangee-sous { color: rgb(150 160 175); opacity: .45; }' }[MUT];
+    sous: '.n-onglets { transform: translateY(-90px); }', contraste: '.n-affiche-libelle, .n-rangee-sous, .n-tuile-detail, .n-carte-sous { color: rgb(150 160 175); opacity: .45; }' }[MUT];
   if (css) await pg.addStyleTag({ content: css });
   if (MUT === 'plein') await pg.evaluate(() => { const p = document.querySelector('[data-v2-principal]'); if (p) { const c = p.cloneNode(true); p.parentElement.appendChild(c); } });
   await pg.waitForTimeout(250);
@@ -84,13 +84,13 @@ async function unEcran(nav, port, base, W, sombre) {
       dit(Math.abs(h - h2) <= 1, `V ${ou} : la boîte des chiffres a la MÊME hauteur en attente (${h}) et lue (${h2}) — rien ne saute`, [h, h2]); }
     else if (base === 'vide') dit(!w.plein && w.colis === 0 && w.alertes === 0 && w.blocs.includes('rien') && !/NaN|undefined|null/.test(w.texte) && w.jour === '0', `V ${ou} : rien à envoyer ni à retirer ⇒ ni bande, ni plein, ni alerte ; 0 € lu, « — » pour le pas su`, { blocs: w.blocs, jour: w.jour });
     else {
-      dit(w.blocs.join() === 'chiffres,envoyer,retirer,ventes' && w.alertes <= 1, `${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — rien d’autre ; au plus une alerte (${w.alertes})`, w.blocs);
+      dit(w.blocs.join() === 'chiffres,envoyer,retirer,courbe,ventes' && w.alertes <= 1, `${ou} : par défaut les chiffres, À envoyer, À retirer, la courbe, Dernières ventes — rien d’autre ; au plus une alerte (${w.alertes})`, w.blocs);
       // (19 nov., « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : un toucher change la période, l'affiche et
       // les faits suivent ; l'écart est nommé ; un chiffre se touche et ouvre Argent sur SA période.
       if (base === 'capture' && !MUT) {
-        const lireS = () => pg.evaluate(() => { const c = document.querySelector('[data-v2-bloc="chiffres"]'); const f = (k) => { const x = document.querySelector(`[data-v2-stat="${k}"] .n-fait-valeur`); return x ? x.textContent.trim() : null; };
-          return { p: c.getAttribute('data-v2-periode'), grand: (document.querySelector('.n-affiche-valeur') || {}).textContent, ecart: (document.querySelector('.n-affiche-ecart') || { textContent: '' }).textContent, ben: f('benefice'), ventes: f('ventes'), panier: f('panier'),
-            detB: ((document.querySelector('[data-v2-stat="benefice"] .n-fait-detail') || {}).textContent || ''), seg: document.querySelectorAll('.n-segmente [role="radio"]').length }; });
+        const lireS = () => pg.evaluate(() => { const c = document.querySelector('[data-v2-bloc="chiffres"]'); const f = (k) => { const x = document.querySelector(`[data-v2-stat="${k}"] .n-tuile-valeur`); return x ? x.textContent.trim() : null; };
+          return { p: c.getAttribute('data-v2-periode'), grand: f('vendu'), ecart: ((document.querySelector('[data-v2-stat="vendu"] .n-tuile-detail') || {}).textContent || ''), ben: f('benefice'), ventes: f('ventes'), panier: f('panier'),
+            detB: ((document.querySelector('[data-v2-stat="benefice"] .n-tuile-detail') || {}).textContent || ''), seg: document.querySelectorAll('.n-segmente [role="radio"]').length }; });
         const toucherS = (s2) => (tel ? pg.locator(s2).first().tap({ timeout: 5000 }) : pg.locator(s2).first().click({ timeout: 5000 })).catch(() => {});
         let s1 = await lireS();
         dit(s1.seg === 3 && s1.p === 'jour' && s1.grand === '102' && /\+85 %/.test(s1.ecart) && s1.ventes === '2' && /51/.test(s1.panier || ''), `S ${ou} : Jour — 102 € vendus, « +85 % » nommé, 2 ventes, panier 51 €`, s1);
@@ -100,6 +100,24 @@ async function unEcran(nav, port, base, W, sombre) {
         await toucherS('[data-v2-stat="benefice"]'); await pg.waitForTimeout(200);
         dit(await pg.evaluate(() => document.documentElement.getAttribute('data-banc-argent')) === 'semaine', `S ${ou} : toucher le bénéfice ouvre Argent sur la semaine`);
         await pg.goto(pg.url(), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
+        // (19 nov., « applique ce que tu proposes ») L'objectif sous les tuiles ; « Personnaliser » coche une carte et elle vient.
+        const ob = await pg.evaluate(() => { const o = document.querySelector('[data-v2-objectif]'); return o ? { e: o.getAttribute('data-v2-objectif'), pct: o.getAttribute('data-v2-objectif-pct'), t: o.textContent } : null; });
+        dit(!!ob && ob.e === 'lu' && ob.pct === '61' && /1\s?840/.test(ob.t) && /3\s?000/.test(ob.t) && /11 jours/.test(ob.t), `O ${ou} : objectif « 1 840 € / 3 000 € · 61 % · il reste 11 jours »`, ob);
+        await toucherS('[data-v2-perso]'); await pg.waitForTimeout(500);
+        await toucherS('[data-v2-perso-carte="comptes"] .n-rangee-corps'); await pg.waitForTimeout(400);
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
+        const apres = await pg.evaluate((s2) => (document.querySelector(s2) || { getAttribute: () => '' }).getAttribute('data-v2-cartes'), ECRAN);
+        dit(/comptes/.test(apres || ''), `P ${ou} : « Personnaliser » → cocher « Par compte et par site » ⇒ la carte apparaît (${apres})`, apres);
+        await pg.goto(pg.url().replace(/&cartes=toutes|$/, '&cartes=toutes'), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(700);
+        const t2 = await pg.evaluate(() => ({ blocs: [...document.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), courbe: (document.querySelector('[data-v2-courbe]') || { getAttribute: () => '' }).getAttribute('data-v2-courbe').split(',').length,
+          comptes: (document.querySelector('[data-v2-comptes]') || { getAttribute: () => '' }).getAttribute('data-v2-comptes'), capte: (document.querySelector('[data-v2-capte]') || { getAttribute: () => '' }).getAttribute('data-v2-capte'),
+          vrm: (document.querySelector('[data-v2-bloc="vrm"]') || { textContent: '' }).textContent }));
+        dit(t2.blocs.join() === 'chiffres,envoyer,retirer,courbe,comptes,annonces,vrm,ventes' && t2.courbe === 30 && /^vinted\|vendeur_1:61200:13,vinted\|julien\.sneakers:26800:6$/.test(t2.comptes) && t2.capte === '4,7' && /3 baisses · 12 messages aux favoris · 1 offre acceptée/.test(t2.vrm),
+          `T ${ou} : toutes les cartes, dans SON ordre ; 30 barres ; la table du jour rangée par CA ; 4 offres et 7 messages captés ; « 3 baisses · 12 messages aux favoris · 1 offre acceptée »`, t2);
+        await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-toutes-${W}-${th}.png`), fullPage: true });
+        const c = await contrastes(pg, ECRAN);
+        dit(c.juges > 15 && !c.faibles.length, `D5 ${ou} : toutes les cartes — ${c.juges} textes ≥ 4,5:1 (min ${c.min})`, c.faibles ? c.faibles.slice(0, 5) : c);
+        await pg.goto(pg.url().replace('&cartes=toutes', ''), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
       }
       const d = await pg.evaluate(DESSIN, [ECRAN, BARRE, ONGLET]);
       dit(d.bande.cases >= 2 && !d.bande.chev.length && !d.bande.chevTextes.length && d.bande.horsBande === 0, `D1 ${ou} : ${d.bande.cases} vignettes, aucune n’en chevauche une autre, aucun texte superposé`, d.bande);
@@ -116,7 +134,7 @@ async function unEcran(nav, port, base, W, sombre) {
           const defile = [...document.querySelectorAll('*')].find((x) => x.scrollHeight > x.clientHeight + 20 && /auto|scroll/.test(getComputedStyle(x).overflowY)) || document.scrollingElement;
           defile.scrollTo(0, defile.scrollHeight); await new Promise((r) => setTimeout(r, 350));
           const e = document.querySelector(sel); const blocs = [...e.querySelectorAll('[data-v2-bloc]')].filter(vis); const fin = Math.max(...blocs.map((x) => x.getBoundingClientRect().bottom));
-          const p = e.querySelector('[data-v2-principal]'); const pq = p ? p.getBoundingClientRect() : null;
+          const p = e.querySelector('.n-page-plein [data-v2-principal]'); const pq = p ? p.getBoundingClientRect() : null;   // un plein COLLÉ seulement (celui d'une carte défile avec elle)
           const touchables = [...e.querySelectorAll('button, a[href]')].filter(vis).filter((x) => { const q = x.getBoundingClientRect(); const y = q.top + q.height / 2; if (y < hb || y > innerHeight) return false; const h = document.elementFromPoint(q.left + q.width / 2, y); return !!h && (x === h || x.contains(h)); }).length;
           defile.scrollTo(0, 0); await new Promise((r) => setTimeout(r, 200));
           return { fin: Math.round(fin), plein: pq ? [Math.round(pq.top), Math.round(pq.bottom)] : null, barre: Math.round(hb), touchables }; }, [ECRAN, BARRE]);

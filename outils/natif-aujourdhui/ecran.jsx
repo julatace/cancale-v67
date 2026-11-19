@@ -45,6 +45,13 @@ const VENTES = [
 const st = (v, n, b, { vp = false, bp = '', ecart = null } = {}) => ({ vendu: { valeur: v, partiel: vp, note: v == null ? 'pas lu' : '' }, ventes: { valeur: n, partiel: false, note: n == null ? 'pas lu' : '' },
   panier: v != null && n > 0 && !vp ? { valeur: Math.round((v / n) * 100) / 100, note: '' } : { valeur: null, note: n === 0 ? 'aucune' : 'partiel' },
   benefice: { valeur: b, brut: true, partiel: !!bp, couverture: bp, note: b == null ? 'prix d’achat manquants' : '' }, ecart });
+// (19 nov.) Les cartes en plus : 30 jours de vendu, la table par compte, ce que l'extension a capté, ce que VRM a fait.
+const C30 = Array.from({ length: 30 }, (_, k) => { const d = new Date(M0 - (29 - k) * 86400000); const v = [0, 45, 120, 0, 58, 247, 90, 36, 0, 180][k % 10] + (k === 29 ? 57 : 0);
+  return { cle: d.toISOString().slice(0, 10), de: d.getTime(), a: d.getTime() + 86400000, v, n: v ? Math.max(1, Math.round(v / 50)) : 0, partiel: false, auj: k === 29 }; });
+const TABLE = (f) => [{ cle: 'vinted|vendeur_1', nom: 'vendeur_1', site: 'Vinted', v: 612 * f, vp: true, n: 13 * f }, { cle: 'vinted|julien.sneakers', nom: 'julien.sneakers', site: 'Vinted', v: 268 * f, vp: false, n: 6 * f },
+  { cle: 'ebay', nom: 'eBay', site: 'eBay', v: 1284 * f, vp: false, n: 1 * f }, { cle: 'leboncoin', nom: 'Leboncoin', site: 'Leboncoin', v: 82.5 * f, vp: false, n: 1 * f }];
+const PLUS = { courbe: { jours: C30 }, comptes: { jour: TABLE(1).slice(0, 2), semaine: TABLE(1), mois: TABLE(3) }, capte: { favoris: null, offres: 4, messages: 7, ventes: 2 },
+  vrm: [{ cle: 'baisses', n: 3 }, { cle: 'favoris', n: 12 }, { cle: 'offres', n: 1 }], objectif: { etat: 'lu', type: 'ca', cible: 3000, valeur: 1840, pct: 61, partiel: false, atteint: false, jours: 11, enregistrer: () => true, retirer: () => {} } };
 const CAS = {
   capture: { pret: true, affiche: { n: 8, pasSu: false, sous: '3 pas encore prêts', ambre: true }, colis: colis(8), plein: { n: 5 },
     retraits: { n: 15, pasSu: false, nPoints: 6, points: [{ lieu: 'Relais Pickup Tabac-Presse du Marché Couvert de la Gare Centrale', code: '416362' }], premier: { txt: 'dernier jour', ambre: true } },
@@ -67,12 +74,14 @@ const GROUPES = [
 ];
 const ONGLETS = [['journee', 'Aujourd’hui', 'soleilLevant', 0], ['annonces', 'Annonces', 'tag', 13], ['ventes', 'Ventes', 'bag', 8], ['achats', 'Achats', 'box', 15], ['compta', 'Argent', 'euro', 0]]
   .map(([cle, libelle, ic, n]) => ({ cle, libelle, icone: <Icon name={ic} size={24}/>, iconeLaterale: <Icon name={ic} size={20}/>, pastille: n || undefined, libellePastille: n ? n + ' à faire' : undefined }));
-const PLUS = [{ entrees: [{ cle: 'stock', libelle: 'Stock', icone: <Icon name="box" size={22}/> }, { cle: 'messages', libelle: 'Messages', icone: <Icon name="chat" size={22}/>, pastille: 19, libellePastille: '19 messages à lire' }] }];
+const PLUS_MENU = [{ entrees: [{ cle: 'stock', libelle: 'Stock', icone: <Icon name="box" size={22}/> }, { cle: 'messages', libelle: 'Messages', icone: <Icon name="chat" size={22}/>, pastille: 19, libellePastille: '19 messages à lire' }] }];
 
 function Ecran() {
+  // `&cartes=toutes` : toutes les cartes montrées (la capture de chaque carte) ; sinon le réglage par défaut.
+  const [brutCartes, setBrutCartes] = React.useState(P.get('cartes') === 'toutes' ? { ordre: ['chiffres', 'envoyer', 'retirer', 'courbe', 'comptes', 'annonces', 'vrm', 'ventes'], montrees: ['chiffres', 'envoyer', 'retirer', 'courbe', 'comptes', 'annonces', 'vrm', 'ventes'] } : null);
   const [actif, setActif] = React.useState(VUE === 'regler' ? 'ventes' : 'journee');
   const c = CAS[BASE] || CAS.capture;
-  const coque = { onglets: ONGLETS, plus: PLUS, actif, onChoisir: setActif, compte: { initiales: 'CE', nom: 'Camille Exemple' }, messages: { n: 19, libelle: 'Messages', icone: <Icon name="chat" size={24}/>, onOuvrir: () => {} } };
+  const coque = { onglets: ONGLETS, plus: PLUS_MENU, actif, onChoisir: setActif, compte: { initiales: 'CE', nom: 'Camille Exemple' }, messages: { n: 19, libelle: 'Messages', icone: <Icon name="chat" size={24}/>, onOuvrir: () => {} } };
   if (VUE === 'regler') return (
     <Coque {...coque} titre="Ventes">
       <Page titre="Ventes">
@@ -83,7 +92,7 @@ function Ecran() {
   );
   return (
     <Coque {...coque} titre="Aujourd’hui">
-      <Aujourdhui titre="Aujourd’hui" Icon={Icon} Photo={Photo} pret={c.pret} affiche={c.affiche} colis={c.colis} retraits={c.retraits} groupes={null} alerte={c.alerte} ventes={c.ventes} aVenir={c.aVenir}
+      <Aujourdhui {...(BASE === 'capture' || BASE === 'volume' ? PLUS : BASE === 'attente' ? { objectif: { ...PLUS.objectif, etat: 'encours', valeur: null, pct: null } } : { objectif: { etat: 'aucun', type: 'ca', cible: null, jours: 11, enregistrer: () => true } })} cartes={{ brut: brutCartes, poser: setBrutCartes }} titre="Aujourd’hui" Icon={Icon} Photo={Photo} pret={c.pret} affiche={c.affiche} colis={c.colis} retraits={c.retraits} groupes={null} alerte={c.alerte} ventes={c.ventes} aVenir={c.aVenir}
         plein={c.plein ? { n: c.plein.n, faire: () => { document.documentElement.setAttribute('data-banc-imprime', String(c.plein.n)); } } : null}
         chiffres={{ ...c.chiffres, montant: euros, ouvrirPeriode: (p) => { document.documentElement.setAttribute('data-banc-argent', p); setActif('compta'); } }} onScanner={() => {}} onColis={() => setActif('ventes')} onRetraits={() => setActif('achats')} onVentes={() => setActif('ventes')}/>
     </Coque>

@@ -843,6 +843,7 @@ import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche, valeurChiffre, sansCompteSur } from "./design/carteChiffres.js";
+const CLE_CARTES_AUJOURDHUI = 'vrm_aujourdhui_cartes';   // (19 nov.) les cartes d'Aujourd'hui, cochées et ordonnées par lui (synchronisé)
 import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { detailFraisFiche } from "./coutPlateformes.js";
@@ -1112,7 +1113,6 @@ import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres �
 // (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
 // (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
 const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
-import { poserIcone } from "./natif/icones.jsx";   // les glyphes seuls, sans les feuilles de style
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -3583,6 +3583,8 @@ const SYNC_KEYS = [
   // lui (src/objectifMois.js) ; la barre de la carte sombre, Statistiques et Ventes
   // lisent CE réglage (plus `vrm_ca_objectif` ni `vinted_goal`, jamais posés en base).
   'vrm_objectif_mois',
+  // (19 nov.) « Personnaliser » Aujourd'hui : les cartes qu'il montre et leur ordre ({ ordre, montrees }) — aucun chiffre.
+  CLE_CARTES_AUJOURDHUI,
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -33570,22 +33572,21 @@ function useSourcesCarte(liveStats) {
 // MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
 // Trois états : en cours (la boîte, à sa taille) · pas su (« — » et la raison, jamais 0) · lu.
 const SEL_TOUT_V2 = { site: 'toutes', compte: null, periode: null };
+const OUTILS_AUJOURDHUI = { load: (k, d) => load(k, d), save: (k, v) => save(k, v), onCloudReady: (f) => onCloudReady(f), lireTout: (q) => lireTout(q), entete: () => enTeteSession(), cle: CLE_CARTES_AUJOURDHUI };
 function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const live = liveStats || liveCoque;
   const S = useSourcesCarte(live);
   const maintenant = Date.now();
+  const [objectifMois, poserObjectif, objectifBrut] = useObjectifMois();
   // Le modèle (src/aujourdhui/modele.js, reçu en `Mo`) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
   const calculer = (Mo) => {
   const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
     etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
     mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
-  const jours = M.jours.map((j) => { const d = new Date(j.de); return { ...j, lettre: d.toLocaleDateString(localeCourante(), { weekday: 'narrow' }).toUpperCase(), long: majusculeJ(dateJourFr(d)),
-    court: d.toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric' }) }; });
-  const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
-    mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
-      benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
+  const chiffres = { etat: M.etat, raison: M.raison, montant: somme,
+    mois: { nom: new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' }) } };
   // (19 nov., Julien : « plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice ») Jour · Semaine · Mois :
   // les mêmes `valeurChiffre` ; la période d'avant coupée au MÊME moment (règles de période de la carte, `REGLES_CARTE`).
   const precedente = (p) => {
@@ -33597,9 +33598,20 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const moisAvant = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth() - 1, 1).toLocaleDateString(localeCourante(), { month: 'long' });
   // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
   const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
-  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null };
+  // (19 nov., « applique ce que tu proposes ») LES CARTES EN PLUS — mêmes `valeurChiffre`, aucune règle neuve :
+  //   la courbe des 30 jours, la table par compte et par site (la sélection { site, compte } de la carte des chiffres),
+  //   l'objectif du mois (src/objectifMois.js : `valeurObjectif`, `progressionObjectif`, les jours qui restent).
+  // Les cartes en plus (courbe, table par compte, objectif) se rangent DANS le morceau d'Aujourd'hui (src/aujourdhui/
+  // Branche.jsx) : l'app ne lui donne que la question au propriétaire (`valeurSel` = `valeurChiffre` avec une sélection).
+  const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, maintenant), S);
+  const objectif = { mois: objectifMois, brut: objectifBrut, poser: poserObjectif, valeur: (o) => valeurObjectif(o, S, REGLES_CARTE, maintenant) };
+  const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : null;
+  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null, plus: { valeurSel, objectif, lignes, maintenant } };
   };
-  return <AujourdhuiV2 {...reste} calculer={calculer}/>;
+  // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
+  // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
+  return <AujourdhuiV2 {...reste} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+    onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -62797,7 +62809,6 @@ function CaptureVentes({ uid }) {
 function CaptureAnnonces({ uid }) {
   return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
 }
-poserIcone(Icon);   // (19 nov.) « VRM natif » : les glyphes internes des composants (chevron, coche…) sont les tracés de l'app
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.

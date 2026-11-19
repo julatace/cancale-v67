@@ -48,6 +48,10 @@ const MUTATIONS = {
   panier_partiel: ['modele', (s) => s.replace("const entier = (x) => x.valeur != null && !x.partiel;", "const entier = (x) => x.valeur != null;")],
   ecart_sans_avant: ['modele', (s) => s.replace("if (lu(P) && !P.partiel && P.valeur > 0) ecart", "if (lu(P)) ecart")],
   stats_zero_pour_passu: ['modele', (s) => s.replace("const vendu = { valeur: lu(V) ? V.valeur : null,", "const vendu = { valeur: lu(V) ? V.valeur : 0,")],
+  courbe_zero_pour_passu: ['modele', (s) => s.replace("return { ...j, v: V.valeur == null ? null : V.valeur,", "return { ...j, v: V.valeur == null ? 0 : V.valeur,")],
+  table_toute_vide: ['modele', (s) => s.replace(".filter((r) => (r.n || 0) > 0 || (r.v || 0) > 0)", "")],
+  vrm_refus_compte: ['modele', (s) => s.replace("e && e.resultat === 'ok' && Date.parse", "e && Date.parse")],
+  cartes_perdues: ['modele', (s) => s.replace("const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];", "const ordre = ok || [...CARTES_AUJOURDHUI];")],
   rien_pour_passu: ['regler', (s) => s.replace("if (!etat && !gardeLue) { gardeLue = true; etat = lireGarde(maintenant); }", "if (!etat) etat = { at: maintenant, frais: false, groupes: [] };")],
 };
 const MUT = process.env.MUTATION || '';
@@ -147,6 +151,32 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(e2.jour.vendu.partiel === true && e2.jour.panier.valeur === null && e2.jour.panier.note === 'partiel' && e2.jour.ecart === null, 'E5 un prix pas lu ⇒ vendu « au moins », panier « — » (une moyenne sur une partie n’est pas un minimum), aucun écart', e2.jour);
   const e3 = M.statsPeriodes({ valeur: proprietaire({ lignes: null }), precedente: avant, raisonCourte, beneficeMois: null });
   dit(e3.jour.vendu.valeur === null && e3.jour.vendu.note === 'pas lu' && e3.mois.ventes.valeur === null && e3.jour.panier.valeur === null && e3.jour.benefice.valeur === null, 'E6 pas su ⇒ « — » et la raison partout, jamais 0', e3.jour);
+
+  console.log('\n── F. Les cartes en plus (19 nov., « applique ce que tu proposes »)');
+  const c30 = M.courbe30({ valeur: proprietaire({ lignes: L2 }), maintenant: MAINTENANT });
+  dit(c30.length === 30 && c30[29].v === 50 && c30[28].v === 75 && c30[29].auj === true && c30.filter((x) => x.v > 0).length === 6, 'F1 la courbe : 30 jours, aujourd’hui en dernier (50 €), hier 75 €, six jours vendus, chaque jour = la somme des ventes du jour', c30.slice(-3));
+  const c30b = M.courbe30({ valeur: proprietaire({ lignes: null }), maintenant: MAINTENANT });
+  dit(c30b.every((x) => x.v === null), 'F2 ventes pas lues ⇒ 30 « — », jamais 30 zéros', c30b.slice(-2));
+  const vSel = (id, p, sel) => proprietaire({ lignes: L2.filter((l) => (!sel || !sel.site || l.plateforme.toLowerCase() === sel.site) && (!sel || !sel.compte || l.compte === sel.compte.login)) })(id, p);
+  const L3 = L2.map((l, i) => (l.plateforme === 'Vinted' ? { ...l, compte: i % 2 ? 'a_1' : 'b_2' } : l));
+  const vSel3 = (id, p, sel) => proprietaire({ lignes: L3.filter((l) => (!sel.site || l.plateforme.toLowerCase() === sel.site) && (!sel.compte || l.compte === sel.compte.login)) })(id, p);
+  const tab = M.parCompteEtSite({ lignes: L3, valeur: vSel3 });
+  dit(tab.semaine.map((r) => r.cle + ':' + r.v).join() === 'vinted|b_2:95,ebay:80,vinted|a_1:30' && tab.semaine.every((r) => r.n > 0) && !tab.semaine.some((r) => r.cle === 'leboncoin'),
+    'F3 par compte et par site (semaine) : rangé par CA (b_2 95 €, eBay 80 €, a_1 30 €), un compte Vinted = son identifiant, Leboncoin sans vente cette semaine n’est pas montré', tab.semaine);
+  dit(M.parCompteEtSite({ lignes: null, valeur: vSel }) === null, 'F4 lignes pas lues ⇒ table « pas su » (null), jamais vide');
+  const ev = [{ type: 'baisse_prix', resultat: 'ok', at: new Date(D(11, 19, 8)).toISOString() }, { type: 'baisse_prix', resultat: 'ok', at: new Date(D(11, 19, 9)).toISOString() },
+    { type: 'favori', resultat: 'ok', at: new Date(D(11, 19, 7)).toISOString() }, { type: 'offre_acceptee', resultat: 'refuse', at: new Date(D(11, 19, 7)).toISOString() },
+    { type: 'baisse_prix', resultat: 'ok', at: new Date(D(11, 18, 22)).toISOString() }];
+  const vj = M.vrmDuJour(ev, MAINTENANT);
+  dit(JSON.stringify(vj) === JSON.stringify([{ cle: 'baisses', n: 2 }, { cle: 'favoris', n: 1 }]), 'F5 ce que VRM a fait aujourd’hui : seulement les gestes ACCEPTÉS depuis minuit (2 baisses, 1 message ; l’offre refusée et la baisse d’hier n’y sont pas)', vj);
+  dit(M.vrmDuJour(null, MAINTENANT) === null && M.vrmDuJour([], MAINTENANT).length === 0, 'F6 journal pas lu ⇒ null (« — » et la raison) ; lu et vide ⇒ rien');
+  const cj = M.capteDuJour([{ s: 'offres', t: D(11, 19, 8) }, { s: 'offres', t: D(11, 18, 8) }, { s: 'messages', t: D(11, 19, 9) }], MAINTENANT);
+  dit(cj.offres === 1 && cj.messages === 1 && cj.favoris === null && M.capteDuJour(null) === null, 'F7 capté aujourd’hui : 1 offre, 1 message (hier n’y est pas) ; les favoris ne sont pas captés ⇒ « — »', cj);
+  const ch = M.cartesChoisies({ ordre: ['ventes', 'chiffres', 'inconnue'], montrees: ['ventes', 'vrm'] });
+  dit(ch.ordre[0] === 'ventes' && ch.ordre[1] === 'chiffres' && ch.ordre.length === M.CARTES_AUJOURDHUI.length && !ch.ordre.includes('inconnue') && ch.montrees.has('vrm') && !ch.montrees.has('chiffres'),
+    'F8 « Personnaliser » : SON ordre d’abord, une carte inconnue ignorée, une carte absente posée à la fin (jamais perdue)', ch);
+  const d = M.cartesChoisies(null);
+  dit([...d.montrees].join() === 'chiffres,envoyer,retirer,courbe,ventes', 'F9 par défaut : les chiffres, À envoyer, À retirer, la courbe, Dernières ventes', [...d.montrees]);
 
   console.log('\n── C. Les dernières ventes');
   const dv = M.dernieresVentes([...LIGNES, { plateforme: 'Vinted', ts: D(11, 18, 21), eur: 45, tx: '9001' }, { plateforme: 'Vinted', ts: NaN, eur: 5, tx: '9099' }, { plateforme: 'Vinted', ts: D(11, 19, 9), eur: 7, tx: '' }, null]);

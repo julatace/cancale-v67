@@ -30,3 +30,5 @@ export { TIRET, estVide, cx } from './outils.js';
 export { Barres } from './Barres.jsx';
 export { Vignettes, CodeRetrait } from './Vignettes.jsx';   // (19 nov.) ajoutés pour « Aujourd'hui » : src/natif/complements.css
 export { Colonnes, Colonne } from './Colonnes.jsx';   // (19 nov.) deux colonnes à l'ordinateur, une au téléphone
+export { Carte, Tuiles, Tuile } from './Carte.jsx';   // (19 nov.) carte-tableau à filet et tuiles de chiffres (« entre Vintex et celui-là »)
+export { Courbe, Progression, Champ } from './Courbe.jsx';   // (19 nov.) la courbe des 30 jours, la progression de l'objectif, un champ court
