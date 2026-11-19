@@ -64,6 +64,73 @@ export function Avatar({ compte = null, taille = 30 }) {
   );
 }
 
+// ── LES PIÈCES DE LA COQUE, pour une app qui garde sa propre structure (src/App.jsx : `<main>` qui défile, ses hôtes) ──
+// <CoqueRacine> : la racine (classes `n-coque`, la mise en page téléphone / ordinateur).
+//   defile  'page' (défaut : le document défile, barre d'onglets fixe) | 'ecran' (la racine a la hauteur de l'écran,
+//           <CoqueEcran> défile, la barre d'onglets est SOUS lui dans le flux — jamais au milieu de l'écran sur iPhone)
+//   volets  'deux' | 'trois' · className · attrs
+// <CoqueEcran> : le <main> de l'écran (className, attrs : id, data-*, style, ref).
+// <ActionsCoque> : les DEUX icônes de la barre de titre (Messages avec pastille, avatar → « Plus »).
+// <FeuillePlus> : la feuille « Plus » (groupes d'entrées, `tete`, `pied`).
+export function CoqueRacine({ defile = 'page', volets = 'deux', className = '', attrs = null, children }) {
+  const ordinateur = useOrdinateur();
+  return (
+    <div className={cx('n-coque', className)} data-n-coque="" data-n-defile={defile} data-n-volets={ordinateur ? volets : undefined} {...(attrs || {})}>
+      {children}
+    </div>
+  );
+}
+export function CoqueEcran({ className = '', attrs = null, children }) {
+  return <main className={cx('n-coque-ecran', className)} data-n-coque-ecran="" {...(attrs || {})}>{children}</main>;
+}
+export function ActionsCoque({ messages = null, compte = null, avatar = null, plusOuvert = false, onPlus, pointPlus = false }) {
+  return (
+    <>
+      {messages ? (
+        <BoutonIcone
+          libelle={messages.n && messages.libellePastille ? messages.libellePastille : (messages.libelle || tr('natif.messages'))}
+          icone={messages.icone}
+          onClick={messages.onOuvrir}
+          attrs={{ 'data-n-coque-messages': '' }}
+          pastille={messages.n ? (messages.n === true ? <span className="n-coin-point" aria-hidden="true"/> : <Pastille ton="ambre-plein" className="n-coin-pastille">{messages.n}</Pastille>) : null}
+        />
+      ) : null}
+      <BoutonIcone
+        libelle={tr('natif.plus.ouvrir')}
+        icone={avatar || <Avatar compte={compte}/>}
+        onClick={onPlus}
+        attrs={{ 'data-n-coque-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': plusOuvert ? 'true' : 'false' }}
+        pastille={pointPlus ? <span className="n-coin-point" aria-hidden="true"/> : null}
+      />
+    </>
+  );
+}
+export function FeuillePlus({ ouverte = false, onFermer, groupes = [], actif = '', onChoisir, tete = null, pied = null }) {
+  return (
+    <Feuille ouverte={ouverte} onFermer={onFermer} titre={tr('natif.plus.titre')} detente="pleine" attrs={{ 'data-n-feuille-plus': '' }}>
+      {tete}
+      {groupes.map((g, i) => (
+        <Groupe key={g.titre || i} titre={g.titre || ''}>
+          {g.entrees.map((o) => (
+            <Rangee
+              key={o.cle}
+              titre={o.libelle}
+              icone={o.iconeLaterale || o.icone}
+              valeur={o.valeur}
+              pastille={o.pastille ? (o.pastille === true ? <Pastille ton="ambre">{tr('natif.plus.nouveau')}</Pastille> : <Pastille ton="ambre-plein" libelle={o.libellePastille || ''}>{o.pastille}</Pastille>) : null}
+              fin={o.interrupteur ? null : (o.cle === actif ? 'coche' : 'chevron')}
+              interrupteur={o.interrupteur || null}
+              onClick={o.interrupteur ? null : () => { if (onFermer) onFermer(); if (o.onChoisir) o.onChoisir(o.cle); else if (onChoisir) onChoisir(o.cle); }}
+              attrs={{ 'data-n-plus-entree': o.cle, ...(o.attrs || {}) }}
+            />
+          ))}
+        </Groupe>
+      ))}
+      {pied}
+    </Feuille>
+  );
+}
+
 export function Coque({ onglets = [], plus = [], actif = '', onChoisir, titre = '', recherche = null, messages = null, compte = null, actions = null,
   bandeaux = null, marque = null, plusTete = null, plusPied = null, plusOuvert, onPlus = null, volets = 'deux', detail = null, detailVide = null,
   className = '', attrs = null, children }) {
