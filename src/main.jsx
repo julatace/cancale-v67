@@ -16,7 +16,7 @@ import Accueil from './Accueil.jsx';
 import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot traduction) La langue est prête AVANT le premier rendu (src/i18n/index.js) ;
 // la racine se redessine quand elle change (Paramètres → Langue, ou relue du nuage).
-import { tr, preparerLangue } from './i18n/index.js';
+import { tr, preparerLangue, langueInitiale } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
 import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
@@ -294,7 +294,7 @@ if ('serviceWorker' in navigator) {
       try { reg.update(); } catch (_) {}
       // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
       // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
-      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE' }); } catch (_) {} }).catch(() => {});
+      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE', langue: langueInitiale() }); } catch (_) {} }).catch(() => {});
       // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
       // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
       // notif ». Si la permission est accordée : on récupère l'abonnement
