@@ -190,5 +190,55 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Sfondo grigio chiaro, schede bianche, carattere e controlli di iPhone.",
   "v2.style.studio": "Studio blu",
-  "v2.style.studio.desc": "Lo sfondo blu e il vetro di prima."
+  "v2.style.studio.desc": "Lo sfondo blu e il vetro di prima.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.aria": "Le vendite di oggi, della settimana e del mese",
+  "v2.jour.auj": "oggi",
+  "v2.jour.hier": "ieri",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "venduto {quand}",
+    "other": "venduti {quand}"
+  },
+  "v2.jour.aucune": "nessuna vendita",
+  "v2.jour.ventes": {
+    "one": "{n} vendita",
+    "other": "{n} vendite"
+  },
+  "v2.jour.pasSu": "vendite non ancora lette",
+  "v2.mois.titre": "Questo mese",
+  "v2.mois.vendu": "Venduto",
+  "v2.mois.recu": "Ricevuto",
+  "v2.mois.benefice": "Utile",
+  "v2.mois.sur": {
+    "one": "{k} vendita su {n}",
+    "other": "{k} vendite su {n}"
+  },
+  "v2.mois.aria": "{mois}: venduto, ricevuto, utile — apri Denaro",
+  "v2.envoyer.titre": "Da spedire",
+  "v2.bande.plus": {
+    "one": "{n} altro pacco da spedire",
+    "other": "{n} altri pacchi da spedire"
+  },
+  "v2.dv.titre": "Ultime vendite",
+  "v2.dv.vente": "Vendita {site}",
+  "v2.dv.aVenir": "Denaro in arrivo",
+  "v2.alerte.poster": {
+    "one": "{n} pacco da spedire · {quand}",
+    "other": "{n} pacchi da spedire · il più urgente {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} reso da consegnare oggi o domani",
+    "other": "{n} resi da consegnare oggi o domani"
+  },
+  "v2.reg.titre": "Da sistemare",
+  "v2.reg.titreN": {
+    "one": "Da sistemare: {n} cosa",
+    "other": "Da sistemare: {n} cose"
+  },
+  "v2.reg.toutVoir": "Vedi tutto · {n}",
+  "v2.reg.moins": "Vedi meno",
+  "v2.reg.ouvrir": "Apri",
+  "v2.reg.completer": "Completa i miei annunci",
+  "v2.reg.completerN": "Completa i miei annunci · {n}"
 };

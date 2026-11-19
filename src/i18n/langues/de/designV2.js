@@ -190,5 +190,55 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Hellgrauer Hintergrund, weiße Karten, Schrift und Schalter wie auf dem iPhone.",
   "v2.style.studio": "Studio Blau",
-  "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas."
+  "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.aria": "Die Verkäufe von heute, der Woche und des Monats",
+  "v2.jour.auj": "heute",
+  "v2.jour.hier": "gestern",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "{quand} verkauft",
+    "other": "{quand} verkauft"
+  },
+  "v2.jour.aucune": "kein Verkauf",
+  "v2.jour.ventes": {
+    "one": "{n} Verkauf",
+    "other": "{n} Verkäufe"
+  },
+  "v2.jour.pasSu": "Verkäufe noch nicht gelesen",
+  "v2.mois.titre": "Dieser Monat",
+  "v2.mois.vendu": "Verkauft",
+  "v2.mois.recu": "Erhalten",
+  "v2.mois.benefice": "Gewinn",
+  "v2.mois.sur": {
+    "one": "{k} Verkauf von {n}",
+    "other": "{k} Verkäufe von {n}"
+  },
+  "v2.mois.aria": "{mois}: verkauft, erhalten, Gewinn — Geld öffnen",
+  "v2.envoyer.titre": "Zu versenden",
+  "v2.bande.plus": {
+    "one": "{n} weiteres Paket zu versenden",
+    "other": "{n} weitere Pakete zu versenden"
+  },
+  "v2.dv.titre": "Letzte Verkäufe",
+  "v2.dv.vente": "{site}-Verkauf",
+  "v2.dv.aVenir": "Geld unterwegs",
+  "v2.alerte.poster": {
+    "one": "{n} Paket aufzugeben · {quand}",
+    "other": "{n} Pakete aufzugeben · das dringendste {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} Rücksendung heute oder morgen abzugeben",
+    "other": "{n} Rücksendungen heute oder morgen abzugeben"
+  },
+  "v2.reg.titre": "Zu erledigen",
+  "v2.reg.titreN": {
+    "one": "Zu erledigen: {n} Sache",
+    "other": "Zu erledigen: {n} Sachen"
+  },
+  "v2.reg.toutVoir": "Alle ansehen · {n}",
+  "v2.reg.moins": "Weniger anzeigen",
+  "v2.reg.ouvrir": "Öffnen",
+  "v2.reg.completer": "Meine Anzeigen vervollständigen",
+  "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}"
 };

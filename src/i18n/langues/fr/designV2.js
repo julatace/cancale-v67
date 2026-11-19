@@ -190,5 +190,55 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Fond gris clair, cartes blanches, police et réglages d'iPhone.",
   "v2.style.studio": "Studio bleu",
-  "v2.style.studio.desc": "Le fond bleu et le verre d'avant."
+  "v2.style.studio.desc": "Le fond bleu et le verre d'avant.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.aria": "Les ventes du jour, de la semaine et du mois",
+  "v2.jour.auj": "aujourd’hui",
+  "v2.jour.hier": "hier",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "vendu {quand}",
+    "other": "vendus {quand}"
+  },
+  "v2.jour.aucune": "aucune vente",
+  "v2.jour.ventes": {
+    "one": "{n} vente",
+    "other": "{n} ventes"
+  },
+  "v2.jour.pasSu": "ventes pas encore lues",
+  "v2.mois.titre": "Ce mois",
+  "v2.mois.vendu": "Vendu",
+  "v2.mois.recu": "Reçu",
+  "v2.mois.benefice": "Bénéfice",
+  "v2.mois.sur": {
+    "one": "{k} vente sur {n}",
+    "other": "{k} ventes sur {n}"
+  },
+  "v2.mois.aria": "{mois} : vendu, reçu, bénéfice — ouvrir Argent",
+  "v2.envoyer.titre": "À envoyer",
+  "v2.bande.plus": {
+    "one": "{n} autre colis à envoyer",
+    "other": "{n} autres colis à envoyer"
+  },
+  "v2.dv.titre": "Dernières ventes",
+  "v2.dv.vente": "Vente {site}",
+  "v2.dv.aVenir": "Argent à venir",
+  "v2.alerte.poster": {
+    "one": "{n} colis à poster · {quand}",
+    "other": "{n} colis à poster · le plus pressé {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} retour à déposer aujourd’hui ou demain",
+    "other": "{n} retours à déposer aujourd’hui ou demain"
+  },
+  "v2.reg.titre": "À régler",
+  "v2.reg.titreN": {
+    "one": "À régler : {n} chose",
+    "other": "À régler : {n} choses"
+  },
+  "v2.reg.toutVoir": "Tout voir · {n}",
+  "v2.reg.moins": "Voir moins",
+  "v2.reg.ouvrir": "Ouvrir",
+  "v2.reg.completer": "Compléter mes annonces",
+  "v2.reg.completerN": "Compléter mes annonces · {n}"
 };

@@ -190,5 +190,55 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Light grey background, white cards, iPhone font and controls.",
   "v2.style.studio": "Blue studio",
-  "v2.style.studio.desc": "The previous blue background and glass."
+  "v2.style.studio.desc": "The previous blue background and glass.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.aria": "Sales today, this week and this month",
+  "v2.jour.auj": "today",
+  "v2.jour.hier": "yesterday",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "sold {quand}",
+    "other": "sold {quand}"
+  },
+  "v2.jour.aucune": "no sale",
+  "v2.jour.ventes": {
+    "one": "{n} sale",
+    "other": "{n} sales"
+  },
+  "v2.jour.pasSu": "sales not read yet",
+  "v2.mois.titre": "This month",
+  "v2.mois.vendu": "Sold",
+  "v2.mois.recu": "Received",
+  "v2.mois.benefice": "Profit",
+  "v2.mois.sur": {
+    "one": "{k} sale out of {n}",
+    "other": "{k} sales out of {n}"
+  },
+  "v2.mois.aria": "{mois}: sold, received, profit — open Money",
+  "v2.envoyer.titre": "To ship",
+  "v2.bande.plus": {
+    "one": "{n} more parcel to ship",
+    "other": "{n} more parcels to ship"
+  },
+  "v2.dv.titre": "Latest sales",
+  "v2.dv.vente": "{site} sale",
+  "v2.dv.aVenir": "Money on its way",
+  "v2.alerte.poster": {
+    "one": "{n} parcel to post · {quand}",
+    "other": "{n} parcels to post · most urgent {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} return to drop off today or tomorrow",
+    "other": "{n} returns to drop off today or tomorrow"
+  },
+  "v2.reg.titre": "To sort out",
+  "v2.reg.titreN": {
+    "one": "To sort out: {n} item",
+    "other": "To sort out: {n} items"
+  },
+  "v2.reg.toutVoir": "See all · {n}",
+  "v2.reg.moins": "See less",
+  "v2.reg.ouvrir": "Open",
+  "v2.reg.completer": "Complete my listings",
+  "v2.reg.completerN": "Complete my listings · {n}"
 };

@@ -190,5 +190,55 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Fondo gris claro, tarjetas blancas, letra y controles de iPhone.",
   "v2.style.studio": "Estudio azul",
-  "v2.style.studio.desc": "El fondo azul y el cristal de antes."
+  "v2.style.studio.desc": "El fondo azul y el cristal de antes.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.aria": "Las ventas del día, de la semana y del mes",
+  "v2.jour.auj": "hoy",
+  "v2.jour.hier": "ayer",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "vendido {quand}",
+    "other": "vendidos {quand}"
+  },
+  "v2.jour.aucune": "ninguna venta",
+  "v2.jour.ventes": {
+    "one": "{n} venta",
+    "other": "{n} ventas"
+  },
+  "v2.jour.pasSu": "ventas aún no leídas",
+  "v2.mois.titre": "Este mes",
+  "v2.mois.vendu": "Vendido",
+  "v2.mois.recu": "Recibido",
+  "v2.mois.benefice": "Beneficio",
+  "v2.mois.sur": {
+    "one": "{k} venta de {n}",
+    "other": "{k} ventas de {n}"
+  },
+  "v2.mois.aria": "{mois}: vendido, recibido, beneficio — abrir Dinero",
+  "v2.envoyer.titre": "Por enviar",
+  "v2.bande.plus": {
+    "one": "{n} paquete más por enviar",
+    "other": "{n} paquetes más por enviar"
+  },
+  "v2.dv.titre": "Últimas ventas",
+  "v2.dv.vente": "Venta {site}",
+  "v2.dv.aVenir": "Dinero por llegar",
+  "v2.alerte.poster": {
+    "one": "{n} paquete por enviar · {quand}",
+    "other": "{n} paquetes por enviar · el más urgente {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} devolución por entregar hoy o mañana",
+    "other": "{n} devoluciones por entregar hoy o mañana"
+  },
+  "v2.reg.titre": "Por resolver",
+  "v2.reg.titreN": {
+    "one": "Por resolver: {n} cosa",
+    "other": "Por resolver: {n} cosas"
+  },
+  "v2.reg.toutVoir": "Ver todo · {n}",
+  "v2.reg.moins": "Ver menos",
+  "v2.reg.ouvrir": "Abrir",
+  "v2.reg.completer": "Completar mis anuncios",
+  "v2.reg.completerN": "Completar mis anuncios · {n}"
 };

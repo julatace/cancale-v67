@@ -904,7 +904,7 @@ import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues a
 import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
-import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
+import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta, questionsArgent } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOIS } from "./cibleNotif.js";
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
@@ -1109,7 +1109,10 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 // `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres → Apparence → Style) : `data-theme-style` posé dès l'import, éteint par défaut
-import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
+import AujourdhuiV2, { ChiffresDuJour } from "./designV2/Aujourdhui.jsx";
+import ARegler, { useARegler } from "./designV2/ARegler.jsx";   // (19 nov.) « À régler » : chaque chose à faire dans SON onglet
+import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
+import { chiffresAujourdhui, dernieresVentes as dernieresVentesFaites, alerteDuJour } from "./aujourdhui/modele.js";   // (19 nov.) le fond d'« Aujourd'hui » : il demande chaque chiffre à son propriétaire
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -33552,6 +33555,37 @@ function useSourcesCarte(liveStats) {
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
 }
 // ═══════════════════════════════════════════════════════════════════════════
+// (19 nov.) « AUJOURD'HUI » ET SES CHIFFRES — Julien : « il y a d'autres choses plus intéressantes pour cet onglet ».
+// ═══════════════════════════════════════════════════════════════════════════
+// Le vendu du jour, les sept jours, le mois (Vendu · Reçu · Bénéfice) et l'argent à venir, posés sur
+// src/designV2/Aujourdhui.jsx. ⚠️ AUCUNE RÈGLE NOUVELLE (§5, un seul propriétaire par chiffre) : chaque valeur est
+// `valeurChiffre` (src/design/carteChiffres.js) sur les sources de la carte des chiffres (`useSourcesCarte` : les
+// lignes de `ventesFaites` de la coque, la ligne publiée par Ventes `vinted_urssaf_mois`, `vrm_benefice_jours`) — les
+// MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
+// Trois états : en cours (la boîte, à sa taille) · pas su (« — » et la raison, jamais 0) · lu.
+const SEL_TOUT_V2 = { site: 'toutes', compte: null, periode: null };
+function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const live = liveStats || liveCoque;
+  const S = useSourcesCarte(live);
+  const maintenant = Date.now();
+  // Le modèle (src/aujourdhui/modele.js) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
+  const M = chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
+    etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
+    mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  const jours = M.jours.map((j) => { const d = new Date(j.de); return { ...j, lettre: d.toLocaleDateString(localeCourante(), { weekday: 'narrow' }).toUpperCase(), long: majusculeJ(dateJourFr(d)),
+    court: d.toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric' }) }; });
+  const chiffres = (
+    <ChiffresDuJour Icon={Icon} etat={M.etat} raison={M.raison} jours={jours} montre={M.montre} montant={somme}
+      onArgent={() => { if (onNav) onNav('compta'); }}
+      mois={{ nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
+        benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice }}/>
+  );
+  return <AujourdhuiV2 {...reste} chiffres={chiffres}
+    aVenir={M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null}/>;
+}
+// ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
 // ═══════════════════════════════════════════════════════════════════════════
 // Les sources sont celles de la carte « Semaine du … » (`JournalSemaineCarte`) et de la frise :
@@ -51078,7 +51112,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const em = lu(xE) && xE.t.emballer ? xE.t.emballer : null;
           const nPrets = em && em.n > 0 ? em.n : 0;
           const ecart = nE == null ? ((xE && xE.titrePasSu) || tr('v2.pasLu')) : nE === 0 ? tr('v2.rienAEnvoyer')
-            : nPrets && nE > nPrets ? tr('v2.ecartCourt', { r: nE - nPrets })
+            : nPrets && nE > nPrets ? tr('v2.ecartCourt', { n: nE - nPrets, r: nE - nPrets })
             : nPrets ? (em.exact === false ? tr('v2.pretsAuMoins', { n: nPrets }) : tr('v2.tousPrets')) : tr('v2.aucunPret');
           const nR = lu(xR) ? (Number(xR.t.n) || 0) : null;
           // Les codes COMPTÉS (dans « à retirer »), groupés par point ; la plus proche date limite, de la publication.
@@ -51097,27 +51131,64 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (!j.avant && !j.tab) return null;
             return { txt: typeof j.action === 'string' && j.action ? j.action : VERBES.voir, faire: () => { if (j.avant) j.avant(); if (onNav && j.tab) onNav(j.tab); } };
           };
+          // ⚠️ (19 nov., décision de Julien : « ça doit être rangé dans les onglets dédiés ») LES GROUPES « À FAIRE » NE SONT PLUS
+          //    MONTRÉS ICI : ils sont PUBLIÉS (src/designV2/aRegler.js) et se lisent en tête de LEUR onglet (« À régler »). Les
+          //    mêmes cartes `jobs`, le même nombre, le MÊME geste (`avant` puis `tab`) ; `tab` et `sens` disent l'onglet.
           const groupesJ = [];
-          if (lu(xM) && xM.t.n > 0) groupesJ.push({ id: 'messages', icone: 'chat', titre: tr('v2.g.messages', { n: xM.t.n }), n: xM.t.n, geste: { txt: tr('v2.g.repondre'), faire: () => { if (onNav) onNav(xM.tab); } } });
-          if (lu(xP) && xP.t.n > 0 && visibiliteCarte('prix', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) groupesJ.push({ id: 'prix', icone: 'tag', titre: tr('v2.g.prix', { n: xP.t.n }), n: xP.t.n, geste: { txt: VERBES.voir, faire: () => { if (onNav) onNav(xP.tab); } } });
-          const dejaJ = new Set();
+          if (lu(xM) && xM.t.n > 0) groupesJ.push({ id: 'messages', icone: 'chat', titre: tr('v2.g.messages', { n: xM.t.n }), n: xM.t.n, tab: xM.tab, geste: { txt: tr('v2.g.repondre'), faire: () => { if (onNav) onNav(xM.tab); } } });
+          if (lu(xP) && xP.t.n > 0 && visibiliteCarte('prix', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) groupesJ.push({ id: 'prix', icone: 'tag', titre: tr('v2.g.prix', { n: xP.t.n }), n: xP.t.n, tab: xP.tab, geste: { txt: VERBES.voir, faire: () => { if (onNav) onNav(xP.tab); } } });
+          const dejaJ = new Set(), rangJ = {};
           for (const j of [...alertesArgent, ...(urssafJob ? [urssafJob] : []), ...jobsAFaire]) {
-            if (!j || j.cycle || dejaJ.has(j) || j.id === 'emballer' || j.id === 'vestiaire-envoyer' || TVB_JOBS.has(j.id)) continue;
+            if (!j || j.cycle || dejaJ.has(j) || j.id === 'emballer' || j.id === 'vestiaire-envoyer') continue;
             dejaJ.add(j);
             const titreJ = String(j.court || j.title || '').trim(); if (!titreJ) continue;
-            groupesJ.push({ id: (j.id || 'job') + ':' + groupesJ.length, icone: j.icon || 'check', titre: titreJ, n: j.n, detail: typeof j.detail === 'string' ? j.detail : '',
-              photo: Array.isArray(j.photos) ? (j.photos.find(Boolean) || null) : null, ambre: !!j.urgent || j.color === C.warn, geste: geste(j) });
+            const idJ = j.id || 'job'; rangJ[idJ] = (rangJ[idJ] || 0) + 1;
+            groupesJ.push({ id: idJ + (rangJ[idJ] > 1 ? ':' + rangJ[idJ] : ''), icone: j.icon || 'check', titre: titreJ, n: j.n, detail: typeof j.detail === 'string' ? j.detail : '',
+              photo: Array.isArray(j.photos) ? (j.photos.find(Boolean) || null) : null, ambre: !!j.urgent || j.color === C.warn, geste: geste(j),
+              tab: j.litige ? (j.litige.sens === 'achat' ? 'achats' : 'cat_ventes') : (j.tab || ''), sens: j.litige ? j.litige.sens : undefined });
           }
+          // AU PLUS UNE LIGNE D'ALERTE : une date limite LUE qui tombe aujourd'hui ou demain (ou déjà passée). Aucune règle
+          // neuve : `toShip` et `texteLimiteEnvoi` (api/_lib/limite-envoi.js — une limite ESTIMÉE n'est jamais dite ici, §5),
+          // `pickupUnion.urgents` (la règle du point ambre d'« À retirer »), les retours « à déposer » (src/retoursAchat.js).
+          const alerteJ = (() => {
+            try {
+              const A = alerteDuJour({ aPoster: toShip, urgentsRetrait: lu(xR) && pickupCount && pickupUnion && tracking !== null ? (Number(pickupUnion.urgents) || 0) : null,
+                retours: retoursAchatVus && retoursAchatVus.etat === 'lu' && Array.isArray(retoursAchatVus.aRenvoyer) ? retoursAchatVus.aRenvoyer : [], joursAvant });
+              if (!A) return null;
+              if (A.id === 'poster') return { id: 'poster', txt: tr('v2.alerte.poster', { n: A.n, quand: limiteCourte(texteLimiteEnvoi(A.premier)) }), faire: () => { if (onNav) onNav('cat_bord'); } };
+              if (A.id === 'retirer') return { id: 'retirer', txt: tr('journee.colisRetirerAujourd', { hd: String(A.n) }), faire: () => { if (onNav) onNav('retraits'); } };
+              return { id: 'retour', txt: tr('v2.alerte.retour', { n: A.n }), faire: () => { if (onNav) onNav('achats'); } };
+            } catch (_) { return null; /* pas su ⇒ aucune alerte inventée */ }
+          })();
+          // LES 5 DERNIÈRES VENTES : les lignes de « Vendu » de la coque (`ventesFaites`, toutes plateformes), les plus
+          // récentes (`dernieresVentesFaites`, src/aujourdhui/modele.js) ; la photo, le titre et le N° d'une vente Vinted par SA transaction (jamais un titre
+          // comme identité).
+          const dernieresJ = (() => {
+            const ev = venduEtat(liveStats);
+            if (ev !== 'lu' || baseKO) return { etat: ev === 'pasSu' || baseKO ? 'passu' : 'encours', lignes: [] };
+            try {
+              const parTx = new Map(); for (const o of (sales.items || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) parTx.set(String(tx), o); }
+              const lignes = (dernieresVentesFaites(liveStats.venduLignes, 5) || []).map((x) => {
+                const o = x.plateforme === 'Vinted' ? parTx.get(x.tx) : null;
+                const bd = o ? bordsParTxn[x.tx] : null; const en = o ? effEntry(o) : null;
+                const num = String(o ? ((bd ? numForBord(bd) : '') || (en && en.numero) || '') : '');
+                return { cle: x.cle, site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre: o ? String(o.title || '') : '', photo: o ? orderPhoto(o) : null, num,
+                  ouvrir: num ? () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: num })); } catch (_) {} } : () => { if (onNav) onNav('cat_ventes'); } };
+              });
+              return { etat: 'lu', lignes };
+            } catch (_) { return { etat: 'passu', lignes: [] }; }
+          })();
           return (
-            <AujourdhuiV2 titre={tr('nav.journee.court')} Photo={PhotoVinted} Plaque={PlaqueJ} Icon={Icon}
+            <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
               colis={nE ? colisJournee : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
-              groupes={groupesJ}
+              groupes={groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
+              onVentes={() => { if (onNav) onNav('cat_ventes'); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
           );
         }
@@ -62707,6 +62778,10 @@ function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.
   const designV2App = useDesignV2();
+  // (19 nov.) « À régler » : la publication d'Aujourd'hui (src/designV2/aRegler.js), lue par la coque pour les pastilles.
+  const pubRegler = useARegler();
+  const setTabRegler = React.useRef(null);
+  React.useEffect(() => { brancherARegler({ uid: (AUTH.user && AUTH.user.id) || '', naviguer: (ecran) => { if (setTabRegler.current) setTabRegler.current(ecran); } }); });
   // En mode solo (MULTI_USER=false) `authState.ready` est vrai d'emblée et
   // l'app démarre directement : rien ne change pour un usage à un seul vendeur.
   const [authState,setAuthState]=useState(AUTH);
@@ -62871,6 +62946,7 @@ function AppCoeur() {
     }
     setTabBrut(r.tab);
   },[]);
+  setTabRegler.current=setTab;   // (19 nov.) « À régler » : le geste d'une rangée gardée ouvre son écran par CE chemin
   // L'écran où une photo Vinted a échoué en premier (le bilan `diag_photos`).
   React.useEffect(()=>{ photosVinted.ecranActuel(tab); },[tab]);
   // (14 nov., n° 61) Le dernier écran de « Paires » ouvert (l'onglet de la barre y ramène).
@@ -65866,7 +65942,14 @@ function AppCoeur() {
   // Colis pour le même colis).
   // (9 nov., lot AC) « À trancher » : la somme des sources SUES (src/aTrancher.js), rien à 0.
   // (11 nov., lot DJ3) Le nombre à envoyer sur Ventes, le nombre à retirer sur Achats (les mêmes publications).
-  const badgesNav={ ventes: colisBadge, achats: retraitsBadge, annonces: nAnnonces, messages: msgNonLus>0 };
+  // (19 nov., décision de Julien : chaque chose à faire dans SON onglet) La pastille d'un onglet = ce qu'elle comptait
+  // (colis à envoyer, à retirer, annonces de la cloche) + UN par groupe « À régler » de cet onglet qu'elle ne comptait pas
+  // déjà (`ajoutPastille` : un colis se compte une fois). Pas de publication ⇒ rien d'ajouté (jamais un 0 inventé).
+  // « N messages à lire » : le nombre de la rangée d'hier devient la pastille de Messages ; « Tout va bien ? » : un point.
+  const plusRegler=(k,base)=>{ if(!designV2App||!pubRegler) return base; const a=ajoutPastille(k,pubRegler.groupes); return a>0 ? (typeof base==='number'&&base>0?base:0)+a : base; };
+  const nMsgRegler=designV2App&&pubRegler ? pubRegler.groupes.filter(g=>g&&g.id==='messages'&&Number(g.n)>0).reduce((t,g)=>t+Number(g.n),0) : 0;
+  const badgesNav={ ventes: plusRegler('ventes',colisBadge), achats: plusRegler('achats',retraitsBadge), annonces: plusRegler('annonces',nAnnonces), garage: plusRegler('stock',undefined),
+    messages: nMsgRegler>0 ? nMsgRegler : msgNonLus>0, ...(designV2App&&pubRegler&&ajoutPastille('sante',pubRegler.groupes)>0 ? { settings: true } : {}) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
@@ -66032,6 +66115,8 @@ function AppCoeur() {
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
           </span> : null}
         </header>
+        {/* (19 nov., décision de Julien) « À régler · N » : ce qui était dans « À faire » d'Aujourd'hui, en tête de SON onglet (replié s'il ne presse pas). */}
+        {designV2App && !baseKO && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}
         <CacheSiV2 si={designV2App && !sous}>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           {designV2App ? null : <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>}

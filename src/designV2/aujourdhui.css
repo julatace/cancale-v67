@@ -1,0 +1,179 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   AUJOURD'HUI (src/designV2/Aujourdhui.jsx) — refait le 19 nov. sur la capture de Julien (« le visuel de l'app doit
+   être absolument parfait ») et sa décision (« d'autres choses plus intéressantes pour cet onglet »).
+   Classes neuves `.aj-*` : aucune règle d'hier ne les vise (les règles `.v2-aujourdhui` sont retirées).
+   Grille de 8 (4 pour le fin), gouttières de 16, cibles ≥ 44, un seul bouton plein.
+   LES TROIS HABILLAGES : « VRM » (le défaut : le héros bleu nuit, les cartes claires), « Apple »
+   (`data-theme-style="apple"` : aucun aplat, la police du système), clair et sombre. Les couleurs des cartes sont les
+   jetons `--ap-*` que les DEUX habillages posent (vrm-interface.css les aligne sur `--vrm-ui-*`) ; le héros a les siens.
+   ════════════════════════════════════════════════════════════════════════════ */
+.aj {
+  --aj-carte: var(--ap-carte, #FFFFFF);
+  --aj-encre: var(--ap-encre, #182439);
+  --aj-muet: var(--ap-gris, #475973);
+  --aj-filet: var(--ap-filet, #CDD8E9);
+  --aj-doux: var(--ap-remplir, #E7EDF7);
+  --aj-accent: var(--ap-bleu, #304E92);
+  --aj-ambre: var(--ap-ambre, var(--v2-ambre, #8A4B00));
+  --aj-ambre-point: var(--ap-ambre-point, var(--v2-ambre-point, #E08A12));
+  --aj-r-carte: 18px;
+  /* Le héros (habillage « VRM ») : le bleu nuit du bandeau, qui continue sous le titre. */
+  --aj-hero-fond: #131E39;
+  --aj-hero-lueur: #283D70;
+  --aj-hero-encre: #F3F6FF;
+  --aj-hero-muet: #C1CCE8;
+  --aj-hero-filet: rgb(171 187 237 / .24);
+  --aj-hero-doux: rgb(228 236 255 / .10);
+  --aj-hero-barre: #9DB2F2;
+  --aj-hero-ambre: #FFCB85;
+  --aj-hero-mois: transparent;
+  display: flex; flex-direction: column; padding: 0 16px 24px; color: var(--aj-encre);
+  font-family: var(--ap-police, Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif);
+}
+:root[data-theme="dark"] .aj { --aj-hero-fond: #101A35; --aj-hero-lueur: #293D73; }
+/* « Apple » : pas d'aplat — le fond groupé, l'encre, le bleu du système ; le mois devient une carte. */
+html[data-theme-style="apple"] .aj {
+  --aj-r-carte: 12px;
+  --aj-hero-fond: transparent; --aj-hero-lueur: transparent;
+  --aj-hero-encre: var(--ap-encre); --aj-hero-muet: var(--ap-gris); --aj-hero-filet: var(--ap-filet);
+  --aj-hero-doux: var(--ap-remplir); --aj-hero-barre: var(--ap-bleu-vif); --aj-hero-ambre: var(--ap-ambre);
+  --aj-hero-mois: var(--ap-carte);
+}
+
+/* ── 1. LE HÉROS : le titre, l'alerte (au plus une), les chiffres ─────────────── */
+.aj-hero { margin: 0 -16px 24px; padding: 0 16px 20px; border-radius: 0 0 28px 28px; color: var(--aj-hero-encre);
+  background: radial-gradient(120% 90% at 100% 0%, var(--aj-hero-lueur), transparent 62%), var(--aj-hero-fond); }
+html[data-theme-style="apple"] .aj-hero { background: none; border-radius: 0; margin-bottom: 16px; padding-bottom: 0; }
+.aj-hero .aj-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0; margin: 0; border: 0; }
+.aj-hero .aj-titre { margin: 0; min-width: 0; color: inherit; font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-alerte-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+html body .aj button.v2-rangee.aj-alerte { min-height: 44px; margin: 4px 0 4px; padding: 0 8px 0 12px; gap: 8px; border-radius: 12px; background: var(--aj-hero-doux); color: var(--aj-hero-ambre); font-size: 15px; font-weight: 600; line-height: 20px; }
+.aj-alerte .v2-point, .aj .v2-point { margin-right: 0; background: var(--aj-ambre-point); }
+.aj-chevron { display: grid; place-items: center; flex: none; width: 20px; height: 20px; color: currentColor; opacity: .7; }
+
+.aj-chiffres { margin-top: 8px; }
+.aj-jour { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 12px; min-height: 52px; }
+.aj-jour-n { font-size: 44px; line-height: 52px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1; white-space: nowrap; }
+.aj-jour-u { font-size: 26px; letter-spacing: 0; font-weight: 600; }
+.aj-jour-mot { font-size: 15px; line-height: 20px; color: var(--aj-hero-muet); min-width: 0; }
+.aj-attente { display: inline-block; width: 120px; height: 36px; border-radius: 10px; background: var(--aj-hero-doux); vertical-align: -4px; }
+/* Les sept jours : une barre par jour (une seule série), le jour choisi plein ; chaque barre se touche (≥ 44 × 72). */
+.aj-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 8px -4px 0; padding: 0; list-style: none; }
+.aj-sem-jour { min-width: 0; }
+.aj-sem-btn { appearance: none; -webkit-appearance: none; margin: 0; border: 0; padding: 4px 0 2px; width: 100%; min-height: 72px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+  background: transparent; color: var(--aj-hero-muet); font: inherit; border-radius: 10px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.aj-sem-btn:focus-visible { outline: 2px solid var(--aj-hero-barre); outline-offset: -2px; }
+.aj-sem-piste { display: flex; align-items: flex-end; width: 24px; height: 44px; border-radius: 6px; background: var(--aj-hero-doux); overflow: hidden; }
+.aj-sem-piste i { display: block; width: 100%; min-height: 0; border-radius: 6px; background: var(--aj-hero-barre); opacity: .5; transition: opacity 160ms ease; }
+.aj-sem-piste i[data-vide] { height: 0; }
+.aj-sem-btn[aria-pressed="true"] .aj-sem-piste i { opacity: 1; }
+.aj-sem-btn[aria-pressed="true"] .aj-sem-piste { box-shadow: inset 0 0 0 1.5px var(--aj-hero-barre); }
+.aj-sem-l { font-size: 12px; line-height: 16px; font-weight: 600; }
+.aj-sem-btn[aria-pressed="true"] .aj-sem-l { color: var(--aj-hero-encre); }
+.aj-sem-btn:active .aj-sem-piste { transform: scaleY(.96); transform-origin: bottom; }
+/* Le mois : Vendu · Reçu · Bénéfice — la ligne entière ouvre Argent. */
+html body .aj button.v2-rangee.aj-mois { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 12px; padding: 12px 0 0; min-height: 44px; border-top: 1px solid var(--aj-hero-filet); border-radius: 0; color: inherit; background: var(--aj-hero-mois); }
+html[data-theme-style="apple"] body .aj button.v2-rangee.aj-mois { padding: 12px 16px; border-top: 0; border-radius: var(--aj-r-carte); }
+.aj-mois-tete { display: flex; align-items: center; gap: 4px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--aj-hero-muet); }
+.aj-mois-cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.aj-mois-case { display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: left; }
+.aj-mois-l { font-size: 12px; line-height: 16px; color: var(--aj-hero-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-mois-v { font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-mois-note { font-size: 12px; line-height: 16px; color: var(--aj-hero-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── 2. LES SECTIONS : un titre court HORS de la carte, la carte = le contenu ─── */
+.aj-section { margin: 0 0 24px; min-width: 0; }
+.aj-h2 { margin: 0 4px 8px; font-size: 20px; line-height: 24px; font-weight: 700; letter-spacing: -.015em; color: var(--aj-encre); }
+.aj-carte, html body .aj button.v2-rangee.aj-passe, .aj-liste { background: var(--aj-carte); border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); box-shadow: 0 1px 2px rgb(24 36 57 / .04); color: var(--aj-encre); }
+html[data-theme-style="apple"] .aj-carte, html[data-theme-style="apple"] body .aj button.v2-rangee.aj-passe, html[data-theme-style="apple"] .aj-liste { border-color: transparent; box-shadow: none; }
+
+/* À envoyer : le nombre, les vignettes, LE plein. */
+.aj-carte { padding: 12px; }
+html body .aj button.v2-rangee.aj-envoyer-tete { gap: 12px; min-height: 56px; padding: 0 0 0 4px; border-radius: 12px; }
+.aj-n { font-size: 40px; line-height: 48px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; flex: none; }
+.aj-n-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.aj-n-mot { font-size: 17px; line-height: 22px; font-weight: 600; }
+.aj-n-sous { font-size: 13px; line-height: 18px; color: var(--aj-muet); }
+.aj-n-sous.is-ambre { color: var(--aj-ambre); }
+.aj-carte .aj-chevron, .aj-liste .aj-chevron, .aj-passe .aj-chevron { color: var(--aj-muet); opacity: 1; }
+/* La bande : des cases de 60, espacées de 8 ; chacune SA plaque dessous, au plus un point d'urgence ; « +N » sinon. */
+.aj-bande { display: flex; gap: 8px; margin-top: 8px; min-height: 88px; overflow: hidden; }
+html body .aj button.v2-rangee.aj-case, .aj span.aj-case { flex: 0 0 60px; width: 60px; min-height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; padding: 0; border-radius: 12px; }
+.aj-case-photo { position: relative; display: grid; place-items: center; flex: none; width: 60px; height: 60px; border-radius: 12px; background: var(--aj-doux); color: var(--aj-muet); }
+.aj-case-photo img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.aj-case-point { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--aj-ambre-point); box-shadow: 0 0 0 2px var(--aj-carte); }
+.aj-case-plaque { display: flex; justify-content: center; align-items: center; flex: none; width: 60px; height: 24px; }
+/* Dans une case de 60, la plaque garde sa forme (kraft, œillet, coin coupé) et son numéro ENTIER ; le « N° » est lu (aria-label). */
+.aj-case-plaque .v2-etiquette { padding: 3px 6px 0 12px; max-width: 60px; }
+.aj-case-plaque .v2-etiquette small { display: none; }
+.aj-case-plaque .v2-etiquette b { font-size: 13px; }
+.aj-case-plus .aj-case-photo { font-size: 17px; font-weight: 600; color: var(--aj-encre); font-variant-numeric: tabular-nums; }
+.aj-plein { margin-top: 12px; }
+
+/* À retirer : la passe — le point sur UNE ligne, le code en grand, centré, puis le compte et l'urgence. */
+html body .aj button.v2-rangee.aj-passe { flex-direction: column; align-items: stretch; gap: 12px; width: 100%; padding: 12px 12px 14px; text-align: left; }
+.aj-passe-lieu { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 36px; }
+.aj-passe-ic { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--aj-doux); color: var(--aj-accent); }
+.aj-passe-nom { flex: 1; min-width: 0; font-size: 17px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-passe-code { display: block; padding: 12px 8px; border-radius: 12px; background: var(--aj-doux); color: var(--aj-encre); text-align: center; font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: .08em; text-indent: .08em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.aj-passe-bas { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; padding: 0 4px; font-size: 15px; line-height: 20px; color: var(--aj-muet); }
+.aj-passe-quand { display: inline-flex; align-items: center; gap: 6px; }
+.aj-passe-quand.is-ambre { color: var(--aj-ambre); font-weight: 600; }
+
+/* Dernières ventes : des rangées de 68, un filet indenté ; « Argent à venir » sur la dernière ligne. */
+.aj-liste { overflow: hidden; }
+html body .aj button.v2-rangee.aj-vente { position: relative; gap: 12px; min-height: 68px; padding: 10px 14px 10px 12px; border-radius: 0; }
+.aj-vente + .aj-vente::before, .aj-vente + .aj-avenir::before { content: ""; position: absolute; left: 72px; right: 0; top: 0; height: 1px; background: var(--aj-filet); }
+.aj-vente-photo { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: var(--aj-doux); color: var(--aj-muet); }
+.aj-vente-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.aj-vente-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.aj-vente-titre { font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-vente-meta { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 24px; }
+.aj-vente-quand { min-width: 0; font-size: 13px; line-height: 18px; color: var(--aj-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-vente-prix { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+html body .aj button.v2-rangee.aj-avenir { position: relative; gap: 8px; min-height: 52px; padding: 0 12px 0 16px; border-radius: 0; }
+.aj-avenir + .aj-avenir::before { content: none; }
+.aj-avenir-l { flex: 1; min-width: 0; font-size: 15px; line-height: 20px; color: var(--aj-muet); text-align: left; }
+.aj-avenir-v { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.aj-avenir-v small { font-size: 13px; font-weight: 400; color: var(--aj-muet); }
+
+/* « Rien à envoyer ni à retirer » : calme, à la place des deux blocs (les chiffres et les ventes restent). */
+.aj .v2-rien.is-compact { align-items: flex-start; text-align: left; margin: 0 0 24px; padding: 16px; border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); background: var(--aj-carte); color: var(--aj-encre); }
+.aj .v2-rien.is-compact .v2-rien-titre { font-size: 17px; line-height: 22px; margin: 0 0 2px; }
+.aj .v2-rien.is-compact .v2-rien-sous { font-size: 15px; line-height: 20px; color: var(--aj-muet); max-width: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  html body .aj button.v2-rangee.aj-vente:hover, html body .aj button.v2-rangee.aj-avenir:hover, html body .aj button.v2-rangee.aj-envoyer-tete:hover { background: color-mix(in srgb, var(--aj-encre) 4%, transparent); }
+  .aj-sem-btn:hover .aj-sem-piste i { opacity: .8; }
+}
+@media (prefers-reduced-motion: reduce) { .aj-sem-piste i { transition: none; } .aj-sem-btn:active .aj-sem-piste { transform: none; } }
+/* Très petit téléphone (≤ 360) : le titre et le chiffre du jour rendent 4 px. */
+@media (max-width: 360px) { .aj-hero .aj-titre { font-size: 30px; } .aj-jour-n { font-size: 40px; } .aj-passe-code { font-size: 28px; } }
+
+/* ── 3. L'ORDINATEUR : la même chose en deux colonnes, sans colonne « À faire » ── */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .aj { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 32px; align-items: start; max-width: 1120px; padding: 12px 32px 32px; }
+  .aj-hero { grid-column: 1 / -1; margin: 0 0 32px; padding: 16px 28px 24px; border-radius: 24px; }
+  html[data-theme-style="apple"] .aj-hero { padding: 0; }
+  .aj-chiffres { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 48px; align-items: end; }
+  .aj-jour { grid-column: 1; }
+  .aj-semaine { grid-column: 1; max-width: 420px; }
+  html body .aj button.v2-rangee.aj-mois { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin-top: 0; padding: 0 0 0 32px; border-top: 0; border-left: 1px solid var(--aj-hero-filet); }
+  html[data-theme-style="apple"] body .aj button.v2-rangee.aj-mois { padding: 16px 20px; border-left: 0; }
+  .aj-mois-v { font-size: 20px; line-height: 26px; }
+  .aj > [data-v2-bloc="envoyer"], .aj > [data-v2-bloc="retirer"], .aj > [data-v2-bloc="rien"] { grid-column: 1; }
+  .aj > [data-v2-bloc="ventes"] { grid-column: 2; grid-row: 2 / span 3; }
+  .aj > [data-v2-bloc="ventes"]:nth-child(2) { grid-column: 1 / -1; grid-row: auto; max-width: 560px; }
+  .aj-carte { padding: 16px; }
+  .aj-plein .v2b-hote-plein { width: auto; }
+}
+
+/* ── 4. CE QUE LES HABILLAGES FORCENT AILLEURS (`!important`, couche `vrm-interface`) ET QUI NE VAUT PAS ICI ──
+   L'habillage « VRM » peint toute icône de l'app à l'encre : sur le héros bleu nuit, le rond « Scanner » serait invisible. */
+@layer vrm-interface {
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-main .aj .aj-hero button.v2b-icone[data-v2-scanner]:not(:disabled):not([aria-disabled="true"]) {
+    width: 44px !important; height: 44px !important; min-width: 44px !important; border: 0 !important; border-radius: 50% !important;
+    background: var(--aj-hero-doux) !important; color: var(--aj-hero-encre) !important;
+  }
+}
+html[data-theme-style="apple"] body .aj .aj-hero button.v2b-icone[data-v2-scanner] { background: var(--ap-remplir); color: var(--ap-bleu); border-radius: 50%; }
