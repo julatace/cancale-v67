@@ -13,7 +13,7 @@ export default {
   "vv.ou.meuble": "Mobile",
   "vv.pret": "pronta",
   "vv.ech.vendue": "venduta il {date}",
-  "vv.col.paire": "Paio",
+  "vv.col.paire": "Articolo",
   "vv.col.limite": "Scadenza",
   "vv.col.ou": "Dove in magazzino",
   "vv.col.transport": "Trasporto",
@@ -77,4 +77,17 @@ export default {
   "va.comptoir.fermer": "Chiudi",
   "va.comptoir.dansJ": "tra {n} g",
   "va.comptoir.achete": "acquistato {prix}",
+  // (19 nov.) Ventes « comme avant » : l’écart nommé, le volet de l’ordinateur
+  "vv.hero.coches": {"one": "{n} selezionato per la stampa", "other": "{n} selezionati per la stampa"},
+  "vv.hero.imprimes": {"one": "{n} stampato, da consegnare", "other": "{n} stampati, da consegnare"},
+  "vv.bord.imprime": "stampato",
+  "vv.ech.estimee": "data stimata",
+  "vv.outils.filtres": "Filtra: entro domani, corriere",
+  "vv.outils.filtresMasquer": "Nascondi i filtri",
+  "vv.volet.label": "La vendita scelta",
+  "vv.volet.vide": "Tocca una vendita: la sua scheda si apre qui.",
+  "vv.volet.fiche": "Tutta la scheda",
+  "vv.volet.imprimer": "Stampa questa etichetta",
+  "vv.volet.pasDepose": "Non ancora consegnato",
+  "vv.volet.suivre": "Segui il pacco"
 };

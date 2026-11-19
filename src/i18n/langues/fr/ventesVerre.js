@@ -13,7 +13,7 @@ export default {
   "vv.ou.meuble": "Meuble",
   "vv.pret": "prêt",
   "vv.ech.vendue": "vendue {date}",
-  "vv.col.paire": "Paire",
+  "vv.col.paire": "Article",
   "vv.col.limite": "Date limite",
   "vv.col.ou": "Où dans le stock",
   "vv.col.transport": "Transport",
@@ -77,4 +77,17 @@ export default {
   "va.comptoir.fermer": "Fermer",
   "va.comptoir.dansJ": "dans {n} j",
   "va.comptoir.achete": "acheté {prix}",
+  // (19 nov.) Ventes « comme avant » : l’écart nommé, le volet de l’ordinateur
+  "vv.hero.coches": {"one": "{n} coché pour l’impression", "other": "{n} cochés pour l’impression"},
+  "vv.hero.imprimes": {"one": "{n} imprimé, à déposer", "other": "{n} imprimés, à déposer"},
+  "vv.bord.imprime": "imprimé",
+  "vv.ech.estimee": "date estimée",
+  "vv.outils.filtres": "Filtrer : avant demain, transporteur",
+  "vv.outils.filtresMasquer": "Masquer les filtres",
+  "vv.volet.label": "La vente choisie",
+  "vv.volet.vide": "Touche une vente : sa fiche s’ouvre ici.",
+  "vv.volet.fiche": "Toute la fiche",
+  "vv.volet.imprimer": "Imprimer ce bordereau",
+  "vv.volet.pasDepose": "Pas encore déposé",
+  "vv.volet.suivre": "Suivre le colis"
 };
