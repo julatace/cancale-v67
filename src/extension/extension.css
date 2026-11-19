@@ -1,0 +1,5 @@
+/* La page « Extension » (19 nov., demande H) : ses phrases SONT l'information (pourquoi non, que faire).
+   Elles ne se coupent jamais en « … » : le titre sur deux lignes et la raison sous un geste vont à la ligne
+   en entier. Limité à cette page ; les autres listes natives gardent leur coupe. */
+[data-ecran-extension] .n-rangee-titre[data-n-lignes="2"] { display: block; -webkit-line-clamp: unset; overflow: visible; }
+[data-ecran-extension] .n-rangee-sous-texte { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
