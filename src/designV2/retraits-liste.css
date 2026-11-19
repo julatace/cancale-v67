@@ -11,8 +11,9 @@ button.v2r-haut:active { opacity: .7; }
 .v2r-photo img { width: 100%; height: 100%; object-fit: cover; }
 .v2r-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .v2r-titre { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2r-limite.v2-passe-limite { font-size: 13px; font-weight: 400; line-height: 18px; text-align: left; padding: 0; opacity: .78; }
-.v2r-limite.is-ambre { opacity: 1; font-weight: 600; }
+.v2r-limite { font-size: 13px; font-weight: 400; line-height: 18px; color: inherit; opacity: .8; }
+/* Date limite proche : en gras, la couleur du texte (un ambre sombre sur la carte bleu nuit tombait à 1,2:1). */
+.v2r-limite.is-ambre { opacity: 1; font-weight: 700; }
 .v2r-code { flex: none; font-size: 26px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1; }
 .v2r-sans.v2-passe-sans { flex: none; max-width: 40%; font-size: 13px; padding: 0; text-align: right; }
 .v2r-gestes { display: flex; justify-content: flex-end; padding: 0 8px 4px; }
@@ -20,4 +21,4 @@ button.v2r-haut:active { opacity: .7; }
   font: inherit; font-size: 15px; font-weight: 600; color: inherit; cursor: pointer; position: relative; }
 .v2r-retire::before { content: ""; position: absolute; inset: -4px 0; } /* cible au doigt 44 px */
 @media (max-width: 359px) { .v2r-code { font-size: 22px; } }
-.v2r-dedans { font-size: 13px; line-height: 18px; opacity: .78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2r-dedans { font-size: 13px; line-height: 18px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

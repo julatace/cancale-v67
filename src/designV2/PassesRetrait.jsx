@@ -37,7 +37,7 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
       <span className="v2r-photo v2-passe-photo" data-v2-photo-article={photo ? '' : undefined} aria-hidden="true">{photo || <Icon name="box" size={22}/>}</span>
       <span className="v2r-texte">
         <span className="v2r-titre v2-passe-titre">{aides.titre(x)}{x.num ? <> <Etiquette num={x.num}/></> : null}</span>
-        <span className={'v2r-limite v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
+        <span className={'v2r-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
           {ech ? ech.t : tr('v2.passe.limiteInconnue')}{qr ? ' · QR' : ''}
         </span>
         {contenuTxt ? <span className={'v2r-dedans' + (contenu.etat === 'pas-lu' ? ' is-pas-lu' : '')} data-v2-contenu={contenu.etat} data-v2-contenu-tx={contenu.tx || undefined} data-v2-contenu-raison={contenu.etat === 'pas-lu' ? contenu.raison : undefined} data-v2-contenu-compte={contenu.compte || undefined}>{contenuTxt}</span> : null}
@@ -50,10 +50,10 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
   return (
     <RangeeFaite fait={fait} onFin={fin} className="v2r-ligne" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '', 'data-v2-code-etat': rg.codeEtat, 'data-v2-qr-dispo': rg.qr ? '1' : '0', 'data-v2-limite-jour': rg.limite.jour || '', 'data-v2-limite-source': rg.limite.source, 'data-v2-titre-de': rg.titreDe || '', 'data-v2-transporteur': rg.transporteur.cle || '' }}>
       {ouvrir && (!codesEnConflit || qr)
-        ? <button type="button" className="v2r-haut" onClick={ouvrir} data-v2-en-grand="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</button>
+        ? <button type="button" className="v2r-haut" onClick={ouvrir} data-v2-en-grand="" data-v2-rangee="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</button>
         : <div className="v2r-haut">{corps}</div>}
       <div className="v2r-gestes">
-        <button type="button" className="v2r-retire" onClick={() => setFait(true)} data-v2-retire="">{tr('v2.passe.retire')}</button>
+        <button type="button" className="v2r-retire" onClick={() => setFait(true)} data-v2-retire="" data-v2b="texte">{tr('v2.passe.retire')}</button>
       </div>
     </RangeeFaite>
   );
