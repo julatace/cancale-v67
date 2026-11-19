@@ -357,7 +357,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
           <span className="n-mail-sujet" data-boite-sujet-ligne="">{e.subject || tr('emails.eMailSans')}</span>
           <span className="n-mail-compris" data-boite-compris="">
             <span className="n-mail-quoi" data-boite-quoi={l.titre}>{enClair(l.titre)}</span>
-            {num ? <Plaque numero={num}/> : null}
+            {num ? <span className="n-mail-plaque" data-v2-etiquette={num}><Plaque numero={num}/></span> : null}
             {essentiel.length ? <span className="n-mail-essentiel" data-boite-essentiel="">{essentiel.map((x, i) => <span key={i} className={/^(?:de|par) /.test(x) ? 'vrm-sensible' : undefined} data-stream-type={/^(?:de|par) /.test(x) ? 'acheteur' : undefined}>{i ? ' · ' : ''}{enClair(x)}</span>)}</span> : null}
             {g ? <span className="n-mail-geste" data-boite-geste-mot={g.k} data-ambre={gesteAmbre(g) ? '1' : '0'} data-passe={g.passe ? '1' : undefined} data-boite-averifier={g.k === 'verifier' ? '' : undefined}>{enClair(g.mot)}</span> : null}
           </span>
@@ -604,7 +604,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
       {/* LE HAUT, sur toute la largeur : le segmenté, puis la recherche, le compte, « ⋯ ». */}
       <div className="n-mail-haut" data-v2-mail-tete="">
         <Segmente className="n-mail-seg" libelle={tr('emails.trierEMails')} valeur={segActif} onChange={choisirSeg}
-          options={SEGMENTS_EMAILS.map((v) => ({ cle: v, libelle: MOT_SEG[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : undefined }))}/>
+          options={SEGMENTS_EMAILS.map((v) => ({ cle: v, libelle: MOT_SEG[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : undefined, attrs: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
         <div className="n-mail-outils" data-v2-mail-outils="">
           <label className="n-mail-cherche" data-boite-cherche={cherche ? '1' : '0'}>
             <span className="n-mail-sr">{tr('emails.chercherEMail')}</span>
