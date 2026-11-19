@@ -1,193 +1,104 @@
-/* « Relier mes annonces » — le parcours (19 nov.). Design « VRM natif » (docs/design/NATIF.md) : une page
-   poussée, listes groupées, un seul plein. Les jetons sont ceux du natif (`--n-*`, src/natif/jetons.css) ;
-   les valeurs écrites ici sont celles du contrat, lues tant que la fondation n'est pas chargée.
-   Aucun `!important`, aucun `:has()`, aucun style en ligne dans le composant. */
-.n-lia, .n-liae {
-  --l-fond: var(--n-fond, #F2F2F7);
-  --l-carte: var(--n-carte, #FFFFFF);
-  --l-carte-2: var(--n-carte-2, #F2F2F7);
-  --l-trait: var(--n-trait, rgb(60 60 67 / .18));
-  --l-encre: var(--n-encre, #111114);
-  --l-encre-2: var(--n-encre-2, #6C6C70);
-  --l-encre-3: var(--n-encre-3, #8E8E93);
-  --l-accent: var(--n-accent, #0068D6);
-  --l-plein: var(--n-plein, #0068D6);
-  --l-sur-plein: var(--n-sur-plein, #FFFFFF);
-  --l-teinte: var(--n-teinte, rgb(0 104 214 / .12));
-  --l-ambre: var(--n-ambre, #8A4B00);
-  --l-ambre-fond: var(--n-ambre-fond, #FFF4DD);
-  --l-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
-}
-html[data-theme="dark"] .n-lia, html[data-theme="dark"] .n-liae {
-  --l-fond: var(--n-fond, #000000);
-  --l-carte: var(--n-carte, #1C1C1E);
-  --l-carte-2: var(--n-carte-2, #2C2C2E);
-  --l-trait: var(--n-trait, rgb(84 84 88 / .60));
-  --l-encre: var(--n-encre, #FFFFFF);
-  --l-encre-2: var(--n-encre-2, #98989F);
-  --l-encre-3: var(--n-encre-3, #636366);
-  --l-accent: var(--n-accent, #409CFF);
-  --l-teinte: var(--n-teinte, rgb(64 156 255 / .20));
-  --l-ambre: var(--n-ambre, #FFB340);
-  --l-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
-}
+/* « Relier mes annonces » — le parcours (19 nov.). Design « VRM natif » (docs/design/NATIF.md) : la page
+   (`PagePoussee`), les listes (`Groupe`, `Rangee`), les boutons, la plaque et l'état vide viennent de
+   src/natif/. Ici : ce qui est propre à CET écran — les volets, l'annonce, les cartes « photo contre
+   photo », la relecture du lot. Jetons `--n-*` seulement ; aucun `!important`, aucun `:has()`. */
+.n-lia-corps { display: flex; flex-direction: column; min-width: 0; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+.n-lia-position { font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; padding-right: 8px; }
+.n-lia-colonne { display: flex; flex-direction: column; min-width: 0; }
+.n-lia-note { margin: 0; padding: 16px var(--n-marge); font: var(--n-t-second); color: var(--n-encre-2); }
 
-.n-lia {
-  position: fixed; inset: 0; z-index: 2100;
-  display: flex; flex-direction: column;
-  height: 100vh; height: 100dvh;
-  background: var(--l-fond); color: var(--l-encre);
-  font: 400 17px/22px var(--l-police); font-variant-numeric: tabular-nums;
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior: contain;
-}
-.n-lia *, .n-lia *::before, .n-lia *::after { box-sizing: border-box; }
-.n-lia button { font: inherit; color: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; cursor: pointer; }
-.n-lia button:disabled { cursor: default; opacity: .5; }
-.n-lia figure { margin: 0; min-width: 0; }
-.n-lia p, .n-lia h1, .n-lia h2, .n-lia h3 { margin: 0; }
-
-/* ── La barre : retour, titre, « 3 sur 12 » ── */
-.n-lia-barre {
-  display: grid; grid-template-columns: 76px 1fr 76px; align-items: center;
-  min-height: 44px; padding: env(safe-area-inset-top, 0px) max(4px, env(safe-area-inset-right, 0px)) 0 max(4px, env(safe-area-inset-left, 0px));
-  border-bottom: .5px solid var(--l-trait); flex: none;
-}
-.n-lia-retour { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--l-accent); border-radius: 12px; }
-.n-lia-titre { font: 600 17px/22px var(--l-police); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.n-lia-position { font: 400 15px/20px var(--l-police); color: var(--l-encre-2); text-align: right; padding-right: 12px; white-space: nowrap; }
-.n-lia-bande { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 4px 16px; flex: none; }
-.n-lia-dernier { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: 400 15px/20px var(--l-police); color: var(--l-encre-2); }
-.n-lia-dernier.is-verifie { color: var(--l-encre); }
-.n-lia-dernier.is-autre { color: var(--l-ambre); }
-
-/* ── Le corps ── */
-.n-lia-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: auto; padding: 0 16px 16px; }
-.n-lia-file { display: none; }
-.n-lia-annonce {
-  position: sticky; top: 0; z-index: 2;
-  display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: center;
-  margin: 0 -16px; padding: 12px 16px; background: var(--l-fond); border-bottom: .5px solid var(--l-trait);
-}
-.n-lia-annonce-textes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.n-lia-annonce-site { font: 600 13px/18px var(--l-police); color: var(--l-encre-2); }
-.n-lia-annonce-titre { font: 600 17px/22px var(--l-police); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.n-lia-annonce-faits { font: 400 15px/20px var(--l-police); color: var(--l-encre-2); }
-.n-lia-annonce-lien { font: 400 15px/20px var(--l-police); color: var(--l-accent); text-decoration: none; padding: 12px 0; margin: -8px 0 -12px; align-self: flex-start; }
+/* ── La bande : le dernier lien (« vérifié »), le lot ── */
+.n-lia-bande { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 0 var(--n-marge) 8px; }
+.n-lia-dernier { display: inline-flex; align-items: center; min-height: var(--n-cible); font: var(--n-t-second); color: var(--n-encre-2); }
+.n-lia-dernier[data-ton="sur"] { color: var(--n-encre); }
+.n-lia-dernier[data-ton="ambre"] { color: var(--n-ambre); }
 
 /* ── Les photos ── */
-.n-lia-photo { display: block; position: relative; overflow: hidden; background: var(--l-carte-2); border-radius: 10px; aspect-ratio: 1 / 1; width: 100%; }
+.n-lia-photo { display: block; position: relative; overflow: hidden; width: 100%; aspect-ratio: 1 / 1; border-radius: var(--n-r-vignette); background: var(--n-carte-2); }
 .n-lia-photo > * { position: absolute; inset: 0; width: 100%; height: 100%; }
-.n-lia-photo img { object-fit: cover; display: block; }
-.n-lia-photo.is-rangee { width: 44px; flex: none; }
-.n-lia-photo.is-lot { width: 100%; }
+.n-lia-photo img { display: block; object-fit: cover; }
+.n-lia-photo[data-sorte="rangee"] { width: 44px; flex: none; }
 
-/* ── La candidate mise en avant : photo contre photo, UN plein ── */
-.n-lia-avant { display: flex; flex-direction: column; gap: 12px; padding: 16px 0 8px; }
-.n-lia-face { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
-.n-lia-face figcaption { margin-top: 6px; font: 400 13px/18px var(--l-police); color: var(--l-encre-2); overflow-wrap: anywhere; }
-.n-lia-face figcaption small { display: block; font: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.n-lia-face figure > .n-lia-btn { margin-top: 8px; width: 100%; }
-
-/* ── Chercher ── */
-.n-lia-cherche { display: flex; gap: 8px; align-items: center; padding: 12px 0; }
-.n-lia-champ {
-  flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 12px; border: 0; border-radius: 10px;
-  background: var(--l-carte); color: var(--l-encre); font: 400 17px/22px var(--l-police); -webkit-appearance: none; appearance: none;
+/* ── L'annonce du site : toujours en vue pendant qu'il compare ── */
+.n-lia-file { display: none; }
+.n-lia-annonce {
+  position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); z-index: 10;
+  display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 8px var(--n-marge) 12px; background: var(--n-fond); border-bottom: .5px solid var(--n-trait);
 }
-.n-lia-champ::placeholder { color: var(--l-encre-2); }
-.n-lia-champ:focus-visible, .n-lia button:focus-visible, .n-lia a:focus-visible, .n-lia-coche:focus-visible { outline: 2px solid var(--l-accent); outline-offset: 2px; }
-.n-lia-puce { flex: none; min-height: 44px; padding: 0 14px; border: 0; border-radius: 22px; background: var(--l-carte); color: var(--l-encre-2); font: 600 15px/20px var(--l-police); }
-.n-lia-puce[aria-pressed="true"] { background: var(--l-teinte); color: var(--l-accent); }
+.n-lia-annonce-textes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.n-lia-annonce-site { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+.n-lia-annonce-titre { margin: 0; font: var(--n-t-corps-fort); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.n-lia-annonce-faits { font: var(--n-t-second); color: var(--n-encre-2); }
+.n-lia-annonce-lien { align-self: flex-start; display: inline-flex; align-items: center; min-height: var(--n-cible); font: var(--n-t-second); color: var(--n-accent); text-decoration: none; }
+.n-lia-candidates { min-width: 0; padding: 0 var(--n-marge) 8px; }
 
-/* ── La grille des candidates : photo contre photo ── */
+/* ── Photo contre photo ── */
+.n-lia-avant { display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; }
+.n-lia-face { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.n-lia-cote { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.n-lia-legende { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+.n-lia-legende-sous { display: block; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-lia-etat { display: inline-flex; align-items: center; gap: 6px; font: var(--n-t-legende-fort); color: var(--n-encre); }
+.n-lia-etat[data-ton="ambre"] { color: var(--n-ambre); }
+.n-lia-diode, .n-lia-point { width: 8px; height: 8px; border-radius: var(--n-r-rond); flex: none; display: inline-block; }
+.n-lia-diode { background: var(--n-accent); }
+.n-lia-point { background: var(--n-ambre); }
+
+/* ── Chercher, la taille ── */
+.n-lia-cherche { display: flex; gap: 8px; align-items: center; padding: 12px 0; }
+.n-lia-cherche > .n-recherche { flex: 1 1 auto; min-width: 0; margin: 0; }
+
+/* ── La grille des candidates : chaque carte se touche en entier ── */
 .n-lia-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .n-lia-carte {
-  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; border: 0; border-radius: 12px;
-  background: var(--l-carte); text-align: left; transition: filter 80ms linear;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px; border: 0; border-radius: var(--n-r-carte);
+  background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); text-align: left; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+  transition: box-shadow var(--n-duree-appui) linear;
 }
-.n-lia-carte:active:not(:disabled), .n-lia-btn:active:not(:disabled), .n-lia-rangee:active, .n-lia-puce:active { filter: brightness(.92); }
-.n-lia-carte.is-focus { outline: 2px solid var(--l-accent); outline-offset: 2px; }
-.n-lia-carte-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; min-width: 0; }
-.n-lia-carte-prix { font: 600 15px/20px var(--l-police); white-space: nowrap; }
-.n-lia-carte-titre { font: 400 15px/20px var(--l-police); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.n-lia-carte-sous { display: flex; flex-wrap: wrap; gap: 0 8px; font: 400 13px/18px var(--l-police); color: var(--l-encre-2); min-width: 0; }
+.n-lia-carte:active { box-shadow: inset 0 0 0 999px var(--n-appui); }
+.n-lia-carte[aria-disabled="true"] { cursor: default; }
+.n-lia-carte[data-focus], .n-lia-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.n-lia-carte-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-top: 4px; }
+.n-lia-carte-prix { font: var(--n-t-second-fort); white-space: nowrap; }
+.n-lia-carte-titre { font: var(--n-t-second); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.n-lia-carte-sous { display: flex; flex-wrap: wrap; gap: 0 8px; min-width: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
 .n-lia-carte-sous > span { overflow-wrap: anywhere; }
-.n-lia-carte-sous .is-ambre { color: var(--l-ambre); font-weight: 600; }
-.n-lia-plaque { display: inline-block; padding: 1px 7px; border-radius: 8px; border: .5px solid var(--l-trait); background: var(--l-carte-2); color: var(--l-encre); font: 700 15px/20px var(--l-police); white-space: nowrap; }
-.n-lia-etat { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/18px var(--l-police); }
-.n-lia-etat.is-sur { color: var(--l-encre); }
-.n-lia-etat.is-verifier { color: var(--l-ambre); }
-.n-lia-diode { width: 8px; height: 8px; border-radius: 50%; background: var(--l-accent); flex: none; }
-.n-lia-point, .n-liae-point { width: 8px; height: 8px; border-radius: 50%; background: var(--l-ambre); flex: none; display: inline-block; }
+.n-lia-carte-sous > [data-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-legende-fort); }
 
-/* ── Les boutons : plein (UN par écran) · teinté · texte ── */
-.n-lia-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: none; font: 600 15px/20px var(--l-police); text-align: center; transition: filter 80ms linear; }
-.n-lia-btn.is-plein { min-height: 50px; width: 100%; border-radius: 14px; background: var(--l-plein); color: var(--l-sur-plein); font: 600 17px/22px var(--l-police); }
-.n-lia-btn.is-teinte { background: var(--l-teinte); color: var(--l-accent); }
-.n-lia-btn.is-texte { color: var(--l-accent); padding: 0 10px; }
-
-/* ── Le pied : les sorties ── */
-.n-lia-pied {
-  flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px;
-  padding: 4px max(12px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
-  border-top: .5px solid var(--l-trait); background: var(--l-fond);
-}
-.n-lia-pied .n-lia-btn.is-plein { margin: 8px 4px; }
+/* ── Les sorties, sous le plein ── */
+.n-lia-sorties { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px; }
 
 /* ── La question, le refus, un lien qui se contredit, l'annonce reliée ── */
-.n-lia-question, .n-lia-contra, .n-lia-fiche { display: flex; flex-direction: column; gap: 12px; padding: 16px; margin-top: 16px; border-radius: 12px; background: var(--l-carte); }
-.n-lia-question-texte { font: 400 17px/22px var(--l-police); }
-.n-lia-question-gestes { display: flex; flex-direction: column; gap: 8px; }
-.n-lia-contra-titre { display: flex; align-items: center; gap: 8px; font: 600 17px/22px var(--l-police); }
-.n-lia-fiche-etat { font: 600 17px/22px var(--l-police); }
-.n-lia-fiche-etat small { font: 400 15px/20px var(--l-police); color: var(--l-encre-2); }
-
-/* ── Les rangées (la file, « plus tard ») ── */
-.n-lia-rangee { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 12px; border: 0; background: var(--l-carte); text-align: left; border-radius: 12px; margin-top: 8px; }
-.n-lia-rangee-textes { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
-.n-lia-rangee-titre { font: 400 17px/22px var(--l-police); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
-.n-lia-rangee-sous { font: 400 13px/18px var(--l-police); color: var(--l-encre-2); }
-.n-lia-chevron, .n-liae-chevron { color: var(--l-encre-3); flex: none; }
-.n-lia-groupe { margin-top: 24px; }
-.n-lia-groupe-titre { font: 400 13px/18px var(--l-police); color: var(--l-encre-2); text-transform: uppercase; padding: 0 12px; }
+.n-lia-bloc { display: flex; flex-direction: column; gap: 12px; margin: 16px var(--n-marge) 0; padding: 16px; border-radius: var(--n-r-carte); background: var(--n-carte); }
+.n-lia-candidates > .n-lia-bloc { margin-inline: 0; }
+.n-lia-bloc-titre { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--n-t-corps-fort); }
+.n-lia-phrase { margin: 0; font: var(--n-t-corps); }
+.n-lia-gestes { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── Le lot : la relecture photo contre photo ── */
-.n-lia-lot-ligne { display: grid; grid-template-columns: minmax(0, 104px) minmax(0, 104px) minmax(0, 1fr) 44px; gap: 12px; align-items: center; padding: 12px; margin-top: 8px; border-radius: 12px; background: var(--l-carte); }
-.n-lia-lot-textes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.n-lia-coche { width: 24px; height: 24px; margin: 10px; accent-color: var(--l-accent); }
+.n-lia-lot-ligne { display: grid; grid-template-columns: minmax(0, 104px) minmax(0, 104px) minmax(0, 1fr) 44px; gap: 12px; align-items: center; margin: 0 var(--n-marge) 8px; padding: 12px; border-radius: var(--n-r-carte); background: var(--n-carte); cursor: pointer; }
+.n-lia-lot-textes { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.n-lia-coche { width: 24px; height: 24px; margin: 10px; accent-color: var(--n-accent); }
 .n-lia-lot-fin { display: block; height: 1px; }
 
-/* ── Les états : attente, vide, fin ── */
-.n-lia-attente, .n-lia-note { font: 400 15px/20px var(--l-police); color: var(--l-encre-2); padding: 16px 0; }
-.n-lia-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 16px 24px; text-align: center; color: var(--l-encre-2); font: 400 15px/20px var(--l-police); }
-.n-lia-vide-titre { font: 700 22px/28px var(--l-police); color: var(--l-encre); }
-.n-lia-vide-coche { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--l-teinte); color: var(--l-accent); }
-.n-lia-vide-coche svg { width: 28px; height: 28px; }
-.n-lia-vide .n-lia-btn.is-plein { max-width: 360px; }
-
-/* ── Plus large : trois candidates par rangée ── */
+/* ── Plus large ── */
 @media (min-width: 600px) {
   .n-lia-grille { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .n-lia-question-gestes { flex-direction: row; flex-wrap: wrap; }
-  .n-lia-corps.is-contradictions, .n-lia-corps.is-lot, .n-lia-corps.is-fin, .n-lia-corps.is-annonce { width: 100%; max-width: 760px; margin: 0 auto; }
+  .n-lia-gestes { flex-direction: row; flex-wrap: wrap; }
+  .n-lia-colonne { width: 100%; max-width: 760px; margin-inline: auto; }
 }
-
 /* ── L'ordinateur : trois volets (la file · l'annonce · les candidates) ── */
 @media (min-width: 1024px) {
-  .n-lia-corps.is-volets { display: grid; grid-template-columns: 300px minmax(300px, 400px) minmax(0, 1fr); padding: 0; overflow: hidden; }
-  .n-lia-corps.is-volets > * { min-height: 0; overflow-y: auto; padding: 16px; }
-  .n-lia-corps.is-volets > .n-lia-file { display: block; border-right: .5px solid var(--l-trait); }
-  .n-lia-file .n-lia-rangee { margin-top: 0; margin-bottom: 4px; background: none; }
-  .n-lia-file .n-lia-rangee[aria-current="true"] { background: var(--l-teinte); }
-  .n-lia-file .n-lia-rangee[aria-current="true"] .n-lia-rangee-titre { color: var(--l-accent); }
-  .n-lia-corps.is-volets > .n-lia-annonce { position: static; display: flex; flex-direction: column; align-items: stretch; margin: 0; border-bottom: 0; border-right: .5px solid var(--l-trait); }
-  .n-lia-corps.is-volets .n-lia-annonce-titre { font: 700 22px/28px var(--l-police); -webkit-line-clamp: 3; }
+  .n-lia-volets { display: grid; grid-template-columns: 320px minmax(280px, 380px) minmax(0, 1fr); align-items: start; }
+  .n-lia-file, .n-lia-volets > .n-lia-annonce { position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); max-height: calc(100vh - var(--n-h-barre) - 140px); overflow-y: auto; }
+  .n-lia-file { display: block; padding-top: 8px; }
+  .n-lia-volets > .n-lia-annonce { display: flex; flex-direction: column; align-items: stretch; padding: 8px 16px 16px; border-bottom: 0; }
+  .n-lia-volets .n-lia-annonce-titre { font: var(--n-t-section); -webkit-line-clamp: 3; }
   .n-lia-grille { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   .n-lia-avant { max-width: 560px; }
-  .n-lia-pied { justify-content: flex-end; }
+  .n-lia-sorties { justify-content: flex-end; }
 }
-@media (hover: hover) and (pointer: fine) {
-  .n-lia-carte:hover:not(:disabled), .n-lia-btn:hover:not(:disabled), .n-lia-rangee:hover, .n-lia-puce:hover { filter: brightness(.96); }
-}
-@media (prefers-reduced-motion: reduce) { .n-lia-carte, .n-lia-btn { transition: none; } }
+@media (hover: hover) and (pointer: fine) { .n-lia-carte:hover { box-shadow: inset 0 0 0 999px var(--n-appui); } }
+@media (prefers-reduced-motion: reduce) { .n-lia-carte { transition: none; } }

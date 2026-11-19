@@ -27562,8 +27562,7 @@ function LiaisonCoque() {
   if (!cible) return null;
   const fermer = () => setCible(null);
   return <GardeEcran nom="liaison" feuille onFermer={fermer}>
-    <LiaisonSitesParesseux key={cible.n} cible={cible} actions={ACTIONS_LIAISON} Photo={photoMemePhoto} onFermer={fermer} FermeAuRetour={FermeAuRetour}
-      extensionSure={extSait('memephotosure') === 'ok' ? 'ok' : 'retard'} versionSure={EXT_CAPACITES.memephotosure.replace(/\.0$/, '')}/>
+    <LiaisonSitesParesseux key={cible.n} cible={cible} actions={ACTIONS_LIAISON} Photo={photoMemePhoto} Icon={Icon} onFermer={fermer}/>
   </GardeEcran>;
 }
 // Les N° à barrer (une liaison a remplacé un N° déjà donné), jusqu'à « C'est écrit ».

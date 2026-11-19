@@ -192,7 +192,7 @@ const lire = (pg) => pg.evaluate(() => {
   const L = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
   const contraste = (e) => { const t = lum(getComputedStyle(e).color), f = fondDe(e); if (!t) return 21; const tt = { r: t.r * t.a + f.r * (1 - t.a), g: t.g * t.a + f.g * (1 - t.a), b: t.b * t.a + f.b * (1 - t.a) }; const a = L(tt), b = L(f); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
   const visible = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight; };
-  const textes = [...R.querySelectorAll('*')].filter((e) => visible(e) && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1) && !e.closest('button:disabled'));
+  const textes = [...R.querySelectorAll('*')].filter((e) => visible(e) && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 1) && !e.closest('[aria-disabled="true"]'));
   const faibles = textes.map((e) => ({ c: Math.round(contraste(e) * 100) / 100, t: e.textContent.trim().slice(0, 30), k: e.className })).filter((x) => x.c < 4.5);
   const petits = textes.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 13).map((e) => e.className);
   const cibles = [...R.querySelectorAll('button, a, input, label.n-lia-lot-ligne')].filter(visible).map((e) => { const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width), k: e.className || e.tagName }; }).filter((x) => x.h < 44 || x.w < 44);
@@ -208,11 +208,11 @@ const lire = (pg) => pg.evaluate(() => {
   const d = R.querySelector('[data-liaison-dernier]');
   const cols = ['.n-lia-file', '.n-lia-annonce', '.n-lia-candidates'].map((s) => { const e = R.querySelector(s); const r = e && getComputedStyle(e).display !== 'none' ? e.getBoundingClientRect() : null; return r ? [Math.round(r.left), Math.round(r.width)] : null; });
   return { ouvert: true, vue: R.getAttribute('data-liaison-vue'), lu: R.getAttribute('data-liaison-lu'), annonce: an ? an.getAttribute('data-liaison-annonce') : '', photoAnnonce: pa ? Math.round(pa.getBoundingClientRect().width) : 0,
-    position: (R.querySelector('[data-liaison-position]') || { getAttribute: () => '' }).getAttribute('data-liaison-position'), cartes, nCandidates: Number((R.querySelector('[data-liaison-candidates]') || { getAttribute: () => 0 }).getAttribute('data-liaison-candidates')),
-    avant: av ? { id: av.getAttribute('data-liaison-avant'), coteACote: fig.length === 2 && Math.abs(fig[0].top - fig[1].top) < 2 && fig[1].left >= fig[0].right, photo: fig[0] ? Math.round(fig[0].width) : 0, plein: Math.round((av.querySelector('.is-plein') || av).getBoundingClientRect().height), numero: (av.querySelector('[data-liaison-relier-avant]') || { getAttribute: () => '' }).getAttribute('data-numero') } : null,
+    position: R.getAttribute('data-liaison-position') || '', cartes, nCandidates: Number((R.querySelector('[data-liaison-candidates]') || { getAttribute: () => 0 }).getAttribute('data-liaison-candidates')),
+    avant: av ? { id: av.getAttribute('data-liaison-avant'), coteACote: fig.length === 2 && Math.abs(fig[0].top - fig[1].top) < 2 && fig[1].left >= fig[0].right, photo: fig[0] ? Math.round(fig[0].width) : 0, plein: Math.round((R.querySelector('[data-liaison-relier-avant]') || av).getBoundingClientRect().height), numero: (R.querySelector('[data-liaison-relier-avant]') || { getAttribute: () => '' }).getAttribute('data-numero') } : null,
     question: q ? { sorte: q.getAttribute('data-liaison-question'), refus: q.getAttribute('data-liaison-refus'), doutes: q.getAttribute('data-liaison-doutes'), garder: [...q.querySelectorAll('[data-liaison-garder]')].map((x) => x.getAttribute('data-liaison-garder')), photos: q.querySelectorAll('figure').length } : null,
     dernier: d ? { etat: d.getAttribute('data-liaison-dernier'), numero: d.getAttribute('data-numero') } : null,
-    lot: (R.querySelector('[data-liaison-lot-ouvrir]') || { getAttribute: () => null }).getAttribute('data-liaison-lot-ouvrir'), pleins: [...R.querySelectorAll('.is-plein')].filter(visible).length,
+    lot: (R.querySelector('[data-liaison-lot-ouvrir]') || { getAttribute: () => null }).getAttribute('data-liaison-lot-ouvrir'), pleins: [...R.querySelectorAll('[data-n-variante="plein"]')].filter(visible).length,
     fin: R.querySelector('[data-liaison-fin]') ? { reste: R.querySelector('[data-liaison-fin]').getAttribute('data-reste'), tard: R.querySelector('[data-liaison-fin]').getAttribute('data-plus-tard'), contra: R.querySelector('[data-liaison-fin]').getAttribute('data-contradictions') } : null,
     contras: [...R.querySelectorAll('[data-liaison-contradiction]')].map((c) => ({ type: c.getAttribute('data-type'), cotes: [...c.querySelectorAll('[data-liaison-cote]')].map((x) => x.getAttribute('data-liaison-cote')), garder: c.querySelectorAll('[data-liaison-garder-numero], [data-liaison-cest], [data-liaison-delier]').length })),
     faibles: faibles.slice(0, 6), petits: petits.slice(0, 4), cibles: cibles.slice(0, 6), cols, deborde: document.documentElement.scrollWidth > innerWidth + 1 || [...R.querySelectorAll('*')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > innerWidth + 1; }) };
@@ -329,7 +329,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           const bouton = await pg.locator('[data-lbc-relier-vinted="5002"]').count();
           if (bouton) { await toucher(pg, tel, '[data-lbc-relier-vinted="5002"]'); const ok = await attendreAnnonce(pg, 'Leboncoin:5002'); const anc = await pg.locator('.vrm-lbc-choix').count();
             dit(ok && anc === 0, `${T} L1 « Relier » d’une rangée Leboncoin ouvre LE parcours sur cette annonce — l’ancienne feuille « Relier à Vinted » n’existe plus`, JSON.stringify({ ok, anc }));
-            await toucher(pg, tel, '[data-liaison-retour]'); await pg.waitForTimeout(400); }
+            await toucher(pg, tel, '[data-liaison] .n-barre-retour'); await pg.waitForTimeout(600); }
           await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: {} })));
           await attendreAnnonce(pg, 'Leboncoin:5001'); await pg.waitForTimeout(500);
           let m = await lire(pg);
