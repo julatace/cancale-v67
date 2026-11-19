@@ -91,7 +91,13 @@ absence ni d'un 403 : le 403 reste la pause d'aujourd'hui (`vrmPauseVinted`, `po
   même temps ⇒ une, débloqué ⇒ « 4 annonces remises », compte retiré ⇒ rien, 503).
 - `--mutation` : **17/17 rouges** (7 de la règle, 9 du fond dont « refus 403 = banni », « absence = banni »,
   « pas su = en pause », « clic bloqué aussi », et le background.js d'avant ⇒ E rouge).
-- Banc `scripts/bancs/compte-bloque.cjs` (390 tactile et 1512, clair et sombre) : voir le résultat dans le rapport.
+- Banc `scripts/bancs/compte-bloque.cjs` (390 tactile et 1512, clair et sombre, base inventée) : **82 verts** — la carte
+  VUE après l'écran d'ouverture (rien par-dessus), « Vinted a bloqué shop_cancale · Mettre ses 3 annonces en pause ? »,
+  un seul plein, cibles 44, aucun débordement ni texte coupé, aucun rouge, contraste ≥ 4,5:1 (5,2 clair, 5,9 sombre),
+  « Oui » range le choix (épisode, 3) ; débloqué ⇒ « 3 annonces remises », « OK » clôt ; 503 ⇒ rien ; Annonces : « 3
+  annonces en pause · compte bloqué (shop_cancale) », ses annonces hors liste, l'autre compte reste ; « Garder » ⇒ rien.
+  Captures regardées. Vu sur la capture 390 de « remis » : le bas de la carte paraît voilé par la couche de Ma journée
+  (le bouton reste au-dessus, contrôle `elementFromPoint` vert) — à surveiller quand la coque natif arrive.
 - `npm run build`, `audit-traduction` (45), `audit-tdz`, `audit-variables`, `audit-quoi-de-neuf`,
   `audit-fonctions-api`, `audit-alerte-moderation` (65), `audit-moteur-offres`, `audit-frein-vinted`,
   `audit-securite-comptes`, `audit-cloisonnement`, `audit-cle-service`, `audit-fusion` : verts.
