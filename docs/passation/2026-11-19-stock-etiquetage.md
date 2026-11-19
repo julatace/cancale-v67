@@ -27,6 +27,9 @@ balayage, « Fiche ») ; 5 articles, puis « Voir les N autres » ; puis **Meubl
   dans son cadre, jamais la page) avec les gestes d'avant (`toucherCase` = `cliquerCase` : la fiche, la sortie d'une
   vendue, placer), « Modifier le meuble », « Monter / Descendre d'un cran », « ‹ Tous les meubles ».
 - **Paires** : « Dans une case · N » (balayer ⇒ « Déplacer ») et les blocs d'avant (à faire, importées, à part…).
+  Avec le lot `fiche-directe` (fusionné du train) : le toucher d'une paire dans une case ouvre LA fiche de la paire, où
+  `DansFiche` pose sa place (le meuble dessiné, la case qui respire) et « Voir sur le plan », « Déplacer » ; une rangée
+  « À ranger » garde SON toucher — il range (demande de Julien pour le Stock) — et la fiche y est un balayage.
 - **La séance « Ranger »** (une feuille, seulement à la demande) : l'article (photo, plaque, titre), « Pose-la ici · meuble
   · rangée, colonne », le meuble DESSINÉ en grand avec la case proposée qui respire (« Ici »), des onglets pour un autre
   meuble ; « Ranger ici » (le plein de la feuille) ou le toucher de n'importe quelle case. **L'article vole dans sa case**
@@ -74,6 +77,8 @@ aucun drapeau du navigateur ne touche un numéro. Le DOM d'avant (bancs `vrm_ban
   Z1 (zoom, 48 cases ≥ 44 px, retour), N1 (aucun N° changé), E1 (moi ⇒ `vrm_numero_ecrit`, « B » refusée, « C » écrite,
   imprimée A4 ⇒ `vrm_etiquetage`, aucun N° ni case touchés), Q. Rouge sur l'arbre d'avant (3 KO puis arrêt).
   Captures regardées (écran, meubles, séance, zoom, vide, réglage ; jour et nuit) ; jamais commitées.
+- Banc `fiche-directe.cjs` : sa base reçoit un meuble et trois paires rangées, le chemin Stock passe par « Paires » :
+  « un toucher ouvre SA fiche » vert à 390 et 1512 (S5 « Prix partout », rouge sans lien avec ce lot).
 - Banc `stock-rangement.cjs` mis au design (meubles d'entrée, séance au meuble dessiné, plus de colonne « à droite ») :
   touchers 2→2 · 20→11 · 2→1 · 6→3, aucun N° changé.
 - Audits verts : traduction, tdz, variables, identite, configuration-depart, quoi-de-neuf, icones, pas-ranger-achat,
