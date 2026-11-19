@@ -198,4 +198,44 @@
 
   /* Un lien discret de bas de carte / de page (« Fixer un objectif », « Personnaliser »). */
   .n-carte-corps > .n-bouton-bloc { display: flex; padding: 4px 8px 8px; }
+
+  /* ListeOrdonnee (19 nov., « Personnaliser » bien fait) : rond −/+ 44, icône, nom + phrase, aperçu, poignée ≡ 44. */
+  .n-ordre { position: relative; display: flex; flex-direction: column; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; margin: 0 var(--n-marge) 8px; }
+  .n-ordre-element { position: relative; display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 4px 4px 4px 8px; background: var(--n-carte);
+    transform: translate3d(0, var(--n-ordre-d, 0px), 0); transition: transform var(--n-duree) var(--n-courbe); }
+  .n-ordre-element + .n-ordre-element { border-top: 1px solid var(--n-trait); }
+  .n-ordre-element[data-n-tenu] { z-index: 2; transition: none; box-shadow: 0 8px 30px rgb(0 0 0 / .12); border-radius: var(--n-r-carte); }
+  .n-ordre[data-n-reduit] .n-ordre-element { transition: none; }
+  .n-ordre-rond { appearance: none; position: relative; flex: 0 0 auto; width: var(--n-cible); height: var(--n-cible); margin: 0; padding: 0; border: 0; border-radius: var(--n-r-rond, 999px); background: transparent; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .n-ordre-rond:focus-visible, .n-ordre-poignee:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-ordre-signe { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: var(--n-r-rond, 999px); background: var(--n-encre-2); }
+  .n-ordre-rond[data-n-mode="ajout"] .n-ordre-signe { background: var(--n-accent); }
+  .n-ordre-signe::before, .n-ordre-signe::after { content: ""; position: absolute; left: 6px; right: 6px; top: 11px; height: 2px; border-radius: var(--n-r-rond, 999px); background: var(--n-carte); }
+  .n-ordre-signe::after { display: none; }
+  .n-ordre-rond[data-n-mode="ajout"] .n-ordre-signe::after { display: block; transform: rotate(90deg); }
+  .n-ordre-icone { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--n-r-plaque); background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-ordre-textes { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .n-ordre-nom { font: var(--n-t-corps); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-ordre-phrase { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-ordre-apercu { flex: 0 0 auto; max-width: 30%; font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ordre-poignee { appearance: none; flex: 0 0 auto; display: grid; place-items: center; width: var(--n-cible); height: var(--n-cible); margin: 0; padding: 0; border: 0; background: transparent; color: var(--n-encre-2); cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  .n-ordre[data-n-glisse] .n-ordre-poignee { cursor: grabbing; }
+
+  /* Le mode « Modifier » de la grille à l'ordinateur : les cartes tremblent légèrement (iOS), une croix pour retirer,
+     on les glisse pour les déplacer ; « + » ajoute. Le tremblement s'arrête si le mouvement est réduit. */
+  .n-editable { position: relative; }
+  .n-editable[data-n-edition] { cursor: grab; touch-action: none; animation: n-tremble 280ms ease-in-out infinite alternate; }
+  .n-editable[data-n-edition]:nth-child(2n) { animation-delay: -140ms; }
+  .n-editable[data-n-edition] > * { pointer-events: none; }
+  .n-editable[data-n-edition] > .n-editable-croix { pointer-events: auto; }
+  .n-editable[data-n-tenu] { z-index: 5; animation: none; opacity: .85; cursor: grabbing; }
+  .n-editable[data-n-cible] > .n-carte, .n-editable[data-n-cible] > .n-tuiles { outline: 2px dashed var(--n-accent); outline-offset: 2px; }
+  @keyframes n-tremble { from { transform: rotate(-.4deg); } to { transform: rotate(.4deg); } }
+  @media (prefers-reduced-motion: reduce) { .n-editable[data-n-edition] { animation: none; } }
+  .n-editable-croix { appearance: none; position: absolute; z-index: 6; top: -20px; left: calc(var(--n-marge) - 24px); display: grid; place-items: center; width: var(--n-cible); height: var(--n-cible); margin: 0; padding: 0; border: 0; border-radius: var(--n-r-rond, 999px); background: transparent; cursor: pointer; }
+  .n-editable-croix > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--n-r-rond, 999px); background: var(--n-encre-2); color: var(--n-carte); }
+  .n-editable-croix:focus-visible { outline: 2px solid var(--n-accent); }
+  .n-ajout-carte { appearance: none; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 2 * var(--n-marge)); min-height: 96px; margin: 0 var(--n-marge) 16px; border: 1px dashed var(--n-encre-3); border-radius: var(--n-r-carte); background: transparent; color: var(--n-accent); font: var(--n-t-corps-fort); cursor: pointer; }
+  .n-ajout-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-ecran-outils { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 }

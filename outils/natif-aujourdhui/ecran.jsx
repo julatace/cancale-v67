@@ -13,6 +13,14 @@ import frNatif from '../../src/i18n/langues/fr.js';   // tout le français de l'
 import { poserIcone, Coque, Page } from '../../src/natif/index.js';
 import Aujourdhui from '../../src/natif/ecrans/Aujourdhui.jsx';
 import ARegler from '../../src/designV2/ARegler.jsx';
+import { useCartes } from '../../src/aujourdhui/cartes.js';
+import { CARTES_AUJOURDHUI } from '../../src/aujourdhui/modele.js';
+
+// Le choix des cartes, comme dans l'app (src/aujourdhui/cartes.js), rangé dans le stockage de la page : deux onglets
+// du banc = deux appareils (l'autre onglet reçoit l'événement `storage`). `&cartes=toutes` sème toutes les cartes.
+const CLE_CARTES = 'vrm_aujourdhui_cartes';
+const OUTILS_H = { cle: CLE_CARTES, load: (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (_) { return d; } },
+  save: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }, onCloudReady: (f) => { f(); return () => {}; } };
 import '../natif-galerie/galerie.css';
 
 ajouterSourceApp(frNatif);
@@ -50,7 +58,13 @@ const C30 = Array.from({ length: 30 }, (_, k) => { const d = new Date(M0 - (29 -
   return { cle: d.toISOString().slice(0, 10), de: d.getTime(), a: d.getTime() + 86400000, v, n: v ? Math.max(1, Math.round(v / 50)) : 0, partiel: false, auj: k === 29 }; });
 const TABLE = (f) => [{ cle: 'vinted|vendeur_1', nom: 'vendeur_1', site: 'Vinted', v: 612 * f, vp: true, n: 13 * f }, { cle: 'vinted|julien.sneakers', nom: 'julien.sneakers', site: 'Vinted', v: 268 * f, vp: false, n: 6 * f },
   { cle: 'ebay', nom: 'eBay', site: 'eBay', v: 1284 * f, vp: false, n: 1 * f }, { cle: 'leboncoin', nom: 'Leboncoin', site: 'Leboncoin', v: 82.5 * f, vp: false, n: 1 * f }];
-const PLUS = { courbe: { jours: C30 }, comptes: { jour: TABLE(1).slice(0, 2), semaine: TABLE(1), mois: TABLE(3) }, capte: { favoris: null, offres: 4, messages: 7, ventes: 2 },
+const STATS2 = { stock: { enLigne: 142, raisonEnLigne: '', achat: 4380, achatPartiel: true, achatN: 142, achatNPrix: 118, raisonAchat: '' },
+  parPeriode: { jour: { n: 2, vitesse: { mediane: 6, nDelai: 2, n: 2 }, marge: { pct: 41.2, brut: 38, nCout: 2, n: 2 }, marques: { top: [{ k: 'Nike', n: 1, ca: 58 }, { k: 'Asics', n: 1, ca: 44 }], sansMarque: 0 } },
+    semaine: { n: 10, vitesse: { mediane: 9, nDelai: 8, n: 10 }, marge: { pct: 38.5, brut: 141, nCout: 8, n: 10 }, marques: { top: [{ k: 'Nike', n: 4, ca: 236 }, { k: 'Adidas', n: 3, ca: 152 }, { k: 'Asics', n: 2, ca: 88 }], sansMarque: 1 } },
+    mois: { n: 30, vitesse: { mediane: 11.5, nDelai: 24, n: 30 }, marge: { pct: 36.9, brut: 187, nCout: 12, n: 30 }, marques: { top: [{ k: 'Nike', n: 12, ca: 512 }, { k: 'Adidas', n: 8, ca: 301 }, { k: 'Asics', n: 4, ca: 1462 }, { k: 'New Balance', n: 3, ca: 141 }, { k: 'Salomon', n: 2, ca: 134 }], sansMarque: 2 } } },
+  ecoulement: { pct: 18, ventes: 26, enLigne: 142 }, prevision: { etat: 'ok', centre: 310000, bas: 260000, haut: 360000, cumul: 196800, jours: 18, joursMois: 30, partiel: false },
+  dorment: { valeur: 37, partiel: false, raison: '' }, avenir: { valeur: 952, partiel: false, raison: '' } };
+const PLUS = { stats2: STATS2, courbe: { jours: C30 }, comptes: { jour: TABLE(1).slice(0, 2), semaine: TABLE(1), mois: TABLE(3) }, capte: { favoris: null, offres: 4, messages: 7, ventes: 2 },
   vrm: [{ cle: 'baisses', n: 3 }, { cle: 'favoris', n: 12 }, { cle: 'offres', n: 1 }], objectif: { etat: 'lu', type: 'ca', cible: 3000, valeur: 1840, pct: 61, partiel: false, atteint: false, jours: 11, enregistrer: () => true, retirer: () => {} } };
 const CAS = {
   capture: { pret: true, affiche: { n: 8, pasSu: false, sous: '3 pas encore prêts', ambre: true }, colis: colis(8), plein: { n: 5 },
@@ -78,7 +92,8 @@ const PLUS_MENU = [{ entrees: [{ cle: 'stock', libelle: 'Stock', icone: <Icon na
 
 function Ecran() {
   // `&cartes=toutes` : toutes les cartes montrées (la capture de chaque carte) ; sinon le réglage par défaut.
-  const [brutCartes, setBrutCartes] = React.useState(P.get('cartes') === 'toutes' ? { ordre: ['chiffres', 'envoyer', 'retirer', 'courbe', 'comptes', 'annonces', 'vrm', 'ventes'], montrees: ['chiffres', 'envoyer', 'retirer', 'courbe', 'comptes', 'annonces', 'vrm', 'ventes'] } : null);
+  if (P.get('cartes') === 'toutes' && !localStorage.getItem(CLE_CARTES)) OUTILS_H.save(CLE_CARTES, { ordre: [...CARTES_AUJOURDHUI], montrees: [...CARTES_AUJOURDHUI], rev: 1, at: 1 });
+  const cartesH = useCartes(OUTILS_H);
   const [actif, setActif] = React.useState(VUE === 'regler' ? 'ventes' : 'journee');
   const c = CAS[BASE] || CAS.capture;
   const coque = { onglets: ONGLETS, plus: PLUS_MENU, actif, onChoisir: setActif, compte: { initiales: 'CE', nom: 'Camille Exemple' }, messages: { n: 19, libelle: 'Messages', icone: <Icon name="chat" size={24}/>, onOuvrir: () => {} } };
@@ -92,7 +107,7 @@ function Ecran() {
   );
   return (
     <Coque {...coque} titre="Aujourd’hui">
-      <Aujourdhui {...(BASE === 'capture' || BASE === 'volume' ? PLUS : BASE === 'attente' ? { objectif: { ...PLUS.objectif, etat: 'encours', valeur: null, pct: null } } : { objectif: { etat: 'aucun', type: 'ca', cible: null, jours: 11, enregistrer: () => true } })} cartes={{ brut: brutCartes, poser: setBrutCartes }} titre="Aujourd’hui" Icon={Icon} Photo={Photo} pret={c.pret} affiche={c.affiche} colis={c.colis} retraits={c.retraits} groupes={null} alerte={c.alerte} ventes={c.ventes} aVenir={c.aVenir}
+      <Aujourdhui {...(BASE === 'capture' || BASE === 'volume' ? PLUS : BASE === 'attente' ? { objectif: { ...PLUS.objectif, etat: 'encours', valeur: null, pct: null } } : { objectif: { etat: 'aucun', type: 'ca', cible: null, jours: 11, enregistrer: () => true } })} cartes={cartesH} titre="Aujourd’hui" Icon={Icon} Photo={Photo} pret={c.pret} affiche={c.affiche} colis={c.colis} retraits={c.retraits} groupes={null} alerte={c.alerte} ventes={c.ventes} aVenir={c.aVenir}
         plein={c.plein ? { n: c.plein.n, faire: () => { document.documentElement.setAttribute('data-banc-imprime', String(c.plein.n)); } } : null}
         chiffres={{ ...c.chiffres, montant: euros, ouvrirPeriode: (p) => { document.documentElement.setAttribute('data-banc-argent', p); setActif('compta'); } }} onScanner={() => {}} onColis={() => setActif('ventes')} onRetraits={() => setActif('achats')} onVentes={() => setActif('ventes')}/>
     </Coque>

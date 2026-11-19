@@ -84,7 +84,7 @@ async function unEcran(nav, port, base, W, sombre) {
       dit(Math.abs(h - h2) <= 1, `V ${ou} : la boîte des chiffres a la MÊME hauteur en attente (${h}) et lue (${h2}) — rien ne saute`, [h, h2]); }
     else if (base === 'vide') dit(!w.plein && w.colis === 0 && w.alertes === 0 && w.blocs.includes('rien') && !/NaN|undefined|null/.test(w.texte) && w.jour === '0', `V ${ou} : rien à envoyer ni à retirer ⇒ ni bande, ni plein, ni alerte ; 0 € lu, « — » pour le pas su`, { blocs: w.blocs, jour: w.jour });
     else {
-      dit(w.blocs.join() === 'chiffres,envoyer,retirer,courbe,ventes' && w.alertes <= 1, `${ou} : par défaut les chiffres, À envoyer, À retirer, la courbe, Dernières ventes — rien d’autre ; au plus une alerte (${w.alertes})`, w.blocs);
+      dit(w.blocs.join() === 'chiffres,envoyer,retirer,stock,vitesse,prevision,courbe,ventes' && w.alertes <= 1, `${ou} : par défaut les chiffres, À envoyer, À retirer, le stock, la vitesse, la prévision, la courbe, Dernières ventes ; au plus une alerte (${w.alertes})`, w.blocs);
       // (19 nov., « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : un toucher change la période, l'affiche et
       // les faits suivent ; l'écart est nommé ; un chiffre se touche et ouvre Argent sur SA période.
       if (base === 'capture' && !MUT) {
@@ -110,20 +110,23 @@ async function unEcran(nav, port, base, W, sombre) {
         // (19 nov., « applique ce que tu proposes ») L'objectif sous les tuiles ; « Personnaliser » coche une carte et elle vient.
         const ob = await pg.evaluate(() => { const o = document.querySelector('[data-v2-objectif]'); return o ? { e: o.getAttribute('data-v2-objectif'), pct: o.getAttribute('data-v2-objectif-pct'), t: o.textContent } : null; });
         dit(!!ob && ob.e === 'lu' && ob.pct === '61' && /1\s?840/.test(ob.t) && /3\s?000/.test(ob.t) && /11 jours/.test(ob.t), `O ${ou} : objectif « 1 840 € / 3 000 € · 61 % · il reste 11 jours »`, ob);
-        await toucherS('[data-v2-perso]'); await pg.waitForTimeout(500);
-        await toucherS('[data-v2-perso-carte="comptes"] .n-rangee-corps'); await pg.waitForTimeout(400);
-        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
-        const apres = await pg.evaluate((s2) => (document.querySelector(s2) || { getAttribute: () => '' }).getAttribute('data-v2-cartes'), ECRAN);
-        dit(/comptes/.test(apres || ''), `P ${ou} : « Personnaliser » → cocher « Par compte et par site » ⇒ la carte apparaît (${apres})`, apres);
+        await pg.evaluate(() => localStorage.clear());
         await pg.goto(pg.url().replace(/&cartes=toutes|$/, '&cartes=toutes'), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(700);
         const t2 = await pg.evaluate(() => ({ blocs: [...document.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), courbe: (document.querySelector('[data-v2-courbe]') || { getAttribute: () => '' }).getAttribute('data-v2-courbe').split(',').length,
           comptes: (document.querySelector('[data-v2-comptes]') || { getAttribute: () => '' }).getAttribute('data-v2-comptes'), capte: (document.querySelector('[data-v2-capte]') || { getAttribute: () => '' }).getAttribute('data-v2-capte'),
           vrm: (document.querySelector('[data-v2-bloc="vrm"]') || { textContent: '' }).textContent }));
-        dit(t2.blocs.join() === 'chiffres,envoyer,retirer,courbe,comptes,annonces,vrm,ventes' && t2.courbe === 30 && /^vinted\|vendeur_1:61200:13,vinted\|julien\.sneakers:26800:6$/.test(t2.comptes) && t2.capte === '4,7' && /3 baisses · 12 messages aux favoris · 1 offre acceptée/.test(t2.vrm),
+        dit(t2.blocs.join() === 'chiffres,envoyer,retirer,stock,vitesse,prevision,courbe,ventes,comptes,marge,marques,dorment,avenir,annonces,vues,vrm' && t2.courbe === 30 && /^vinted\|vendeur_1:61200:13,vinted\|julien\.sneakers:26800:6$/.test(t2.comptes) && t2.capte === '4,7' && /3 baisses · 12 messages aux favoris · 1 offre acceptée/.test(t2.vrm),
           `T ${ou} : toutes les cartes, dans SON ordre ; 30 barres ; la table du jour rangée par CA ; 4 offres et 7 messages captés ; « 3 baisses · 12 messages aux favoris · 1 offre acceptée »`, t2);
         await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-toutes-${W}-${th}.png`), fullPage: true });
         const c = await contrastes(pg, ECRAN);
         dit(c.juges > 15 && !c.faibles.length, `D5 ${ou} : toutes les cartes — ${c.juges} textes ≥ 4,5:1 (min ${c.min})`, c.faibles ? c.faibles.slice(0, 5) : c);
+        // (19 nov., « d'autres stats ») Les cartes en plus : chacune ses chiffres (ceux qu'on lui a donnés), ou sa raison.
+        const st = await pg.evaluate(() => { const a = (b, n) => (document.querySelector(`[data-v2-bloc="${b}"]`) || { getAttribute: () => null }).getAttribute(n);
+          const vides = [...document.querySelectorAll('[data-v2-bloc]')].filter((b) => (b.innerText || '').replace(/\s+/g, ' ').trim().split(' ').length < 3).map((b) => b.getAttribute('data-v2-bloc'));
+          return { stock: a('stock', 'data-v2-stock'), vitesse: a('vitesse', 'data-v2-vitesse'), prev: a('prevision', 'data-v2-prevision'), marge: a('marge', 'data-v2-marge'), marques: a('marques', 'data-v2-marques'),
+            dorment: a('dorment', 'data-v2-dorment'), avenir: a('avenir', 'data-v2-avenir2'), vues: (document.querySelector('[data-v2-bloc="vues"]') || { innerText: '' }).innerText, vides }; });
+        dit(st.stock === '142,438000' && st.vitesse === '6,18' && st.prev === '310000,260000,360000' && st.marge === '41.2' && /^Nike:5800:1,Asics:4400:1$/.test(st.marques || '') && st.dorment === '37' && st.avenir === '95200'
+          && /pas capté/.test(st.vues) && !/\b0\b/.test(st.vues) && !st.vides.length, `S2 ${ou} : stock 142 · 4 380 € ; vendue en 6 j · écoulement 18 % ; prévision 3 100 € (2 600–3 600) ; marge 41,2 % ; marques du jour ; 37 qui dorment ; 952 € à venir ; vues « — · pas capté » ; aucune carte muette`, st);
         await pg.goto(pg.url().replace('&cartes=toutes', ''), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
       }
       const d = await pg.evaluate(DESSIN, [ECRAN, BARRE, ONGLET]);
@@ -158,6 +161,121 @@ async function unEcran(nav, port, base, W, sombre) {
     }
     dit(!erreurs.length, `${ou} : aucune erreur JS`, erreurs);
   } catch (e) { dit(false, `${ou} : le contrôle est allé au bout`, String(e && e.stack || e).slice(0, 500)); }
+  await ctx.close();
+}
+
+// « PERSONNALISER » (19 nov., Julien : « ça doit être bien fait ») — au doigt à 390 (événements tactiles réels, CDP), à la
+// souris à 1512 : ajouter (+), retirer (−), réordonner (poignée ≡), l'écran derrière en direct, « Remettre par défaut » et
+// son annulation, la persistance après rechargement, DEUX appareils (deux onglets : un choix plus ancien n'écrase rien),
+// et à l'ordinateur le mode « Modifier » sur la grille (glisser une carte, la croix, « + »).
+async function personnaliser(nav, port, W, sombre) {
+  const th = sombre ? 'sombre' : 'clair', ou = `Personnaliser · ${W} · ${th}`;
+  console.log(`\n── ${ou}`);
+  const { ctx, pg, erreurs, tel } = await ouvrir(nav, port, { W, sombre, base: 'capture' });
+  const cartes = () => pg.evaluate((s2) => (document.querySelector(s2) || { getAttribute: () => '' }).getAttribute('data-v2-cartes'), ECRAN);
+  const toucher = async (sel) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); await (tel ? l.tap({ timeout: 5000 }) : l.click({ timeout: 5000 })).catch(() => {}); await pg.waitForTimeout(350); };
+  // Glisser de (x, y) de dy pixels : au doigt (CDP, touchStart/Move/End ⇒ pointerType « touch ») ou à la souris.
+  const cdp = tel ? await ctx.newCDPSession(pg) : null;
+  const glisser = async (x, y, dx, dy) => {
+    const pas = 12;
+    if (tel) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let k = 1; k <= pas; k++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (dx * k) / pas, y: y + (dy * k) / pas }] }); await pg.waitForTimeout(16); }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await pg.mouse.move(x, y); await pg.mouse.down();
+      for (let k = 1; k <= pas; k++) { await pg.mouse.move(x + (dx * k) / pas, y + (dy * k) / pas); await pg.waitForTimeout(16); }
+      await pg.mouse.up();
+    }
+    await pg.waitForTimeout(450);
+  };
+  try {
+    await pg.evaluate(() => localStorage.clear()); await pg.reload({ waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
+    const avant = await cartes();
+    await toucher('[data-v2-perso]');
+    const f = await pg.evaluate(() => { const x = document.querySelector('[data-v2-feuille-perso]'); if (!x) return null;
+      const lignes = [...x.querySelectorAll('[data-v2-perso-montrees] > .n-ordre-element')];
+      return { terminer: (x.querySelector('.n-feuille-terminer') || { textContent: '' }).textContent.trim(), groupes: [...x.querySelectorAll('.n-groupe-titre')].map((g) => g.textContent.trim()),
+        montrees: (x.querySelector('[data-v2-perso-montrees]') || { getAttribute: () => '' }).getAttribute('data-v2-perso-montrees'),
+        complet: lignes.every((l) => l.querySelector('.n-ordre-icone svg') && l.querySelector('.n-ordre-nom').textContent && l.querySelector('.n-ordre-phrase') && l.querySelector('.n-ordre-apercu')),
+        cibles: [...x.querySelectorAll('.n-ordre-rond, .n-ordre-poignee')].map((b) => { const q = b.getBoundingClientRect(); return Math.min(q.width, q.height); }).filter((m) => m > 0) }; });
+    dit(!!f && /Terminé/.test(f.terminer) && f.groupes.join('|') === 'Affichées|À ajouter' && f.montrees === avant && f.complet && f.cibles.every((m) => m >= 43.5),
+      `K ${ou} : feuille « Personnaliser » — « Terminé » en haut à droite, « Affichées » (dans l’ordre de l’écran) puis « À ajouter » ; chaque carte : icône, nom, phrase, aperçu ; ronds et poignées ≥ 44`, f);
+    await pg.screenshot({ path: path.join(SHOTS, `perso-feuille-${W}-${th}.png`) });
+    // Ajouter « Marge » (+) : l'écran derrière la montre aussitôt.
+    await toucher('[data-v2-perso-ajout] [data-v2-perso-carte="marge"] .n-ordre-rond');
+    let c = await cartes();
+    dit(/(^|,)marge(,|$)/.test(c) && c.split(',').pop() === 'marge', `K ${ou} : + « Marge » ⇒ la carte est sur l’écran derrière, à la fin (${c})`, c);
+    // Retirer « Courbe » (−).
+    await toucher('[data-v2-perso-montrees] [data-v2-perso-carte="courbe"] .n-ordre-rond');
+    c = await cartes();
+    dit(!/courbe/.test(c), `K ${ou} : − « 30 derniers jours » ⇒ retirée de l’écran (${c})`, c);
+    // Réordonner : la poignée de « Stock en ligne » glissée de deux rangées vers le bas.
+    // Glisser jusqu'au centre de la rangée qui est DEUX places plus bas (les rangées n'ont pas toutes la même hauteur).
+    const h = await pg.evaluate(() => { const r = document.querySelector('[data-v2-perso-montrees] [data-v2-perso-carte="stock"]'); r.scrollIntoView({ block: 'center' });
+      const R = [...r.parentElement.children]; const k = R.indexOf(r); const c = (x) => { const q = x.getBoundingClientRect(); return q.top + q.height / 2; };
+      return { h: c(R[k + 2]) - c(r) + 6 }; });
+    await pg.waitForTimeout(200);
+    const h2 = await pg.evaluate(() => { const b = document.querySelector('[data-v2-perso-montrees] [data-v2-perso-carte="stock"] .n-ordre-poignee'); const q = b.getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
+    const avantGl = await cartes();
+    await glisser(h2.x, h2.y, 0, h.h);
+    c = await cartes();
+    const iA = avantGl.split(','), iB = c.split(',');
+    dit(iB.indexOf('stock') === iA.indexOf('stock') + 2 && iB.length === iA.length, `K ${ou} : la poignée ≡ glissée ${tel ? 'au doigt' : 'à la souris'} de deux rangées ⇒ « Stock en ligne » descend de deux places (${avantGl} → ${c})`, { avantGl, c });
+    await pg.screenshot({ path: path.join(SHOTS, `perso-feuille-apres-${W}-${th}.png`) });
+    // Au clavier : flèche haut sur la poignée ⇒ remonte d'une place.
+    await pg.locator('[data-v2-perso-montrees] [data-v2-perso-carte="stock"] .n-ordre-poignee').first().focus().catch(() => {});
+    await pg.keyboard.press('ArrowUp'); await pg.waitForTimeout(300);
+    const c2 = await cartes();
+    dit(c2.split(',').indexOf('stock') === iB.indexOf('stock') - 1, `K ${ou} : ↑ sur la poignée ⇒ « Stock en ligne » remonte d’une place (clavier, lecteur d’écran)`, c2);
+    // « Remettre par défaut », puis « Annuler » dans les 10 s.
+    await toucher('[data-v2-perso-defaut]');
+    const d = await cartes();
+    dit(d === 'chiffres,envoyer,retirer,stock,vitesse,prevision,courbe,ventes', `K ${ou} : « Remettre par défaut » ⇒ les cartes d’origine (${d})`, d);
+    await toucher('.n-toast button');
+    const d2 = await cartes();
+    dit(d2 === c2, `K ${ou} : « Annuler » (10 s) ⇒ le choix d’avant revient (${d2})`, { d2, c2 });
+    await toucher('.n-feuille-terminer');
+    // Persistance : rechargée, la page garde SON choix.
+    await pg.reload({ waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
+    const r = await cartes();
+    dit(r === c2, `K ${ou} : après rechargement, le même choix (${r})`, { r, c2 });
+    // Deux appareils : un 2e onglet lit le même choix ; un changement ici y arrive ; un choix PLUS ANCIEN venu d'ailleurs n'écrase rien.
+    const pg2 = await ctx.newPage(); await pg2.goto(pg.url(), { waitUntil: 'load' }); await pg2.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg2.waitForTimeout(600);
+    const lire2 = () => pg2.evaluate((s2) => (document.querySelector(s2) || { getAttribute: () => '' }).getAttribute('data-v2-cartes'), ECRAN);
+    dit(await lire2() === r, `K ${ou} : l’autre appareil montre le même choix`, await lire2());
+    await toucher('[data-v2-perso]'); await toucher('[data-v2-perso-ajout] [data-v2-perso-carte="avenir"] .n-ordre-rond'); await toucher('.n-feuille-terminer');
+    await pg2.waitForTimeout(500);
+    const ici = await cartes(), la = await lire2();
+    dit(/avenir/.test(ici) && la === ici, `K ${ou} : ajouté ici ⇒ l’autre appareil suit (${la})`, { ici, la });
+    const revIci = await pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_aujourdhui_cartes')).rev);
+    await pg2.evaluate((rv) => { localStorage.setItem('vrm_aujourdhui_cartes', JSON.stringify({ ordre: ['ventes', 'chiffres'], montrees: ['ventes'], rev: rv - 1, at: 1 })); }, revIci);
+    await pg.waitForTimeout(500);
+    dit(await cartes() === ici, `K ${ou} : un choix plus ancien (rev ${revIci - 1} < ${revIci}) venu de l’autre appareil n’écrase pas le plus récent`, await cartes());
+    await pg2.close(); await pg.bringToFront(); await pg.waitForTimeout(300);
+    // À l'ordinateur : « Modifier » sur la grille — les cartes tremblent, on glisse « Stock » sur « À envoyer », la croix retire, « + » ajoute.
+    if (!tel) {
+      await toucher('[data-v2-modifier]');
+      const m = await pg.evaluate(() => ({ edition: document.querySelectorAll('[data-n-edition]').length, croix: document.querySelectorAll('.n-editable-croix').length, plus: !!document.querySelector('[data-v2-ajout-carte]'),
+        anim: getComputedStyle(document.querySelector('[data-n-edition]')).animationName }));
+      dit(m.edition > 3 && m.croix === m.edition && m.plus && m.anim === 'n-tremble', `M ${ou} : « Modifier » ⇒ ${m.edition} cartes qui tremblent, une croix chacune, « + »`, m);
+      await pg.screenshot({ path: path.join(SHOTS, `perso-grille-modifier-${W}-${th}.png`) });
+      const avantG = await cartes();
+      // La carte juste avant « Stock » dans la grille : les deux sont à l'écran (on glisse ce qu'on voit).
+      const pos = await pg.evaluate(() => { const T = [...document.querySelectorAll('[data-n-editable]')]; const a = document.querySelector('[data-n-editable="stock"]'); const b = T[T.indexOf(a) - 1]; b.scrollIntoView({ block: 'center' });   // pas sous la barre de titre collée
+        const qa = a.getBoundingClientRect(), qb = b.getBoundingClientRect(); return { x: qa.left + qa.width / 2, y: qa.top + 30, bx: qb.left + qb.width / 2, by: qb.top + 30 }; });
+      await glisser(pos.x, pos.y, pos.bx - pos.x, pos.by - pos.y);
+      const apresG = await cartes();
+      dit(apresG.split(',').indexOf('stock') === avantG.split(',').indexOf('stock') - 1, `M ${ou} : « Stock » glissé à la souris sur la carte d’avant ⇒ il prend sa place (${avantG} → ${apresG})`, { avantG, apresG });
+      await pg.evaluate(() => document.querySelector('[data-n-editable="vitesse"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
+      await pg.locator('[data-n-editable="vitesse"] .n-editable-croix').first().click({ force: true, timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(350);   // elle tremble : « force »
+      dit(!/vitesse/.test(await cartes()), `M ${ou} : la croix retire « Vitesse de vente »`, await cartes());
+      await toucher('[data-v2-ajout-carte]');
+      dit(await pg.evaluate(() => !!document.querySelector('[data-v2-feuille-perso] .n-feuille-terminer') && !!document.querySelector('[data-v2-feuille-perso]').closest('[data-n-etat="ouverte"]')), `M ${ou} : « + » ouvre la feuille pour ajouter`);
+      await toucher('.n-feuille-terminer'); await toucher('[data-v2-modifier]');
+    }
+    dit(!erreurs.length, `${ou} : aucune erreur JS`, erreurs);
+  } catch (e) { dit(false, `${ou} : le contrôle est allé au bout`, String(e && e.stack || e).slice(0, 600)); }
   await ctx.close();
 }
 
@@ -199,6 +317,7 @@ async function regler(nav, port, W, sombre) {
   try {
     for (const base of BASES) for (const W of LARGEURS) for (const t of THEMES) await unEcran(nav, port, base, W, t === 'sombre');
     if (!MUT && !process.env.SANS_REGLER) for (const W of LARGEURS) for (const t of THEMES) await regler(nav, port, W, t === 'sombre');
+    if (!MUT && !process.env.SANS_PERSO) for (const W of LARGEURS) for (const t of THEMES) await personnaliser(nav, port, W, t === 'sombre');
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 900)); }
   await nav.close(); s.close();
   console.log(`\n${ko ? '❌' : '✅'} aujourdhui-natif${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);

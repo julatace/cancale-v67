@@ -33875,7 +33875,7 @@ function useSourcesCarte(liveStats) {
 // MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
 // Trois états : en cours (la boîte, à sa taille) · pas su (« — » et la raison, jamais 0) · lu.
 const SEL_TOUT_V2 = { site: 'toutes', compte: null, periode: null };
-const OUTILS_AUJOURDHUI = { load: (k, d) => load(k, d), save: (k, v) => save(k, v), onCloudReady: (f) => onCloudReady(f), lireTout: (q) => lireTout(q), entete: () => enTeteSession(), cle: CLE_CARTES_AUJOURDHUI };
+const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };
 function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const live = liveStats || liveCoque;
@@ -33890,17 +33890,7 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   const chiffres = { etat: M.etat, raison: M.raison, montant: somme,
     mois: { nom: new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' }) } };
-  // (19 nov., Julien : « plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice ») Jour · Semaine · Mois :
-  // les mêmes `valeurChiffre` ; la période d'avant coupée au MÊME moment (règles de période de la carte, `REGLES_CARTE`).
-  const precedente = (p) => {
-    const de = p === 'jour' ? new Date(new Date(maintenant).setHours(0, 0, 0, 0)) : REGLES_CARTE.debutPeriode(maintenant, p);
-    const avant = p === 'jour' ? new Date(de.getFullYear(), de.getMonth(), de.getDate() - 1) : REGLES_CARTE.decalerPeriode(de, p, -1);
-    return { de: avant.getTime(), a: Math.min(de.getTime(), avant.getTime() + (maintenant - de.getTime())), label: '' };
-  };
-  const stats = Mo.statsPeriodes({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S), precedente, raisonCourte, beneficeMois: M.mois.benefice });
-  const moisAvant = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth() - 1, 1).toLocaleDateString(localeCourante(), { month: 'long' });
-  // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
-  const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
+  // Jour · Semaine · Mois (19 nov.) et les cartes en plus : calculés DANS le morceau d'Aujourd'hui (src/aujourdhui/Branche.jsx).
   // (19 nov., « applique ce que tu proposes ») LES CARTES EN PLUS — mêmes `valeurChiffre`, aucune règle neuve :
   //   la courbe des 30 jours, la table par compte et par site (la sélection { site, compte } de la carte des chiffres),
   //   l'objectif du mois (src/objectifMois.js : `valeurObjectif`, `progressionObjectif`, les jours qui restent).
@@ -33908,12 +33898,11 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   // Branche.jsx) : l'app ne lui donne que la question au propriétaire (`valeurSel` = `valeurChiffre` avec une sélection).
   const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, maintenant), S);
   const objectif = { mois: objectifMois, brut: objectifBrut, poser: poserObjectif, valeur: (o) => valeurObjectif(o, S, REGLES_CARTE, maintenant) };
-  const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : null;
-  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null, plus: { valeurSel, objectif, lignes, maintenant } };
+  return { chiffres, aVenir: null, plus: { valeurSel, objectif, live, maintenant, regles: REGLES_CARTE, beneficeMois: M.mois.benefice } };
   };
   // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
   // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
-  return <AujourdhuiV2 {...reste} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+  return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI}
     onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════

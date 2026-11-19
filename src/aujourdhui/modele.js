@@ -208,11 +208,55 @@ export function capteDuJour(entrees, maintenant = Date.now()) {
 // LES CARTES D'AUJOURD'HUI, cochées et ordonnées par lui (`vrm_aujourdhui_cartes`, synchronisé). Par défaut : les
 // chiffres, À envoyer, À retirer, la courbe, les dernières ventes. Une carte inconnue est ignorée ; une carte connue
 // absente de l'ordre se pose à la fin (une carte ajoutée plus tard n'est jamais perdue).
-export const CARTES_AUJOURDHUI = ['chiffres', 'envoyer', 'retirer', 'courbe', 'ventes', 'comptes', 'annonces', 'vrm'];
-export const CARTES_DEFAUT = ['chiffres', 'envoyer', 'retirer', 'courbe', 'ventes'];
+// (19 nov., Julien : « tu peux trouver mieux, peut-être d'autres stats ») + stock en ligne, vitesse de vente, prévision du
+// mois (les trois montrées d'office), marge, marques, paires qui dorment, argent à venir, vues et favoris.
+// (« Meilleurs moments » : refusé par Julien le 19 nov. — ne pas l'ajouter.)
+export const CARTES_AUJOURDHUI = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
+export const CARTES_DEFAUT = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes'];
 export function cartesChoisies(brut) {
   const ok = brut && typeof brut === 'object' && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
   const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];
   const montrees = ok && Array.isArray(brut.montrees) ? brut.montrees.filter((x) => CARTES_AUJOURDHUI.includes(x)) : CARTES_DEFAUT;
   return { ordre, montrees: new Set(montrees) };
+}
+
+// LE CHOIX DES CARTES, ENTRE SES APPAREILS (19 nov., « ça doit être bien fait ») : chaque écriture porte `rev` (un de
+// plus que le plus grand connu) et `at`. Deux choix se départagent par `rev`, puis par `at` : un choix plus ancien reçu
+// d'un autre appareil n'écrase JAMAIS un choix plus récent (comparer-et-échanger, la règle de `modifierCas`).
+export function choixPlusRecent(a, b) {
+  const ok = (x) => !!x && typeof x === 'object' && Array.isArray(x.ordre);
+  if (!ok(a)) return ok(b) ? b : null;
+  if (!ok(b)) return a;
+  const ra = Number(a.rev) || 0, rb = Number(b.rev) || 0;
+  if (ra !== rb) return ra > rb ? a : b;
+  return (Number(b.at) || 0) > (Number(a.at) || 0) ? b : a;
+}
+export function nouveauChoix(avant, { ordre, montrees }, maintenant = Date.now()) {
+  return { ordre: [...ordre], montrees: [...montrees], rev: (Number(avant && avant.rev) || 0) + 1, at: maintenant };
+}
+
+// LES CHIFFRES DU RELEVÉ PAR PÉRIODE (vitesse, marge, marques) — le relevé des ventes FINALISÉES de l'écran Ventes
+// (`vrm_stats_ventes`, les lignes de Statistiques : { ts, eur, achat, marqueLue, modele, enLigne }) et les règles de
+// Statistiques (src/statsVentes.js) : `delaisPar` (délai médian mise en ligne → vente, sa couverture « sur N »),
+// `margesPar` (marge = brut ÷ CA des ventes au prix d'achat connu, « sur N »). Les marques : la marque LUE de l'annonce
+// (`marqueLue`), jamais devinée d'un titre ; sans marque lue, la vente compte dans « sans marque lue ».
+// `bornes(p)` → { de, a } (les règles de période de l'app). Relevé pas lu ⇒ null.
+export function releveParPeriode({ lignes, bornes, delaisPar, margesPar, periodes = PERIODES_STATS }) {
+  if (!Array.isArray(lignes)) return null;
+  const out = {};
+  for (const p of periodes) {
+    const B = bornes(p); if (!B) { out[p] = null; continue; }
+    const L = lignes.filter((l) => l && Number.isFinite(l.ts) && l.ts >= B.de && (B.a == null || l.ts < B.a));
+    const D = delaisPar(L, () => 'tout');
+    const M = margesPar(L, () => 'tout');
+    const g = M && M.groupes[0];
+    const parMarque = margesPar(L, (l) => l.marqueLue || '');
+    out[p] = {
+      n: L.length,
+      vitesse: D ? { mediane: D.mediane, nDelai: D.nDelai, n: D.n } : null,
+      marge: g ? { pct: g.marge, brut: g.brut, nCout: g.nCout, n: g.n } : { pct: null, brut: null, nCout: 0, n: L.length },
+      marques: parMarque ? { top: [...parMarque.groupes].sort((a, b) => b.ca - a.ca || b.n - a.n).slice(0, 5).map((x) => ({ k: x.k, n: x.n, ca: x.ca })), sansMarque: parMarque.sansCle } : null,
+    };
+  }
+  return out;
 }
