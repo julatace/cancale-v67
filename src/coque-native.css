@@ -10,10 +10,11 @@
    qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
    Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
    ════════════════════════════════════════════════════════════════════════════ */
-:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
   all: revert-layer;
 }
 /* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
    `!important`) lui posait un fond gris dans le champ blanc ; un `!important` d'avant ne se renvoie pas par revert-layer.
    L'identifiant de <main> (#vrm-contenu) suffit à passer devant, sans surenchère ailleurs. */
-#vrm-contenu .n-page-recherche .n-recherche-champ { background: transparent !important; box-shadow: none !important; }
+#vrm-contenu .n-page-recherche .n-recherche-champ, #vrm-contenu .n-tt-recherche .n-recherche-champ { background: transparent !important; box-shadow: none !important; }
+/* (19 nov. soir) Le tableau de travail (`.n-tt`), le plein collé d'une page native et les volets d'Automatisations : les mêmes. */

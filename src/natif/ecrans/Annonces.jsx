@@ -40,6 +40,7 @@ import { useOrdinateur } from '../Coque.jsx';
 import '../jetons.css';
 import '../natif.css';
 import './annonces.css';
+import AnnoncesTableau from './AnnoncesTableau.jsx';   // (19 nov. soir) l'ordinateur : le tableau de travail
 
 const PAR_PAGE = 60;
 // Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
@@ -91,9 +92,9 @@ function FeuilleFait({ cible, onFermer, onFait, euros }) {
 }
 
 // La fiche courte de l'article (les MÊMES faits pour tous les sites) — la fiche complète est celle de l'app (`onFiche`).
-function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSaisir, onNumero, onPlace, onPrix, onRelier, onFiche, Icon }) {
+function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSaisir, onNumero, onPlace, onPrix, onRelier, onFiche, Icon, cote = false }) {
   return (
-    <PagePoussee ouverte={ouverte} titre={a ? (a.numero ? tr('egalite.numeroCourt', { n: a.numero }) : a.titre) : ''} libelleRetour={tr('egalite.titre')} onRetour={onRetour} attrs={{ 'data-eg-fiche': a ? a.cle : undefined }}>
+    <PagePoussee ouverte={ouverte} titre={a ? (a.numero ? tr('egalite.numeroCourt', { n: a.numero }) : a.titre) : ''} libelleRetour={tr('egalite.titre')} onRetour={onRetour} className={cote ? 'n-tt-fiche' : ''} attrs={{ 'data-eg-fiche': a ? a.cle : undefined }}>
       {a ? <>
         <Groupe>
           <Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre} lignes={2} plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
@@ -124,7 +125,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions = [], onAction, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '',
-  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null }) {
+  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null }) {
   const ordinateur = useOrdinateur();
   const [reglerOuvert, setReglerOuvert] = React.useState(false);
   const [menuSites, setMenuSites] = React.useState(false);
@@ -223,6 +224,29 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       </table>
     </Groupe>
   );
+
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : le TABLEAU DE TRAVAIL (barre d'outils, Statut à compteurs, colonnes,
+  // sélection). Mêmes articles, mêmes saisies, mêmes actions ; la fiche s'ouvre en panneau à droite, la liste reste visible.
+  const actionsTableau = actions;
+  const aReglerHaut = aRegler.length ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
+    {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
+  </Groupe> : null;
+  const listeTableau = travail && Array.isArray(travail.articles) ? travail.articles : (travail ? travail.articles : undefined);
+  const articleOuvertT = ouvert && Array.isArray(listeTableau) ? (listeTableau.find((x) => x.a.cle === ouvert) || {}).a || null : null;
+  if (ordinateur && travail) {
+    return (
+      <>
+        <AnnoncesTableau articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
+          actions={actionsTableau} onAction={onAction} onOuvrir={(a) => setOuvert(a.cle)} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche}
+          plein={onPublier ? <Bouton variante="plein" onClick={onPublier} attrs={{ 'data-eg-publier': '' }}>{tr('egalite.publier')}</Bouton> : null}
+          haut={aReglerHaut} pied={[manque, ...limites].filter(Boolean).join(' ')} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
+        <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>
+        <FicheArticle a={articleOuvertT} ouverte={!!articleOuvertT} cote onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
+          onNumero={onNumero} onPlace={onPlace} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche} Icon={Icon}/>
+        {dit ? <Toast key={dit.id} message={dit.message} onFin={() => setDit(null)}/> : null}
+      </>
+    );
+  }
 
   return (
     <>

@@ -234,6 +234,28 @@ export function compterArticles(articles, opts = {}) {
   for (const s of ['tous', ...SITES]) { out[s] = {}; for (const e of ['enligne', 'apublier', 'dorment', 'vendues', 'retirees']) out[s][e] = filtrerArticles(articles, { ...opts, site: s, etat: e, recherche: '' }).length; }
   return out;
 }
+// (19 nov. soir, le tableau de travail) L'état d'un article pour le site et le compte choisis : le MEILLEUR état de SES annonces
+// de ce site / de ce compte (l'ordre RANG, celui de `construireArticles`) ; aucune annonce ⇒ null (l'article n'y est pas).
+// Cocher En ligne · Masquée · En pause · À confirmer = le segment « En ligne » (`filtrerArticles` etat 'enligne') : même nombre.
+export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'brouillon', 'vendue', 'retiree'];
+export const STATUTS_EN_LIGNE = ETATS_FILTRE.enligne;
+export function statutTableau(a, { site = 'tous', compte = '' } = {}) {
+  const ann = arr(a && a.annonces).filter((x) => (site === 'tous' || x.site === site) && (!compte || str(x.compte) === str(compte)));
+  if (!ann.length) return null;
+  return ann.map((x) => x.etat).sort((x, y) => (RANG[x] ?? 9) - (RANG[y] ?? 9))[0] || null;
+}
+// Les comptes vus dans les annonces (un compte appartient à UN site) : [{ cle: 'site:compte', site, compte, pseudo }].
+export function comptesDesArticles(articles, site = 'tous') {
+  const m = new Map();
+  for (const a of arr(articles)) for (const x of arr(a.annonces)) {
+    if (site !== 'tous' && x.site !== site) continue;
+    if (!str(x.compte)) continue;
+    const c = x.site + ':' + str(x.compte);
+    if (!m.has(c)) m.set(c, { cle: c, site: x.site, compte: str(x.compte), pseudo: str(x.pseudo) });
+    else if (!m.get(c).pseudo && str(x.pseudo)) m.get(c).pseudo = str(x.pseudo);
+  }
+  return [...m.values()].sort((x, y) => (SITES.indexOf(x.site) - SITES.indexOf(y.site)) || (x.pseudo || x.compte).localeCompare(y.pseudo || y.compte, 'fr'));
+}
 // Le plus récent d'abord (date de mise en ligne lue) ; sans date : après, par N° puis titre — un ordre STABLE.
 export function trierArticles(articles) {
   return [...arr(articles)].sort((a, b) => ((b.depuis || 0) - (a.depuis || 0)) || String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }) || a.titre.localeCompare(b.titre, 'fr') || a.cle.localeCompare(b.cle));

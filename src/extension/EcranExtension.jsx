@@ -179,6 +179,20 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
 
+      {/* (19 nov. soir, référence « Profils vendeur ») UNE carte « Comptes détectés et liés » : une rangée par compte (initiale,
+          pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes
+          comptes et la même ouverture que les groupes dessous (`pageExtension`) ; délier reste dans Paramètres → Comptes. */}
+      {!chargement && vm.sites.some((s) => s.comptes.length) ? (
+        <Groupe titre={tr('ext.groupe.lies')} pied={tr('ext.lies.pied')} attrs={{ 'data-ext-groupe': 'lies' }}>
+          {vm.sites.flatMap((s) => s.comptes).map((c) => {
+            const ici = c.ouverture === 'ici' || c.ouverture === 'relais';
+            return <Rangee key={`lie:${c.site}:${c.id}`} icone={<span className="n-ext-initiale" aria-hidden="true">{String(c.nom || '?').trim().charAt(0).toUpperCase() || '?'}</span>}
+              titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], ici ? tr('ext.lies.ici') : '', faits.ext && faits.ext.version ? tr('ext.lies.version', { v: faits.ext.version }) : ''].filter(Boolean).join(' · ')}
+              valeur={tr('ext.lies.lie')} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
+          })}
+        </Groupe>
+      ) : null}
+
       {!etapesFaites ? (
         <Groupe titre={tr('ext.groupe.premier')} attrs={{ 'data-ext-groupe': 'premier' }}>
           {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}

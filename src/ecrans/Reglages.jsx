@@ -2494,6 +2494,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
   // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
+  const allerAutomatisations = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} };
   const rangeeCatV2 = (c) => {
     const pl = c.id === 'compte' ? (reglePlanCourante() || {}).plan : null;
     const v = c.id === 'compte' ? (pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : null) : c.id === 'securite-donnees' ? valeurCat({ ...c, id: 'donnees' }) : valeurCat(c);
@@ -2604,6 +2605,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
               <div data-categories-reglages="" data-onglets-reglages="">
                 <div className="v2-pm-liste" data-v2-pm-sections={catsV2.length}>{catsV2.map(rangeeCatV2)}</div>
+                {/* (19 nov. soir) Automatisations : l'écran des automatismes (src/automatisations/), hors des dix catégories. */}
+                <div className="v2-pm-liste" data-auto-entree=""><RangeeTouchable className="v2-pm-rangee" onClick={allerAutomatisations} attrs={{ 'data-auto-ouvrir': '' }}>
+                  <span className="v2-pm-ic" aria-hidden="true"><Icon name="spark" size={18}/></span><span className="v2-pm-lib">{tr('auto.titre')}</span><span className="v2-pm-chev" aria-hidden="true">{chevron}</span></RangeeTouchable></div>
               </div>
             </section>
             ) :
@@ -2622,6 +2626,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
               <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
                 {(designV2 ? catsV2 : categories).map((c) => ligneCategorie(c, { actif: designV2 ? idV2(catActive || cat || 'compte') === c.id : catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+                <button type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-auto-ouvrir="" onClick={allerAutomatisations}>
+                  <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name="spark" size={17}/></span><span className="vrm-set-lib"><b style={{color:C.text}}>{tr('auto.titre')}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr('auto.desc')}</small></span>{chevron}
+                </button>
               </div>
             </nav>
             <div className="vrm-pm-contenu">{designV2

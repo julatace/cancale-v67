@@ -13,6 +13,8 @@ import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutL
 import { ICONE_FAMILLE, GESTE_FAMILLE } from '../api/_lib/notif-belle.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
+import { useOrdinateur } from './natif/Coque.jsx';
+import NotificationsTableau from './natif/ecrans/NotificationsTableau.jsx';   // (19 nov. soir) à l'ordinateur : le tableau de travail
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
 // (8 nov.) Une ligne de la cloche : l'icône de la famille, le fait, le texte, le
@@ -84,11 +86,13 @@ export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, alerte = false, al
 export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onReglages, Fermer, Icon, z = 9500, enTete = null }) {
   const [etat, setEtat] = React.useState({ entrees: undefined, lu: null });
   const [filtre, setFiltre] = React.useState('');
+  const [majLe, setMajLe] = React.useState(undefined);
+  const ordinateur = useOrdinateur();
   const vivant = React.useRef(true);
   const lire = React.useCallback(async () => {
-    setEtat((e) => ({ ...e, entrees: undefined }));
+    setEtat((e) => ({ ...e, entrees: undefined })); setMajLe(undefined);
     const r = await charger().catch(() => ({ journal: null, lu: null }));
-    if (vivant.current) setEtat({ entrees: entreesDuJournal(r.journal), lu: r.lu });
+    if (vivant.current) { const en = entreesDuJournal(r.journal); setEtat({ entrees: en, lu: r.lu }); setMajLe(en === null ? null : Date.now()); }
   }, [charger]);
   React.useEffect(() => { vivant.current = true; lire(); return () => { vivant.current = false; }; }, [lire]);
   const { entrees, lu } = etat;
@@ -107,6 +111,22 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
   const toutMarquer = () => { if (entrees && entrees.length && lu !== null) poserLu(toutLu(entrees[0].seq, lu)); };
   const groupes = visibles ? parJour(visibles) : [];
   const etatListe = entrees === undefined ? 'lecture' : entrees === null ? 'passu' : entrees.length ? 'lu' : 'vide';
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : le centre en TABLEAU DE TRAVAIL (type, période, Statut Non lue · Lue,
+  // « Marquer comme lues » en série) — les mêmes entrées, le même « lu », le même toucher.
+  if (ordinateur) {
+    return (
+      <SheetShell onClose={onFermer} titre="Notifications" maxWidth={1080} z={z} FermeAuRetour={Fermer}
+        className="vrm-cn-feuille vrm-cn-feuille-tableau" aria-label="Notifications" data-centre-notifs="" data-centre-etat={etatListe} data-noswipe="1">
+        <NotificationsTableau entrees={entrees} lu={lu} types={TYPES_CENTRE} nomType={nomType} etatTexte={(e) => ETAT_CENTRE[e.etat] || ''} majLe={majLe} onRafraichir={lire}
+          estLue={estLue} icone={(e) => <Icon name={ICONE_FAMILLE[e.famille] || 'bell2'} size={22}/>} onOuvrir={ouvrir}
+          onMarquerLues={(es) => { if (lu !== null) poserLu(marquerLues(lu, es.map((e) => e.seq))); }}
+          haut={enTete ? <div className="vrm-cn-entete" data-centre-fraicheur="">{enTete}</div> : null} Icon={Icon}/>
+        <div className="vrm-cn-pied">
+          <button type="button" className="vrm-cn-lien" data-centre-reglages="" onClick={() => { onFermer(); onReglages(); }}>Réglages des notifications</button>
+        </div>
+      </SheetShell>
+    );
+  }
   return (
     <SheetShell onClose={onFermer} titre="Notifications" maxWidth={560} z={z} FermeAuRetour={Fermer}
       className="vrm-cn-feuille" aria-label="Notifications" data-centre-notifs="" data-centre-etat={etatListe} data-noswipe="1">
