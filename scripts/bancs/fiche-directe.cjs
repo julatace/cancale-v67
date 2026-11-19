@@ -84,6 +84,8 @@ function baseDirecte() {
   // claude/annonces-a-egalite) portera le N° par l'annonce du site elle-même ; l'entrée de la fiche (`articleFiche`) est la même.
   num[7699990018] = { numero: '3108', num: '3108', accountId: String(uid), numberedAt: iso(40), title: 'Asics Gel-Lyte III crème taille 44', photo: '' };
   m.vinted_used_nums.push(3108);
+  // (19 nov. soir) Le carrousel : l'annonce Vinted du N°3102 porte QUATRE photos (la série `photos` lue par Vinted).
+  for (const it of lst.data.payload.items) { const f = num[it.id]; if (f && String(f.numero) === '3102') it.photos = [1, 2, 3, 4].map((k) => ({ url: photo(it.id + '-' + k) })); }
   if (enl) enl.data.n = enl.data.ids.length;
   lst.data.nItems = lst.data.payload.items.length; lst.data.payload.pagination = { total_entries: lst.data.payload.items.length };
   return b;
@@ -101,12 +103,11 @@ async function ouvrir(nav, W, sombre, url) {
 const fermerToasts = (pg) => pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
 async function muter(pg) {
   if (MUT === 'faits') await pg.addStyleTag({ content: '[data-fd-faits]{display:none!important}' });
-  if (MUT === 'photo') await pg.addStyleTag({ content: '[data-fiche-heros]{min-height:560px!important}' });
-  if (MUT === 'pleins') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const t = f && f.querySelector('[data-fd-tuile]'); if (t) t.setAttribute('data-fd-plein', ''); });
+  if (MUT === 'photo') await pg.addStyleTag({ content: '[data-fiche-heros]{min-height:1200px!important}' });
+  if (MUT === 'pleins') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const t = f && f.querySelector('[data-fd-actions-ouvrir]'); if (t) t.setAttribute('data-fd-plein', ''); });
   if (MUT === 'onglets') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const g = f && f.querySelector('[data-fd-faits]'); if (g) { const t = document.createElement('div'); t.setAttribute('role', 'tablist'); t.innerHTML = '<button role="tab">Argent</button>'; g.before(t); g.hidden = true; } });
-  // « ⋯ » fermé : sa feuille n'est pas montée ⇒ la mutation pose une feuille FERMÉE (cachée) et y range les gestes.
-  if (MUT === 'plus') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const g = f && f.querySelector('[data-fd-tuiles]'); if (!f || !g) return;
-    let s = f.querySelector('[data-fd-plus]'); if (!s) { s = document.createElement('div'); s.setAttribute('data-fd-plus', '0'); s.hidden = true; f.append(s); } (s.querySelector('[role="dialog"]') || s).append(g); });
+  // « Choisir une action » rangé derrière un « ⋯ » (caché) : les gestes ne sont plus à un toucher.
+  if (MUT === 'plus') await pg.addStyleTag({ content: '[data-fd-actions-ouvrir]{display:none!important}' });
 }
 
 // ── La mesure de la fiche, DANS la page. ──
@@ -149,6 +150,7 @@ function mesurerFiche() {
     tuiles: [...f.querySelectorAll('[data-fd-tuile]')].map((t) => ({ k: t.getAttribute('data-fd-tuile'), page: horsPlus(t) && vis(t), h: Math.round(t.getBoundingClientRect().height) })),
     histoire: (() => { const e = f.querySelector('[data-fd-histoire]'); return e ? { etat: e.getAttribute('data-fd-histoire'), vues: [...e.querySelectorAll('[data-fiche-hist-etape]')].filter(vis).map((x) => x.getAttribute('data-fiche-hist-etape')), total: Number((e.querySelector('[data-fiche-hist]') || { getAttribute: () => 0 }).getAttribute('data-fiche-hist')), toutVoir: !!e.querySelector('[data-fd-tout-voir]') } : null; })(),
     plusOuvrir: [...f.querySelectorAll('[data-fd-plus-ouvrir]')].filter(vis).length,
+    actionsOuvrir: (() => { const e = f.querySelector('[data-fd-actions-ouvrir]'); return e ? { vu: dansEcran(e), h: Math.round(e.getBoundingClientRect().height) } : null; })(),
     plusSeul: plus ? montants(texte(plus)).filter((x) => !tPage.replace(/\s+/g, ' ').includes(x)) : [],
     zeros: faits.filter((x) => !x.su && /(^|\s)[+−-]?0(,00)?\s?€/.test(x.txt)).map((x) => x.cle),
     deborde: document.scrollingElement.scrollWidth - innerWidth,
@@ -162,38 +164,45 @@ function jugerFiche(m, n, suf, tel) {
   if (!dit(!!m && m.num === n, `F0 ${suf} : la fiche du N°${n} est rendue`, m && m.num)) return;
   const cles = m.faits.map((x) => x.cle);
   const il = (k) => m.faits.find((x) => x.cle === k);
-  const attendus = ['prix', 'achat', 'taille', 'quand', 'place'].concat(cles.includes('si-vendue') ? ['si-vendue'] : ['benefice']);
+  // (19 nov. soir — Julien : « c'est de la merde la fiche de la paire » ⇒ fiche PRODUIT, photo en grand.) Au premier écran :
+  // la photo, le N°, le titre, l'état, le PRIX et ses pastilles (mini, achat, bénéfice), le plein et « Choisir une action ».
+  // Le reste (taille, place, favoris, sites, histoire) en un défilement : avant 1,5 écran.
+  const benef = cles.includes('si-vendue') ? 'si-vendue' : 'benefice';
+  const essentiels = ['prix', 'achat', benef].concat(cles.includes('mini') ? ['mini'] : []);
+  const attendus = essentiels.concat(['taille', 'quand', 'place']);
   dit(m.onglets === 0, `P1 ${suf} : plus d'onglets (Argent · Sites · Histoire) — tout est sur la fiche`, String(m.onglets));
   dit(attendus.every((k) => il(k)), `F1 ${suf} : les faits attendus sont là (${cles.join(', ')})`, attendus.filter((k) => !il(k)).join(','));
-  dit(attendus.every((k) => il(k) && il(k).vu), `F2 ${suf} : chaque fait est visible au premier écran, sans défiler ni toucher`, m.faits.filter((x) => !x.vu).map((x) => `${x.cle}@${x.y}-${x.b}`).join(' '));
-  dit(!!m.photo && m.photo.vu && !!m.plaque && m.plaque.vu && new RegExp('^N°' + n + '$').test(m.plaque.txt) && !!m.titre && m.titre.vu && m.titre.lignes <= 2, `F3 ${suf} : en-tête compact — photo, N°, titre sur 2 lignes au plus`, { photo: m.photo, plaque: m.plaque, titre: m.titre });
-  dit(m.etats.filter((e) => /\S/.test(e.txt)).length >= 1 && m.etats.every((e) => e.vu), `F3 ${suf} : la ligne d'état est au premier écran`, m.etats);
-  if (tel) dit(!!m.photo && m.photo.h >= 110 && m.photo.h <= 170, `F3 ${suf} : la photo fait 110 à 170 px (${m.photo && m.photo.h})`);
-  if (n !== '3106') dit(!!m.sites && m.sites.vu && m.sites.rangees === m.sites.n && m.sites.n >= 1, `F4 ${suf} : les sites (${m.sites && m.sites.n}) au premier écran, une rangée par site`, m.sites);
+  dit(essentiels.every((k) => il(k) && il(k).vu), `F2 ${suf} : le prix et ses pastilles (${essentiels.join(', ')}) au premier écran, sans défiler ni toucher`, m.faits.filter((x) => essentiels.includes(x.cle) && !x.vu).map((x) => `${x.cle}@${x.y}-${x.b}`).join(' '));
+  dit(m.faits.every((x) => x.b <= m.H * 1.5 + 1), `F2 ${suf} : chaque autre fait avant 1,5 écran`, m.faits.filter((x) => x.b > m.H * 1.5).map((x) => `${x.cle}@${x.b}`).join(' '));
+  dit(!!m.photo && m.photo.vu && !!m.plaque && m.plaque.vu && new RegExp('^N°' + n + '$').test(m.plaque.txt) && !!m.titre && m.titre.vu, `F3 ${suf} : en-tête produit — photo, N°, titre`, { photo: m.photo, plaque: m.plaque, titre: m.titre });
+  dit(m.etats.filter((e) => /\S/.test(e.txt)).length >= 1 && m.etats.every((e) => e.vu), `F3 ${suf} : l'état est au premier écran`, m.etats);
+  if (tel) dit(!!m.photo && m.photo.w >= m.W - 1 && (m.photo.image ? m.photo.h >= Math.min(m.W, m.H * 0.46) - 1 : m.photo.h >= m.W * 0.5), `F3 ${suf} : la photo en grand — toute la largeur, carrée (${m.photo && m.photo.w} × ${m.photo && m.photo.h})`);
+  if (n !== '3106') dit(!!m.sites && m.sites.rangees === m.sites.n && m.sites.n >= 1 && m.sites.y <= m.H * 1.5, `F4 ${suf} : les sites (${m.sites && m.sites.n}) en tableau, une rangée par site, avant 1,5 écran`, m.sites);
   if (n === '3105') dit(!!m.sites && m.sites.n === 6, `F4 ${suf} : six sites, six rangées`, m.sites);
   if (m.action) dit(m.pleins.length === 1 && m.pleins[0].vu, `F5 ${suf} : le bouton principal (« ${m.pleins[0] && m.pleins[0].txt} ») est au premier écran`, m.pleins);
   dit(m.pleins.length <= 1, `Q1 ${suf} : un seul plein`, m.pleins.map((x) => x.txt).join(' | '));
-  dit(m.faits.filter((x) => !x.su).every((x) => /—/.test(x.txt) && x.txt.replace(/—/g, '').trim().split(' ').length >= 2) && !m.zeros.length, `F6 ${suf} : un fait pas su s'écrit « — » avec sa raison, jamais 0`, m.faits.filter((x) => !x.su).map((x) => x.txt).join(' | '));
-  dit(m.tuiles.length > 0 && m.tuiles.every((t) => t.page), `P2 ${suf} : les gestes (${m.tuiles.map((t) => t.k).join(', ')}) sont SUR la fiche, pas derrière « ⋯ »`, m.tuiles.filter((t) => !t.page).map((t) => t.k).join(','));
+  // Un fait pas su : « Ajouter » (ou « Relier ») quand il se corrige — c'est la porte ; sinon « — » et sa raison. Jamais 0.
+  dit(m.faits.filter((x) => !x.su).every((x) => (x.porte ? /Ajouter|Relier/.test(x.txt) : /—/.test(x.txt) && x.txt.replace(/—/g, '').trim().split(' ').length >= 2)) && !m.zeros.length, `F6 ${suf} : un fait pas su dit « Ajouter » (s'il se corrige) ou « — » et sa raison, jamais 0`, m.faits.filter((x) => !x.su).map((x) => x.txt).join(' | '));
+  dit(!!m.actionsOuvrir && m.actionsOuvrir.vu, `P2 ${suf} : « Choisir une action » est au premier écran (les gestes à un toucher)`, m.actionsOuvrir);
   dit(!m.plusSeul.length, `P3 ${suf} : aucun montant ni date seulement derrière « ⋯ »`, m.plusSeul.join(' | '));
-  if (!tel) dit(m.plusOuvrir === 0, `P4 ${suf} : à l'ordinateur, aucun menu « ⋯ »`, String(m.plusOuvrir));
-  dit(!!m.histoire && m.histoire.vues.length <= 3 && m.histoire.toutVoir && (m.histoire.total <= 3 || m.histoire.vues.length === 3), `F7 ${suf} : l'histoire repliée à ses 3 dernières étapes (${m.histoire && m.histoire.vues.join(' → ')}) et « Tout voir »`, m.histoire);
-  // 1,5 écran ; chaque site au-delà de deux est une rangée d'information de plus (≈ 50 px), jamais cachée (F4).
-  const plafond = Math.round(844 * 1.5 + 50 * Math.max(0, ((m.sites && m.sites.n) || 0) - 2));
-  if (tel) dit(m.hauteur <= plafond + 1, `Q2 ${suf} : la fiche entière tient sur 1,5 écran${plafond > 1266 ? ' (+ une rangée par site au-delà de deux)' : ''} (${m.hauteur} px ≤ ${plafond})`);
+  dit(m.plusOuvrir === 0, `P4 ${suf} : aucun menu « ⋯ »`, String(m.plusOuvrir));
+  dit(!!m.histoire && m.histoire.vues.length <= 3 && (m.histoire.total <= 3 || (m.histoire.vues.length === 3 && m.histoire.toutVoir)), `F7 ${suf} : l'histoire repliée à ses 3 dernières étapes (${m.histoire && m.histoire.vues.join(' → ')}) et « Tout voir »`, m.histoire);
+  // 2 écrans au plus ; chaque site au-delà de deux est une rangée d'information de plus (≈ 56 px), jamais cachée (F4).
+  const plafond = Math.round(m.H * 2 + 56 * Math.max(0, ((m.sites && m.sites.n) || 0) - 2));
+  if (tel) dit(m.hauteur <= plafond + 1, `Q2 ${suf} : la fiche entière tient sur 2 écrans${plafond > m.H * 2 ? ' (+ une rangée par site au-delà de deux)' : ''} (${m.hauteur} px ≤ ${plafond})`);
   dit(m.deborde <= 1 && !m.hors.length && !m.rognes.length, `Q3 ${suf} : rien ne déborde, aucun texte rogné`, { page: m.deborde, hors: m.hors, rognes: m.rognes });
   if (tel) dit(!!m.toast && m.toast.zones >= 2 && m.toast.couvre === 0, `Q4 ${suf} : un message passager ne couvre ni la barre ni la photo de la fiche`, m.toast);
   if (n === '3119') dit(il('achat') && !il('achat').su && il('achat').porte && il('benefice') && !il('benefice').su, `F8 ${suf} : vendue sans achat — « Achat — » est la porte, le bénéfice dit « — » et pourquoi`, m.faits.map((x) => x.txt).join(' | '));
   if (n === '3120') dit(il('benefice') && il('benefice').su && /\+58\s?€/.test(il('benefice').txt) && !/au moins/i.test(il('benefice').txt) && m.action === 'bordereau', `F8 ${suf} : vendue reliée — bénéfice +58 €, jamais « au moins », plein « bordereau »`, { b: il('benefice'), a: m.action });
   if (n === '3102') dit(m.action === 'baisser' && il('mini') && il('interet') && /4\s·\s61/.test(il('interet').txt) && m.sites.n === 2, `F8 ${suf} : en vente sur 2 sites — prix mini, favoris · vues (4 · 61), plein « baisser »`, { a: m.action, f: cles });
   if (n === '3104') dit(il('prix') && /1\s?250\s?€/.test(il('prix').txt) && il('achat') && /1\s?020\s?€/.test(il('achat').txt), `F8 ${suf} : prix à quatre chiffres écrits en entier`, m.faits.map((x) => x.txt).join(' | '));
-  if (n === '3103') dit(!!m.photo && !m.photo.image && m.photo.vu, `F8 ${suf} : sans photo — la place de la photo reste (silhouette), rien ne saute`, m.photo);
+  if (n === '3103') dit(!!m.photo && !m.photo.image && m.photo.vu, `F8 ${suf} : sans photo — la place de la photo reste (une image dessinée), rien ne saute`, m.photo);
   if (n === '3107' || n === '3108') {
     const site = n === '3107' ? 'leboncoin' : 'ebay';
     dit(!!m.titre && !/jamais servi|sans titre/i.test(m.titre.txt) && m.titre.txt.trim().length > 6 && !!m.photo && m.photo.image, `A1 ${suf} : l'article a SON titre et SA photo (ceux de son annonce ${site})`, { t: m.titre, p: m.photo });
     dit(il('prix') && il('prix').su && il('quand') && il('quand').su && !!m.sites && m.sites.n === 1 && m.sitesListe.join() === site + ':en-ligne', `A2 ${suf} : prix, jours en ligne et site lus sur ${site} — rien de vide`, { f: m.faits.map((x) => x.txt), s: m.sitesListe });
     dit(!/vinted/i.test(m.texte), `A3 ${suf} : rien ne dit « Vinted » (ni « relie à Vinted »)`, (m.texte.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
-    dit(m.tuiles.length >= 3 && m.pleins.length === 1, `A4 ${suf} : ses gestes (${m.tuiles.map((t) => t.k).join(', ')}) et UN bouton principal`, m.pleins);
+    dit(!!m.actionsOuvrir && m.actionsOuvrir.vu && m.pleins.length === 1, `A4 ${suf} : « Choisir une action » et UN bouton principal`, m.pleins);
     if (n === '3107') dit(il('achat') && il('achat').su && /60\s?€/.test(il('achat').txt) && il('si-vendue') && il('si-vendue').su && il('interet') && /3/.test(il('interet').txt), `A5 ${suf} : achat 60 € (posé par N°), bénéfice prévu, 3 favoris lus chez Leboncoin`, m.faits.map((x) => x.txt).join(' | '));
     if (n === '3108') dit(il('achat') && !il('achat').su && il('achat').porte === 'achat', `A5 ${suf} : « Achat — » se tape sur place, sans annonce Vinted`, il('achat'));
   }
@@ -285,6 +294,62 @@ async function surPlace(nav, sombre) {
   finally { if (o) await o.ctx.close().catch(() => {}); }
 }
 
+
+// I — « il faut que ça rende bien sur iPhone et ordi » (Julien, 19 nov. soir). Chaque appareil, clair et sombre :
+//   iPhone 390 × 844 et 430 × 932 en application installée (zone sûre haut 47 / bas 34), iPhone 390 en onglet Safari
+//   (barre d'adresse en bas : 390 × 664 utiles, pas de zone sûre dans la page), ordinateur 1512 × 900 et 1280 × 800.
+// Contrôles : photo de toute la largeur (téléphone) sans bande vide, titre et prix jamais coupés, rien sous l'encoche ni sous
+// la barre du bas, le plein visible sans défiler, cibles ≥ 44 (36 à la souris), aucun défilement de côté.
+const APPAREILS = [
+  { nom: 'iphone-390-app', W: 390, H: 844, haut: 47, bas: 34, tel: true },
+  { nom: 'iphone-390-safari', W: 390, H: 664, haut: 0, bas: 0, tel: true },
+  { nom: 'iphone-430-app', W: 430, H: 932, haut: 47, bas: 34, tel: true },
+  { nom: 'ordi-1512', W: 1512, H: 900, haut: 0, bas: 0, tel: false },
+  { nom: 'ordi-1280', W: 1280, H: 800, haut: 0, bas: 0, tel: false },
+];
+async function appareil(nav, A, sombre) {
+  const th = sombre ? 'sombre' : 'clair';
+  let o;
+  try {
+    o = await P.ouvrir(nav, { W: A.tel ? 390 : 1512, sombre, b: baseDirecte(), url: '/?tab=journee', api: B.apiVolume, dsf: DSF });
+    await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
+    await o.pg.setViewportSize({ width: A.W, height: A.H });
+    await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg);
+    // La zone sûre d'un iPhone (encoche, barre du bas) : celle que lit l'app (`--n-haut-sur`, `--n-bas-sur`).
+    if (A.haut || A.bas) await o.pg.addStyleTag({ content: `:root,:root:root{--n-haut-sur:${A.haut}px!important;--n-bas-sur:${A.bas}px!important}` });
+    for (const n of (process.env.CAS_APPAREILS || '3102,3104,3120').split(',')) {
+      const suf = `${A.nom} ${th} N°${n}`;
+      await fermerToasts(o.pg); await ouvrirParNum(o.pg, n); await fermerToasts(o.pg); await o.pg.waitForTimeout(400);
+      await o.pg.screenshot({ path: path.join(SHOTS, `appareil-${A.nom}-${th}-${n}.png`) });
+      const m = await o.pg.evaluate(({ haut, bas }) => {
+        const f = document.querySelector('[data-fiche-paire]'); if (!f) return null;
+        const R = (e) => (e ? e.getBoundingClientRect() : null);
+        const gal = R(f.querySelector('.nf-defile')), img = R(f.querySelector('.nf-defile img'));
+        const titre = f.querySelector('[data-fd-titre]'), prix = f.querySelector('.nf-prix-valeur');
+        const retour = R(f.querySelector('.n-barre-retour')), plein = R(f.querySelector('[data-fd-plein]')), choisir = R(f.querySelector('[data-fd-actions-ouvrir]'));
+        return { W: innerWidth, H: innerHeight, gal: gal && { x: gal.left, w: gal.width, h: gal.height }, img: img && { w: img.width, h: img.height },
+          titreCoupe: titre ? titre.scrollHeight > titre.clientHeight + 1 || titre.scrollWidth > titre.clientWidth + 1 : null,
+          prixCoupe: prix ? prix.scrollWidth > prix.clientWidth + 1 || prix.getBoundingClientRect().right > innerWidth : null,
+          retourHaut: retour ? retour.top : null, plein: plein ? { haut: plein.top, bas: plein.bottom } : null, choisirBas: choisir ? choisir.bottom : null,
+          cote: document.scrollingElement.scrollWidth - innerWidth, defile: f.scrollWidth - f.clientWidth, haut, bas };
+      }, { haut: A.haut, bas: A.bas });
+      if (!dit(!!m, `I ${suf} : la fiche est rendue`)) continue;
+      if (A.tel) dit(!!m.gal && m.gal.x <= 0.5 && Math.abs(m.gal.w - m.W) <= 1 && m.gal.h >= Math.min(m.W, m.H * 0.46) - 1 && !!m.img && m.img.w >= m.gal.w - 1 && m.img.h >= m.gal.h - 1, `I1 ${suf} : la photo prend toute la largeur, sans bande vide`, { gal: m.gal, img: m.img });
+      else dit(!!m.gal && m.gal.w >= m.W * 0.3 && !!m.img && m.img.h >= m.gal.h - 1, `I1 ${suf} : la galerie à gauche, la photo la remplit`, { gal: m.gal, img: m.img });
+      dit(m.titreCoupe === false && m.prixCoupe !== true, `I2 ${suf} : titre et prix jamais coupés`, { t: m.titreCoupe, p: m.prixCoupe });
+      dit(m.retourHaut != null && m.retourHaut >= m.haut - 0.5, `I3 ${suf} : rien sous l'encoche (le retour à ${Math.round(m.retourHaut)} px, zone sûre ${m.haut})`);
+      dit(!!m.plein && m.plein.bas <= m.H - m.bas + 0.5 && m.plein.haut >= m.haut, `I4 ${suf} : le plein visible sans défiler, au-dessus de la barre du bas`, m.plein);
+      dit(m.choisirBas != null && m.choisirBas <= m.H - m.bas + 0.5, `I4 ${suf} : « Choisir une action » visible sans défiler`, String(m.choisirBas));
+      dit(m.cote <= 1 && m.defile <= 1, `I5 ${suf} : aucun défilement de côté`, { page: m.cote, fiche: m.defile });
+      const q = await o.pg.evaluate(P.mesurer, { tactile: A.tel, sombre, racines: ['[data-fiche-paire]'] });
+      dit(!q.cibles.length, `I6 ${suf} : cibles ≥ ${A.tel ? 44 : 36} px (${q.nCibles})`, q.cibles.slice(0, 4));
+      dit(!q.contraste.length, `I7 ${suf} : contrastes ≥ 4,5:1 (${q.nTextes} textes)`, q.contraste.slice(0, 4));
+    }
+    if (o.erreurs.length) console.log(`   (erreurs de page : ${o.erreurs.slice(0, 2).join(' | ')})`);
+  } catch (err) { dit(false, `I ${A.nom} ${th} : ouverture`, String(err.message || err).slice(0, 200)); }
+  finally { if (o) await o.ctx.close().catch(() => {}); }
+}
+
 module.exports = { baseDirecte, mesurerFiche, CAS };
 if (require.main === module) (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
@@ -304,6 +369,12 @@ if (require.main === module) (async () => {
           jugerFiche(m, n, suf, W < 600);
           // Q5 — cibles et contrastes, par la mesure commune (design-passe) : la fiche seule.
           const q = await o.pg.evaluate(P.mesurer, { tactile: W < 600, sombre: th === 'sombre', racines: ['[data-fiche-paire]'] });
+          // G — UN toucher sur « Choisir une action » : la feuille des gestes (rangées), puis Échap.
+          await o.pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fd-actions-ouvrir]'); if (b) b.click(); }); await o.pg.waitForTimeout(500);
+          const g = await o.pg.evaluate(() => [...document.querySelectorAll('[data-fd-actions="1"] [data-fd-tuile]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-fd-tuile')));
+          if (W === LARGEURS[0] && th === THEMES[0]) await o.pg.screenshot({ path: path.join(SHOTS, `actions-${n}-${W}.png`) });
+          dit(g.length >= (n === '3106' || n === '3119' ? 2 : 3), `G ${suf} : un toucher sur « Choisir une action » montre ses gestes (${g.join(', ')})`);
+          await o.pg.keyboard.press('Escape').catch(() => {}); await o.pg.waitForTimeout(400);
           dit(!q.cibles.length, `Q5 ${suf} : chaque cible fait ${W < 600 ? 44 : 36} px (${q.nCibles} mesurées)`, q.cibles.slice(0, 4));
           dit(!q.contraste.length, `Q6 ${suf} : contrastes ≥ 4,5:1 sur le fond rendu (${q.nTextes} textes)`, q.contraste.slice(0, 4));
           dit(!q.coupes.length && !q.rognes.length, `Q7 ${suf} : aucun mot coupé, aucun chiffre rogné`, [...q.coupes, ...q.rognes].slice(0, 4));
@@ -316,6 +387,7 @@ if (require.main === module) (async () => {
     }
     if (!process.env.SANS_TOUCHER) for (const ch of CHEMINS) { await unToucher(nav, ch, 390, false); if (ch === 'annonces' || ch === 'stock') await unToucher(nav, ch, 1512, false); }
     if (!process.env.SANS_SAISIE) for (const th of THEMES) await surPlace(nav, th === 'sombre');
+    if (!process.env.SANS_APPAREILS) for (const A of APPAREILS.filter((x) => !process.env.APPAREILS || process.env.APPAREILS.split(',').includes(x.nom))) for (const th of THEMES) await appareil(nav, A, th === 'sombre');
   } finally { await nav.close(); P.srv.close(); }
   console.log(`\n${bilan.ok} ✅ · ${bilan.ko} ❌ (captures : ${SHOTS})`);
   process.exit(bilan.ko ? 1 : 0);

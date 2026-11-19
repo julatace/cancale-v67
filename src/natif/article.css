@@ -67,15 +67,6 @@
   /* Les boutons d'un bloc d'avant (« Par étape · Dans l'ordre », « Ouvrir dans Ventes › »…) se touchent au doigt : 44 px. */
   .n-herite :is(button, a.vrm-lien-action) { min-height: var(--n-cible); }
   .n-herite[data-n-nu] { padding: 0; background: transparent; }
-  /* La fiche à l'ordinateur, hors du volet de la coque (les écrans d'avant n'ont que deux volets) : un VOLET À DROITE,
-     la liste reste visible et touchable à gauche — toucher une autre rangée change la fiche. */
-  @media (min-width: 1024px) {
-    .n-poussee.n-fiche:not([data-n-volet]) {
-      left: auto; width: clamp(560px, 46vw, 720px); border-left: .5px solid var(--n-trait);
-      box-shadow: -12px 0 32px -16px rgb(0 0 0 / .28);
-    }
-  }
-  @media (min-width: 1024px) { .n-poussee.n-fiche:not([data-n-volet]) .n-article { grid-template-columns: 140px minmax(0, 1fr); } .n-poussee.n-fiche:not([data-n-volet]) .n-article-photo { width: 140px; height: 140px; } }
   .n-poussee[data-n-volet] .n-article, .n-poussee[data-n-large] .n-article { grid-template-columns: 140px minmax(0, 1fr); }
   .n-poussee[data-n-volet] .n-article-photo, .n-poussee[data-n-large] .n-article-photo { width: 140px; height: 140px; }
 }
