@@ -244,7 +244,7 @@ const MESURE_QUALITE = (racineSel) => {
           const ec = await pg.evaluate(() => { const s = document.querySelector('[data-relier-ecran]'); return { id: s.dataset.relierEcran, scene: !!s.querySelector('figure[data-scene][aria-hidden="true"]'), geste: (s.querySelector('[data-geste]') || {}).dataset ? s.querySelector('[data-geste]').dataset.geste : '', lien: (s.querySelector('[data-ouvrir-messagerie]') || {}).href || '', pleins: document.querySelectorAll('[data-relier-ma-boite] [data-n-variante="plein"]').length }; });
           vus.push(ec);
           if (!tactile) await pg.mouse.move(2, 2);   // l'état au repos (le survol d'un bouton n'est pas son contraste de repos)
-          await pg.waitForTimeout(150);
+          await pg.waitForTimeout(450);
           const Q = await pg.evaluate(MESURE_QUALITE, '[data-relier-ma-boite]');
           if (Q.bas.length || Q.cibles.length || Q.cote || Q.petits.length) dit(false, `${nom} : F — écran ${ec.id} : contrastes, cibles, taille`, JSON.stringify({ bas: Q.bas.slice(0, 3), cibles: Q.cibles.slice(0, 3), petits: Q.petits.slice(0, 3), cote: Q.cote }));
           if (k === 0 || k === 2) await pg.waitForTimeout(350); await pg.screenshot({ path: path.join(CAPT, `relier-${k + 2}-${nom}.png`) });

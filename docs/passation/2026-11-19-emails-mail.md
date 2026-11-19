@@ -71,3 +71,17 @@ beaucoup plus simple. »
   brut sur une ligne » (règle du 5 nov. remplacée par la demande du 19 nov. : le sujet EST sur la ligne). À réécrire
   sur les data-* gardés (`data-boite-email`, `data-boite-quoi`, `data-boite-lecture`, `data-boite-heros`…) ou retirer.
 - Les phrases de `src/boiteEmails.js` (titres « Colis à retirer », « Vendu »…) restent en français (lib d'avant).
+
+## Résultats (19 nov., fin du lot)
+
+- `node scripts/bancs/emails-mail.cjs` sur le build de la branche : **111 verts, 0 rouge** (6 combinaisons × boîte,
+  vide, relier). Captures regardées (liste, lecture, vide, chaque écran du parcours, « Reçu ✓ ») à 390 / 1280 / 1512,
+  clair et sombre.
+- **Le même banc sur l'écran d'AVANT** (src/BoiteEmails.jsx du train, `BANC_DIST`) : **15 rouges** — entre autres
+  « B — la liste prend 64 % de la largeur utile, colonne de lecture vide affichée », segmenté absent, sujet absent des
+  rangées, code de retrait à 28 px, cibles de 36 px, pas de parcours `[data-relier-ma-boite]`.
+- Trouvé en route : `:where(.vrm-app-shell) button { background: var(--fu-remplir) }` (sans couche) repeignait en
+  gris les rangées et les boutons natifs de l'écran (CDP `getMatchedStylesForNode`) ⇒ pont `all: revert-layer` en
+  tête de src/emails-mail.css (même principe que src/coque-native.css), sans valeur ni `!important` hors du champ de
+  recherche et du menu du compte (règle d'avant en `!important`, passée par `#vrm-contenu`).
+- Build : `NODE_OPTIONS=--max-old-space-size=6144` nécessaire (le tas par défaut de 2 Go casse `vite build`).
