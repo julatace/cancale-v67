@@ -103,4 +103,31 @@ U un toucher depuis Annonces, Ventes, Stock, Aujourd'hui, la recherche ; F les f
 premier écran, « — » avec sa raison ; P rien seulement derrière « ⋯ », plus d'onglets ; S la saisie sur place ; Q un
 plein, cibles, contrastes, débordements, 1,5 écran, message passager ; A l'article sans annonce Vinted.
 Rouge sur le code d'avant (`BANC_DIST` = build d'`origin/main`) et sous mutation (`MUTATION=faits|photo|pleins|onglets|
-plus|montee`). Chiffres : voir le rapport de la session (fin de ce fichier).
+plus|montee`).
+
+### Chiffres (relance sous Opus, 19 nov. au soir)
+
+- **Après** (build de `claude/fiche-directe`, natif-fondation fusionnée, DSF 2) : **1 130 ✅ · 0 ❌** — 9 cas × 390 / 1512 /
+  1280 × clair / sombre, un toucher depuis Annonces (390, 1512), Ventes, Stock (390, 1512), Aujourd'hui, la recherche ;
+  saisie sur place (achat, prix mini, prix) clair et sombre.
+- **Avant** (build d'`origin/main` ad73a3c7c, 390 clair) : **78 ✅ · 133 ❌** — plus de faits visibles (onglets), photo
+  310 px, gestes derrière « ⋯ », Leboncoin seul / eBay seul « N° jamais servi », un toucher depuis Stock, Aujourd'hui, la
+  recherche et Annonces n'ouvre pas la fiche complète.
+- **Mutations** : `faits`, `photo`, `pleins`, `onglets`, `montee`, `plus` — chacune rougit son contrôle (la mutation `plus`
+  a été corrigée : la feuille « ⋯ » fermée n'est plus montée par le natif, elle ne mordait plus).
+- Q2 (1,5 écran) : 3105 (6 sites) mesure 1 450 px ; le plafond compte une rangée de plus par site au-delà de deux (aucun
+  site caché, F4).
+
+### Ce qui a changé à la relance
+
+- La règle globale `button { min-height: 34px; font-size: 13px }` (index.html, hors couche) écrasait les tailles natives
+  (retour 30 px, plein 36 px) : le pont `src/coque-native.css` de `claude/natif-fondation` (revert-layer) la neutralise
+  dans les pages natives — fusionné, plus rien à poser ici.
+- « — » et sa raison sur UNE ligne (`Faits.jsx`, `.n-fait-ligne`) ; les gestes en grille de rangées (2 colonnes au
+  téléphone, 3 à l'ordinateur) avec « Vendu ailleurs » en dernière rangée (bouton d'avant rendu en `Rangee`) ; la ligne
+  qui situe le plein sous l'état ; un site par ligne avec son compte ; l'histoire avec son montant ou sa date à droite.
+- À l'ordinateur : la fiche est un volet à droite (`.n-fiche`, 560–720 px), la liste reste visible et touchable ; aucun
+  « ⋯ » (Certificat, Son N° dans la grille). Quand la coque à trois volets portera les écrans d'avant, la même page
+  s'ouvrira dans son volet de détail (`PagePoussee` le fait déjà).
+- La taille d'un article sans annonce Vinted se lit en fin du titre de SON annonce (Leboncoin, eBay).
+- Banc `ecrans-verre-2` : ses vues `fiche-*` (fiche D) ne sont plus jouées par défaut — la fiche est jugée ici.
