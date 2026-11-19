@@ -161,3 +161,83 @@ site** (`vrmBadgePos[vinted|leboncoin|vestiaire|ebay]`, chrome.storage.local), e
   sont exécutés par `audit-arrivee-capte`, le rendu ne l'est pas encore.
 - Banc Orion iPhone du panneau : pas joué (le banc tactile 390 l'approche).
 - Régénérer les zips 5.409 à l'intégration.
+
+---
+
+## Suite du 19 nov. (même branche, même 5.409, sans zips)
+
+### 7. Annonces du panneau (modèle « Articles »)
+« Choisir une action ▾ » (gestes en série PERMIS : Republier et Baisser le prix ouvrent leurs ateliers GARDÉS dans VRM ;
+« Offre à leurs favoris » mène au parcours des favoris de la carte ; « Ouvrir sur le site » pour une seule annonce ;
+**jamais de suppression en série**, §3), recherche (titre ou N°), filtre **Statut à compteurs LUS** dans la réponse de
+Vinted (`is_draft`, `is_closed`/`item_closing_action`, `is_hidden`, `is_reserved` ; « en vente » seulement par
+`<enligne-regle>`, sinon « à confirmer »), **liste / grille**, **Colonnes ▾** (N°, Prix, Prix mini, Acheté, En ligne,
+Vues, Favoris, Statut) gardé dans `chrome.storage.local` (`vrmPanneauAnnonces`), cases + « tout ». « Place au
+stock » : pas dans ce que la carte lit (reste). Au téléphone : liste empilée, colonnes en ligne sous le titre.
+
+### 8. Automatisations (état LU, jamais écrit d'ici)
+Messages aux favoris (versions, rythme, mode auto : délais, plafonds, horaires — lus dans `vrm_favoris_reglages_{uid}`
+et la file `favoris_file_*`), offres auto (`vinted_offres_auto`, prix mini posés, message de refus), **négociation par
+paliers** (ci-dessous), baisse auto « Bientôt » (pas livrée). « Modifier dans VRM » : l'extension n'écrit JAMAIS
+`main` (§5) — les réglages se changent dans l'app (mêmes clés). « Envoyer pas à pas » ouvre le parcours A→Z.
+
+### 9. Notifications (journal capté)
+Tableau filtrable (type, statut « nouveau » / « vu » selon le marqueur `vrm_capte_vu`), 7 jours, compte de l'onglet ;
+chaque ligne ouvre VRM par identité.
+
+### 10. Ventes : transporteur lu, par identité
+`email_bord_*` (n° de transaction → n° de suivi) puis `email_track_*` (n° de suivi → transporteur). Mesuré : 43 ventes
+reliées ainsi (39 Chronopost, 4 Mondial Relay). Rien relié, ou « autre » ⇒ aucun transporteur (jamais « inconnu »).
+Vestiaire : le transporteur de `vc_ventes`.
+
+### 11. Répondre depuis le volet Messages
+`repondreCarte` (fond) : sur SON toucher (`confirme`), seulement une conversation de la boîte RANGÉE du compte de
+l'onglet, depuis l'onglet vinted.fr, par le MÊME chemin que la réponse depuis l'app (`executerPourAppCoeur` →
+`gardeStricte` : sécurité, 50/h, réserve, pause, compte de l'onglet ; liste blanche `ENDPOINTS_APP`). Capacité
+`repondrecarte: '5.409.0'`.
+
+### 12. Négociation des offres par PALIERS, sans IA (décision du 19 nov.)
+- Règle pure `src/negociationPaliers.js` ; copie dans le moteur (`palierContreOffre`), comparée sur 13 cas.
+- Plancher = prix mini du N° ; sinon prix − remise maximale (%) ; sinon rien. Palier i = prix − (prix − plancher) ×
+  pct_i, arrondi à l'euro, jamais sous le plancher, jamais ≤ l'offre. Aperçu « 100 → 93 → 88 → 85 · plancher 85 ».
+- Moteur `autoAccepterOffres` : entre le seuil de refus et le prix mini ⇒ contre-offre du palier suivant ; MÊME chemin
+  (délai aléatoire 3–20 min, offre RELUE, `secuGeste`, `garde` : compte de l'onglet, 15/h offres, 50/h, réserve,
+  pause, captcha ; une à la fois) ; une par palier et par négociation (mémo `vrmContreOffres` AVANT le geste, rendu si
+  rien ne part) ; message optionnel (ses versions, jamais la précédente, garde de mots) ; journal `contre_offre`.
+  **Éteinte par défaut** (`vinted_offres_paliers.actif`), l'allumer DEMANDE. Réglage : Offres auto → « Négocier par
+  paliers ». Capacité `contreoffres: '5.409.0'`.
+- « Boost favoris auto » : **non fait** (engagement simulé, refusé).
+
+### 13. Leboncoin et Vestiaire dans le grand panneau
+Compte de l'onglet de CE site ; annonces (`lbc_listings`, `vc_listings`) et ventes (`lbc_ventes`, `vc_ventes`) qui
+portent CE compte seulement — **celles lues sans compte sont comptées et dites, jamais montrées** (mesuré : 124 des 194
+annonces Leboncoin rangées n'ont pas de compte). Ce que le site ne permet pas est dit UNE fois (Leboncoin : pas de
+favoris nominatifs ni d'offres ; Vestiaire : « aimés » depuis VRM) ; « Choisir une action » n'y propose ni Republier ni
+Offre aux favoris. Messages Leboncoin/Vestiaire : pas recopiés dans le panneau (reste).
+
+### Le journal `journal_vrm_*` vide chez Julien — pourquoi (pas corrigé : ce n'est pas mon fichier)
+Aucune ligne n'a jamais été écrite (journal d'écritures de la base : 0), alors que la base l'accepterait (aucun
+déclencheur ni règle ne la refuse) : **`noterJournal` n'est appelé que pour un geste ACCEPTÉ par Vinted, et ses lignes
+`actions_compte_*` ne montrent presque aucun geste** (0 aujourd'hui sur les Chrome en 5.377–5.408 ; 1 à 2 gestes sur
+des lignes écrites par des versions sans champ `v`, d'avant la 5.337 qui a créé le journal). Les écritures de
+`actions_compte_*` (342) viennent de la jauge publiée à CHAQUE visite, « 0 compris ».
+
+### Preuves de la suite
+- `audit-panneau-carte` : 14/14 (statuts lus, transporteur par identité, automatisations, notifications, réponse
+  gardée, Leboncoin/Vestiaire par compte) ; rouge sur l'arbre d'avant (7) ; `--prouve` 6/6.
+- `audit-negociation-paliers` : 11/11 (13 cas app = extension, moteur exécuté : éteint ⇒ rien ; 93 → 88 → 85 puis
+  rien ; jamais sous le plancher ; journal ; 50/50 ⇒ rien) ; rouge sur l'arbre d'avant (5) ; `--prouve` 5/5.
+- Bancs : `grand-panneau` **145/145** (Vinted 1512 et 390 clair/sombre + **Orion iPhone 390**, émulé dans Chromium :
+  WebKit n'est pas installé ici), `grand-panneau-sites` **68/68** (Leboncoin, Vestiaire), `feuille-arrivee` **41/41**
+  (vrai `FeuilleArrivee.jsx` ; mutations doublon / marqueur ⇒ 12 rouges chacune). Captures regardées ; corrigé après
+  lecture : tableau des annonces (grille CSS invalide), « Baisse auto : Pas su » ⇒ « Bientôt ».
+- La croix et les chevrons de la `Feuille` native sont vides dans le banc de l'app (les glyphes sont posés par la coque,
+  absente du banc) : à vérifier dans l'app réelle.
+- Build vert ; audits verts (liste ci-dessus + moteur-offres, offres-sures).
+
+### Reste après la suite
+- Interrupteurs des automatisations DANS le panneau (aujourd'hui : état lu + « Modifier dans VRM ») ; ciblage des
+  favoris (note minimale, limite par article, période) ; plusieurs messages éditables (✎ 🗑) dans le panneau.
+- Masquer / Afficher en série (aucun chemin gardé n'existe encore ; décision 3 = autre chantier).
+- Messages Leboncoin / Vestiaire dans le panneau ; baisse auto (décision 1) ; paliers pour Vestiaire.
+- Place au stock dans les colonnes.
