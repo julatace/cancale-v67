@@ -24,8 +24,9 @@ export function Colonnes({ className = '', attrs = null, children }) {
   return <div className={cx('n-colonnes', className)} {...(attrs || {})}>{children}</div>;
 }
 
-export function Colonne({ className = '', attrs = null, children }) {
-  return <div className={cx('n-colonne', className)} {...(attrs || {})}>{children}</div>;
+// `pleine` : la colonne traverse toute la grille à l'ordinateur (les tuiles de chiffres, en tête).
+export function Colonne({ pleine = false, className = '', attrs = null, children }) {
+  return <div className={cx('n-colonne', className)} data-n-pleine={pleine ? '' : undefined} {...(attrs || {})}>{children}</div>;
 }
 
 export default Colonnes;

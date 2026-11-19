@@ -61,16 +61,32 @@ beaucoup plus simple. »
   relier-compte (R6 mis à jour : LE parcours de l'écran est `RelierMaBoite`), email-rattacher, journal-emails,
   stockage-sur, icones.
 
-## Ce qui reste
+## Restes faits (19 nov., soir, demande du coordinateur)
 
-- Paramètres → Mes e-mails → « Mon adresse VRM » ouvre encore l'ancien `ParcoursAdresseVrm` (feuille, avec ses
-  réglages : adresse active, remplacer) : à basculer sur `RelierMaBoite` + un bloc réglages (deux parcours tant que
-  ce n'est pas fait).
-- Bancs anciens qui jugent l'ANCIEN DOM de l'écran (`boite-emails.cjs`, `design-v2-messages.cjs`,
-  `adresse-reception.cjs` partie E-mails, `emails-densite.cjs`…) : ils attendent `.vrm-boite-*`, « jamais le sujet
-  brut sur une ligne » (règle du 5 nov. remplacée par la demande du 19 nov. : le sujet EST sur la ligne). À réécrire
-  sur les data-* gardés (`data-boite-email`, `data-boite-quoi`, `data-boite-lecture`, `data-boite-heros`…) ou retirer.
-- Les phrases de `src/boiteEmails.js` (titres « Colis à retirer », « Vendu »…) restent en français (lib d'avant).
+1. **Un seul parcours.** Paramètres → Mes e-mails → « Mon adresse VRM » ouvre `RelierMaBoite` dans sa feuille
+   (`FeuilleAdresseReception`, src/AdresseReception.jsx réduit à la feuille et à son entrée). « Adresse active » et
+   « Remplacer l'adresse » vivent DANS le parcours (repliés sous « Réglages de l'adresse »), sur les MÊMES gestes de la
+   MÊME route : POST `{ geste: 'actif', actif }` et POST `{ geste: 'remplacer' }` (Remplacer demande un second toucher).
+   L'ancien `ParcoursAdresseVrm` (barre 1·2·3·✓) est RETIRÉ ; sa lecture `useAdresseVrm` est passée dans RelierMaBoite.jsx.
+2. **L'ancien panneau « Aperçu · Journal · Adresses · À rattacher »** (`reglages` de l'écran : `AdressesSansCompte` +
+   `EmailsSetting`) est rangé sous le parcours, replié derrière une rangée natif « Réception des e-mails » ; il ne se
+   monte qu'à SON toucher (ou quand l'ancienne scène demande « Mes adresses »). Il garde son dessin d'avant (exclu du
+   pont `revert-layer`).
+3. **Les mots de src/boiteEmails.js par `tr()`, 5 langues** : les règles restent écrites et jugées en français (les
+   gestes se reconnaissent à leur mot) ; `enClair(mot)` traduit à l'AFFICHAGE — table des mots fixes (natures, gestes,
+   « détail non gardé », jours) et formes à trou (« code {x} », « avant le {x} (demain) », « tu reçois {x} », « Voir le
+   N°{x} », identités « colis n° {x} »…). Clés `bm.*` (src/i18n/langues/*/emailsMail.js). Les familles rangées par le
+   serveur (`r.f`) et les dates courtes (« 9 nov. ») restent telles que lues.
+4. **Bancs réécrits sur le nouvel écran** : `boite-emails` (en entier), `design-v2-messages` (partie E-mails : E1
+   compare à la route — il n'y a plus de boîte « d'hier » ni de dessin « éteint » pour E-mails ; E3 : plus de bouton de
+   geste dans les rangées), `adresse-reception` (A–D sur le parcours accompagné, C avec les réglages de l'adresse ; au
+   téléphone Paramètres montre des tuiles : la ligne se trouve par la recherche des réglages), `emails-densite`.
+   **Règle remplacée, sur la demande de Julien du 19 nov.** : « le sujet brut n'est sur aucune ligne » (5 nov.) ⇒ la
+   ligne porte l'expéditeur, le SUJET d'origine, ce que VRM a compris en une ligne, la date. **Deux mesures de densité
+   remplacées aussi** : « la liste fait 340–420 px » ⇒ sans sélection elle prend toute la place (340–440 seulement en
+   deux volets) ; « le code ≤ 34 px » ⇒ le code de retrait EN GRAND (≥ 40 px), demandé le 19 nov. À 1280 px l'e-mail HTML
+   tient dans le volet (échelle ≤ 1) ; à 1512, taille naturelle.
+   Ajout à `src/natif/Segmente.jsx` : `attrs` par choix (des data-* ; aucune API cassée).
 
 ## Résultats (19 nov., fin du lot)
 
@@ -85,3 +101,15 @@ beaucoup plus simple. »
   tête de src/emails-mail.css (même principe que src/coque-native.css), sans valeur ni `!important` hors du champ de
   recherche et du menu du compte (règle d'avant en `!important`, passée par `#vrm-contenu`).
 - Build : `NODE_OPTIONS=--max-old-space-size=6144` nécessaire (le tas par défaut de 2 Go casse `vite build`).
+
+## Résultats des restes (après le dernier `git merge origin/claude/integration-19nov`)
+
+- Bancs, sur le build de la branche fusionnée : `emails-mail` 110 verts · `boite-emails` 156 verts · `adresse-reception`
+  166 verts · `emails-densite` 108 verts — **0 rouge**.
+- `design-v2-messages` : la partie E-mails est verte (E1 segments = route, E2 rubriques et « À traiter », E3 plaques et
+  codes, E4 « Ranger », E5 « C'est à moi », tronqués, cibles, un plein). Restent rouges, HORS de ce lot : Messages
+  (« titre et cloche sur une ligne », « fil en bulles » — l'écran Messages, pas touché ici), « éteint : pas de référence »
+  (il faut `SIGNATURE_AVANT`), et par moments « 1512 E : CLS 0,019 » — les sources nommées commencent par la barre
+  du haut de l'app (`vrm-micro`, `kbd`) qui pousse le segmenté ; la place des nombres du segmenté est gardée.
+- Audits verts : traduction, tdz, variables, quoi-de-neuf, boite-emails, boite-mail, emails-html, emails-transfert,
+  relier-compte, email-rattacher, journal-emails, stockage-sur, icones, fonctions-api, colis-achat-auto.

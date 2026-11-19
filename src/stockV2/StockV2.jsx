@@ -25,6 +25,8 @@ import LigneGlissable from '../LigneGlissable.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire — ici, plus dans Aujourd'hui
 import { Etiquette } from '../designV2/Signature.jsx';   // l'étiquette N° kraft partagée du nouveau design
 import { MQ_ORDINATEUR } from '../coque.js';
+import { attrsFicheLigne, ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la rangée ouvre LA fiche
+import DansFiche from '../DansFiche.jsx';
 import './stock-v2.css';
 
 // Le petit plan d'un meuble : les cases en grille, la case visée pleine. Lecture seule (aucun toucher) ;
@@ -190,21 +192,21 @@ function Seance({ s, seance, fermer }) {
 }
 
 // ── « OÙ EST… » : la réponse d'un N° (une seule paire), en grand ──────────────
-function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
+function Reponse({ s, f, onDeplacer, onRanger, onVoir, sansTete = false }) {
   const { Icon } = s;
   const ou = s.ouEst(f);
   const vendue = s.estVendu(f);
   const k = s.cleDe(f);
   return (
     <div className="sr-reponse" data-sr-reponse={k} data-sr-reponse-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'}>
-      <div className="sr-reponse-tete">
+      {sansTete ? null : <div className="sr-reponse-tete">
         <Photo f={f} Photo={s.Photo} Icon={Icon} taille={72}/>
         <div className="sr-paire-txt">
           <Plaque n={f.numero}/>
           <span className="sr-paire-titre">{f.title || '—'}</span>
           {vendue ? <span className="sr-vendue" data-sr-vendue="">{tr('sr.reponse.vendue')}</span> : null}
         </div>
-      </div>
+      </div>}
       {ou ? (
         <div className="sr-kraft-anneau"><div className="sr-ici sr-kraft is-reponse" data-sr-etiquette-place="">
           <span className="sr-ici-meuble" data-sr-reponse-meuble="">{ou.meuble.name}</span>
@@ -223,7 +225,7 @@ function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
 
 
 // ── UNE PAIRE DANS LA LISTE : la rangée A du nouveau design (photo 64, titre sur 2 lignes, « N° · T. · place »).
-// Toucher : sa place (une feuille) ; glisser à gauche : « Ranger » ou « Déplacer » (les mêmes gestes que la feuille).
+// Toucher : LA fiche de la paire (19 nov., fiche directe) ; glisser à gauche : « Ranger » ou « Déplacer » (les mêmes gestes que la feuille).
 function LignePaire({ s, l, onOuvrir, onRanger, onDeplacer, actif = false }) {
   const { Icon } = s;
   const actions = !l.cle ? [] : [l.ou
@@ -234,7 +236,7 @@ function LignePaire({ s, l, onOuvrir, onRanger, onDeplacer, actif = false }) {
     <div className="v2l v2l-a sr-ligne" data-v2l="A" role="listitem" data-sr-ligne={l.cle || 'sans'} data-sr-ligne-place={l.ou ? `${l.ou.meuble.name}|${l.ou.rangee}|${l.ou.colonne}` : (l.cle ? 'non-range' : 'sans-numero')}
       aria-label={[l.cle ? 'N°' + l.numero : '', l.titre, place || (l.cle ? tr('sr.ligne.aRanger') : tr('sr.ligne.sansNum'))].filter(Boolean).join(' · ')}
       aria-current={actif ? 'true' : undefined} data-sr-actif={actif ? '1' : undefined}
-      tabIndex={0} onClick={() => onOuvrir(l)} onKeyDown={(e) => { if (e.key === 'Enter') onOuvrir(l); }} {...(gp || {})}>
+      tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') onOuvrir(l); }} {...(l.cle ? attrsFicheLigne({ contexte: 'stock', site: 'stock', cle: 's' + l.cle, nums: [String(l.numero)], photo: l.photo || '', titre: l.titre || '' }) : {})} {...(gp || {})}>
       <span className="v2l-photo v2l-photo-a" aria-hidden="true">{l.photo ? <s.Photo src={l.photo} alt="" loading="lazy" decoding="async"/> : <span className="v2l-sans"><Icon name="cintre" size={22}/></span>}</span>
       <span className="v2l-a-txt">
         <span className="v2l-a-l1"><span className="v2l-a-titre">{l.titre || '—'}</span></span>
@@ -288,12 +290,11 @@ export default function StockV2({ s }) {
   const [vue, setVueEtat] = React.useState(() => { try { return localStorage.getItem('vrm_stock_v2_vue') === 'places' ? 'places' : 'paires'; } catch (_) { return 'paires'; } });
   const setVue = (v) => { setVueEtat(v); try { localStorage.setItem('vrm_stock_v2_vue', v); } catch (_) {} };
   const [plus, setPlus] = React.useState(false);
-  const [fiche, setFiche] = React.useState(null);        // la paire touchée dans la liste (sa place, en feuille)
   const [max, setMax] = React.useState(60);
   const [ordre, setOrdre] = React.useState(null);        // le meuble dont on change l'ordre (Monter / Descendre)
   const ordi = useOrdi();
   const aRangerCles = s.aRanger.map(s.cleDe).filter(Boolean);
-  const lancer = (cles, deplacer = false) => { if (cles.length) { setFiche(null); setSeance({ cles, deplacer }); } };
+  const lancer = (cles, deplacer = false) => { if (cles.length) { setSeance({ cles, deplacer }); } };
   const rangerA = (k) => lancer([k, ...aRangerCles.filter((x) => x !== k)]);
   // Une demande « ranger / déplacer CE N° » (Annonces, la fiche « Déplacer ») : la séance s'ouvre sur lui.
   React.useEffect(() => {
@@ -304,23 +305,29 @@ export default function StockV2({ s }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.place]);
   const ouvrir = (id) => setOuverts((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const voir = (f) => { const ou = s.ouEst(f); setFiche(null); if (ou) { setVue('places'); setOuverts((x) => new Set([...x, String(ou.meuble.id)])); } s.montrer(f); };
+  const voir = (f) => { const ou = s.ouEst(f); if (ou) { setVue('places'); setOuverts((x) => new Set([...x, String(ou.meuble.id)])); } s.montrer(f); };
   const exact = s.qEstNum ? s.resultats.filter((f) => s.exactNum(f)) : [];
   const un = choisi ? s.resultats.find((f) => s.cleDe(f) === choisi) : (exact.length === 1 ? exact[0] : (s.resultats.length === 1 ? s.resultats[0] : null));
   React.useEffect(() => { setChoisi(null); }, [s.q]);
   const nPlein = aRangerCles.length;
   const chercheVide = !s.q.trim();
-  const ficheF = fiche ? s.ficheDe(fiche) : null;
   const lignes = s.lignes;
   const nonRangees = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
-  const ligne = (l) => <LignePaire key={l.key} s={s} l={l} actif={ordi && !!l.cle && fiche === l.cle} onOuvrir={(x) => { if (x.cle && s.ficheDe(x.cle)) setFiche(x.cle); }} onRanger={() => rangerA(l.cle)} onDeplacer={() => lancer([l.cle], true)}/>;
+  // (19 nov., « fiche directe » — Julien : « je dois cliquer sur la paire puis cliquer sur les points ») UN toucher sur la rangée
+  // ouvre LA fiche de la paire (ses `data-fl-*`, src/ficheLigne.js — le toucher est délégué par la coque ; Entrée fait de
+  // même). Sa place (l'étiquette, le petit plan) et ses gestes « Voir », « Déplacer », « Ranger » y sont posés par `DansFiche`
+  // (place « contexte ») : plus de feuille intermédiaire ni de « Tout sur la paire ».
+  const ouvrirFiche = (x) => { if (x.cle) ouvrirLigne(lireLigneDe(x)); };
+  const lireLigneDe = (x) => ({ cle: 'stock:stock:s' + x.cle, contexte: 'stock', site: 'stock', nums: [String(x.numero)], item: '', tx: '', suivi: '', photo: x.photo || '', titre: x.titre || '', prix: '', sous: '' });
+  const ligne = (l) => { const f = l.cle ? s.ficheDe(l.cle) : null; return (<React.Fragment key={l.key}>
+    <LignePaire s={s} l={l} onOuvrir={ouvrirFiche} onRanger={() => rangerA(l.cle)} onDeplacer={() => lancer([l.cle], true)}/>
+    {f ? <DansFiche cle={'stock:stock:s' + l.cle} place="contexte" seulementFiche>
+      <Reponse s={s} f={f} sansTete onVoir={() => { fermerLigne(); voir(f); }} onDeplacer={() => { fermerLigne(); lancer([l.cle], true); }} onRanger={() => { fermerLigne(); rangerA(l.cle); }}/>
+    </DansFiche> : null}
+  </React.Fragment>); };
   let reste = max;
   const tranche = (arr) => { const a = arr.slice(0, Math.max(0, reste)); reste -= a.length; return a; };
 
-  const ficheCorps = ficheF ? <>
-    <Reponse s={s} f={ficheF} onVoir={() => voir(ficheF)} onDeplacer={() => lancer([fiche], true)} onRanger={() => rangerA(fiche)}/>
-    <BoutonV2 role="texte" attrs={{ 'data-sr-tout-sur': fiche }} onClick={() => { const n = String(ficheF.numero); setFiche(null); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }}>{tr('sr.reponse.fiche')}</BoutonV2>
-  </> : null;
   const placesBloc = (
     <section className="sr-groupe" data-sr-places={s.meubles.length}>
       {s.meubles.length === 0 ? s.blocs.explication : null}
@@ -440,8 +447,8 @@ export default function StockV2({ s }) {
           {s.blocs.importees}{s.blocs.aPart}{s.blocs.ecartes}
           </div>
           {/* Ordinateur : la liste à gauche ; à droite, la place de la paire touchée (son étiquette, son plan), sinon les places. */}
-          {ordi ? <aside className="sr-cote" data-sr-cote={ficheF ? 'paire' : 'places'} aria-label={ficheF ? 'N°' + ficheF.numero : tr('sr.seg.places')}>
-            {ficheF ? <div className="sr-cote-paire" data-sr-fiche={fiche}>{ficheCorps}</div> : placesBloc}
+          {ordi ? <aside className="sr-cote" data-sr-cote="places" aria-label={tr('sr.seg.places')}>
+            {placesBloc}
           </aside> : null}
         </div> : <>
           {placesBloc}
@@ -450,10 +457,6 @@ export default function StockV2({ s }) {
       </> : null}
       {s.blocs.modale}
 
-      {ficheF && !ordi ? (
-        <Feuille onClose={() => setFiche(null)} titre={'N°' + ficheF.numero} maxWidth={520} data-sr-fiche={fiche} className="sr-feuille">
-          <div className="sr-seance is-fiche">{ficheCorps}</div>
-        </Feuille>) : null}
       {plus ? <FeuillePlus s={s} fermer={() => setPlus(false)}/> : null}
       {seance ? <Seance s={s} seance={seance} fermer={() => setSeance(null)}/> : null}
     </div>

@@ -11,7 +11,7 @@
    `all: revert-layer` renvoie les contrôles de l'écran à la couche `vrm-natif` (ce fichier, les composants natifs).
    Exceptions : les pièces d'avant gardées telles quelles (`.vrm-pv` : choix du compte, sa vérification ; `.vrm-boite` :
    l'ancienne scène quand l'adresse VRM n'est pas ouverte). */
-:is(.n-mail, .n-mail-feuille, .n-relier) :is(button, input, select, textarea, a):not(.vrm-pv *, .vrm-boite *) {
+:is(.n-mail, .n-mail-feuille, .n-relier) :is(button, input, select, textarea, a):not(.vrm-pv *, .vrm-boite *, .n-mail-reglages-corps *) {
   all: revert-layer;
 }
 #vrm-contenu .n-mail-cherche input { background: transparent !important; box-shadow: none !important; }
@@ -76,9 +76,9 @@
   .n-mail-pj { display: flex; color: var(--n-encre-2); }
   .n-mail-milieu { grid-area: milieu; display: grid; gap: 1px; min-width: 0; }
   .n-mail-sujet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-second); color: var(--n-encre); }
-  .n-mail-compris { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; font: var(--n-t-legende); color: var(--n-encre-2); }
-  .n-mail-quoi { flex: 0 0 auto; font-weight: 600; color: var(--n-encre-2); }
-  .n-mail-compris .n-plaque { flex: 0 0 auto; }
+  .n-mail-compris { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-quoi { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre-2); }
+  .n-mail-compris .n-mail-plaque { flex: 0 0 auto; display: flex; }
   .n-mail-essentiel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .n-mail-geste { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre); }
   .n-mail-geste[data-ambre="1"] { color: var(--n-ambre); }
@@ -181,7 +181,7 @@
   .n-mail-message .vrm-boite-cadre { margin-top: 0; }
   .n-mail-message .vrm-boite-cadre-images { color: var(--n-encre-2); }
   .n-mail-message .vrm-boite-cadre-images .vrm-boite-second { min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); cursor: pointer; }
-  .n-mail-msg { display: grid; gap: 12px; font: var(--n-t-corps); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-mail-msg { display: grid; gap: 12px; max-width: 56ch; font: var(--n-t-corps); color: var(--n-encre); overflow-wrap: anywhere; }
   .n-mail-msg p { margin: 0; }
   .n-mail-msg a { color: var(--n-accent); text-decoration: underline; text-underline-offset: 2px; }
   .n-mail-msg-liste { margin: 0; padding: 0 0 0 20px; display: grid; gap: 6px; }
@@ -208,7 +208,14 @@
   /* « Relier ma boîte » */
   .n-mail-relier { display: grid; gap: 8px; }
   .n-mail-relier-retour { margin: 0 0 4px -8px; }
-  .n-mail-reglages { margin-top: 16px; }
+  .n-mail-reglages { margin-top: 24px; max-width: 560px; }
+  .n-mail-reglages-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "t c" "s c"; align-items: center; column-gap: 12px; min-height: 56px; padding: 8px 16px; border-radius: 12px; background: var(--n-carte); cursor: pointer; list-style: none; }
+  .n-mail-reglages-tete::-webkit-details-marker { display: none; }
+  .n-mail-reglages-titre { grid-area: t; font: var(--n-t-corps-fort); color: var(--n-encre); }
+  .n-mail-reglages-sous { grid-area: s; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-reglages-tete .n-glyphe { grid-area: c; color: var(--n-encre-3); transition: transform .2s cubic-bezier(.32,.72,0,1); }
+  .n-mail-reglages[open] .n-mail-reglages-tete .n-glyphe { transform: rotate(90deg); }
+  .n-mail-reglages-corps { margin-top: 12px; }
 
   @media (min-width: 1024px) {
     .n-mail { padding: 0 24px 32px; }
