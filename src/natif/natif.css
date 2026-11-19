@@ -457,6 +457,11 @@
   .n-toast-action:focus-visible { outline-color: var(--n-sur-inverse); outline-offset: -2px; }
   .n-toast-action:active { opacity: .7; }
 
+  /* (19 nov., intégration) Le toast des N° neufs vit dans l'écran (qui remet --n-bas à 0) : il se pose quand même AU-DESSUS
+     de la barre d'onglets au téléphone ; à l'ordinateur, il n'y a pas de barre en bas. */
+  [data-toast-numeros] { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur)); }
+  @media (min-width: 1024px) { [data-toast-numeros] { --n-bas: var(--n-bas-sur); } }
+
   /* ── BarreOnglets ───────────────────────────────────────────────────────── */
   .n-onglets {
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; box-sizing: border-box;

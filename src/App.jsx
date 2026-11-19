@@ -56,7 +56,6 @@ import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urg
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
 import ConfortCoque from './ConfortCoque.jsx';
 import CapteNotif from './capteNotif/CapteNotif.jsx';   // (14 nov., ext. 5.377) « L'extension a capté » — le toast
-import FeuilleArrivee from './capteNotif/FeuilleArrivee.jsx';   // (19 nov., ext. 5.409) « Depuis ta dernière visite » — la feuille d'arrivée
 import { brancherExtensionCapte } from './capteNotif/regle.js';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
 import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
 import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
@@ -289,8 +288,6 @@ const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
 const AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));   // (19 nov. soir) Paramètres → Automatisations
-import VentesTableau from './natif/ecrans/VentesTableau.jsx';
-import AchatsTableau from './natif/ecrans/AchatsTableau.jsx';   // (19 nov. soir) Achats à l'ordinateur   // (19 nov. soir) Ventes à l'ordinateur : le tableau de travail
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -350,6 +347,14 @@ function aLaDemandeDiscret(charger) {
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+// (19 nov., intégration — budget de démarrage) Hors du démarrage : la feuille « Depuis ta dernière visite » (ext. 5.409),
+// les tableaux de travail de l'ordinateur et Ventes natif, chargés quand ils s'affichent.
+const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
+const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
+const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
+const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
+const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
+const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('./OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
@@ -628,7 +633,6 @@ import { GuideDemarrage, BandeauExemple, CadreExemple, ChoixNumerotation, Verifi
 const ParcoursArrivee = aLaDemandeFeuille(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.ParcoursArrivee })));
 const CarteParcours = aLaDemandeDiscret(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.CarteParcours })));
 // (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
-import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
 import { CLE_ECRANS_VUS, poserStockageEcransVus, ecranNouveau, badgeAvecNouveau, abonnerEcransVus } from "./ecransVus.js";
 import { CLE_BILAN_MINUTE } from "./bilanMinute.js";
 import { CLE_PREMIER_COLIS, EVT_BORDEREAU_IMPRIME, bordereauxDejaImprimes } from "./premierColis.js";
@@ -765,7 +769,6 @@ import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau
 import { cochesEffectives, basculerCoche, memeQueDefaut, emplacementDe as emplacementVente, etapesRoute, etapesFicheVente, cleRecherche, contientRecherche } from "./ventesVerre.js";
 // (19 nov., « VRM natif ») Le fond de l'écran Ventes : les rangées en objets (src/ventes/modeleVentes.js), remplies ici.
 import { rangeeEnvoyer, rangeeRoute, ecartNomme, pleinImprimer } from "./ventes/modeleVentes.js";
-import VentesNatif from "./natif/ecrans/Ventes.jsx";
 import { ARegarder } from "./ventes/ARegarder.jsx";   // (16 nov., lot ventes-clair) « N choses à regarder » : les cartes d'information de Ventes dans UN repli
 import { SegmentVentes, HeroVentes, CaseCoche, Emplacement, PleinLarge, EtapesRoute, EtapesVente, DuoMontants, RangeeEntree, IconeV, texteEmplacement, FicheVenteBloc, VoletVente, useGrandEcran } from "./ventes/VentesVerre.jsx";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
@@ -862,6 +865,7 @@ import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche, valeurChiffre, sansCompteSur } from "./design/carteChiffres.js";
+const CLE_CARTES_AUJOURDHUI = 'vrm_aujourdhui_cartes';   // (19 nov.) les cartes d'Aujourd'hui, cochées et ordonnées par lui (synchronisé)
 import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { detailFraisFiche } from "./coutPlateformes.js";
@@ -884,7 +888,16 @@ import { chiffresRetirer, siteDuColisSorti } from "./retirerSite.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
-import DansFiche from './DansFiche.jsx';
+import DansFiche, { useLigneIci } from './DansFiche.jsx';
+// (19 nov., fiche directe — « l'outil doit être pratique, pas chiant ») Les gestes rares d'une annonce (file Leboncoin, publier
+// partout, visuels, relier un achat, passeport, marquer vendue…) vivaient dans une feuille ouverte par « ⋯ » : depuis la fiche,
+// cela faisait « ⋯ » de la fiche → « ⋯ » de la ligne → le geste (trois touchers). Quand la fiche est ouverte DEPUIS cette ligne,
+// ils sont rendus à plat, à leur place dans la fiche ; dans la liste, la feuille d'avant. `rendre` n'est appelé que là où il sert.
+function MenuLigneFiche({ cle, ouvert, feuille, rendre }) {
+  const ici = useLigneIci(cle);
+  if (ici) return <div className="vrm-fiche-menu-plat" data-fiche-menu-inline="">{rendre()}</div>;
+  return ouvert ? feuille(rendre()) : null;
+}
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
@@ -1137,7 +1150,6 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
 // (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
 const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
-import { poserIcone } from "./natif/icones.jsx";   // les glyphes seuls, sans les feuilles de style
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -3460,6 +3472,7 @@ const SYNC_KEYS = [
   'vrm_securite_comptes',
   // (19 nov., lot compte-bloque) SON choix pour un compte bloqué par Vinted (pause / garder / plus tard), écrit sur SON toucher, lu par l'extension 5.409 (src/compteBloque.js).
   'vrm_comptes_bloques',
+  'vrm_numeros_a_ecrire',   // (19 nov.) les N° neufs donnés par VRM, à écrire sur les cartons (Stock), vidés sur SON « C'est écrit »
   'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vinted_offres_paliers','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
@@ -3622,6 +3635,8 @@ const SYNC_KEYS = [
   // lui (src/objectifMois.js) ; la barre de la carte sombre, Statistiques et Ventes
   // lisent CE réglage (plus `vrm_ca_objectif` ni `vinted_goal`, jamais posés en base).
   'vrm_objectif_mois',
+  // (19 nov.) « Personnaliser » Aujourd'hui : les cartes qu'il montre et leur ordre ({ ordre, montrees }) — aucun chiffre.
+  CLE_CARTES_AUJOURDHUI,
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -16330,6 +16345,44 @@ async function alerteLocale(title, body, vers){
 // double d'une notification du serveur), et la carte de l'extension de CE navigateur (5.382,
 // `numerotes` : un lot « VRM a numéroté » par compte Vinted, identités `id:N°`, une fois).
 // Les mots suivent le profil du vendeur (« paires » / « articles ») : aucune règle n'en dépend.
+// (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
+const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
+let _toastNumeros = null; const _abToastNumeros = new Set();
+function poserToastNumeros(t) { _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
+// Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
+const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
+function ToastNumeros() {
+  const [t, setT] = React.useState(_toastNumeros);
+  const [cache, setCache] = React.useState(false);
+  React.useEffect(() => { _abToastNumeros.add(setT); return () => { _abToastNumeros.delete(setT); }; }, []);
+  // (le même message par le bus de l'app, `vrm:numeros-donnes` { message } : ce que pose aussi un autre appareil relu, et le banc natif-coque)
+  React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
+  React.useEffect(() => {
+    if (!t) return undefined;
+    const voir = () => setCache(recouvrementOuvert());
+    voir();
+    const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
+    return () => mo.disconnect();
+  }, [t]);
+  if (!t || cache) return null;
+  const fin = () => { _toastNumeros = null; setT(null); };
+  return <div data-toast-numeros=""><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+}
+// Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
+function NumerosAEcrire() {
+  const [d, setD] = React.useState(() => load(CLE_A_ECRIRE, null));
+  React.useEffect(() => { const f = () => setD(load(CLE_A_ECRIRE, null)); window.addEventListener('vrm:save', f); window.addEventListener('storage', f); return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', f); }; }, []);
+  const items = d && Array.isArray(d.items) ? d.items : [];
+  if (!items.length) return null;
+  return (
+    <div data-numeros-a-ecrire={items.length} style={{ padding: '8px 0' }}>
+      <Natif.Groupe titre={tr('nn.stock.titre', { n: items.length })} pied={tr('nn.stock.pied')}>
+        <Natif.Rangee titre={listeNumeros(items.map((x) => x.numero))} lignes={2}/>
+        <Natif.Rangee titre={tr('nn.stock.ecrit')} ton="neutre" onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': '' }}/>
+      </Natif.Groupe>
+    </div>
+  );
+}
 function direNouveauxNumeros(liste) {
   try {
     const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim() && x.id != null);
@@ -16338,7 +16391,11 @@ function direNouveauxNumeros(liste) {
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
     // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
-    accompagner('numero.donne', { vars: { n: l.length, mot: titre, numeros: nums } }).fini();
+    // (19 nov., intégration) Plus une pilule posée sur l'écran (elle couvrait la fiche) : un Toast NATIF au-dessus de la barre
+    // d'onglets, une fois, fermable, jamais sur une page poussée ni une feuille ; le détail reste dans Stock (« À écrire sur tes cartons »).
+    poserToastNumeros({ id: Date.now(), message: `${titre} · ${nums}` });
+    try { const d = load(CLE_A_ECRIRE, null); const avant = d && Array.isArray(d.items) ? d.items : []; const vus = new Set(avant.map((x) => String(x.numero)));
+      save(CLE_A_ECRIRE, { v: 1, items: [...avant, ...l.filter((x) => !vus.has(String(x.numero))).map((x) => ({ numero: String(x.numero), id: String(x.id), at: Date.now() }))].slice(-500) }); } catch (_) {}
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
@@ -19340,7 +19397,7 @@ const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Ve
 try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
 // La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
 // pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
-function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
+function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = false }) {
   const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
   const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
   const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
@@ -19405,7 +19462,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
     .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }));
   const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
-  return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
+  return <PrixPartout key={num} num={rn.cle || num} focusPrix={focusPrix} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
     onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
     onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
     onAppliquer={async ({ coches, prix, surEtat }) => {
@@ -33833,25 +33890,46 @@ function useSourcesCarte(liveStats) {
 // MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
 // Trois états : en cours (la boîte, à sa taille) · pas su (« — » et la raison, jamais 0) · lu.
 const SEL_TOUT_V2 = { site: 'toutes', compte: null, periode: null };
+const OUTILS_AUJOURDHUI = { load: (k, d) => load(k, d), save: (k, v) => save(k, v), onCloudReady: (f) => onCloudReady(f), lireTout: (q) => lireTout(q), entete: () => enTeteSession(), cle: CLE_CARTES_AUJOURDHUI };
 function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const live = liveStats || liveCoque;
   const S = useSourcesCarte(live);
   const maintenant = Date.now();
+  const [objectifMois, poserObjectif, objectifBrut] = useObjectifMois();
   // Le modèle (src/aujourdhui/modele.js, reçu en `Mo`) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
   const calculer = (Mo) => {
   const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
     etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
     mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
-  const jours = M.jours.map((j) => { const d = new Date(j.de); return { ...j, lettre: d.toLocaleDateString(localeCourante(), { weekday: 'narrow' }).toUpperCase(), long: majusculeJ(dateJourFr(d)),
-    court: d.toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric' }) }; });
-  const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
-    mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
-      benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
-  return { chiffres, aVenir: M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null };
+  const chiffres = { etat: M.etat, raison: M.raison, montant: somme,
+    mois: { nom: new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' }) } };
+  // (19 nov., Julien : « plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice ») Jour · Semaine · Mois :
+  // les mêmes `valeurChiffre` ; la période d'avant coupée au MÊME moment (règles de période de la carte, `REGLES_CARTE`).
+  const precedente = (p) => {
+    const de = p === 'jour' ? new Date(new Date(maintenant).setHours(0, 0, 0, 0)) : REGLES_CARTE.debutPeriode(maintenant, p);
+    const avant = p === 'jour' ? new Date(de.getFullYear(), de.getMonth(), de.getDate() - 1) : REGLES_CARTE.decalerPeriode(de, p, -1);
+    return { de: avant.getTime(), a: Math.min(de.getTime(), avant.getTime() + (maintenant - de.getTime())), label: '' };
   };
-  return <AujourdhuiV2 {...reste} calculer={calculer}/>;
+  const stats = Mo.statsPeriodes({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S), precedente, raisonCourte, beneficeMois: M.mois.benefice });
+  const moisAvant = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth() - 1, 1).toLocaleDateString(localeCourante(), { month: 'long' });
+  // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
+  const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
+  // (19 nov., « applique ce que tu proposes ») LES CARTES EN PLUS — mêmes `valeurChiffre`, aucune règle neuve :
+  //   la courbe des 30 jours, la table par compte et par site (la sélection { site, compte } de la carte des chiffres),
+  //   l'objectif du mois (src/objectifMois.js : `valeurObjectif`, `progressionObjectif`, les jours qui restent).
+  // Les cartes en plus (courbe, table par compte, objectif) se rangent DANS le morceau d'Aujourd'hui (src/aujourdhui/
+  // Branche.jsx) : l'app ne lui donne que la question au propriétaire (`valeurSel` = `valeurChiffre` avec une sélection).
+  const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, maintenant), S);
+  const objectif = { mois: objectifMois, brut: objectifBrut, poser: poserObjectif, valeur: (o) => valeurObjectif(o, S, REGLES_CARTE, maintenant) };
+  const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : null;
+  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null, plus: { valeurSel, objectif, lignes, maintenant } };
+  };
+  // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
+  // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
+  return <AujourdhuiV2 {...reste} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+    onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -51686,7 +51764,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
-              colis={nE ? colisJournee : []}
+              // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
+              // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
+              colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
@@ -55325,8 +55405,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestesLeboncoin')}
                       onClick={()=>setFicheMenu(String(it._acc.vinted_user_id)+'_'+String(it.id))} style={geste}><Icon name="more" size={18}/></button>
                   </div>
-                  {ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id) && (
-                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>
+                  <MenuLigneFiche cle={flAnn['data-fiche-ligne']} ouvert={ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id)}
+                    feuille={(contenu) => <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>{contenu}</SheetShell>}
+                    rendre={() => (
                   <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button,a'); if (b && !b.hasAttribute('data-fiche-place')) setTimeout(()=>setFicheMenu(null), 0); }}>
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
@@ -55363,8 +55444,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <BoutonRappel variante="geste" style={geste} cible={{ sorte: 'article', num: num || '', item: String(it.id || '') }} libelle={num ? `N°${num}` : (it.title || '')}/>
                     <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title={tr('annonces.marquerVendueRetire')} style={geste}>{tr('annonces.marquerVendue')}</button>
                   </div>
-                  </SheetShell>
-                  )}
+                    )}/>
                   {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
                       était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
                       de la fiche le montre déjà, et la raison se dit UNE fois
@@ -63417,7 +63497,6 @@ function CaptureVentes({ uid }) {
 function CaptureAnnonces({ uid }) {
   return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
 }
-poserIcone(Icon);   // (19 nov.) « VRM natif » : les glyphes internes des composants (chevron, coche…) sont les tracés de l'app
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.
@@ -64165,6 +64244,7 @@ function AppCoeur() {
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
   // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
   const [prixNum,setPrixNum]=useState(null);
+  const prixFocus=useRef(false);   // (19 nov., fiche directe) « Prix partout » ouvert en touchant LA VALEUR du prix : le champ est prêt à taper
   // (14 nov., lot argent-prix) 121 « Prix d'un site à l'autre » et 114 « Remettre les prix » : deux feuilles de la coque.
   const [ecartsOuvert,setEcartsOuvert]=useState(null);
   const [remiseOuverte,setRemiseOuverte]=useState(null);
@@ -67569,6 +67649,8 @@ function AppCoeur() {
             gestes: blocVenduAilleurs(p, rn, etat),
             questions: <>{questionChezToiFiche(p.num)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
             note: <NotePaireCoque numero={p.num} variante="bloc" ajout dicter/>,
+            // (19 nov., fiche directe) La note DÉJÀ écrite est une information : sous l'en-tête, sans rien toucher (rien quand il n'y en a pas).
+            noteLue: <NotePaireCoque numero={p.num} variante="ligne"/>,
             // (15 nov., lot securite-ventes ; rangé dans la fiche D le 16 nov.) « Où vendre cet article ? » avec les infos : une paire
             // déjà VENDUE (une vente lue sous ce N°, jamais réattribué) n'a plus à choisir où se vendre.
             infos: <><InfosPaireCoque numero={p.num}/>{!(rn.ventes && [rn.ventes.vinted, rn.ventes.lbc, rn.ventes.ebay].some((l) => Array.isArray(l) && l.length)) ? <OuVendreCoque annonces={rn.annonces || []} prixC={p.resume && p.resume.siVendue ? p.resume.siVendue.prix : null} stats={numData && numData.stats ? numData.stats : null} comptes={vintedAccounts} ebay={ebayCommandes} vc={ventesVcCoque}/> : null}</>,
@@ -67584,11 +67666,55 @@ function AppCoeur() {
               for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (commandeEbayEngagee(c)) out.push({ site: 'ebay', etat: 'vendue', compte: '', date: Date.parse(c.creationDate || '') || null, prix: null });
               const st = numData && numData.stats ? numData.stats : null;
               // Le prix : celui que la règle de « Prix partout » lit, sinon le prix LU dans le dressing (la lecture la plus fraîche).
+              const msLu = (d) => { if (d == null || d === '') return undefined; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : undefined; };
+              const autreSite = (x) => { try {
+                if (x.site === 'vinted') { const a = (rn.annonces || []).find((y) => String(y.id) === String(x.id)); return { photo: a ? (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || '')) : '' }; }
+                if (x.site === 'leboncoin') { const ad = ex && ex.lbcItems ? ex.lbcItems[x.id] : null; return ad ? { photo: (Array.isArray(ad.images) && ad.images[0]) || '', depuis: msLu(ad.publieeLe), favoris: ad.stats && Number.isFinite(ad.stats.favoris) ? ad.stats.favoris : undefined, compte: ad.accountName || x.compte || '' } : {}; }
+                if (x.site === 'ebay') { const a = (rn.annoncesEbay || []).find((y) => String(y.itemId) === String(x.id)); return a ? { photo: typeof a.photo === 'string' ? a.photo : '', depuis: msLu(a.depuis), favoris: Number.isFinite(a.observateurs) ? a.observateurs : undefined } : {}; }
+                if (x.site === 'vestiaire') { const it = ex && ex.vcItems ? ex.vcItems[x.id] : null; return it ? { photo: typeof it.photo === 'string' ? it.photo : '', depuis: msLu(it.depuis) } : {}; }
+              } catch (_) {} return {}; };
               const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+              // (19 nov., fiche directe) + l'identifiant de l'annonce et son prix mini (le fait « Prix mini », tapé sur place), ses vues
+              // (lues comme les favoris), son adresse sur le site (la rangée l'ouvre) — les mêmes lectures, rien de calculé.
               for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
-                favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
+                id: String(x.id || ''), mini: x.site === 'vinted' && x.mini != null ? Math.round(x.mini * 100) : null, miniPorte: x.site === 'vinted' && !!(numeros && numeros[String(x.id)]), lien: x.lien || '',
+                // (19 nov., Julien : « tout doit être parfait sur chaque application ») L'annonce d'un AUTRE site porte son titre, sa photo,
+                // sa date de mise en ligne et ses favoris LUS (Leboncoin : `publieeLe`, `stats.favoris` ; eBay : `depuis`, observateurs) :
+                // un article sans annonce Vinted a une fiche complète. Rien d'inventé : un champ pas lu reste absent.
+                titre: x.titre || '', ...autreSite(x),
+                favoris: x.site === 'vinted' ? (st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined) : autreSite(x).favoris,
+                vues: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].vues) ? st[x.id].vues : undefined });
             } catch (_) {}
             return out; })();
+          // (19 nov., fiche directe) Ce qui n'est PAS lu est dit sous les sites (« Pas lu : Leboncoin ») : les sites que la règle
+          // de « Prix partout » nomme (`manques`), une fois les lectures en plus arrivées (`ex`), pour les plateformes qu'il montre.
+          const sitesManquesFiche = (() => { if (!p || !rn || !ex) return undefined;
+            try { const aff = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+              return sitesPrixDe(numF, rn, ex).manques.filter((m) => m !== 'le numéro' && (!aff || aff.includes(String(m).toLowerCase()))); } catch (_) { return undefined; } })();
+          // La taille : celle de la fiche de l'annonce, sinon de l'annonce lue, sinon celle écrite en fin de titre (la règle des listes).
+          const tailleFiche = (() => { if (!p) return ''; try { const f = p.idFiche && numeros ? numeros[p.idFiche] : null; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)) || (rn.annonces || [])[0] || null;
+            // (19 nov.) Un article sans annonce Vinted : la taille écrite en fin du titre de SON annonce (Leboncoin, eBay…).
+            const tf = [p.titre].concat((sitesFiche || []).map((s) => s && s.titre)).map((t) => tailleEnFin(t || '')).find(Boolean); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
+          const photosFiche = p ? (rn.annonces || []).map((a) => (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || ''))).filter(Boolean) : [];
+          // « Acheté » et « Prix mini » se tapent SUR PLACE (Julien, 19 nov. : « l'outil doit être pratique, pas chiant ») : les
+          // MÊMES écritures qu'avant — `poserPrixAchatVente` (la feuille « prix d'achat ») et `montantSeuil` (la case « accepter
+          // dès » d'Annonces) —, chacune un geste annulable, sans confirmation.
+          // (19 nov., l'ARTICLE et pas l'annonce Vinted) Un N° sans fiche d'annonce Vinted (Leboncoin seul, eBay seul…) : son prix
+          // d'achat est celui posé PAR N° (`vinted_buyprice_by_num`, le miroir qui existe déjà) — lu ici, écrit par le même geste annulable.
+          const achatParNumFiche = (() => { if (!p || p.idFiche || !rn || !rn.cle) return null; const v = (load('vinted_buyprice_by_num', {}) || {})[String(rn.cle)]; const n = Number(String(v == null ? '' : v).replace(',', '.')); return v != null && String(v).trim() !== '' && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; })();
+          const editsFiche = p && !p.double && !p.ancienNumero ? {
+            achat: !p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok' || !rn.cle) return;
+              const buy = load('vinted_buyprice_by_num', {}) || {}; const k = String(rn.cle);
+              gesteVrm(`N°${k} : acheté ${String(w.patch.buyPrice).replace('.', ',')} €`, [{ k: 'vinted_buyprice_by_num', type: 'cle', id: k, apres: String(w.patch.buyPrice), avant: buy[k] }], {}, () => { setTimeout(() => { emettreClesRelues(['vinted_buyprice_by_num']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); }
+            : p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok') return;
+              poserPrixAchatVente({ item: p.idFiche, num: String(p.num || '') }, texte); setTimeout(() => setFicheTick((t) => t + 1), 750); } : null,
+            mini: (id, texte) => { const fiches = load('vinted_annonce_numeros', {}) || {}; const f = fiches[String(id)];
+              if (!f) { toast(tr('fd.mini.sansFiche'), 'err'); return; }
+              const v = montantSeuil(texte); const n = Number(String(v).replace(',', '.'));
+              if (!(Number.isFinite(n) && n > 0)) { toast(MONTANT_ILLISIBLE); return; }
+              gesteVrm(tr('fd.mini.fait', { n: String(p.num || ''), prix: montant(n) }), [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { min: v }, avant: { min: f.min } }], {},
+                () => { setTimeout(() => { emettreClesRelues(['vinted_annonce_numeros']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); },
+          } : null;
           const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;
           const relierFiche = p && pf ? { proposition: pf.prop, onRelier: (pr) => relierAchatFiche(pf, pr),
             onAutre: async () => {
@@ -67599,10 +67725,12 @@ function AppCoeur() {
             } } : null;
           const lienF = p ? lienAchatDe(numF) : null;
           const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} sitesManques={sitesManquesFiche} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
+            siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
+            onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
-            onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
@@ -67805,7 +67933,7 @@ function AppCoeur() {
             Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
         </GardeEcran>}
         {/* (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), UN clic. (19 nov.) « Appliquer » envoie la baisse par l'extension, ou la range (HotePrixPartout). */}
-        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>setPrixNum(null)}/></GardeEcran>}
+        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} focusPrix={prixFocus.current} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>{ prixFocus.current = false; setPrixNum(null); }}/></GardeEcran>}
         {pubAil && <GardeEcran nom="publier" feuille resetKey={pubAil.num||''} onFermer={()=>setPubAil(null)}><Differe rendre={()=>{
           // (5 nov.) LE PARCOURS « PUBLIER AILLEURS » : les sites de CE N° (par identité).
           const num = pubAil.num;
@@ -68155,6 +68283,8 @@ function AppCoeur() {
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
+        <ToastNumeros/>
+        {tab==='garage' ? <NumerosAEcrire/> : null}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}

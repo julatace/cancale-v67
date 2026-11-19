@@ -23,6 +23,10 @@ export default {
     "other": "{n} Etiketten drucken"
   },
   "v2.bande.aria": "Pakete zu versenden",
+  "v2.retirer.autresPoints": {
+    "one": "{n} weiterer Punkt",
+    "other": "{n} weitere Punkte"
+  },
   "v2.retirer.titre": "Abzuholen",
   "v2.retirer.voir": "Abholcodes ansehen",
   "v2.retirer.resume": {
@@ -182,26 +186,7 @@ export default {
   "v2.style.studio": "Studio Blau",
   "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "heute",
-  "v2.jour.hier": "gestern",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "{quand} verkauft",
-    "other": "{quand} verkauft"
-  },
-  "v2.jour.aucune": "kein Verkauf",
-  "v2.jour.ventes": {
-    "one": "{n} Verkauf",
-    "other": "{n} Verkäufe"
-  },
   "v2.jour.pasSu": "Verkäufe noch nicht gelesen",
-  "v2.mois.vendu": "Verkauft",
-  "v2.mois.recu": "Erhalten",
-  "v2.mois.benefice": "Gewinn",
-  "v2.mois.sur": {
-    "one": "{k} Verkauf von {n}",
-    "other": "{k} Verkäufe von {n}"
-  },
   "v2.envoyer.titre": "Zu versenden",
   "v2.bande.plus": {
     "one": "{n} weiteres Paket zu versenden",
@@ -224,5 +209,95 @@ export default {
   "v2.reg.completer": "Meine Anzeigen vervollständigen",
   "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}",
   "v2.jour.lecture": "wird gelesen…",
+  "v2.stats.titre": "Deine Zahlen",
+  "v2.stats.ca": "Umsatz",
+  "v2.obj.fixer": "Monatsziel festlegen",
+  "v2.obj.titre": "Monatsziel",
+  "v2.obj.libelle": "Umsatzziel für diesen Monat",
+  "v2.obj.texte": "{v} / {c}",
+  "v2.obj.detail": {
+    "one": "{pct} % · noch {j} Tag",
+    "other": "{pct} % · noch {j} Tage"
+  },
+  "v2.obj.atteint": "erreicht · {pct} %",
+  "v2.obj.enregistrer": "Speichern",
+  "v2.obj.retirer": "Ziel entfernen",
+  "v2.obj.invalide": "Ein Betrag in Euro, größer als 0.",
+  "v2.courbe.titre": "Letzte 30 Tage",
+  "v2.courbe.voir": "Verkäufe ansehen",
+  "v2.comptes.titre": "Nach Konto und Seite",
+  "v2.comptes.ventes": {
+    "one": "{n} Verkauf",
+    "other": "{n} Verkäufe"
+  },
+  "v2.comptes.vide": "Keine Verkäufe im Zeitraum",
+  "v2.capte.titre": "Heute bei deinen Anzeigen",
+  "v2.capte.favoris": "Neue Favoriten",
+  "v2.capte.offres": "Erhaltene Angebote",
+  "v2.capte.messages": "Nachrichten",
+  "v2.capte.pasCapte": "nicht erfasst",
+  "v2.capte.pasLu": "noch nicht gelesen",
+  "v2.vrm.titre": "Was VRM heute getan hat",
+  "v2.vrm.rien": "Heute noch nichts",
+  "v2.vrm.pasLu": "Protokoll nicht gelesen",
+  "v2.vrm.baisses": {
+    "one": "{n} Preissenkung",
+    "other": "{n} Preissenkungen"
+  },
+  "v2.vrm.favoris": {
+    "one": "{n} Nachricht an Favoriten",
+    "other": "{n} Nachrichten an Favoriten"
+  },
+  "v2.vrm.offres": {
+    "one": "{n} Angebot angenommen",
+    "other": "{n} Angebote angenommen"
+  },
+  "v2.vrm.republications": {
+    "one": "{n} Neueinstellung",
+    "other": "{n} Neueinstellungen"
+  },
+  "v2.vrm.bordereaux": {
+    "one": "{n} Etikett abgerufen",
+    "other": "{n} Etiketten abgerufen"
+  },
+  "v2.vrm.messages": {
+    "one": "{n} Nachricht gesendet",
+    "other": "{n} Nachrichten gesendet"
+  },
+  "v2.vrm.offresFaites": {
+    "one": "{n} Angebot gesendet",
+    "other": "{n} Angebote gesendet"
+  },
+  "v2.perso.ouvrir": "Diesen Bildschirm anpassen",
+  "v2.perso.titre": "Karten von Heute",
+  "v2.perso.pied": "Hake an, was du sehen willst; wische eine Karte, um sie zu verschieben.",
+  "v2.perso.monter": "Hoch",
+  "v2.perso.descendre": "Runter",
+  "v2.perso.defaut": "Zurücksetzen",
+  "v2.perso.carte.chiffres": "Deine Zahlen",
+  "v2.perso.carte.envoyer": "Zu versenden",
+  "v2.perso.carte.retirer": "Abzuholen",
+  "v2.perso.carte.courbe": "Letzte 30 Tage",
+  "v2.perso.carte.ventes": "Letzte Verkäufe",
+  "v2.perso.carte.comptes": "Nach Konto und Seite",
+  "v2.perso.carte.annonces": "Bei deinen Anzeigen",
+  "v2.perso.carte.vrm": "Was VRM getan hat",
+  "v2.stats.periode": "Zeitraum",
+  "v2.stats.jour": "Tag",
+  "v2.stats.semaine": "Woche",
+  "v2.stats.mois": "Monat",
+  "v2.stats.vendus.jour": "heute verkauft",
+  "v2.stats.vendus.semaine": "diese Woche verkauft",
+  "v2.stats.vendus.mois": "im {mois} verkauft",
+  "v2.stats.ecart.jour": "{s} ggü. gestern",
+  "v2.stats.ecart.semaine": "{s} ggü. Vorwoche",
+  "v2.stats.ecart.mois": "{s} ggü. {mois}",
+  "v2.stats.benefice": "Gewinn",
+  "v2.stats.beneficeBrut": "Bruttogewinn",
+  "v2.stats.ventes": "Verkäufe",
+  "v2.stats.panier": "Ø Verkauf",
+  "v2.stats.auMoinsSur": "mind. · Einkäufe {c}",
+  "v2.stats.aucune": "kein Verkauf",
+  "v2.stats.pasTout": "nicht alles gelesen",
   "v2.alerte.retourTitre": "Rücksendung abzugeben"
 };

@@ -163,6 +163,27 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     await pg.waitForTimeout(700);
     await k2bas(pg, `${t} · ${id} (écran gardé)`, '');
   }
+  // K9 (19 nov., intégration) — le message « N nouvelles paires numérotées » est un Toast natif AU-DESSUS de la barre d'onglets,
+  // et JAMAIS sur une feuille ou une fiche ouverte : il attend qu'elle se ferme, puis revient.
+  {
+    const vu = () => pg.evaluate(() => { const e = document.querySelector('[data-toast-numeros] .n-toast, [data-toast-numeros] > *'); if (!e || !e.getClientRects().length) return null;
+      const r = e.getBoundingClientRect(), b = document.querySelector('[data-n-onglets]'); const rb = b ? b.getBoundingClientRect() : null; return { bas: Math.round(r.bottom), barre: rb ? Math.round(rb.top) : null }; });
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: '3 nouvelles paires numérotées · N°1, 2, 3' } })));
+    await pg.waitForTimeout(500);
+    const a = await vu();
+    dit(!!a && a.barre != null && a.bas <= a.barre, `K9 ${t} : le toast des N° neufs est posé au-dessus de la barre d’onglets`, a);
+    await pg.locator('[data-n-coque-plus]').first().tap({ timeout: 10000 }).catch(() => {});
+    await pg.waitForTimeout(700);
+    const b = await vu();
+    const ouverte = await pg.evaluate(() => !!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    dit(ouverte && !b, `K9 ${t} : une feuille ouverte ⇒ aucun toast par-dessus`, { ouverte, toast: b });
+    await pg.keyboard.press('Escape').catch(() => {}); await pg.locator('[data-n-feuille-plus] [data-n-feuille-fermer], [data-n-feuille-plus] button[aria-label]').first().tap({ timeout: 3000 }).catch(() => {});
+    await pg.waitForTimeout(900);
+    const c = await vu();
+    const encore = await pg.evaluate(() => !!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    dit(encore || !!c, `K9 ${t} : la feuille fermée, le toast revient (une seule fois)`, { encore, toast: c });
+    await pg.evaluate(() => { const x = document.querySelector('[data-toast-numeros] button'); if (x) x.click(); });
+  }
   erreursTout.push(...erreurs);
   await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);
   await ctx.close();
