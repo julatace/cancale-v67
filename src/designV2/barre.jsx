@@ -2,10 +2,10 @@
 //  LA BARRE D'ONGLETS — son style (17 nov. soir). Julien, sur la planche des cinq propositions
 //  (scratchpad barres/) : « prends la C et propose un menu déroulant, je choisirai le mieux ».
 //  Cinq dessins d'UNE même barre (mêmes onglets, mêmes pastilles, même onglet allumé, mêmes cibles de 44) :
-//    C · Épurée (défaut) — barre arrondie à 12 px des bords ; icônes seules, l'actif « icône + nom » dans une capsule teintée ;
+//    C · Épurée — barre arrondie à 12 px des bords ; icônes seules, l'actif « icône + nom » dans une capsule teintée ;
 //    A · iOS classique  — pleine largeur, verre, icône + nom ; l'actif à l'accent ;
 //    B · Pilule flottante — l'actif dans une bulle pleine ;
-//    D · Trait au-dessus  — barre pleine, un trait d'accent au-dessus de l'actif ;
+//    D · Trait au-dessus (défaut) — barre pleine, un trait d'accent au-dessus de l'actif ;
 //    E · Kraft           — les teintes de l'étiquette N°, un point ambre sous l'actif.
 //  Le choix est une préférence SYNCHRONISÉE (`vrm_barre_style`, SYNC_KEYS d'App.jsx) : posé sur la racine
 //  (`data-barre` sur <html>) dès l'import, appliqué tout de suite (aucun rechargement). Le dessin vit dans
@@ -16,7 +16,7 @@ import './barre.css';
 
 export const CLE_BARRE = 'vrm_barre_style';
 export const STYLES_BARRE = ['C', 'A', 'B', 'D', 'E'];
-export const BARRE_DEFAUT = 'C';
+export const BARRE_DEFAUT = 'D';
 const EVT = 'vrm:barre-style';
 
 // `save`/`load` d'App.jsx rangent en JSON : on lit les deux formes ('"A"' et 'A').

@@ -11,7 +11,7 @@ require('./_porte-banc.cjs');
 //    E. le réglage : « Apple » touché dans Paramètres → la racine porte `data-theme-style="apple"`, et après un
 //       rechargement aussi (le choix TIENT) ; « Studio bleu » l'enlève ;
 //    F. éteint (le défaut) : aucun attribut, le dégradé bleu d'hier est là, et chaque règle de la couche `vrm-apple`
-//       est sous `[data-theme-style="apple"]` (rien ne fuit sur l'ancien style).
+//       est limitée aux styles Apple et VRM.
 //  Preuve par mutation : MUTATION=gris (le gris redevient #AEAEB2) ⇒ B rouge ; MUTATION=degrade (le fond bleu
 //  revient) ⇒ A rouge ; MUTATION=deux (un second bouton plein) ⇒ C rouge ; MUTATION=persiste (le choix n'est pas
 //  rangé) ⇒ E rouge ; MUTATION=fuite (une règle hors du sélecteur) ⇒ F rouge.
@@ -117,7 +117,7 @@ async function ouvrir(nav, W, sombre, url, avecStyle) {
     {
       const { ctx, pg } = await ouvrir(nav, 390, false, '/?tab=settings', false);
       const avant = await pg.evaluate(() => document.documentElement.getAttribute('data-theme-style'));
-      dit(avant === null, 'éteint par défaut : aucun data-theme-style', avant);
+      dit(avant === 'vrm', 'VRM est le style par défaut', avant);
       // Le réglage est dans la page Apparence de Paramètres : on la cherche comme lui (le bouton « Apple »).
       const ap = pg.locator('[data-sous-ouvrir="apparence"]').first();
       await ap.waitFor({ timeout: 30000 }).catch(() => {});
@@ -137,6 +137,9 @@ async function ouvrir(nav, W, sombre, url, avecStyle) {
     // ── F : éteint, l'ancien style est intact ──
     {
       const { ctx, pg } = await ouvrir(nav, 390, false, '/?tab=journee', false);
+      await pg.evaluate(() => localStorage.setItem('vrm_style', 'studio'));
+      await pg.reload({ waitUntil: 'domcontentloaded' });
+      await pg.locator('.vrm-main').waitFor({ timeout: 45000 });
       const f = await pg.evaluate((mut) => {
         if (mut === 'fuite') { const s = document.createElement('style'); s.textContent = '@layer vrm-apple { body .vrm-main { background: #F2F2F7 !important } }'; document.head.appendChild(s); }
         const hors = [];
@@ -145,14 +148,14 @@ async function ouvrir(nav, W, sombre, url, avecStyle) {
         const voir = (rules, dansCouche) => { for (const r of rules) {
           if (r instanceof CSSLayerBlockRule) voir(r.cssRules, dansCouche || r.name === 'vrm-apple');
           else if (r.cssRules && !(r instanceof CSSStyleRule)) voir(r.cssRules, dansCouche);
-          else if (dansCouche && r.selectorText) for (const s of decouper(r.selectorText)) if (!/data-theme-style="apple"/.test(s)) hors.push(s.trim().slice(0, 80));
+          else if (dansCouche && r.selectorText) for (const s of decouper(r.selectorText)) if (!/data-theme-style="(?:apple|vrm)"/.test(s)) hors.push(s.trim().slice(0, 80));
         } };
         for (const sh of document.styleSheets) { try { voir(sh.cssRules, false); } catch (_) {} }
         const coque = document.querySelector('.vrm-app-shell');
         return { attr: document.documentElement.getAttribute('data-theme-style'), avant: coque ? getComputedStyle(coque, '::before').backgroundImage.slice(0, 80) : null, hors: hors.slice(0, 6), nHors: hors.length };
       }, MUT);
       dit(f.attr === null && /gradient/.test(f.avant || ''), 'éteint : le fond bleu d’hier est là (Studio bleu inchangé)', f);
-      dit(f.nHors === 0, 'chaque règle de la couche vrm-apple est sous [data-theme-style="apple"] : rien ne fuit sur l’ancien style', f.hors);
+      dit(f.nHors === 0, 'chaque règle de la couche vrm-apple est limitée aux styles Apple et VRM', f.hors);
       await ctx.close();
     }
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1200)); }

@@ -21,4 +21,4 @@ export function prechargerPolices(doc = typeof document !== 'undefined' ? docume
   }
   return n;
 }
-prechargerPolices();
+if (typeof document !== 'undefined' && !document.documentElement.hasAttribute('data-theme-style')) prechargerPolices();

@@ -31,16 +31,16 @@ async function verifier({ src, dem, app }, bavard = true) {
   try { A = await import(pathToFileURL(f).href + '?t=' + Date.now() + Math.random()); }
   catch (e) { dit(false, 'src/apparence.js se charge', String(e.message).slice(0, 120)); return ko; }
   // Le script de démarrage, dans un faux navigateur.
-  const lanceDemarrage = (stock, heure, systeme) => {
-    const attrs = {}; let meta = null;
-    const doc = { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } }, querySelector: () => ({ setAttribute: (k, v) => { meta = v; } }) };
+  const lanceDemarrage = (stock, heure, systeme, app = false) => {
+    const attrs = app ? { 'data-vrm-boot-app': '' } : {}; let meta = null;
+    const doc = { documentElement: { setAttribute: (k, v) => { attrs[k] = v; }, hasAttribute: (k) => Object.hasOwn(attrs, k) }, querySelector: () => ({ setAttribute: (k, v) => { meta = v; } }) };
     const RealDate = Date;
     class FausseDate extends RealDate { constructor(...a) { if (a.length) super(...a); else { super(2026, 10, 8, heure, 30, 0); } } getHours() { return super.getHours(); } }
     const ctx = { window: {}, document: doc, localStorage: { getItem: (k) => (k in stock ? stock[k] : null) }, Date: FausseDate, JSON };
     ctx.window.matchMedia = (q) => ({ matches: /dark/.test(q) && systeme });
     ctx.window.localStorage = ctx.localStorage;
     try { vm.runInNewContext(dem, ctx, { timeout: 500 }); } catch (e) { return { erreur: e.message }; }
-    return { theme: attrs['data-theme'], meta };
+    return { theme: attrs['data-theme'], style: attrs['data-theme-style'], meta };
   };
   // 1. Les deux copies, sur toutes les entrées.
   const MODES = [undefined, 'clair', 'sombre', 'auto', 'soir', 'n_importe'];
@@ -54,11 +54,17 @@ async function verifier({ src, dem, app }, bavard = true) {
     if (r.erreur || (r.theme === 'dark') !== react) ecarts.push(`${mode}/${ancien}/${sys ? 'sys-sombre' : 'sys-clair'}/${h}h : React ${react ? 'sombre' : 'clair'}, démarrage ${r.erreur || r.theme}`);
   }
   dit(ecarts.length === 0, `le script de démarrage et React donnent la MÊME teinte sur ${n} entrées (aucun flash)`, ecarts.slice(0, 3).join(' | '));
-  const r0 = lanceDemarrage({ vrm_apparence: '"sombre"' }, 12, false);
-  // (15 nov., chantier « ouverture ») Pendant le DÉMARRAGE, la barre d'état prend le haut du dégradé de l'écran
-  // de démarrage « Verre dépoli » en bleu-nuit (#133460, `--sv-haut` sombre de studio-verre.css) ; l'app pose celle du Studio à la sortie de cet écran
-  // (src/App.jsx, `vrm:demarrage-fin`). Le thème suivi reste le même (sombre ici) : c'est ce que juge ce contrôle.
-  dit(r0.meta === '#133460' && r0.theme === 'dark', 'la barre d’état suit le thème choisi dès le démarrage (theme-color = le haut du bleu-nuit de l’écran de démarrage, #133460)', String(r0.meta));
+  for (const [style, clair, sombre] of [
+    [undefined, '#F3F5F8', '#101A29'],
+    ['apple', '#F2F2F7', '#000000'],
+    ['studio', '#2563A8', '#133460'],
+  ]) {
+    for (const [mode, couleur] of [['clair', clair], ['sombre', sombre]]) {
+      const r = lanceDemarrage({ vrm_apparence: JSON.stringify(mode), vrm_style: style }, 12, false, true);
+      dit(r.meta === couleur && r.style === (style === 'studio' ? undefined : style || 'vrm'),
+        `démarrage de l’app · ${style || 'VRM par défaut'} · ${mode} : barre d’état ${couleur}`, String(r.meta));
+    }
+  }
   // 2. La règle.
   const S = (mode, h, sys = false, ancien = false) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
   dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');

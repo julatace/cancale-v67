@@ -52,10 +52,20 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
   const pret = dejaPret.current;
   // La HAUTEUR RÉELLE du plein au pouce (une ou deux lignes en très grand texte) : la page garde barre + plein + 16 dessous
   // (`--v2-pouce-h`, design-v2.css), aucune carte ne reste cachée sous lui.
+  const observateurPouce = React.useRef(null);
   const poucer = React.useCallback((el) => {
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const poser = () => { try { document.documentElement.style.setProperty('--v2-pouce-h', Math.round(el.getBoundingClientRect().height) + 'px'); } catch (_) {} };
-    poser(); try { new ResizeObserver(poser).observe(el); } catch (_) {}
+    observateurPouce.current?.disconnect();
+    observateurPouce.current = null;
+    if (!el) return;
+    const poser = () => {
+      document.documentElement.style.setProperty('--v2-pouce-h', Math.round(el.getBoundingClientRect().height) + 'px');
+    };
+    poser();
+    if (typeof ResizeObserver === 'function') {
+      const observateur = new ResizeObserver(poser);
+      observateur.observe(el);
+      observateurPouce.current = observateur;
+    }
   }, []);
   // L'ORDRE DES GROUPES est celui de leur première apparition : un groupe lu plus tard se range à la fin, jamais
   // au-dessus des autres (rien ne glisse sous le doigt pendant la lecture).
