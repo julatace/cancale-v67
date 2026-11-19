@@ -21371,6 +21371,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
   if (msg && /^(lbcPublier|lbcMarque|lbcQuota|ebayPreparer|ebayMarque)$/.test(String(msg.cmd || ''))) return await publierDepuisApp(msg);
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
+  // (19 nov., 5.409, publier-agent) Une fiche de l'agent, d'où qu'elle vienne, vers Leboncoin ou Vestiaire (`publierFicheSite`).
+  if (msg && msg.cmd === 'publierFiche') return await publierFicheSite(msg);
   // 31 oct. (5.295) : répondre dans UNE conversation Vestiaire, sur son clic (voir `repondreVestiaire`).
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
@@ -26426,6 +26428,145 @@ async function publierVestiaire(msg) {
     await majCmd(cleJob, { etape: 'depot', id, numero: r.ad.numero || '', tabId: tab && tab.id != null ? tab.id : null, raison: null });
     return { accepte: true, jobId: cleJob, etape: 'depot', ...(r.ad.categorieDemandee ? { categorie: r.ad.categorieDemandee } : {}) };
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
+}
+// ── (19 nov., 5.409, chantier publier-agent) PUBLIER UNE FICHE DE L'AGENT — capacité `publierfiche` ──
+// Julien : « c'est l'extension qui va publier dans tous les cas » ; « je vais pouvoir transvaser une
+// annonce de Vinted, Leboncoin, eBay à Vestiaire Collective ». L'agent de l'app (src/publier/agent.js)
+// décide des champs ; ICI, rien n'est décidé, tout est REVÉRIFIÉ, et l'envoi part de l'onglet du site :
+//   · une fiche entière ou rien : N° lisible, « VRM-{n°} » dans la description (l'identité), titre dans
+//     la limite du site, prix > 0, 1 à 10 photos https d'un site connu, état du vocabulaire du site ;
+//   · RIEN NE PART SANS CATÉGORIE SÛRE : Leboncoin, une catégorie de son vocabulaire (`criteresFicheLbc`) ;
+//     Vestiaire, univers › catégorie › sous-catégorie EXISTANT tel quel dans le catalogue capté
+//     (`categorieVcDemandee`) ;
+//   · Vestiaire : la marque est cherchée dans la LISTE DU SITE (`vc_catalogue.deposit_brands`) — absente
+//     ou « banned » ⇒ pas vendable ici, dit, jamais une autre marque ;
+//   · le compte de l'ONGLET (un seul compte ouvert sur ce site dans ce Chrome), la sécurité du compte,
+//     le plafond de 50 actions/heure, UN dépôt à la fois par site, sur SON geste (une commande de l'app).
+const HOTES_PHOTOS_FICHE = /^https:\/\/(?:[a-z0-9-]+\.)*(?:vinted\.net|vinted\.com|vinted\.fr|leboncoin\.fr|ebayimg\.com|vestiairecollective\.com)\/[^\s<>"']+$/i;
+const ETATS_VC_FICHE = ['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'Satisfaisant'];
+const TITRE_MAX_FICHE = { leboncoin: 50, vestiaire: 80 };
+function ficheAgentValide(fiche, site, catVc) {
+  const f = fiche && typeof fiche === 'object' && !Array.isArray(fiche) ? fiche : null;
+  const non = (code, raison) => ({ ok: false, code, raison });
+  if (site !== 'leboncoin' && site !== 'vestiaire') return non('site', 'site inconnu — rien n’est parti');
+  if (!f) return non('invalide', 'fiche illisible — rien n’est parti');
+  const numero = cleNum(f.numero);
+  if (!/^[A-Z]{0,3}\d{1,6}$/.test(numero)) return non('numero', 'cette fiche n’a pas de N° lisible — rien n’est parti');
+  const titre = String(f.titre || '').replace(/\s+/g, ' ').trim();
+  if (!titre || titre.length > TITRE_MAX_FICHE[site]) return non('titre', `titre vide ou trop long (${TITRE_MAX_FICHE[site]} caractères au plus) — rien n’est parti`);
+  const description = String(f.description || '').replace(/\r/g, '').trim();
+  if (description.length > 4000) return non('description', 'description trop longue — rien n’est parti');
+  if (!new RegExp('VRM-' + numero + '(?!\\d)', 'i').test(description)) return non('reference', 'la description ne porte pas « VRM-' + numero + ' » : sans elle, VRM ne reconnaîtrait pas l’annonce — rien n’est parti');
+  const prix = Math.round(Number(f.prix) * 100) / 100;
+  if (!(isFinite(prix) && prix > 0 && prix < 100000)) return non('prix', 'prix illisible — rien n’est parti');
+  const photos = Array.isArray(f.photos) ? f.photos.filter((u) => typeof u === 'string') : [];
+  if (!photos.length || photos.length > 10 || photos.length !== (f.photos || []).length || !photos.every((u) => HOTES_PHOTOS_FICHE.test(u))) return non('photos', 'photos illisibles (1 à 10 adresses d’un site connu) — rien n’est parti');
+  const etat = String(f.etat || '').trim();
+  const vintedId = /^\d{1,15}$/.test(String(f.vintedId || '')) ? String(f.vintedId) : '';
+  const base = { id: vintedId || ('fiche-' + numero), numero, ref: 'VRM-' + numero, title: titre, description, price: String(prix), photos, etat, viaFiche: true, vintedId };
+  if (site === 'leboncoin') {
+    if (LBC_ETATS.indexOf(etat) < 0) return non('etat', 'état hors du vocabulaire de Leboncoin — rien n’est parti');
+    const cr = criteresFicheLbc({ categorie: f.categorie, criteres: f.criteres });
+    if (!cr.ok) return non('categorie', cr.raison + ' — rien n’est parti');
+    if (!cr.categorie) return non('categorie', 'aucune catégorie sûre pour Leboncoin — rien n’est parti');
+    return { ok: true, ad: Object.assign(base, { category: cr.categorie, criteres: cr.criteres || {}, marque: (cr.criteres && cr.criteres.marque) || '', taille: (cr.criteres && cr.criteres.taille) || '', couleur: (cr.criteres && cr.criteres.couleur) || '', edite: true }) };
+  }
+  if (ETATS_VC_FICHE.indexOf(etat) < 0) return non('etat', 'état inconnu — rien n’est parti');
+  const marque = String(f.marque || '').replace(/\s+/g, ' ').trim();
+  if (!marque || marque.length > 60 || /[<>]/.test(marque)) return non('marque', 'Vestiaire demande la marque — rien n’est parti');
+  const dc = categorieVcDemandee(f.categorie, catVc);
+  if (!dc) return non('categorie', 'cette catégorie n’existe pas telle quelle dans le catalogue de Vestiaire capté — rien n’est parti');
+  const taille = String(f.taille || '').trim().slice(0, 20);
+  return { ok: true, ad: Object.assign(base, { marque, taille, vcCategorie: dc, categorieDemandee: 'posee', etiquette: 'pas-choisie' }) };
+}
+// La marque dans la liste de Vestiaire (`deposit_brands`, captée sur SON navigateur) : 'listee' (le libellé
+// exact) · 'absente' · 'bannie' · 'pas-su' (liste pas lue). Casse et espaces ignorés, rien d'approché.
+function marqueVcListee(marque, liste) {
+  if (!liste || !Array.isArray(liste.data)) return { etat: 'pas-su' };
+  const n = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase();
+  const m = n(marque); if (!m) return { etat: 'absente' };
+  const l = liste.data.filter((b) => b && n(b.name) === m);
+  if (!l.length) return { etat: 'absente' };
+  if (l.every((b) => b.banned === true)) return { etat: 'bannie' };
+  const b = l.find((x) => x.banned !== true);
+  return { etat: 'listee', valeur: String(b.name).trim(), id: b.id != null ? String(b.id) : '' };
+}
+let _marquesVc = null, _marquesVcAt = 0;
+async function lireMarquesVc() {
+  if (_marquesVc && Date.now() - _marquesVcAt < 3600000) return _marquesVc;
+  const r = await sbGet('app_data?id=eq.vc_catalogue&select=c:data->deposit_brands->>corps');
+  if (!r || !r[0] || !r[0].c) return null;
+  try { _marquesVc = JSON.parse(r[0].c); _marquesVcAt = Date.now(); } catch (_) { return null; }
+  return _marquesVc;
+}
+// Le compte ouvert dans les onglets du site : UN seul, sinon rien (jamais au nom d'un compte deviné).
+async function compteUniqueOnglets(site) {
+  if (site === 'leboncoin') {
+    let cartes = {};
+    try { cartes = (await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {}; } catch (_) { return { ok: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const vus = new Set(); let tabId = null;
+    for (const [tid, c] of Object.entries(cartes)) {
+      if (!c || c.source !== 'prive' || c.ambigue || !c.compte) continue;
+      let tab = null; try { tab = await chrome.tabs.get(Number(tid)); } catch (_) { tab = null; }
+      if (!tab || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tab.url || '')) continue;
+      vus.add(String(c.compte).replace(/^lbc-account:/, '')); tabId = Number(tid);
+    }
+    if (!vus.size) return { ok: false, code: 'lbc-absent', raison: 'ouvre leboncoin.fr dans ce Chrome, connecté sur le compte où publier, puis réessaie — rien n’est parti' };
+    if (vus.size > 1) return { ok: false, code: 'deux-comptes', raison: 'deux comptes Leboncoin sont ouverts dans ce Chrome : garde seulement celui où publier, puis réessaie — rien n’est parti' };
+    return { ok: true, compte: [...vus][0], tabId };
+  }
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vestiairecollective.com/*', 'https://vestiairecollective.com/*'] }); } catch (_) { tabs = []; }
+  if (!tabs.length) return { ok: false, code: 'vc-absent', raison: 'ouvre vestiairecollective.com dans ce Chrome, connecté sur ton compte, puis réessaie — rien n’est parti' };
+  const vus = new Set();
+  for (const t of tabs) { const c = await compteVcOnglet(t.id); if (c) vus.add(c); }
+  if (!vus.size) return { ok: false, code: 'session', raison: 'je ne sais pas encore quel compte Vestiaire est ouvert — recharge la page Vestiaire, puis réessaie — rien n’est parti' };
+  if (vus.size > 1) return { ok: false, code: 'deux-comptes', raison: 'deux comptes Vestiaire sont ouverts dans ce Chrome : garde seulement celui où publier — rien n’est parti' };
+  return { ok: true, compte: [...vus][0] };
+}
+async function publierFicheSite(msg) {
+  const site = String((msg && msg.site) || '');
+  if (site !== 'leboncoin' && site !== 'vestiaire') return { accepte: false, code: 'site', raison: 'site inconnu — rien n’est parti' };
+  const verrou = 'fiche:' + site;
+  // UN dépôt à la fois par site (l'extension n'a qu'UN dépôt en attente par site).
+  if (PUBLICATIONS_EN_VOL.has(verrou)) return { accepte: false, code: 'en-cours', raison: 'un dépôt sur ce site est déjà en train de partir' };
+  PUBLICATIONS_EN_VOL.add(verrou);
+  try {
+    if (site === 'vestiaire') await chargerCataloguesPlateformes();
+    const v = ficheAgentValide(msg.fiche, site, _catVc);
+    if (!v.ok) return { accepte: false, code: v.code, raison: v.raison };
+    const ad = v.ad;
+    const cle = site === 'leboncoin' ? 'vrmPendingAd' : 'vrmPendingVc';
+    let pend = null; try { pend = (await chrome.storage.local.get(cle))[cle]; } catch (_) { return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+    if (pend && pend.ad && Date.now() - Number(pend.at || 0) < 30 * 60000) return { accepte: false, code: 'en-cours', raison: (site === 'leboncoin' ? 'un dépôt Leboncoin' : 'une préparation Vestiaire') + ' est encore ouvert : finis-le ou ferme son onglet, puis réessaie — rien n’est parti' };
+    // Une paire prouvée VENDUE sur Vinted ne part pas ailleurs.
+    if (ad.vintedId) { const pr = await lireVentesProuvees(); if (pr.echec) return { accepte: false, code: 'preuve', raison: "je n'ai pas pu vérifier qu'elle n'est pas déjà vendue — réessaie dans un moment" }; if (pr.vendus.has(ad.vintedId)) return { accepte: false, code: 'vendue', raison: 'elle est déjà vendue sur Vinted — rien n’est parti' }; }
+    if (site === 'vestiaire') {
+      const l = marqueVcListee(ad.marque, await lireMarquesVc());
+      if (l.etat === 'pas-su') return { accepte: false, code: 'lecture', raison: 'la liste des marques de Vestiaire n’est pas lue : ouvre le dépôt Vestiaire une fois dans ce Chrome, puis réessaie — rien n’est parti' };
+      if (l.etat !== 'listee') return { accepte: false, code: 'marque-hors-liste', raison: `Vestiaire n’a pas la marque « ${ad.marque} » dans sa liste${l.etat === 'bannie' ? ' (refusée par le site)' : ''} : pas vendable sur Vestiaire sous ce nom — rien n’est parti` };
+      ad.marque = l.valeur; ad.marqueId = l.id;
+    }
+    const o = await compteUniqueOnglets(site);
+    if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
+    const pf = site === 'leboncoin' ? 'leboncoin' : 'vestiaire';
+    { const rb = await secuRobotDit(pf, o.compte); if (rb) return { accepte: false, code: rb.code, raison: rb.error }; }
+    const secu = await secuGeste(pf, o.compte, 'mise_en_ligne', 'clic');
+    if (secu) return { accepte: false, code: secu.code, raison: secu.error };
+    if (site === 'leboncoin') { const fr = await pauseLbcMsg(); if (fr) return { accepte: false, code: 'lbc-pause', raison: 'Leboncoin a demandé de ralentir — rien n’est parti, réessaie plus tard' }; }
+    const cpt = await compterAction((site === 'leboncoin' ? 'lbc:' : 'vc:') + o.compte, ACTIONS_MAX_HEURE);
+    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    ad.account = o.compte; ad.publier = true;
+    let tab = null;
+    try { tab = await chrome.tabs.create({ url: site === 'leboncoin' ? 'https://www.leboncoin.fr/deposer-une-annonce' : VC_PAGE_VENDRE, active: true }); } catch (_) { tab = null; }
+    const tabId = tab && tab.id != null ? tab.id : null;
+    await chrome.storage.local.set({ [cle]: site === 'leboncoin' ? { ad, at: Date.now() } : { ad, at: Date.now(), tabId } });
+    const jobId = (site === 'leboncoin' ? 'lbc:' : 'vc:') + ad.id;
+    const voulu = site === 'leboncoin' ? { categorie: ad.category, univers: (ad.criteres && ad.criteres.univers) || '', type: (ad.criteres && ad.criteres.type) || '' } : { univers: ad.vcCategorie.univers, categorie: ad.vcCategorie.categorie, sous: ad.vcCategorie.sous };
+    await majCmd(jobId, { etape: 'depot', id: ad.id, numero: ad.numero, tabId, raison: null, viaFiche: true, voulu });
+    return { accepte: true, jobId, etape: 'depot', compte: o.compte };
+  } finally { PUBLICATIONS_EN_VOL.delete(verrou); }
 }
 // 28 oct. (5.268) : Julien — « ça m'amène juste sur Vestiaire, sur Vendre un
 //    article, et ça ne fait rien après ». On ouvrait la page d'ACCUEIL « vendre »

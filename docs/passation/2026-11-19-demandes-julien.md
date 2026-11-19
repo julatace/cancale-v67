@@ -161,6 +161,7 @@ uniquement des règles, des tables, ce qui est lu et ce qu'il a déjà répondu 
 pourquoi et quoi faire. Garde-fous de l'extension inchangés (son geste, compte de l'onglet, plafonds, une à la fois).
 G ter : « c'est l'extension qui va publier dans tous les cas » — l'agent prépare et décide des champs dans l'app ;
 la PUBLICATION part toujours de l'extension (onglet du site, compte de l'onglet, plafonds), comme aujourd'hui.
+**État (19 nov.)** : G, G bis, G ter construits sur `claude/publier-agent` (pas en ligne) — `2026-11-19-publier-agent.md`.
 
 ### H. Le lien extension ↔ application, compréhensible par n'importe quel vendeur
 Julien : « améliore le lien entre l'extension et l'application : on ne sait pas quand ton compte Vinted est ouvert,
