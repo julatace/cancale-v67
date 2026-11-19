@@ -74,7 +74,7 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
   .vrm-rg-liste { overflow: visible; flex: none; min-height: 0; }
   .vrm-rg[data-glisser-vue="cibles"] .vrm-rg-achats, .vrm-rg[data-glisser-vue="achats"] .vrm-rg-cibles {
     position: absolute; left: -300vw; top: 0; width: 1px; height: 1px; overflow: hidden; visibility: hidden; }
-  .vrm-rg-col > .vrm-rg-h3 { display: none; }
+  .vrm-rg-col > .vrm-rg-h3, .vrm-rg-entete > .vrm-rg-h3 { display: none; }
   /* La pilule « Achat relié · Bénéfice … » (5 s) : la feuille s'arrête au-dessus d'elle, jamais une ligne dessous ;
      sans pilule, aucune bande vide. */
   body:has([data-pilule]) .vrm-rg-corps { margin-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
@@ -93,3 +93,18 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
 @media (min-width: 900px) { .vrm-rg-choisi { max-width: 1152px; width: calc(100% - 48px); margin: 0 auto 8px; box-sizing: border-box; } }
 .vrm-rg-ici { display: inline-flex; align-items: center; justify-content: center; }
 @media (max-width: 520px) { .vrm-rg-question-texte { flex-basis: 100%; } .vrm-rg-oui, .vrm-rg-non { flex: 1 1 0; } }
+
+/* (19 nov., Julien) Les filtres des deux listes : « Libres · Déjà reliés » et « Toutes · En ligne · Vendues ». */
+.vrm-rg-entete { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.vrm-rg-filtres { flex: none; display: flex; gap: 6px; padding: 2px 2px 8px; flex-wrap: wrap; }
+.vrm-rg-filtre { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: transparent; color: inherit;
+  font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.vrm-rg-filtre[aria-pressed="true"] { background: var(--rg-encre, #1d1d1f); color: var(--rg-fond, #fff); border-color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-achat.is-relie { cursor: default; opacity: .78; }
+/* À l'ordinateur (souris) : le titre et ses filtres sur UNE ligne, filtres de 32 px — la liste ne descend pas. */
+@media (min-width: 900px) {
+  .vrm-rg-entete { margin: 2px 2px 6px; }
+  .vrm-rg-entete > .vrm-rg-h3 { margin: 0; }
+  .vrm-rg-filtres { padding: 0; }
+  .vrm-rg-filtre { min-height: 32px; padding: 0 12px; font-size: 13px; }
+}
