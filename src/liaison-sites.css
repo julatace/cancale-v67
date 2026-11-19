@@ -48,6 +48,8 @@
 /* ── Chercher, la taille ── */
 .n-lia-cherche { display: flex; gap: 8px; align-items: center; padding: 12px 0; }
 .n-lia-cherche > .n-recherche { flex: 1 1 auto; min-width: 0; margin: 0; }
+.n-lia-cherche > .n-bouton-bloc, .n-lia-cherche > .n-bouton { flex: none; }
+.n-lia-cherche .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }   /* « T. 39,5 » sur une ligne */
 
 /* ── La grille des candidates : chaque carte se touche en entier ── */
 .n-lia-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -81,6 +83,12 @@
 .n-lia-lot-ligne { display: grid; grid-template-columns: minmax(0, 104px) minmax(0, 104px) minmax(0, 1fr) 44px; gap: 12px; align-items: center; margin: 0 var(--n-marge) 8px; padding: 12px; border-radius: var(--n-r-carte); background: var(--n-carte); cursor: pointer; }
 .n-lia-lot-textes { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .n-lia-coche { width: 24px; height: 24px; margin: 10px; accent-color: var(--n-accent); }
+/* Au téléphone : les deux photos sur toute la largeur, le N° et le titre dessous, la case à droite (le texte ne se coupe plus lettre à lettre). */
+@media (max-width: 599px) {
+  .n-lia-lot-ligne { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; row-gap: 8px; }
+  .n-lia-lot-ligne > .n-lia-lot-textes { grid-column: 1 / 3; grid-row: 2; }
+  .n-lia-lot-ligne > .n-lia-coche { grid-column: 3; grid-row: 1 / 3; justify-self: center; }
+}
 .n-lia-lot-fin { display: block; height: 1px; }
 
 /* ── Plus large ── */

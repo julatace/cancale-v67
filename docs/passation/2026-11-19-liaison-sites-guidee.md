@@ -104,6 +104,25 @@ at, ecrit, par }` ; et, pour chaque lien, sa preuve et sa date dans `vrm_liaison
 Banc de rendu `scripts/bancs/liaison-sites.cjs` (390 × 844 tactile et 1512, clair et sombre, base inventée) : compte les
 touchers, lit les liens écrits, mesure contrastes (≥ 4,5:1 sur le fond rendu), cibles (≥ 44), débordements, un seul plein,
 grandes photos, aucun texte superposé. `scripts/bancs/meme-photo.cjs` lance désormais ce banc (la feuille est remplacée).
+**244 verts, 0 rouge** (19 nov., après la reprise sous Opus). Touchers mesurés : **1** pour une « sûre » (le plein), **1** pour
+une candidate touchée dans la liste (y compris la capture de Julien : « Adidas Spezial vert 39,5 » ⇒ N°234 PREMIÈRE parmi 30,
+un toucher), **2** quand il y a UN vrai doute (deux N° en jeu : la question puis « N°300 »), **1** pour le lot entier après
+la relecture qu'on fait défiler.
+
+Ce que le banc a attrapé à la reprise (corrigé) :
+- **Toucher la photo d'une candidate ouvrait la visionneuse** (« la photo en grand, partout ») au lieu de relier : la carte,
+  la ligne du lot et la file portent `data-sans-visionneuse` — toucher la carte, photo comprise, relie.
+- **Les composants natifs rendus à 34 px** : les règles « bouton » d'`index.html` (hors couche) écrasaient la couche
+  `vrm-natif` (plein 50 → 34, « Retour » 30). Elles ne s'appliquent plus aux classes `n-*` (`:where`, même spécificité) —
+  vaut pour TOUT écran natif, pas seulement celui-ci.
+- **« Relier » d'une rangée Leboncoin montrait la PREMIÈRE annonce, pas celle touchée** : l'effet « reprendre sur la
+  première » écrasait l'annonce demandée dans le même rendu (mise à jour fonctionnelle, l'annonce demandée gagne ; une
+  annonce demandée absente d'un calcul d'avant l'ouverture attend le calcul relancé).
+- **La fin oubliait « Plus tard »** (l'annonce écartée par son geste sortait aussi de cette liste) ; « reprendre » la remet.
+- Téléphone : la relecture du lot coupait le titre lettre à lettre (photos sur toute la largeur, texte dessous) ; la puce
+  « T. 39,5 » passait sur deux lignes.
+- L'audit a gagné **J5** : une annonce que l'ancien écran disait « pas d'article à relier » (reliée, sans N°) est « que sur
+  ce site », hors de la file — jamais « reliée » à un N° fantôme.
 
 ## 5. Pour les autres écrans (ne rien recalculer)
 

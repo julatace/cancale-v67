@@ -197,10 +197,10 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
   // L'annonce montrée : celle demandée, sinon là où il s'est arrêté, sinon la première.
   // Une annonce DEMANDÉE absente d'un calcul d'avant l'ouverture (il a pu être fait sans elle) : on attend le calcul relancé
   // à l'ouverture, jamais une autre annonce à sa place (sinon « Relier » d'une rangée montrerait la mauvaise annonce).
-  const ouvertA = React.useRef(Date.now());
+  const ouvertA = React.useRef(Date.now()), cibleEnAttente = React.useRef(!!(cible.id && cible.site));
   React.useEffect(() => {
     if (!lu || courant) return;
-    if (cible.id && cible.site) { const k = `${cible.site}:${cible.id}`; if (res.parCle.has(k)) { setCourant(k); return; } if (!(res.at >= ouvertA.current)) return; }
+    if (cibleEnAttente.current) { const k = `${cible.site}:${cible.id}`; if (res.parCle.has(k)) { cibleEnAttente.current = false; setCourant(k); return; } if (!(res.at >= ouvertA.current)) return; cibleEnAttente.current = false; }
     if (vue !== 'file') return;
     const rep = lireReprise();
     const e = aFaire.find((x) => x.cle === rep) || aFaire[0] || null;
@@ -272,8 +272,9 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
       setLotCoches(null); setCourant(null); setVue('file');
     } finally { setEnCours(false); }
   };
-  // Après le lot (ou un retour dans la file) : reprendre sur la première annonce restante.
-  React.useEffect(() => { if (vue === 'file' && lu && !courant) { const e = aFaire[0]; if (e) setCourant(e.cle); else if (total0.current != null) setVue('fin'); } }, [vue, lu, courant, aFaire.length]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Après le lot (ou un retour dans la file) : reprendre sur la première annonce restante — jamais à la place de l'annonce
+  // DEMANDÉE posée dans le même rendu (mise à jour fonctionnelle : la demandée gagne).
+  React.useEffect(() => { if (vue === 'file' && lu && !courant && !cibleEnAttente.current) { const e = aFaire[0]; if (e) setCourant((c) => c || e.cle); else if (total0.current != null && !cible.id) setVue('fin'); } }, [vue, lu, courant, aFaire.length]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const retour = () => { if (question) { setQuestion(null); return; } if (vue === 'lot' || (vue === 'contradictions' && cible.vue !== 'contradictions')) { setVue(aFaire.length ? 'file' : 'fin'); return; } onFermer(); };
   // ── Le clavier : ← → la candidate, ↑ ↓ l'annonce, Entrée relie, « / » cherche, Échap revient. ──
