@@ -131,3 +131,9 @@ plus|montee`).
   s'ouvrira dans son volet de détail (`PagePoussee` le fait déjà).
 - La taille d'un article sans annonce Vinted se lit en fin du titre de SON annonce (Leboncoin, eBay).
 - Banc `ecrans-verre-2` : ses vues `fiche-*` (fiche D) ne sont plus jouées par défaut — la fiche est jugée ici.
+- Banc `fiche-paire` : il ouvre « Tout voir » puis « Étapes » (le parcours vit sur la fiche) : 92 OK · 2 KO — les deux KO
+  (E, 390 et 1512) sont le bouton loupe de la recherche (`button[data-recherche-loupe]`), changé par la coque native.
+- Restent rouges, pas de la fiche : `garde-ecrans` (17 ; 0 sur main) — la navigation et l'en-tête de la coque native ;
+  `ecrans-verre-2` (Argent et Paramètres « en blanc sur le fond ») ; `fiche-partout` 52 KO (42 sur main) — des rangées
+  d'avant introuvables (sélecteurs du Studio) et des délais « fiche posée en N ms » sur une machine saturée ; les « toucher
+  la ligne ouvre LA fiche » à 390, rouges sur main, y passent. `design-v2` arrêté par la limite de 2 h (pas de verdict).
