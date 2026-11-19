@@ -268,7 +268,12 @@
        gauche, et le chiffre cliquable « Coût d'achat » a mis son étiquette, son
        nombre et sa légende SUR UNE SEULE LIGNE. Une hauteur plancher suffit :
        le navigateur centre le contenu tout seul. */
-    button, a.vrm-btn {
+    /* ⚠️ 19 nov. : ces deux règles ne sont dans AUCUNE couche, elles gagnent donc sur
+       `@layer vrm-natif` quoi qu'il arrive — mesuré dans l'atelier « Compléter » : les
+       `.n-bouton` tombaient à 34 px et 13 px au lieu de 44 px et 17 px. Les composants natifs
+       (`class="n-…"`, src/natif/) portent leurs propres mesures : on les laisse hors d'ici.
+       L'exclusion est dans `:where()` : la spécificité reste celle d'avant pour tous les autres boutons. */
+    button:where(:not([class^="n-"], [class*=" n-"])), a.vrm-btn {
       font-family: inherit;
       font-size: 13px;
       font-weight: 600;
@@ -280,7 +285,7 @@
       transition: background-color .11s ease, border-color .11s ease, color .11s ease, box-shadow .11s ease, filter .11s ease;
     }
     /* Les boutons qui ne portent qu'une icône restent compacts. */
-    button[aria-label] { min-height: 30px; }
+    button[aria-label]:where(:not([class^="n-"], [class*=" n-"])) { min-height: 30px; }
 
     /* ⚠️ UNE RANGÉE DE PASTILLES : elle DÉFILE sur téléphone, elle REVIENT À
        LA LIGNE sur ordinateur. Sur mobile, laisser retourner à la ligne faisait

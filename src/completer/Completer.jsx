@@ -21,6 +21,8 @@
 // Aucune confirmation là où « Annuler » suffit ; aucun texte à lire à chaque carte ; aucun style
 // en ligne.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { portailNatif } from '../natif/outils.js';
 import { tr, monnaie } from '../i18n/index.js';
 import { PagePoussee, Groupe, Rangee, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Faits, Fait, Toast, useOrdinateur, poserIcone, iconePosee } from '../natif/index.js';
 import { fileCompleter, filtrer, parGenre, questionsDe, compteurs, pucesMini, jugerMini, apercuLot, ecrituresLot, candidatsAchat, opsPrixAchat, opsMini, opsPrixFiche, opsSans, opsRevoir,
@@ -68,13 +70,17 @@ function Bandeau({ gestes }) {
   useEffect(() => (gestes ? gestes.abonner(setEtat) : undefined), [gestes]);
   const v = etat && etat.visible;
   if (!v) return null;
+  // Par le portail du natif (comme les feuilles) : rendu à côté de la page, il restait dans l'écran
+  // d'en dessous, masqué sur téléphone — « Annuler » n'était plus visible (banc completer, 390 px).
+  const cible = portailNatif(); if (!cible) return null;
   const echec = v.etat === 'echec' || v.etat === 'echec-annulation';
   const texte = v.etat === 'annulation' ? tr('cpl.annulation') : v.etat === 'annule' ? tr('cpl.annule') : echec ? `${tr('cpl.pasEnregistre')} · ${v.texte}` : v.etat === 'garde' ? `${v.texte} · ${tr('cpl.garde')}` : v.texte;
-  return (
+  return createPortal(
     <div data-cp-bandeau={v.etat}>
       <Toast key={v.id + ':' + v.etat} className="vrm-cp-toast" message={texte} duree={600000}
         onAnnuler={v.peutAnnuler ? () => gestes.annuler(v.id) : v.peutReessayer ? () => gestes.reessayer(v.id) : null} libelleAnnuler={v.peutReessayer ? tr('cpl.reessayer') : tr('cpl.annuler')}/>
-    </div>
+    </div>,
+    cible
   );
 }
 

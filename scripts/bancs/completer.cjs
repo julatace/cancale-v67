@@ -179,7 +179,10 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
           // 3. la vente 6200003 : « Je ne sais plus ».
           await toucher('[data-cp-carte] [data-cp-sans="achat"]'); await fini('je ne sais plus', 'v:6200003');
           ov = await local(pg, 'vinted_sale_overrides'); const sans = await local(pg, 'vrm_completer_sans');
-          dit(!(ov && ov['6200003']) && sans && sans['v:6200003|achat'], `J ${tag} : « Je ne sais plus » ⇒ noté, AUCUN prix écrit`, { ov: ov && ov['6200003'], sans });
+          // Juger le PRIX, pas la présence de la ligne : le N° donné tout seul à une vente sans numéro
+          // (`numero`, `autoAssigned`, `autoShip`, §5 règle a) vit dans la même ligne et n'est pas un prix.
+          const o3 = (ov && ov['6200003']) || {};
+          dit(o3.buyPrice == null && o3.buyFromId == null && o3.buyFrom == null &&sans && sans['v:6200003|achat'],`J ${tag} : « Je ne sais plus » ⇒ noté, AUCUN prix écrit`, { ov: ov && ov['6200003'], sans });
           // 4. la vente 6200004 : 3, 5, OK.
           await toucher('[data-cp-carte] [data-cp-touche="3"]'); await toucher('[data-cp-carte] [data-cp-touche="5"]'); await toucher('[data-cp-ok]'); await fini('prix tapé', 'v:6200004');
           // 5. N°101 (favoris) : achat proposé, puis le prix mini par une puce.
