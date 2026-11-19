@@ -78,12 +78,12 @@ async function rendre(b, port, { tel, sombre = false, v2, reduit = false, petit 
   // coche « fait » de la séance.
   await pg.addInitScript(() => {
     window.__cls = 0; window.__reponses = [];
-    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {}
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; (window.__sauts = window.__sauts || []).push(Math.round(e.value * 1000) / 1000 + ' ' + (e.sources || []).map((x) => x.node && x.node.nodeType === 1 ? (x.node.tagName + '.' + String(x.node.className).split(' ')[0] + (x.node.getAttribute('data-sr-ligne') ? '#' + x.node.getAttribute('data-sr-ligne') : '') + ' ' + Math.round(x.previousRect.y) + '→' + Math.round(x.currentRect.y) + '/' + Math.round(x.previousRect.x) + '→' + Math.round(x.currentRect.x)) : '?').join(',')); } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {}
     let t0 = 0;
     addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-sr-ranger-ici]')) t0 = performance.now(); }, true);
     new MutationObserver(() => { if (t0 && document.querySelector('.sr-coche')) { window.__reponses.push(Math.round(performance.now() - t0)); t0 = 0; } }).observe(document, { childList: true, subtree: true });
   });
-  await pg.addInitScript(({ m, sombre, v2, petit }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); localStorage.setItem('vrm_design_v2', v2 ? '1' : '0'); /* (18 nov.) allumé par défaut : « 0 » = l'ancien design */ if (petit) localStorage.setItem('vrm_taille_texte', 'tresGrand'); } catch (_) {} }, { m: MAIN, sombre, v2, petit });
+  await pg.addInitScript(({ m, sombre, v2, petit }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); localStorage.setItem('vrm_design_v2', v2 ? '1' : '0'); /* (18 nov.) allumé par défaut : « 0 » = l'ancien design */ if (v2) localStorage.removeItem('vrm_banc_dom_ancien'); /* (19 nov.) la garde réseau a déjà traduit « pas choisi » en ancien DOM pour ce chargement */ if (petit) localStorage.setItem('vrm_taille_texte', 'tresGrand'); } catch (_) {} }, { m: MAIN, sombre, v2, petit });
   await pg.goto(`http://localhost:${port}/?tab=garage`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector(v2 ? '[data-sr-ecran] [data-sr-lancer]' : '[data-case-ici="mA:0"]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(1200);
@@ -115,7 +115,7 @@ const regles = (pg) => pg.evaluate(() => {
   const serrees = [...document.querySelectorAll('.sr-reponse, .sr-ici, .sr-place-corps')].filter(vis).filter((e) => { const cs = getComputedStyle(e); return parseFloat(cs.paddingRight) < 19.5 || parseFloat(cs.paddingTop) < 3.5; }).length;
   const liste = document.querySelector('.sr-liste-paires'), cote = document.querySelector('.sr-cote');
   const deux = !!(liste && cote && cote.getBoundingClientRect().left >= liste.getBoundingClientRect().right - 1);
-  return { petits, coupes, pleins, premiere, ih: innerHeight, basses, serrees, deux, ordi: innerWidth >= 1024, glisse: !!document.querySelector('[data-sr-glisse="ranger"]'), sw: document.documentElement.scrollWidth, iw: innerWidth };
+  return { petits, coupes, pleins, premiere, ih: innerHeight, basses, serrees, deux, ordi: innerWidth >= 1024, glisse: !!document.querySelector('[data-sr-glisse="ranger"]'), ranger: !!document.querySelector('[data-sm-ranger] .sm-ranger-fin'), sw: document.documentElement.scrollWidth, iw: innerWidth };
 });
 // La signature de l'écran Stock (éteint) : balises, attributs data-*, textes — pour la comparer à celle de main.
 const signature = (pg) => pg.evaluate(() => {
@@ -173,7 +173,8 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
   // P7 (allumé) — LA DERNIÈRE PLACE : la 1re paire posée par « Autre place » dans l'Armoire (mB:0) ; la suivante doit se
   // voir proposer l'Armoire (mB:1), pas la première case libre de l'Étagère (mA:6).
   if (v2) { const r = await rendre(b, port, { tel, sombre, v2, petit });
-    await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-autre]'); await r.toucher('[data-sr-onglet="mB"]');
+    // (19 nov., lot stock-etiquetage) Le meuble est dessiné dans la séance : on choisit l'onglet du meuble, puis on touche la case.
+    await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-onglet="mB"]');
     await shot(r.pg, nom + '-apres-autre-place');
     await r.toucher('[data-sr-grille="mB"] [data-sr-case="mB:0"]');
     await r.pg.waitForSelector('[data-sr-courant="202"]', { timeout: 8000 }).catch(() => {});
@@ -187,10 +188,11 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
   // paresseuses ; aucun décalage de mise en page (CLS < 0,05) en passant Paires → Places → Paires.
   if (v2) {
     { const r = await rendre(b, port, { tel, sombre, v2, petit });
-      const q = await r.pg.evaluate(() => { const l = document.querySelector('.sr-liste-paires > .sr-ligne'); const imgs = [...document.querySelectorAll('.sr-liste-paires img')];
-        return { cv: l ? getComputedStyle(l).contentVisibility : null, lazy: imgs.length > 0 && imgs.every((i) => i.loading === 'lazy') }; });
-      dit(q.cv === 'auto' && q.lazy, `${t} : Q — rangées en content-visibility, photos paresseuses`, JSON.stringify(q));
-      await r.toucher('[data-sr-seg="places"]'); await r.toucher('[data-sr-seg="paires"]');
+      // (19 nov., lot stock-etiquetage) Les rangées sont celles du design natif (<Rangee>) : « À ranger » montre 5 articles puis
+      // « Voir les N autres » (pages de 60) — plus de content-visibility à juger ; les photos restent paresseuses.
+      const q = await r.pg.evaluate(() => { const imgs = [...document.querySelectorAll('[data-sr-groupe] img')]; return { lazy: imgs.length > 0 && imgs.every((i) => i.loading === 'lazy') }; });
+      dit(q.lazy, `${t} : Q — photos paresseuses`, JSON.stringify(q));
+      await r.toucher('[data-sr-segment] .n-segmente-choix:nth-child(3)'); await r.toucher('[data-sr-segment] .n-segmente-choix:nth-child(2)');
       await r.toucher('[data-sr-lancer]');
       const el = r.pg.locator('[data-sr-ranger-ici]').first(); await el.waitFor({ state: 'visible' });
       // Le 2e toucher arrive PENDANT les 220 ms du mouvement (un toucher de Playwright attend la stabilité : il pourrait
@@ -203,7 +205,7 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       const apres = await r.pg.evaluate(() => ({ courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant'), rep: window.__reponses.slice(), cls: window.__cls, slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null') }));
       dit(apres.rep.length && Math.max(...apres.rep) < 100, `${t} : Q — la coche « fait » arrive < 100 ms après le toucher`, apres.rep.join(',') + ' ms');
       dit(courant2 === '202' && apres.courant === '202' && apres.slots['201'] && apres.slots['201'].m === 'mA' && apres.slots['201'].i === 6 && !apres.slots['202'], `${t} : Q — un 2e toucher pendant le mouvement : la suivante arrive, rien n'est reposé`, JSON.stringify({ c: apres.courant, s201: apres.slots['201'], s202: apres.slots['202'] }));
-      dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4));
+      dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4) + ' ' + JSON.stringify(await r.pg.evaluate(() => (window.__sauts || []).slice(0, 6))));
       await r.ctx.close(); }
     { const r = await rendre(b, port, { tel, sombre, v2, petit, reduit: true });
       await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-ranger-ici]');
@@ -219,7 +221,7 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
     let trouve = false;
     if (v2) {
       await r.taper('[data-sr-cherche]', '178');
-      trouve = await r.pg.evaluate(() => { const e = document.querySelector('[data-sr-reponse="178"]'); return !!e && e.getAttribute('data-sr-reponse-ou') === 'Armoire chambre|2|2' && !!e.querySelector('[data-sr-plan-vise]'); });
+      trouve = await r.pg.evaluate(() => { const e = document.querySelector('[data-sr-reponse="178"]'); return !!e && e.getAttribute('data-sr-reponse-ou') === 'Armoire chambre|2|2' && !!e.querySelector('[data-sr-plan-vise], [data-sm-vise]'); });
       await shot(r.pg, nom + '-apres-trouver');
       res.p3 = r.touchers();
       await r.toucher('[data-sr-deplacer]');
@@ -235,7 +237,9 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       res.p3 = r.touchers();
       await r.toucher('[data-case-num="178"]');
       // La fiche s'ouvre ; « Déplacer » vit dans sa feuille « ⋯ » (src/FichePaire.jsx, 16 nov.).
-      await r.toucher('[data-fd-plus-ouvrir]');
+      // (19 nov., fiche directe) « Déplacer » est posé dans la fiche (sa place « contexte ») ; « ⋯ » seulement s'il n'y est pas.
+      await r.pg.waitForTimeout(600);
+      if (!(await r.pg.locator('[data-fiche-ranger="deplacer"]').locator('visible=true').count())) await r.toucher('[data-fd-plus-ouvrir]');
       await r.toucher('[data-fiche-ranger="deplacer"]');
       await r.toucher(caseLibreAvant('mB'));
     }
@@ -247,18 +251,19 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
     await r.ctx.close(); }
   // P5 — voir ce qu'il y a dans l'Armoire ; P6 — la vendue allumée.
   { const r = await rendre(b, port, { tel, sombre, v2, petit });
-    if (v2) { await r.toucher('[data-sr-seg="places"]'); await r.toucher('[data-sr-place-ouvrir="mB"]'); }
+    // (19 nov.) Les meubles sont l'écran d'entrée : un toucher sur l'Armoire la zoome.
+    if (v2) { await r.toucher('[data-sr-place-ouvrir="mB"]'); }
     await r.pg.waitForTimeout(300);
     // La distance à faire défiler pour AVOIR l'Armoire sous les yeux (le haut de ses cases), mesurée avant de défiler.
-    const dist = await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"] [data-meuble-grille]'); if (!e) return null; const q = e.getBoundingClientRect(); return Math.max(0, Math.round(q.bottom - innerHeight)); });
-    await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"]'); if (e) e.scrollIntoView({ block: 'center' }); });
+    const dist = await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"] [data-meuble-grille], [data-sm-zoom="mB"] .sm-corps'); if (!e) return null; const q = e.getBoundingClientRect(); return Math.max(0, Math.round(q.bottom - innerHeight)); });
+    await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"], [data-sm-zoom="mB"] .sm-meuble'); if (e) e.scrollIntoView({ block: 'center' }); });
     await r.pg.waitForTimeout(400);
-    const vu = await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"] [data-case-num="178"]'); if (!e) return null; const q = e.getBoundingClientRect(); return { dedans: q.top >= 0 && q.bottom <= innerHeight }; });
+    const vu = await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"] [data-case-num="178"], [data-sm-zoom="mB"] [data-case-num="178"]'); if (!e) return null; const q = e.getBoundingClientRect(); return { dedans: q.top >= 0 && q.bottom <= innerHeight }; });
     res.p5 = r.touchers(); res.p5defile = dist;
     dit(!!vu && vu.dedans, `${t} : P5 — l'Armoire montre ses cases (N°178 à l'écran)`, dist != null ? `${dist} px à défiler` : 'absente');
     await shot(r.pg, nom + (v2 ? '-apres' : '-avant') + '-meuble');
-    if (v2) { await r.toucher('[data-sr-place-ouvrir="mA"]'); r.zero(); }
-    const vend = await r.pg.evaluate(() => { const e = document.querySelector('[data-case-num="3"]'); return e ? { allumee: e.classList.contains('is-vendue'), ligne: document.querySelector('[data-sr-place="mA"] [data-sr-a-sortir]') ? 1 : 0 } : null; });
+    if (v2) { await r.toucher('[data-sm-dezoom]'); await r.toucher('[data-sr-place-ouvrir="mA"]'); r.zero(); }
+    const vend = await r.pg.evaluate(() => { const e = document.querySelector('[data-case-num="3"]'); return e ? { allumee: e.classList.contains('is-vendue') || e.getAttribute('data-sm-etat') === 'vendue', ligne: document.querySelector('[data-sr-place="mA"] [data-sr-a-sortir]') ? 1 : 0 } : null; });
     res.p6 = 0;
     dit(!!vend && vend.allumee, `${t} : P6 — la case de N°3 (vendue) reste allumée, sans geste`, JSON.stringify(vend));
     if (v2) dit(!!vend && vend.ligne === 1, `${t} : P6 — « Mes places » dit « 1 à sortir » sur l'Étagère`);
@@ -296,9 +301,10 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
         dit(g.sw <= g.iw, `${t} : ${k} — aucun défilement de côté`, `${g.sw}/${g.iw}`);
         dit(g.pleins <= 1, `${t} : ${k} — un seul bouton plein`, String(g.pleins));
         dit(!g.basses && !g.serrees, `${t} : ${k} — l'air : rangées ≥ 64 px, cartes ≥ 20 px à l'intérieur`, `${g.basses} rangées basses, ${g.serrees} cartes serrées`);
-        if (k === 'écran' && g.ordi) dit(g.deux, `${t} : écran — ordinateur : la liste à gauche, les places à droite`);
+        // (19 nov., Julien : « au lieu que je doive appuyer sur l'article et qu'après ce soit à droite ») plus de colonne de droite.
+        if (k === 'écran' && g.ordi) dit(!g.deux, `${t} : écran — ordinateur : plus de place « à droite », une seule colonne pleine largeur`);
         if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * (/^375/.test(t) ? 0.6 : 0.5), `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
-          if (/^3(90|75)/.test(t)) dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
+          dit(g.ranger, `${t} : écran — « Ranger » au bout de chaque article à ranger (le toucher de la rangée)`); }
       }
       if (REF) {
         const ref = await parcours(b, portRef, { ...c, v2: false, nom: c.nom + '-main' });

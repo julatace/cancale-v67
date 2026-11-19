@@ -1,98 +1,95 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  LE STOCK DU NOUVEAU DESIGN (17 nov., lot stock-rangement) — seulement allumé (`vrm_design_v2`).
-//  Julien : « l'onglet stock… pour ranger c'est un peu la galère, il faudrait que ce soit beaucoup plus
-//  naturel et simple d'utilisation ». Récit et mesures : docs/passation/2026-11-17-stock-rangement.md.
+//  LE STOCK (19 nov. 2026, lot stock-etiquetage — avant : 17 nov., lot stock-rangement). Design « VRM natif ».
+//  Julien, 19 nov. : « Pour chaque article, mets "à ranger maintenant" au lieu que je doive appuyer sur l'article et
+//  qu'après ce soit à droite. Fais une meilleure représentation du meuble, avec une animation quand je range l'article
+//  dans le meuble. Je veux voir le meuble d'un peu plus loin : qu'il occupe toute la largeur de l'écran, et que
+//  "ranger" n'apparaisse que quand on le demande. Je veux tous les meubles de rangement parfaitement dans l'onglet
+//  Stock. » Récit : docs/passation/2026-11-19-stock-etiquetage.md.
 //
-//  CE QUI CHANGE (la forme, le chemin) :
-//    · « Ranger » est une SÉANCE : les articles à ranger arrivent un par un (photo, N°), la case proposée
-//      est dite en grand avec son petit plan ; « Ranger ici » (un toucher) et le suivant arrive. La case
-//      proposée suit la DERNIÈRE place utilisée (le même meuble), jamais imposée : « Autre place » à côté.
-//    · « Où est… » : un N° tapé ou dit montre tout de suite SA place, en grand, sur le plan du meuble.
-//    · « Mes places » : un meuble par rangée ; la toucher ouvre le meuble (ses cases, les photos, les N°).
-//    · « Déplacer » : la même séance, sur une seule paire, avec le choix de la case ouvert.
-//  CE QUI NE CHANGE PAS (les règles, toutes chez l'appelant, src/ecrans/Stock.jsx) : la pose (`poser`, qui
-//  DEMANDE si la case est prise, la gravité des piles), les cases proposées (`casesProposees`, `caseLibreDans`,
-//  src/ouRanger.js), la recherche par IDENTITÉ de N° (`resultats`), la case allumée d'une vendue et sa sortie,
-//  la sortie automatique à l'expédition prouvée. Aucun N° n'est écrit, changé ni deviné ici : ce composant ne
-//  connaît que des clés `cleNum` et appelle les gestes de l'écran.
+//  L'ÉCRAN, de haut en bas :
+//    · « Stock », le champ « Où est… » (un N° tapé ou dit ⇒ SA place, en grand, sur son meuble dessiné) ;
+//    · « À ranger · N » : une rangée par article, « Ranger » au bout — le toucher de la rangée ouvre la séance sur
+//      CET article (plus de fiche à droite) ; balayer ⇒ « Fiche » ;
+//    · Meubles · Articles : Meubles = TOUS les meubles dessinés, chacun sur toute la largeur (côte à côte à
+//      l'ordinateur), lisibles de loin (le N° en grand, jamais de photo) ; un toucher ZOOME sur un meuble (ses cases se
+//      touchent : les gestes d'avant, `toucherCase`). Articles = ceux déjà dans une case, et les blocs d'avant.
+//  LA SÉANCE « RANGER » (une feuille, seulement quand on la demande) : l'article, la case proposée sur le meuble dessiné
+//  en grand ; « Ranger ici » ou le toucher d'une autre case ; l'article VOLE dans sa case (260 ms, courbe iOS ;
+//  mouvement réduit ⇒ fondu seul), la suivante arrive. « Déplacer » = la même séance sur une paire.
+//  CE QUI NE CHANGE PAS (les règles, toutes chez l'appelant, src/ecrans/Stock.jsx) : la pose (`poser`, qui DEMANDE si la
+//  case est prise, la gravité des piles, lire-fusionner-réécrire de `vrm_slots`), les cases proposées (`casesProposees`,
+//  `caseLibreDans`, `premiereCaseLibre`, src/ouRanger.js) — on range un ARTICLE (une annonce), jamais un achat —, la
+//  recherche par IDENTITÉ de N°, la case allumée d'une vendue et sa sortie. Aucun N° n'est écrit, changé ni deviné
+//  ici : ce composant ne connaît que des clés `cleNum` et appelle les gestes de l'écran.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, nombre } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
-import { BoutonV2, BoutonIconeV2 } from '../designV2/BoutonV2.jsx';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
-import LigneGlissable from '../LigneGlissable.jsx';
-import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire — ici, plus dans Aujourd'hui
-import { Etiquette } from '../designV2/Signature.jsx';   // l'étiquette N° kraft partagée du nouveau design
-import { MQ_ORDINATEUR } from '../coque.js';
-import { attrsFicheLigne, ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la rangée ouvre LA fiche
+import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
+import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
+import MeubleDessin from './MeubleDessin.jsx';
+import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
 import DansFiche from '../DansFiche.jsx';
 import './stock-v2.css';
+import './meubles.css';
+import './pont.css';   // sans couche : rend aux pièces natives du Stock ce que dit la couche natif
 
-// Le petit plan d'un meuble : les cases en grille, la case visée pleine. Lecture seule (aucun toucher) ;
-// au-delà de 240 cases, il n'est pas dessiné (la phrase « rangée, colonne » suffit).
-function PetitPlan({ m, viseI, occupee }) {
-  if (!m) return null;
-  const cols = Math.max(1, Number(m.cols) || 1), rows = Math.max(1, Number(m.rows) || 1);
-  if (cols * rows > 240) return null;
-  const cote = Math.max(8, Math.min(22, Math.floor(220 / Math.max(cols, rows * 0.9))));
-  return (
-    <div className="sr-plan" aria-hidden="true" data-sr-plan={String(m.id)} style={{ gridTemplateColumns: `repeat(${cols}, ${cote}px)`, gridAutoRows: `${Math.round(cote * 0.72)}px` }}>
-      {Array.from({ length: cols * rows }).map((_, i) => (
-        <i key={String(m.id) + ':' + i} className={'sr-plan-case' + (i === viseI ? ' is-vise' : (occupee(m.id, i) ? ' is-prise' : ''))} data-sr-plan-vise={i === viseI ? '' : undefined}/>
-      ))}
-    </div>
-  );
-}
-
-// Les lettres de l'étiquette d'un meuble (« Étagère entrée » → « ÉE ») : comme celles écrites au feutre sur un carton.
-// L'ordinateur (la règle de la coque, `MQ_ORDINATEUR`) : deux colonnes, la place à droite.
-function useOrdi() {
-  const q = MQ_ORDINATEUR;   // la règle de la coque (src/coque.js) : aucune largeur n'a deux mises en page
-  const [o, setO] = React.useState(() => { try { return window.matchMedia(q).matches; } catch (_) { return false; } });
-  React.useEffect(() => { let m; try { m = window.matchMedia(q); } catch (_) { return undefined; } const f = () => setO(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
-  return o;
-}
 const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
-const initiales = (nom) => String(nom || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·';
+const DUREE_VOL = 260;          // ms : l'article vole dans sa case (NATIF.md : 200–300 ms)
+const COURBE = 'cubic-bezier(.32, .72, 0, 1)';
+const A_RANGER_MONTRES = 5;     // « À ranger » : les 5 premiers, « Voir les N autres » déplie
+const PAR_PAGE = 60;
 
-function Plaque({ n, grand = false }) {
-  return <span data-sr-plaque={String(n)}><Etiquette num={String(n)} taille={grand ? 'grand' : 'moyen'}/></span>;
-}
-
-// Une photo de paire (fixe, recadrée) ; sans photo, une boîte au trait sur fond uni (jamais une photo inventée).
-function Photo({ f, Photo: P, Icon, taille }) {
-  return (
-    <span className="sr-photo" style={{ width: taille, height: taille }}>
-      {f && f.photo ? <P src={f.photo} loading="lazy" decoding="async" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <Icon name="box" size={Math.round(taille / 3)}/>}
-    </span>
-  );
+// L'ARTICLE QUI VOLE : une copie de sa photo part de la carte de l'article et se pose dans la case visée.
+// Posée sur <body> (une feuille animée a un `transform` : un `position: fixed` dedans serait relatif à elle).
+function voler(depuis, vers, photo) {
+  if (!depuis || !vers || mouvementReduit()) return null;
+  const a = depuis.getBoundingClientRect(), b = vers.getBoundingClientRect();
+  if (!a.width || !b.width) return null;
+  const g = document.createElement('div');
+  g.className = 'sm-vol'; g.setAttribute('data-sm-vol', String(DUREE_VOL)); g.setAttribute('aria-hidden', 'true');
+  g.style.left = a.left + 'px'; g.style.top = a.top + 'px'; g.style.width = a.width + 'px'; g.style.height = a.height + 'px';
+  if (photo) { const im = document.createElement('img'); im.src = photo; im.alt = ''; g.appendChild(im); }
+  document.body.appendChild(g);
+  const dx = (b.left + b.width / 2) - (a.left + a.width / 2), dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  const k = Math.max(0.2, Math.min(1, Math.min(b.width / a.width, b.height / a.height) * 0.9));
+  let anim = null;
+  try {
+    anim = g.animate([{ transform: 'translate(0, 0) scale(1)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(${k})`, opacity: 0.9 }],
+      { duration: DUREE_VOL, easing: COURBE, fill: 'forwards' });
+    anim.onfinish = () => g.remove(); anim.oncancel = () => g.remove();
+  } catch (_) { g.remove(); return null; }
+  setTimeout(() => { if (g.isConnected) g.remove(); }, DUREE_VOL + 200);
+  return anim;
 }
 
 // ── LA SÉANCE « RANGER » (et « Déplacer », la même sur une paire) ─────────────
-function Seance({ s, seance, fermer }) {
-  const { Icon, Feuille, mots } = s;
+function Seance({ s, seance, ouverte, fermer }) {
+  const { Icon, mots } = s;
   const [faits, setFaits] = React.useState([]);          // clés rangées pendant la séance (dans l'ordre)
   const [passes, setPasses] = React.useState([]);        // clés passées (« Plus tard »)
   const [derniere, setDerniere] = React.useState(null);  // le meuble de la dernière pose (la place proposée suit)
-  const [autre, setAutre] = React.useState(!!seance.deplacer);   // le choix d'une autre case, ouvert ou non
   const [meubleChoisi, setMeubleChoisi] = React.useState(null);
   const [enCours, setEnCours] = React.useState(false);
-  const [sortie, setSortie] = React.useState(false);     // le mouvement « fait » (220 ms) avant que la suivante arrive
-  const file = seance.cles;
+  const [sortie, setSortie] = React.useState(false);     // le vol (260 ms) avant que le suivant arrive
+  const refPhoto = React.useRef(null);
+  const refCases = React.useRef(new Map());
+  const file = seance ? seance.cles : [];
   const cle = file.find((k) => !faits.includes(k) && !passes.includes(k)) || null;
   const f = cle ? s.ficheDe(cle) : null;
   const ou = f ? s.ouEst(f) : null;
   const total = file.length;
-  // La case proposée : la première libre du meuble de la dernière pose, sinon la case proposée à cet article.
-  const prop = cle && !seance.deplacer ? s.caseProposee(cle, derniere) : null;
-  const mProp = prop ? s.meubles.find((m) => String(m.id) === String(prop.meubleId)) : null;
-  const mAutre = s.meubles.find((m) => String(m.id) === String(meubleChoisi || (ou && ou.meuble.id) || (prop && prop.meubleId) || (s.meubles[0] && s.meubles[0].id))) || null;
-  React.useEffect(() => { setMeubleChoisi(null); setAutre(!!seance.deplacer || !prop); /* eslint-disable-next-line */ }, [cle]);
-  // Fin de séance : « Tout est rangé » se dit, puis la feuille se referme seule (aucun toucher de plus).
-  React.useEffect(() => { if (cle) return undefined; const t = setTimeout(fermer, 1400); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [cle]);
-  // LE MOUVEMENT INTERRUPTIBLE : pendant les 220 ms où la paire rangée glisse, un toucher (n'importe quel geste de la
-  // séance) fait arriver la suivante TOUT DE SUITE — il ne repose jamais la paire déjà rangée.
+  // La case proposée : la première libre du meuble choisi (onglet), sinon de celui de la dernière pose, sinon la
+  // première libre de tous (src/ouRanger.js). « Déplacer » ne propose rien : il touche la case.
+  const prop = cle && !seance.deplacer ? s.caseProposee(cle, meubleChoisi || derniere) : null;
+  const idAffiche = meubleChoisi || (prop && prop.meubleId) || (ou && ou.meuble.id) || (s.meubles[0] && s.meubles[0].id);
+  const mAffiche = s.meubles.find((m) => String(m.id) === String(idAffiche)) || null;
+  React.useEffect(() => { setMeubleChoisi(null); /* eslint-disable-next-line */ }, [cle]);
+  // Fin de séance : « Tout est rangé » se dit, puis la feuille se referme seule.
+  React.useEffect(() => { if (cle || !seance) return undefined; const t = setTimeout(fermer, 1400); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [cle, seance]);
+  // LE MOUVEMENT INTERRUPTIBLE : pendant le vol, un toucher (n'importe quel geste de la séance) fait arriver le suivant
+  // TOUT DE SUITE — il ne repose jamais l'article déjà rangé.
   const attente = React.useRef(null);
   const finirSortie = () => { const a = attente.current; if (!a) return false; attente.current = null; clearTimeout(a.t); a.fin(); return true; };
   React.useEffect(() => () => { const a = attente.current; if (a) clearTimeout(a.t); }, []);
@@ -103,87 +100,76 @@ function Seance({ s, seance, fermer }) {
     let ok = false;
     try { ok = await s.poser(cle, mid, i, { muet: true }); } finally { setEnCours(false); }
     if (ok === false) return;
-    // LE MOUVEMENT (la signature) : la paire rangée glisse et se replie avec sa coche, le compteur descend d'un cran.
     const k = cle;
-    const fin = () => { setSortie(false); setFaits((x) => (x.includes(k) ? x : [...x, k])); setDerniere(String(mid)); setAutre(false); };
-    if (mouvementReduit()) { fin(); return; }
+    const fin = () => { setSortie(false); setFaits((x) => (x.includes(k) ? x : [...x, k])); setDerniere(String(mid)); setMeubleChoisi(null); };
+    // LE VOL : de la photo de l'article à la case touchée (la case finale, dans une pile, est dite après).
+    const vers = String(mAffiche && mAffiche.id) === String(mid) ? refCases.current.get(Number(i)) : null;
+    const anim = voler(refPhoto.current, vers, f && f.photo);
+    if (!anim) { fin(); return; }
     setSortie(true);
-    attente.current = { fin, t: setTimeout(() => { attente.current = null; fin(); }, 220) };
+    attente.current = { fin, t: setTimeout(() => { attente.current = null; fin(); }, DUREE_VOL) };
   };
-  // L'ARRIVÉE de la suivante : un ressort court (WAAPI : la carte suit, s'annule si une autre arrive avant la fin).
-  const carte = React.useRef(null);
-  React.useLayoutEffect(() => {
-    const el = carte.current; if (!el || !cle || mouvementReduit() || typeof el.animate !== 'function') return undefined;
-    const a = el.animate([{ opacity: 0, transform: 'translateX(28px)' }, { opacity: 1, transform: 'none' }], { duration: 340, easing: 'cubic-bezier(.32, .72, 0, 1)' });
-    return () => { try { a.cancel(); } catch (_) {} };
-  }, [cle]);
   const reste = Math.max(0, total - faits.length);
   // La dernière pose, DITE avec la case finale (relue : dans une pile, l'article a pu descendre).
   const kFait = faits[faits.length - 1] || null; const fFait = kFait ? s.ficheDe(kFait) : null; const ouFait = fFait ? s.ouEst(fFait) : null;
   const fait = ouFait ? tr('sr.fait', { num: String(fFait.numero), ou: s.placeEnMots(ouFait) }) : '';
-  const titre = seance.deplacer ? tr('sr.deplacer.titre') : tr('sr.seance.titre');
+  const titre = seance && seance.deplacer ? tr('sr.deplacer.titre') : tr('sr.seance.titre');
+  const ouMeuble = ou && mAffiche && String(ou.meuble.id) === String(mAffiche.id) ? ou.i : null;
+  const viseIci = prop && mAffiche && String(prop.meubleId) === String(mAffiche.id) ? prop.i : null;
+  const pied = cle && prop && viseIci != null
+    ? <Bouton variante="plein" chargement={enCours} attrs={{ 'data-sr-ranger-ici': '' }} onClick={() => poser(String(prop.meubleId), prop.i)}>{tr('sr.ici.ranger')}</Bouton>
+    : null;
   return (
-    <Feuille onClose={fermer} titre={titre} sousTitre={!seance.deplacer && cle ? <span className="sr-reste" key={reste} data-sr-reste={reste}>{tr('sr.seance.reste', { n: reste, nb: nombre(reste) })}</span> : undefined} maxWidth={520} data-sr-seance={seance.deplacer ? 'deplacer' : 'ranger'} className="sr-feuille">
-      {!cle ? (
-        <div className="sr-fin" role="status" data-sr-fin={String(faits.length)}>
-          <span className="sr-fin-ic" aria-hidden="true"><Icon name="check" size={30}/></span>
-          {fait ? <p className="sr-fait is-fin" data-sr-fait={faits[faits.length - 1]}><span>{fait}</span></p> : null}
-          <p className="sr-fin-titre">{seance.deplacer ? tr('sr.deplacer.fait') : tr('sr.seance.fin', { n: faits.length, mot: faits.length > 1 ? mots.noms : mots.nom })}</p>
+    <Feuille ouverte={ouverte} onFermer={fermer} titre={titre} detente="pleine" pied={pied} className="sr-feuille sm-feuille"
+      attrs={{ 'data-sr-seance': seance && seance.deplacer ? 'deplacer' : 'ranger' }}>
+      {!seance ? null : !cle ? (
+        <div className="sm-fin" role="status" data-sr-fin={String(faits.length)}>
+          <span className="sm-fin-ic" aria-hidden="true"><Icon name="check" size={30}/></span>
+          {fait ? <p className="sm-fait" data-sr-fait={kFait}>{fait}</p> : null}
+          <p className="sm-fin-titre">{seance.deplacer ? tr('sr.deplacer.fait') : tr('sr.seance.fin', { n: faits.length, mot: faits.length > 1 ? mots.noms : mots.nom })}</p>
         </div>
       ) : (
-        <div ref={carte} className={'sr-seance' + (sortie ? ' is-sortie' : '')} data-sr-courant={cle} key={cle}>
-          {fait ? <p className="sr-fait" role="status" data-sr-fait={faits[faits.length - 1]}><Icon name="check" size={16}/><span>{fait}</span></p> : null}
-          <div className="sr-paire">
-            <span className="sr-paire-photo"><Photo f={f} Photo={s.Photo} Icon={Icon} taille={112}/>{sortie ? <span className="sr-coche" aria-hidden="true"><Icon name="check" size={28}/></span> : null}</span>
-            <div className="sr-paire-txt">
-              <Plaque n={f ? f.numero : cle} grand/>
-              <span className="sr-paire-titre">{(f && f.title) || '—'}</span>
-              {ou ? <span className="sr-paire-ou" data-sr-ou-avant="">{tr('sr.deplacer.avant', { ou: s.placeEnMots(ou) })}</span> : null}
-            </div>
+        <div className="sm-seance" data-sr-courant={cle}>
+          {!seance.deplacer && total > 1 ? <p className="sm-reste" key={reste} data-sr-reste={reste}>{tr('sr.seance.reste', { n: reste, nb: nombre(reste) })}</p> : null}
+          {fait ? <p className="sm-fait" role="status" data-sr-fait={kFait}><Icon name="check" size={16}/><span>{fait}</span></p> : null}
+          <div className="sm-article sm-seance-corps" key={cle}>
+            <span className={'sm-article-photo' + (sortie ? ' is-part' : '')} ref={refPhoto}>
+              {f && f.photo ? <img src={f.photo} alt="" decoding="async"/> : <Icon name="box" size={30}/>}
+              {sortie ? <span className="sm-coche sr-coche" aria-hidden="true"><Icon name="check" size={28}/></span> : null}
+            </span>
+            <span className="sm-article-txt">
+              <Plaque numero={f ? f.numero : cle} grand doublon={!!(f && s.estDouble(cle))}/>
+              <span className="sm-article-titre">{(f && f.title) || '—'}</span>
+              {ou ? <span className="sm-article-ou" data-sr-ou-avant="">{tr('sr.deplacer.avant', { ou: s.placeEnMots(ou) })}</span> : null}
+            </span>
           </div>
-          {!autre && prop ? (
-            <div className="sr-ici sr-kraft" data-sr-propose={prop.meubleId + ':' + prop.i} data-sr-propose-suite={derniere && String(derniere) === String(prop.meubleId) ? '' : undefined}>
-              <span className="sr-ici-l">{derniere && String(derniere) === String(prop.meubleId) ? tr('sr.ici.suite') : tr('sr.ici.l')}</span>
-              <span className="sr-ici-meuble">{prop.meuble}</span>
-              <span className="sr-ici-case">{tr('sr.ici.case', { r: nombre(prop.rangee), c: nombre(prop.colonne) })}</span>
-              <PetitPlan m={mProp} viseI={prop.i} occupee={s.occupee}/>
+          {prop && viseIci != null ? (
+            <p className="sm-propose" data-sr-propose={prop.meubleId + ':' + prop.i} data-sr-propose-suite={derniere && String(derniere) === String(prop.meubleId) ? '' : undefined}>
+              <span className="sm-propose-l">{derniere && String(derniere) === String(prop.meubleId) ? tr('sr.ici.suite') : tr('sr.ici.l')}</span>
+              <span className="sm-propose-ou">{prop.meuble} · {tr('sr.ici.case', { r: nombre(prop.rangee), c: nombre(prop.colonne) })}</span>
+            </p>
+          ) : null}
+          {!s.meubles.length ? <p className="sm-sans" data-sr-sans-case="">{tr('sr.ici.aucunMeuble')}</p>
+            : !seance.deplacer && !prop ? <p className="sm-sans" data-sr-sans-case="">{tr('sr.ici.plein')}</p> : null}
+          {s.meubles.length > 1 ? (
+            <div className="sm-onglets" role="tablist" aria-label={tr('sr.choix.meubles')}>
+              {s.meubles.map((m) => (
+                <button key={m.id} type="button" role="tab" className="sm-onglet" aria-selected={!!mAffiche && String(mAffiche.id) === String(m.id)} data-sr-onglet={m.id}
+                  onClick={() => { if (!finirSortie()) setMeubleChoisi(String(m.id)); }}>{m.name}</button>
+              ))}
             </div>
           ) : null}
-          {!autre && !prop ? <p className="sr-sans" data-sr-sans-case="">{s.meubles.length ? tr('sr.ici.plein') : tr('sr.ici.aucunMeuble')}</p> : null}
-          {autre ? (
-            <div className="sr-choix" data-sr-choix="">
-              {s.meubles.length > 1 ? (
-                <div className="sr-meubles" role="tablist" aria-label={tr('sr.choix.meubles')}>
-                  {s.meubles.map((m) => (
-                    <button key={m.id} type="button" role="tab" className="sr-meuble-onglet" aria-selected={mAutre && String(mAutre.id) === String(m.id)} data-sr-onglet={m.id} onClick={() => setMeubleChoisi(String(m.id))}>{m.name}</button>
-                  ))}
-                </div>
-              ) : null}
-              {mAutre ? (
-                <div className="sr-grille-hote">
-                  <div className="sr-grille" style={{ gridTemplateColumns: `repeat(${Math.max(1, Number(mAutre.cols) || 1)}, minmax(44px, 56px))` }} data-sr-grille={mAutre.id}>
-                    {Array.from({ length: (Number(mAutre.cols) || 1) * (Number(mAutre.rows) || 1) }).map((_, i) => {
-                      const occ = s.occupantNum(mAutre.id, i); const p = s.placeCase(i, mAutre);
-                      const ici = ou && String(ou.meuble.id) === String(mAutre.id) && ou.i === i;
-                      return (
-                        <button key={String(mAutre.id) + ':' + i} type="button" className={'sr-case' + (occ ? ' is-prise' : '') + (ici ? ' is-ici' : '')} data-sr-case={mAutre.id + ':' + i} disabled={ici || enCours}
-                          aria-label={occ ? tr('sr.case.prise', { num: occ, r: p.rangee, c: p.colonne }) : tr('sr.case.libre', { r: p.rangee, c: p.colonne })} onClick={() => poser(String(mAutre.id), i)}>
-                          {occ ? <span className="sr-case-n">{occ}</span> : null}
-                        </button>);
-                    })}
-                  </div>
-                </div>
-              ) : <p className="sr-sans">{tr('sr.ici.aucunMeuble')}</p>}
-              <p className="sr-aide">{tr('sr.choix.aide')}</p>
+          {mAffiche ? (
+            <div className="sm-defile" data-sr-grille={mAffiche.id}>
+              <MeubleDessin m={mAffiche} info={(i) => s.caseInfo(mAffiche.id, i)} mode="pres" vise={viseIci} ici={ouMeuble} arrivee={kFait || ''}
+                refCase={(i, el) => { if (el) refCases.current.set(i, el); else refCases.current.delete(i); }}
+                onCase={enCours ? null : (i) => poser(String(mAffiche.id), i)}/>
             </div>
           ) : null}
-          <div className="sr-gestes">
-            {!autre && prop ? <button type="button" className="sr-btn sr-btn-plein" data-sr-ranger-ici="" disabled={enCours} onClick={() => poser(String(prop.meubleId), prop.i)}>{tr('sr.ici.ranger')}</button> : null}
-            <div className="sr-gestes-bas">
-              {!seance.deplacer && (prop || autre) ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-autre="" aria-pressed={autre} onClick={() => { if (!finirSortie()) setAutre((x) => !x); }}>{autre ? (prop ? tr('sr.choix.retour') : tr('sr.choix.fermer')) : tr('sr.choix.autre')}</button> : null}
-              {!seance.deplacer && total > 1 ? <button type="button" className="sr-btn sr-btn-texte" data-sr-passer="" onClick={() => { if (!finirSortie()) setPasses((x) => [...x, cle]); }}>{tr('sr.seance.passer')}</button> : null}
-              {!s.meubles.length ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-creer-meuble="" onClick={() => { fermer(); s.creerMeuble(); }}>{tr('sr.places.ajouter')}</button> : null}
-            </div>
+          {mAffiche ? <p className="sm-aide">{tr('sm.seance.aide')}</p> : null}
+          <div className="sm-gestes-bas">
+            {!seance.deplacer && total > 1 ? <Bouton variante="texte" attrs={{ 'data-sr-passer': '' }} onClick={() => { if (!finirSortie()) setPasses((x) => [...x, cle]); }}>{tr('sr.seance.passer')}</Bouton> : null}
+            {!s.meubles.length ? <Bouton variante="teinte" attrs={{ 'data-sr-creer-meuble': '' }} onClick={() => { fermer(); s.creerMeuble(); }}>{tr('sr.places.ajouter')}</Bouton> : null}
           </div>
         </div>
       )}
@@ -191,111 +177,123 @@ function Seance({ s, seance, fermer }) {
   );
 }
 
-// ── « OÙ EST… » : la réponse d'un N° (une seule paire), en grand ──────────────
+// ── LA PLACE D'UN ARTICLE (« Où est… », le toucher d'une rangée « Dans une case ») ─────
 function Reponse({ s, f, onDeplacer, onRanger, onVoir, sansTete = false }) {
   const { Icon } = s;
   const ou = s.ouEst(f);
   const vendue = s.estVendu(f);
   const k = s.cleDe(f);
   return (
-    <div className="sr-reponse" data-sr-reponse={k} data-sr-reponse-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'}>
-      {sansTete ? null : <div className="sr-reponse-tete">
-        <Photo f={f} Photo={s.Photo} Icon={Icon} taille={72}/>
-        <div className="sr-paire-txt">
-          <Plaque n={f.numero}/>
-          <span className="sr-paire-titre">{f.title || '—'}</span>
-          {vendue ? <span className="sr-vendue" data-sr-vendue="">{tr('sr.reponse.vendue')}</span> : null}
-        </div>
+    <div className="sm-seance" data-sr-reponse={k} data-sr-reponse-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'}>
+      {sansTete ? null : <div className="sm-article">
+        <span className="sm-article-photo">{f.photo ? <img src={f.photo} alt="" loading="lazy" decoding="async"/> : <Icon name="box" size={30}/>}</span>
+        <span className="sm-article-txt">
+          <Plaque numero={f.numero} grand doublon={s.estDouble(k)}/>
+          <span className="sm-article-titre">{f.title || '—'}</span>
+          {vendue ? <span className="sm-article-ou" data-sr-vendue="">{tr('sr.reponse.vendue')}</span> : null}
+        </span>
       </div>}
-      {ou ? (
-        <div className="sr-kraft-anneau"><div className="sr-ici sr-kraft is-reponse" data-sr-etiquette-place="">
-          <span className="sr-ici-meuble" data-sr-reponse-meuble="">{ou.meuble.name}</span>
-          <span className="sr-ici-case">{tr('sr.ici.case', { r: nombre(ou.rangee), c: nombre(ou.colonne) })}</span>
-          <PetitPlan m={ou.meuble} viseI={ou.i} occupee={s.occupee}/>
-        </div></div>
-      ) : <p className="sr-sans" data-sr-reponse-pas-rangee="">{tr('sr.reponse.pasRangee')}</p>}
-      <div className="sr-gestes-bas">
-        {ou ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-voir="" onClick={onVoir}>{tr('sr.reponse.voir')}</button> : null}
-        {ou && !vendue ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-deplacer="" onClick={onDeplacer}>{tr('sr.reponse.deplacer')}</button> : null}
-        {!ou && !vendue && s.peutRanger(k) ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-ranger-maintenant="" onClick={onRanger}>{tr('sr.reponse.ranger')}</button> : null}
+      {ou ? <>
+        <p className="sm-propose" data-sr-etiquette-place="">
+          <span className="sm-propose-l">{tr('sm.reponse.ici')}</span>
+          <span className="sm-propose-ou" data-sr-reponse-meuble="">{ou.meuble.name} · {tr('sr.ici.case', { r: nombre(ou.rangee), c: nombre(ou.colonne) })}</span>
+        </p>
+        <MeubleDessin m={ou.meuble} info={(i) => s.caseInfo(ou.meuble.id, i)} mode="loin" vise={ou.i}/>
+      </> : <p className="sm-sans" data-sr-reponse-pas-rangee="">{tr('sr.reponse.pasRangee')}</p>}
+      <div className="sm-gestes">
+        {!ou && !vendue && s.peutRanger(k) ? <Bouton variante="teinte" attrs={{ 'data-sr-ranger-maintenant': '' }} onClick={onRanger}>{tr('sr.reponse.ranger')}</Bouton> : null}
+        {ou ? <Bouton variante="teinte" attrs={{ 'data-sr-voir': '' }} onClick={onVoir}>{tr('sr.reponse.voir')}</Bouton> : null}
+        {ou && !vendue ? <Bouton variante="teinte" attrs={{ 'data-sr-deplacer': '' }} onClick={onDeplacer}>{tr('sr.reponse.deplacer')}</Bouton> : null}
+        {sansTete ? null : <Bouton variante="texte" attrs={{ 'data-sr-tout-sur': k }} onClick={() => { const n = String(f.numero); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }}>{tr('sr.reponse.fiche')}</Bouton>}
       </div>
     </div>
   );
-}
-
-
-// ── UNE PAIRE DANS LA LISTE : la rangée A du nouveau design (photo 64, titre sur 2 lignes, « N° · T. · place »).
-// Toucher : LA fiche de la paire (19 nov., fiche directe) ; glisser à gauche : « Ranger » ou « Déplacer » (les mêmes gestes que la feuille).
-function LignePaire({ s, l, onOuvrir, onRanger, onDeplacer, actif = false }) {
-  const { Icon } = s;
-  const actions = !l.cle ? [] : [l.ou
-    ? { cle: 'deplacer', libelle: tr('sr.glisse.deplacer'), icone: <Icon name="box" size={20}/>, faire: onDeplacer, data: { 'data-sr-glisse': 'deplacer' } }
-    : { cle: 'ranger', libelle: tr('sr.glisse.ranger'), icone: <Icon name="box" size={20}/>, faire: onRanger, data: { 'data-sr-glisse': 'ranger' } }];
-  const place = l.ou ? s.placeEnMots(l.ou) : '';
-  const corps = (gp, tiroir) => (
-    <div className="v2l v2l-a sr-ligne" data-v2l="A" role="listitem" data-sr-ligne={l.cle || 'sans'} data-sr-ligne-place={l.ou ? `${l.ou.meuble.name}|${l.ou.rangee}|${l.ou.colonne}` : (l.cle ? 'non-range' : 'sans-numero')}
-      aria-label={[l.cle ? 'N°' + l.numero : '', l.titre, place || (l.cle ? tr('sr.ligne.aRanger') : tr('sr.ligne.sansNum'))].filter(Boolean).join(' · ')}
-      aria-current={actif ? 'true' : undefined} data-sr-actif={actif ? '1' : undefined}
-      tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') onOuvrir(l); }} {...(l.cle ? attrsFicheLigne({ contexte: 'stock', site: 'stock', cle: 's' + l.cle, nums: [String(l.numero)], photo: l.photo || '', titre: l.titre || '' }) : {})} {...(gp || {})}>
-      <span className="v2l-photo v2l-photo-a" aria-hidden="true">{l.photo ? <s.Photo src={l.photo} alt="" loading="lazy" decoding="async"/> : <span className="v2l-sans"><Icon name="cintre" size={22}/></span>}</span>
-      <span className="v2l-a-txt">
-        <span className="v2l-a-l1"><span className="v2l-a-titre">{l.titre || '—'}</span></span>
-        <span className="v2l-a-l2">
-          {l.cle ? <Etiquette num={l.numero} double={!!l.double}/> : <span className="sr-sans-num">{tr('sr.ligne.sansNum')}</span>}
-          <span className="v2l-faits-txt">{[l.taille ? tr('v2.l.taille', { t: l.taille }) : '', place].filter(Boolean).join(' · ')}</span>
-          {l.vendue ? <span className="v2l-geste" data-sr-ligne-vendue="">{tr('sr.ligne.vendue')}</span> : null}
-        </span>
-      </span>
-      {tiroir}
-    </div>
-  );
-  if (!actions.length) return corps(null, null);
-  return <LigneGlissable actions={actions} cle={'sr:' + l.cle} libelle={l.titre || 'N°' + l.numero}>{(gp, tiroir) => corps(gp, tiroir)}</LigneGlissable>;
 }
 
 // ── « ⋯ » : ce qui n'est pas compté (chacun avec SON geste) et les outils du Stock. ──
-function FeuillePlus({ s, fermer }) {
-  const { Icon, Feuille } = s;
+function FeuillePlus({ s, ouverte, fermer }) {
+  const { Icon } = s;
   const geste = (f) => () => { fermer(); setTimeout(f, 60); };
   return (
-    <Feuille onClose={fermer} titre={tr('sr.menu.titre')} maxWidth={520} data-sr-plus="" className="sr-feuille">
-      <div className="sr-plus">
-        {s.etats.length ? <>
-          <h3 className="sr-plus-h">{tr('sr.menu.verifier')}</h3>
-          <div className="sr-plus-groupe">
-            {s.etats.map((e) => (
-              <button key={e.k} type="button" className="sr-plus-ligne" data-sr-etat={e.k} onClick={e.faire ? geste(e.faire) : undefined} disabled={!e.faire}>
-                <span className="sr-plus-txt"><b>{e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{e.titre}</b><span>{e.geste}</span></span>
-                {e.faire ? <Icon name="chevron" size={16}/> : null}
-              </button>))}
-          </div>
-        </> : null}
-        <h3 className="sr-plus-h">{tr('sr.menu.outils')}</h3>
-        <div className="sr-plus-groupe">
-          <button type="button" className="sr-plus-ligne" data-stock-recherche-photo="" onClick={geste(s.ouvrirPhoto)}><Icon name="camera" size={20}/><span className="sr-plus-txt"><b>{tr('stock.trouverPhoto')}</b></span></button>
-          <button type="button" className="sr-plus-ligne" data-stock-inventaire-ouvrir="" onClick={geste(s.ouvrirInventaire)}><Icon name="scan" size={20}/><span className="sr-plus-txt"><b>{tr('stock.faireInventaire')}</b></span></button>
-          <button type="button" className="sr-plus-ligne" data-creer-meuble="" onClick={geste(s.creerMeuble)}><Icon name="box" size={20}/><span className="sr-plus-txt"><b>{tr('sr.places.ajouter')}</b></span></button>
-          <button type="button" className="sr-plus-ligne" data-sr-vers-annonces="" onClick={geste(s.versAnnonces)}><Icon name="tag" size={20}/><span className="sr-plus-txt"><b>{tr('sr.menu.annonces')}</b></span></button>
-        </div>
-      </div>
+    <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('sr.menu.titre')} className="sr-feuille" attrs={{ 'data-sr-plus': '' }}>
+      {s.etats.length ? (
+        <Groupe titre={tr('sr.menu.verifier')}>
+          {s.etats.map((e) => <Rangee key={e.k} titre={e.titre} sousTitre={e.geste} sousLignes={2} ton={e.ambre ? 'ambre' : 'neutre'} fin={e.faire ? 'chevron' : null}
+            onClick={e.faire ? geste(e.faire) : null} attrs={{ 'data-sr-etat': e.k }}/>)}
+        </Groupe>) : null}
+      <Groupe titre={tr('sr.menu.outils')}>
+        <Rangee icone={<Icon name="camera" size={22}/>} titre={tr('stock.trouverPhoto')} onClick={geste(s.ouvrirPhoto)} attrs={{ 'data-stock-recherche-photo': '' }}/>
+        <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('stock.faireInventaire')} onClick={geste(s.ouvrirInventaire)} attrs={{ 'data-stock-inventaire-ouvrir': '' }}/>
+        <Rangee icone={<Icon name="box" size={22}/>} titre={tr('sr.places.ajouter')} onClick={geste(s.creerMeuble)} attrs={{ 'data-creer-meuble': '' }}/>
+        <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('sm.menu.etiquetage')} sousTitre={s.etiquetage ? s.etiquetage.resume : ''} fin="chevron" onClick={geste(s.ouvrirEtiquetage)} attrs={{ 'data-sm-vers-etiquetage': '' }}/>
+        <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('sr.menu.annonces')} fin="chevron" onClick={geste(s.versAnnonces)} attrs={{ 'data-sr-vers-annonces': '' }}/>
+      </Groupe>
     </Feuille>
   );
 }
 
+// ── TOUS LES MEUBLES : la vue d'ensemble, puis un meuble zoomé ────────────────
+function Meubles({ s, zoom, setZoom, vise }) {
+  const { Icon } = s;
+  const m = zoom ? s.meubles.find((x) => String(x.id) === String(zoom)) : null;
+  const k = m ? s.meubles.indexOf(m) : -1;
+  if (m) {
+    const c = s.compteMeuble(m);
+    return (
+      <section className="sm-zoom" data-sm-zoom={m.id} data-sr-place={m.id} data-ouvert="1" aria-label={m.name}>
+        <div className="sm-zoom-tete">
+          <Bouton variante="texte" attrs={{ 'data-sm-dezoom': '' }} onClick={() => setZoom(null)}>{tr('sm.tous')}</Bouton>
+        </div>
+        <div>
+          <h2 className="sm-zoom-nom">{m.name}</h2>
+          <p className="sm-zoom-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sm-tuile-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</p>
+        </div>
+        <div className="sm-defile">
+          <MeubleDessin m={m} info={(i) => s.caseInfo(m.id, i)} mode="pres" vise={vise && String(vise.m) === String(m.id) ? vise.i : null} onCase={(i) => s.toucherCase(m.id, i)}/>
+        </div>
+        <p className="sm-aide">{tr('sm.zoom.aide')}</p>
+        <div className="sm-gestes">
+          <Bouton variante="teinte" icone={<Icon name="pencil" size={18}/>} attrs={{ 'data-sr-modifier-meuble': m.id }} onClick={() => s.modifierMeuble(m)}>{tr('sr.place.modifier')}</Bouton>
+          {s.meubles.length > 1 ? <Bouton variante="texte" indisponible={k === 0} raison={k === 0 ? tr('sm.ordre.premier') : ''} attrs={{ 'data-sr-monter': m.id }} onClick={() => s.deplacerMeuble(m.id, -1)}>{tr('sr.place.monter')}</Bouton> : null}
+          {s.meubles.length > 1 ? <Bouton variante="texte" indisponible={k === s.meubles.length - 1} raison={k === s.meubles.length - 1 ? tr('sm.ordre.dernier') : ''} attrs={{ 'data-sr-descendre': m.id }} onClick={() => s.deplacerMeuble(m.id, 1)}>{tr('sr.place.descendre')}</Bouton> : null}
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="sm-tous" data-sr-places={s.meubles.length} data-sm-tous={s.meubles.length}>
+      {s.meubles.length === 0 ? s.blocs.explication : null}
+      {s.meubles.map((x) => { const c = s.compteMeuble(x); return (
+        <button key={x.id} type="button" className="sm-tuile" data-sr-place-ouvrir={x.id} data-sm-tuile={x.id} data-sm-large={Number(x.cols) >= 6 ? '' : undefined} onClick={() => setZoom(String(x.id))}
+          aria-label={`${x.name} · ${tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}${c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}`}>
+          <span className="sm-tuile-tete">
+            <span className="sm-tuile-nom">{x.name}</span>
+            <span className="sm-tuile-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sm-tuile-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</span>
+          </span>
+          <MeubleDessin m={x} info={(i) => s.caseInfo(x.id, i)} mode="loin" vise={vise && String(vise.m) === String(x.id) ? vise.i : null}/>
+        </button>); })}
+      <button type="button" className="sm-tuile sm-tuile-ajout" data-creer-meuble="" onClick={s.creerMeuble}>+ {tr('sr.places.ajouter')}</button>
+    </section>
+  );
+}
+
 export default function StockV2({ s }) {
-  const { Icon, Mic, mots, Feuille } = s;
+  const { Icon, Mic, mots } = s;
   const [seance, setSeance] = React.useState(null);      // { cles: [...], deplacer: bool }
-  const [ouverts, setOuverts] = React.useState(() => new Set());
+  const [seanceOuverte, setSeanceOuverte] = React.useState(false);
   const [choisi, setChoisi] = React.useState(null);      // une clé choisie parmi plusieurs résultats
-  const [vue, setVueEtat] = React.useState(() => { try { return localStorage.getItem('vrm_stock_v2_vue') === 'places' ? 'places' : 'paires'; } catch (_) { return 'paires'; } });
+  const [vue, setVueEtat] = React.useState(() => { try { const v = localStorage.getItem('vrm_stock_v2_vue'); return v === 'paires' || v === 'articles' ? 'articles' : 'meubles'; } catch (_) { return 'meubles'; } });
   const setVue = (v) => { setVueEtat(v); try { localStorage.setItem('vrm_stock_v2_vue', v); } catch (_) {} };
+  const [zoom, setZoom] = React.useState(null);          // le meuble zoomé (son id)
+  const [vise, setVise] = React.useState(null);          // { m, i } : la case montrée (« Voir sur le plan »)
   const [plus, setPlus] = React.useState(false);
-  const [max, setMax] = React.useState(60);
-  const [ordre, setOrdre] = React.useState(null);        // le meuble dont on change l'ordre (Monter / Descendre)
-  const ordi = useOrdi();
+  const [tousARanger, setTousARanger] = React.useState(false);
+  const [max, setMax] = React.useState(PAR_PAGE);
   const aRangerCles = s.aRanger.map(s.cleDe).filter(Boolean);
-  const lancer = (cles, deplacer = false) => { if (cles.length) { setSeance({ cles, deplacer }); } };
+  const lancer = (cles, deplacer = false) => { if (cles.length) { fermerLigne(); setSeance({ cles, deplacer, id: Date.now() }); setSeanceOuverte(true); } };
   const rangerA = (k) => lancer([k, ...aRangerCles.filter((x) => x !== k)]);
+  // La feuille anime sa sortie (300 ms) avant que la séance soit oubliée ; une séance relancée entre-temps reste.
+  const fermerSeance = () => { const id = seance ? seance.id : null; setSeanceOuverte(false); setTimeout(() => setSeance((x) => (x && x.id === id ? null : x)), 320); };
   // Une demande « ranger / déplacer CE N° » (Annonces, la fiche « Déplacer ») : la séance s'ouvre sur lui.
   React.useEffect(() => {
     if (!s.place) return;
@@ -304,82 +302,74 @@ export default function StockV2({ s }) {
     if (f && s.ouEst(f)) lancer([k], true); else rangerA(k);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.place]);
-  const ouvrir = (id) => setOuverts((x) => { const n = new Set(x); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const voir = (f) => { const ou = s.ouEst(f); if (ou) { setVue('places'); setOuverts((x) => new Set([...x, String(ou.meuble.id)])); } s.montrer(f); };
+  // « Voir sur le plan » : Meubles, CE meuble zoomé, SA case qui respire.
+  const voir = (f) => { const ou = s.ouEst(f); if (ou) { setVue('meubles'); setZoom(String(ou.meuble.id)); setVise({ m: String(ou.meuble.id), i: ou.i }); setTimeout(() => setVise(null), 4000); } s.montrer(f); };
   const exact = s.qEstNum ? s.resultats.filter((f) => s.exactNum(f)) : [];
   const un = choisi ? s.resultats.find((f) => s.cleDe(f) === choisi) : (exact.length === 1 ? exact[0] : (s.resultats.length === 1 ? s.resultats[0] : null));
   React.useEffect(() => { setChoisi(null); }, [s.q]);
-  const nPlein = aRangerCles.length;
+  // Le compte du bouton ne bouge pas non plus sous la feuille (il suivait chaque pose : la ligne du titre sautait).
+  const nGel = React.useRef(null);
+  if (seanceOuverte && nGel.current == null) nGel.current = aRangerCles.length;
+  if (!seanceOuverte) nGel.current = null;
+  const nPlein = seanceOuverte && nGel.current != null ? nGel.current : aRangerCles.length;
   const chercheVide = !s.q.trim();
   const lignes = s.lignes;
-  const nonRangees = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
-  // (19 nov., « fiche directe » — Julien : « je dois cliquer sur la paire puis cliquer sur les points ») UN toucher sur la rangée
-  // ouvre LA fiche de la paire (ses `data-fl-*`, src/ficheLigne.js — le toucher est délégué par la coque ; Entrée fait de
-  // même). Sa place (l'étiquette, le petit plan) et ses gestes « Voir », « Déplacer », « Ranger » y sont posés par `DansFiche`
-  // (place « contexte ») : plus de feuille intermédiaire ni de « Tout sur la paire ».
-  const ouvrirFiche = (x) => { if (x.cle) ouvrirLigne(lireLigneDe(x)); };
+  const nonRangeesVives = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
+  // Pendant la séance, la liste « À ranger » de l'écran (sous la feuille) ne bouge pas : elle se met à jour à la fermeture
+  // (rien ne saute derrière la feuille ; mesuré au banc stock-rangement, CLS 0,16 à 1512).
+  const gel = React.useRef(null);
+  if (seanceOuverte && !gel.current) gel.current = nonRangeesVives;
+  if (!seanceOuverte && gel.current) gel.current = null;
+  const nonRangees = seanceOuverte && gel.current ? gel.current : nonRangeesVives;
+  // (19 nov., « fiche directe », lot fiche-directe fusionné) La fiche d'un article est LA fiche de la paire (src/ficheLigne.js) :
+  // sa place (le meuble dessiné, la case qui respire) et ses gestes « Voir », « Déplacer », « Ranger » y sont posés par
+  // `DansFiche` (place « contexte »). « À ranger » garde SON toucher : il range (Julien) ; la fiche y est un balayage.
   const lireLigneDe = (x) => ({ cle: 'stock:stock:s' + x.cle, contexte: 'stock', site: 'stock', nums: [String(x.numero)], item: '', tx: '', suivi: '', photo: x.photo || '', titre: x.titre || '', prix: '', sous: '' });
-  const ligne = (l) => { const f = l.cle ? s.ficheDe(l.cle) : null; return (<React.Fragment key={l.key}>
-    <LignePaire s={s} l={l} onOuvrir={ouvrirFiche} onRanger={() => rangerA(l.cle)} onDeplacer={() => lancer([l.cle], true)}/>
-    {f ? <DansFiche cle={'stock:stock:s' + l.cle} place="contexte" seulementFiche>
-      <Reponse s={s} f={f} sansTete onVoir={() => { fermerLigne(); voir(f); }} onDeplacer={() => { fermerLigne(); lancer([l.cle], true); }} onRanger={() => { fermerLigne(); rangerA(l.cle); }}/>
-    </DansFiche> : null}
-  </React.Fragment>); };
-  let reste = max;
-  const tranche = (arr) => { const a = arr.slice(0, Math.max(0, reste)); reste -= a.length; return a; };
-
-  const placesBloc = (
-    <section className="sr-groupe" data-sr-places={s.meubles.length}>
-      {s.meubles.length === 0 ? s.blocs.explication : null}
-      <div className="sr-liste">
-        {s.meubles.map((m, k) => { const c = s.compteMeuble(m); const ouvert = ouverts.has(String(m.id)) || (s.cherche && c.ici > 0); return (
-          <div key={m.id} className="sr-place" data-sr-place={m.id} data-ouvert={ouvert ? '1' : '0'}>
-            <button type="button" className="sr-rangee" aria-expanded={ouvert} data-sr-place-ouvrir={m.id} onClick={() => ouvrir(String(m.id))}>
-              <span className="sr-place-etiquette sr-kraft" aria-hidden="true" data-sr-place-etiquette={m.id}>{initiales(m.name)}</span>
-              <span className="sr-rangee-txt"><span className="sr-rangee-t">{m.name}</span>
-                <span className="sr-rangee-s">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sr-a-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</span></span>
-              <span className="sr-chevron" aria-hidden="true" data-ouvert={ouvert ? '1' : '0'}><Icon name="chevron" size={16}/></span>
-            </button>
-            {ouvert ? (
-              <div className="sr-place-corps">
-                {/* LA PLACE, sur sa ligne : l'étiquette kraft en grand, son nom ENTIER et ce qu'elle porte ; puis ses gestes NOMMÉS. */}
-                <div className="sr-ici sr-kraft is-place" data-sr-place-grande={m.id}>
-                  <span className="sr-ici-meuble">{m.name}</span>
-                  <span className="sr-ici-case">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}</span>
-                </div>
-                <div className="sr-place-gestes">
-                  <BoutonV2 role="secondaire" icone={<Icon name="pencil" size={18}/>} attrs={{ 'data-sr-modifier-meuble': m.id }} onClick={() => s.modifierMeuble(m)}>{tr('sr.place.modifier')}</BoutonV2>
-                  {s.meubles.length > 1 ? <BoutonV2 role="texte" attrs={{ 'data-sr-ordre': m.id, 'aria-expanded': ordre === String(m.id) }} onClick={() => setOrdre((x) => (x === String(m.id) ? null : String(m.id)))}>{tr('sr.place.ordre')}</BoutonV2> : null}
-                </div>
-                {ordre === String(m.id) ? <div className="sr-place-gestes" data-sr-ordre-gestes="">
-                  <BoutonV2 role="texte" indisponible={k === 0} attrs={{ 'data-sr-monter': m.id }} onClick={() => s.deplacerMeuble(m.id, -1)}>{tr('sr.place.monter')}</BoutonV2>
-                  <BoutonV2 role="texte" indisponible={k === s.meubles.length - 1} attrs={{ 'data-sr-descendre': m.id }} onClick={() => s.deplacerMeuble(m.id, 1)}>{tr('sr.place.descendre')}</BoutonV2>
-                </div> : null}
-                {s.rendreMeuble(m, k)}
-              </div>) : null}
-          </div>); })}
-        <button type="button" className="sr-rangee sr-rangee-ajout" data-creer-meuble="" onClick={s.creerMeuble}>
-          <span className="sr-place-ic is-ajout" aria-hidden="true">+</span>
-          <span className="sr-rangee-txt"><span className="sr-rangee-t is-lien">{tr('sr.places.ajouter')}</span></span>
-        </button>
-      </div>
-    </section>
-  );
+  const ouvrirFiche = (l) => { if (l.cle && s.ficheDe(l.cle)) ouvrirLigne(lireLigneDe(l)); };
+  const dansFiche = (l) => { const f = l.cle ? s.ficheDe(l.cle) : null; return f ? <DansFiche key={'df' + l.key} cle={'stock:stock:s' + l.cle} place="contexte" seulementFiche>
+    <Reponse s={s} f={f} sansTete onVoir={() => { fermerLigne(); voir(f); }} onDeplacer={() => { fermerLigne(); lancer([l.cle], true); }} onRanger={() => { fermerLigne(); rangerA(l.cle); }}/>
+  </DansFiche> : null; };
+  // « À RANGER » : la rangée entière range CET article (Julien : plus de « toucher l'article, puis à droite »).
+  const ligneARanger = (l) => {
+    const peut = s.peutRanger(l.cle);
+    return <Rangee key={l.key} vignette={<Vignette src={l.photo || ''} alt=""/>} titre={l.titre || '—'} lignes={2} plaque={<Plaque numero={l.numero} doublon={!!l.double}/>}
+      sousTitre={l.taille ? tr('v2.l.taille', { t: l.taille }) : ''} fin={peut ? <span className="sm-ranger-fin">{tr('sm.ranger')}</span> : 'chevron'}
+      onClick={() => (peut ? rangerA(l.cle) : ouvrirFiche(l))}
+      actions={[{ cle: 'fiche', libelle: tr('sm.fiche'), ton: 'neutre', onClick: () => ouvrirFiche(l) }]}
+      attrs={{ 'data-sr-ligne': l.cle, 'data-sr-ligne-place': 'non-range', 'data-sm-ranger': peut ? l.cle : undefined, 'aria-label': [tr('sm.rangerNum', { num: String(l.numero) }), l.titre].filter(Boolean).join(' · ') }}/>;
+  };
+  const ligneRangee = (l) => {
+    const place = l.ou ? s.placeEnMots(l.ou) : '';
+    return <Rangee key={l.key} vignette={<Vignette src={l.photo || ''} alt=""/>} titre={l.titre || '—'} lignes={2} plaque={l.cle ? <Plaque numero={l.numero} doublon={!!l.double}/> : null}
+      sousTitre={l.cle ? [l.taille ? tr('v2.l.taille', { t: l.taille }) : '', place].filter(Boolean).join(' · ') : tr('sr.ligne.sansNum')} fin={l.cle ? 'chevron' : null}
+      onClick={l.cle ? () => ouvrirFiche(l) : null}
+      actions={l.cle && l.ou ? [{ cle: 'deplacer', libelle: tr('sr.glisse.deplacer'), onClick: () => lancer([l.cle], true) }] : null}
+      attrs={{ ...(l.cle ? attrsFicheLigne({ contexte: 'stock', site: 'stock', cle: 's' + l.cle, nums: [String(l.numero)], photo: l.photo || '', titre: l.titre || '' }) : {}), 'data-sr-ligne': l.cle || 'sans', 'data-sr-ligne-place': l.ou ? `${l.ou.meuble.name}|${l.ou.rangee}|${l.ou.colonne}` : (l.cle ? 'non-range' : 'sans-numero') }}/>;
+  };
+  const aRangerVus = tousARanger ? nonRangees.slice(0, max) : nonRangees.slice(0, A_RANGER_MONTRES);
+  const rangeesVues = rangees.slice(0, max);
+  const etiq = s.etiquetage;
+  const imprimer = etiq && etiq.support === 'imprimee' && nonRangees.length
+    ? <Bouton variante="texte" attrs={{ 'data-sm-imprimer': nonRangees.length }} onClick={() => s.imprimerEtiquettes(nonRangees.map((l) => ({ num: l.numero, titre: l.titre })))}>{tr('sm.imprimer', { n: nonRangees.length })}</Bouton>
+    : null;
   return (
-    <div className="sr-ecran" data-sr-ecran="" data-sr-vue={vue} data-sr-ordi={ordi ? '1' : undefined}>
+    <div className="sr-ecran sm-ecran" data-sr-ecran="" data-sr-vue={vue} data-sm-vue={zoom && vue === 'meubles' ? 'zoom' : vue}>
       {s.blocs.inventaire}{s.blocs.annuel}
-      {/* La tête : le grand titre et LE geste de l'écran (compact, en haut à droite, comme Annonces). */}
-      <div className="v2-titre-ligne sr-titre-ligne">
-        <h1 className="sr-titre">{tr('nav.garage')}</h1>
-        {nPlein && !seance ? <BoutonV2 role="principal" compact icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
-          onClick={() => lancer(aRangerCles)}>{tr('sr.lancerCourt', { n: nPlein })}</BoutonV2> : null}
+      <div className="sm-tete">
+        <h1 className="sm-titre sr-titre">{tr('nav.garage')}</h1>
+        <span className="sm-tete-gestes">
+        {/* LE geste de l'écran, compact sur la ligne du titre (comme Annonces) : visible au premier écran, même à 375 px
+            en « Très grand », sans repousser la liste ; il reste posé pendant la séance (rien ne bouge sous la feuille). */}
+        {nPlein ? <Bouton variante="teinte" icone={<Icon name="box" size={18}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
+          onClick={() => lancer(aRangerCles)}>{tr('sr.lancerCourt', { n: nPlein })}</Bouton> : null}
+        <BoutonIcone libelle={tr('sr.menu.ouvrir')} icone={<Icon name="more" size={22}/>} onClick={() => setPlus(true)} attrs={{ 'data-sr-plus-ouvrir': '', 'data-sr-etats': s.etats.length || undefined }}/>
+        </span>
       </div>
-      {/* UNE ligne : plateforme · compte (les filtres d'avant, dans sa feuille). */}
       {s.filtres ? <div className="v2-sous-titre sr-sous-titre"><MenuPlateforme id="stock" Icon={Icon} Retour={s.Retour} libelle={s.filtres.libelle} sous={s.filtres.sous}>{s.filtres.corps}</MenuPlateforme></div> : null}
       <ARegler onglet="stock" Icon={Icon}/>
       {s.blocs.horsLigne}
 
-      {/* « Où est… » : le champ (photo et voix dedans) et « ⋯ ». */}
+      {/* « Où est… » : le champ (photo et voix dedans). */}
       <div className="sr-cherche-ligne">
         <div className="sr-cherche" data-sr-recherche="">
           <span className="sr-cherche-ic" aria-hidden="true"><Icon name="search" size={18}/></span>
@@ -390,75 +380,62 @@ export default function StockV2({ s }) {
             : <>{s.dicteeOk ? <Mic nu titre={tr('stock.chercherVoixNumero')} onText={(t) => s.setQ(requeteDeLaVoix(t).requete)}/> : null}
               <button type="button" className="sr-rond is-petit" aria-label={tr('stock.trouverPhoto')} title={tr('stock.trouverPhoto')} data-sr-photo="" onClick={s.ouvrirPhoto}><Icon name="camera" size={20}/></button></>}</span>
         </div>
-        <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('sr.menu.ouvrir')} onClick={() => setPlus(true)} attrs={{ 'data-sr-plus-ouvrir': '', 'data-sr-etats': s.etats.length || undefined }}/>
       </div>
 
       {!chercheVide ? (
-        <div className="sr-resultats" data-stock-resultats={s.resultats.length}>
-          {un ? <Reponse s={s} f={un} onVoir={() => voir(un)} onDeplacer={() => lancer([s.cleDe(un)], true)} onRanger={() => rangerA(s.cleDe(un))}/> : null}
-          {!un && s.resultats.length === 0 ? <p className="sr-vide-l" data-stock-rien="">{s.qEstNum ? tr('sr.cherche.rienNum', { num: s.q.trim() }) : tr('sr.cherche.rien', { q: s.q.trim() })}</p> : null}
+        <div className="sm-bloc" data-stock-resultats={s.resultats.length}>
+          {un ? <Groupe><div className="sm-carte-pad"><Reponse s={s} f={un} onVoir={() => voir(un)} onDeplacer={() => lancer([s.cleDe(un)], true)} onRanger={() => rangerA(s.cleDe(un))}/></div></Groupe> : null}
+          {!un && s.resultats.length === 0 ? <p className="sm-sans" data-stock-rien="">{s.qEstNum ? tr('sr.cherche.rienNum', { num: s.q.trim() }) : tr('sr.cherche.rien', { q: s.q.trim() })}</p> : null}
           {!un && s.resultats.length > 1 ? (
-            <div className="sr-liste">
+            <Groupe>
               {s.resultats.slice(0, 30).map((f) => { const ou = s.ouEst(f); return (
-                <button key={f.id} type="button" className="sr-rangee" data-stock-res={s.cleDe(f)} onClick={() => setChoisi(s.cleDe(f))}>
-                  <Photo f={f} Photo={s.Photo} Icon={Icon} taille={52}/>
-                  <span className="sr-rangee-txt"><span className="sr-rangee-t"><b>N°{f.numero}</b> {f.title || '—'}</span>
-                    <span className="sr-rangee-s">{ou ? s.placeEnMots(ou) : tr('sr.reponse.pasRangee')}</span></span>
-                  <span className="sr-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
-                </button>); })}
-            </div>) : null}
+                <Rangee key={f.id} vignette={<Vignette src={f.photo || ''} alt=""/>} titre={f.title || '—'} lignes={2} plaque={<Plaque numero={f.numero}/>}
+                  sousTitre={ou ? s.placeEnMots(ou) : tr('sr.reponse.pasRangee')} fin="chevron" onClick={() => setChoisi(s.cleDe(f))} attrs={{ 'data-stock-res': s.cleDe(f) }}/>); })}
+            </Groupe>) : null}
         </div>
       ) : null}
       {chercheVide && s.cibles.length ? (
-        <section className="sr-groupe" data-stock-cibles={s.cibles.length}>
-          <h2 className="sr-h2">{tr('stock.allerChercher')}</h2>
-          <div className="sr-liste">
-            {s.cibles.map((k) => { const f = s.ficheDe(k); const ou = f && s.ouEst(f); return (
-              <button key={k} type="button" className="sr-rangee" data-aller-chercher={k} onClick={() => { if (f && ou) voir(f); }}>
-                <Photo f={f} Photo={s.Photo} Icon={Icon} taille={52}/>
-                <span className="sr-rangee-txt"><span className="sr-rangee-t"><b>N°{f ? f.numero : k}</b> {(f && f.title) || ''}</span><span className="sr-rangee-s">{ou ? s.placeEnMots(ou) : tr('sr.reponse.pasRangee')}</span></span>
-              </button>); })}
-          </div>
-          <BoutonV2 role="texte" onClick={() => s.setCibles([])}>{tr('creerVinted.fermer')}</BoutonV2>
-        </section>) : null}
+        <Groupe titre={tr('stock.allerChercher')} action={<Bouton variante="texte" onClick={() => s.setCibles([])}>{tr('creerVinted.fermer')}</Bouton>} attrs={{ 'data-stock-cibles': s.cibles.length }}>
+          {s.cibles.map((k) => { const f = s.ficheDe(k); const ou = f && s.ouEst(f); return (
+            <Rangee key={k} vignette={<Vignette src={(f && f.photo) || ''} alt=""/>} titre={(f && f.title) || ''} plaque={<Plaque numero={f ? f.numero : k}/>}
+              sousTitre={ou ? s.placeEnMots(ou) : tr('sr.reponse.pasRangee')} onClick={() => { if (f && ou) voir(f); }} attrs={{ 'data-aller-chercher': k }}/>); })}
+        </Groupe>) : null}
 
       {chercheVide ? <>
-        {/* Paires · Places : les deux façons de regarder le stock ; leurs nombres sont ceux d'avant (en ligne · meubles). */}
-        <div className="v2-ann-segment sr-segment" data-sr-segment={vue}>
-          <div className="sr-seg" role="tablist" aria-label={tr('sr.seg.label')}>
-            {[{ v: 'paires', l: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? '≥ ' : '') + nombre(s.nombres.enLigne) : null },
-              { v: 'places', l: tr('sr.seg.places'), n: s.meubles.length ? nombre(s.meubles.length) : null }].map((o) => (
-              <button key={o.v} type="button" role="tab" className="sr-seg-btn" aria-selected={vue === o.v} data-sr-seg={o.v} onClick={() => setVue(o.v)}>
-                <span>{o.l}</span>{o.n != null ? <span className="sr-seg-n">{o.n}</span> : null}
-              </button>))}
-          </div>
+        {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
+        {/* Pendant la lecture, le squelette a la FORME de « À ranger » (5 rangées) : la liste arrive à sa place, les meubles
+            ne sautent pas (mesuré au banc stock-rangement : CLS 0,31 quand la liste arrivait sur une ligne de texte). */}
+        {s.nombres.enLigne == null && s.nombres.attente ? <div data-stock-actuelles={s.nombres.etat} aria-busy="true" aria-label={tr('stock.jeLisAnnonces')}><Attente forme="rangees" n={A_RANGER_MONTRES} vignette={56} titre/></div> : null}
+        {s.nombres.enLigne == null && !s.nombres.attente ? <p className="sm-sans" data-stock-actuelles={s.nombres.etat}>{tr('sr.pasLu')}</p> : null}
+        {nonRangees.length ? (
+          <Groupe titre={tr('sm.aRanger', { n: nombre(nonRangees.length) })} action={imprimer} attrs={{ 'data-sr-groupe': 'aranger', 'data-sm-a-ranger': nonRangees.length }}>
+            {aRangerVus.map(ligneARanger)}
+            {aRangerVus.map(dansFiche)}
+          </Groupe>) : null}
+        {nonRangees.length > aRangerVus.length ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sm-a-ranger-tous': '' }} onClick={() => { if (tousARanger) setMax((x) => x + PAR_PAGE); else setTousARanger(true); }}>{tr('sm.voirAutres', { n: nombre(Math.min(tousARanger ? PAR_PAGE : 9999, nonRangees.length - aRangerVus.length)) })}</Bouton></div> : null}
+
+        {/* Meubles · Articles : les deux façons de regarder le stock. */}
+        <div className="sm-bloc" data-sr-segment={vue}>
+          <Segmente libelle={tr('sr.seg.label')} valeur={vue} onChange={(v) => { setVue(v); setZoom(null); }}
+            options={[{ cle: 'meubles', libelle: tr('sm.seg.meubles'), n: s.meubles.length ? nombre(s.meubles.length) : null },
+              { cle: 'articles', libelle: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? '≥ ' : '') + nombre(s.nombres.enLigne) : null }]}/>
         </div>
-        {vue === 'paires' ? <div className={ordi ? 'sr-deux' : undefined}><div className="sr-col">
-          {s.nombres.enLigne == null ? <p className="sr-vide-l" data-stock-actuelles={s.nombres.etat}>{s.nombres.attente ? tr('stock.jeLisAnnonces') : tr('sr.pasLu')}</p> : null}
-          {lignes.length ? (
-            <div className="v2-liste-annonces sr-liste-paires" data-v2-ligne="A" role="list" data-stock-actuelles={s.nombres.etat} data-sr-liste={lignes.length}>
-              {nonRangees.length ? <h3 className="v2-ann-groupe" data-sr-groupe="aranger">{tr('sr.groupe.aRanger')}<span className="v2-ann-groupe-n">{nombre(nonRangees.length)}</span></h3> : null}
-              {tranche(nonRangees).map(ligne)}
-              {rangees.length && reste > 0 ? <h3 className="v2-ann-groupe" data-sr-groupe="rangees">{tr('sr.groupe.rangees')}<span className="v2-ann-groupe-n">{nombre(rangees.length)}</span></h3> : null}
-              {tranche(rangees).map(ligne)}
-            </div>) : null}
-          {lignes.length > max ? <BoutonV2 role="texte" attrs={{ 'data-sr-liste-plus': '' }} onClick={() => setMax((x) => x + 60)}>{tr('sr.liste.plus', { n: nombre(Math.min(60, lignes.length - max)) })}</BoutonV2> : null}
+        {vue === 'meubles' ? <Meubles s={s} zoom={zoom} setZoom={(z) => { setZoom(z); setVise(null); }} vise={vise}/> : <>
+          {rangees.length ? (
+            <Groupe titre={tr('sm.dansCase', { n: nombre(rangees.length) })} attrs={{ 'data-sr-groupe': 'rangees', 'data-sr-liste': lignes.length, 'data-stock-actuelles': s.nombres.etat }}>
+              {rangeesVues.map(ligneRangee)}
+              {rangeesVues.map(dansFiche)}
+            </Groupe>) : null}
+          {rangees.length > max ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sr-liste-plus': '' }} onClick={() => setMax((x) => x + PAR_PAGE)}>{tr('sr.liste.plus', { n: nombre(Math.min(PAR_PAGE, rangees.length - max)) })}</Bouton></div> : null}
           {s.blocs.aFaire}
           {s.blocs.importees}{s.blocs.aPart}{s.blocs.ecartes}
-          </div>
-          {/* Ordinateur : la liste à gauche ; à droite, la place de la paire touchée (son étiquette, son plan), sinon les places. */}
-          {ordi ? <aside className="sr-cote" data-sr-cote="places" aria-label={tr('sr.seg.places')}>
-            {placesBloc}
-          </aside> : null}
-        </div> : <>
-          {placesBloc}
           {s.blocs.plus}
         </>}
       </> : null}
       {s.blocs.modale}
 
-      {plus ? <FeuillePlus s={s} fermer={() => setPlus(false)}/> : null}
-      {seance ? <Seance s={s} seance={seance} fermer={() => setSeance(null)}/> : null}
+      <FeuillePlus s={s} ouverte={plus} fermer={() => setPlus(false)}/>
+      <Seance key={seance ? seance.id : 'aucune'} s={s} seance={seance} ouverte={seanceOuverte && !!seance} fermer={fermerSeance}/>
     </div>
   );
 }

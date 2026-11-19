@@ -3364,6 +3364,8 @@ const SYNC_KEYS = [
   // (7 nov.) « Je numérote moi-même dans mes annonces » (src/numeroEcrit.js) : { actif, depuis }.
   // Allumé, VRM ne donne plus aucun N° tout seul ; il lit celui écrit dans l'annonce.
   'vrm_numero_ecrit',
+  // (19 nov., lot stock-etiquetage) L'étiquette choisie (écrite à la main ou imprimée, son format) : src/etiquetage/methode.js.
+  'vrm_etiquetage',
   // (11 nov.) Les alertes « vérifier avant de publier » qu'il a coupées (« Ne plus me le
   // dire », src/verifAnnonce.js) : { codes, at } — écrit sur SON clic, rallumé dans Paramètres.
   'vrm_verif_coupees',
@@ -24185,10 +24187,13 @@ function ConfigurationDepartApp({ onFin, seule = null }) {
     microOptions: load('vrm_micro_options', null), rythme: load('vinted_urssaf_freq', null), tauxBrut: load('vinted_urssaf_taux', null),
     societeTva: load(CLE_SOCIETE_TVA, null), numeroEcrit: load(CLE_NUMERO_ECRIT, null),
     affichage: load(CLE_AFFICHAGE, null), configuration: load(CLE_CONFIGURATION, null),
+    // (19 nov., lot stock-etiquetage) la série des prochains N°, la lettre des anciens (refusée), l'étiquette.
+    prefixe: load('vrm_num_prefixe', ''), archive: archiveNumeros(), etiquetage: load('vrm_etiquetage', null),
   }), []);
+  // La lettre des N° passe aussi par la copie locale (lue tout de suite par les champs N°, comme Paramètres).
   const ecrire = React.useCallback((liste) => Promise.all((liste || []).map((w) => w.ligne
     ? ecrirePushPrefs(w.valeur, w.avant)
-    : new Promise((res) => save(w.cle, w.valeur, (ok) => res(ok !== false))))).then((r) => r.every(Boolean)), []);
+    : new Promise((res) => { if (w.cle === 'vrm_num_prefixe' && !ecrireCopieLocale(w.cle, w.valeur)) { res(false); return; } save(w.cle, w.valeur, (ok) => res(ok !== false)); if (w.cle === 'vrm_num_prefixe') { try { window.dispatchEvent(new Event('vrm-prefixe')); } catch (_) {} } }))).then((r) => r.every(Boolean)), []);
   // (11 nov., lot DJ2) La question seule « Tu vends quoi ? » : « Plus tard » ⇒ `vu` (rien d'autre).
   const vuSeule = React.useCallback(() => { const w = ecritureVendsVu(load(CLE_JE_VENDS, null)); return w ? ecrire([w]) : Promise.resolve(true); }, [ecrire]);
   const fermer = () => { if (seule) { vuSeule(); onFin && onFin('plusTard'); return; } if (!lireConfiguration(load(CLE_CONFIGURATION, null))) save(CLE_CONFIGURATION, { etat: 'plusTard', at: new Date().toISOString(), statut: null, version: 1 }); onFin && onFin('plusTard'); };
