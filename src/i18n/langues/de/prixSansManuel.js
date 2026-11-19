@@ -38,4 +38,18 @@ export default {
   "prixPartout.issue.change": "Nr. {num} · {site}: nichts gesendet, der Preis ist jetzt {prix}",
   "prixPartout.issue.perimee": "Nr. {num} · {site}: Senkung in 24 Std. nicht gesendet, nichts geändert",
   "prixPartout.issue.refuse": "Nr. {num} · {site}: Senkung abgelehnt, nichts geändert",
+  // (19 nov.) Publier sur Leboncoin : les photos demandées à l'extension (plus de « ouvre l'annonce sur Vinted ») ; les puces des modèles.
+  "lbcPhotos.lecture": "liest… {n} von {total}",
+  "lbcPhotos.enCours": "Fotos werden auf Vinted gelesen…",
+  "lbcPhotos.vide": "Vinted hat die Fotos noch nicht geliefert: VRM versucht es selbst erneut.",
+  "lbcPhotos.attente": "Die Fotos werden gelesen, sobald Vinted mit {compte} offen ist.",
+  "lbcPhotos.attenteSans": "Die Fotos werden gelesen, sobald Vinted mit diesem Konto offen ist.",
+  "lbcPhotos.installer": "Erweiterung installieren",
+  "modeles.inserer": "Einfügen:",
+  "photosFond.aucuneOuAjoute": "Noch kein Foto: VRM liest sie, sobald Vinted mit diesem Konto offen ist. Du kannst sie auch unten hinzufügen.",
+  "photosFond.partielles": "{n} von {total} Fotos gelesen: die anderen kommen, sobald Vinted mit diesem Konto offen ist.",
+  "photosFond.titre": "Noch nicht alle Fotos gelesen: VRM liest sie selbst",
+  "photosFond.noteAucune": "Leboncoin lehnt ein Angebot ohne Foto ab. VRM liest die Fotos selbst, sobald Vinted mit dem Konto des Angebots offen ist.",
+  "photosFond.noteUne": "VRM liest die anderen Fotos selbst, sobald Vinted mit dem Konto des Angebots offen ist.",
+  "prixPartout.etat.format": "VRM kann den Preis dieses Angebots noch nicht ändern: ändere ihn auf {site}",
 };

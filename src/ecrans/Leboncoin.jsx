@@ -187,7 +187,17 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
   const sansSouris = useSansSouris();
   const jobId = 'lbc:' + q.id;
   const job = jobs[jobId] || null;
-  const defauts = React.useMemo(() => defautsFicheLbc(q), [q]);
+  // ⚠️ (19 nov., décision de Julien sur une photo de son Mac : « 0 sur 0 captées (13 sur Vinted) · Pas de photo
+  // (Leboncoin la refuse) : ouvre l'annonce sur Vinted » — « ce genre de fonctionnalité, tu me les enlèves : c'est à
+  // l'extension, c'est pas à moi ») LES PHOTOS QUI MANQUENT SONT DEMANDÉES À L'EXTENSION dès l'ouverture de la fiche
+  // (et au « Publier ») : la commande `photos` qui existe déjà (UNE lecture de la page de CETTE annonce, par son
+  // identifiant, compte de l'onglet seulement, budget de LECTURE, dans la file Vinted — aucun garde-fou touché).
+  // Trois états dits en une ligne : en cours · prêtes · « seront lues dès que Vinted est ouvert sur {compte} »
+  // (l'extension les lit alors seule, en fond : `tickPhotos`, une page par minute). Plus aucune consigne « ouvre
+  // l'annonce ». Ne pas la remettre.
+  const [photosLues, setPhotosLues] = React.useState(null);     // null · les photos relues après la lecture de l'extension
+  const [lecturePh, setLecturePh] = React.useState(null);       // null · 'cherche' · 'fait' · 'attente' · 'vide'
+  const defauts = React.useMemo(() => defautsFicheLbc(photosLues ? { ...q, photosAll: photosLues } : q), [q, photosLues]);
   const [titre, setTitre] = React.useState(defauts.title);
   const [prix, setPrix] = React.useState(defauts.price);
   const [etat, setEtat] = React.useState(defauts.etat);
@@ -197,7 +207,28 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
   const [envoi, setEnvoi] = React.useState(false);
   const [refus, setRefus] = React.useState(null);
   const [aConfirmer, setAConfirmer] = React.useState(false);
-  const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
+  const toutes = photosLues || (Array.isArray(q.photosAll) ? q.photosAll : []);
+  const nVinted = Number.isFinite(Number(q.nReelles)) && Number(q.nReelles) > 0 ? Number(q.nReelles) : null;
+  const photosManquent = toutes.length === 0 || (nVinted != null && toutes.length < nVinted);
+  const lirePhotos = React.useCallback(async () => {
+    if (!q.uid || !/^\d+$/.test(String(q.id))) { setLecturePh('attente'); return false; }
+    if (!vmrExtPresent()) { setLecturePh('attente'); return false; }
+    setLecturePh('cherche');
+    let r = null; try { r = await vmrCmd({ cmd: 'photos', uid: q.uid, id: String(q.id) }, 30000); } catch (_) { r = null; }
+    if (!(r && r.accepte)) { setLecturePh('attente'); return false; }       // autre compte, pause, pas d'onglet : l'extension les lira seule
+    if (r.etape !== 'fait') { setLecturePh('vide'); return false; }         // Vinted n'a pas rendu la page : elle réessaie seule
+    let fx = null; try { fx = await lireFichesPage([q.id]); } catch (_) { fx = null; }
+    const d = fx && fx[String(q.id)];
+    const lues = Array.isArray(d && d.photos) ? d.photos.map((x) => (typeof x === 'string' ? x : (x && (x.url || x.full_size_url)) || '')).filter(Boolean) : [];
+    if (!lues.length) { setLecturePh('vide'); return false; }
+    setPhotosLues(lues);
+    // Sa sélection n'est remplacée que s'il n'y a pas touché (elle était celle d'origine).
+    setPhotos((l) => (l.length === (Array.isArray(q.photosAll) ? Math.min(q.photosAll.length, LBC_PHOTOS_MAX) : 0) && l.every((u, i) => u === q.photosAll[i]) ? lues.slice(0, LBC_PHOTOS_MAX) : l));
+    setLecturePh('fait');
+    return true;
+  }, [q]);
+  const demandeePh = React.useRef(false);
+  React.useEffect(() => { if (photosManquent && !demandeePh.current) { demandeePh.current = true; lirePhotos(); } }, [photosManquent, lirePhotos]);
   const ref = 'VRM-' + q.numero;
   const saisie = { title: titre, description: desc, price: prix, etat, photos };
   const v = valideAnnonceLbc(saisie, { ref, photos: toutes, etat: q.etat });
@@ -224,6 +255,8 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
     saitFiche === 'ok' ? { annonce: v.annonce } : {}, confirme ? { confirme: true } : {}), 30000);
   const publier = async (confirme) => {
     if (envoi || fait) return;
+    // (19 nov.) Sans photo, « Publier » relance d'abord la lecture (une lecture, sur son clic) au lieu de le renvoyer sur Vinted.
+    if (toutes.length === 0 && lecturePh !== 'cherche' && !glob) { const ok = await lirePhotos(); if (!ok) return; setRefus(null); return; }
     if (bloque && !enCours) { setRefus(bloque.texte); return; }
     if (abandonne && !confirme) { setAConfirmer(true); return; }
     // (3 nov.) Vérifier avant de publier : une ligne par problème, « Publier quand même » possible.
@@ -347,7 +380,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         </div>
         {etat && !LBC_ETATS.includes(etat) && <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>« {etat} » n'est pas un libellé de Leboncoin : l'état restera à choisir sur la page.</div>}
 
-        <Etiquette droite={`${photos.length} sur ${toutes.length}${q.nReelles != null && q.nReelles > toutes.length ? ` captées (${q.nReelles} sur Vinted)` : ''}`} err={errDe('photos')}>Photos</Etiquette>
+        <Etiquette droite={lecturePh === 'cherche' ? tr('lbcPhotos.lecture', { n: toutes.length, total: nVinted != null ? nVinted : '…' }) : `${photos.length} sur ${toutes.length}`} err={lecturePh === 'cherche' ? null : errDe('photos')}>Photos</Etiquette>
         <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: -2, marginBottom: 8, lineHeight: 1.4 }}>Touche-les dans l'ordre voulu — la n°1 est la couverture.</div>
         <div data-fiche-photos={photos.length} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
           {toutes.map((u) => {
@@ -364,7 +397,14 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
             );
           })}
         </div>
-        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Pas de photo (Leboncoin la refuse) : ouvre l'annonce sur Vinted.</div>}
+        {/* (19 nov.) UNE ligne, vraie : la lecture est en cours, ou elle partira seule. Jamais « ouvre l'annonce ». */}
+        {photosManquent && lecturePh && lecturePh !== 'fait' && (
+          <div data-fiche-photos-lecture={lecturePh} aria-live="polite" style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginTop: toutes.length ? 8 : 0 }}>
+            {lecturePh === 'cherche' ? tr('lbcPhotos.enCours')
+              : lecturePh === 'vide' ? tr('lbcPhotos.vide')
+              : q.compte ? tr('lbcPhotos.attente', { compte: q.compte }) : tr('lbcPhotos.attenteSans')}
+          </div>
+        )}
 
         <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
         <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescLbc} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: q.numero, taille: q.taille, marque: q.marque }}/>
@@ -398,7 +438,10 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
         )}
 
         <div style={{ position: 'sticky', bottom: 'calc(-18px - env(safe-area-inset-bottom))', background: C.bg, margin: '14px -18px 0', padding: '12px 18px calc(20px + env(safe-area-inset-bottom))', borderTop: `1px solid ${C.border}` }}>
-          {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}</div>}
+          {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}
+            {/* (19 nov.) Un bouton éteint dit QUOI FAIRE : sans extension dans ce navigateur, le geste est de l'installer (ou de la réparer). */}
+            {bloque.code === 'absente' && <> — <a data-fiche-installer="" href="/aide/extension.html" target="_blank" rel="noopener noreferrer" style={{ color: C.accent, fontWeight: 600, display: 'inline-block', padding: '12px 0', margin: '-12px 0' }}>{tr('lbcPhotos.installer')}</a></>}
+          </div>}
           {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version : mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
           {refus && <div data-fiche-refus="" style={{ fontSize: 12, color: C.warn, lineHeight: 1.45, marginBottom: 8, fontWeight: 600 }}>{refus}</div>}
           <button type="button" data-fiche-publier={grise ? 'grise' : etatFiche} onClick={() => publier(false)} aria-disabled={grise || fait ? 'true' : undefined}
@@ -1574,7 +1617,7 @@ function LeboncoinScreen() {
         // corriger — les mêmes entrées que `buildLbcAd` dans l'extension (§11).
         base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
         etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
-        compte: nomCompteDe(o.uid),
+        compte: nomCompteDe(o.uid), uid: o.uid != null ? String(o.uid) : '',
         jumelle: twinDe(o.id),
         // (3 nov.) Le prix d'achat CONNU (fiche du N°, sinon saisie par N°), pour
         // « vérifier avant de publier » — jamais deviné (§2.5).
@@ -2523,7 +2566,7 @@ function LeboncoinScreen() {
                   {(vign.length > 0 || manque > 0) && (
                     <div className="vrm-apub-vignettes">
                       {vign.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />)}
-                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`}>+{manque}</span>}
+                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={tr('photosFond.titre')}>+{manque}</span>}
                     </div>
                   )}
                   {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
@@ -2549,9 +2592,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, là où est l’extension : ses photos arrivent ici au passage.</> })}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>{tr('photosFond.noteAucune')}</> })}
                 {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
-                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois : les photos suivent. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>{tr('photosFond.noteUne')} <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}

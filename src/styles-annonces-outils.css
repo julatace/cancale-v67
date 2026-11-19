@@ -63,6 +63,9 @@
 /* Chips des modèles au-dessus d'une description. */
 .vrm-ao-chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none; }
 .vrm-ao-chips::-webkit-scrollbar { display: none; }
+/* (19 nov.) Ce que sont ces puces : « Insérer : » devant, en légende. */
+.vrm-ao-chips { align-items: center; }
+.vrm-ao-chips-libelle { flex: none; font-size: 13px; line-height: 18px; color: var(--fu-gris, #6e6e73); }
 .vrm-ao-chip {
   flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--fu-piste, #e5e5ea); background: var(--fu-carte, #fff);
   color: var(--fu-encre, #1d1d1f); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;

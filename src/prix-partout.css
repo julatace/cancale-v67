@@ -44,7 +44,7 @@ html[data-theme="dark"] .pp-voile {
 
 /* Le champ : libellé 13 gris, le prix en grand (jamais sous 16 px : pas de zoom d'iOS). */
 .pp-champ { display: block; background: var(--pp-carte); border-radius: 12px; padding: 12px 16px 8px; margin: 4px 0 16px; cursor: text; }
-.pp-champ > span:first-child { display: block; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--pp-encre-2); }
+.pp-champ > span:first-child { display: block; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--pp-encre-2); margin-bottom: 4px; }
 .pp-champ-saisie { display: flex; align-items: baseline; gap: 8px; }
 .pp-champ-saisie input {
   flex: 1; min-width: 0; width: 100%; height: 48px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent; color: var(--pp-encre);
@@ -53,6 +53,10 @@ html[data-theme="dark"] .pp-voile {
 .pp-champ-saisie input[aria-invalid="true"] { color: var(--pp-ambre); }
 .pp-champ-saisie b { flex: none; font-size: 22px; line-height: 28px; font-weight: 600; color: var(--pp-encre-2); }
 .pp-champ:focus-within { box-shadow: inset 0 0 0 2px var(--pp-accent); }
+/* Le foyer se lit sur le CHAMP (l'anneau ci-dessus), pas sur la zone de saisie : l'anneau général des anciens
+   habillages (`:focus-visible`) dessinait une boîte qui mordait sur le libellé. */
+html body .pp-voile .pp-feuille .pp-champ .pp-champ-saisie input[data-prix-champ]:focus,
+html body .pp-voile .pp-feuille .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outline: 0; outline-offset: 0; border: 0; box-shadow: none; background: transparent; }
 
 /* Le groupe : une rangée par site. Case à cocher (44 × 44) · le corps · au plus UN geste texte. */
 .pp-groupe { list-style: none; margin: 0 0 16px; padding: 0; background: var(--pp-carte); border-radius: 12px; overflow: hidden; }

@@ -255,6 +255,14 @@ async function controles({ bg, sources = {} }) {
       dit(at.e.etat === 'attente' && at.deposes.length === 1 && at.deposes[0].site === 'leboncoin', 'D4 Leboncoin pas ouvert ⇒ la baisse attend', at.e);
       const pe = await jouer({ accepte: false, code: 'perime', prixVu: 60, raison: 'le prix a changé' }, { site: sL });
       dit(pe.e.etat === 'refuse' && pe.e.code === 'prix-change' && pe.deposes.length === 0, 'D5 Leboncoin : le prix a changé depuis l’aperçu ⇒ rien ne part, dit', pe.e);
+      // Le « format appris » d'une annonce Vinted : jamais appris ⇒ dit AVANT d'appliquer, aucune commande, aucune attente.
+      if (typeof P.sitesDuNumero === 'function') {
+        const src = { rn: { annonces: [{ id: ID, etat: 'en-ligne', accountId: UID, price: { amount: '59.0' }, title: 'x' }], manques: [], annoncesEbay: [] }, fiches: {}, lbcItems: {}, vcItems: {} };
+        const sans = P.sitesDuNumero('134', src, { formats: { [ID]: false } }).sites[0] || {}, avec = P.sitesDuNumero('134', src, { formats: { [ID]: true } }).sites[0] || {}, passu = P.sitesDuNumero('134', src, { formats: null }).sites[0] || {};
+        const x = await jouer({ accepte: true, etape: 'fait', prixVu: 58 }, { site: sans });
+        dit(sans.mode === 'site' && sans.raison === 'format' && avec.mode === 'ext' && passu.mode === 'ext' && x.e.etat === 'a-faire' && x.appels.length === 0 && x.deposes.length === 0,
+          'D8 annonce Vinted dont le format n’a jamais été appris ⇒ dit avant d’appliquer, AUCUNE commande ni attente ; appris ou pas su ⇒ le geste part', { sans: sans.mode + ':' + sans.raison, avec: avec.mode, passu: passu.mode, e: x.e.etat });
+      }
       const hv = await jouer({ accepte: true, etape: 'fait' }, { site: sV, prix: '130' });
       dit(hv.e.etat === 'hausse' && hv.appels.length === 0, 'D6 hausse Leboncoin / Vestiaire ⇒ aucune commande', hv.e);
       if (typeof P.sitesDuNumero === 'function') {
@@ -477,6 +485,7 @@ const MUT = {
   'ext : sans le rythme': ['bg', "baisserPrixVinted(Object.assign({}, msg, { programme: true }))", 'baisserPrixVinted(Object.assign({}, msg, { programme: false }))'],
   // ── la règle de l'app ──
   'app : Vinted proposé (l’ancien état)': ['src/prixPartout.js', "    if (s.mode === 'ext' && s.prix != null && cible > s.prix) {", "    if (s.mode === 'ext' && s.site === 'vinted') { dire(s.cle, { etat: 'propose', raison: null, prix: cible, avant: s.prix }); continue; }\n    if (s.mode === 'ext' && s.prix != null && cible > s.prix) {"],
+  'app : format jamais appris envoyé': ['src/prixPartout.js', "mode: compteOk && prixLu != null && !sansFormat ? 'ext' : 'site',", "mode: compteOk && prixLu != null ? 'ext' : 'site',"],
   'app : hausse envoyée': ['src/prixPartout.js', "if (s.mode === 'ext' && s.prix != null && cible > s.prix) { dire(s.cle, { etat: 'hausse', raison: null, prix: cible }); continue; }", ''],
   'app : sans le prix vu': ['src/prixPartout.js', "({ cmd: 'baisserPrixVinted', uid: s.compte, id: s.id, prix: p, prixAvant: s.prix, confirme: true })", "({ cmd: 'baisserPrixVinted', uid: s.compte, id: s.id, prix: p, confirme: true })"],
   'app : sans confirmation': ['src/prixPartout.js', "({ cmd: 'baisserPrixVinted', uid: s.compte, id: s.id, prix: p, prixAvant: s.prix, confirme: true })", "({ cmd: 'baisserPrixVinted', uid: s.compte, id: s.id, prix: p, prixAvant: s.prix })"],

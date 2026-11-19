@@ -72,8 +72,13 @@ export const NOM_SITE = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin'
 //   fiches      `vinted_annonce_numeros` (le prix mini `min` par annonce)
 //   lbcItems    `lbc_listings.data.items` (null = pas su)
 //   vcItems     `vc_listings.data.items` (null = pas su)
-//   o           { cleNum, numLbc(ad, id), numVc(id), recettes: { leboncoin, vestiaire } }
+//   o           { cleNum, numLbc(ad, id), numVc(id), recettes: { leboncoin, vestiaire }, formats: { [idVinted]: bool } }
 //               (`recettes` : true apprise · false PAS apprise · null/absent pas su)
+//               (`formats` : l'extension ne baisse un prix Vinted qu'en rejouant le corps que Vinted a ACCEPTÉ pour
+//                CETTE annonce (`vrm_vinted_modele`, appris quand il l'enregistre sur vinted.fr ou que VRM la crée) ;
+//                false = jamais appris ⇒ dit AVANT d'appliquer, aucune commande ; absent = pas su ⇒ on essaie.
+//                ⚠️ MESURÉ le 19 nov. (lecture seule) : 31 annonces en ligne sur 198 ont ce format. C'est LA limite
+//                qui reste — docs/passation/2026-11-19-prix-sans-manuel.md §« Ce qui reste à la main ».)
 // Rend { sites: [...], manques: [...] } — une source non lue est NOMMÉE dans
 // `manques`, jamais prise pour « pas en ligne ».
 export function sitesDuNumero(cle, { rn, fiches, lbcItems, vcItems } = {}, o = {}) {
@@ -91,9 +96,10 @@ export function sitesDuNumero(cle, { rn, fiches, lbcItems, vcItems } = {}, o = {
     // (19 nov.) Vinted : la baisse part par l'extension sur « Appliquer » (mode 'ext'), ou attend.
     const compteOk = a.accountId != null && /^\d+$/.test(String(a.accountId));
     const prixLu = montant(a.price);
+    const sansFormat = !!(o.formats && o.formats[String(a.id)] === false);
     sites.push({ cle: 'vinted:' + a.id, site: 'vinted', id: String(a.id), compte: a.accountId != null ? String(a.accountId) : null,
-      titre: a.title || '', prix: prixLu, mini, mode: compteOk && prixLu != null ? 'ext' : 'site',
-      raison: !compteOk ? 'compte introuvable' : prixLu == null ? 'prix actuel pas lu' : null,
+      titre: a.title || '', prix: prixLu, mini, mode: compteOk && prixLu != null && !sansFormat ? 'ext' : 'site',
+      raison: !compteOk ? 'compte introuvable' : prixLu == null ? 'prix actuel pas lu' : sansFormat ? 'format' : null,
       lien: `https://www.vinted.fr/items/${encodeURIComponent(String(a.id))}` });
   }
   // eBay : les annonces dont le SKU désigne ce N° (`numEbayAnnonce`, déjà appliqué par `toutSurLeNumero`).

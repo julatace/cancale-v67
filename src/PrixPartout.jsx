@@ -20,12 +20,13 @@ import { commandeCourante } from './prixAttente.js';
 import { tr } from './i18n/index.js';
 import './prix-partout.css';
 
-const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(Math.round(n * 100) / 100) ? 0 : 2).replace('.', ',')} €`);
+// « 1 250 € », « 1 199,50 € » : milliers séparés par une espace fine insécable, jamais coupés.
+const eur = (n) => { if (n == null) return '—'; const v = Math.round(n * 100) / 100; const [e, d] = v.toFixed(Number.isInteger(v) ? 0 : 2).split('.'); return `${e.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f')}${d ? ',' + d : ''}\u00a0€`; };
 
 // L'état d'une commande LUE dans sa base (une baisse rangée plus tôt, ou celle de cette feuille relue).
-const etatDeCommande = (v, s) => {
+const etatDeCommande = (v, s, sait) => {
   if (!v) return null;
-  if (v.etat === 'attente') return { etat: 'attente', prix: v.prix, idCmd: v.id, compte: s.compte || null, lue: true };
+  if (v.etat === 'attente') return { etat: 'attente', prix: v.prix, idCmd: v.id, compte: s.compte || null, lue: true, maj: sait === false };
   if (v.etat === 'pris') return { etat: 'pris', prix: v.prix };
   if (v.etat === 'fait') return { etat: 'fait', prix: v.prix, relu: v.relu, prixRelu: v.prixVu };
   if (v.etat === 'perimee') return { etat: 'refuse', code: 'perimee', prix: v.prix };
@@ -47,7 +48,7 @@ function phrase(e, s, compteDe) {
   if (e.etat === 'hausse') return { ton: 'geste', texte: tr('prixPartout.etat.hausse', { site }), lien: true };
   if (e.etat === 'a-faire') {
     const r = String(e.raison || '');
-    const texte = r === 'recette' ? tr('prixPartout.etat.recette', { site }) : r === 'compte introuvable' ? tr('prixPartout.etat.compte', { site })
+    const texte = r === 'recette' ? tr('prixPartout.etat.recette', { site }) : r === 'format' ? tr('prixPartout.etat.format', { site }) : r === 'compte introuvable' ? tr('prixPartout.etat.compte', { site })
       : r === 'prix actuel pas lu' ? tr('prixPartout.etat.prixPasLu', { site }) : /^annonce en [A-Z]{3}$/.test(r) ? tr('prixPartout.etat.devise', { site, devise: r.slice(-3) }) : tr('prixPartout.etat.aFaire', { site });
     return { ton: 'geste', texte, lien: true };
   }
@@ -56,13 +57,15 @@ function phrase(e, s, compteDe) {
     if (e.code === 'perimee' || e.code === 'expiree') return { ton: 'geste', texte: tr('prixPartout.etat.perimee') };
     if (e.code === 'base') return { ton: 'geste', texte: tr('prixPartout.etat.base') };
     if (e.code === 'pas-appris' || e.code === 'pas-rejouable') return { ton: 'geste', texte: tr('prixPartout.etat.recette', { site }), lien: true };
+    // L'extension n'a pas (ou plus) le corps que Vinted a accepté pour cette annonce : une phrase, pas son mode d'emploi.
+    if (e.code === 'modele-absent' || e.code === 'modele-ancien' || e.code === 'coffre-absent') return { ton: 'geste', texte: tr('prixPartout.etat.format', { site }), lien: true };
     return { ton: 'geste', texte: tr('prixPartout.etat.refuse'), raison: e.raison || null, lien: true };
   }
   if (e.etat === 'incertain') return { ton: 'geste', texte: tr('prixPartout.etat.incertain'), raison: e.raison || null, lien: true };
   return null;
 }
 
-export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, attentes = null, compteDe = null, onAnnuler = null, dire = null }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, attentes = null, saitAttendre = true, compteDe = null, onAnnuler = null, dire = null }) {
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -102,9 +105,9 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const etatDe = (s) => {
     const e = etats[s.cle] || null;
     const v = Array.isArray(attentes) ? commandeCourante(attentes, s.cle) : null;
-    if (e && e.etat === 'attente') return v && v.id === e.idCmd && v.etat !== 'attente' ? etatDeCommande(v, s) : e;
+    if (e && e.etat === 'attente') return v && v.id === e.idCmd && v.etat !== 'attente' ? etatDeCommande(v, s, saitAttendre) : e;
     if (e) return e;
-    if (v && !enCours) return etatDeCommande(v, s);
+    if (v && !enCours) return etatDeCommande(v, s, saitAttendre);
     if (s.mode === 'site' && s.raison) return { etat: 'a-faire', raison: s.raison, avant: true };
     return null;
   };

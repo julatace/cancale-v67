@@ -38,4 +38,18 @@ export default {
   "prixPartout.issue.change": "N°{num} · {site} : rien n’est parti, le prix est maintenant {prix}",
   "prixPartout.issue.perimee": "N°{num} · {site} : baisse pas partie en 24 h, rien n’a changé",
   "prixPartout.issue.refuse": "N°{num} · {site} : baisse refusée, rien n’a changé",
+  // (19 nov.) Publier sur Leboncoin : les photos demandées à l'extension (plus de « ouvre l'annonce sur Vinted ») ; les puces des modèles.
+  "lbcPhotos.lecture": "lecture… {n} sur {total}",
+  "lbcPhotos.enCours": "Photos en cours de lecture sur Vinted…",
+  "lbcPhotos.vide": "Vinted n’a pas encore rendu les photos : VRM réessaie tout seul.",
+  "lbcPhotos.attente": "Les photos seront lues dès que Vinted est ouvert sur {compte}.",
+  "lbcPhotos.attenteSans": "Les photos seront lues dès que Vinted est ouvert sur ce compte.",
+  "lbcPhotos.installer": "Installer l’extension",
+  "modeles.inserer": "Insérer :",
+  "photosFond.aucuneOuAjoute": "Pas encore de photo : VRM les lit dès que Vinted est ouvert sur ce compte. Tu peux aussi les ajouter ci-dessous.",
+  "photosFond.partielles": "{n} sur {total} photos lues : les autres arrivent dès que Vinted est ouvert sur ce compte.",
+  "photosFond.titre": "Photos pas encore toutes lues : VRM les lit tout seul",
+  "photosFond.noteAucune": "Leboncoin refuse une annonce sans photo. VRM lit les photos tout seul dès que Vinted est ouvert sur le compte de l’annonce.",
+  "photosFond.noteUne": "VRM lit les autres photos tout seul dès que Vinted est ouvert sur le compte de l’annonce.",
+  "prixPartout.etat.format": "VRM ne sait pas encore changer le prix de cette annonce : change-le sur {site}",
 };

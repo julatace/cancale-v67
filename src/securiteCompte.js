@@ -61,6 +61,7 @@ export const LIBELLES_TYPE = {
   message_envoye: 'Message envoyé',
   // (10 nov., lot G) notés par l'extension 5.337 (`journal_vrm_*`)
   baisse_prix: 'Prix baissé',
+  baisse_prix_attente: 'Baisse de prix en attente',   // (19 nov., ext. 5.409) l'issue d'une baisse rangée : refusée, pas sûre, pas partie en 24 h
   annonce_modifiee: 'Annonce modifiée',
   // (11 nov., extension 5.340) relu chez Vinted après son clic
   vacances_pose: 'Mode vacances · posé',
@@ -80,7 +81,7 @@ const familleType = (t) => (t === 'favori' || t === 'favori_offre' ? 'favoris'
   : t === 'ebay_retrait' || t === 'ebay_action' ? 'ebay'
   : t === 'bordereau_demande' ? 'bordereau'
   : t === 'offre_acceptee' || t === 'offre_refusee' || t === 'offre_faite' || t === 'message_envoye' ? 'offres'
-  : t === 'baisse_prix' || t === 'annonce_modifiee' ? 'prix'
+  : t === 'baisse_prix' || t === 'baisse_prix_attente' || t === 'annonce_modifiee' ? 'prix'
   : t === 'lbc_publication' ? 'leboncoin'
   : /^moderation_/.test(String(t || '')) ? 'moderation' : t);
 

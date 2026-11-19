@@ -19035,7 +19035,7 @@ export function enregistrerSoldeVrm({ fin, site, faites }) {
 }
 export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
-  cleNum, recettes: extra ? extra.recettes : null,
+  cleNum, recettes: extra ? extra.recettes : null, formats: extra ? extra.formats : null,
   numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
@@ -19099,10 +19099,30 @@ try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x
 function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
   const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
+  const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
+  const [formats, setFormats] = useState(null);         // { [idVinted]: true (format appris) | false } · null (pas su)
   const { rn } = rechercheParNumero(num, numData, comptes);
   const ex = extra && extra.num === num ? extra : null;
   const lecture = !numData || !ex;
-  const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(num, rn, ex ? { ...ex, recettes } : { lbcItems: undefined, vcItems: undefined });
+  const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(num, rn, ex ? { ...ex, recettes, formats } : { lbcItems: undefined, vcItems: undefined, formats });
+  // Le « format appris » de chaque annonce Vinted de ce N° (`vrm_vinted_modele`, une date par annonce, jamais le corps : §4.4).
+  const idsVinted = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 12).join(',');
+  useEffect(() => {
+    if (!idsVinted) return undefined;
+    let vivant = true;
+    (async () => {
+      try {
+        const ids = idsVinted.split(',');
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_vinted_modele&select=${ids.map((id, i) => `f${i}:data->"${id}"->>at`).join(',')}`, { headers: sbAuth(), cache: 'no-store' });
+        if (!r.ok) return;
+        const rows = await r.json();
+        if (!vivant || !Array.isArray(rows)) return;
+        const l = rows[0] || {};
+        setFormats(Object.fromEntries(ids.map((id, i) => [id, !!l['f' + i]])));
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  }, [idsVinted]);
   const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
   const cles = sitesVus.filter((x) => x.site !== 'ebay').map((x) => x.cle).join(',');
   const relire = React.useCallback(async () => {
@@ -19112,7 +19132,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   useEffect(() => { relire(); }, [relire]);
   useEffect(() => {
     let vivant = true;
-    if (extSait('prixattente') !== 'ok') lireRelais().catch(() => {});
+    if (extSait('prixattente') !== 'ok') lireRelais().then(() => { if (vivant) setSait(extensionSaitAttendre()); }).catch(() => {});
     (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_prix_recette,vc_prix_recette)&select=id,appris:data->appris`, { headers: sbAuth() });
@@ -19137,7 +19157,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   const libelles = load('vinted_account_labels', {}) || {};
   const compteDe = (uid) => { const a = (comptes || []).find((x) => String(x.vinted_user_id) === String(uid)); return a ? (libelles[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; };
   return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
-    onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
+    onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
     onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
     onAppliquer={async ({ coches, prix, surEtat }) => {
       const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: envoisPrixVrm(String(rn.cle || num)), surEtat, reglage: reglageP });
