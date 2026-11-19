@@ -37,5 +37,6 @@ export const DRAPEAUX = [ { "m": "d1", "a": ".vrm-main", "s": ".vrm-sel-barre" }
  { "m": "d35", "a": "body", "s": ".vrm-rg" },
  { "m": "d36", "a": "body", "s": "[data-pilule]" },
  { "m": "d37", "a": "html", "s": ".vrm-maj" },
- { "m": "d38", "a": ".vrm-main", "s": ">.vrm-paires-selecteur" }
+ { "m": "d38", "a": ".vrm-main", "s": ">.vrm-paires-selecteur" },
+ { "m": "d39", "a": "body", "s": "[data-fiche-paire][data-n-poussee]:not([data-n-volet])" }
 ];

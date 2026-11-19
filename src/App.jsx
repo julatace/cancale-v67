@@ -3472,6 +3472,7 @@ const SYNC_KEYS = [
   'vrm_securite_comptes',
   // (19 nov., lot compte-bloque) SON choix pour un compte bloqué par Vinted (pause / garder / plus tard), écrit sur SON toucher, lu par l'extension 5.409 (src/compteBloque.js).
   'vrm_comptes_bloques',
+  'vrm_numeros_a_ecrire',   // (19 nov.) les N° neufs donnés par VRM, à écrire sur les cartons (Stock), vidés sur SON « C'est écrit »
   'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vinted_offres_nego','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
@@ -16342,6 +16343,44 @@ async function alerteLocale(title, body, vers){
 // double d'une notification du serveur), et la carte de l'extension de CE navigateur (5.382,
 // `numerotes` : un lot « VRM a numéroté » par compte Vinted, identités `id:N°`, une fois).
 // Les mots suivent le profil du vendeur (« paires » / « articles ») : aucune règle n'en dépend.
+// (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
+const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
+let _toastNumeros = null; const _abToastNumeros = new Set();
+function poserToastNumeros(t) { _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
+// Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
+const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
+function ToastNumeros() {
+  const [t, setT] = React.useState(_toastNumeros);
+  const [cache, setCache] = React.useState(false);
+  React.useEffect(() => { _abToastNumeros.add(setT); return () => { _abToastNumeros.delete(setT); }; }, []);
+  // (le même message par le bus de l'app, `vrm:numeros-donnes` { message } : ce que pose aussi un autre appareil relu, et le banc natif-coque)
+  React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
+  React.useEffect(() => {
+    if (!t) return undefined;
+    const voir = () => setCache(recouvrementOuvert());
+    voir();
+    const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
+    return () => mo.disconnect();
+  }, [t]);
+  if (!t || cache) return null;
+  const fin = () => { _toastNumeros = null; setT(null); };
+  return <div data-toast-numeros=""><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+}
+// Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
+function NumerosAEcrire() {
+  const [d, setD] = React.useState(() => load(CLE_A_ECRIRE, null));
+  React.useEffect(() => { const f = () => setD(load(CLE_A_ECRIRE, null)); window.addEventListener('vrm:save', f); window.addEventListener('storage', f); return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', f); }; }, []);
+  const items = d && Array.isArray(d.items) ? d.items : [];
+  if (!items.length) return null;
+  return (
+    <div data-numeros-a-ecrire={items.length} style={{ padding: '8px 0' }}>
+      <Natif.Groupe titre={tr('nn.stock.titre', { n: items.length })} pied={tr('nn.stock.pied')}>
+        <Natif.Rangee titre={listeNumeros(items.map((x) => x.numero))} lignes={2}/>
+        <Natif.Rangee titre={tr('nn.stock.ecrit')} ton="neutre" onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': '' }}/>
+      </Natif.Groupe>
+    </div>
+  );
+}
 function direNouveauxNumeros(liste) {
   try {
     const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim() && x.id != null);
@@ -16350,7 +16389,11 @@ function direNouveauxNumeros(liste) {
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
     // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
-    accompagner('numero.donne', { vars: { n: l.length, mot: titre, numeros: nums } }).fini();
+    // (19 nov., intégration) Plus une pilule posée sur l'écran (elle couvrait la fiche) : un Toast NATIF au-dessus de la barre
+    // d'onglets, une fois, fermable, jamais sur une page poussée ni une feuille ; le détail reste dans Stock (« À écrire sur tes cartons »).
+    poserToastNumeros({ id: Date.now(), message: `${titre} · ${nums}` });
+    try { const d = load(CLE_A_ECRIRE, null); const avant = d && Array.isArray(d.items) ? d.items : []; const vus = new Set(avant.map((x) => String(x.numero)));
+      save(CLE_A_ECRIRE, { v: 1, items: [...avant, ...l.filter((x) => !vus.has(String(x.numero))).map((x) => ({ numero: String(x.numero), id: String(x.id), at: Date.now() }))].slice(-500) }); } catch (_) {}
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
@@ -68178,6 +68221,8 @@ function AppCoeur() {
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
+        <ToastNumeros/>
+        {tab==='garage' ? <NumerosAEcrire/> : null}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
