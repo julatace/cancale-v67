@@ -102,7 +102,9 @@ suivent la même règle (`echeanceJ` : « à vérifier » pour une estimée).
 
 - `node scripts/audit-aujourdhui.cjs` : **46 verts, 0 rouge**.
 - `node scripts/bancs/aujourdhui-natif.cjs` (le vrai écran dans la vraie coque native, 390 zone sûre / 1512 / 1280,
-  clair et sombre, bases capture, volume, vide, attente, plus « À régler ») : **270 verts, 0 rouge**.
+  clair et sombre, bases capture, volume, vide, attente, plus « À régler ») : **270 verts, 0 rouge**. Sous mutation
+  (capture · 390 · clair) : `bande` 2 rouges, `plaque` 1, `passe` 1, `barre` 2 — chacune rougit SA mesure ; `sous`,
+  `plein`, `contraste` pas relancées ce jour (file des bancs saturée, tâche arrêtée au bout de 2 h).
 - `node scripts/bancs/aujourdhui-propre.cjs` (l'APP rendue, bases capture / estimée / volume / vide, 390 / 1512 / 1280,
   clair et sombre) : **160 verts, 0 rouge**.
 - Audits traduction, tdz, variables, studio, composants, icones, violet, rouge-doublon, csp, quoi-de-neuf : verts.
