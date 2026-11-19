@@ -152,6 +152,23 @@ toutes seules en `--n-carte-2`.
 écran peut lire : `useOrdinateur()` (≥ 1024 px) ; ce qu'il obtient sans rien faire : sa `<PagePoussee>` dans le volet de
 détail quand la coque est en `volets="trois"`.
 
+### Dans l'app (livraison 2, 19 nov.) : comment un écran passe en natif
+
+L'app garde sa propre structure (`<main>` qui défile, ses écrans gardés) et pose les PIÈCES de la coque :
+`CoqueRacine` (`defile="ecran"`), `CoqueEcran` (le `<main>`), `TetePage` (la barre de titre + le champ de recherche),
+`ActionsCoque` (Messages + la photo ⇒ « Plus »), `FeuillePlus`, `BarreOnglets`, `BarreLaterale`. Un écran d'AVANT garde
+son titre ; la coque ne pose qu'une barre de titre fine (le titre y apparaît au défilement) et la recherche.
+
+Pour qu'un écran REFAIT ait le grand titre et, à l'ordinateur, trois volets :
+1. il rend `<Page titre={tr('…')} plein={…}>` (sans `actions` de coque : la coque les pose) ;
+2. on ajoute son identifiant d'onglet à `ECRANS_NATIFS` dans `src/App.jsx` (une ligne : `new Set(['ventes'])`).
+La coque dessine alors son grand titre (34, qui se réduit dans la barre), sa `<Page>` n'ajoute que le contenu ; à
+l'ordinateur un volet de détail s'ouvre à droite et sa `<PagePoussee>` s'y pose d'elle-même (`ContexteCoque.voletDetail`).
+
+À ne pas faire : poser une barre d'onglets, un menu, une loupe ou une cloche dans un écran (une seule navigation : les
+5 onglets + « Plus ») ; poser un attribut qui suit l'onglet sur `<html>`, `<body>` ou la racine de la coque (chaque
+changement d'onglet restylerait tout — banc `natif-coque` K8).
+
 ## Icônes
 
 `poserIcone(Icon)` est appelé une fois par l'app : les glyphes internes (chevron, coche, loupe, croix, « ⋯ », scanner,

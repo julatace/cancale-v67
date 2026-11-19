@@ -208,9 +208,6 @@
 
 /* Une seule présentation du logo officiel, sans recadrage ni filtre. */
 .vrm-brand-asset{object-fit:contain!important;filter:none!important;opacity:1;flex-shrink:0;}
-.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#1D1D1F;display:flex;align-items:center;justify-content:center;}
-.vrm-app-shell .vrm-header-logo>img.vrm-logo{width:40px!important;height:40px!important;border-radius:0!important;box-shadow:none!important;}
-.vrm-sidebar-brand img.vrm-logo{border-radius:0!important;box-shadow:none!important;}
 .vrm-brand-auth{background:#1D1D1F;padding:2px;box-sizing:border-box;object-fit:contain!important;}
 /* Le panneau doit rester lisible même lorsque la liste est dézoomée. */
 @media(min-width:1024px){
@@ -331,9 +328,7 @@
 }
 
 /* Perle : fondus limités aux surfaces, jamais aux informations. */
-.vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}
 .vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#AEAEB214,transparent 64%)!important;}
-.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#C7C7CC;}
 .vrm-main :is(.vrm-surface,.vrm-day-card,.vrm-set-carte,.vrm-kpi-ventes-grille){border-color:var(--gestion-line)!important;}
 .vrm-main .vrm-set-carte{background:var(--gestion-surface);}
 .vrm-main .vrm-notice[data-tone=info]>span:first-child{background:var(--gestion-accent)!important;}

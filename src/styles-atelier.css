@@ -1,33 +1,8 @@
 /* Rail compact : reprend les couleurs de la coque existante. */
-.vrm-atelier-rail { padding:24px 12px 18px; overflow:visible; box-sizing:border-box; }
-.vrm-atelier-rail .vrm-sidebar-brand { padding:4px 0 28px; display:flex; justify-content:center; }
-.vrm-rail-platforms { display:flex; flex-direction:column; align-items:center; gap:12px; overflow-y:auto; min-height:0; scrollbar-width:none; }
-.vrm-rail-button { position:relative; display:flex; align-items:center; justify-content:center; width:52px; min-height:48px; flex-shrink:0; padding:8px; border:1px solid transparent; border-radius:12px; background:transparent; color:inherit; cursor:pointer; transition:background .16s,border-color .16s; }
-.vrm-rail-button[aria-current="page"],.vrm-rail-button[data-active],.vrm-rail-button[aria-expanded="true"] { background:#ffffff15; border-color:#ffffff24; color:#fff; }
-.vrm-rail-button[aria-current="page"]::before,.vrm-rail-button[data-active]::before { content:''; position:absolute; left:-6px; height:18px; width:2px; border-radius:2px; background:#D1D1D6; }
-.vrm-rail-button:focus-visible { outline:2px solid #D1D1D6; outline-offset:2px; }
-.vrm-rail-bottom { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:auto; padding-top:24px; }
-@media(hover:hover) and (pointer:fine) {
- .vrm-rail-button:hover { background:#ffffff12; border-color:#ffffff20; }
-}
-@media(prefers-reduced-motion:reduce) { .vrm-rail-button { transition:none; } }
 /* Les mêmes logos monochromes restent lisibles sur le chrome sombre. */
-.vrm-atelier-rail { --vrm-brand-filter:invert(1); }
-
-.vrm-rail-scroll { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
-.vrm-rail-scroll::-webkit-scrollbar { display:none; }
-.vrm-rail-platforms { overflow:visible; }
-.vrm-rail-management-group { display:flex; flex-direction:column; align-items:center; border-top:1px solid #ffffff20; margin-top:20px; padding-top:16px; }
-.vrm-rail-management { display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:8px; }
 @media(min-width:1024px) { .vrm-main .vrm-ebay-sales,.vrm-main .vrm-ebay-offers { max-width:none; } }
 
 /* Tous les accès sont permanents, dans un bandeau plus généreux. */
-.vrm-atelier-rail { padding-inline:20px; }
-.vrm-rail-platforms { gap:7px; }
-.vrm-rail-button { width:64px; min-height:44px; }
-.vrm-rail-management { gap:2px; padding-top:4px; }
-.vrm-rail-management-group { margin-top:14px; padding-top:12px; }
-.vrm-rail-section-label { color:inherit; opacity:.65; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:0 0 6px; }
 .vrm-day-lower { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
 .vrm-day-lower .vrm-day-recent { margin-top:0!important; min-width:0; }
 .vrm-day-stock h3 { font-size:15px; margin:0; font-weight:600; }
@@ -83,28 +58,6 @@
    resserre (≈ 120 px gagnés : tout tient jusqu'à ~650 px), et quand il défile
    quand même, un fondu dit de quel côté il en reste (`data-rail-suite`, posé
    par SideBar, qui ramène aussi l'entrée active dans la vue). */
-@media (min-width: 768px) and (max-height: 800px) {
-  .vrm-atelier-rail { padding-top: 12px; padding-bottom: 10px; }
-  .vrm-atelier-rail .vrm-sidebar-brand { padding: 0 0 10px; gap: 4px; }
-  .vrm-atelier-rail .vrm-sidebar-brand img.vrm-logo { width: 40px !important; height: 40px !important; }
-  .vrm-atelier-rail .vrm-rail-button { min-height: 38px; padding-block: 5px; }
-  .vrm-atelier-rail .vrm-rail-platforms { gap: 2px; }
-  .vrm-atelier-rail .vrm-rail-management { gap: 2px; padding-top: 2px; }
-  .vrm-atelier-rail .vrm-rail-management-group { margin-top: 8px; padding-top: 8px; }
-  .vrm-atelier-rail .vrm-rail-bottom { padding-top: 8px; gap: 4px; }
-}
-.vrm-rail-scroll[data-rail-suite="bas"] {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-          mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-}
-.vrm-rail-scroll[data-rail-suite="haut"] {
-  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - 36px), transparent);
-          mask-image: linear-gradient(to top, #000 calc(100% - 36px), transparent);
-}
-.vrm-rail-scroll[data-rail-suite="les-deux"] {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
-          mask-image: linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
-}
 
 /* (30 oct., Edge) 1024–1279 px : « À faire » passait en 2 colonnes pour 3 tâches,
    et la 3ᵉ laissait une case grise vide à côté d'elle. Deux colonnes franches, et

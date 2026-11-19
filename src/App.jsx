@@ -571,7 +571,7 @@ import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeB
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
-import { onduler, preparerOndulation } from "./design/ondulation.js";
+// (19 nov., « VRM natif ») `design/ondulation.js` n'est plus importé : aucun anneau ne se pose au changement d'onglet.
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -1079,6 +1079,7 @@ import { useGlisserSelection } from './ui/useGlisserSelection.js';
 import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.js';
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+import "./coque-native.css";   // (19 nov., « VRM natif ») le pont : les contrôles des pièces natives ne prennent plus les styles d'avant sans couche (sa place : avant styles-tablette et le studio, audits coque-tablette et studio S3 ; elle gagne par la spécificité, pas par l'ordre)
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
@@ -1119,7 +1120,8 @@ import { AfficheVentes as AfficheVentesV2, RechercheVentes as RechercheVentesV2,
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
-import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
+import * as Natif from "./natif/index.js";   // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
+// (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -17989,6 +17991,8 @@ const Icon = ({ name, size = 24, style }) => {
       style={{verticalAlign:'middle',...(style||{})}}>{d}</svg>
   );
 };
+// (19 nov., « VRM natif ») Les glyphes des composants natifs (chevron, coche, loupe…) sont CES icônes.
+Natif.poserIcone(Icon);
 // ── SAISIE VOCALE (G34) ───────────────────────────────────────────────────────
 // Dictée par le micro du navigateur (Web Speech API), en français, SANS clé ni
 // serveur — c'est ce que le navigateur fait SEUL (§2.9). Le bouton n'apparaît
@@ -20075,19 +20079,6 @@ const _etatActionsSubs = new Set();
 const publierEtatActions = (e) => { ETAT_ACTIONS_VU = e; _etatActionsSubs.forEach((f) => { try { f(); } catch (_) {} }); };
 const useEtatActionsVu = () => React.useSyncExternalStore((f) => { _etatActionsSubs.add(f); return () => _etatActionsSubs.delete(f); }, () => ETAT_ACTIONS_VU);
 const ouvrirEtatActions = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
-// La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
-// (14 nov.) Elle porte le point d'état de la pastille « Actions Vinted » (qui ne tient plus dans la barre) :
-// ambre = un geste à faire, encre = tu peux agir, gris = lecture seule — jamais rouge (§7).
-function BoutonProfilTete() {
-  const uid = (AUTH.user && AUTH.user.id) || '';
-  const etat = useEtatActionsVu();
-  if (!uid) return null;
-  const lib = etat && etat.nom ? `${tr('coque.monProfil')} · ${etat.nom}` : tr('coque.monProfil');
-  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" data-etat-ton={etat ? etat.ton : undefined} aria-haspopup="dialog" aria-label={lib} onClick={ouvrirMenuProfil}>
-    <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
-    {etat ? <span className="vrm-hdr-profil-etat" data-etat-point={etat.ton} aria-hidden="true" style={{ '--etat-point': etat.point }}/> : null}
-  </button>;
-}
 // Le nom de l'entreprise dans l'en-tête : rien quand il est masqué (ou pas encore lu).
 function NomEntrepriseCoque({ entreprise, className }) {
   const uid = (AUTH.user && AUTH.user.id) || '';
@@ -20095,275 +20086,9 @@ function NomEntrepriseCoque({ entreprise, className }) {
   if (MULTI_USER && uid && n.masque !== false) return null;
   return <NomEntreprise entreprise={entreprise} className={className}/>;
 }
-function SideBar({ tab, setTab, entreprise, sites, badges }) {
-  useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
-  const groupes = groupesVisibles(sites, t => !t.tel, true);
-  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label + suffixeBadgeNav(t, badges)} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>{ revenirSurOnglet(); ouvrirEntree(t,setTab); }} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
-  // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
-  // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
-  // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
-  // de l'écran ouvert est ramenée dans la vue à chaque changement.
-  const groupe = g => <section key={g.nom} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.nom}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
-  const zoneRef = React.useRef(null);
-  React.useEffect(() => {
-    const el = zoneRef.current; if (!el) return undefined;
-    const poser = () => {
-      const reste = el.scrollHeight - el.clientHeight;
-      const haut = reste > 1 && el.scrollTop > 1, bas = reste > 1 && el.scrollTop < reste - 1;
-      const v = haut && bas ? 'les-deux' : bas ? 'bas' : haut ? 'haut' : '';
-      if (v) el.setAttribute('data-rail-suite', v); else el.removeAttribute('data-rail-suite');
-    };
-    poser();
-    el.addEventListener('scroll', poser, { passive: true });
-    let ro = null; try { ro = new ResizeObserver(poser); ro.observe(el); } catch (_) {}
-    window.addEventListener('resize', poser);
-    return () => { el.removeEventListener('scroll', poser); window.removeEventListener('resize', poser); try { ro && ro.disconnect(); } catch (_) {} };
-  }, []);
-  // (1er nov., capture de Julien à 1512 × ~1000) « Vestiaire » COUPÉ à moitié
-  // par le filet du pied : une entrée de navigation ne se coupe jamais. Quand la
-  // colonne ne tient pas, ses rangées se RESSERRENT (densité 1 à 4, styles-
-  // finition.css) ; si même serrée elle ne tient pas, c'est TOUTE la colonne qui
-  // défile (pied compris), jamais une ligne coupée par un filet intérieur.
-  // Banc : scripts/bancs/tous-boutons.cjs (« colonne »).
-  const railRef = React.useRef(null);
-  const nEntrees = groupes.reduce((n, g) => n + g.items.length, 0);
-  React.useLayoutEffect(() => {
-    const rail = railRef.current, zone = zoneRef.current; if (!rail || !zone) return undefined;
-    let raf = 0;
-    const ajuster = () => {
-      rail.removeAttribute('data-rail-defile');
-      for (let d = 0; d <= 4; d++) {
-        if (d) rail.setAttribute('data-rail-densite', String(d)); else rail.removeAttribute('data-rail-densite');
-        if (zone.scrollHeight <= zone.clientHeight + 1) return;
-      }
-      rail.setAttribute('data-rail-defile', 'tout');
-    };
-    ajuster();
-    const plusTard = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(ajuster); };
-    window.addEventListener('resize', plusTard);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', plusTard); };
-  }, [nEntrees, badges]);
-  React.useEffect(() => {
-    const el = zoneRef.current; if (!el) return;
-    const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
-    try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
-  }, [tab]);
-  // (9 nov., direction artistique 5) L'INDICATEUR QUI GLISSE : une seule pastille
-  // (`data-nav-indicateur`) posée sous l'entrée de l'écran ouvert, qui glisse
-  // d'une entrée à l'autre (transform, styles-nav-v2.css ; immobile sous
-  // `prefers-reduced-motion`). Purement décoratif (`aria-hidden`) : l'état reste
-  // `aria-current`, et sans mesure (pas d'entrée allumée, entrée hors de la zone
-  // visible) la pastille se cache et l'entrée garde son propre fond.
-  const indRef = React.useRef(null), indPose = React.useRef(false);
-  React.useLayoutEffect(() => {
-    const nav = railRef.current, ind = indRef.current, zone = zoneRef.current; if (!nav || !ind) return undefined;
-    let raf = 0;
-    const placer = (anime) => {
-      const b = nav.querySelector('.vrm-rail-button[aria-current="page"]');
-      const cacher = () => { ind.style.opacity = '0'; nav.removeAttribute('data-indicateur'); };
-      if (!b || !b.getClientRects().length) return cacher();
-      const nr = nav.getBoundingClientRect(), br = b.getBoundingClientRect();
-      if (zone && zone.contains(b)) { const zr = zone.getBoundingClientRect(); if (br.top < zr.top - 1 || br.bottom > zr.bottom + 1) return cacher(); }
-      ind.style.transition = anime && indPose.current ? '' : 'none';
-      ind.style.width = br.width + 'px'; ind.style.height = br.height + 'px';
-      ind.style.transform = `translate3d(${Math.round(br.left - nr.left + nav.scrollLeft)}px, ${Math.round(br.top - nr.top + nav.scrollTop)}px, 0)`;
-      ind.style.opacity = '1'; nav.setAttribute('data-indicateur', '1'); indPose.current = true;
-    };
-    placer(true);
-    const suivre = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => placer(false)); };
-    const cibles = [zone, nav].filter(Boolean);
-    cibles.forEach((c) => c.addEventListener('scroll', suivre, { passive: true }));
-    window.addEventListener('resize', suivre);
-    return () => { cancelAnimationFrame(raf); cibles.forEach((c) => c.removeEventListener('scroll', suivre)); window.removeEventListener('resize', suivre); };
-  }, [tab, nEntrees, badges]);
-  // (9 nov., DA 5) LA CARTE DU COMPTE, au pied : l'initiale, le nom de
-  // l'entreprise s'il est connu (sinon l'e-mail du compte VRM), et l'offre
-  // SEULEMENT si le serveur l'a dite (`reglePlanCourante`, Solo / Pro) — rien
-  // n'est inventé (§5). Floutée en mode stream (`vrm-sensible`).
-  const [, rafraichir] = React.useState(0);
-  React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
-  const mail = String((AUTH.user && AUTH.user.email) || '').trim();
-  const nomCompte = (entreprise && entreprise.nom) || '';
-  const planLu = (reglePlanCourante() || {}).plan;
-  const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
-  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
-  // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
-  // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
-  // (14 nov.) Elle s'allume pour Paramètres ET ses sous-écrans (Organisation…), comme l'ancienne roue
-  // (`entreeActive` → `BAR_GROUPE`) : sans ça, sur Organisation, le rail ne disait plus où l'on est.
-  const uidCompte = (AUTH.user && AUTH.user.id) || '';
-  const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
-  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={(BAR_GROUPE[tab] || tab) === 'settings' ? 'page' : undefined}
-    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
-    <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
-    <span className="vrm-nav-compte-txt">
-      {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
-        : nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
-      {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
-    </span>
-  </button> : null;
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail vrm-rail-verre" data-nav-v2="" data-rail-verre="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
-    <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
-    <div className="vrm-rail-scroll" ref={zoneRef}>
-      {/* (15 nov., refonte-journee — le rail de la maquette ordinateur validée) Ma journée, puis VENDRE (Ventes, Annonces,
-          Messages, E-mails), RANGER (Stock, Achats), COMPTER (Argent) : les MÊMES entrées qu'hier (rien de retiré : une
-          entrée que ce classement ne nomme pas suit dans « Compter »), les mêmes data-nav-entree, les mêmes pastilles. */}
-      {(() => {
-        const entrees = [...NAV_TACHES, ...groupes.filter(g => g.nom !== 'Moi').flatMap(g => g.items)];
-        const pris = new Set();
-        const prendre = (ids) => ids.map(id => entrees.find(t => t.id === id && !pris.has(cleEntree(t)))).filter(Boolean).map(t => { pris.add(cleEntree(t)); return t; });
-        const tete = prendre(['journee']);
-        const R = [groupeNav({ cle: 'vendre', nom: 'vendre', items: prendre(['ventes', 'annonces', 'messages', 'emails']) }), groupeNav({ cle: 'ranger', nom: 'ranger', items: prendre(['garage', 'achats']) })];
-        const compter = prendre(['compta']);
-        const reste = entrees.filter(t => !pris.has(cleEntree(t)));
-        R.push(groupeNav({ cle: 'compter', nom: 'compter', items: [...compter, ...reste] }));
-        return <>
-          <div className="vrm-rail-platforms" data-nav-taches="">{tete.map(bouton)}</div>
-          {R.filter(g => g.items.length).map(groupe)}
-        </>;
-      })()}
-    </div>
-    {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
-        de la colonne : une fenêtre basse fait défiler le reste, jamais
-        Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
-        Le pied est une carte : le compte, puis Communauté et Paramètres. */}
-    {/* Le pied : Paramètres (la maquette validée le remet en entrée ; le menu du profil le garde aussi), le compte,
-        puis Communauté. */}
-    <div className="vrm-rail-pied"><div className="vrm-rail-management vrm-rail-reglages" data-nav-groupe="reglages">{bouton(ONGLET_PARAMETRES)}</div>{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
-  </nav>;
-}
 
-// ── « PLUS » : LA FEUILLE DE TOUT CE QUE LA BARRE NE PORTE PAS (téléphone) ──
-// (31 oct.) Rangée PAR TÂCHE : Vendre · Expédier · Gérer · Argent · Moi (plus
-// de « Plateformes » ici depuis le 31 oct. au soir : ses sections sont dans les
-// sous-onglets des tâches). ⚠️ Elle NE RÉPÈTE PAS la barre du bas (Julien, 21 sept. : « tu mets
-// deux fois Ma journée, Annonces et Ventes ») : Journée, Annonces, Ventes et
-// Colis n'y sont pas. Aucun groupe vide, aucune entrée d'un site sans compte.
-// ⚠️ Sur ordinateur elle n'existe pas : la colonne montre déjà tout.
-// Le bouton de l'en-tête (« Tous les écrans », caché sur téléphone depuis la
-// coque iPhone) ouvre la même feuille, depuis le haut.
-function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, badges = null, ouvert = null, setOuvert = null }) {
-  // (5 nov.) Dans la barre du bas, l'état « ouvert » appartient à la barre
-  // (`ouvert`/`setOuvert`) : toucher un autre onglet referme le panneau.
-  const [openLocal, setOpenLocal] = React.useState(false);
-  const open = typeof setOuvert === 'function' ? !!ouvert : openLocal;
-  const setOpen = typeof setOuvert === 'function' ? setOuvert : setOpenLocal;
-  const declencheur = React.useRef(null);
-  const panneau = React.useRef(null);
-  React.useEffect(() => { setOpen(false); }, [tab]);
-  React.useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => panneau.current?.querySelector('[role="menuitem"]')?.focus());
-    const clavier = e => {
-      if (e.key === 'Escape') { setOpen(false); return; }
-      if (e.key !== 'Tab') return;
-      const boutons = [...(panneau.current?.querySelectorAll('button') || [])];
-      const premier = boutons[0], dernier = boutons[boutons.length - 1];
-      if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); }
-      else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); }
-    };
-    window.addEventListener('keydown', clavier);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('keydown', clavier);
-      declencheur.current?.focus();
-    };
-  }, [open]);
-  useProfilVendeur();   // (8 nov.) Simple / Complet
-  // (13 nov., lot 54) La ligne « Parrainer » : seulement quand le programme est ouvert (lu une fois).
-  const [, majParrain] = React.useState(0);
-  React.useEffect(() => { const off = suivreParrainageOuvert(() => majParrain((n) => n + 1)); lireParrainageOuvert(); return off; }, []);
-  const groupes = groupesVisibles(sites, () => true);
-  const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
-  const pointPlus = !!(badges && badges.messages === true);
-  // (14 nov., n° 61) Le point du ☰ : un écran du menu (hors Paires, que la barre porte) a un geste ou du nouveau.
-  const pointMenu = !bottom && !!badges && groupes.some(g => g.cle !== 'paires' && g.items.some(t => { const v = badges[cleEntree(t)]; return v === true || (typeof v === 'number' && v > 0); }));
-  const rangee = (t) => {
-    const on = entreeActive(t, tab);
-    return (
-      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-sheet-row" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
-        <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
-        <span className="vrm-sheet-lib">{t.label}</span>
-        <BadgeNav t={t} badges={badges} place="feuille"/>
-        <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
-      </button>
-    );
-  };
-  // (5 nov., barre iPhone revue) LA 5ᵉ PLACE DIT OÙ L'ON EST. Sur un écran
-  // rangé dans « Plus » (Statistiques, Stock, Paramètres…), elle montre CET
-  // écran — son icône, son nom court — au lieu d'un « Plus » allumé qui ne
-  // disait rien. Le toucher ouvre toujours le panneau. Hors de « Plus » (et
-  // pour un écran qui n'y est pas), elle reste « Plus ».
-  const courant = bottom && !dansBarre ? (PLUS_TABS.find(t => entreeActive(t, tab)) || null) : null;
-  const tuile = (t) => {
-    const on = entreeActive(t, tab);
-    return (
-      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-plus-tuile" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
-        <span className="vrm-plus-ic" aria-hidden="true"><NavigationIcon item={t} size={22}/><BadgeNav t={t} badges={badges} place="tuile"/></span>
-        <span className="vrm-sheet-lib">{t.label}</span>
-      </button>
-    );
-  };
-  if (bottom) return (
-    <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label={courant && (courant.court || courant.label) !== tr('nav.plus') ? `${tr('nav.plus')} · ${courant.court || courant.label}` : tr('nav.plus')} aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
-        <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
-        {(() => { const lib = courant ? (courant.court || courant.label) : tr('nav.plus'); return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
-      </button>
-      {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
-          la barre — la barre reste visible et touchable, rien n'est caché sous
-          la zone sûre ; tout tient sans défiler, même sur un iPhone SE. Il se
-          ferme au geste « retour » (FermeAuRetour : le retour ne quitte plus
-          VRM), en touchant « Plus » ou à côté, par Échap. */}
-      {open && (
-        <div data-noswipe className="vrm-sheet-voile vrm-plus-voile" onClick={()=>setOpen(false)}>
-          <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
-            <div className="vrm-plus-grille">
-              {groupes.map(g => (
-                <div className="vrm-plus-groupe" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>{g.items.map(tuile)}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-  return (
-    <>
-      {/* (14 nov., n° 61 — Julien : « un menu qui s'ouvre en haut avec le reste des onglets ») Le bouton ☰ revient
-          dans l'en-tête du téléphone, à gauche, au pouce : il porte un POINT quand un écran du menu a un geste
-          (Messages non lus, un nombre ambre) — le nombre lui-même est dans le menu, une seule fois. */}
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn vrm-hdr-menu" data-menu-ecrans="" aria-label={pointMenu ? `${tr('coque.tousLesEcrans')} · ${tr('coque.nouveau')}` : tr('coque.tousLesEcrans')} aria-haspopup="menu" aria-expanded={open}>
-        <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/>{pointMenu ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="menu" data-badge-n="point" aria-hidden="true"/> : null}</span>
-      </button>
-      {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
-          l'en-tête (sticky, z-index 50), elle restait SOUS la barre du bas
-          (z-index 60) en paysage et sur iPad. Banc `feuilles-coque.cjs`. */}
-      {open && createPortal(
-        <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
-          <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
-            <div className="vrm-sheet-tete">
-              <span className="vrm-sheet-titre">{tr('coque.tonEspace')}</span>
-              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label={tr('coque.fermerMenu')} onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
-            </div>
-            {/* (14 nov., n° 61) Les tâches sont toutes dans la barre du bas (Aujourd'hui · Paires · Ventes · Argent) :
-                le menu ne les répète pas (Julien, 21 sept.) ; il porte TOUT le reste, groupé. */}
-            {groupes.map(g => (
-              <div className="vrm-menu-group vrm-sheet-groupe" key={g.nom} data-nav-groupe={g.nom}>
-                <div className="vrm-sheet-label">{g.titre}</div>
-                <div className="vrm-sheet-carte">{g.items.map(rangee)}</div>
-              </div>
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
+// (19 nov., « VRM natif ») Le menu ☰ « Tous les écrans » (`MenuEcrans`), le rail `SideBar` et la photo de l'en-tête
+// (`BoutonProfilTete`) sont retirés : « Plus » (FeuillePlus) et la barre latérale native les remplacent (git log pour l'ancien).
 
 // Retrouver sa position après un passage dans un autre écran.
 function MemoireDefilement({ ecran }) {
@@ -20490,12 +20215,94 @@ function LigneVenteV2({ tx, o, photo, titre, num, prix, sous, l3, serie, gestes 
 function CacheSiV2({ si, children }) {
   return si ? <div className="v2-cache" hidden style={{ display: 'none' }}>{children}</div> : children;
 }
+// ⚠️⚠️ (19 nov., « VRM natif », docs/design/NATIF.md §2) LA COQUE NATIVE. Trois pièces, dessinées par src/natif/ :
+//   · `LateraleNative` (ordinateur) : la barre latérale — les 5 onglets, puis les écrans de « Plus » ;
+//   · `TeteNative` : la barre de titre (à droite DEUX icônes : Messages avec pastille, la photo du profil ⇒ « Plus »),
+//     le grand titre pour un écran natif, la recherche (le champ, avec le scanner DEDANS) ;
+//   · `BottomBar` (téléphone) : la barre d'onglets.
+// UNE seule navigation (audit d'utilité du 19 nov., décision 9) : le menu ☰ « Tous les écrans » n'est plus rendu ;
+// tout ce qu'il portait est dans « Plus ». Rien n'est perdu (§4.11) : la cloche est la rangée « Notifications », l'état
+// des actions, la synchronisation, « Cacher les montants », le mode stream et « Mon profil » sont des rangées de « Plus ».
+// ⚠️ UN ÉCRAN REFAIT EN NATIF (il rend sa propre `<Page titre=…>`) ajoute son identifiant ici : la coque dessine alors
+// SON grand titre (34/41, qui se réduit dans la barre) et sa `<Page>` n'ajoute que le contenu et le bouton plein.
+const ECRANS_NATIFS = new Set([]);
+const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: null });
+const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
+const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
+const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
+  onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
+const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null }) {
+  useProfilVendeur(); useEcransVusTick();
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const mail = String((AUTH.user && AUTH.user.email) || '').trim();
+  const nomCompte = (entreprise && entreprise.nom) || '';
+  const nomCoque = useNomCoque({ owner: uid, headers: enTeteSession, nom: nomCompte, email: mail });
+  const actif = BAR_GROUPE[tab] || tab;
+  const parrainage = groupesVisibles(sites, () => true, true).some((g) => g.items.some((t) => t.id === 'parrainage'));
+  const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges);
+  const groupes = [
+    { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
+    { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
+    { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
+      // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
+      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
+      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
+      e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
+  ];
+  const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
+  return (
+    <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }}
+      tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
+      pied={uid ? (<>
+        {boiteOutils}
+        <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" title={tr('coque.monProfil')}
+          aria-label={`${nomCoque.texte} — ${tr('coque.ouvrirProfil')}`} onClick={() => ouvrirMenuProfil()}>
+          <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span></span>
+        </button>
+      </>) : boiteOutils}/>
+  );
+}
+function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, ouvrirRecherche, scanner, streamVisible = false, etats = null, gestesLoupe = null }) {
+  useProfilVendeur(); useEcransVusTick();
+  const [plus, setPlus] = React.useState(false);
+  const montants = useMontantsCaches();
+  const stream = useStream();
+  const etat = useEtatActionsVu();
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const natif = ECRANS_NATIFS.has(tab);
+  React.useEffect(() => { setPlus(false); }, [tab]);
+  const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges, 22);
+  const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
+  const groupes = plus ? [
+    { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
+    { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={22}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
+      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} } },
+      e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
+    { entrees: [uid ? { cle: 'profil', libelle: tr('coque.monProfil'), icone: <Icon name="users" size={22}/>, onChoisir: () => ouvrirMenuProfil(), attrs: { 'data-profil-tete': '' } } : null,
+      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
+      { cle: 'montants', libelle: tr('coque.cacherMontants'), icone: <Icon name="eyeOff" size={22}/>, interrupteur: { actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } } },
+      streamVisible || stream ? { cle: 'stream', libelle: tr('natif.plus.stream'), icone: <Icon name="stream" size={22}/>, interrupteur: { actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } } } : null].filter(Boolean) },
+  ] : [];
+  const actions = ordi ? null : (
+    <Natif.ActionsCoque plusOuvert={plus} onPlus={() => setPlus(true)} pointPlus={!!(etat && etat.ton === 'ambre')}
+      messages={{ n: nonLus > 0 ? nonLus : undefined, libelle: tr('nav.messages'), libellePastille: nonLus > 0 ? `${tr('nav.messages')} · ${nonLus}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
+      avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
+  );
+  return (
+    <>
+      <Natif.TetePage titre={titre} grandTitre={natif} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
+        recherche={ordi || rechercheOuverte ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
+      {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
+    </>
+  );
+}
 function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
-  // (17 nov.) Le style de la barre : après la lecture du nuage, la valeur rangée ailleurs reprend le défaut (src/designV2/barre.js).
-  React.useEffect(()=>onCloudReady(()=>reprendreBarre()),[]);
+  // (19 nov., « VRM natif ») Le style de la barre « Studio » (src/designV2/barre.*) ne se pose plus : la barre est native.
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
   const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
@@ -20513,8 +20320,8 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
-  const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
-  React.useEffect(()=>{ preparerOndulation(); },[]);   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+  // (19 nov., « VRM natif ») Plus d'ondulation au changement d'espace : un toucher ne pose plus rien hors de la barre.
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
   const tabMontre=(vise&&enCours)?vise:tab;
   const navRef=React.useRef(null);
@@ -20579,41 +20386,22 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
     window.addEventListener('focusout',onOut);
     return ()=>{ window.removeEventListener('focusin',onIn); window.removeEventListener('focusout',onOut); };
   },[]);
+  // ⚠️⚠️ (19 nov., décision de Julien — « VRM natif », docs/design/NATIF.md §2) LA BARRE D'ONGLETS NATIVE : 5 onglets de
+  // même largeur, icône + libellé, l'actif à l'accent : Aujourd'hui · Annonces · Ventes · Achats · Argent. Le dessin est
+  // `BarreOnglets` (src/natif/) ; la logique reste celle d'avant (l'onglet touché s'allume tout de suite, l'écran se calcule
+  // en tâche interruptible, un écran gardé revient tel quel, l'onglet allumé retouché remonte en haut, cachée au clavier).
+  // « Annonces » ouvre Annonces (le Stock est dans « Plus », par la photo du profil). Plus d'ondulation, plus de pastille qui glisse.
+  const ORDRE_NATIF=['journee',ID_PAIRES,'ventes','achats','compta'];
+  const groupeMontre=tabMontre==='garage'?'':groupeBarre(tabMontre,BAR_GROUPE);
+  const ongletsNatifs=ORDRE_NATIF.map(id=>BOTTOM_TABS.find(t=>t.id===id)).filter(Boolean).map(t=>{
+    const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0;
+    return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?`${n} à faire`:'', attrs:{ 'data-nav-entree':t.id } }; });
+  const choisirNatif=(id)=>{ setPlusOuvert(false);
+    const cible=id===ID_PAIRES?'annonces':id;
+    if(!vise&&(id===ID_PAIRES?tab==='annonces':groupeBarre(tab,BAR_GROUPE)===id)) remonterEnHaut(); else { revenirSurOnglet(); allerA(cible); } };
   return (
-    <>
-    {/* ⚠️ COQUE APP-SHELL (28 sept.) : la barre n'est PAS `position:fixed`.
-       Elle est un frère de `<main>` dans une colonne flex bornée à l'écran, et
-       c'est `<main>` qui défile — elle ne peut donc pas « flotter au milieu de
-       l'écran » pendant l'inertie iOS. Masquée au clavier par `display:none`.
-       (16 oct.) BARRE D'ONGLETS NATIVE : icônes fines, libellé 11 px, l'onglet
-       actif prend la teinte d'accent — plus de pastille bleue pleine (§7 : une
-       seule couleur, rare). Fond en verre, filet fin. Tout le dessin vit dans
-       `.vrm-tabbar` (styles-coque.css) : ici seulement la structure. */}
-    <nav ref={navRef} className="vrm-mobile-nav vrm-tabbar" data-en-cours={enCours?'1':undefined} data-plus-ouvert={plusOuvert?'1':'0'} aria-label={tr('coque.navigationPrincipale')} style={{display:kbOpen?'none':'flex','--vrm-nav-bg':C.sidebar||C.chrome}}>
-      {/* (31 oct.) PAR TÂCHE : Journée · Annonces · Ventes · Colis · Plus. Icône
-          d'accent et libellé d'encre à l'actif (styles-vitrine.css), 52 px. */}
-      <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
-      {BOTTOM_TABS.map((t,i)=>{ const on=groupeBarre(tabMontre,BAR_GROUPE)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
-        <React.Fragment key={t.id}>
-        {/* ⚠️ (17 nov., Julien, trois fois : « Le + dégueulasse ») PLUS DE DISQUE « + » DANS LA BARRE, réglage allumé ou
-            éteint. Ses gestes ont chacun leur place, à un toucher : Chercher = la loupe ; Scanner = l'icône dans le champ
-            de recherche (et le rond « Scanner » de Ventes, d'Achats, d'Aujourd'hui) ; Publier = la ligne du titre
-            d'Annonces ; Imprimer N = Ma journée / Aujourd'hui et « Tout imprimer » de Ventes ; Ajouter un achat = Achats.
-            Ne pas le remettre. */}
-        <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
-          const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
-          // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
-          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else { revenirSurOnglet(); allerA(dernierePaire(),ic); } return; }
-          // (17 nov., chasse-bugs) L'onglet ALLUMÉ retouché remonte en haut (Argent sur Statistiques ou Déclarer compris).
-          if(!vise&&groupeBarre(tab,BAR_GROUPE)===t.id) remonterEnHaut(); else { revenirSurOnglet(); allerA(t.id,ic); } }} aria-current={on?'page':undefined}>
-          <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
-          <span className="vrm-nav-label">{lib}</span>{n ? <span className="vrm-sr-seul"> · {n} à faire</span> : null}
-        </button>
-        </React.Fragment>
-      );})}
-      {/* (14 nov., n° 61) Plus de « Plus » dans la barre : tout ce qu'il portait est dans le menu du haut (☰ de l'en-tête). */}
-    </nav>
-    </>
+    <Natif.BarreOnglets onglets={ongletsNatifs} actif={BOTTOM_TABS.some(t=>t.id===groupeMontre)?groupeMontre:''} onChoisir={choisirNatif}
+      libelle={tr('coque.navigationPrincipale')} attrs={{ ref:navRef, hidden:kbOpen||undefined, 'data-en-cours':enCours?'1':undefined, 'data-barre-native':'' }}/>
   );
 }
 
@@ -60978,7 +60766,7 @@ const compterNonLuesNotifs = async () => {
 // l'appareil à chaque ouverture (jamais écrite dans le journal) ; elle n'est plus calculée, donc celles qu'il voyait
 // disparaissent aussi. Les clés de l'appareil (`vrm_ranger_vus`, `vrm_ranger_proposes`) ne sont plus lues ; rien
 // n'est effacé (aucune écriture).
-function CentreNotifsCoque({ onReglages, enTete = null }) {
+function CentreNotifsCoque({ onReglages, enTete = null, sansBouton = false }) {
   const [nonLues, setNonLues] = useState(null);
   // (14 nov., refonte de la coque) La ligne de fraîcheur (« N choses à revoir ») ne s'écrit plus en tête de page :
   // la cloche porte son point ambre, sa feuille porte la ligne (détail et geste inchangés, src/LigneFraicheur.jsx).
@@ -61006,7 +60794,7 @@ function CentreNotifsCoque({ onReglages, enTete = null }) {
   const aller = React.useCallback((q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} }, []);
   return (
     <>
-      <BoutonCentreNotifs nonLues={nonLues} onOuvrir={() => setOuvert(true)} Icon={Icon} alerte={alerteFraicheur} alerteNom={alerteFraicheur ? tr('coque.aRevoir') : ''}/>
+      {sansBouton ? null : <BoutonCentreNotifs nonLues={nonLues} onOuvrir={() => setOuvert(true)} Icon={Icon} alerte={alerteFraicheur} alerteNom={alerteFraicheur ? tr('coque.aRevoir') : ''}/>}
       {ouvert && <FeuilleCentreNotifs onFermer={fermer} charger={chargerCentreNotifs} ecrireLu={ecrireLuNotifs} onAller={aller} onReglages={onReglages} Fermer={FermeAuRetour} Icon={Icon}
         enTete={alerteFraicheur && typeof enTete === 'function' ? enTete(fermer) : null}/>}
     </>
@@ -63653,6 +63441,11 @@ function AppCoeur() {
   const ileRef = React.useRef(null);
   // (31 oct.) La place des filtres de site dans la barre du haut (ordinateur).
   const [slotBarre, setSlotBarre] = React.useState(null);
+  // (19 nov., « VRM natif ») Trois volets à l'ordinateur pour un écran natif (ECRANS_NATIFS) : la fente du détail, et ce
+  // que la coque dit aux pages (`ContexteCoque`). Un écran d'avant : pas de détail, le contexte reste figé (aucun rendu de plus).
+  const [fenteDetail, setFenteDetail] = React.useState(null);
+  const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab));
+  const contexteCoque = React.useMemo(() => (troisVolets ? { titreRendu: true, voletDetail: fenteDetail, ordinateur: true } : CONTEXTE_COQUE_NATIVE), [troisVolets, fenteDetail]);
   // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
   React.useEffect(() => {
     const k = (e) => {
@@ -66877,14 +66670,21 @@ function AppCoeur() {
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
     <SansCompteCarte.Provider value={sansAucunCompte}>
-    <div className="vrm-app-shell" data-tablette={(ordi && tablette) || undefined} data-espace={espaceDe(tab, BAR_GROUPE)} style={{...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'}}
+    {/* (19 nov., « VRM natif ») La racine est celle de la coque native. ⚠️ Plus AUCUN attribut qui dépend de l'onglet ici
+        (`data-espace` reste sur <main>, dont le contenu change de toute façon) : changer d'onglet ne restyle plus la coque. */}
+    <Natif.CoqueRacine className="vrm-app-shell" defile="ecran" attrs={{ 'data-tablette': (ordi && tablette) || undefined, style: {...variablesTheme(C,dark),height:'100%',width:'100%',display:'flex',flexDirection:'column',overflowX:'clip',background:C.bg,color:C.text,fontFamily:'inherit',transition:'background .3s,color .3s',boxSizing:'border-box'} }}
       // (9 nov., Julien : « je ne veux pas que ça glisse entre les onglets quand je zoome à deux
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
+      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
+        outils={<>
+          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
+          {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
+          {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
+        </>}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -66919,84 +66719,14 @@ function AppCoeur() {
       <ProgrammeRepubVeille/>
       {/* (2 nov.) Le mode automatique des favoris : VRM ouvert dans un onglet suffit. */}
       <PiloteFavorisAutoConnecte comptes={vintedAccounts.map(a=>String(a.vinted_user_id))}/>
-      {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
-          derrière au défilement au lieu de buter sur un bandeau plein. */}
-      {/* Sur ordinateur l'en-tête commence APRÈS la barre latérale, et la marque
-          n'y est plus : elle est en haut de la barre. Deux logos sur le même
-          écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
-      {/* ⚠️ SUR ORDINATEUR LE BANDEAU NE PREND PLUS DE PLACE DANS LA PAGE. Il
-          restait 56 px de vide au-dessus de CHAQUE titre d'écran, pour quatre
-          icônes collées à droite (§5.62 avait retiré la marque de ce bandeau,
-          §5.68 le mot « VRM » — il ne restait plus rien à gauche). En le passant
-          en `fixed`, le titre de l'écran remonte et partage la ligne avec les
-          actions, comme dans une vraie application. Sur téléphone il porte le
-          menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      {/* (16 oct.) Le dessin de l'en-tête vit dans `.vrm-app-header`
-          (styles-coque.css) : téléphone = barre transparente qui prend son verre
-          et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
-          haut à droite. Ici seulement la structure et la position. */}
-      <header className={`vrm-app-header${defile && !(designV2App && !ordi) ? ' is-defile' : ''}${v2Tete ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Tete ? 'absolute' : 'sticky',top: ordi ? 12 : v2Tete ? 6 : 0,right: ordi ? 24 : v2Tete ? 12 : undefined,...(v2Tete ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
-        {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
-            invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
-          {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
-              les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark} sites={sitesPresents} badges={badgesNav}/>}
-          <div className="vrm-header-logo" aria-label="VRM">
-            <VrmLogo size={36} anim={false}/>
-          </div>
-          {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
-          <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
-        </div>
-        {/* (17 nov.) Nouveau design, au téléphone : le GRAND titre est dans l'écran ; au défilement, ni verre opaque ni petit
-            titre posé sur la recherche (rapport de l'agent Stock, #1249). */}
-        {!ordi && !designV2App && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
-        {!ordi && gsOpen && champRechercheMobile}
-        <div className="vrm-header-actions">
-          {/* (5 nov., chantier H — revue 2.28) Au téléphone, l'en-tête ne porte plus que :
-              la PASTILLE d'état (un point de couleur, plus de « ⓘ »), « Stream », la
-              cloche, la loupe — et le nuage seulement quand une sauvegarde a raté. */}
-          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}>
-            <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
-            {syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}
-          </span>
-          <div style={{display:'flex',alignItems:'center'}}>
-            {(() => { const eD = dark; return (<>
-            {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
-                écrans (Julien, 5 octobre). Voir `EtatActions`. */}
-            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/>}
-            {/* (5 nov.) « Stream » remplace l'œil des montants : la règle programmée
-                (src/modeStream.js) cache montants, marques, comptes, pseudos…
-                (6 nov.) Le bouton n'apparaît que s'il est choisi dans Réglages → Mode
-                stream (« Afficher le bouton Stream », éteint par défaut). Allumé, il
-                RESTE tant que le mode stream l'est (le décocher en filmant ne doit pas
-                tout montrer d'un coup, ni laisser le mode sans bouton pour l'éteindre).
-                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé) ;
-                pendant un stream, l'œil se tait (le stream cache déjà les montants :
-                une seule porte à la fois dans l'en-tête). */}
-            {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-            {/* (14 nov., refonte de la coque) Au téléphone, l'œil vit dans le menu du compte (trois icônes au
-                plus dans la barre : loupe · cloche · compte) ; il revient dans la barre tant que les montants
-                SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
-            {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
-            {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && !v2Tete && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
-              onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
-                appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
-              onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
-              onContextMenu={(e)=>{ if(DICTEE_OK) e.preventDefault(); }}
-              onClick={()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
-              <Icon name="search" size={21}/>
-            </button>}
-            {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
-            {!ordi && MULTI_USER && !v2Tete && <BoutonProfilTete/>}
-            {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
-                dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
-            </>); })()}
-          </div>
-        </div>
-      </header>
+      {/* (19 nov., « VRM natif ») Au téléphone, la tête est `TeteNative`, DANS <main> (elle défile avec le grand titre). Ici il ne
+          reste que le champ de la recherche OUVERTE (collé en haut, ses résultats dessous) ; la cloche (sans bouton) et l'état des
+          actions restent montés pour que « Plus » et les notifications les ouvrent.
+          ⚠️ (19 nov.) À l'ordinateur, plus d'île flottante en haut à droite (logo, état, œil, cloche) : la barre latérale porte
+          la cloche (« Notifications »), l'état des actions et, en pied, la synchronisation, l'œil / Stream et le profil. */}
+      {!ordi && gsOpen ? <header className="vrm-app-header is-defile" data-n-recherche-ouverte="" style={{position:'sticky',top:0,zIndex:50}}>{champRechercheMobile}</header> : null}
+      {AUTH.user ? <CentreNotifsCoque sansBouton onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/> : null}
+      {MULTI_USER ? <span data-n-etat-muet="" style={{display:'none'}}><EtatActions onNav={setTab} ordi={false} sombre={dark} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/></span> : null}
       {/* (31 oct.) Sur téléphone, les résultats de la recherche tombent sous l'en-tête (pas d'écran plein). */}
       {!ordi && panneauRecherche}
       {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
@@ -67009,9 +66739,9 @@ function AppCoeur() {
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
       {/* (14 nov.) « J'ai déjà un compte · Me connecter » à côté de « Créer mon compte » ; le cadre hachuré
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
-      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: 32 } : undefined}onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main className="vrm-main" id="vrm-contenu" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
+      <Natif.CoqueEcran className="vrm-main" attrs={{ id: 'vrm-contenu', 'data-ecran': tab, 'data-espace': espaceDe(tab, BAR_GROUPE), 'data-defile': '1', style: {
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -67041,14 +66771,27 @@ function AppCoeur() {
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
-        marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
+        // (19 nov., « VRM natif ») La barre latérale est fixe et la racine lui garde sa place (natif.css) : plus de marge de 272 px.
+        paddingLeft: ordi ? 32 : undefined,
         paddingRight: ordi ? 28 : undefined,
         // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
         paddingTop: ordi ? 14 : undefined,
         // La barre étant maintenant DANS le flux (sous `<main>`), plus besoin de
         // réserver sa hauteur : juste une marge pour ne pas coller la dernière
         // carte à la barre.
-        paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
+        paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
+        <Natif.ContexteCoque.Provider value={contexteCoque}>
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+          rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
+          // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
+          // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
+          gestesLoupe={{ 'data-recherche-loupe-voix': DICTEE_OK && !VOIX.refus ? '1' : '0',
+            onPointerDown:(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
+              appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); },
+            onPointerUp:()=>clearTimeout(appuiLoupe.current.t), onPointerCancel:()=>clearTimeout(appuiLoupe.current.t), onPointerLeave:()=>clearTimeout(appuiLoupe.current.t),
+            onContextMenu:(e)=>{ if(DICTEE_OK) e.preventDefault(); },
+            onClick:()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } ouvrirRecherche(); } }}
+          etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/>}
         {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
@@ -67460,7 +67203,11 @@ function AppCoeur() {
         </>)}
         </GardeEcran>
         </BarreHautSlot.Provider>
-      </main>
+        </Natif.ContexteCoque.Provider>
+      </Natif.CoqueEcran>
+      {/* (19 nov., « VRM natif ») Le TROISIÈME volet, à l'ordinateur, pour un écran natif : sa `<PagePoussee>` s'y pose
+          (`ContexteCoque.voletDetail`). Un écran d'avant n'en a pas : il garde liste + reste. */}
+      {troisVolets ? <aside className="n-coque-detail" data-n-coque-detail="" aria-label={tr('natif.detail.nom')}><div className="n-coque-fente" ref={setFenteDetail}/></aside> : null}
       {pnOuvert && <GardeEcran nom="parcours-nouveau" feuille onFermer={()=>fermerParcoursNouveau('plusTard')}><ParcoursNouveauApp comptes={vintedAccounts} etapeForcee={pnEtape} onFermer={fermerParcoursNouveau}/></GardeEcran>}
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
@@ -67522,7 +67269,7 @@ function AppCoeur() {
         * { box-sizing: border-box; }
       `}</style>
       <ArgentAVenirHote/>
-    </div>
+    </Natif.CoqueRacine>
     </SansCompteCarte.Provider>
     </LiveStatsCarte.Provider>
   );
