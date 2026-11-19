@@ -15,7 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tr, monnaie } from './i18n/index.js';
-import { appuiSuivant, vitesseBord, listesGlisser, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
+import { appuiSuivant, vitesseBord, listesGlisser, marquerPour, achatsRelies, compterCibles, filtrerCibles, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
 import { lotDe } from './suggestionsAchat.js';
 import { FaitsAchat, NoteTailleAchats } from './FaitsAchat.jsx';   // (17 nov., lot relier-taille)
 import { faitsAchat, sansTailleLue } from './faitsAchat.js';
@@ -44,6 +44,8 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   // restait en bas). Toucher un achat ⇒ la liste d'en face prend la place ; le glisser (appui long 400 ms) montre la liste
   // d'en face sous le doigt. Les listes arrivent par tranches de 60 (2 000 achats ne figent plus l'écran).
   const [ongletTel, setOngletTel] = useState('achats');
+  // (19 nov., Julien) Les filtres : à gauche « Libres · Déjà reliés », à droite « Toutes · En ligne · Vendues ».
+  const [filtreA, setFiltreA] = useState('libres'), [filtreC, setFiltreC] = useState('toutes');
   const [nVusA, setNVusA] = useState(60), [nVusC, setNVusC] = useState(60);
   const corpsRef = useRef(null), finA = useRef(null), finC = useRef(null), tirer = useRef(null);
   const bordDepuis = useRef(0), vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
@@ -187,6 +189,14 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   };
   const nSansTaille = useMemo(() => (details && Array.isArray(L.achats) ? sansTailleLue(L.achats.map((x) => x.a), details) : 0), [details, L.achats]);
   const nA = Array.isArray(L.achats) ? L.achats.length : null;
+  const relies = useMemo(() => achatsRelies({ achats, liens }), [achats, liens]);
+  const nRelies = Array.isArray(relies) ? relies.length : null;
+  // « Très probable » : seulement pour la vente / l'annonce CHOISIE, et ces achats-là en tête.
+  const achatsVus = useMemo(() => (filtreA === 'relies' ? relies : marquerPour(L.achats, tresProbables, cibleChoisie)), [filtreA, relies, L.achats, tresProbables, cibleChoisie]);
+  const nCibles = useMemo(() => compterCibles(L.cibles), [L.cibles]);
+  const ciblesVues = useMemo(() => filtrerCibles(L.cibles, filtreC), [L.cibles, filtreC]);
+  // Un choix fait (achat ou article) : la liste d'en face revient à « Libres » / garde son filtre.
+  useEffect(() => { if (cibleChoisie && filtreA !== 'libres') setFiltreA('libres'); }, [cibleChoisie, filtreA]);
   const carteAchat = (x, flottante = false) => {
     const a = x.a, ph = photoDe(a), px = prixDe(a), lot = lotDe(a).lot;
     // (17 nov., lot relier-taille) La taille (lue chez Vinted, sinon celle du titre), comparée à la vente / l'annonce
@@ -199,7 +209,8 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
         <span className="vrm-rg-texte">
           <span className="vrm-rg-titre">{a.title || '—'}</span>
           <span className="vrm-rg-sous">{sous}</span>
-          {x.propose && !flottante ? <span className="vrm-rg-propose" data-glisser-propose={x.propose}>{tr('liaison.niveau.tresProbable')}</span> : null}
+          {x.pour && !flottante ? <span className="vrm-rg-propose" data-glisser-propose={cibleChoisie}>{tr('liaison.niveau.tresProbable')}</span> : null}
+          {x.relie ? <span className="vrm-rg-propose" data-glisser-deja-relie="">{tr('glisser.dejaRelie')}</span> : null}
         </span>
         <span className="vrm-rg-prix">{lot ? tr('glisser.lot') : px != null ? montant(px) : '—'}</span>
       </>
@@ -232,19 +243,31 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
       ) : null}
       {!large && !mode && !leve ? (
         <div className="vrm-rg-onglets" role="tablist" data-glisser-onglets="">
-          {[['achats', tr('glisser.achats'), nA], ['cibles', tr('glisser.cibles'), L.cibles.length]].map(([k, lib, n]) => (
+          {[['achats', tr('glisser.achatsTitre'), null], ['cibles', tr('glisser.cibles'), null]].map(([k, lib, n]) => (
             <button key={k} type="button" role="tab" aria-selected={vueTel === k} className="vrm-rg-onglet" data-glisser-onglet={k} onClick={() => setOngletTel(k)}>
               {lib}{n != null ? <span className="vrm-rg-n">{n}</span> : null}</button>))}
         </div>
       ) : null}
       <div className="vrm-rg-corps" ref={corpsRef} data-glisser-defile="">
         <section className="vrm-rg-col vrm-rg-achats" aria-label={tr('glisser.achats')}>
-          <h3 className="vrm-rg-h3">{tr('glisser.achats')}{nA != null ? <span className="vrm-rg-n">{nA}</span> : null}</h3>
-          <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)}>
-            {L.achats === undefined ? <li className="vrm-rg-vide">…</li>
-              : L.achats === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
-              : !L.achats.length ? <li className="vrm-rg-vide" data-glisser-vide="achats">{tr('glisser.aucunAchat')}</li>
-              : L.achats.slice(0, nVusA).map((x) => (
+          <div className="vrm-rg-entete">
+          <h3 className="vrm-rg-h3">{tr('glisser.achatsTitre')}</h3>
+          {!mode && !leve ? (
+            <div className="vrm-rg-filtres" role="group" aria-label={tr('glisser.filtrer')} data-glisser-filtre-achats={filtreA}>
+              {[['libres', tr('glisser.filtre.libres'), nA], ['relies', tr('glisser.filtre.relies'), nRelies]].map(([k, lib, n]) => (
+                <button key={k} type="button" className="vrm-rg-filtre" aria-pressed={filtreA === k} data-glisser-filtre={k} onClick={() => { setFiltreA(k); setNVusA(60); }}>
+                  {lib}{n != null ? <span className="vrm-rg-n">{n}</span> : null}</button>))}
+            </div>
+          ) : null}
+          </div>
+          <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)} data-glisser-achats-vus={Array.isArray(achatsVus) ? String(achatsVus.length) : ''}>
+            {achatsVus === undefined ? <li className="vrm-rg-vide">…</li>
+              : achatsVus === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
+              : !achatsVus.length ? <li className="vrm-rg-vide" data-glisser-vide="achats">{filtreA === 'relies' ? tr('glisser.aucunRelie') : tr('glisser.aucunAchat')}</li>
+              : achatsVus.slice(0, nVusA).map((x) => (x.relie ? (
+                <li key={'r' + x.tx}>
+                  <div className="vrm-rg-carte vrm-rg-achat is-relie" data-glisser-relie={x.tx}>{carteAchat(x)}</div>
+                </li>) : (
                 <li key={x.tx}>
                   <button type="button" className="vrm-rg-carte vrm-rg-achat" data-glisser-achat={x.tx} aria-pressed={choisi === x.tx}
                     data-glisser-source={leve && leve.tx === x.tx ? '1' : undefined}
@@ -252,17 +275,28 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                     onClick={() => toucherAchat(x)}>
                     {carteAchat(x)}
                   </button>
-                </li>))}
+                </li>)))}
             {/* La phrase « N achats sans taille lue », une fois, au BAS de la liste : au téléphone la moitié haute de
                 l'écran reste aux achats eux-mêmes. */}
-            {Array.isArray(L.achats) && L.achats.length > nVusA ? <li ref={finA} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="achats" onClick={() => setNVusA((n) => n + 60)}>{tr('relierTout.plus', { n: String(L.achats.length - nVusA) })}</button></li> : null}
-            {details && nSansTaille && Array.isArray(L.achats) && L.achats.length ? <li className="vrm-rg-note-li"><NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/></li> : null}
+            {Array.isArray(achatsVus) && achatsVus.length > nVusA ? <li ref={finA} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="achats" onClick={() => setNVusA((n) => n + 60)}>{tr('relierTout.plus', { n: String(achatsVus.length - nVusA) })}</button></li> : null}
+            {filtreA === 'libres' && details && nSansTaille && Array.isArray(L.achats) && L.achats.length ? <li className="vrm-rg-note-li"><NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/></li> : null}
           </ul>
         </section>
         <section className="vrm-rg-col vrm-rg-cibles" aria-label={tr('glisser.cibles')}>
-          <h3 className="vrm-rg-h3">{tr('glisser.cibles')}<span className="vrm-rg-n">{L.cibles.length}</span></h3>
-          <ul className="vrm-rg-liste" ref={listeCibles} data-glisser-cibles={String(L.cibles.length)}>
-            {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li> : L.cibles.slice(0, nVusC).map((c) => {
+          <div className="vrm-rg-entete">
+          <h3 className="vrm-rg-h3">{tr('glisser.cibles')}</h3>
+          {L.cibles.length ? (
+            <div className="vrm-rg-filtres" role="group" aria-label={tr('glisser.filtrer')} data-glisser-filtre-cibles={filtreC}>
+              {[['toutes', tr('glisser.filtre.toutes'), nCibles.toutes], ['annonce', tr('glisser.filtre.enLigne'), nCibles.annonce], ['vente', tr('glisser.filtre.vendues'), nCibles.vente]].map(([k, lib, n]) => (
+                <button key={k} type="button" className="vrm-rg-filtre" aria-pressed={filtreC === k} data-glisser-filtre={k} onClick={() => { setFiltreC(k); setNVusC(60); }}>
+                  {lib}<span className="vrm-rg-n">{n}</span></button>))}
+            </div>
+          ) : null}
+          </div>
+          <ul className="vrm-rg-liste" ref={listeCibles} data-glisser-cibles={String(L.cibles.length)} data-glisser-cibles-vues={String(ciblesVues.length)}>
+            {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li>
+              : !ciblesVues.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles-filtre">{tr('glisser.aucuneFiltre')}</li>
+              : ciblesVues.slice(0, nVusC).map((c) => {
               const actif = survol === String(c.key);
               const propose = achatLeve && achatLeve.propose === String(c.key);
               return (
@@ -280,7 +314,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                 </li>
               );
             })}
-            {L.cibles.length > nVusC ? <li ref={finC} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="cibles" onClick={() => setNVusC((n) => n + 60)}>{tr('relierTout.plus', { n: String(L.cibles.length - nVusC) })}</button></li> : null}
+            {ciblesVues.length > nVusC ? <li ref={finC} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="cibles" onClick={() => setNVusC((n) => n + 60)}>{tr('relierTout.plus', { n: String(ciblesVues.length - nVusC) })}</button></li> : null}
           </ul>
         </section>
       </div>
