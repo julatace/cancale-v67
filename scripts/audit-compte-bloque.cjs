@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calmes : midi (Paris)
 // ════════════════════════════════════════════════════════════════════════════
 //  audit-compte-bloque — « VINTED A BLOQUÉ {COMPTE} » (19 nov., ext. 5.409)
 //  node scripts/audit-compte-bloque.cjs [--recopie] [--mutation] [--src <bg.js>]
@@ -184,10 +185,92 @@ async function extension(src) {
   });
 }
 
-async function tout({ regleFichier = REGLE, src = BG } = {}) {
+// ── S. LA ROUTE /api/push, action « comptebloque », EXÉCUTÉE (§4.10) ─────────
+async function serveur() {
+  if (!muet()) console.log('\nS · la route /api/push, action « comptebloque », exécutée');
+  const OWNER = '11111111-2222-3333-4444-555555555555';
+  process.env.SUPABASE_URL = 'https://banc.supabase.test';
+  process.env.SUPABASE_SERVICE_KEY = 'banc-cle-service';
+  process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
+  const webpush = require(path.join(RACINE, 'node_modules', 'web-push'));
+  const pushes = [];
+  webpush.setVapidDetails = () => {};
+  webpush.sendNotification = async (sub, body) => { pushes.push(JSON.parse(body)); return { statusCode: 201 }; };
+  const { servirTable } = await import('file://' + path.join(RACINE, 'src', 'exempleBase.js'));
+  let tables, casse = false;
+  const ligne = (id, data) => ({ id, owner: OWNER, data, updated_at: new Date().toISOString() });
+  const compte = (uid, login) => ({ id: Number(uid), vinted_user_id: String(uid), login, domain: 'www.vinted.fr', owner: OWNER, updated_at: new Date().toISOString() });
+  const remettre = (rows, comptes) => { tables = { app_data: { lignes: rows }, vinted_accounts: { lignes: comptes } }; pushes.length = 0; casse = false; };
+  const lectures = [];
+  const fetchAvant = global.fetch;
+  global.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const rep = (b, st = 200) => new Response(typeof b === 'string' ? b : JSON.stringify(b), { status: st, headers: { 'content-type': 'application/json' } });
+    if (u.pathname === '/auth/v1/user') return rep({ id: OWNER, email: 'vendeuse@exemple.test', created_at: '2025-01-10T10:00:00Z' });
+    if (u.pathname === '/rest/v1/rpc/vrm_acces_pour') return rep(true);
+    lectures.push(decodeURIComponent(u.search));
+    if (casse && /panel_comptes_etat/.test(decodeURIComponent(u.search))) return rep('<html>522</html>', 522);
+    const t = u.pathname.replace('/rest/v1/', '');
+    if (!tables[t]) return rep([]);
+    let corps = null; try { corps = opts.body ? JSON.parse(opts.body) : null; } catch (_) {}
+    const pref = String((opts.headers || {}).Prefer || (opts.headers || {}).prefer || '');
+    if ((opts.method || '').toUpperCase() === 'POST' && /ignore-duplicates/.test(pref) && Array.isArray(corps) && corps.every((l) => tables[t].lignes.some((x) => x.id === l.id))) return rep([], 201);
+    const x = servirTable(tables[t], { methode: (opts.method || 'GET').toUpperCase(), url: u.pathname + u.search, entetes: opts.headers || {}, corps, owner: OWNER });
+    return new Response(x.status === 204 || x.body == null ? null : JSON.stringify(x.body), { status: x.status, headers: x.headers });
+  };
+  try {
+    const { default: handler } = await import('file://' + path.join(RACINE, 'api', 'push.js'));
+    const appel = async () => {
+      let st = 0, js = null;
+      const res = { status(c) { st = c; return this; }, json(j) { js = j; return this; }, setHeader() {}, end() {} };
+      await handler({ method: 'POST', headers: { authorization: 'Bearer aaa.bbb.ccc', origin: 'https://vrm.center' }, body: { action: 'comptebloque' } }, res);
+      return { st, js };
+    };
+    const SUB = ligne('push_subs', { subs: [{ endpoint: 'https://fcm.googleapis.com/fcm/send/banc', keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' } }], rev: 1 });
+    const T = Date.now();
+    const etats = (e) => ligne('panel_comptes_etat', { comptes: { 111: e } });
+    const BANNI = { etat: 'banni', at: iso(T - H), preuve: 'champ profil is_account_banned', depuis: iso(T - 2 * H) };
+    await essaie('S1', async () => {
+      remettre([SUB, etats(BANNI), ligne('main', { vinted_account_labels: {} })], [compte(111, 'shop_a')]);
+      const r = await appel();
+      dit(r.st === 200 && pushes.length === 1 && /Vinted a bloqué shop_a/.test(pushes[0].title), 'S1 bloqué ⇒ « ⛔ Vinted a bloqué shop_a »', JSON.stringify([r, pushes]));
+      await appel();
+      dit(pushes.length === 1, 'S2 rappelée ⇒ rien de plus (jamais deux fois)', String(pushes.length));
+      dit(!lectures.some((q) => /id=eq\.main/.test(q) && /select=data(&|$)/.test(q)), 'S2b `main` lue en projection, jamais `select=data`', JSON.stringify(lectures.filter((q) => /main/.test(q))));
+    });
+    await essaie('S3', async () => {
+      remettre([SUB, etats(BANNI)], [compte(111, 'shop_a')]);
+      await Promise.all([appel(), appel(), appel()]);
+      dit(pushes.length === 1, 'S3 trois appels en même temps ⇒ une seule', String(pushes.length));
+    });
+    await essaie('S4', async () => {
+      remettre([SUB, etats({ etat: 'actif', at: iso(T), depuis: iso(T) }), ligne('main', { vrm_comptes_bloques: { 111: { choix: 'pause', at: iso(T - H), episode: BANNI.depuis, n: 4 } } })], [compte(111, 'shop_a')]);
+      await appel();
+      dit(pushes.length === 1 && /shop_a est débloqué/.test(pushes[0].title) && /4 annonces remises/.test(pushes[0].body), 'S4 débloqué après SA pause ⇒ « shop_a est débloqué · 4 annonces remises »', JSON.stringify(pushes));
+    });
+    await essaie('S5', async () => {
+      remettre([SUB, etats(BANNI), ligne('vrm_blocked_accounts', { uids: ['111'] })], [compte(111, 'shop_a')]);
+      await appel();
+      dit(pushes.length === 0, 'S5 compte retiré ⇒ on ne lui en parle plus');
+    });
+    await essaie('S6', async () => {
+      remettre([SUB, etats(BANNI)], [compte(111, 'shop_a')]); casse = true;
+      const r = await appel();
+      dit(r.st === 503 && pushes.length === 0, 'S6 lecture ratée ⇒ 503, rien envoyé (le service rejoue)', JSON.stringify(r));
+    });
+    await essaie('S7', async () => {
+      remettre([SUB, etats({ etat: 'actif', at: iso(T) })], [compte(111, 'shop_a')]);
+      await appel();
+      dit(pushes.length === 0, 'S7 compte actif, aucune pause ⇒ rien');
+    });
+  } finally { global.fetch = fetchAvant; }
+}
+
+async function tout({ regleFichier = REGLE, src = BG, serveurAussi = true } = {}) {
   await regle(regleFichier);
   copie();
   await extension(src);
+  if (serveurAussi) await serveur();
 }
 
 const MUTATIONS = [
