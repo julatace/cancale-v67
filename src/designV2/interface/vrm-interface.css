@@ -919,4 +919,18 @@
       overflow: hidden;
     }
   }
+
+  /* (19 nov., correctif en ligne) Le texte « posé sur la page » avait été écrit en BLANC pour le fond bleu nuit du
+     verre (`--sv-clair*`, lus aussi par `--v2-page-*`). Le fond de cet habillage est CLAIR : hors d'Aujourd'hui (qui
+     garde son bandeau bleu nuit et ses propres jetons `--journee-*`), ce texte lit l'encre de l'habillage. Mesuré :
+     « 30 colis à envoyer » de Ventes à 1,13:1. En sombre le fond reste foncé : rien ne change. */
+  html:is([data-theme-style="vrm"], :not([data-theme-style])):not([data-theme="dark"]) #root .vrm-app-shell:not([data-espace="journee"]) .vrm-main {
+    --sv-clair: var(--vrm-ui-ink) !important;
+    --sv-clair-2: var(--vrm-ui-muted) !important;
+    --sv-clair-lien: var(--vrm-ui-accent) !important;
+    --sv-clair-ambre: #764300 !important;
+    --v2-page-texte: var(--vrm-ui-ink) !important;
+    --v2-page-muet: var(--vrm-ui-muted) !important;
+    --v2-page-ambre: #764300 !important;
+  }
 }
