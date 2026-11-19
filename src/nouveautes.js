@@ -42,6 +42,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'retraits-parfaits', date: '2026-11-19', titre: 'Nouveau code de retrait : VRM te prévient', phrase: 'Consigne ou comptoir dit, colis retirés relus, codes de casier lus.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-natif', date: '2026-11-19', titre: 'Ventes redessinées, tes colis cochés d’office', phrase: 'À envoyer, en route, terminées ; sur ordinateur, la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (19 nov., ext. 5.409) docs/passation/2026-11-19-extension-utile.md
+  { id: 'negociation-paliers', date: '2026-11-19', titre: 'Contre-offres par paliers, jamais sous le plancher', phrase: 'Une offre trop basse reçoit une contre-offre, palier par palier.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-vinted', date: '2026-11-19', titre: 'Un grand panneau VRM sur Vinted', phrase: 'Messages, annonces, favoris, ventes : tout dans l’onglet Vinted.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'arrivee-capte', date: '2026-11-19', titre: 'Ce que l’extension a capté, à ton arrivée', phrase: 'Ventes, codes, messages : une feuille les dit, chacun mène à l’élément.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « je veux que ça demande pour mettre en suspens les annonces et que ça les remette ») docs/passation/2026-11-19-compte-bloque.md
   { id: 'compte-bloque', date: '2026-11-19', titre: 'Compte bloqué par Vinted : VRM te demande', phrase: 'Ses annonces en pause, remises seules quand Vinted le débloque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
