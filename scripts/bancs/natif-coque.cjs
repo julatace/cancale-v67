@@ -21,11 +21,13 @@ require('./_porte-banc.cjs');
 //        les cinq onglets en tête, puis Stock, Messages, E-mails, Tout va bien ?, Notifications, Paramètres, Communauté ;
 //        l'entrée active ≥ 4,5:1 ; aucun débordement horizontal ;
 //  Les deux :
-//    K8  changer d'onglet ne restyle pas le document : trace Chrome, aucune tâche de style (UpdateLayoutTree) > 50 ms de
-//        THREAD pour un écran déjà visité, et le nombre d'éléments restylés au retour reste petit (≤ 3 000).
-//        (La machine est partagée : on juge le temps de thread et les comptes, jamais l'horloge.)
+//    K8a changer d'onglet ne restyle pas le document : trace Chrome (InvalidationTracking), aucune invalidation de style
+//        sur <html>, <body> ou la racine de la coque ;
+//    K8b aucune tâche de style (UpdateLayoutTree) > 50 ms de THREAD au retour sur un écran déjà visité (≤ 3 000 éléments).
+//        (La machine est partagée : on juge le temps de thread et les comptes, jamais l'horloge.) La tâche la plus lourde
+//        est l'écran gardé qui ré-apparaît (moteur `src/ecransGardes.jsx`) : mesurée aussi sur le build d'avant.
 //  Mutations (rouge attendu) : MUTATION=dessous (l'écran passe sous la barre) ⇒ K2 ; MUTATION=largeur (un onglet plus
-//  large) ⇒ K1 ; MUTATION=restyle (un attribut posé sur <body> à chaque toucher, lu par une règle universelle) ⇒ K8.
+//  large) ⇒ K1 ; MUTATION=restyle (un attribut posé sur <body> à chaque toucher, lu par une règle universelle) ⇒ K8a.
 //  `BANC_DIST=…` juge un autre build ; `SHOTS=dossier` garde les captures (regarde-les) ; `DSF=2` des captures nettes.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -40,6 +42,8 @@ let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 500) : '')); } return c; };
 const pret = async (pg) => { await pg.waitForSelector('.vrm-main', { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(2600); };
 const ONGLETS = ['journee', 'annonces', 'ventes', 'achats', 'compta'];
+// La clé d'un onglet de la barre (data-n-onglet) : « Annonces » est l'entrée « paires » de l'app (ID_PAIRES), qui ouvre l'écran annonces.
+const CLE_BARRE = (id) => (id === 'annonces' ? 'paires' : id);
 const PLUS = ['garage', 'messages', 'emails', 'sante', 'notifications', 'settings', 'communaute', 'profil', 'montants'];
 const LATERALE = [...ONGLETS, 'garage', 'messages', 'emails', 'sante', 'notifications', 'settings', 'communaute'];
 
@@ -74,6 +78,14 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee', dsf: DSF });
   await pret(pg); await poser(pg); await pg.evaluate(MESURE_CONTRASTE);
   const t = `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`;
+  // K8_SEUL=1 : la seule mesure du changement d'onglet (pour la comparer à un build d'AVANT, qui n'a pas la coque native).
+  if (process.env.K8_SEUL) { await k8(pg, t, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true); await ctx.close(); return; }
+  // K2_SEUL=1 : seulement « rien sous la barre », écran par écran, première visite puis écran gardé (vite, pour un correctif).
+  if (process.env.K2_SEUL) { for (const tour of ['1re visite', 'écran gardé']) for (const id of ONGLETS) {
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(900); await k2bas(pg, `${t} · ${id} (${tour})`, tour === '1re visite' ? `bas-390-${id}${sombre ? '-sombre' : ''}.png` : ''); }
+    await ctx.close(); return; }
   // K1
   const k1 = await pg.evaluate(() => {
     const bar = document.querySelector('[data-n-onglets]'); if (!bar) return null;
@@ -81,7 +93,7 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     return { ordre: tabs.map((x) => x.getAttribute('data-nav-entree')), larg: tabs.map((x) => Math.round(x.getBoundingClientRect().width * 10) / 10), haut: tabs.map((x) => Math.round(x.getBoundingClientRect().height)),
       libelles: tabs.map((x) => { const l = x.querySelector('.n-onglet-libelle'); if (!l) return null; const r = document.createRange(); r.selectNodeContents(l); const tw = r.getBoundingClientRect().width, lw = l.getBoundingClientRect().width; return { t: l.textContent, entier: tw <= lw + 1 && lw > 4 && getComputedStyle(l).visibility !== 'hidden' }; }) };
   });
-  dit(k1 && k1.ordre.join(',') === ONGLETS.join(','), `K1 ${t} : les 5 onglets dans l’ordre`, k1 && k1.ordre);
+  dit(k1 && k1.ordre.join(',') === ONGLETS.map(CLE_BARRE).join(','), `K1 ${t} : les 5 onglets dans l’ordre`, k1 && k1.ordre);
   dit(k1 && Math.max(...k1.larg) - Math.min(...k1.larg) <= 1 && Math.min(...k1.larg) >= 44 && Math.min(...k1.haut) >= 44, `K1 ${t} : même largeur, cibles ≥ 44 (${k1 && k1.larg.join('/')} × ${k1 && Math.min(...k1.haut)})`, k1);
   dit(k1 && k1.libelles.every((l) => l && l.entier), `K1 ${t} : chaque libellé visible et entier`, k1 && k1.libelles);
   // K2
@@ -136,15 +148,23 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   // K5 + K6 (onglets)
   for (const id of ONGLETS) {
     const n0 = erreurs.length;
-    await pg.locator(`[data-n-onglet="${id}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
     await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
     await pg.waitForTimeout(900);
     const r = await pg.evaluate(() => { const a = document.querySelector('[data-n-onglets] .n-onglet[aria-current="page"]'); return { ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), actif: a && a.getAttribute('data-n-onglet'), c: a ? window.__contraste(a.querySelector('.n-onglet-libelle')) : 0 }; });
-    dit(r.ecran === id && r.actif === id && r.c >= 4.5 && erreurs.length === n0, `K5/K6 ${t} : ${id} s’ouvre, son onglet s’allume (contraste ${r.c})`, { ...r, erreurs: erreurs.slice(n0) });
+    dit(r.ecran === id && r.actif === CLE_BARRE(id) && r.c >= 4.5 && erreurs.length === n0, `K5/K6 ${t} : ${id} s’ouvre, son onglet s’allume (contraste ${r.c})`, { ...r, erreurs: erreurs.slice(n0) });
     if (id === 'ventes' && !sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-ventes.png') });
+    await k2bas(pg, `${t} · ${id} (1re visite)`, nomBase === 'volume' && !sombre ? `bas-390-${id}.png` : '');
+  }
+  // K2 bis — les écrans GARDÉS (revenus tels quels) : la même mesure au retour, défilés jusqu'en bas.
+  for (const id of ONGLETS) {
+    await pg.locator(`[data-n-onglet="${CLE_BARRE(id)}"]`).first().tap({ timeout: 60000 }).catch(() => {});
+    await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') === x; }, id, { timeout: 30000 }).catch(() => {});
+    await pg.waitForTimeout(700);
+    await k2bas(pg, `${t} · ${id} (écran gardé)`, '');
   }
   erreursTout.push(...erreurs);
-  await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, '[data-n-onglet="%s"]', true);
+  await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);
   await ctx.close();
 }
 
@@ -153,6 +173,7 @@ async function ordinateur(nav, b, W, sombre, nomBase, erreursTout) {
   if (W !== 1512) await pg.setViewportSize({ width: W, height: 860 });
   await pret(pg); await poser(pg); await pg.evaluate(MESURE_CONTRASTE);
   const t = `${W} ${sombre ? 'sombre' : 'clair'} ${nomBase}`;
+  if (process.env.K8_SEUL) { if (W === 1512) await k8(pg, t, ':is([data-n-laterale], .vrm-sidebar) [data-nav-entree="%s"]', false); await ctx.close(); return; }
   const k7 = await pg.evaluate(() => {
     const lat = document.querySelector('[data-n-laterale]'), main = document.querySelector('.vrm-main');
     if (!lat || !main) return null;
@@ -179,8 +200,53 @@ async function ordinateur(nav, b, W, sombre, nomBase, erreursTout) {
     dit(r.ecran === id && r.actif === id && erreurs.length === n0, `K6 ${t} : ${id} s’ouvre depuis la barre latérale, sans erreur`, { ...r, erreurs: erreurs.slice(n0) });
   }
   erreursTout.push(...erreurs);
-  if (W === 1512) await k8(pg, t, '[data-n-laterale] [data-n-entree="%s"]', false);
+  if (W === 1512) await k8(pg, t, ':is([data-n-laterale], .vrm-sidebar) [data-nav-entree="%s"]', false);
   await ctx.close();
+}
+
+// K2 (chaque écran) : l'écran montré, défilé jusqu'EN BAS (jusqu'à ce que sa hauteur ne bouge plus) : aucun texte, aucun
+// contrôle de l'écran — même `position: fixed` / `sticky` — ne recouvre la barre d'onglets ; sa dernière rangée finit
+// au-dessus d'elle. (Capture de Julien du 19 nov. : « le flou du bas mange la dernière rangée ».)
+async function k2bas(pg, t, capture) {
+  const r = await pg.evaluate(async () => {
+    const bar = document.querySelector('[data-n-onglets]'), main = document.querySelector('.vrm-main'); if (!bar || !main) return null;
+    let h = -1; for (let i = 0; i < 6 && main.scrollHeight !== h; i++) { h = main.scrollHeight; main.scrollTop = main.scrollHeight; await new Promise((ok) => setTimeout(ok, 350)); }
+    const rb = bar.getBoundingClientRect();
+    // Montré : rendu, sa PROPRE visibilité (un enfant peut redevenir visible sous un parent caché), aucune opacité nulle au-dessus.
+    const raisons = {}; let vus = 0;
+    const montre = (e) => { if (!e.getClientRects().length) return false; if (getComputedStyle(e).visibility === 'hidden') { raisons.vis = (raisons.vis || 0) + 1; return false; } for (let x = e; x && x !== main; x = x.parentElement) { const s = getComputedStyle(x); if (s.display === 'none' || +s.opacity === 0 || x.hidden || x.hasAttribute('data-ecran-cache')) { const k = s.display === 'none' ? 'none' : +s.opacity === 0 ? 'opacite:' + (x.className && typeof x.className === 'string' ? x.className.split(' ')[0] : x.tagName) : 'cache'; raisons[k] = (raisons[k] || 0) + 1; return false; } } return true; };
+    const sous = [];
+    let dernier = 0;
+    for (const e of main.querySelectorAll('*')) {
+      if (e.closest('svg') && e.tagName.toLowerCase() !== 'svg') continue;
+      const controle = e.matches('button, a[href], input, select, textarea, [role="button"]');
+      const texte = [...e.childNodes].some((n) => n.nodeType === 3 && /\S/.test(n.nodeValue));
+      if (!controle && !texte && !e.matches('img, svg')) continue;
+      // Le rectangle VISIBLE : coupé par chaque ancêtre qui rogne (overflow ≠ visible), <main> compris — sauf un élément fixe,
+      // que rien ne rogne. Un élément rogné par <main> sous son bord n'est pas peint : il n'est pas « sous la barre ».
+      const q = (() => { const b = e.getBoundingClientRect(); let t = b.top, bo = b.bottom, l = b.left, ri = b.right, par = '';
+        if (getComputedStyle(e).position !== 'fixed') for (let x = e.parentElement; x; x = x.parentElement) { const s = getComputedStyle(x);
+          if (s.position === 'fixed') break;
+          // Chaque axe pour lui-même : `overflow-x: clip` ne rogne pas en hauteur.
+          // `display: contents` (les hôtes des écrans gardés) n'a pas de boîte : il ne rogne rien.
+          const c = s.display !== 'contents' && (s.overflowX !== 'visible' || s.overflowY !== 'visible') ? x.getBoundingClientRect() : null;
+          if (c && s.overflowY !== 'visible') { if (c.top > t || c.bottom < bo) par = (typeof x.className === 'string' && x.className.split(' ')[0]) || x.tagName; t = Math.max(t, c.top); bo = Math.min(bo, c.bottom); }
+          if (c && s.overflowX !== 'visible') { l = Math.max(l, c.left); ri = Math.min(ri, c.right); }
+          if (x === main) break; }
+        return { top: t, bottom: bo, left: l, right: ri, width: ri - l, height: bo - t, par, brut: b.height }; })();
+      if (q.width < 3 || q.height < 3) { if (q.par && q.brut >= 3) raisons['rogne:' + q.par] = (raisons['rogne:' + q.par] || 0) + 1; continue; }
+      if (q.bottom <= q.top || q.right <= 0 || q.left >= innerWidth) continue;
+      if (!montre(e)) continue;
+      vus++;
+      if (q.bottom > dernier && q.top < innerHeight) dernier = q.bottom;
+      if (q.bottom > rb.top + 1 && q.top < rb.bottom) sous.push(`${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.split(/\s+/)[0] : ''} « ${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 30)} » ${Math.round(q.top)}→${Math.round(q.bottom)} (${getComputedStyle(e).position})`);
+    }
+    const out = { barre: Math.round(rb.top), dernier: Math.round(dernier), sous: sous.slice(0, 5), n: sous.length, hauteur: main.scrollHeight, vus, raisons };
+    return out;
+  });
+  if (capture) await pg.screenshot({ path: path.join(SHOTS, capture) });
+  await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; });
+  dit(r && r.vus > 0 && r.n === 0 && r.dernier <= r.barre + 0.5, `K2 ${t} : défilé jusqu’en bas, la dernière rangée finit à ${r && r.dernier} ≤ barre ${r && r.barre}, rien dessous (${r && r.vus} éléments vus ; écartés ${JSON.stringify(r && r.raisons)})`, r);
 }
 
 // K8 : le retour sur un écran DÉJÀ visité, sous trace Chrome. Temps de THREAD des tâches de style, éléments restylés.
@@ -191,7 +257,7 @@ async function k8(pg, t, modele, tactile) {
   const cdp = await pg.context().newCDPSession(pg);
   const evts = [];
   cdp.on('Tracing.dataCollected', (d) => { for (const e of d.value) evts.push(e); });
-  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
+  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.invalidationTracking', transferMode: 'ReportEvents' });
   await toucher('ventes'); await toucher('journee');
   const fini = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
   await cdp.send('Tracing.end'); await fini;
@@ -200,7 +266,29 @@ async function k8(pg, t, modele, tactile) {
   const pire = tdur.length ? Math.max(...tdur) : 0;
   const elements = style.map((e) => (e.args && e.args.elementCount) || (e.args && e.args.data && e.args.data.elementCount) || 0);
   const maxEl = elements.length ? Math.max(...elements) : 0;
-  dit(style.length > 0 && pire <= 50 && maxEl <= 3000, `K8 ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus (${style.length} tâches)`, { pire, maxEl, n: style.length });
+  // Ce que pèse l'écran montré (un écran gardé qui revient se recalcule lui-même : c'est le moteur des écrans gardés) et le document.
+  const tailles = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length > 0; const m = document.querySelector('.vrm-main');
+    return { document: document.getElementsByTagName('*').length, ecran: m ? [...m.getElementsByTagName('*')].filter(vis).length : 0 }; });
+  const top = style.map((e, i) => [Math.round(tdur[i] * 10) / 10, elements[i]]).sort((a, b) => b[0] - a[0]).slice(0, 4);
+  // K8a — LA COQUE : aucune invalidation de style posée sur <html>, <body> ou la racine de la coque (un attribut qui suit
+  // l'onglet là-haut restylerait tout le document). Lu dans les événements « InvalidationTracking » de la trace.
+  const inval = evts.filter((e) => /InvalidationTracking/.test(e.name) && e.args && e.args.data);
+  // « Affected by :has() » : une règle d'AVANT ancrée sur body / la coque (`body:has(…)`, `.vrm-app-shell:has(…)`) que le
+  // contenu de l'écran réveille — comptée et dite (chantier `claude/lisible-partout`), pas jugée ici : K8a juge ce que la
+  // coque POSE (un attribut, une classe, un style sur html / body / la racine).
+  const enHaut = (e) => /^(HTML|BODY)\b|vrm-app-shell|n-coque'|n-coque /.test(String(e.args.data.nodeName || ''));
+  const parHas = (e) => /:has\(\)/.test(String(e.args.data.reason || ''));
+  // Ce qui est POSÉ là-haut : un attribut, une classe ou un id changé sur html / body / la racine (ScheduleStyleInvalidationTracking).
+  // Les autres invalidations de ces nœuds (focus, survol, style en ligne d'une mesure, :has() d'avant) sont comptées, pas jugées.
+  const pose = (e) => { const d = e.args.data; return d.changedAttribute || d.changedClass || d.changedId; };
+  const haut = inval.filter((e) => enHaut(e) && !parHas(e) && pose(e));
+  const autres = inval.filter((e) => enHaut(e) && !pose(e)).length;
+  const nomsHaut = [...new Set(haut.map((e) => `${e.args.data.nodeName} · ${pose(e)}`))].slice(0, 6);
+  dit(inval.length > 0 && haut.length === 0, `K8a ${t} : la coque ne pose aucun attribut, classe ou id sur <html>, <body> ou sa racine au changement d’onglet (${inval.length} invalidations ; ${haut.length} posées en haut ; ${autres} autres en haut : focus, :has() d’avant, style en ligne)`, nomsHaut);
+  // K8b — le temps de THREAD des tâches de style. ⚠️ La plus lourde est l'écran gardé qui RE-APPARAÎT (src/ecransGardes.jsx,
+  // chantier `claude/vite-et-sans-bug`) : mesuré aussi sur le build d'avant (main ad73a3c7c), voir le récit du 19 nov.
+  dit(style.length > 0 && pire <= 50 && maxEl <= 3000,
+    `K8b ${t} : retour sur un écran visité — pire tâche de style ${pire.toFixed(1)} ms de thread, ${maxEl} éléments restylés au plus, ${style.length} tâches (écran montré ${tailles.ecran}, document ${tailles.document})`, { pire, maxEl, n: style.length, top, ...tailles });
 }
 
 (async () => {
@@ -213,7 +301,7 @@ async function k8(pg, t, modele, tactile) {
   try {
     const casTel = MUT ? [[false, 'volume']] : [[false, 'volume'], [true, 'volume'], [false, 'vide']];
     for (const [sombre, nom] of casTel) { console.log(`\nTéléphone 390 · ${sombre ? 'sombre' : 'clair'} · base ${nom}`); await telephone(nav, nom === 'vide' ? vide : volume, sombre, nom, erreurs); }
-    if (MUT !== 'dessous' && MUT !== 'largeur') {
+    if (MUT !== 'dessous' && MUT !== 'largeur' && process.env.SEUL !== 'tel') {   // SEUL=tel : le téléphone seulement
       const casOrdi = MUT ? [[1512, false, 'volume']] : [[1512, false, 'volume'], [1512, true, 'volume'], [1280, false, 'volume'], [1512, false, 'vide']];
       for (const [W, sombre, nom] of casOrdi) { console.log(`\nOrdinateur ${W} · ${sombre ? 'sombre' : 'clair'} · base ${nom}`); await ordinateur(nav, nom === 'vide' ? vide : volume, W, sombre, nom, erreurs); }
     }

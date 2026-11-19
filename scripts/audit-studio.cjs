@@ -49,7 +49,7 @@ const JETONS_FIXES = ['--sb-r-tuile', '--sb-r-plan', '--sb-r-barre', '--sb-r-tou
   '--sb-e-appui', '--sb-e-espace', '--sb-e-avant'];
 const CLASSES = ['.sb-btn-plein', '.sb-btn-plein--barre', '.sb-touche', '.sb-rond', '.sb-rond--disque', '.sb-lien', '.sb-plaque', '.sb-plaque.is-double', '.sb-plaque--grande',
   '.sb-tuile', '.sb-tuile-plus', '.sb-rangee', '.sb-vignette', '.sb-bande', '.sb-chiffre-affiche', '.sb-feuille', '.sb-barre', '.sb-disque', '.sb-eventail',
-  '.sb-segment', '.sb-champ', '.sb-avant', '.sb-diode', '.sb-onde', '.sb-voile', '.sb-lame'];
+  '.sb-segment', '.sb-champ', '.sb-avant', '.sb-diode', '.sb-voile', '.sb-lame'];
 const TAILLES = ['1x1', '2x1', '2x2', '3x1'];
 const ESPACES = ['journee', 'paires', 'ventes', 'argent'];
 
@@ -110,7 +110,8 @@ function juger(depot) {
   dit(imports.indexOf('./styles-tablette.css') >= 0 && imports.indexOf('./styles-tablette.css') < imports.indexOf('./design/studio.css'), 'S3 après styles-tablette.css');
   dit(/import '\.\/stylesApp\.js'/.test(app) && app.indexOf("import './stylesApp.js'") < app.indexOf('import "./design/studio.css"'), 'S3 après stylesApp.js (styles-vitrine.css)');
   const rm = css.indexOf('@media (prefers-reduced-motion: reduce)');
-  dit(rm > 0 && /\.sb-onde\s*\{\s*display:\s*none/.test(css.slice(rm)) && /data-sb-eventail[^{]*\{\s*transform:\s*none/.test(css.slice(rm)), 'S3 mouvement réduit : ni ondulation, ni recul de l’écran (fondus seulement)');
+  // (19 nov., « VRM natif ») L'ondulation (`.sb-onde`) est RETIRÉE avec la barre « Studio » : il reste le recul de l'écran.
+  dit(rm > 0 && !/\.sb-onde/.test(css) && /data-sb-eventail[^{]*\{\s*transform:\s*none/.test(css.slice(rm)), 'S3 mouvement réduit : aucun recul de l’écran (fondus seulement) ; plus d’ondulation du tout (19 nov.)');
 
   // S4 — le rouge n'est qu'au doublon.
   const usages = [...css.matchAll(/var\(--sb-doublon\)/g)].map((m) => { const avant = css.lastIndexOf('}', m.index); return css.slice(avant + 1, css.indexOf('{', avant + 1)).trim(); });
@@ -165,7 +166,7 @@ const MUTATIONS = [
   ['S2', 'forme du contrat absente', 'src/design/studio.css', (t) => t.split('.sb-rond--disque').join('.sb-rond--grand')],
   ['S2', 'espace sans aplat', 'src/design/studio.css', (t) => t.replace('[data-espace="ventes"]  { --sb-aplat: #D2E5F4; }', '')],
   ['S3', 'studio.css avant une autre feuille', 'src/App.jsx', (t) => t.replace('import "./design/polices.js";', 'import "./design/polices.js";\nimport "./styles-tard.css";')],
-  ['S3', 'mouvement réduit oublié', 'src/design/studio.css', (t) => t.replace('  .sb-onde { display: none !important; animation: none !important; }', '')],
+  ['S3', 'mouvement réduit oublié', 'src/design/studio.css', (t) => t.replace('html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }', '')],
   ['S4', 'rouge hors du doublon', 'src/design/studio.css', (t) => t.replace('.sb-lien:active, .sb-lien.is-appui { opacity: .55; }', '.sb-lien:active, .sb-lien.is-appui { opacity: .55; color: var(--sb-doublon); }')],
   ['S5', 'police bloquante', 'src/design/studio-polices.css', (t) => t.replace('font-display: swap;', 'font-display: block;')],
   ['S5', 'police chargée d’ailleurs', 'src/design/studio-polices.css', (t) => t.replace("src: url('./polices/inter-latin-wght-normal.woff2')", "src: url('https://fonts.example.test/inter.woff2')")],

@@ -13,14 +13,3 @@
    Une capsule neutre (l'encre à 7 % : l'accent reste à l'icône, §7) qui GLISSE
    vers l'onglet touché — un `transform`, interrompu proprement par un second
    toucher (transition, jamais une animation par images clés). */
-.vrm-tab-pastille-ancre { position: relative; flex: 0 0 0; width: 0; min-width: 0; padding: 0; margin: 0; align-self: stretch; pointer-events: none; }
-.vrm-tab-pastille {
-  position: absolute; left: 0; top: 0; height: 0; width: 0;
-  border-radius: 16px; pointer-events: none;
-  background: color-mix(in srgb, var(--vrm-ink, #1D1D1F) 7%, transparent);
-}
-.vrm-tab-pastille[data-prete] { transition: transform 280ms cubic-bezier(.32, .72, 0, 1), width 280ms cubic-bezier(.32, .72, 0, 1); }
-html .vrm-app-shell .vrm-tabbar > .vrm-tab { position: relative; }
-@media (prefers-reduced-motion: reduce) {
-  .vrm-tab-pastille[data-prete] { transition: none; }
-}

@@ -524,7 +524,8 @@
     /* La coque dont l'ÉCRAN défile, à l'ordinateur : la barre latérale est FIXE à gauche, la racine lui garde sa place
        (tout ce qui est dans le flux — bandeaux de panne, d'exemple, l'écran — commence après elle, sans calcul). */
     .n-coque[data-n-defile="ecran"] { display: flex; flex-direction: column; padding-inline-start: var(--n-l-laterale); }
-    .n-coque[data-n-defile="ecran"] > .n-laterale { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; height: auto; }
+    /* `align-self: stretch` : un enfant fixe d'un conteneur flex suit son alignement (start ⇒ il ne s'étirait pas, 691 px). */
+    .n-coque[data-n-defile="ecran"] > .n-laterale { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; height: auto; align-self: stretch; }
     .n-coque[data-n-defile="ecran"] > .n-coque-ecran { width: auto; height: auto; }
     /* Trois volets : un écran natif qui a un détail. La liste est l'écran, le détail un volet fixe à droite. */
     .n-coque[data-n-defile="ecran"] > .n-coque-ecran[data-n-volets="trois"] { flex: 1 1 auto; width: var(--n-l-liste); max-width: var(--n-l-liste); border-right: .5px solid var(--n-trait); }
