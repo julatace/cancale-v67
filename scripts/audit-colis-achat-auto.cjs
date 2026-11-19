@@ -45,7 +45,7 @@ const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 
 const MUTS = {
-  'bouton-sur-la-passe': ['src/designV2/PassesRetrait.jsx', "          <BoutonV2 role=\"texte\" onClick={() => setFait(true)}", "          <BoutonV2 role=\"texte\" onClick={() => {}} attrs={{ 'data-v2-relier': '' }}>Relier l’achat</BoutonV2>\n          <BoutonV2 role=\"texte\" onClick={() => setFait(true)}"],
+  'bouton-sur-la-passe': ['src/designV2/PassesRetrait.jsx', "        <button type=\"button\" className=\"v2r-retire\"", "        <button type=\"button\" onClick={() => {}} data-v2-relier=\"\">Relier l’achat</button>\n        <button type=\"button\" className=\"v2r-retire\""],
   'bouton-sur-la-ligne': ['src/CarteRelais.jsx', "        <span className=\"vrm-rpf-relier-t\">{contenuTxt}</span>", "        <span className=\"vrm-rpf-relier-t\">{contenuTxt}</span><button type=\"button\" data-rp-relier-ouvrir={x.cle}>Relier</button>"],
   'par-le-titre': ['src/contenuColis.js', "  return commandeUnique(a, jonction || null);", "  return commandeUnique(a, jonction || null) || (achats || []).find((o) => o && t.artTitle && o.title === t.artTitle) || null;"],
   'deux-achats-le-premier': ['src/liensColis.js', " return c&&c.size===1?[...c.values()][0]:null;", " return c&&c.size>=1?[...c.values()][0]:null;"],
