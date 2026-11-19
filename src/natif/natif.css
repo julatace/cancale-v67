@@ -502,6 +502,8 @@
   .n-laterale-entree:active { background: var(--n-appui); }
   .n-laterale-point { flex: 0 0 auto; width: 10px; height: 10px; margin-inline-end: 4px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
   .n-coque-marque { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--n-encre); font: var(--n-t-second-fort); }
+  .n-laterale-outils { display: flex; align-items: center; gap: 4px; min-height: var(--n-cible); margin: 0 0 4px; }
+  .n-laterale-outils:empty { display: none; }
   .n-coque-etats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 var(--n-marge); }
   .n-coque-etats:empty { display: none; }
   .n-laterale-pied { flex: 0 0 auto; padding-top: 8px; border-top: .5px solid var(--n-trait); }
@@ -519,9 +521,14 @@
     .n-coque { --n-bas: 0px; display: grid; grid-template-columns: var(--n-l-laterale) minmax(0, 1fr); align-items: start; }
     .n-coque[data-n-volets="trois"] { grid-template-columns: var(--n-l-laterale) minmax(380px, 520px) minmax(0, 1fr); height: 100dvh; overflow: hidden; align-items: stretch; }
     .n-coque[data-n-volets="trois"] > .n-coque-ecran { height: 100dvh; overflow-y: auto; overscroll-behavior: contain; border-right: .5px solid var(--n-trait); }
-    .n-coque[data-n-defile="ecran"] { display: grid; grid-template-rows: minmax(0, 1fr); height: 100%; }
-    .n-coque[data-n-defile="ecran"] > .n-laterale { height: 100%; }
-    .n-coque[data-n-defile="ecran"] > .n-coque-ecran { grid-column: 2; height: 100%; }
+    /* La coque dont l'ÉCRAN défile, à l'ordinateur : la barre latérale est FIXE à gauche, la racine lui garde sa place
+       (tout ce qui est dans le flux — bandeaux de panne, d'exemple, l'écran — commence après elle, sans calcul). */
+    .n-coque[data-n-defile="ecran"] { display: flex; flex-direction: column; padding-inline-start: var(--n-l-laterale); }
+    .n-coque[data-n-defile="ecran"] > .n-laterale { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; height: auto; }
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran { width: auto; height: auto; }
+    /* Trois volets : un écran natif qui a un détail. La liste est l'écran, le détail un volet fixe à droite. */
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran[data-n-volets="trois"] { flex: 1 1 auto; width: var(--n-l-liste); max-width: var(--n-l-liste); border-right: .5px solid var(--n-trait); }
+    .n-coque[data-n-defile="ecran"] > .n-coque-detail { position: fixed; z-index: 1; top: 0; bottom: 0; right: 0; left: calc(var(--n-l-laterale) + var(--n-l-liste)); height: auto; }
     .n-coque-detail { position: relative; height: 100dvh; min-width: 0; overflow: hidden; background: var(--n-fond); }
     .n-coque-fente { display: contents; }
     .n-coque-detail-vide { display: none; height: 100%; align-items: center; justify-content: center; }

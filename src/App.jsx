@@ -20510,7 +20510,7 @@ const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0;
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
   onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
 const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
-function LateraleNative({ tab, setTab, entreprise, sites, badges }) {
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null }) {
   useProfilVendeur(); useEcransVusTick();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -20523,18 +20523,23 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges }) {
     { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
+      // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
+      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
+      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
   ];
+  const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
     <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }}
       tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
-      pied={uid ? (
+      pied={uid ? (<>
+        {boiteOutils}
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" title={tr('coque.monProfil')}
           aria-label={`${nomCoque.texte} — ${tr('coque.ouvrirProfil')}`} onClick={() => ouvrirMenuProfil()}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
           <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span></span>
         </button>
-      ) : null}/>
+      </>) : boiteOutils}/>
   );
 }
 function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, ouvrirRecherche, scanner, streamVisible = false, etats = null }) {
@@ -63715,6 +63720,11 @@ function AppCoeur() {
   const ileRef = React.useRef(null);
   // (31 oct.) La place des filtres de site dans la barre du haut (ordinateur).
   const [slotBarre, setSlotBarre] = React.useState(null);
+  // (19 nov., « VRM natif ») Trois volets à l'ordinateur pour un écran natif (ECRANS_NATIFS) : la fente du détail, et ce
+  // que la coque dit aux pages (`ContexteCoque`). Un écran d'avant : pas de détail, le contexte reste figé (aucun rendu de plus).
+  const [fenteDetail, setFenteDetail] = React.useState(null);
+  const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab));
+  const contexteCoque = React.useMemo(() => (troisVolets ? { titreRendu: true, voletDetail: fenteDetail, ordinateur: true } : CONTEXTE_COQUE_NATIVE), [troisVolets, fenteDetail]);
   // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
   React.useEffect(() => {
     const k = (e) => {
@@ -66948,7 +66958,12 @@ function AppCoeur() {
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
+      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
+        outils={<>
+          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
+          {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
+          {(!reglesStream.bouton && !streamOn) || montantsCaches ? <BoutonMontants/> : null}
+        </>}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -66983,90 +66998,14 @@ function AppCoeur() {
       <ProgrammeRepubVeille/>
       {/* (2 nov.) Le mode automatique des favoris : VRM ouvert dans un onglet suffit. */}
       <PiloteFavorisAutoConnecte comptes={vintedAccounts.map(a=>String(a.vinted_user_id))}/>
-      {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
-          derrière au défilement au lieu de buter sur un bandeau plein. */}
-      {/* Sur ordinateur l'en-tête commence APRÈS la barre latérale, et la marque
-          n'y est plus : elle est en haut de la barre. Deux logos sur le même
-          écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
-      {/* ⚠️ SUR ORDINATEUR LE BANDEAU NE PREND PLUS DE PLACE DANS LA PAGE. Il
-          restait 56 px de vide au-dessus de CHAQUE titre d'écran, pour quatre
-          icônes collées à droite (§5.62 avait retiré la marque de ce bandeau,
-          §5.68 le mot « VRM » — il ne restait plus rien à gauche). En le passant
-          en `fixed`, le titre de l'écran remonte et partage la ligne avec les
-          actions, comme dans une vraie application. Sur téléphone il porte le
-          menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      {/* (16 oct.) Le dessin de l'en-tête vit dans `.vrm-app-header`
-          (styles-coque.css) : téléphone = barre transparente qui prend son verre
-          et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
-          haut à droite. Ici seulement la structure et la position. */}
       {/* (19 nov., « VRM natif ») Au téléphone, la tête est `TeteNative`, DANS <main> (elle défile avec le grand titre). Ici il ne
           reste que le champ de la recherche OUVERTE (collé en haut, ses résultats dessous) ; la cloche (sans bouton) et l'état des
-          actions restent montés pour que « Plus » et les notifications les ouvrent. */}
+          actions restent montés pour que « Plus » et les notifications les ouvrent.
+          ⚠️ (19 nov.) À l'ordinateur, plus d'île flottante en haut à droite (logo, état, œil, cloche) : la barre latérale porte
+          la cloche (« Notifications »), l'état des actions et, en pied, la synchronisation, l'œil / Stream et le profil. */}
       {!ordi && gsOpen ? <header className="vrm-app-header is-defile" data-n-recherche-ouverte="" style={{position:'sticky',top:0,zIndex:50}}>{champRechercheMobile}</header> : null}
-      {!ordi && AUTH.user ? <CentreNotifsCoque sansBouton onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/> : null}
-      {!ordi && MULTI_USER ? <span data-n-etat-muet="" style={{display:'none'}}><EtatActions onNav={setTab} ordi={false} sombre={dark} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/></span> : null}
-      {ordi ? <header className={`vrm-app-header${defile && !(designV2App && !ordi) ? ' is-defile' : ''}${v2Tete ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Tete ? 'absolute' : 'sticky',top: ordi ? 12 : v2Tete ? 6 : 0,right: ordi ? 24 : v2Tete ? 12 : undefined,...(v2Tete ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
-        {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
-            invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
-          {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
-              les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark} sites={sitesPresents} badges={badgesNav}/>}
-          <div className="vrm-header-logo" aria-label="VRM">
-            <VrmLogo size={36} anim={false}/>
-          </div>
-          {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
-          <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
-        </div>
-        {/* (17 nov.) Nouveau design, au téléphone : le GRAND titre est dans l'écran ; au défilement, ni verre opaque ni petit
-            titre posé sur la recherche (rapport de l'agent Stock, #1249). */}
-        {!ordi && !designV2App && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
-        {!ordi && gsOpen && champRechercheMobile}
-        <div className="vrm-header-actions">
-          {/* (5 nov., chantier H — revue 2.28) Au téléphone, l'en-tête ne porte plus que :
-              la PASTILLE d'état (un point de couleur, plus de « ⓘ »), « Stream », la
-              cloche, la loupe — et le nuage seulement quand une sauvegarde a raté. */}
-          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}>
-            <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
-            {syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}
-          </span>
-          <div style={{display:'flex',alignItems:'center'}}>
-            {(() => { const eD = dark; return (<>
-            {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
-                écrans (Julien, 5 octobre). Voir `EtatActions`. */}
-            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/>}
-            {/* (5 nov.) « Stream » remplace l'œil des montants : la règle programmée
-                (src/modeStream.js) cache montants, marques, comptes, pseudos…
-                (6 nov.) Le bouton n'apparaît que s'il est choisi dans Réglages → Mode
-                stream (« Afficher le bouton Stream », éteint par défaut). Allumé, il
-                RESTE tant que le mode stream l'est (le décocher en filmant ne doit pas
-                tout montrer d'un coup, ni laisser le mode sans bouton pour l'éteindre).
-                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé) ;
-                pendant un stream, l'œil se tait (le stream cache déjà les montants :
-                une seule porte à la fois dans l'en-tête). */}
-            {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-            {/* (14 nov., refonte de la coque) Au téléphone, l'œil vit dans le menu du compte (trois icônes au
-                plus dans la barre : loupe · cloche · compte) ; il revient dans la barre tant que les montants
-                SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
-            {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
-            {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && !v2Tete && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
-              onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
-                appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
-              onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
-              onContextMenu={(e)=>{ if(DICTEE_OK) e.preventDefault(); }}
-              onClick={()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
-              <Icon name="search" size={21}/>
-            </button>}
-            {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
-            {!ordi && MULTI_USER && !v2Tete && <BoutonProfilTete/>}
-            {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
-                dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
-            </>); })()}
-          </div>
-        </div>
-      </header> : null}
+      {AUTH.user ? <CentreNotifsCoque sansBouton onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/> : null}
+      {MULTI_USER ? <span data-n-etat-muet="" style={{display:'none'}}><EtatActions onNav={setTab} ordi={false} sombre={dark} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/></span> : null}
       {/* (31 oct.) Sur téléphone, les résultats de la recherche tombent sous l'en-tête (pas d'écran plein). */}
       {!ordi && panneauRecherche}
       {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
@@ -67079,7 +67018,7 @@ function AppCoeur() {
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
       {/* (14 nov.) « J'ai déjà un compte · Me connecter » à côté de « Créer mon compte » ; le cadre hachuré
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
-      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: 32 } : undefined}onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
       <Natif.CoqueEcran className="vrm-main" attrs={{ id: 'vrm-contenu', 'data-ecran': tab, 'data-espace': espaceDe(tab, BAR_GROUPE), 'data-defile': '1', style: {
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
@@ -67111,7 +67050,7 @@ function AppCoeur() {
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
-        // (19 nov., « VRM natif ») La barre latérale est une colonne de la grille : plus de marge de 272 px à gauche.
+        // (19 nov., « VRM natif ») La barre latérale est fixe et la racine lui garde sa place (natif.css) : plus de marge de 272 px.
         paddingLeft: ordi ? 32 : undefined,
         paddingRight: ordi ? 28 : undefined,
         // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
@@ -67119,8 +67058,8 @@ function AppCoeur() {
         // La barre étant maintenant DANS le flux (sous `<main>`), plus besoin de
         // réserver sa hauteur : juste une marge pour ne pas coller la dernière
         // carte à la barre.
-        paddingBottom: ordi ? 40 : 20} }}>
-        <Natif.ContexteCoque.Provider value={CONTEXTE_COQUE_NATIVE}>
+        paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
+        <Natif.ContexteCoque.Provider value={contexteCoque}>
         {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/>}
@@ -67537,6 +67476,9 @@ function AppCoeur() {
         </BarreHautSlot.Provider>
         </Natif.ContexteCoque.Provider>
       </Natif.CoqueEcran>
+      {/* (19 nov., « VRM natif ») Le TROISIÈME volet, à l'ordinateur, pour un écran natif : sa `<PagePoussee>` s'y pose
+          (`ContexteCoque.voletDetail`). Un écran d'avant n'en a pas : il garde liste + reste. */}
+      {troisVolets ? <aside className="n-coque-detail" data-n-coque-detail="" aria-label={tr('natif.detail.nom')}><div className="n-coque-fente" ref={setFenteDetail}/></aside> : null}
       {pnOuvert && <GardeEcran nom="parcours-nouveau" feuille onFermer={()=>fermerParcoursNouveau('plusTard')}><ParcoursNouveauApp comptes={vintedAccounts} etapeForcee={pnEtape} onFermer={fermerParcoursNouveau}/></GardeEcran>}
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}
