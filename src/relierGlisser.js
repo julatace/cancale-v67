@@ -22,7 +22,7 @@
 // ombre, petite oscillation) est le seul retour. Aucun texte ne promet une vibration.
 //
 // Module PUR : exécuté par scripts/audit-relier-glisser.cjs.
-import { tousAchatsLibres, tousAchatsLibresDetail } from './suggestionsAchat.js';
+import { tousAchatsLibres, tousAchatsLibresDetail, foinAchat } from './suggestionsAchat.js';
 
 export const DELAI_APPUI_MS = 400;     // appui long (iPhone : ~0,5 s pour soulever une icône)
 export const SEUIL_DEFILEMENT_PX = 10; // un doigt qui bouge plus avant le délai = un défilement
@@ -107,6 +107,25 @@ export function compterCibles(cibles) {
 export function filtrerCibles(cibles, filtre = 'toutes') {
   const cs = Array.isArray(cibles) ? cibles : [];
   return filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;
+}
+
+// ── (19 nov., Julien : « une barre de recherche pour retrouver les ventes et les achats quand on relie ») ──────────
+// Chaque MOT tapé doit se trouver dans la ligne (sans accents ni majuscules) ; « contient », jamais un rapprochement.
+// Achats : le même foin que « Tous mes achats » (`foinAchat` : titre, marque, taille « 42 » / « taille 42 » / « t42 »,
+// prix « 24,63 », date « 12/10 » ou « octobre », compte, vendeur, n° de transaction).
+const motsDe = (q) => String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+export function chercherAchats(liste, q = '', aides = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const mots = motsDe(q); if (!mots.length) return liste;
+  return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.every((m) => foin.includes(m)); });
+}
+// Ventes et annonces : N° (« 215 », « n°215 »), titre, taille, prix et date écrits sur la ligne, « vendue » / « en vente ».
+export function chercherCibles(cibles, q = '') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  const mots = motsDe(q); if (!mots.length) return cs;
+  const foin = (c) => { const t = String(c.taille || '').replace(',', '.'); const n = String(c.num || '');
+    return motsDe([c.titre, n, n ? 'n°' + n : '', n ? 'n' + n : '', t, t.replace('.', ','), t ? 'taille ' + t : '', t ? 't' + t : '', c.sous, c.genre === 'vente' ? 'vendue vendu' : 'en vente en ligne'].filter(Boolean).join(' ')).join(' '); };
+  return cs.filter((c) => { const f = foin(c); return mots.every((m) => f.includes(m)); });
 }
 
 // ── La phrase de confirmation (une ligne) ───────────────────────────────────
