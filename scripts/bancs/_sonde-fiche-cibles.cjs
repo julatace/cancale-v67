@@ -31,7 +31,16 @@ const W = Number(process.env.W || 390);
         if (props.length) console.log('  ', (r.rule.layers || []).map((l) => l.text).join('>') || '(sans couche)', '|', r.rule.selectorList.text.slice(0, 120), '|', props.join('; ').slice(0, 200));
       }
     }
-    if (process.env.SHOT) await o.pg.screenshot({ path: process.env.SHOT, fullPage: false });
+    // Captures de la fiche ENTIÈRE (viewport haut) : NUMS=3102,3105 SHOTS=<dossier>.
+    if (process.env.SHOTS) for (const n of (process.env.NUMS || N).split(',')) {
+      await o.pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: x })), n);
+      await o.pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 12000 }).catch(() => {}); await o.pg.waitForTimeout(2500);
+      const h = await o.pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); return f ? f.scrollHeight : 900; });
+      await o.pg.setViewportSize({ width: W, height: Math.min(2400, h + 10) }); await o.pg.waitForTimeout(600);
+      await o.pg.screenshot({ path: path.join(process.env.SHOTS, `entiere-${n}-${W}${process.env.SOMBRE ? '-sombre' : ''}.png`) });
+      console.log('fiche', n, 'hauteur', h);
+      await o.pg.setViewportSize({ width: W, height: W < 600 ? 844 : 950 });
+    }
     await o.ctx.close();
   } finally { await nav.close(); P.srv.close(); }
 })();
