@@ -30,6 +30,8 @@ import { planRetirerAilleurs, texteConfirmation, executerRetraits, avecRelecture
 // (15 nov., retrait-ailleurs) « À retirer ailleurs » : un endroit, un geste par site (src/aRetirerAilleurs.js).
 import ARetirerAilleurs from './ARetirerAilleurs.jsx';
 import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
+// (19 nov., décisions « 1 oui, 3 oui », ext. 5.409) La baisse par règle (éteinte par défaut) et « vendue ailleurs ⇒ masquée ».
+import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
@@ -577,7 +579,7 @@ import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeB
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
-import { onduler, preparerOndulation } from "./design/ondulation.js";
+// (19 nov., « VRM natif ») `design/ondulation.js` n'est plus importé : aucun anneau ne se pose au changement d'onglet.
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -929,6 +931,7 @@ import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ImportStockReglage } (était importé en statique)
 const ImportStockReglage = aLaDemande(() => import('./composants/ImportStock.jsx').then((m) => ({ default: m.ImportStockReglage })));
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
+import { nouvelleCommandePrix, deposerPrixAttente, lirePrixAttente, annulerPrixAttente } from "./prixAttente.js";   // (19 nov., ext. 5.409) une baisse qui ne peut pas partir tout de suite ATTEND
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CreerSurVinted (était importé en statique)   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
@@ -1088,6 +1091,7 @@ import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
+import "./coque-native.css";   // (19 nov., « VRM natif ») le pont : les contrôles des pièces natives ne prennent plus les styles d'avant sans couche (sa place : avant les polices du studio, audit-studio S3 ; elle gagne par la spécificité, pas par l'ordre)
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
@@ -1128,7 +1132,7 @@ import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
 import * as Natif from "./natif/index.js";   // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
-import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
+// (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -1206,7 +1210,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.408.0';
+const EXT_ATTENDUE = '5.409.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1638,7 +1642,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3426,7 +3430,7 @@ const SYNC_KEYS = [
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
   // (11 nov., lot securite-vinted) SES réglages de sécurité des comptes + « Tout arrêter » (src/securiteComptes.js), écrits sur SON geste, lus par l'extension.
   'vrm_securite_comptes',
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -19218,12 +19222,142 @@ export function enregistrerSoldeVrm({ fin, site, faites }) {
 }
 export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
-  cleNum, capVinted: extSait('republiermodif'),
+  cleNum, recettes: extra ? extra.recettes : null, formats: extra ? extra.formats : null,
   numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
 // Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
-const ENVOIS_PRIX = envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE });
+// ⚠️ (19 nov., décision de Julien : « c'est à l'extension de baisser les prix, c'est pas à moi »)
+//    « Appliquer » est SON clic : sur Vinted, Leboncoin et Vestiaire la baisse part par la commande
+//    de baisse de l'extension (une par annonce, le prix vu joint) ; quand l'extension ne peut pas
+//    agir maintenant (iPhone, autre compte, plafond, pause), elle est RANGÉE (`cmd_prix_*`,
+//    src/prixAttente.js) et part seule dès qu'un de ses navigateurs ouvre le site sur ce compte.
+//    Plus de second bouton, plus de feuille « Baisser le prix » ouverte par-dessus. Ne pas les remettre.
+const depPrixAttente = () => ({ base: `${SUPABASE_URL}/rest/v1`, entetes: (x) => sbAuth(x), ligne: withOwner, conflit: SB_CONFLICT });
+const CAP_PRIX_SITE = { vinted: 'baisseprix', leboncoin: 'lbcprix', vestiaire: 'vcprix' };
+// Une extension qui sait relever les prix en attente est-elle CONNUE ? Celle de ce navigateur (le pont),
+// ou celle de l'ordinateur (son battement `relais_ext`, lu à l'ouverture de la feuille). « Pas su » ⇒ non.
+const extensionSaitAttendre = () => {
+  if (extSait('prixattente') === 'ok') return true;
+  const r = __relais;
+  return !!(r && r.ver && /^\d+\.\d+\.\d+$/.test(r.ver) && cmpVersion(r.ver, EXT_CAPACITES.prixattente) >= 0);
+};
+const envoisPrixVrm = (num) => envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE,
+  ici: (site) => extSait(CAP_PRIX_SITE[site]) === 'ok',
+  saitAttendre: extensionSaitAttendre,
+  deposer: async (c) => {
+    if (!(AUTH.user && AUTH.user.id) || !isCloudReady()) return null;
+    const cmd = nouvelleCommandePrix({ ...c, num, owner: String(AUTH.user.id), alea: Math.random().toString(36).slice(2, 10) });
+    const d = cmd ? await deposerPrixAttente(depPrixAttente(), cmd) : null;
+    if (d) suivrePrixAttente(d.id, { num, site: c.site, cle: d.data.cle });
+    return d;
+  } });
+// Les commandes rangées PENDANT cette session : relues toutes les 30 s (page visible) et au signe de
+// l'extension ; leur issue est dite UNE fois (prix relu, ou pourquoi rien n'est parti). Lecture seule.
+const __prixSuivis = new Map();   // id → { num, site, cle }
+let __prixSuiviMinuteur = null;
+async function tourPrixSuivis() {
+  if (!__prixSuivis.size) { clearInterval(__prixSuiviMinuteur); __prixSuiviMinuteur = null; return; }
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const l = await lirePrixAttente(depPrixAttente(), [...new Set([...__prixSuivis.values()].map((x) => x.cle))]);
+  if (!l) return;
+  for (const [id, info] of [...__prixSuivis]) {
+    const v = l.find((x) => x.id === id);
+    if (!v || v.etat === 'attente' || v.etat === 'pris') continue;
+    __prixSuivis.delete(id);
+    const site = NOM_SITE_PRIX[info.site] || '';
+    const eur = (n) => (n == null ? '—' : String(Math.round(n * 100) / 100).replace('.', ',') + '\u00a0€');
+    if (v.etat === 'fait') toast(tr(v.relu ? 'prixPartout.issue.faitRelu' : 'prixPartout.issue.fait', { num: info.num, site, prix: eur(v.relu ? v.prixVu : v.prix) }), 'ok');
+    else if (v.etat === 'annulee' || v.etat === 'remplacee') { /* son geste : rien à dire */ }
+    else if (v.code === 'prix-change') toast(tr('prixPartout.issue.change', { num: info.num, site, prix: eur(v.prixVu) }));
+    else if (v.etat === 'perimee') toast(tr('prixPartout.issue.perimee', { num: info.num, site }));
+    else toast(tr('prixPartout.issue.refuse', { num: info.num, site }));
+  }
+  try { window.dispatchEvent(new CustomEvent('vrm:prix-attente')); } catch (_) {}
+}
+function suivrePrixAttente(id, info) {
+  __prixSuivis.set(id, info);
+  if (!__prixSuiviMinuteur && typeof window !== 'undefined') __prixSuiviMinuteur = setInterval(tourPrixSuivis, (typeof window.__VRM_PRIX_SUIVI_MS === 'number' && window.__VRM_PRIX_SUIVI_MS > 0) ? window.__VRM_PRIX_SUIVI_MS : 30000);
+}
+const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
+// La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
+// pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
+function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
+  const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
+  const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
+  const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
+  const [formats, setFormats] = useState(null);         // { [idVinted]: true (format appris) | false } · null (pas su)
+  const { rn } = rechercheParNumero(num, numData, comptes);
+  const ex = extra && extra.num === num ? extra : null;
+  const lecture = !numData || !ex;
+  const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(num, rn, ex ? { ...ex, recettes, formats } : { lbcItems: undefined, vcItems: undefined, formats });
+  // Le « format appris » de chaque annonce Vinted de ce N° (`vrm_vinted_modele`, une date par annonce, jamais le corps : §4.4).
+  const idsVinted = ((rn && rn.annonces) || []).map((a) => String(a.id)).filter((x) => /^\d{4,15}$/.test(x)).slice(0, 12).join(',');
+  useEffect(() => {
+    if (!idsVinted) return undefined;
+    let vivant = true;
+    (async () => {
+      try {
+        const ids = idsVinted.split(',');
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vrm_vinted_modele&select=${ids.map((id, i) => `f${i}:data->"${id}"->>at`).join(',')}`, { headers: sbAuth(), cache: 'no-store' });
+        if (!r.ok) return;
+        const rows = await r.json();
+        if (!vivant || !Array.isArray(rows)) return;
+        const l = rows[0] || {};
+        setFormats(Object.fromEntries(ids.map((id, i) => [id, !!l['f' + i]])));
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  }, [idsVinted]);
+  const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
+  const cles = sitesVus.filter((x) => x.site !== 'ebay').map((x) => x.cle).join(',');
+  const relire = React.useCallback(async () => {
+    if (!cles) { setAtt([]); return; }
+    setAtt(await lirePrixAttente(depPrixAttente(), cles.split(',')));
+  }, [cles]);
+  useEffect(() => { relire(); }, [relire]);
+  useEffect(() => {
+    let vivant = true;
+    if (extSait('prixattente') !== 'ok') lireRelais().then(() => { if (vivant) setSait(extensionSaitAttendre()); }).catch(() => {});
+    (async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(lbc_prix_recette,vc_prix_recette)&select=id,appris:data->appris`, { headers: sbAuth() });
+        if (!r.ok) return;
+        const rows = await r.json();
+        if (!vivant || !Array.isArray(rows)) return;
+        const de = (id) => { const l = rows.find((x) => x && x.id === id); return l ? l.appris === true : false; };
+        setRecettes({ leboncoin: de('lbc_prix_recette'), vestiaire: de('vc_prix_recette') });
+      } catch (_) {}
+    })();
+    return () => { vivant = false; };
+  }, []);
+  // Tant qu'une baisse attend ou est prise : relue toutes les 20 s (page visible), et au signe de l'extension.
+  const enCours = Array.isArray(att) && att.some((v) => v.etat === 'attente' || v.etat === 'pris');
+  useEffect(() => {
+    const maj = () => relire();
+    window.addEventListener('vrm:prix-attente', maj);
+    const t = enCours ? setInterval(() => { if (!document.hidden) relire(); }, 20000) : null;
+    return () => { window.removeEventListener('vrm:prix-attente', maj); if (t) clearInterval(t); };
+  }, [enCours, relire]);
+  const reglageP = load(CLE_PRIX_PARTOUT, null);
+  const libelles = load('vinted_account_labels', {}) || {};
+  const compteDe = (uid) => { const a = (comptes || []).find((x) => String(x.vinted_user_id) === String(uid)); return a ? (libelles[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; };
+  // (19 nov., décision 1) La baisse par règle, réglée par compte Vinted de CE N° (éteinte par défaut, SON toucher).
+  const [regles, setRegles] = useState(() => load(REGLE_CLE, null));
+  const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
+    .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }));
+  const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
+  return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
+    onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
+    onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
+    onAppliquer={async ({ coches, prix, surEtat }) => {
+      const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: envoisPrixVrm(String(rn.cle || num)), surEtat, reglage: reglageP });
+      if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
+      relire();
+      return r;
+    }}/>;
+}
 // DUPLIQUER : une fiche neuve (`vrm_fiches_neuves`), un N° neuf (`prochainLibre`
 // sur TOUS les numéros servis, réservés compris), aucune photo, aucune identité.
 // Rend { ok, numero } ou { ok:false, raison }. Rien sur « pas su ».
@@ -20260,19 +20394,6 @@ const _etatActionsSubs = new Set();
 const publierEtatActions = (e) => { ETAT_ACTIONS_VU = e; _etatActionsSubs.forEach((f) => { try { f(); } catch (_) {} }); };
 const useEtatActionsVu = () => React.useSyncExternalStore((f) => { _etatActionsSubs.add(f); return () => _etatActionsSubs.delete(f); }, () => ETAT_ACTIONS_VU);
 const ouvrirEtatActions = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
-// La photo du profil dans l'en-tête du téléphone (à droite) : ouvre le même menu.
-// (14 nov.) Elle porte le point d'état de la pastille « Actions Vinted » (qui ne tient plus dans la barre) :
-// ambre = un geste à faire, encre = tu peux agir, gris = lecture seule — jamais rouge (§7).
-function BoutonProfilTete() {
-  const uid = (AUTH.user && AUTH.user.id) || '';
-  const etat = useEtatActionsVu();
-  if (!uid) return null;
-  const lib = etat && etat.nom ? `${tr('coque.monProfil')} · ${etat.nom}` : tr('coque.monProfil');
-  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" data-etat-ton={etat ? etat.ton : undefined} aria-haspopup="dialog" aria-label={lib} onClick={ouvrirMenuProfil}>
-    <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
-    {etat ? <span className="vrm-hdr-profil-etat" data-etat-point={etat.ton} aria-hidden="true" style={{ '--etat-point': etat.point }}/> : null}
-  </button>;
-}
 // Le nom de l'entreprise dans l'en-tête : rien quand il est masqué (ou pas encore lu).
 function NomEntrepriseCoque({ entreprise, className }) {
   const uid = (AUTH.user && AUTH.user.id) || '';
@@ -20280,275 +20401,9 @@ function NomEntrepriseCoque({ entreprise, className }) {
   if (MULTI_USER && uid && n.masque !== false) return null;
   return <NomEntreprise entreprise={entreprise} className={className}/>;
 }
-function SideBar({ tab, setTab, entreprise, sites, badges }) {
-  useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
-  const groupes = groupesVisibles(sites, t => !t.tel, true);
-  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label + suffixeBadgeNav(t, badges)} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>{ revenirSurOnglet(); ouvrirEntree(t,setTab); }} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
-  // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
-  // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
-  // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
-  // de l'écran ouvert est ramenée dans la vue à chaque changement.
-  const groupe = g => <section key={g.nom} className="vrm-rail-management-group" aria-label={g.titre} data-nav-groupe={g.nom}><div className="vrm-rail-section-label">{g.titre}</div><div className="vrm-rail-management">{g.items.map(bouton)}</div></section>;
-  const zoneRef = React.useRef(null);
-  React.useEffect(() => {
-    const el = zoneRef.current; if (!el) return undefined;
-    const poser = () => {
-      const reste = el.scrollHeight - el.clientHeight;
-      const haut = reste > 1 && el.scrollTop > 1, bas = reste > 1 && el.scrollTop < reste - 1;
-      const v = haut && bas ? 'les-deux' : bas ? 'bas' : haut ? 'haut' : '';
-      if (v) el.setAttribute('data-rail-suite', v); else el.removeAttribute('data-rail-suite');
-    };
-    poser();
-    el.addEventListener('scroll', poser, { passive: true });
-    let ro = null; try { ro = new ResizeObserver(poser); ro.observe(el); } catch (_) {}
-    window.addEventListener('resize', poser);
-    return () => { el.removeEventListener('scroll', poser); window.removeEventListener('resize', poser); try { ro && ro.disconnect(); } catch (_) {} };
-  }, []);
-  // (1er nov., capture de Julien à 1512 × ~1000) « Vestiaire » COUPÉ à moitié
-  // par le filet du pied : une entrée de navigation ne se coupe jamais. Quand la
-  // colonne ne tient pas, ses rangées se RESSERRENT (densité 1 à 4, styles-
-  // finition.css) ; si même serrée elle ne tient pas, c'est TOUTE la colonne qui
-  // défile (pied compris), jamais une ligne coupée par un filet intérieur.
-  // Banc : scripts/bancs/tous-boutons.cjs (« colonne »).
-  const railRef = React.useRef(null);
-  const nEntrees = groupes.reduce((n, g) => n + g.items.length, 0);
-  React.useLayoutEffect(() => {
-    const rail = railRef.current, zone = zoneRef.current; if (!rail || !zone) return undefined;
-    let raf = 0;
-    const ajuster = () => {
-      rail.removeAttribute('data-rail-defile');
-      for (let d = 0; d <= 4; d++) {
-        if (d) rail.setAttribute('data-rail-densite', String(d)); else rail.removeAttribute('data-rail-densite');
-        if (zone.scrollHeight <= zone.clientHeight + 1) return;
-      }
-      rail.setAttribute('data-rail-defile', 'tout');
-    };
-    ajuster();
-    const plusTard = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(ajuster); };
-    window.addEventListener('resize', plusTard);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', plusTard); };
-  }, [nEntrees, badges]);
-  React.useEffect(() => {
-    const el = zoneRef.current; if (!el) return;
-    const b = el.querySelector('.vrm-rail-button[aria-current="page"]');
-    try { if (b) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
-  }, [tab]);
-  // (9 nov., direction artistique 5) L'INDICATEUR QUI GLISSE : une seule pastille
-  // (`data-nav-indicateur`) posée sous l'entrée de l'écran ouvert, qui glisse
-  // d'une entrée à l'autre (transform, styles-nav-v2.css ; immobile sous
-  // `prefers-reduced-motion`). Purement décoratif (`aria-hidden`) : l'état reste
-  // `aria-current`, et sans mesure (pas d'entrée allumée, entrée hors de la zone
-  // visible) la pastille se cache et l'entrée garde son propre fond.
-  const indRef = React.useRef(null), indPose = React.useRef(false);
-  React.useLayoutEffect(() => {
-    const nav = railRef.current, ind = indRef.current, zone = zoneRef.current; if (!nav || !ind) return undefined;
-    let raf = 0;
-    const placer = (anime) => {
-      const b = nav.querySelector('.vrm-rail-button[aria-current="page"]');
-      const cacher = () => { ind.style.opacity = '0'; nav.removeAttribute('data-indicateur'); };
-      if (!b || !b.getClientRects().length) return cacher();
-      const nr = nav.getBoundingClientRect(), br = b.getBoundingClientRect();
-      if (zone && zone.contains(b)) { const zr = zone.getBoundingClientRect(); if (br.top < zr.top - 1 || br.bottom > zr.bottom + 1) return cacher(); }
-      ind.style.transition = anime && indPose.current ? '' : 'none';
-      ind.style.width = br.width + 'px'; ind.style.height = br.height + 'px';
-      ind.style.transform = `translate3d(${Math.round(br.left - nr.left + nav.scrollLeft)}px, ${Math.round(br.top - nr.top + nav.scrollTop)}px, 0)`;
-      ind.style.opacity = '1'; nav.setAttribute('data-indicateur', '1'); indPose.current = true;
-    };
-    placer(true);
-    const suivre = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => placer(false)); };
-    const cibles = [zone, nav].filter(Boolean);
-    cibles.forEach((c) => c.addEventListener('scroll', suivre, { passive: true }));
-    window.addEventListener('resize', suivre);
-    return () => { cancelAnimationFrame(raf); cibles.forEach((c) => c.removeEventListener('scroll', suivre)); window.removeEventListener('resize', suivre); };
-  }, [tab, nEntrees, badges]);
-  // (9 nov., DA 5) LA CARTE DU COMPTE, au pied : l'initiale, le nom de
-  // l'entreprise s'il est connu (sinon l'e-mail du compte VRM), et l'offre
-  // SEULEMENT si le serveur l'a dite (`reglePlanCourante`, Solo / Pro) — rien
-  // n'est inventé (§5). Floutée en mode stream (`vrm-sensible`).
-  const [, rafraichir] = React.useState(0);
-  React.useEffect(() => suivreAbonnement(() => rafraichir((n) => n + 1)), []);
-  const mail = String((AUTH.user && AUTH.user.email) || '').trim();
-  const nomCompte = (entreprise && entreprise.nom) || '';
-  const planLu = (reglePlanCourante() || {}).plan;
-  const offre = planLu === 'pro' ? 'Pro' : planLu === 'solo' ? 'Solo' : '';
-  // (9 nov., lot AI — demande 13 de Julien) La carte se TOUCHE. (11 nov., lot DJ6) Elle ouvre le
-  // MENU DU PROFIL (Paramètres, Appareils, Se déconnecter) ; la photo est celle du profil, et
-  // « Masquer mon nom » (ou pas encore lu) ⇒ « Mon compte », ni nom ni e-mail.
-  // (14 nov.) Elle s'allume pour Paramètres ET ses sous-écrans (Organisation…), comme l'ancienne roue
-  // (`entreeActive` → `BAR_GROUPE`) : sans ça, sur Organisation, le rail ne disait plus où l'on est.
-  const uidCompte = (AUTH.user && AUTH.user.id) || '';
-  const nomCoque = useNomCoque({ owner: uidCompte, headers: enTeteSession, nom: nomCompte, email: mail });
-  const carteCompte = (uidCompte && (nomCompte || mail)) ? <button type="button" className="vrm-nav-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" aria-current={(BAR_GROUPE[tab] || tab) === 'settings' ? 'page' : undefined}
-    aria-label={`${nomCoque.texte}${offre ? ' · ' + offre : ''} — ${tr('coque.ouvrirProfil')}`} title={tr('coque.monProfil')} onClick={() => ouvrirMenuProfil()}>
-    <PastilleProfil owner={uidCompte} headers={enTeteSession} nom={nomCompte} email={mail} taille={32} className="vrm-nav-avatar vrm-sensible"/>
-    <span className="vrm-nav-compte-txt">
-      {nomCoque.masque !== false ? <span className="vrm-nav-compte-nom" data-nav-compte-masque="">{nomCoque.texte}</span>
-        : nomCompte ? <NomEntreprise entreprise={entreprise} className="vrm-nav-compte-nom"/> : <span className="vrm-nav-compte-nom vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span>}
-      {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
-    </span>
-  </button> : null;
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail vrm-rail-verre" data-nav-v2="" data-rail-verre="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
-    <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
-    <div className="vrm-rail-scroll" ref={zoneRef}>
-      {/* (15 nov., refonte-journee — le rail de la maquette ordinateur validée) Ma journée, puis VENDRE (Ventes, Annonces,
-          Messages, E-mails), RANGER (Stock, Achats), COMPTER (Argent) : les MÊMES entrées qu'hier (rien de retiré : une
-          entrée que ce classement ne nomme pas suit dans « Compter »), les mêmes data-nav-entree, les mêmes pastilles. */}
-      {(() => {
-        const entrees = [...NAV_TACHES, ...groupes.filter(g => g.nom !== 'Moi').flatMap(g => g.items)];
-        const pris = new Set();
-        const prendre = (ids) => ids.map(id => entrees.find(t => t.id === id && !pris.has(cleEntree(t)))).filter(Boolean).map(t => { pris.add(cleEntree(t)); return t; });
-        const tete = prendre(['journee']);
-        const R = [groupeNav({ cle: 'vendre', nom: 'vendre', items: prendre(['ventes', 'annonces', 'messages', 'emails']) }), groupeNav({ cle: 'ranger', nom: 'ranger', items: prendre(['garage', 'achats']) })];
-        const compter = prendre(['compta']);
-        const reste = entrees.filter(t => !pris.has(cleEntree(t)));
-        R.push(groupeNav({ cle: 'compter', nom: 'compter', items: [...compter, ...reste] }));
-        return <>
-          <div className="vrm-rail-platforms" data-nav-taches="">{tete.map(bouton)}</div>
-          {R.filter(g => g.items.length).map(groupe)}
-        </>;
-      })()}
-    </div>
-    {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
-        de la colonne : une fenêtre basse fait défiler le reste, jamais
-        Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
-        Le pied est une carte : le compte, puis Communauté et Paramètres. */}
-    {/* Le pied : Paramètres (la maquette validée le remet en entrée ; le menu du profil le garde aussi), le compte,
-        puis Communauté. */}
-    <div className="vrm-rail-pied"><div className="vrm-rail-management vrm-rail-reglages" data-nav-groupe="reglages">{bouton(ONGLET_PARAMETRES)}</div>{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
-  </nav>;
-}
 
-// ── « PLUS » : LA FEUILLE DE TOUT CE QUE LA BARRE NE PORTE PAS (téléphone) ──
-// (31 oct.) Rangée PAR TÂCHE : Vendre · Expédier · Gérer · Argent · Moi (plus
-// de « Plateformes » ici depuis le 31 oct. au soir : ses sections sont dans les
-// sous-onglets des tâches). ⚠️ Elle NE RÉPÈTE PAS la barre du bas (Julien, 21 sept. : « tu mets
-// deux fois Ma journée, Annonces et Ventes ») : Journée, Annonces, Ventes et
-// Colis n'y sont pas. Aucun groupe vide, aucune entrée d'un site sans compte.
-// ⚠️ Sur ordinateur elle n'existe pas : la colonne montre déjà tout.
-// Le bouton de l'en-tête (« Tous les écrans », caché sur téléphone depuis la
-// coque iPhone) ouvre la même feuille, depuis le haut.
-function MenuEcrans({ tab, setTab, dark = false, bottom = false, sites = null, badges = null, ouvert = null, setOuvert = null }) {
-  // (5 nov.) Dans la barre du bas, l'état « ouvert » appartient à la barre
-  // (`ouvert`/`setOuvert`) : toucher un autre onglet referme le panneau.
-  const [openLocal, setOpenLocal] = React.useState(false);
-  const open = typeof setOuvert === 'function' ? !!ouvert : openLocal;
-  const setOpen = typeof setOuvert === 'function' ? setOuvert : setOpenLocal;
-  const declencheur = React.useRef(null);
-  const panneau = React.useRef(null);
-  React.useEffect(() => { setOpen(false); }, [tab]);
-  React.useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => panneau.current?.querySelector('[role="menuitem"]')?.focus());
-    const clavier = e => {
-      if (e.key === 'Escape') { setOpen(false); return; }
-      if (e.key !== 'Tab') return;
-      const boutons = [...(panneau.current?.querySelectorAll('button') || [])];
-      const premier = boutons[0], dernier = boutons[boutons.length - 1];
-      if (e.shiftKey && document.activeElement === premier) { e.preventDefault(); dernier?.focus(); }
-      else if (!e.shiftKey && document.activeElement === dernier) { e.preventDefault(); premier?.focus(); }
-    };
-    window.addEventListener('keydown', clavier);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('keydown', clavier);
-      declencheur.current?.focus();
-    };
-  }, [open]);
-  useProfilVendeur();   // (8 nov.) Simple / Complet
-  // (13 nov., lot 54) La ligne « Parrainer » : seulement quand le programme est ouvert (lu une fois).
-  const [, majParrain] = React.useState(0);
-  React.useEffect(() => { const off = suivreParrainageOuvert(() => majParrain((n) => n + 1)); lireParrainageOuvert(); return off; }, []);
-  const groupes = groupesVisibles(sites, () => true);
-  const dansBarre = BOTTOM_TABS.some(t => t.id === (BAR_GROUPE[tab] || tab));
-  const pointPlus = !!(badges && badges.messages === true);
-  // (14 nov., n° 61) Le point du ☰ : un écran du menu (hors Paires, que la barre porte) a un geste ou du nouveau.
-  const pointMenu = !bottom && !!badges && groupes.some(g => g.cle !== 'paires' && g.items.some(t => { const v = badges[cleEntree(t)]; return v === true || (typeof v === 'number' && v > 0); }));
-  const rangee = (t) => {
-    const on = entreeActive(t, tab);
-    return (
-      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-sheet-row" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
-        <span className="vrm-sheet-ic"><NavigationIcon item={t} size={19}/></span>
-        <span className="vrm-sheet-lib">{t.label}</span>
-        <BadgeNav t={t} badges={badges} place="feuille"/>
-        <span aria-hidden="true" className="vrm-sheet-fin"><Icon name={on?'check':'chevron'} size={on?17:16}/></span>
-      </button>
-    );
-  };
-  // (5 nov., barre iPhone revue) LA 5ᵉ PLACE DIT OÙ L'ON EST. Sur un écran
-  // rangé dans « Plus » (Statistiques, Stock, Paramètres…), elle montre CET
-  // écran — son icône, son nom court — au lieu d'un « Plus » allumé qui ne
-  // disait rien. Le toucher ouvre toujours le panneau. Hors de « Plus » (et
-  // pour un écran qui n'y est pas), elle reste « Plus ».
-  const courant = bottom && !dansBarre ? (PLUS_TABS.find(t => entreeActive(t, tab)) || null) : null;
-  const tuile = (t) => {
-    const on = entreeActive(t, tab);
-    return (
-      <button key={cleEntree(t)} type="button" role="menuitem" className="vrm-plus-tuile" data-nav-entree={cleEntree(t)} onClick={()=>{ ouvrirEntree(t, setTab); setOpen(false); }} aria-current={on?'page':undefined}>
-        <span className="vrm-plus-ic" aria-hidden="true"><NavigationIcon item={t} size={22}/><BadgeNav t={t} badges={badges} place="tuile"/></span>
-        <span className="vrm-sheet-lib">{t.label}</span>
-      </button>
-    );
-  };
-  if (bottom) return (
-    <>
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-tab vrm-nav-more" aria-label={courant && (courant.court || courant.label) !== tr('nav.plus') ? `${tr('nav.plus')} · ${courant.court || courant.label}` : tr('nav.plus')} aria-haspopup="menu" aria-expanded={open} aria-current={!dansBarre?'page':undefined} data-plus-ecran={courant?cleEntree(courant):''}>
-        <span aria-hidden="true" className="vrm-tab-ic" style={{display:'flex',position:'relative'}}>{courant ? <NavigationIcon item={courant} size={22} style={{strokeWidth:2}}/> : <Icon name="more" size={24} style={{strokeWidth:1.6}}/>}{pointPlus ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="plus" data-badge-n="point" aria-hidden="true"/> : null}</span>
-        {(() => { const lib = courant ? (courant.court || courant.label) : tr('nav.plus'); return <span className="vrm-nav-label" data-lib-long={lib.length > 8 ? '1' : undefined}>{lib}</span>; })()}
-      </button>
-      {/* Le PANNEAU « Plus » (5 nov.) : une grille de tuiles posée AU-DESSUS de
-          la barre — la barre reste visible et touchable, rien n'est caché sous
-          la zone sûre ; tout tient sans défiler, même sur un iPhone SE. Il se
-          ferme au geste « retour » (FermeAuRetour : le retour ne quitte plus
-          VRM), en touchant « Plus » ou à côté, par Échap. */}
-      {open && (
-        <div data-noswipe className="vrm-sheet-voile vrm-plus-voile" onClick={()=>setOpen(false)}>
-          <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-bas vrm-menu-bottom vrm-plus-panneau" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
-            <div className="vrm-plus-grille">
-              {groupes.map(g => (
-                <div className="vrm-plus-groupe" key={g.nom} role="group" aria-label={g.titre} data-nav-groupe={g.nom}>{g.items.map(tuile)}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-  return (
-    <>
-      {/* (14 nov., n° 61 — Julien : « un menu qui s'ouvre en haut avec le reste des onglets ») Le bouton ☰ revient
-          dans l'en-tête du téléphone, à gauche, au pouce : il porte un POINT quand un écran du menu a un geste
-          (Messages non lus, un nombre ambre) — le nombre lui-même est dans le menu, une seule fois. */}
-      <button ref={declencheur} type="button" onClick={()=>setOpen(o=>!o)} className="vrm-hbtn vrm-hdr-menu" data-menu-ecrans="" aria-label={pointMenu ? `${tr('coque.tousLesEcrans')} · ${tr('coque.nouveau')}` : tr('coque.tousLesEcrans')} aria-haspopup="menu" aria-expanded={open}>
-        <span aria-hidden="true" style={{display:'flex',position:'relative'}}><Icon name={open?'close':'menu'} size={22} style={{strokeWidth:1.6}}/>{pointMenu ? <span className="vrm-nav-badge vrm-nav-badge-point vrm-nav-badge-barre" data-badge-nav="menu" data-badge-n="point" aria-hidden="true"/> : null}</span>
-      </button>
-      {/* (23 oct.) La feuille d'en-tête part dans document.body : rendue DANS
-          l'en-tête (sticky, z-index 50), elle restait SOUS la barre du bas
-          (z-index 60) en paysage et sur iPad. Banc `feuilles-coque.cjs`. */}
-      {open && createPortal(
-        <div data-noswipe className="vrm-sheet-voile" onClick={()=>setOpen(false)}>
-          <FermeAuRetour fermer={()=>setOpen(false)}/>
-          <div ref={panneau} className="vrm-mobile-menu vrm-sheet vrm-sheet-haut" onClick={e=>e.stopPropagation()} role="menu" aria-label={tr('coque.tousLesEcrans')}>
-            <div className="vrm-sheet-tete">
-              <span className="vrm-sheet-titre">{tr('coque.tonEspace')}</span>
-              <button className="vrm-icon-control vrm-sheet-fermer" type="button" aria-label={tr('coque.fermerMenu')} onClick={()=>setOpen(false)}><Icon name="close" size={18}/></button>
-            </div>
-            {/* (14 nov., n° 61) Les tâches sont toutes dans la barre du bas (Aujourd'hui · Paires · Ventes · Argent) :
-                le menu ne les répète pas (Julien, 21 sept.) ; il porte TOUT le reste, groupé. */}
-            {groupes.map(g => (
-              <div className="vrm-menu-group vrm-sheet-groupe" key={g.nom} data-nav-groupe={g.nom}>
-                <div className="vrm-sheet-label">{g.titre}</div>
-                <div className="vrm-sheet-carte">{g.items.map(rangee)}</div>
-              </div>
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
+// (19 nov., « VRM natif ») Le menu ☰ « Tous les écrans » (`MenuEcrans`), le rail `SideBar` et la photo de l'en-tête
+// (`BoutonProfilTete`) sont retirés : « Plus » (FeuillePlus) et la barre latérale native les remplacent (git log pour l'ancien).
 
 // Retrouver sa position après un passage dans un autre écran.
 function MemoireDefilement({ ecran }) {
@@ -20692,7 +20547,7 @@ const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0;
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
   onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
 const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
-function LateraleNative({ tab, setTab, entreprise, sites, badges }) {
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null }) {
   useProfilVendeur(); useEcransVusTick();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -20705,18 +20560,23 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges }) {
     { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
+      // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
+      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
+      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
   ];
+  const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
     <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }}
       tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
-      pied={uid ? (
+      pied={uid ? (<>
+        {boiteOutils}
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" title={tr('coque.monProfil')}
           aria-label={`${nomCoque.texte} — ${tr('coque.ouvrirProfil')}`} onClick={() => ouvrirMenuProfil()}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
           <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span></span>
         </button>
-      ) : null}/>
+      </>) : boiteOutils}/>
   );
 }
 function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, ouvrirRecherche, scanner, streamVisible = false, etats = null }) {
@@ -20757,8 +20617,7 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
-  // (17 nov.) Le style de la barre : après la lecture du nuage, la valeur rangée ailleurs reprend le défaut (src/designV2/barre.js).
-  React.useEffect(()=>onCloudReady(()=>reprendreBarre()),[]);
+  // (19 nov., « VRM natif ») Le style de la barre « Studio » (src/designV2/barre.*) ne se pose plus : la barre est native.
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
   const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
@@ -49443,6 +49302,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return () => { vivant = false; clearTimeout(t); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offresAuto, sales.items, listings.items, txnPret]);
+  // (19 nov., décision 3 de Julien, ext. 5.409) VENDUE AILLEURS ⇒ MASQUÉE SUR VINTED. L'app publie les annonces
+  // Vinted dont la paire est VENDUE (preuve, par identité) sur un AUTRE site (src/reglesAuto.js) ; l'extension les
+  // masque (réversible, jamais une suppression) et démasque ce qu'ELLE a masqué si la vente est annulée — seulement sur
+  // une liste COMPLÈTE (une lecture ratée publie une liste incomplète : rien n'est démasqué).
+  React.useEffect(() => {
+    if (!Array.isArray(sales.items) || !Array.isArray(listings.items) || !txnPret) return;
+    let vivant = true;
+    const t = setTimeout(async () => {
+      let l;
+      try { const data = await chargerRetraitsMulti(); l = listeMasquerAilleurs(data, articlesVendusAilleurs(data)); }
+      catch (_) { l = listeMasquerAilleurs(null, null); }
+      if (vivant) save(MASQUER_CLE, l);
+    }, 6000);
+    return () => { vivant = false; clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, listings.items, txnPret]);
   // (5 nov., chantier E1, revue 2.1) « VENDUS AILLEURS » EST UNE CARTE DE « À FAIRE »,
   // et seulement s'il y a quelque chose à vérifier. Ma journée lance donc la lecture
   // (la même : `chargerRetraitsMulti` → `articlesVendusAilleurs`, src/VendusAilleurs.jsx)
@@ -63818,9 +63693,6 @@ function AppCoeur() {
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const n=typeof d.num==='string'&&d.num.trim()&&d.num.length<=64?d.num.trim():null; const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null; setPubAil({num:n,site:st});};window.addEventListener('vrm:publier-ailleurs',ouvrir);return()=>window.removeEventListener('vrm:publier-ailleurs',ouvrir);},[]);
   // (11 nov.) « PUBLIER PARTOUT » : les N° des annonces Vinted (une, ou la sélection d'Annonces).
   const [pubPartout,setPubPartout]=useState(null);
-  // (11 nov. soir) La baisse PROPOSÉE sur Vinted par « Changer le prix » : la feuille « Baisser le prix »
-  // existante, sur CETTE annonce ; rien ne part avant SON clic là-bas (src/BaissePrixSerie.jsx).
-  const [baisseCoque,setBaisseCoque]=useState(null);
   useEffect(()=>{const ouvrir=e=>{const d=(e&&e.detail)||{}; const l=(Array.isArray(d.nums)?d.nums:[]).map(x=>String(x==null?'':x).trim()).filter(x=>x&&x.length<=64).slice(0,200); if(l.length) setPubPartout({nums:l,at:Date.now()});};window.addEventListener('vrm:publier-partout',ouvrir);return()=>window.removeEventListener('vrm:publier-partout',ouvrir);},[]);
   // (11 nov., lot visuels-reseaux) « VISUEL RÉSEAUX » : { items (annonces Vinted de l'app, par identité), lot }.
   const [visuels,setVisuels]=useState(null);
@@ -64018,6 +63890,11 @@ function AppCoeur() {
   const ileRef = React.useRef(null);
   // (31 oct.) La place des filtres de site dans la barre du haut (ordinateur).
   const [slotBarre, setSlotBarre] = React.useState(null);
+  // (19 nov., « VRM natif ») Trois volets à l'ordinateur pour un écran natif (ECRANS_NATIFS) : la fente du détail, et ce
+  // que la coque dit aux pages (`ContexteCoque`). Un écran d'avant : pas de détail, le contexte reste figé (aucun rendu de plus).
+  const [fenteDetail, setFenteDetail] = React.useState(null);
+  const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab));
+  const contexteCoque = React.useMemo(() => (troisVolets ? { titreRendu: true, voletDetail: fenteDetail, ordinateur: true } : CONTEXTE_COQUE_NATIVE), [troisVolets, fenteDetail]);
   // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
   React.useEffect(() => {
     const k = (e) => {
@@ -67262,7 +67139,12 @@ function AppCoeur() {
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
+      {ordi ? <LateraleNative tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
+        outils={<>
+          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
+          {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
+          {(!reglesStream.bouton && !streamOn) || montantsCaches ? <BoutonMontants/> : null}
+        </>}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -67297,90 +67179,14 @@ function AppCoeur() {
       <ProgrammeRepubVeille/>
       {/* (2 nov.) Le mode automatique des favoris : VRM ouvert dans un onglet suffit. */}
       <PiloteFavorisAutoConnecte comptes={vintedAccounts.map(a=>String(a.vinted_user_id))}/>
-      {/* En-tête en VERRE DÉPOLI, comme la barre du bas : le contenu passe
-          derrière au défilement au lieu de buter sur un bandeau plein. */}
-      {/* Sur ordinateur l'en-tête commence APRÈS la barre latérale, et la marque
-          n'y est plus : elle est en haut de la barre. Deux logos sur le même
-          écran, c'est le genre de doublon qui fait « assemblé », pas « conçu ». */}
-      {/* ⚠️ SUR ORDINATEUR LE BANDEAU NE PREND PLUS DE PLACE DANS LA PAGE. Il
-          restait 56 px de vide au-dessus de CHAQUE titre d'écran, pour quatre
-          icônes collées à droite (§5.62 avait retiré la marque de ce bandeau,
-          §5.68 le mot « VRM » — il ne restait plus rien à gauche). En le passant
-          en `fixed`, le titre de l'écran remonte et partage la ligne avec les
-          actions, comme dans une vraie application. Sur téléphone il porte le
-          menu, le logo et la synchro : il reste `sticky`, rien ne change. */}
-      {/* (16 oct.) Le dessin de l'en-tête vit dans `.vrm-app-header`
-          (styles-coque.css) : téléphone = barre transparente qui prend son verre
-          et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
-          haut à droite. Ici seulement la structure et la position. */}
       {/* (19 nov., « VRM natif ») Au téléphone, la tête est `TeteNative`, DANS <main> (elle défile avec le grand titre). Ici il ne
           reste que le champ de la recherche OUVERTE (collé en haut, ses résultats dessous) ; la cloche (sans bouton) et l'état des
-          actions restent montés pour que « Plus » et les notifications les ouvrent. */}
+          actions restent montés pour que « Plus » et les notifications les ouvrent.
+          ⚠️ (19 nov.) À l'ordinateur, plus d'île flottante en haut à droite (logo, état, œil, cloche) : la barre latérale porte
+          la cloche (« Notifications »), l'état des actions et, en pied, la synchronisation, l'œil / Stream et le profil. */}
       {!ordi && gsOpen ? <header className="vrm-app-header is-defile" data-n-recherche-ouverte="" style={{position:'sticky',top:0,zIndex:50}}>{champRechercheMobile}</header> : null}
-      {!ordi && AUTH.user ? <CentreNotifsCoque sansBouton onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/> : null}
-      {!ordi && MULTI_USER ? <span data-n-etat-muet="" style={{display:'none'}}><EtatActions onNav={setTab} ordi={false} sombre={dark} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/></span> : null}
-      {ordi ? <header className={`vrm-app-header${defile && !(designV2App && !ordi) ? ' is-defile' : ''}${v2Tete ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Tete ? 'absolute' : 'sticky',top: ordi ? 12 : v2Tete ? 6 : 0,right: ordi ? 24 : v2Tete ? 12 : undefined,...(v2Tete ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
-        {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
-            invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
-        <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
-          {/* Tous les écrans, en haut à gauche. Sur ordinateur la barre latérale
-              les montre déjà tous : ce bouton n'y existe pas. */}
-          {!ordi && <MenuEcrans tab={tab} setTab={setTab} dark={dark} sites={sitesPresents} badges={badgesNav}/>}
-          <div className="vrm-header-logo" aria-label="VRM">
-            <VrmLogo size={36} anim={false}/>
-          </div>
-          {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
-          <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
-        </div>
-        {/* (17 nov.) Nouveau design, au téléphone : le GRAND titre est dans l'écran ; au défilement, ni verre opaque ni petit
-            titre posé sur la recherche (rapport de l'agent Stock, #1249). */}
-        {!ordi && !designV2App && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
-        {!ordi && gsOpen && champRechercheMobile}
-        <div className="vrm-header-actions">
-          {/* (5 nov., chantier H — revue 2.28) Au téléphone, l'en-tête ne porte plus que :
-              la PASTILLE d'état (un point de couleur, plus de « ⓘ »), « Stream », la
-              cloche, la loupe — et le nuage seulement quand une sauvegarde a raté. */}
-          <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}>
-            <BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>
-            {syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}
-          </span>
-          <div style={{display:'flex',alignItems:'center'}}>
-            {(() => { const eD = dark; return (<>
-            {/* « Puis-je agir sur Vinted depuis cette page ? » — sur tous les
-                écrans (Julien, 5 octobre). Voir `EtatActions`. */}
-            {MULTI_USER && <EtatActions onNav={setTab} ordi={ordi} sombre={eD} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/>}
-            {/* (5 nov.) « Stream » remplace l'œil des montants : la règle programmée
-                (src/modeStream.js) cache montants, marques, comptes, pseudos…
-                (6 nov.) Le bouton n'apparaît que s'il est choisi dans Réglages → Mode
-                stream (« Afficher le bouton Stream », éteint par défaut). Allumé, il
-                RESTE tant que le mode stream l'est (le décocher en filmant ne doit pas
-                tout montrer d'un coup, ni laisser le mode sans bouton pour l'éteindre).
-                Sans lui, l'œil des montants revient (et reste tant qu'il est allumé) ;
-                pendant un stream, l'œil se tait (le stream cache déjà les montants :
-                une seule porte à la fois dans l'en-tête). */}
-            {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
-            {/* (14 nov., refonte de la coque) Au téléphone, l'œil vit dans le menu du compte (trois icônes au
-                plus dans la barre : loupe · cloche · compte) ; il revient dans la barre tant que les montants
-                SONT cachés (un mode allumé garde son interrupteur sous le pouce). */}
-            {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
-            {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
-            {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && !v2Tete && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
-              onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
-                appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
-              onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
-              onContextMenu={(e)=>{ if(DICTEE_OK) e.preventDefault(); }}
-              onClick={()=>{ if(appuiLoupe.current.long){ appuiLoupe.current.long=false; return; } if(gsOpen) fermerRecherche(); else ouvrirRecherche(); }} title="Rechercher" aria-label={`Rechercher ${motsArticle(PROFIL_VENDEUR.vend || vendActuel()).un}`} aria-expanded={gsOpen} aria-controls="vrm-recherche-resultats">
-              <Icon name="search" size={21}/>
-            </button>}
-            {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
-            {!ordi && MULTI_USER && !v2Tete && <BoutonProfilTete/>}
-            {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
-                dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
-            </>); })()}
-          </div>
-        </div>
-      </header> : null}
+      {AUTH.user ? <CentreNotifsCoque sansBouton onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/> : null}
+      {MULTI_USER ? <span data-n-etat-muet="" style={{display:'none'}}><EtatActions onNav={setTab} ordi={false} sombre={dark} comptes={!accountsLoaded ? undefined : baseKO ? null : vintedAccounts}/></span> : null}
       {/* (31 oct.) Sur téléphone, les résultats de la recherche tombent sous l'en-tête (pas d'écran plein). */}
       {!ordi && panneauRecherche}
       {/* Le panneau « 🔔 Notifications » (cloche) est retiré le 17 octobre : rien ne
@@ -67393,7 +67199,7 @@ function AppCoeur() {
       {/* (6 nov.) Mode exemple : le bandeau, hors de <main> (il ne défile pas), sur TOUS les écrans. */}
       {/* (14 nov.) « J'ai déjà un compte · Me connecter » à côté de « Créer mon compte » ; le cadre hachuré
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
-      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
+      {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: 32 } : undefined}onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
       <Natif.CoqueEcran className="vrm-main" attrs={{ id: 'vrm-contenu', 'data-ecran': tab, 'data-espace': espaceDe(tab, BAR_GROUPE), 'data-defile': '1', style: {
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
@@ -67425,7 +67231,7 @@ function AppCoeur() {
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
-        // (19 nov., « VRM natif ») La barre latérale est une colonne de la grille : plus de marge de 272 px à gauche.
+        // (19 nov., « VRM natif ») La barre latérale est fixe et la racine lui garde sa place (natif.css) : plus de marge de 272 px.
         paddingLeft: ordi ? 32 : undefined,
         paddingRight: ordi ? 28 : undefined,
         // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
@@ -67433,8 +67239,8 @@ function AppCoeur() {
         // La barre étant maintenant DANS le flux (sous `<main>`), plus besoin de
         // réserver sa hauteur : juste une marge pour ne pas coller la dernière
         // carte à la barre.
-        paddingBottom: ordi ? 40 : 20} }}>
-        <Natif.ContexteCoque.Provider value={CONTEXTE_COQUE_NATIVE}>
+        paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
+        <Natif.ContexteCoque.Provider value={contexteCoque}>
         {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/>}
@@ -67474,30 +67280,8 @@ function AppCoeur() {
           <VisuelsReseaux articles={visuels.articles} lot={visuels.lot} lirePhoto={lirePhotoVisuel} reglages={load(CLE_VISUELS,null)} onReglages={(r)=>save(CLE_VISUELS,r)}
             Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
         </GardeEcran>}
-        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><Differe rendre={()=>{
-          // (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), un clic.
-          const { rn } = rechercheParNumero(prixNum, numData, vintedAccounts);
-          const ex = ficheExtra && ficheExtra.num === prixNum ? ficheExtra : null;
-          const lecture = !numData || !ex;
-          const { sites, manques } = rn.etat === 'invalide' ? { sites: [], manques: [] } : sitesPrixDe(prixNum, rn, ex || { lbcItems: undefined, vcItems: undefined });
-          const sitesVus = lecture ? sites.filter((x) => x.site === 'vinted' || x.site === 'ebay') : sites;
-          // (11 nov. soir) « Un prix modifié dans VRM change partout » : chaque site avec SON ajustement
-          // (`vrm_partout_prix`, réglé dans « Publier partout ») ; sur Vinted, VRM PROPOSE la baisse
-          // (la feuille « Baisser le prix », son clic) ; eBay relu après (src/prixPartout.js).
-          const reglageP = load(CLE_PRIX_PARTOUT, null);
-          return <PrixPartout key={prixNum} num={rn.cle || prixNum} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} Retour={FermeAuRetour}
-            onFermer={()=>setPrixNum(null)} prixDe={(site, p)=>prixParSite(site, p, reglageP)}
-            onProposer={(s, e)=>{ const fiche = (load('vinted_annonce_numeros', {}) || {})[String(s.id)] || {};
-              const delta = Math.round(((s.prix || 0) - (e.prix || 0)) * 100) / 100;
-              if (!(delta > 0)) return;
-              setBaisseCoque({ annonces: [{ id: String(s.id), uid: String(s.compte || ''), compte: (()=>{ const a=(vintedAccounts||[]).find(x=>String(x.vinted_user_id)===String(s.compte)); const lb=load('vinted_account_labels',{})||{}; return a ? (lb[a.vinted_user_id] || a.login || `#${a.vinted_user_id}`) : ''; })(), numero: String(fiche.numero || rn.cle || ''), titre: s.titre || '', photo: fiche.photo || '', prix: s.prix }],
-                baisse: { mode: 'eur', texte: String(delta).replace('.', ',') }, at: Date.now() }); }}
-            onAppliquer={async({ coches, prix, surEtat })=>{
-              const r = await appliquerPrix({ sites: sitesVus, coches, prix, envoyer: ENVOIS_PRIX, surEtat, reglage: reglageP });
-              if (r.res) save('vrm_prix_journal', noterJournalPrix(load('vrm_prix_journal', {}) || {}, rn.cle, r.prix, sitesVus, r.res));
-              return r;
-            }}/>;
-        }}/></GardeEcran>}
+        {/* (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), UN clic. (19 nov.) « Appliquer » envoie la baisse par l'extension, ou la range (HotePrixPartout). */}
+        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>setPrixNum(null)}/></GardeEcran>}
         {pubAil && <GardeEcran nom="publier" feuille resetKey={pubAil.num||''} onFermer={()=>setPubAil(null)}><Differe rendre={()=>{
           // (5 nov.) LE PARCOURS « PUBLIER AILLEURS » : les sites de CE N° (par identité).
           const num = pubAil.num;
@@ -67511,14 +67295,6 @@ function AppCoeur() {
           return <HotePublierAilleurs comptes={vintedAccounts} num={num} site={pubAil.site} sitesVus={sitesVus} manquesLecture={manquesL} lecture={lecture}
             onChoisir={(n)=>setPubAil((x)=>({ ...(x||{}), num: n }))} onFermer={()=>setPubAil(null)} onNav={setTab}/>;
         }}/></GardeEcran>}
-        {baisseCoque && <GardeEcran nom="baisse-coque" feuille resetKey={String(baisseCoque.at)} onFermer={()=>setBaisseCoque(null)}>{(()=>{
-          const vc = vintedDeChrome();
-          const rx = raisonExtGlobale(false, { cap:'baisseprix', role:'baisse tes prix sur Vinted' });
-          return <BaissePrixSerie annonces={baisseCoque.annonces} baisseInitiale={baisseCoque.baisse} compteOnglet={vc === undefined ? undefined : (vc ? String(vc.uid||'') : null)}
-            plancherDe={(a)=>plancherVente((load('vinted_annonce_numeros', {}) || {})[String(a.id)] || null)} extRaison={rx ? rx.texte : ''} Photo={PhotoVinted} Retour={FermeAuRetour}
-            onFermer={()=>setBaisseCoque(null)} soldeOk={soldeOkVrm()} onSolde={enregistrerSoldeVrm}
-            onBaisser={(l)=>vmrCmdSuivi({ cmd:'baisserPrixVinted', uid:l.uid, id:l.id, prix:l.nouveau, prixAvant:l.prix, confirme:true }, 120000)}/>;
-        })()}</GardeEcran>}
         {ecartsOuvert && <GardeEcran nom="ecarts-prix" feuille resetKey={String(ecartsOuvert)} onFermer={()=>setEcartsOuvert(null)}>
           <HoteEcartsPrix comptes={vintedAccounts} numData={numData} onFermer={()=>setEcartsOuvert(null)} onChanger={(n)=>{ setEcartsOuvert(null); setPrixNum(String(n)); }}/>
         </GardeEcran>}
@@ -67866,6 +67642,9 @@ function AppCoeur() {
         </BarreHautSlot.Provider>
         </Natif.ContexteCoque.Provider>
       </Natif.CoqueEcran>
+      {/* (19 nov., « VRM natif ») Le TROISIÈME volet, à l'ordinateur, pour un écran natif : sa `<PagePoussee>` s'y pose
+          (`ContexteCoque.voletDetail`). Un écran d'avant n'en a pas : il garde liste + reste. */}
+      {troisVolets ? <aside className="n-coque-detail" data-n-coque-detail="" aria-label={tr('natif.detail.nom')}><div className="n-coque-fente" ref={setFenteDetail}/></aside> : null}
       {pnOuvert && <GardeEcran nom="parcours-nouveau" feuille onFermer={()=>fermerParcoursNouveau('plusTard')}><ParcoursNouveauApp comptes={vintedAccounts} etapeForcee={pnEtape} onFermer={fermerParcoursNouveau}/></GardeEcran>}
       {bienvenue && <GardeEcran nom="bienvenue" feuille onFermer={()=>{ save('vrm_bienvenue_vue',{at:new Date().toISOString()}); setBienvenue(false); }}><Bienvenue prenom={String(load('vrm_prenom','')||'').trim()} dark={!!dark} vend={vendActuel()} ouInstaller={ouExtensionIci()}
         onTheme={(d)=>{ if(!!d!==!!dark) toggleDark(); }}

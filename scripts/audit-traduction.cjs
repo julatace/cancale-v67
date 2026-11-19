@@ -80,6 +80,7 @@ const MIGRES = [
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
+  ['src/PrixPartout.jsx', ['*']],   // (19 nov.) « Changer le prix » en UN geste (prix-sans-manuel)
   ['src/design/QuoiRepublier.jsx', ['*']],   // (11 nov., lot quoi-republier)
   // (14 nov., lot argent-choix) coller des prix, modèle et taille, déclaration annuelle.
   ['src/composants/CollerPrixAchat.jsx', ['*']],

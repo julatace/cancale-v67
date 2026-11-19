@@ -1487,7 +1487,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
                 <span style={{ fontSize: 13, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pairSel.title}</span>
               </div>
               {nVinted === 0 && (
-                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? 'Je récupère ses photos sur Vinted…' : "Pas de photo : rouvre l'annonce sur Vinted, ou ajoute-les ci-dessous."}</div>
+                <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>{photosEtat === 'cherche' ? tr('lbcPhotos.enCours') : tr('photosFond.aucuneOuAjoute')}</div>
               )}
               {/* ⚠️ HONNÊTE sur le nombre : si Vinted a plus de photos que ce
                   qu'on a capté (carrousel lazy tant que l'extension à jour n'est
@@ -1497,7 +1497,7 @@ function EbayPublier({ onPublie, paires = [], dejaSurEbay = null, brouillon = nu
               ) : photosEtat && photosEtat.raison ? (
                 <div data-ebay-photos="echec" style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45 }}>Photos pas récupérées : {photosEtat.raison}. Ouvre son annonce sur Vinted, puis rechoisis l'article.</div>
               ) : pairSel.nPhotos != null && nVinted < pairSel.nPhotos ? (
-                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>Seulement {nVinted} photo{nVinted > 1 ? 's' : ''} captée{nVinted > 1 ? 's' : ''} sur {pairSel.nPhotos} : rouvre l'annonce sur Vinted.</div>
+                <div style={{ fontSize: 12, color: C.warn, marginTop: 8, lineHeight: 1.45, background: `${C.warn}12`, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '8px 10px' }}>{tr('photosFond.partielles', { n: nVinted, total: pairSel.nPhotos })}</div>
               ) : (
                 <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, marginTop: 8, lineHeight: 1.45 }}>Ses photos Vinted sont reprises dans « Photos », juste en dessous.</div>
               )}
