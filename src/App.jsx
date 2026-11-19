@@ -481,7 +481,8 @@ function SuiviTravailCoque() {
 const VeilleJourneeParesseux = lazySur(() => import('./VeilleJournee.jsx'));
 const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
-const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
+const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));
+const CompteBloque = lazySur(() => import('./CompteBloque.jsx'));   // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » + la question   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
 const PublierPartout = aLaDemande(() => import('./PublierPartout.jsx'), true);
@@ -1164,6 +1165,8 @@ import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
+// (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » : ses annonces en pause sur SON choix (src/compteBloque.js).
+import { useComptesBloques, uidsEnPauseConnus, uidsBloquesConnus } from "./compteBloqueEtat.js";
 import { CLE_AIDES as CLE_AIDES_PN, noterVisiteVue as noterVisiteVuePN } from "./accueilReste/aides.js";
 import { ACCES_OFFERT as ACCES_OFFERT_PN, PRIX_MOIS as PRIX_MOIS_PN, PRIX_PRO_MOIS as PRIX_PRO_MOIS_PN, PRO_OUVERT as PRO_OUVERT_PN } from "./accueil-reglages.js";
 const ParcoursNouveau = aLaDemande(() => import('./parcoursNouveau/ParcoursNouveau.jsx'));
@@ -1631,7 +1634,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { comptebloque: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3415,6 +3418,8 @@ const SYNC_KEYS = [
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
   // (11 nov., lot securite-vinted) SES réglages de sécurité des comptes + « Tout arrêter » (src/securiteComptes.js), écrits sur SON geste, lus par l'extension.
   'vrm_securite_comptes',
+  // (19 nov., lot compte-bloque) SON choix pour un compte bloqué par Vinted (pause / garder / plus tard), écrit sur SON toucher, lu par l'extension 5.409 (src/compteBloque.js).
+  'vrm_comptes_bloques',
   'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
@@ -18658,6 +18663,7 @@ function fetchEmailsParCompteMemo() {
   return _receptionComptes.p;
 }
 function useEtatEmailsComptes(comptes, actif = true) {
+  const { bloques: bloquesCB } = useComptesBloques();
   const [reception, setReception] = useState(() => (_receptionComptes.v != null && Date.now() - _receptionComptes.t < 120e3 ? _receptionComptes.v : undefined));   // undefined en cours · null pas su · objet lu
   const { ventes, ko } = useVentesCoque();
   useEffect(() => {
@@ -18669,8 +18675,9 @@ function useEtatEmailsComptes(comptes, actif = true) {
   return useMemo(() => etatEmailsComptes({
     comptes: comptes || [], reception, ventes, ventesKO: ko,
     adresses: load('vinted_account_emails', {}) || {},
-    exclus: load('vinted_accounts_hidden', []) || [],
-  }), [comptes, reception, ventes, ko]);
+    // (19 nov., lot compte-bloque) un compte bloqué par Vinted (profil lu) se tait : « n'envoie aucun e-mail » est normal.
+    exclus: [...(load('vinted_accounts_hidden', []) || []), ...uidsBloquesConnus()],
+  }), [comptes, reception, ventes, ko, bloquesCB]);
 }
 const dateCourteFr = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
 // Ce que dit un compte muet, sur sa ligne : la PREUVE (ses ventes sans email),
@@ -36031,6 +36038,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la liste (synchronisée) : ses annonces et ses ventes sont masquées automatiquement
   // tant qu'un futur « Synchroniser » ne le voit pas revenir en ligne.
   const [blockedAccts, setBlockedAccts] = useState(() => new Set((load('vinted_accounts_blocked', []) || []).map(String)));
+  // (19 nov., lot compte-bloque) Les comptes bloqués PROUVÉS (profil Vinted) dont il a mis les annonces en pause.
+  const { pause: pauseCB } = useComptesBloques();
   // ⚠️⚠️ CES DEUX LISTES SONT LUES AU MONTAGE, ET LE NUAGE ARRIVE APRÈS.
   // C'est le défaut de la carte des points relais (§5.49), cette fois sur la
   // donnée qui dit **quels comptes il a mis de côté**. Mesuré au rendu le
@@ -39787,6 +39796,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       //    expirée »), et l'auto-réparation rallume un compte re-capté — donc
       //    aucun compte sain n'est écarté à tort.
       if (blockedAccts.has(uidIt)) return false;
+      // (19 nov., lot compte-bloque) Compte bloqué par Vinted, ses annonces en pause (SON choix) : hors de « en ligne »
+      //    et des totaux, comptées « en pause · compte bloqué » (`annEnPause`). Ses ventes, elles, restent partout.
+      if (pauseCB.has(uidIt)) return false;
       if (venteOffOf(it) || soldManual.has(String(it.id))) return false;
       if (!showEmailSold && emailSoldIds.has(String(it.id))) return false;
       // Vendue d'après VINTED LUI-MÊME (identité, jamais le titre).
@@ -39795,7 +39807,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const annBase = useMemo(() => (listings.items || []).filter(garderAnnonce),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
+  [listings.items, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids, pauseCB]);
   // Les annonces d'un compte pas relu depuis 24 h : ni en ligne, ni disparues —
   // dites UNE fois au-dessus de la grille, repliées (`FraicheurAnnonces`).
   const annAConfirmer = useMemo(() => (listings.aConfirmer || []).filter(garderAnnonce),
@@ -41004,6 +41016,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { n: comptes.reduce((s, k) => s + parCompte[k], 0), comptes };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.items, blockedAccts, accountUids, soldManual, emailSoldIds, showEmailSold, annoncesVendues]);
+  // (19 nov., lot compte-bloque) Les annonces mises en pause parce que Vinted a bloqué leur compte (SON choix) :
+  //    même critère que `annBase`, comptées pour être DITES (« N annonces en pause · compte bloqué »).
+  const annEnPause = useMemo(() => {
+    const parCompte = {};
+    for (const it of (listings.items || [])) {
+      const uid = String((it && it._acc && it._acc.vinted_user_id) || '');
+      if (!uid || !accountUids.has(uid) || !pauseCB.has(uid) || blockedAccts.has(uid)) continue;
+      if (acctOffOf(it) || soldManual.has(String(it.id))) continue;
+      if (!showEmailSold && (emailSoldIds.has(String(it.id)) || annoncesVendues.has(String(it.id)))) continue;
+      const lg = (load('vinted_account_labels', {}) || {})[uid] || (it._acc && it._acc.login) || uid;
+      parCompte[lg] = (parCompte[lg] || 0) + 1;
+    }
+    const comptes = Object.keys(parCompte);
+    return { n: comptes.reduce((s, k) => s + parCompte[k], 0), comptes };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings.items, pauseCB, blockedAccts, accountUids, soldManual, emailSoldIds, showEmailSold, annoncesVendues]);
 
   const annStats = useMemo(() => {
     // Même base que la grille (annBase) : le bandeau compte exactement ce qui
@@ -54272,6 +54300,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <b>{trj('annonces.annonces', { n: annBannies.n })}</b> {tr('annonces.texte7')} {annBannies.comptes.length>1?tr('annonces.comptesRefuses'):'ton compte '+annBannies.comptes[0]} {tr('annonces.retiree')}{annBannies.n>1?'s':''} {tr('annonces.vintedCompteBloque')}{annBannies.n>1?'les':'la'} {tr('journee.texte2')} <b>Leboncoin</b> {tr('annonces.texte5')} <b>eBay</b>. <Pourquoi>{trj('annonces.compteBloqueElles', { n: annBannies.n })}</Pourquoi>
           </div>
         )}
+        {/* (19 nov., lot compte-bloque) Ce que SA pause a mis de côté : dit, neutre, une ligne (rien n'est perdu). */}
+        {annEnPause.n>0 && (
+          <p className="vrm-cb-ligne" data-annonces-en-pause={annEnPause.n} style={{margin:'0 0 12px',fontSize:13,lineHeight:1.4,color:C.muted}}>
+            {annEnPause.comptes.length>1 ? tr('compteBloque.enPausePlusieurs', { n: annEnPause.n }) : tr('compteBloque.enPause', { n: annEnPause.n, nom: annEnPause.comptes[0] })}
+          </p>
+        )}
         {/* ── SIGNALEMENTS, REPLIÉS ────────────────────────────────────────
             Trois bandeaux d'alerte s'empilaient ici en permanence (compte muet,
             annonces disparues, compte bloqué) : il fallait défiler longtemps
@@ -64593,6 +64627,8 @@ function AppCoeur() {
   const [annoncesTick, setAnnoncesTick] = useState(0);
   const perAccRef = useRef(null);            // { cle, perAcc } : la dernière lecture complète
   const comptesSignales = useRef(null);      // Set des comptes signalés, 'tous', ou null
+  // (19 nov., lot compte-bloque) Sa pause (ou le déblocage) change « en ligne » : le calcul repart.
+  useEffect(() => { const f = () => setAnnoncesTick((t) => t + 1); window.addEventListener('vrm:comptes-bloques', f); return () => window.removeEventListener('vrm:comptes-bloques', f); }, []);
   useEffect(() => {
     const relire = (uids) => {
       const cur = comptesSignales.current;
@@ -64661,6 +64697,9 @@ function AppCoeur() {
       const blockedS=new Set((load('vinted_accounts_blocked',[])||[]).map(String));
       const hiddenS=new Set((load('vinted_accounts_hidden',[])||[]).map(String));
       const skipAcc=(uid)=>blockedS.has(String(uid))||hiddenS.has(String(uid));
+      // (19 nov., lot compte-bloque) Ses annonces en pause (compte bloqué par Vinted, SON choix) : hors de « en ligne »,
+      //    comme l'écran Annonces (`annBase`) ; ses ventes et ses messages restent.
+      const pauseS=uidsEnPauseConnus();
       // Paires déjà vendues mais encore présentes dans la moisson wardrobe :
       // marquées à la main (✓ vendue) ou confirmées par un email de vente /
       // bordereau (calcul de l'onglet Annonces, mémorisé). Même exclusion des
@@ -64700,7 +64739,7 @@ function AppCoeur() {
       //    écartés (`compteEcarte`) en sortent — comme sur l'écran Ventes.
       // Revue 5.165 : sur un SIGNAL de l'extension (voir `comptesSignales`), on ne
       // relit que les annonces des comptes signalés, dans la moisson.
-      const cleCalc=cleComptesVinted(vintedAccounts)+'|'+[...blockedS].sort().join(',')+'|'+[...hiddenS].sort().join(',');
+      const cleCalc=cleComptesVinted(vintedAccounts)+'|'+[...blockedS].sort().join(',')+'|'+[...hiddenS].sort().join(',')+'|'+[...pauseS].sort().join(',');
       const sig=comptesSignales.current; comptesSignales.current=null;
       const prec=perAccRef.current;
       const perAcc=(sig && prec && prec.cle===cleCalc)
@@ -64792,7 +64831,7 @@ function AppCoeur() {
         // par `onCloudReady` des deux côtés : sur un appareil neuf elles
         // arrivaient APRÈS le premier rendu, et les deux écrans annonçaient
         // deux nombres (64 et 63, mesuré).
-        if(actif && list.ok){ ok=true;
+        if(actif && list.ok && !pauseS.has(String(a.vinted_user_id))){ ok=true;
           const uidL=String(a.vinted_user_id); let nL=0;
           for(const it of list.items){
             const id=String(it.id);
@@ -67282,6 +67321,8 @@ function AppCoeur() {
           comptes={(vintedAccounts || []).filter((a) => a && a.vinted_user_id != null).map((a) => ({ uid: String(a.vinted_user_id), nom: (load('vinted_account_labels', {}) || {})[String(a.vinted_user_id)] || a.login || ('#' + a.vinted_user_id) }))}/>
         <ApercuSansAbonnement tab={tab} setTab={setTab}/>
         <BandeauLiaison/>
+        {/* (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » : l'annonce et LA question, une fois (src/CompteBloque.jsx). */}
+        {!baseKO && !horsLigne && <GardeEcran nom="coque:compte-bloque"><Suspense fallback={null}><CompteBloque comptes={vintedAccounts}/></Suspense></GardeEcran>}
         {!baseKO && <BandeauStatut/>}
         <BandeauConfirmationAdresse onVoir={() => { ouvrirEmailsRelier('adresses'); setTab('emails'); }}/>
         <DemandeCodeDiscord/>
