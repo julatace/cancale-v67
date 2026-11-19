@@ -551,7 +551,7 @@
     .n-coque[data-n-defile="ecran"] { display: flex; flex-direction: column; padding-inline-start: var(--n-l-laterale); }
     /* (19 nov., intégration) Un écran d'avant prend TOUTE la largeur du volet de contenu : sa marge automatique (style en ligne)
        le rétrécissait à la largeur de son texte (Stock : 535 px sur 1 272). Les trois volets gardent la largeur de leur liste. */
-    .n-coque[data-n-defile="ecran"] > .n-coque-ecran { align-self: stretch !important; width: 100% !important; box-sizing: border-box; }
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran:not([data-n-volets="trois"]) { align-self: stretch !important; width: 100% !important; box-sizing: border-box; }
     /* `align-self: stretch` : un enfant fixe d'un conteneur flex suit son alignement (start ⇒ il ne s'étirait pas, 691 px). */
     .n-coque[data-n-defile="ecran"] > .n-laterale { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; height: auto; align-self: stretch; }
     .n-coque[data-n-defile="ecran"] > .n-coque-ecran { width: auto; height: auto; }
