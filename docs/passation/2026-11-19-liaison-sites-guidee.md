@@ -195,8 +195,8 @@ de l'annonce.
 - **Après la fusion de `claude/integration-19nov`** (19 nov. au soir) : banc `liaison-sites` **244 verts** (L1 rejoue
   `ouvrirLiaison({ site, id })`, que l'écran « Annonces à égalité » appelle — les rangées sont à lui ; L4 : le sens inverse) ;
   audits liaison-sites (103), liaison-numero (13), publiees-sites (19), ebay-lien-publication (8) et la batterie habituelle verts.
-  Rouges qui ne viennent pas de ce chantier : budget du démarrage **2 009 Ko pour 1 970** (le budget a été abaissé sur la
-  branche d'intégration) ; `a-retirer-ailleurs` T0 (« Ouvrir Vestiaire ↗ » repeint en blanc par une règle d'avant,
+  Budget du démarrage : **1 999 Ko pour 2 000** (budget de la branche d'intégration, après la seconde fusion). Rouges qui ne
+  viennent pas de ce chantier (vus avant la seconde fusion) : `a-retirer-ailleurs` T0 (« Ouvrir Vestiaire ↗ » repeint en blanc par une règle d'avant,
   `.vrm-fu-carte :is(a, button…)`) ; `garde-ecrans` (la navigation que le banc cherche est remplacée par la coque native).
 - Le build a besoin de `NODE_OPTIONS=--max-old-space-size=6144` sur cette machine (sinon « heap out of memory »).
 
