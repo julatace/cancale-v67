@@ -119,3 +119,26 @@ faire, pas à moi. »
 - Lot du 16 nov. (finitions + Stock v4) : gardé sur `claude/integration-16nov-finitions-stock-v4`, non appliqué.
 - App Store : il faut un compte Apple Developer (99 $/an) et son Mac relié (Xcode) ; Apple relit 1 à 2 jours ; pas de
   paiement Stripe dans l'app iPhone, « Se connecter avec Apple » si Google reste, suppression du compte dans l'app.
+
+### G. « Publier partout » : une fiche complète par article, traduite pour chaque site
+Julien : « je vais pouvoir transvaser une annonce de Vinted, Leboncoin, eBay à Vestiaire Collective, mais je veux être sûr
+que pour chaque article, peu importe ce que c'est, ça publie au bon endroit dans la bonne catégorie, même si les
+catégories ne sont pas les mêmes » — « pour chaque article que je publie sur Vinted, ça enregistre la catégorie […] et
+il faut également que ça enregistre couleur, matériaux, pointure, description, absolument tout ».
+Existant (mesuré dans le code) : l'extension lit déjà sur l'annonce Vinted `catalog_id`, `brand_id`/`brand`, `size_id`,
+`size_title`, `status_id`, `color1_id`/`color2_id`/`color_ids`, `package_size_id`, `is_unisex`, mesures, `item_attributes`
+(background.js ~7812 et 13483) ; `src/correspondances.js` traduit la CATÉGORIE Vinted → Leboncoin (18 sûres / 5 à
+demander), Vestiaire (7 / 14), eBay (suggestion de l'API) ; réponses retenues dans `vrm_correspondances`.
+À construire :
+1. UNE FICHE ARTICLE NEUTRE gardée par VRM pour chaque article (quel que soit le site d'origine) : catégorie VRM,
+   genre, marque, pointure (EU, jamais convertie), état, couleur(s), matière(s), dimensions, titre, description,
+   photos, prix, prix mini — remplie à la LECTURE de l'annonce (Vinted, et aussi Leboncoin, eBay, Vestiaire), jamais
+   devinée ; un champ pas lu reste vide et se demande une fois.
+2. Des TABLES PAR CHAMP et par site, dans les DEUX sens (catégorie, état, couleur, matière, marque, pointure), tirées
+   des listes que chaque site sert ; pas sûr ⇒ demandé une fois, retenu ; un site qui refuse (marque hors liste
+   Vestiaire) ⇒ « pas vendable sur ce site », jamais forcé.
+3. Publier n'importe quel sens (Leboncoin → Vestiaire sans Vinted) ; rien ne part sans catégorie ni champ obligatoire
+   sûr ; RELECTURE après publication (la catégorie enregistrée par le site = la voulue, sinon dit).
+4. Un tableau de couverture : pour chaque catégorie présente dans le stock, sûre / à demander / impossible, par site.
+Dépend de `annonces-a-egalite` (l'article central). Extension probablement touchée (lecture des fiches Leboncoin /
+eBay / Vestiaire) ⇒ dans la version unique 5.409.
