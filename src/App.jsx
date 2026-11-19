@@ -67880,6 +67880,9 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {ordi && !troisVolets && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
+            « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
+        {ordi && troisVolets && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>

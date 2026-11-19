@@ -112,12 +112,14 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
   const k3 = await pg.evaluate(async () => {
     const tete = document.querySelector('[data-n-tete]'), main = document.querySelector('.vrm-main'); if (!tete || !main) return null;
     const centre = tete.querySelector('.n-barre-centre'); const op = () => +getComputedStyle(centre).opacity;
+    // (19 nov., intégration) Un écran qui ne défile pas (base vide : tout tient) ne peut pas réduire sa barre : sans objet.
+    if (main.scrollHeight <= main.clientHeight + 40) return { sansObjet: true };
     main.scrollTop = 0; await new Promise((r) => setTimeout(r, 500)); const haut = { r: tete.hasAttribute('data-n-reduit'), o: op() };
     main.scrollTop = 600; await new Promise((r) => setTimeout(r, 800)); const bas = { r: tete.hasAttribute('data-n-reduit'), o: op(), titre: centre.textContent, colle: Math.round(tete.getBoundingClientRect().top) };
     main.scrollTop = 0; await new Promise((r) => setTimeout(r, 500));
     return { haut, bas, retour: tete.hasAttribute('data-n-reduit') };
   });
-  dit(k3 && !k3.haut.r && k3.bas.r && k3.bas.o > .9 && !!k3.bas.titre && k3.bas.colle <= 1 && !k3.retour, `K3 ${t} : la barre de titre se réduit au défilement (« ${k3 && k3.bas.titre} ») et redevient claire en haut`, k3);
+  if (k3 && k3.sansObjet) console.log(`  --  K3 ${t} : sans objet (l'écran tient sans défiler)`); else dit(k3 && !k3.haut.r && k3.bas.r && k3.bas.o > .9 && !!k3.bas.titre && k3.bas.colle <= 1 && !k3.retour, `K3 ${t} : la barre de titre se réduit au défilement (« ${k3 && k3.bas.titre} ») et redevient claire en haut`, k3);
   if (!sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-aujourdhui.png') });
   if (sombre && nomBase === 'volume') await pg.screenshot({ path: path.join(SHOTS, 'coque-390-aujourdhui-sombre.png') });
   // K4

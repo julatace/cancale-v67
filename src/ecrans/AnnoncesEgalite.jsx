@@ -17,6 +17,7 @@
 //  sinon `vrm_articles_sites` sous l'identifiant de l'annonce de SON site), relus juste avant : carte pas lue ⇒ rien.
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
+import { useComptesBloques } from '../compteBloqueEtat.js';
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
@@ -103,7 +104,11 @@ export async function lireAnnoncesEgalite(accounts) {
   return { annonces: out, manque };
 }
 
-export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', onEcranSite = null }) {
+export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
+  // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
+  // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
+  const { pause: pauseCB } = useComptesBloques();
+  const accounts = React.useMemo(() => (accountsTous || []).filter((a) => !(a && pauseCB && pauseCB.has(String(a.vinted_user_id)))), [accountsTous, pauseCB]);
   const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
