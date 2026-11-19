@@ -274,3 +274,24 @@ total de tous les sites : c'est celui de l'app.
 formulaire « Achats hors plateforme » (`src/ecrans/Achats.jsx`) écoute — il ouvre la saisie d'un achat hors
 plateforme (vide-grenier, boutique). Ce formulaire n'est monté que dans la liste des achats Vinted : sur les autres
 sites, personne n'écoute et le toucher ne fait rien (mesuré par le banc, ligne « ajouter »).
+
+## 10. Plus AUCUN « Relier » manuel achat ↔ colis (Julien redemande, 19 nov. : « c'est à toi de le faire avec le code de retrait »)
+
+Le §2 avait gardé deux gestes ; ils sont retirés à leur tour :
+- le **scanner** (« Colis inconnu · Relier à un achat ») : `HoteRetrouver` ne passe plus `onRelier` ; un colis inconnu dit
+  son transporteur, son n° et « Chercher », rien d'autre ;
+- l'outil **« + Ajouter un n° de suivi »** (Achats, outils de retrait) : plus de « Relier à un achat » sur un n° ajouté.
+Un lien posé par le passé reste LU (« Relié à … », « Délier ») — audit et banc `colis-achat-auto`.
+Restent, exprès (un autre sujet) : relier un achat à une VENTE ou une ANNONCE (fiche, « Relier achats et ventes »), et
+« Relier » une boîte e-mail (Ma journée). Ma journée « Pas encore relié : ouvre l'achat sur Vinted » est une phrase qui
+mène au geste de lecture, pas un lien manuel.
+
+Sous un autre site qu'Achats · Vinted, la ligne repliable « À retirer · N › » (nombre de tous les sites) n'est plus
+rendue (`RepliRetirerAchats siteFiltre`) : la tête de la section dit le nombre du site.
+
+Bancs : `scan-achat` (32 verts : n° inconnu sans « Relier », rien d'écrit ; un n° connu ⇒ la fiche de SON achat),
+`achats-retirer-site` (44 verts), `suivi-colis` mis à jour (la scène « Relier à un achat » devient « aucun Relier, aucun
+lien écrit ») mais ce banc est rouge en masse (45) dans cet environnement, À L'IDENTIQUE sur le build d'avant ce lot —
+des appels d'authentification sortent vers la production (garde réseau) : panne du banc, pas de ce lot ; à reprendre.
+`design-v2` : 18 rouges (taille de « Afficher le QR » et du sélecteur de site, contrastes d'Aujourd'hui) hors de ce que
+ce lot touche ; non comparés à main.
