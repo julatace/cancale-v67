@@ -26876,6 +26876,11 @@ async function repondreLeboncoin(msg) {
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette conversation dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
     if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "ouvre leboncoin.fr dans ce Chrome, connecté sur le compte de cette conversation, puis réessaie — l'envoi part de cet onglet" };
+    // 19 nov. (5.409, audit-actions-gardees) : la réponse Leboncoin passait le plafond (50/h) mais PAS la
+    // sécurité du compte (anti-robot, « Tout arrêter », repos, plafonds du jour) — comme Vestiaire, désormais.
+    { const rbR = await secuRobotDit('leboncoin', compte); if (rbR) return { accepte: false, code: rbR.code, raison: rbR.error }; }
+    const secuR = await secuGeste('leboncoin', compte, 'reponse', 'clic');
+    if (secuR) return { accepte: false, code: secuR.code, raison: secuR.error };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -27704,6 +27709,10 @@ async function pauseLbcDepuisApp(msg) {
     //    sur un message, une pause ou une suppression) ⇒ rien ne part ; et l'ordre prend
     //    sa place dans les 50 actions/heure DU COMPTE Leboncoin (avant : compteurs à part,
     //    50 messages + 10 suppressions + 10 pauses par heure).
+    // 19 nov. (5.409, audit-actions-gardees) : la pause Leboncoin passait le plafond mais PAS la sécurité du compte.
+    { const rbP = await secuRobotDit('leboncoin', compte); if (rbP) return { accepte: false, code: rbP.code, raison: rbP.error }; }
+    const secuP = await secuGeste('leboncoin', compte, 'autre', 'clic');
+    if (secuP) return { accepte: false, code: secuP.code, raison: secuP.error };
     const freinLbc = await pauseLbcMsg();
     if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
