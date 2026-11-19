@@ -64,6 +64,8 @@
   /* ── Hérité : un bloc d'un écran d'avant, posé dans une page native (ses contrôles gardent leurs gestes) ── */
   .n-herite { box-sizing: border-box; margin: 0 var(--n-marge) 24px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); min-width: 0; overflow-wrap: anywhere; }
   .n-herite:empty { display: none; }
+  /* Les boutons d'un bloc d'avant (« Par étape · Dans l'ordre », « Ouvrir dans Ventes › »…) se touchent au doigt : 44 px. */
+  .n-herite :is(button, a.vrm-lien-action) { min-height: var(--n-cible); }
   .n-herite[data-n-nu] { padding: 0; background: transparent; }
   /* La fiche à l'ordinateur, hors du volet de la coque (les écrans d'avant n'ont que deux volets) : un VOLET À DROITE,
      la liste reste visible et touchable à gauche — toucher une autre rangée change la fiche. */

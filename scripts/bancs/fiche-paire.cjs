@@ -113,15 +113,17 @@ async function fiche(pg, n) {
   await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), n);
   await pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 });
   for (let i = 0; i < 60; i++) { const l = await pg.evaluate(() => (document.querySelector('[data-fiche-paire]') || { getAttribute: () => '1' }).getAttribute('data-fiche-lecture-en-cours')); if (l === '0') break; await pg.waitForTimeout(250); }
-  // (19 nov., fiche directe — Julien : « je dois cliquer sur la paire puis cliquer sur les points pour avoir des
-  // informations ») L'histoire complète (le parcours étape par étape) vit sous l'histoire repliée de la fiche : « Tout
-  // voir » la déplie, sur la fiche même. Le banc l'ouvre comme lui, puis lit les mêmes `data-fiche-etape`.
+  await deplier(pg);
+  return lire(pg);
+}
+// (19 nov., fiche directe — Julien : « je dois cliquer sur la paire puis cliquer sur les points pour avoir des
+// informations ») L'histoire complète (le parcours étape par étape) vit sous l'histoire repliée de la fiche : « Tout
+// voir » la déplie, sur la fiche même ; sa vue « Étapes » porte les `data-fiche-etape` (« Dans l'ordre » est la vue par défaut).
+async function deplier(pg) {
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fd-tout-voir][aria-expanded="false"]'); if (b) (b.querySelector('button') || b).click(); });
   await pg.waitForTimeout(400);
-  // … et la vue « Étapes » du parcours (la vue « Dans l'ordre » est celle par défaut ; ses `data-fiche-etape` sont ceux d'Étapes).
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fiche-vue-choix="etapes"][aria-pressed="false"]'); if (b) b.click(); });
   await pg.waitForTimeout(300);
-  return lire(pg);
 }
 const lire = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-fiche-paire]'); if (!el) return null;
@@ -166,7 +168,7 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         dit(f.etapes.vente.etat === 'fait' && /Vendue sur Vinted/.test(f.etapes.vente.txt) && f.vente === '9500' && f.txs.join() === '9117', `A ${T} vendue sur Vinted 95 €, par SA transaction`, f.vente + ' ' + f.txs.join() + ' ' + (f.etapes.vente || {}).txt);
         dit(f.etapes.colis.etat === 'fait' && /livré/i.test(f.etapes.colis.txt), `A ${T} le colis livré (la règle de l'étiquette de la vente)`, (f.etapes.colis || {}).txt);
         dit(f.etapes.argent.etat === 'fait' && /versé/i.test(f.etapes.argent.txt), `A ${T} l'argent versé (transaction finalisée), daté`, (f.etapes.argent || {}).txt);
-        dit(f.benef === '4300' && f.partiel === '1' && /\+43/.test(f.benefTxt) && /frais pas tous confirmés/.test(f.benefTxt), `A ${T} bénéfice +43 €, dit partiel (frais pas tous confirmés)`, f.benef + ' ' + f.benefTxt);
+        dit(f.benef === '4300' && f.partiel === '1' && /\+43/.test(f.benefTxt) && /frais pas tous confirmés|au plus/.test(f.benefTxt), `A ${T} bénéfice +43 €, dit partiel (« au plus » : frais pas tous confirmés)`, f.benef + ' ' + f.benefTxt);
         dit(rgb(f.pastille)[0] < 60, `A ${T} une étape lue : pastille pleine, à l'encre`, f.pastille);
         dit(!f.petits.length, `F ${T} chaque bouton fait au moins ${f.seuil} px (44 au doigt, 36 à la souris)`, f.petits.join(' | '));
         dit(f.sw <= f.cw + 1, `F ${T} aucun débordement horizontal`, `${f.sw} > ${f.cw}`);
@@ -200,9 +202,10 @@ const rgb = (s) => (/rgba?\((\d+), (\d+), (\d+)/.exec(s || '') || []).slice(1).m
         await pg.waitForSelector('[data-tout-parcours]', { timeout: 15000 });
         await pg.click('[data-tout-parcours]');
         await pg.waitForSelector('[data-fiche-paire="117"]', { timeout: 8000 });
+        await pg.waitForTimeout(800); await deplier(pg);
         const f = await lire(pg);
         dit(!!f && f.num === '117' && f.etapes.vente && f.etapes.vente.etat === 'fait', `E ${T} « Tout sur le N° » → « Toute l'histoire » ouvre la fiche de CE N°`, f && f.num);
-        await pg.click('[data-fiche-retour]');
+        await pg.click('[data-fiche-paire] .n-barre-retour, [data-fiche-retour]');   // (19 nov.) le retour « ‹ » de la page native
         await pg.waitForTimeout(300);
         const retour = await pg.evaluate(() => !document.querySelector('[data-fiche-paire]') && !!document.querySelector('[data-tout-num="117"]'));
         dit(retour, `E ${T} « ‹ Tout sur le N° » revient au bloc de la recherche`);
