@@ -148,10 +148,10 @@ const ECRANS = [
   { id: 'communaute', groupe: 'Communauté', etapes: [{ aller: '?tab=communaute' }], preuve: '.vrm-main' },
   { id: 'communaute-parrainage', groupe: 'Communauté', etapes: [{ aller: '?tab=parrainage' }], preuve: '.vrm-main' },
   // ── La coque : cloche, loupe, menus, aide ──
-  { id: 'coque-cloche', groupe: 'Coque', etapes: [{ aller: '?tab=journee' }, { clic: '[data-centre-notifs-cloche]' }], preuve: '[data-centre-notifs], [data-centre-notifs-panneau], .vrm-cn-panneau, [role="dialog"]' },
+  { id: 'coque-cloche', groupe: 'Coque', etapes: [{ aller: '?tab=journee' }, { clic: '[data-centre-notifs-cloche], [data-n-notifs]', ou: [{ clic: '[data-n-coque-plus]' }, { clic: '[data-n-notifs]' }] }], preuve: '[data-centre-notifs], [data-centre-notifs-panneau], .vrm-cn-panneau, [role="dialog"]' },
   { id: 'coque-loupe', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '5' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
   { id: 'coque-loupe-numero', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '3102' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
-  { id: 'coque-profil', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-profil-tete], [data-nav-compte]' }], preuve: '[role="dialog"], [role="menu"], .vrm-profil-menu, [data-profil-menu]' },
+  { id: 'coque-profil', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-profil-tete], [data-nav-compte]', ou: [{ clic: '[data-n-coque-plus]' }, { clic: '[data-profil-tete]' }] }], preuve: '[role="dialog"], [role="menu"], .vrm-profil-menu, [data-profil-menu]' },
   { id: 'coque-etat-extension', groupe: 'Coque', si: (c) => !c.tel, etapes: [{ aller: '?tab=achats' }, { clic: '[data-etat-actions]' }], preuve: '[data-etat-actions][aria-expanded="true"]' },
   { id: 'coque-aide', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-aide-ouvrir]' }], preuve: '[role="dialog"], .vrm-aide-feuille, [data-aide-feuille]' },
   // ── La fiche d'un article (un autre chantier : ouverte, listée à part) ──
@@ -481,7 +481,7 @@ async function jouer(o, etapes) {
     else if (e.ls) { await pg.evaluate(([k, v]) => { try { localStorage.setItem(k, v); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch (_) {} }, e.ls); }
     else if (e.reglage) { for (let i = 0; i < 6; i++) { const r = await pg.evaluate(pasVersReglage, e.reglage).catch(() => 'rien'); if (r !== 'retour' && r !== 'categorie') break; await pg.waitForTimeout(280); } await calme(pg, 250, 2500); }
     else if (e.loupe) {
-      if (o.tel) { if (!(await toucher(o, 'button[data-recherche-loupe]'))) return false; } else { await pg.mouse.click(700, 500).catch(() => {}); await pg.keyboard.press('Control+K'); }
+      if (o.tel) { if (!(await toucher(o, 'button[data-recherche-loupe], input[data-recherche-loupe]'))) return false; } else { await pg.mouse.click(700, 500).catch(() => {}); await pg.keyboard.press('Control+K'); }
       await pg.waitForSelector('[data-recherche-champ]', { timeout: 5000 }).catch(() => {});
       await pg.evaluate((v) => { const el = document.querySelector('[data-recherche-champ]'); if (!el) return; const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; poser.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); }, e.loupe);
       await pg.waitForTimeout(900); await calme(pg, 300, 3000);

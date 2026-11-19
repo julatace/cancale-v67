@@ -206,6 +206,8 @@
     font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
     touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
+  /* (19 nov., intégration) Un repli d'en-tête n'a pas de fond : un ancien fond de bouton (#E3E3E8) y tombait sous l'encre seconde (4,09:1). */
+  .n-groupe-repli, .n-groupe-repli:hover { background: transparent !important; }
   .n-groupe-fleche { color: var(--n-encre-3); transition: transform var(--n-duree) var(--n-courbe); }
   .n-groupe-repli[aria-expanded="true"] .n-groupe-fleche { transform: rotate(90deg); }
   .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; }
