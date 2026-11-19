@@ -203,3 +203,4 @@ Elles CHANGENT des règles de CLAUDE.md : à reporter dans CLAUDE.md (§2.5, §3
 - Migration 048 APPLIQUÉE le 19 nov. (index `app_data_preuve_adresse`, index BRIN `journal_ecritures_at_brin`, fonction `sauvegarde.vrm_purger_journal`, clé de service seule) — rien effacé.
 - Copies `sauvegarde.app_data_20260930` et `sauvegarde.app_data_20261002` (111 Mo) SUPPRIMÉES le 19 nov. (aucune fonction, vue ni code ne les lisait).
 - Mises en ligne regroupées : 1 à 2 « trains » par jour au lieu de 8 à 10.
+- Messages aux favoris (Julien, 19 nov. soir : « 4 min c'est peut-être beaucoup, on garde toujours le temps aléatoire ») : attente aléatoire 40–90 s par défaut + temps d'écriture ; choix « Plus prudent » 2–4 min ; plafonds inchangés (15/h favoris, 50/h, jour). Livré avec l'extension 5.409 (chantier extension-utile).

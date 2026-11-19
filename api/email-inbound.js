@@ -60,6 +60,7 @@ import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FU
 import { horairesDepuisTexte } from './_lib/horaires-relais.js';
 import { completerParLignePrecedente } from './_lib/rappel-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
+import { estFormeCodeRetrait, normaliserCode } from './_lib/forme-code-retrait.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta, liensDesLignes } from './_lib/suivi-colis.js';
@@ -1186,6 +1187,10 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // rangé « info » (aucun n°) et le colis n'était nulle part.
   if (!suivi) { const m = all.match(/\bcolis\s+(?:n[°o]|num[ée]ro)\s*[:：\-]?\s*([A-Z0-9]{8,20})\b/i); if (m && /\d{6}/.test(m[1])) suivi = m[1].toUpperCase(); }
   if (!suivi) { const m = all.match(/\b(\d[A-Z]\d{11}|[A-Z]{2}\d{9}[A-Z]{2})\b/); if (m) suivi = m[1]; }
+  // (19 nov., retraits parfaits) UPS « 1Z… » (18 signes) et le n° à 24 chiffres d'un Locker InPost : sans eux, l'e-mail
+  // « disponible » de ces réseaux n'avait aucun n° et restait « info » (mesuré au banc : UPS Access Point, Locker InPost).
+  if (!suivi) { const m = all.match(/\b(1Z[0-9A-Z]{16})\b/); if (m) suivi = m[1].toUpperCase(); }
+  if (!suivi) { const m = all.match(/(?:^|[^\d])(\d{24})(?!\d)/); if (m) suivi = m[1]; }
   if (!suivi) { const m = all.match(/\b(\d{8,14})\b/); if (m) suivi = m[1]; }
 
   // ── ÉTAPE DU COLIS ────────────────────────────────────────────────────────
@@ -1253,6 +1258,34 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   if (!code && !codesMultiples) {
     const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]{1,2}\d{3,10}|\d{4,10})\b/i);
     if (m && nombreSurSaLigne(all, m)) code = m[1].toUpperCase();
+  }
+  // (19 nov., retraits parfaits — Julien : « reconnaître absolument tous les types de code de retrait ») LES CODES DE
+  // CONSIGNE ET LES AUTRES FORMES, sur la même ligne que leur libellé (`nombreSurSaLigne`), jamais deviné ailleurs :
+  //   · le code à TAPER sur l'écran d'une consigne : « Saisissez / Tapez / Entrez / Composez / Utilisez le code 482918 (sur
+  //     l'écran du Locker) », « Code du casier : », « Code de la consigne : », « Code d'accès : », « Code à saisir : » ;
+  //   · un code MÊLANT lettres et chiffres (Relais Colis, casiers : « 6A4B2C ») après « code de retrait » — au moins deux
+  //     chiffres et une lettre (api/_lib/forme-code-retrait.js : « suivant », sans chiffre, n'en est jamais un) ;
+  //   · un code écrit EN GROUPES à la fin de sa ligne (« 731 204 », « 73-12-04 ») : chaque groupe de 2 à 4 chiffres, 4 à
+  //     10 chiffres en tout. « 1234 56000 » (un groupe de 5 : un code postal collé) n'est jamais joint ;
+  //   · le code-barres à présenter (« code-barres : 8R… ») en dernier : jamais le n° de suivi (`codeImpossible`).
+  if (!code && !codesMultiples) {
+    const VERBE = String.raw`(?:saisi(?:s|ssez)|tap(?:e|es|ez)|entr(?:e|es|ez)|compos(?:e|es|ez)|utilis(?:e|es|ez)|indiqu(?:e|es|ez))\s+(?:le\s+|ce\s+)?code(?:\s+(?:suivant|de\s+retrait|d['’]ouverture|d['’]acc[eè]s|secret|pin))?`;
+    const LIBELLE = String.raw`code\s+(?:du\s+(?:casier|locker|consigne)|de\s+(?:la\s+)?consigne|d['’]acc[eè]s|[àa]\s+(?:saisir|taper|composer)|secret)`;
+    const m = all.match(new RegExp(`(?:${VERBE}|${LIBELLE})[\\s*_:：\\-–—]*([A-Z]{0,2}\\d{3,10}|(?=[A-Z0-9]{5,10}\\b)(?=(?:[A-Z]*\\d){2})(?=\\d*[A-Z])[A-Z0-9]{5,10})\\b`, 'i'));
+    if (m && nombreSurSaLigne(all, m) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/code\s+(?:de\s+)?retrait(?:\s+(?:est|sera))?[\s*_\-–—]*[:：]?[\s*_\-–—]*((?=[A-Z0-9]{5,10}\b)(?=(?:[A-Z]*\d){2})(?=\d*[A-Z])[A-Z0-9]{5,10})\b/i);
+    if (m && nombreSurSaLigne(all, m) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|d['’]ouverture)|\bpin\b)(?:\s+(?:est|sera))?[ \t\u00a0*_]*[:：]?[ \t\u00a0*_]*(\d{2,4}(?:[ \u00a0.\-]\d{2,4}){1,3})[ \t\u00a0*_.]*(?=\n|$)/i);
+    const joint = m ? normaliserCode(m[1]) : '';
+    if (m && /^\d{4,10}$/.test(joint)) code = joint;
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/code[\s-]*barres?(?:\s+(?:suivant|ci-dessous))?[\s*_]*[:：][\s*_]*([A-Z0-9]{6,20})\b/i);
+    if (m && nombreSurSaLigne(all, m) && /\d{4}/.test(m[1]) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
   }
   // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
   //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
@@ -1359,7 +1392,9 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   }
   // (17 oct.) La consigne Vinted Go est une CONSIGNE (on saisit un code, pas de
   // comptoir) : « Consigne Vinted Go » ne passait pas le motif.
-  const consigne = /consigne\s+pickup|consigne\s+vinted\s*go|casier|locker/i.test(all);
+  // (19 nov., retraits parfaits) + les autres consignes automatiques : Pickup Station (Colissimo), Parcel Locker (GLS),
+  // InPost, « consigne automatique », « sur l'écran du casier ». Une consigne n'a pas de comptoir : on TAPE le code.
+  const consigne = /consigne\s+pickup|consigne\s+vinted\s*go|consigne\s+automatique|casier|locker|pickup\s+station|parcel\s*locker|\binpost\b|packstation/i.test(all);
 
   // ── MESURE : lieu introuvable sur un colis À RETIRER ─────────────────────
   // Julien (30 sept.) : « le lieu est en bas du mail ou dans ses infos ». Le
