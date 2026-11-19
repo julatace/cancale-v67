@@ -180,3 +180,19 @@ de questions de leur part. »
   « compte Vinted vu ✓ ») ; une aide « Pourquoi ? » d'une ligne par état.
 Mesure d'abord, en prod, les états réellement rencontrés (lignes `ext_appareil_*`, `actions_compte_*`, rapports) et les
 libellés actuels (inventaire de l'audit d'utilité) ; extension probablement touchée ⇒ version unique 5.409.
+
+## DÉCISIONS DE JULIEN (19 nov., réponse « 1 oui, 2 oui, 3 oui, 4 oui » aux questions de l'audit d'utilité §8)
+Elles CHANGENT des règles de CLAUDE.md : à reporter dans CLAUDE.md (§2.5, §3) à l'intégration, avec cette date.
+1. **Baisse de prix par règle automatique** : OUI. Une règle posée une fois (ex. « −5 % tous les 14 jours sans vente,
+   jamais sous le prix mini »), appliquée par l'extension seule, dans ses plafonds (45/h, réserve 5, baisses
+   irrégulières, arrêt au 1er captcha, prudence), journal « Ce que VRM a fait », éteinte par défaut, réglage par compte.
+   Jamais sous le prix mini ; sans prix mini, jamais sous achat + 10 % ; sans achat connu ni prix mini : pas de baisse.
+2. **Prix d'achat posé seul** : OUI. Le montant du REÇU de CET achat (son n° de transaction) est posé quand l'achat
+   reçoit son N° (ou quand il est relié par identité) ; jamais deviné ; un LOT n'est jamais divisé (demandé) ; une
+   saisie de Julien n'est jamais écrasée ; dit une fois (« prix d'achat repris du reçu »). Remplace §2.5 « il saisit
+   les prix d'achat lui-même ».
+3. **Vendue ailleurs ⇒ masquer seul sur Vinted** : OUI. Une paire dont la vente est PROUVÉE sur un autre site est
+   MASQUÉE (réversible) sur Vinted par l'extension, compte de l'onglet, dans les plafonds ; la SUPPRESSION reste son
+   toucher (§3 inchangé : jamais de suppression automatique) ; vente annulée ⇒ démasquée ; dit dans le journal.
+4. **Envoi des colis** : OUI. « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont retirés ; le dépôt
+   est constaté par le suivi du transporteur ; « Imprimer N bordereaux » imprime depuis Aujourd'hui.
