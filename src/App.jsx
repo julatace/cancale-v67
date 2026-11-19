@@ -3273,7 +3273,6 @@ const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
   'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
-  'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
