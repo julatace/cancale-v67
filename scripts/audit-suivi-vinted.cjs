@@ -525,15 +525,22 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       dit(!l1.some((v) => /3100000001[0-3]|31000000099/.test(v.chemin)), 'jamais une commande finalisée, un achat pas encore expédié, une VENTE, ni un achat livré', l1.map((v) => v.chemin.split('/')[4]).join(' '));
       dit(l1.length === 3 && l1.every((v) => lignes[`harvest_111_suivi_${v.chemin.split('/')[4]}`]), 'chaque suivi lu est rangé', Object.keys(lignes).filter((k) => /_suivi_/.test(k)).join(' '));
       const dues = ((f.store.vrmLecturesDues || {})['111'] || {}).suivi;
-      dit(!dues, 'le suivi n’entre pas dans la réserve des lectures prioritaires (il revient sans cesse : ce n’est pas un rattrapage)', JSON.stringify(dues));
+      // (19 nov., 5.409 — chantier colis-achat-auto) Le n° de suivi d'un achat EXPÉDIÉ sans n° est une lecture de COLIS :
+      // il entre dans la réserve, pour ce qui lui RESTE (5 expédiés sans n°, 3 lus ⇒ 2), plafonné à 3 par visite
+      // (`lecteursPrioritaires`). Les achats déjà numérotés ou pas encore expédiés n'y entrent pas (le risque du 24 oct.).
+      dit(!!dues && Number(dues.reste) === 2, 'le suivi réserve seulement ce qui reste à lire des achats EXPÉDIÉS sans n° (5.409 : 2 sur 5)', JSON.stringify(dues));
       await f.ctx.capterSuivisAchats('111');
       const l2 = lusJ(f);
       // (5.372) Chaque achat sans n° coûte aussi le détail de sa transaction : la visite 2 lit
       // d'AUTRES achats que la 1re ; puis les 6 lectures de l'heure sont prises (plus rien).
       dit(l2.length > l1.length && !l2.slice(l1.length).some((v) => l1.map((x) => x.chemin).includes(v.chemin)), 'la visite suivante lit les suivants (pas les mêmes avant 3 h)', l2.length);
+      // (5.409) l'achat pas encore expédié (classe « suivi ») peut passer à la visite 3, une fois la part des colis lue ;
+      // puis tout est dans le mémo de 3 h ou les 6 lectures de l'heure.
+      await f.ctx.capterSuivisAchats('111');
       const nAvant3 = f.j.vinted.length;
       await f.ctx.capterSuivisAchats('111');
-      dit(f.j.vinted.length === nAvant3, 'tout est dans le mémo de 3 h ou les 6 lectures de l’heure : plus aucune lecture', f.j.vinted.length - nAvant3);
+      const suivisHeure = f.j.vinted.filter((v) => /\/transactions\/\d+/.test(v.chemin)).length;
+      dit(f.j.vinted.length === nAvant3 && suivisHeure <= 6, 'tout est dans le mémo de 3 h ou les 6 lectures de l’heure : plus aucune lecture', `${f.j.vinted.length - nAvant3} de plus, ${suivisHeure} dans l’heure`);
       // trois heures passent (le mémo ET les compteurs de l'heure)
       for (const k of Object.keys(f.store.vrmSuiviFaits || {})) f.store.vrmSuiviFaits[k] = Date.now() - 3 * 3600000 - 60000;
       for (const c of ['vrmSuiviLus', 'vrmLectures']) for (const k of Object.keys(f.store[c] || {})) f.store[c][k] = f.store[c][k].map((t) => t - 3 * 3600000 - 60000);
@@ -914,7 +921,8 @@ const ecrits = (f, id) => f.j.posts.filter((ids) => ids.includes(id)).length;
       dit(code >= 1, 'le code du colis arrivé au point relais est lu, malgré 35 achats en route', `lectures de sa conversation : ${code}`);
       dit(lus <= 6, 'le suivi lit 6 achats au plus dans l’heure, sur un compte', `${lus} lecture(s)`);
       const rP = await faireFond({ src: BG, lignes: {} }).ctx.reserveLectures('111', 'photos');
-      dit(rP === 16, 'la réserve que les photos laissent ne compte pas le suivi (16, pas 19)', `réserve=${rP}`);
+      // (19 nov., 5.409) la part du suivi des achats EXPÉDIÉS sans n° (au plus 3) entre dans la réserve : 13 + 3 relecture + 3 suivi.
+      dit(rP === 19, 'la réserve que les photos laissent compte la part du suivi des achats expédiés (19 : 13 + 3 relecture + 3 suivi, « pas su »)', `réserve=${rP}`);
       // b. une forme jamais reconnue : une lecture de mesure, pas 12 toutes les 3 h
       const ach2 = []; for (let i = 0; i < 12; i++) ach2.push({ transaction_id: 34000000000 + i, title: 'Achat ' + i, status: "Commande expédiée et en cours d'acheminement ! ", transaction_user_status: 'waiting', date: H(24 + i) });
       const fi = faireFond({ src: BG, lignes: { harvest_111_orders_purchased: { type: 'orders_purchased', payload: { my_orders: ach2 } } },

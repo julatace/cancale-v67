@@ -2258,12 +2258,34 @@ function clesDeBoost(obj) {
 // 5.371 : les 30 dernières ÉTIQUETTES notées, datées (`vrmDiagRecents`, ce navigateur)
 // — ce que « Envoyer un rapport » joint (étiquettes techniques, jamais une donnée).
 let _diagRecents = Promise.resolve();
+// 5.409 (19 nov., chantier colis-achat-auto) — LE DIAGNOSTIC DES LECTURES, PAR NAVIGATEUR. `panel_diag_capture` est
+// UNE ligne pour tous les navigateurs (cumul) : le 19 nov., celui resté en 5.273 la réécrivait et les compteurs des
+// versions récentes (`suivi_plafond_heure`, refus de lecture) n'y étaient pas lisibles — la mesure n'a pas pu dire
+// pourquoi le suivi n'était plus lu. Les clés des LECTURES (suivi, lectures refusées, rattrapages qui laissent la
+// place, import) sont aussi comptées dans CE navigateur, par jour (aujourd'hui + hier), et publiées dans SA ligne
+// `ext_appareil_{id}` (`diag`). Des compteurs seulement : aucun n°, aucun texte.
+const DIAG_NAV = 'vrmDiagNav';
+const RE_DIAG_NAV = /^(?:suivi_|lecture_|versement_laisse|versement_plafond|import_|lectures_)/;
+function diagNavAjoute(etat, cle, jour) {
+  const e = etat && typeof etat === 'object' ? etat : {};
+  let auj = e.auj && e.auj.jour === jour ? e.auj : null, hier = e.hier || null;
+  if (!auj) { hier = e.auj && e.auj.jour ? e.auj : hier; auj = { jour, n: {} }; }
+  const n = Object.assign({}, auj.n);
+  if (Object.keys(n).length < 80 || n[cle]) n[cle] = (n[cle] || 0) + 1;
+  return { auj: { jour, n }, hier };
+}
 async function noterDiag(cle) {
   _diagRecents = _diagRecents.then(async () => {
     let l = []; try { l = (await chrome.storage.local.get('vrmDiagRecents')).vrmDiagRecents; } catch (_) {}
     l = Array.isArray(l) ? l : [];
     l.push({ k: String(cle).slice(0, 60), at: Date.now() });
     try { await chrome.storage.local.set({ vrmDiagRecents: l.slice(-30) }); } catch (_) {}
+    if (RE_DIAG_NAV.test(String(cle))) {
+      try {
+        const g = (await chrome.storage.local.get(DIAG_NAV))[DIAG_NAV];
+        await chrome.storage.local.set({ [DIAG_NAV]: diagNavAjoute(g, String(cle).slice(0, 60), new Date().toISOString().slice(0, 10)) });
+      } catch (_) {}
+    }
   }).catch(() => {});
   return majTampon((buf) => { buf.n[cle] = (buf.n[cle] || 0) + 1; });
 }
@@ -3593,7 +3615,9 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     // 5.326 : envoyée LÉGÈRE (`commandesParServeur`) — la fusion se fait chez vrm.center.
     const lg = await commandesParServeur(uid, type, parsed, domain);
     if (lg === 'inchange' || lg === 'forme') return;
-    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); if (lg === 'ecrit') await capteVinted(uid, type, lusCapte); return; }
+    if (lg === 'ecrit' || lg === 'partiel' || lg === null) { await apresCommandesServeur(uid, type, lg, true); if (lg === 'ecrit') await capteVinted(uid, type, lusCapte);
+      if (lg === 'ecrit' && type === 'orders_purchased') await noterAchatsExpedies(uid, (parsed && parsed.my_orders) || []);   // 5.409
+      return; }
     // 'absent' (route pas encore déployée) ou 'direct' (complète et petite) : la voie d'avant.
     // 5.327 : 'secours' (vrm.center muet N fois de suite) : la même voie, BORNÉE.
     const c = lg === 'secours' ? await commandesSecours(rowId, type, parsed) : await commandesARanger(rowId, type, parsed);
@@ -3654,6 +3678,8 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // suivante. Seulement si l'écriture a ABOUTI : prévenir sur un échec ferait
   // relire une ligne qui n'a pas bougé.
   if (ecrit !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  // 5.409 : un achat qui passe à « expédié » ⇒ son n° de suivi en tête de file (aucune requête ici).
+  if (ecrit !== false && type === 'orders_purchased') await noterAchatsExpedies(uid, (parsed && parsed.my_orders) || []);
   // 5.165 : un dressing RANGÉ fait foi sur les suppressions d'avant (règle
   // `supprimeeApres`) et rajeunit « annonces lues il y a… » : l'app relit.
   if (ecrit !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });
@@ -11129,6 +11155,8 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   if (ecritRow === true) await capteVinted(uid, type, lusCapte);   // 5.377
   if (ecritRow !== false && type === 'orders_sold') notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
   if (ecritRow !== false && type === 'orders_purchased') notifierApp({ type: 'maj', quoi: 'achats', uid: String(uid) });
+  // 5.409 : un achat qui passe à « expédié » ⇒ son n° de suivi en tête de file (aucune requête ici).
+  if (ecritRow !== false && type === 'orders_purchased') await noterAchatsExpedies(uid, (data.payload && data.payload.my_orders) || []);
   if (ecritRow !== false && type === 'listings') notifierApp({ type: 'maj', quoi: 'annonces', uid: String(uid) });   // 5.165 (voir storeHarvest)
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
@@ -13280,6 +13308,10 @@ async function visiteVintedUnPassage() {
     // hasard). Rien ne part si la base n'a pas répondu (« pas su » ⇒ éteint).
     await autoAccepterOffres(uid);
     await capterRetraits(uid);
+    // 5.409 (19 nov.) : JUSTE APRÈS LES CODES, le n° de suivi des achats expédiés sans n° (l'identité qui relie
+    //    le colis du point relais à son achat — lecture de colis, `suivicolis`). Avant, il passait après les
+    //    versements et les relevés (jusqu'à 13 lectures) et n'était plus jamais lu (mesure-famine-suivi).
+    await capterSuivisAchats(uid);
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
@@ -13300,7 +13332,8 @@ async function visiteVintedUnPassage() {
     // colis »), puis les notifications « une étape de plus » restées en file.
     // ⚠️ (revue du 24 oct.) APRÈS l'argent et les colis : ce n'est pas une
     // lecture prioritaire (classe « suivi », 6 par heure au plus).
-    await capterSuivisAchats(uid);
+    // 5.409 : `capterSuivisAchats` est passé juste après les codes (un seul appel par visite : 3 par visite,
+    //    6 par heure, inchangés) ; restent ici les notifications « une étape de plus ».
     await envoyerNotifsSuivi();
     // 5.319 : les avis reçus (première page), une fois par 24 h — lecture seule, classe « suivi ».
     await capterAvis(uid);
@@ -18254,7 +18287,15 @@ const LECTURES_DUES_VALIDITE_MS = 60 * 60 * 1000;
 //    route, et le code d'un colis arrivé au point relais n'était plus lu (mesuré
 //    au banc : 0 lecture de sa conversation). Il a sa classe « suivi » : sous
 //    l'argent et les colis (comme la relecture), et 6 lectures par heure au plus.
-const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE });
+// ⚠️⚠️ 5.409 (19 nov., chantier colis-achat-auto — Julien : « quand je fais l'achat, l'extension doit capter le
+//    numéro de suivi ») MESURÉ : aucune ligne de suivi écrite depuis le 11 nov. ; 36 achats en cours sur 38 sans n°,
+//    15 colis à retirer sur 15 sans contenu. Exécuté (scripts/mesure-famine-suivi.cjs) : dès 7 lectures dans l'heure,
+//    la classe « suivi » passait sous la réserve des quatre lecteurs ci-dessous (13 sur 20) et les rattrapages de fond
+//    (versements, import) tenaient le compteur au-dessus ⇒ plus aucun suivi lu. Le n° d'un achat EXPÉDIÉ sans n° est
+//    l'identité qui relie le colis du point relais à son achat : c'est une lecture de COLIS. Elle devient un lecteur
+//    prioritaire (`suivi`, au plus `SUIVI_MAX_PAR_VISITE`), lue en classe 'suivicolis' (tout le budget de 20/h, comme
+//    les codes) ; le suivi des autres achats (déjà numérotés, pas expédiés) reste en classe « suivi ».
+const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: RELEVE_MAX_PAR_VISITE, retrait: RETRAIT_MAX_PAR_VISITE, preuve: PREUVE_MAX_PAR_VISITE, suivi: SUIVI_MAX_PAR_VISITE });
 // ⚠️⚠️ REVUE DE LA 5.167 — LA RELECTURE PUBLIQUE ÉTAIT DANS LA CLASSE DES PHOTOS.
 //    Après une republication (30 annonces neuves dont il manque les photos),
 //    `tickPhotos` vidait le budget à la minute 0, et les autres comptes attendaient
@@ -18337,7 +18378,9 @@ async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_M
     const pr = await prudenceDe(uid);
     if (pr) { noterDiag(`lecture_prudence_${String(classe).replace(/[^a-z]/g, '').slice(0, 12)}`); return { ok: false, code: 'prudence', error: 'Vinted a freiné ce compte : les lectures de fond reprennent dans 24 h (codes de retrait toujours lus).' }; }
   }
-  const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic';
+  // 5.409 : 'suivicolis' (le n° de suivi d'un achat EXPÉDIÉ sans n°) a tout le budget, comme les codes ; la
+  //    prudence l'arrête comme toute lecture de fond (seuls les codes de retrait passent pendant 24 h).
+  const prioritaire = classe === 'argent' || classe === 'colis' || classe === 'clic' || classe === 'suivicolis';
   // 'suivi' (le suivi Vinted des achats) : sous la réserve de l'argent et des
   // colis, comme la relecture — jamais à leur place.
   // 5.341 : `plafondMax` — le rattrapage des dates de versement s'arrête AVANT la
@@ -19658,7 +19701,7 @@ async function publierAppareilUn(force) {
   const s = await loadSession();
   if (!s || s.mort || !(s.access_token || s.refresh_token)) return false;   // AUCUN réseau sans session
   let local = {};
-  try { local = await chrome.storage.local.get(['vrmFlux', APPAREIL_PUB_STORE, COMPTES_VUS_STORE]); } catch (_) { return false; }
+  try { local = await chrome.storage.local.get(['vrmFlux', APPAREIL_PUB_STORE, COMPTES_VUS_STORE, DIAG_NAV]); } catch (_) { return false; }
   const flux = local.vrmFlux || {}, pub = local[APPAREIL_PUB_STORE] || {};
   const t = Date.now();
   const dernierKo = Math.max(0, ...PLATEFORMES_APPAREIL.map((p) => Number((flux[p] || {}).koAt) || 0));
@@ -19673,7 +19716,8 @@ async function publierAppareilUn(force) {
     fl[p] = Object.assign({ okAt: Number(x.okAt) || null, koAt: Number(x.koAt) || null, koStatut: x.koStatut == null ? null : String(x.koStatut),
       refus: (Array.isArray(x.refus) ? x.refus.slice(-5) : []) }, x.secours ? { secours: x.secours } : {});
   }
-  const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {} };
+  const data = { v: 1, appareil: decrireAppareil(), ver, code: CODE_VERSION, at: new Date(t).toISOString(), atMs: t, flux: fl, vus: local[COMPTES_VUS_STORE] || {},
+    ...(local[DIAG_NAV] ? { diag: local[DIAG_NAV] } : {}) };   // 5.409 : le diagnostic des lectures de CE navigateur
   // Son propre échec ne doit pas devenir « le dernier refus » d'une capture.
   const garde = [_statutDernierRefus, _familleDernierRefus, _octetsDernierRefus];
   let ok = false;
@@ -22935,9 +22979,13 @@ function achatExpedie(o) {
 // 5.372 : d'abord les achats EXPÉDIÉS SANS n° (au point relais avant ceux en route),
 // puis les autres sans n°, puis ceux qui ont leur n° ; à rang égal, le moins
 // récemment relu (jamais relu en premier), puis le plus ANCIEN achat.
-function rangSuivi(o, derniers) {
+// 5.409 : `tete` — les achats que la capture de « Mes commandes » a vus PASSER à « expédié » (ou arriver déjà
+// expédiés) sans n° (`noterAchatsExpedies`, `vrmSuiviAFaire`) : rang −1, en tête de file, avant tout le reste.
+// Le rang ≤ 1 (expédié sans n°, ou liste de n° à relire) est la LECTURE DE COLIS (`suiviColis`).
+function rangSuivi(o, derniers, tete) {
   const da = derniers.get(String(o.transaction_id));
   const sansNumero = !(da && da.nu);
+  if (tete && tete.has(String(o.transaction_id)) && sansNumero && achatExpedie(o)) return -1;
   const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
   // 5.403 : au point relais sans sa liste de n° (une ligne d'avant la 5.403) : au même rang que « au point sans n° ».
   if (relais && listeARelire(o, da)) return 0;
@@ -22945,8 +22993,9 @@ function rangSuivi(o, derniers) {
   if (listeARelire(o, da)) return 1;
   return sansNumero ? 2 : 3;
 }
-function ordreSuivi(a, b, derniers) {
-  const r = rangSuivi(a, derniers) - rangSuivi(b, derniers);
+const suiviColis = (o, derniers, tete) => rangSuivi(o, derniers, tete) <= 1;
+function ordreSuivi(a, b, derniers, tete) {
+  const r = rangSuivi(a, derniers, tete) - rangSuivi(b, derniers, tete);
   if (r) return r;
   const la = derniers.get(String(a.transaction_id)), lb = derniers.get(String(b.transaction_id));
   const ma = la && Number.isFinite(la.ms) ? la.ms : 0, mb = lb && Number.isFinite(lb.ms) ? lb.ms : 0;
@@ -23014,6 +23063,51 @@ async function formeSuiviInconnue() {
     return !!(m && m.etat === 'inconnue' && m.ver === CODE_VERSION);
   } catch (_) { return false; }
 }
+// 5.409 — « QUAND JE FAIS L'ACHAT » : au moment de l'achat le n° n'existe pas (il naît quand le vendeur prend son
+// bordereau). À chaque capture RANGÉE de « Mes commandes » (achats), un achat qui PASSE à « expédié » (ou qu'on voit
+// pour la première fois déjà expédié) est noté dans `vrmSuiviAFaire` ; `capterSuivisAchats` le lit EN TÊTE, sans
+// attendre le délai de 3 h d'une lecture d'avant (faite quand il n'était que payé), au passage suivant — la visite, ou
+// le passage de fond (`tickVersements`, onglet vinted.fr ouvert, compte de l'onglet). Aucune requête Vinted ici :
+// la liste vient de la capture. Bornes : 7 jours, 100 achats par compte.
+const SUIVI_A_FAIRE = 'vrmSuiviAFaire';           // { [uid]: { [tx]: ms } }
+const SUIVI_ETATS_VUS = 'vrmSuiviEtatsVus';       // { [uid]: { [tx]: 0 | 1 } } — expédié ou non à la dernière capture
+const SUIVI_A_FAIRE_MS = 7 * 86400000;
+async function noterAchatsExpedies(uid, commandes) {
+  try {
+    if (!uid || !Array.isArray(commandes) || !commandes.length) return 0;
+    const st = await chrome.storage.local.get([SUIVI_A_FAIRE, SUIVI_ETATS_VUS]);
+    const af = st[SUIVI_A_FAIRE] || {}, ev = st[SUIVI_ETATS_VUS] || {};
+    const a = Object.assign({}, af[String(uid)] || {}), e = Object.assign({}, ev[String(uid)] || {});
+    const t = Date.now();
+    let n = 0;
+    for (const o of commandes) {
+      const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+      if (!/^\d{4,20}$/.test(tx)) continue;
+      const exp = achatExpedie(o) && !SUIVI_FINI.test(String(o.status || '')) ? 1 : 0;
+      if (exp && e[tx] !== 1 && !a[tx]) { a[tx] = t; n++; }
+      e[tx] = exp;
+    }
+    for (const k of Object.keys(a)) if (t - Number(a[k]) > SUIVI_A_FAIRE_MS) delete a[k];
+    af[String(uid)] = Object.fromEntries(Object.entries(a).sort((x, y) => y[1] - x[1]).slice(0, 100));
+    ev[String(uid)] = Object.fromEntries(Object.entries(e).slice(-400));
+    await chrome.storage.local.set({ [SUIVI_A_FAIRE]: af, [SUIVI_ETATS_VUS]: ev });
+    if (n) noterDiag('suivi_a_faire_note');
+    return n;
+  } catch (_) { return 0; }
+}
+async function suiviAFaire(uid) {
+  try { return Object.assign({}, (((await chrome.storage.local.get(SUIVI_A_FAIRE))[SUIVI_A_FAIRE]) || {})[String(uid)] || {}); } catch (_) { return {}; }
+}
+async function oterSuiviAFaire(uid, txs) {
+  if (!txs || !txs.length) return;
+  try {
+    const af = (await chrome.storage.local.get(SUIVI_A_FAIRE))[SUIVI_A_FAIRE] || {};
+    const a = Object.assign({}, af[String(uid)] || {});
+    for (const tx of txs) delete a[String(tx)];
+    af[String(uid)] = a;
+    await chrome.storage.local.set({ [SUIVI_A_FAIRE]: af });
+  } catch (_) {}
+}
 async function capterSuivisAchats(uid) {
   try {
     if (!uid) return 0;
@@ -23031,9 +23125,14 @@ async function capterSuivisAchats(uid) {
       if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null, sl: !!(r && r.sl) });
     }
     const maintenant = Date.now();
+    // 5.409 : les achats vus passer à « expédié » (capture), en tête ; un qui a déjà son n° en sort.
+    const aFaire = await suiviAFaire(uid);
+    const tete = new Set(Object.keys(aFaire).filter((tx) => !((derniers.get(tx) || {}).nu)));
+    const dejaNumerotes = Object.keys(aFaire).filter((tx) => !tete.has(tx));
+    if (dejaNumerotes.length) await oterSuiviAFaire(uid, dejaNumerotes);
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
-      .sort((a, b) => ordreSuivi(a, b, derniers));
-    if (!cibles.length) return 0;
+      .sort((a, b) => ordreSuivi(a, b, derniers, tete));
+    if (!cibles.length) { await noterLecturesDues(uid, 'suivi', 0); return 0; }
     // Une forme jamais reconnue : une seule lecture de mesure par jour et par compte.
     let max = SUIVI_MAX_PAR_VISITE;
     const mesures = (await chrome.storage.local.get('vrmSuiviMesure')).vrmSuiviMesure || {};
@@ -23045,16 +23144,29 @@ async function capterSuivisAchats(uid) {
     for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
     // Le mémo porte l'instant de la lecture, ou (rien de reconnu) un instant
     // avancé qui la tient à l'écart 24 h.
-    const aLire = (o) => { const tx = String(o.transaction_id); return !(memo[tx] && Date.now() - Number(memo[tx]) < SUIVI_RETRY_MS); };
+    // 5.409 : un achat passé à « expédié » APRÈS sa dernière lecture (faite quand il n'était que payé) n'attend
+    //    pas les 3 h : la capture a vu le changement. Le mémo garde sa règle pour tout le reste (24 h d'une forme
+    //    inconnue, refus) — un instant AVANCÉ (forme inconnue) n'est jamais levé.
+    const aLire = (o) => {
+      const tx = String(o.transaction_id);
+      if (!(memo[tx] && Date.now() - Number(memo[tx]) < SUIVI_RETRY_MS)) return true;
+      return tete.has(tx) && Number(aFaire[tx]) > Number(memo[tx]) && Number(memo[tx]) <= Date.now();
+    };
+    // Les lectures de COLIS encore dues (expédiés sans n°) : la réserve que les autres lecteurs lui laissent.
+    const dusColis = () => cibles.filter((o) => suiviColis(o, derniers, tete) && aLire(o)).length;
     let n = 0, ecrits = 0;
+    const lusTete = [];
     for (const o of cibles) {
       if (n >= max) break;
       if (!aLire(o)) continue;
       const tx = String(o.transaction_id);
-      const refus = await gardeLecture(uid, acc, 'suivi');
-      if (refus) { if (refus.code !== 'vinted-pause') logActivity(`⚠️ Suivi d'un achat non lu : ${refus.error}`); break; }
+      const colis = suiviColis(o, derniers, tete);
+      const refus = await gardeLecture(uid, acc, colis ? 'suivicolis' : 'suivi');
+      if (refus) { noterDiag(`suivi_refus_${colis ? 'colis' : 'autre'}_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); if (refus.code !== 'vinted-pause') logActivity(`⚠️ Suivi d'un achat non lu : ${refus.error}`); break; }
       if (!(await compterLectureSuivi(uid))) { noterDiag('suivi_plafond_heure'); break; }
       memo[tx] = Date.now();
+      if (tete.has(tx)) lusTete.push(tx);
+      noterDiag(colis ? 'suivi_lu_colis' : 'suivi_lu_autre');
       n++;
       // 5.372 : pas encore expédié (payé, bordereau pas encore déposé) : le suivi n'a pas
       //    d'étape — seul le détail de la transaction peut déjà porter le n° (bordereau
@@ -23085,7 +23197,7 @@ async function capterSuivisAchats(uid) {
       // 5.372 : le suivi ne porte pas le n° ⇒ le détail de la transaction (une lecture de
       // plus, dans les MÊMES bornes : 6/h pour le suivi, sous la réserve de l'argent et des colis).
       if (contrat && !contrat.suivi && n < max) {
-        const refus2 = await gardeLecture(uid, acc, 'suivi');
+        const refus2 = await gardeLecture(uid, acc, colis ? 'suivicolis' : 'suivi');
         if (!refus2 && (await compterLectureSuivi(uid))) {
           n++;
           const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
@@ -23117,6 +23229,10 @@ async function capterSuivisAchats(uid) {
       if (r) ecrits++;
     }
     await chrome.storage.local.set({ vrmSuiviFaits: memo });
+    await oterSuiviAFaire(uid, lusTete);
+    // 5.409 : ce qui reste à lire en lecture de COLIS — les rattrapages de fond (versements, import, photos,
+    //    relecture) s'arrêtent avant (`reserveAutresQueVersement`, `reserveLectures` ; « pas su » ⇒ réserve entière).
+    await noterLecturesDues(uid, 'suivi', dusColis());
     if (ecrits) logActivity(`📦 Suivi Vinted relu pour ${ecrits} achat${ecrits > 1 ? 's' : ''}`);
     return n;
   } catch (_) { return 0; }
@@ -23406,6 +23522,14 @@ async function tickVersements() {
     if (await sansSessionPourEcrire()) return 0;
     if (await reculBase()) return 0;
     if (await compteNonCapte(uid)) return 0;
+    // 5.409 : AVANT tout rattrapage, le n° de suivi des achats expédiés sans n° — seulement quand il en reste
+    //    (noté il y a moins d'une heure), qu'un achat vient de passer à « expédié » (`vrmSuiviAFaire`), ou que
+    //    ce n'est pas su. Mêmes gardes que la visite (compte de l'onglet, pause, prudence, 20/h, 6/h, 3 par passage).
+    try {
+      const ds = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).suivi || null;
+      const suSansReste = ds && Date.now() - Number(ds.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(ds.reste) > 0);
+      if (!suSansReste || Object.keys(await suiviAFaire(uid)).length) await capterSuivisAchats(uid);
+    } catch (_) {}
     // 5.378 : d'abord les mois du relevé (une lecture date tout un mois), seulement
     // avec une recette apprise et des mois que Vinted liste ; mêmes gardes, même budget.
     try { if (await recetteReleve(uid)) await capterReleves(uid); } catch (_) {}

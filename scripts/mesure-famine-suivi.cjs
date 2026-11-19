@@ -14,7 +14,7 @@
 //  encore du travail (ou que leur reste n'est pas su) — la classe « suivi » passe sous leur réserve (13 lectures sur
 //  20), et les rattrapages de fond (`tickVersements` : 15/h ; import : jusqu'à 20/h) tiennent le compteur au-dessus.
 //
-//  Le changement d'extension à faire (PAS fait ici : `vinted-sync-extension/` n'est pas touché par ce chantier) est
+//  (5.409, fait : docs/passation/2026-11-19-colis-achat-auto.md §11 ; contrôle : audit-suivi-colis-ext.) Le changement est
 //  décrit dans docs/passation/2026-11-19-colis-achat-auto.md §5. Cette mesure deviendra son contrôle : avec le
 //  correctif, la colonne « réserves pas sues » doit lire au moins les achats expédiés sans n° (rangs 0 et 1).
 //  `BG_SRC=chemin/background.js` pour juger une autre version.
