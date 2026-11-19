@@ -179,3 +179,32 @@ valide la direction : « applique ce que tu proposes ».
   2 029 557 octets pour 2 029 568 permis (−11) — c'est juste ; le prochain ajout au démarrage devra retirer d'abord.
 - **Preuves** : `audit-aujourdhui` 61 verts (F1–F9 : courbe, table, journal, capté, cartes) et les mutations
   `courbe_zero_pour_passu`, `table_toute_vide`, `vrm_refus_compte`, `cartes_perdues` rouges. Bancs : voir le rapport.
+
+## Titres entiers, autres stats, « Personnaliser » bien fait (19 nov., fin de nuit)
+
+- **Titres** (capture 390) : au téléphone le titre d'un colis ou d'une vente a SA ligne (2 au plus), l'échéance passe
+  sous le titre (« N° · échéance », `Rangee.pastilleSous`, prop ajoutée), le prix à droite. Banc « L » rouge sur le code
+  d'avant (9 titres coupés), vert après.
+- **« Tu peux trouver mieux, peut-être d'autres stats »** — huit cartes de plus, toutes des règles qui existaient
+  (`src/aujourdhui/Branche.jsx`) : **Stock en ligne** (`enligne` + valeur au prix d'achat publiée par Annonces,
+  `lireValeurStock`, « au moins · 118 sur 142 » ; la valeur AFFICHÉE n'est publiée nulle part : pas montrée plutôt
+  qu'inventée) · **Vitesse de vente** (`delaisPar` : médiane mise en ligne → vente, « sur N » ; écoulement 30 j = ventes
+  des 30 jours ÷ annonces en ligne) · **Prévision du mois** (`previsionMois`, la fourchette) · **Marge** (`margesPar` :
+  brut ÷ CA au prix connu, « sur N ») · **Marques** (la marque LUE de l'annonce, jamais devinée ; « N sans marque lue »)
+  · **Paires qui dorment** (`dorment`, le toucher ouvre Annonces sur la vue « qui dorment ») · **Argent à venir**
+  (`attente`) · **Vues et favoris** (« — · pas capté » : l'extension ne les capte pas encore). « Meilleurs moments » :
+  **refusé par Julien**, pas fait. Les trois premières (stock, vitesse, prévision) sont montrées d'office.
+- **« Personnaliser » bien fait** : une feuille « Cartes d'Aujourd'hui » avec « Terminé » en haut à droite
+  (`Feuille.terminer`), « Affichées » (dans l'ordre de l'écran) puis « À ajouter » ; chaque carte : icône, nom, phrase,
+  aperçu de sa valeur ; rond − / + de 44 ; poignée ≡ qu'on glisse au doigt ou à la souris (250 ms, mouvement réduit
+  respecté), ↑ ↓ au clavier, « Monter / Descendre » pour le lecteur d'écran (`ListeOrdonnee`) ; l'écran derrière suit en
+  direct ; « Remettre par défaut » annulable 10 s. À l'ordinateur, **« Modifier »** sur la grille : les cartes tremblent
+  (iOS), une croix pour retirer, on les glisse l'une sur l'autre, « + Ajouter une carte » (`Editable`). Le choix porte
+  `rev` et `at` (`src/aujourdhui/cartes.js`) : un choix plus ancien venu d'un autre appareil n'écrase jamais le plus
+  récent (`choixPlusRecent`).
+- **Preuves** : `audit-aujourdhui` 65 verts (F10–F13 : deux appareils, rev, relevé par période ; mutations
+  `ancien_ecrase`, `marque_devinee` rouges). Banc `aujourdhui-natif` : les cartes (S2 : chaque carte ses chiffres ou sa
+  raison, aucune carte muette), « Personnaliser » (K : feuille, +, −, poignée glissée au doigt à 390 et à la souris à
+  1512, ↑ au clavier, défaut + annuler, rechargement, deux onglets ; M : « Modifier », glisser, croix, « + »), 390 et 1512,
+  clair et sombre : vert. Budget de démarrage : 143 octets sous la limite (les calculs Jour · Semaine · Mois sont partis
+  dans le morceau d'Aujourd'hui).
