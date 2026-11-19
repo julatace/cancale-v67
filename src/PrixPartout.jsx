@@ -13,7 +13,7 @@ const ETAT = { envoi: 'Envoi…', fait: 'Fait', refuse: 'Refusé', incertain: 'P
 // (son ajustement réglé, `prixDe`), eBay RELU après, Vinted PROPOSÉ (« Baisser le prix »).
 const etatTexte = (e) => (e.etat === 'propose' ? tr('prixPartout.propose') : e.etat === 'fait' && e.relu ? tr('prixPartout.relu') : ETAT[e.etat]);
 
-export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, onProposer = null }) {
+export default function PrixPartout({ num, sites = [], manques = [], lecture = false, onAppliquer, onFermer, Retour, prixDe = null, onProposer = null, focusPrix = false }) {
   const [prix, setPrix] = React.useState('');
   const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
@@ -54,7 +54,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
         <label className="vrm-ao-prix">
           <span>Nouveau prix</span>
           <span className="vrm-ao-prix-champ">
-            <input inputMode="decimal" autoComplete="off" value={prix} onChange={(e) => { setPrix(e.target.value); setFini(false); }} disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
+            <input inputMode="decimal" autoComplete="off" autoFocus={focusPrix || undefined} enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); setFini(false); }} disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
             <b>€</b>
           </span>
         </label>

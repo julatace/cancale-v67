@@ -220,42 +220,17 @@
     background: var(--vrm-ui-bg) !important;
   }
 
-  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd :is(.fd-s, .fd-v) {
-    color: var(--vrm-ui-ink) !important;
-    background: var(--vrm-ui-panel) !important;
-    background-image: none !important;
-  }
-
+  /* (19 nov., fiche directe) La fiche lit ses jetons `--fd-*` (src/design/fiche-d.css) depuis cette palette. */
   html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd .fd-nom {
     color: var(--vrm-ui-ink) !important;
-    font-weight: 690 !important;
-    letter-spacing: -.04em !important;
-    line-height: 1.13 !important;
   }
 
-  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd .fd-act {
-    background: var(--vrm-ui-soft) !important;
-    border-color: var(--vrm-ui-border) !important;
-    box-shadow: none !important;
-  }
-
-  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd .fd-plein {
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd button.fd-plein.fd-plein:not(:disabled):not([aria-disabled="true"]) {
     height: auto !important;
-    min-height: 44px !important;
-    padding-block: 10px !important;
+    min-height: 50px !important;
+    border-radius: 12px !important;
     line-height: 1.2 !important;
     white-space: normal !important;
-  }
-
-  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd .fd-plein > span {
-    min-width: 0 !important;
-    flex: 0 1 auto !important;
-  }
-
-  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-fp.fd :is(.fd-tuile, .fd-rond.is-clair) {
-    background: var(--vrm-ui-panel) !important;
-    border-color: var(--vrm-ui-border) !important;
-    color: var(--vrm-ui-ink) !important;
   }
 
   html:is([data-theme-style="vrm"], :not([data-theme-style])) #root [role="menu"]:has([role="menuitem"]) {

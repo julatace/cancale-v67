@@ -539,10 +539,10 @@
       padding-inline: 10px !important;
     }
 
-    html:is([data-theme-style="vrm"], :not([data-theme-style])) body .vrm-fp button[data-fiche-retour] {
-      border-color: var(--iphone-mat-line) !important;
-      background: #141e37ed !important;
-      color: var(--iphone-mat-ink) !important;
+    /* (19 nov., fiche directe) Le « ‹ » de la fiche n'est plus posé sur une photo sombre : la forme claire des autres retours. */
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) body .vrm-fp.fd button[data-fiche-retour] {
+      border-radius: 50% !important;
+      box-shadow: none !important;
     }
 
     html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is([data-sous-retour], [data-categorie-retour]):focus-visible,

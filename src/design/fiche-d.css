@@ -1,226 +1,267 @@
 /* ════════════════════════════════════════════════════════════════════════════
-   VRM — LA FICHE D'UN ARTICLE, DIRECTION D « FICHE PRODUIT » (15 nov. 2026, choisie par Julien)
-   Maquette : scratchpad maquettes-verre/fiche-v3.cjs (`D`, CSS « D ») — valeurs reprises telles quelles :
-   photo 310 px pleine largeur + plaque N° (36 px, 20/800 → 700), feuille arrondie 28 qui recouvre la photo de
-   26 px, nom 26/750 → 700, UNE ligne d'état 16 (ambre #744400 → --sv-ambre s'il y a un geste), carte d'action
-   (rayon 20, plein 50 px rayon 16), segment 44 px dans un creux de rayon 15, chiffres 28 (36 pour le bénéfice
-   d'une vente reliée), texte ≥ 15 px. Récit : docs/passation/2026-11-15-fiche-d.md.
+   VRM — LA FICHE D'UN ARTICLE, « FICHE DIRECTE » (19 nov. 2026 — docs/passation/2026-11-19-fiche-directe.md)
+   Julien : « je dois cliquer sur la paire puis cliquer sur les points pour avoir des informations. Ce n'est pas normal,
+   ça doit être beaucoup plus accessible et beaucoup plus simple. […] le visuel doit être absolument parfait. »
+   Elle REMPLACE la direction D du 15 nov. (photo de 310 px, carte d'action, onglets Argent · Sites · Histoire, tout le
+   reste derrière « ⋯ ») : un en-tête compact (photo 124 px touchable, étiquette N°, titre sur 2 lignes, une ligne d'état),
+   une grille de FAITS (libellé 13 px gris au-dessus, valeur 17/600, chiffres tabulaires), les sites, UN bouton plein,
+   les gestes en tuiles (4 colonnes), l'histoire repliée. Le premier écran d'un iPhone (390 × 844) porte l'en-tête, les
+   faits, les sites et le bouton principal ; le tout tient sur ~1,5 écran.
 
-   OÙ DANS LA CASCADE : la couche `vrm-verre` (la PREMIÈRE nommée, index.html — ses `!important` passent devant
-   ceux des couches suivantes) ; des classes NEUVES (`fd-*`) : aucune règle d'une autre feuille n'est modifiée.
-   Les sélecteurs portent :root répété pour passer devant les règles génériques de la même couche.
+   TROIS HABILLAGES, UNE SEULE FEUILLE : toutes les couleurs passent par les jetons `--fd-*` posés sur la fiche —
+     · l'interface VRM (le défaut, et « Ancien design ») : la palette `--vrm-ui-*` (src/designV2/interface/) ;
+     · le style « Apple » (`data-theme-style="apple"`) : la palette `--ap-*` (src/designV2/theme-apple.css) ;
+     · jour et nuit : ces palettes changent seules avec `data-theme`.
+   OÙ DANS LA CASCADE : la couche `vrm-verre` (comme la fiche D) ; des classes à soi (`fd-*`). Les sélecteurs portent
+   :root répété pour passer devant les règles génériques de la même couche.
    RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-* ne vit ici.
    ════════════════════════════════════════════════════════════════════════════ */
 @layer vrm-verre {
 
-:root {
-  --fd-feuille: rgb(247 250 253 / .97); --fd-carte: #FFFFFF; --fd-creux: rgb(12 29 48 / .07); --fd-seg-on: #FFFFFF;
-  --fd-plein: #0C1D30; --fd-plein-t: #FFFFFF; --fd-filet: rgb(12 29 48 / .10); --fd-pastille: rgb(12 29 48 / .06);
-  --fd-bord-am: rgb(178 106 0 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(8 26 50 / .5);
+/* ══ 0. LES JETONS ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd {
+  --fd-fond: var(--vrm-ui-bg, #EDF1F8); --fd-carte: var(--vrm-ui-panel, #FFFFFF); --fd-creux: var(--vrm-ui-soft, #E7EDF7);
+  --fd-filet: var(--vrm-ui-border, #CDD8E9); --fd-encre: var(--vrm-ui-ink, #182439); --fd-encre-2: var(--vrm-ui-muted, #475973);
+  --fd-lien: var(--vrm-ui-accent, #304E92); --fd-ambre: #764300; --fd-plein: var(--vrm-ui-button, #243A70); --fd-plein-t: #FFFFFF;
+  --fd-rayon: 14px; --fd-rayon-plein: 12px; --fd-police: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --fd-ombre: 0 1px 2px rgb(24 36 57 / .05);
 }
-:root[data-theme="dark"] {
-  --fd-feuille: rgb(14 27 46 / .97); --fd-carte: #16273C; --fd-creux: rgb(255 255 255 / .08); --fd-seg-on: rgb(255 255 255 / .16);
-  --fd-plein: #EEF4FB; --fd-plein-t: #0C1D30; --fd-filet: rgb(255 255 255 / .10); --fd-pastille: rgb(255 255 255 / .08);
-  --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
-    --fd-feuille: rgb(14 27 46 / .97); --fd-carte: #16273C; --fd-creux: rgb(255 255 255 / .08); --fd-seg-on: rgb(255 255 255 / .16);
-    --fd-plein: #EEF4FB; --fd-plein-t: #0C1D30; --fd-filet: rgb(255 255 255 / .10); --fd-pastille: rgb(255 255 255 / .08);
-    --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8);
-  }
+:root[data-theme="dark"]:root:root:root:root:root:root:root body .vrm-fp.fd { --fd-ambre: #F2B65E; --fd-ombre: none; }
+html[data-theme-style="apple"]:root:root:root:root:root:root:root:root body .vrm-fp.fd {
+  --fd-fond: var(--ap-fond); --fd-carte: var(--ap-carte); --fd-creux: var(--ap-remplir); --fd-filet: var(--ap-filet);
+  --fd-encre: var(--ap-encre); --fd-encre-2: var(--ap-gris); --fd-lien: var(--ap-bleu); --fd-ambre: var(--ap-ambre);
+  --fd-plein: var(--ap-plein); --fd-plein-t: #FFFFFF; --fd-rayon: 12px; --fd-rayon-plein: 12px; --fd-police: var(--ap-police); --fd-ombre: none;
 }
 
-/* ══ 1. LA RACINE : un plein écran au téléphone (la photo en haut, la feuille dessous) ══ */
+/* ══ 1. LA RACINE : un plein écran au téléphone ══ */
 :root:root:root:root:root:root:root:root body .vrm-fp.fd {
   position: fixed !important; inset: 0 !important; z-index: 9000 !important; overflow-y: auto !important; overscroll-behavior: contain !important;
-  background: var(--fd-feuille) !important; background-image: none !important; color: var(--sv-encre) !important; padding: 0 !important;
-  font-family: var(--sb-police-texte, Inter, system-ui, sans-serif) !important;
+  background: var(--fd-fond) !important; background-image: none !important; color: var(--fd-encre) !important; padding: 0 !important;
+  font-family: var(--fd-police) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd::before { content: none !important; display: none !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-cadre { position: relative; min-height: 100%; box-sizing: border-box; background: var(--fd-feuille); display: flex; flex-direction: column; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph { flex: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-cadre { position: relative; min-height: 100%; box-sizing: border-box; background: var(--fd-fond); display: flex; flex-direction: column; }
 :root:root:root:root:root:root:root:root body .fd-fond { display: none; }
 
-/* ══ 2. LA PHOTO, les deux ronds, la plaque ══ */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph { position: relative; height: 310px; overflow: hidden; background: var(--sv-bas, #0E2C52); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph-img { position: absolute; inset: 0; display: block; color: rgb(255 255 255 / .7); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph-img img { width: 100% !important; height: 100% !important; max-width: none !important; object-fit: cover !important; object-position: 50% 60%; display: block; border-radius: 0 !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph.is-sans-photo .fd-ph-img { display: grid; place-items: center; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ph.is-sans-photo .fd-ph-img svg { width: 120px; height: 75px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-scrim { position: absolute; left: 0; right: 0; top: 0; height: 120px; background: linear-gradient(rgb(4 14 30 / .55), rgb(4 14 30 / 0)); pointer-events: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-top { position: absolute; left: 16px; right: 16px; top: max(14px, calc(env(safe-area-inset-top) + 8px)); display: flex; justify-content: space-between; z-index: 2; }
+/* ══ 2. LA BARRE : ‹ · d'où l'on vient · ⋯ (téléphone) ou × (ordinateur) ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-barre {
+  position: sticky; top: 0; z-index: 5; flex: none; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; column-gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px; background: var(--fd-fond);
+}
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ctx { text-align: center; font: 600 15px/1.25 var(--fd-police) !important; color: var(--fd-encre-2) !important; overflow-wrap: anywhere; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond {
   width: 44px !important; height: 44px !important; min-width: 44px; min-height: 44px; border-radius: 50% !important; display: grid !important; place-items: center; padding: 0 !important; margin: 0 !important;
-  background: rgb(8 24 46 / .5) !important; background-image: none !important; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #FFFFFF !important;
-  border: 1px solid rgb(255 255 255 / .3) !important; box-shadow: none !important; cursor: pointer; transition: transform 120ms ease !important;
+  background: var(--fd-carte) !important; background-image: none !important; color: var(--fd-encre) !important; border: 1px solid var(--fd-filet) !important; box-shadow: none !important;
+  cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform 100ms ease-out !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond:active { transform: scale(.94); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond.is-clair { background: var(--fd-creux) !important; color: var(--sv-encre) !important; border-color: transparent !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond svg { color: currentColor !important; }
+
+/* ══ 3. LE CORPS ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-corps { flex: 1 0 auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 16px calc(20px + env(safe-area-inset-bottom)); min-width: 0; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-corps > * { margin: 0; min-width: 0; }
+
+/* L'en-tête compact : la photo (touchable), l'étiquette N°, le titre sur deux lignes au plus, UNE ligne d'état. */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tete { display: grid; grid-template-columns: 124px minmax(0, 1fr); column-gap: 14px; align-items: center; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-photo {
+  position: relative; width: 124px !important; height: 124px !important; min-height: 0 !important; border-radius: 16px !important; overflow: hidden; padding: 0 !important; margin: 0 !important; border: 0 !important;
+  background: var(--fd-creux) !important; background-image: none !important; box-shadow: none !important; display: grid !important; place-items: center; color: var(--fd-encre-2) !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-photo { cursor: zoom-in; touch-action: manipulation; transition: transform 100ms ease-out !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-photo:active { transform: scale(.97); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-photo img { width: 100% !important; height: 100% !important; max-width: none !important; object-fit: cover !important; display: block; border-radius: 0 !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-photo.is-vide svg { width: 72px; height: 45px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-photo-n { position: absolute; right: 6px; bottom: 6px; min-width: 22px; height: 22px; box-sizing: border-box; padding: 0 6px; border-radius: 11px; background: rgb(0 0 0 / .62); color: #FFFFFF; font: 600 12px/22px var(--fd-police); text-align: center; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-t { min-width: 0; display: flex !important; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0 !important; background: none !important; box-shadow: none !important; border: 0 !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque {
-  position: absolute; left: 16px; bottom: 38px; z-index: 2; display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 10px;
-  background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18); box-shadow: 0 2px 6px rgb(8 26 50 / .35);
-  color: #0C1D30 !important; font: 700 20px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 8px; background: var(--fd-carte) !important; border: 1px solid var(--fd-filet);
+  color: var(--fd-encre) !important; font: 700 15px/1 var(--fd-police) !important; font-variant-numeric: tabular-nums;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque.is-double { color: var(--vrm-doublon) !important; border-color: var(--vrm-doublon); }
-
-/* ══ 3. LA FEUILLE : nom, état, carte d'action, segment, vue ══ */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-s {
-  position: relative; z-index: 1; flex: 1 0 auto; margin-top: -26px; border-radius: 28px 28px 0 0; padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
-  background: var(--fd-feuille); border-top: 1px solid var(--sv-feuille-bord, #FFFFFF); box-shadow: 0 -16px 40px -20px rgb(4 12 26 / .6);
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque.is-etiquette { height: auto; padding: 0; border: 0; background: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque.is-double:not(.is-etiquette) { color: var(--vrm-doublon) !important; border-color: var(--vrm-doublon); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-nom {
+  margin: 0 !important; font: 700 20px/1.2 var(--fd-police) !important; letter-spacing: -.02em !important; color: var(--fd-encre) !important; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-t { display: block !important; padding: 0 !important; background: none !important; box-shadow: none !important; border: 0 !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ctx { display: block; font: 600 13px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; margin-bottom: 2px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-nom { margin: 0 !important; font: 700 26px/1.15 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; overflow-wrap: anywhere; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat { display: block; margin-top: 4px; font: 600 16px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-am { color: var(--sv-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat { display: block; font: 600 15px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-am { color: var(--fd-ambre) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-rouge, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { color: var(--vrm-doublon) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { margin: 12px 0 0; font: 600 15px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { font: 600 15px/1.35 var(--fd-police) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-note:empty { display: none; }
 
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act {
-  margin-top: 14px; padding: 14px; border-radius: 20px; background: var(--fd-carte) !important; box-shadow: var(--fd-ombre-carte) !important; border: 1px solid var(--fd-filet);
-  display: flex; flex-direction: column; color: var(--sv-encre) !important;
+/* ══ 4. LES FAITS : libellé 13 gris au-dessus, valeur 17/600, chiffres tabulaires ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-faits, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-sites, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-histoire, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ligne:not(:empty), :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rares, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-vue, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-p {
+  background: var(--fd-carte) !important; background-image: none !important; border: 1px solid var(--fd-filet) !important; border-radius: var(--fd-rayon) !important; box-shadow: var(--fd-ombre) !important; color: var(--fd-encre) !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act.is-am { border: 1.5px solid var(--fd-bord-am); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-t { display: block; font: 700 17px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.015em; color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act.is-am .fd-act-t { color: var(--sv-ambre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-s { display: block; margin-top: 2px; font: 600 15px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-p { display: flex; align-items: center; gap: 12px; margin-top: 10px; min-width: 0; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-ph { width: 52px; height: 52px; flex: none; border-radius: 12px; overflow: hidden; background: var(--fd-pastille); display: grid; place-items: center; color: var(--sv-encre-2); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-faits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 12px; padding: 14px 16px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait {
+  appearance: none; -webkit-appearance: none; display: flex !important; flex-direction: column; align-items: flex-start !important; justify-content: flex-start !important; gap: 1px; min-width: 0; min-height: 44px !important; height: auto !important;
+  margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 8px !important; background: none !important; background-image: none !important; box-shadow: none !important; text-align: left; color: var(--fd-encre) !important; font: inherit;
+}
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait.is-large { grid-column: 1 / -1; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-l { font: 400 13px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-v { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font: 600 17px/1.25 var(--fd-police) !important; letter-spacing: -.01em; color: var(--fd-encre) !important; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: left; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait.is-manque .fd-fait-v { color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-s { font: 400 13px/1.25 var(--fd-police) !important; color: var(--fd-encre-2) !important; text-align: left; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait.is-porte.is-manque :is(.fd-fait-v, .fd-fait-s) { color: var(--fd-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-crayon { display: inline-flex; flex: none; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait.is-porte.is-manque .fd-fait-crayon { color: var(--fd-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-crayon svg { color: currentColor !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-fait { cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: opacity 100ms ease-out !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-fait:active { opacity: .55; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-fait:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-lien:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd a.fd-site:focus-visible, :root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-photo:focus-visible { outline: 2px solid var(--fd-lien) !important; outline-offset: 2px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-fait-champ {
+  box-sizing: border-box; width: 100% !important; max-width: 116px; height: 34px !important; min-height: 0 !important; margin: 0 !important; padding: 0 8px !important; border-radius: 8px !important; border: 1.5px solid var(--fd-lien) !important;
+  background: var(--fd-carte) !important; color: var(--fd-encre) !important; font: 600 17px/1 var(--fd-police) !important; font-variant-numeric: tabular-nums; outline: none !important; box-shadow: none !important;
+}
+
+/* ══ 5. LES SITES ET LES COMPTES ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-sites { padding: 0 16px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 4px 0; box-sizing: border-box; color: var(--fd-encre) !important; text-decoration: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site + .fd-site, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site + .fd-sites-manque { border-top: 1px solid var(--fd-filet); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-logo { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--fd-creux); color: var(--fd-encre) !important; flex: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-txt b { font: 600 15px/1.3 var(--fd-police) !important; color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-compte { font: 400 13px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; overflow-wrap: anywhere; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-fin { flex: none; max-width: 46%; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-fin b { font: 600 15px/1.3 var(--fd-police) !important; color: var(--fd-encre) !important; font-variant-numeric: tabular-nums; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-fin span { font: 400 13px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-va { display: inline-flex; flex: none; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-sites-manque { margin: 0; padding: 12px 0; font: 400 13px/1.35 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vide { margin: 0; padding: 0 2px; font: 400 15px/1.35 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+
+/* ══ 6. LE BOUTON PRINCIPAL (un seul plein) et sa ligne ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-agir { display: flex; flex-direction: column; gap: 8px; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-l { display: flex; flex-wrap: wrap; column-gap: 6px; padding: 0 2px; font: 600 15px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-l > span + span::before { content: "· "; color: var(--fd-encre-2); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-l .is-am { color: var(--fd-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-p { display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-width: 0; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-ph { width: 48px; height: 48px; flex: none; border-radius: 10px; overflow: hidden; background: var(--fd-creux); display: grid; place-items: center; color: var(--fd-encre-2); }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-ph img { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; display: block; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-ph svg { width: 40px; height: 25px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-ph svg { width: 36px; height: 23px; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-pt { display: flex; flex-direction: column; min-width: 0; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-pt b { font: 700 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-pt span { font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-pt b { font: 600 15px/1.3 var(--fd-police) !important; color: var(--fd-encre) !important; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act-pt span { font: 400 13px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein {
-  margin-top: 12px !important; height: 50px !important; min-height: 50px !important; width: 100% !important; border-radius: 16px !important; border: 0 !important;
-  display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: center !important; gap: 10px; padding: 0 16px !important;
+  margin: 0 !important; height: auto !important; min-height: 50px !important; width: 100% !important; box-sizing: border-box; border-radius: var(--fd-rayon-plein) !important; border: 0 !important;
+  display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: center !important; gap: 10px; padding: 10px 16px !important;
   background: var(--fd-plein) !important; background-image: none !important; color: var(--fd-plein-t) !important;
-  font: 700 16px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.01em !important; box-shadow: 0 10px 20px -10px rgb(8 26 50 / .7) !important; cursor: pointer;
-  transition: transform 120ms ease !important;
+  font: 600 17px/1.2 var(--fd-police) !important; letter-spacing: -.01em !important; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: transform 100ms ease-out, filter 100ms ease-out !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein:active { transform: scale(.98); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein svg { color: currentColor !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein > * { flex: none !important; display: inline-flex !important; margin: 0 !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein:active { transform: scale(.98); filter: brightness(.92); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein svg { color: currentColor !important; flex: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein > span { min-width: 0; flex: 0 1 auto; text-align: center; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-lien {
-  align-self: stretch; min-height: 44px !important; margin-top: 2px; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important;
-  font: 600 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-lien) !important; cursor: pointer; text-align: center;
+  align-self: center; min-height: 44px !important; margin: 0 !important; padding: 0 12px !important; border: 0 !important; background: none !important; box-shadow: none !important;
+  font: 600 15px/1.2 var(--fd-police) !important; color: var(--fd-lien) !important; cursor: pointer; text-align: center; touch-action: manipulation;
 }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-questions:empty, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ligne:empty { display: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-ligne:not(:empty) { padding: 12px 16px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-sans { padding: 0; }
 
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg { display: flex; margin-top: 14px; padding: 3px; border-radius: 15px; background: var(--fd-creux) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg-b {
-  flex: 1; height: 44px !important; min-height: 44px !important; display: grid !important; place-items: center; border-radius: 12px !important; border: 0 !important; padding: 0 4px !important;
-  background: transparent !important; background-image: none !important; box-shadow: none !important; cursor: pointer; transition: none !important;
-  font: 600 15px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important;
+/* ══ 7. LES GESTES : une grille de quatre, icône + libellé ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile {
+  min-height: 68px !important; height: auto !important; min-width: 0; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px 4px !important; margin: 0 !important;
+  border-radius: var(--fd-rayon) !important; border: 1px solid var(--fd-filet) !important; background: var(--fd-carte) !important; background-image: none !important; box-shadow: var(--fd-ombre) !important; cursor: pointer;
+  font: 600 13px/1.2 var(--fd-police) !important; color: var(--fd-encre) !important; text-align: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform 100ms ease-out !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-seg-b[aria-selected="true"] { background: var(--fd-seg-on) !important; color: var(--sv-encre) !important; font-weight: 700 !important; box-shadow: 0 3px 8px -3px rgb(8 26 50 / .35) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-v { margin-top: 12px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vide { margin: 4px 0 0; font: 600 15px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile:active { transform: scale(.96); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile[aria-pressed="true"] { border-color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-ic { display: grid; place-items: center; color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-ic svg { color: currentColor !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-l { max-width: 100%; overflow-wrap: anywhere; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-vue { padding: 12px 16px; }
 
-/* Argent : deux chiffres côte à côte (28 ; le bénéfice d'une vente reliée en 36). */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg { display: flex; gap: 10px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-c { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-c > span { font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-c > b { display: block; margin-top: 2px; font: 700 28px/1.1 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; font-variant-numeric: tabular-nums; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-c > b.is-am { color: var(--sv-ambre) !important; }
-/* (16 nov.) Le « ? » d'« Achetée » est la porte de la saisie (§5) : la case entière se touche (44 px au moins). */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-arg-porte { appearance: none; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; min-height: 44px; cursor: pointer; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-arg-porte > small { color: var(--sv-ambre) !important; text-decoration: underline; text-underline-offset: 2px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg.is-grand .fd-arg-c.is-gros > b { font-size: 36px !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg.is-grand .fd-arg-c:not(.is-gros) > b { font-size: 22px !important; margin-top: 10px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-n { font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-/* (16 nov., relier-fiable) « Reçu » et « Délier » à côté de « Achetée » : deux liens de 44 px, côte à côte, qui passent à la ligne au besoin. */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes { display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; margin-top: 4px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes .fd-arg-g { align-self: auto; margin-top: 0; text-align: left; font-size: 15px !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes .fd-arg-n { font-size: 13px !important; }
-
-/* Sites : une rangée par site (logo dans une pastille, « Site · compte », ce qui s'y passe). */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site { display: flex; align-items: center; gap: 12px; min-height: 56px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site + .fd-site { border-top: 1px solid var(--fd-filet); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--fd-pastille); color: var(--sv-encre) !important; flex: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-txt { display: flex; flex-direction: column; min-width: 0; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-txt b { font: 700 16px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site-txt span { font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
-
-/* Histoire : un point par étape, reliés par un trait. */
+/* ══ 8. L'HISTOIRE : repliée à ses trois dernières étapes, puis « Tout voir » ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-histoire { padding: 14px 16px 4px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-titre-sec { margin: 0 0 10px !important; font: 400 13px/1.3 var(--fd-police) !important; letter-spacing: 0 !important; color: var(--fd-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist { list-style: none; margin: 0; padding: 0; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l { position: relative; display: grid; grid-template-columns: 14px auto 1fr; align-items: baseline; column-gap: 10px; min-height: 32px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l::after { content: ""; position: absolute; left: 6px; top: 19px; bottom: -2px; width: 2px; background: var(--fd-filet); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l { position: relative; display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 12px; padding-bottom: 12px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l::after { content: ""; position: absolute; left: 5px; top: 18px; bottom: 0; width: 2px; background: var(--fd-filet); }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l:last-child::after { display: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l > i { position: relative; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--fd-carte); box-shadow: inset 0 0 0 2px rgb(12 29 48 / .3); z-index: 1; }
-:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp.fd .fd-hist-l > i { box-shadow: inset 0 0 0 2px rgb(255 255 255 / .35); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-fait > i { background: var(--sv-encre); box-shadow: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-am > i { box-shadow: inset 0 0 0 3px var(--sv-ambre); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-ici > i { box-shadow: inset 0 0 0 3px var(--sv-encre); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l b { font: 700 16px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; white-space: nowrap; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-am b, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-am span { color: var(--sv-ambre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l span { min-width: 0; font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-questions:not(:empty) { margin-top: 16px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-sans { margin-top: 14px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l > i { position: relative; top: 4px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; background: var(--fd-carte); border: 2px solid var(--fd-encre-2); z-index: 1; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-fait > i { background: var(--fd-encre); border-color: var(--fd-encre); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-am > i { border-color: var(--fd-ambre); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-ici > i { border-color: var(--fd-encre); border-width: 3px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-t { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; min-width: 0; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-t b { font: 600 15px/1.35 var(--fd-police) !important; color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-t > span { font: 400 15px/1.35 var(--fd-police) !important; color: var(--fd-encre-2) !important; overflow-wrap: anywhere; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-hist-l.is-am :is(b, .fd-hist-t > span) { color: var(--fd-ambre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; margin-left: -12px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes .fd-arg-g { align-self: auto; text-align: left; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-n { padding: 0 12px; font: 400 13px/1.3 var(--fd-police) !important; color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout { margin: 0 -16px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > summary {
+  list-style: none; display: flex; align-items: center; justify-content: center; min-height: 48px; cursor: pointer; border-top: 1px solid var(--fd-filet);
+  font: 600 15px/1 var(--fd-police) !important; color: var(--fd-lien) !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > summary::-webkit-details-marker { display: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout[open] { padding: 0 16px 12px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout[open] > summary { margin: 0 -16px 12px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > :not(summary) { margin-bottom: 12px; }
+/* Ce que « Tout voir » contient vient de l'ancienne fiche (posée sur le bleu) : ici, sur la carte, à l'encre. */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-tout, .fd-tuile-vue) :is(.vrm-fp-etat-titre, .vrm-fp-note, .vrm-fp-raccourcis, .vrm-fp-detail, .vrm-fp-ev, .vrm-fp-ev-txt, .vrm-fp-date, dt, small) { color: var(--fd-encre-2) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-tout, .fd-tuile-vue) :is(.vrm-fp-ligne1 b, dd, dd b, .vrm-fp-etat-l b) { color: var(--fd-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-tout, .fd-tuile-vue) :is(.vrm-fp-etat, .vrm-fp-histo-num, .vrm-fp-parcours) { background: none !important; background-image: none !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; padding-left: 0 !important; padding-right: 0 !important; color: var(--fd-encre) !important; }
 
-/* ══ 4. « ⋯ » : la feuille de tuiles (et « Tout voir ») ══ */
+/* ══ 9. « ⋯ » (téléphone) : les gestes rares de la ligne, en feuille ; à l'ordinateur ils sont en bas du volet ══ */
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus[hidden] { display: none !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus { position: fixed; inset: 0; z-index: 9100; display: flex; flex-direction: column; justify-content: flex-end; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-voile { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: rgb(4 12 26 / .45) !important; cursor: pointer; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-voile { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; border-radius: 0 !important; background: rgb(4 12 26 / .45) !important; cursor: pointer; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-f {
-  position: relative !important; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box !important; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)) !important; margin: 0 !important; width: auto !important;
-  border-radius: 28px 28px 0 0; background: var(--fd-feuille) !important; color: var(--sv-encre) !important; box-shadow: 0 -18px 40px -20px rgb(4 12 26 / .7);
+  position: relative !important; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box !important; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)) !important; margin: 0 !important; width: auto !important;
+  border-radius: 20px 20px 0 0; background: var(--fd-fond) !important; color: var(--fd-encre) !important; box-shadow: 0 -18px 40px -20px rgb(4 12 26 / .5);
   animation: fd-monte 260ms cubic-bezier(.32, .72, 0, 1) both;
 }
 @keyframes fd-monte { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-f { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-f { animation: none; } :root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-rond, .fd-tuile, .fd-plein, button.fd-photo) { transition: none !important; } }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-tete { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-bottom: 8px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-tete b { font: 700 20px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.02em; color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile {
-  min-height: 76px !important; height: auto !important; display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px !important;
-  border-radius: 16px !important; border: 1px solid var(--fd-filet) !important; background: var(--fd-carte) !important; background-image: none !important; box-shadow: none !important; cursor: pointer;
-  font: 600 13px/1.15 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; text-align: center; transition: transform 120ms ease !important;
-}
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile:active { transform: scale(.97); }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile[aria-pressed="true"] { border-color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--fd-pastille); color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tuile-vue { margin-top: 12px; padding: 12px; border-radius: 18px; background: var(--fd-carte); border: 1px solid var(--fd-filet); color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout { margin-top: 12px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus-tete b { font: 700 20px/1.2 var(--fd-police) !important; letter-spacing: -.02em; color: var(--fd-encre) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-gestes:not(:empty) { margin-top: 12px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > summary {
-  list-style: none; display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 14px; cursor: pointer;
-  background: var(--fd-creux); font: 600 15px/1 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-lien) !important;
-}
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > summary::-webkit-details-marker { display: none; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout[open] > summary { margin-bottom: 12px; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-tout > :not(summary) { margin-bottom: 12px; }
-/* Ce que « Tout voir » contient vient de l'ancienne fiche (posée sur le bleu) : ici, sur la feuille claire, à l'encre. */
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus :is(.vrm-fp-etat-titre, .vrm-fp-note, .vrm-fp-raccourcis, .vrm-fp-detail, .vrm-fp-ev, .vrm-fp-ev-txt, .vrm-fp-date, dt, small) { color: var(--sv-encre-2) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus :is(.vrm-fp-ligne1 b, dd, dd b, .vrm-fp-etat-l b) { color: var(--sv-encre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plus :is(.vrm-fp-etat, .vrm-fp-histo-num, .vrm-fp-parcours) { background: var(--fd-carte) !important; background-image: none !important; box-shadow: none !important; border: 1px solid var(--fd-filet) !important; border-radius: 18px !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rares { padding: 12px 16px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rares:not(:has(button, a, input)) { display: none; }
 
-/* ══ 5. ORDINATEUR : la même fiche, en panneau à droite (la liste reste visible à gauche) ══ */
+/* ══ 10. LA PHOTO EN GRAND ══ */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis { position: fixed; inset: 0; z-index: 9200; background: #000000; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-piste { position: absolute; inset: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior: contain; scrollbar-width: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-piste::-webkit-scrollbar { display: none; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-page { flex: 0 0 100%; scroll-snap-align: center; display: grid; place-items: center; min-width: 0; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-page img { width: 100% !important; height: 100% !important; max-width: none !important; object-fit: contain !important; border-radius: 0 !important; display: block; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-fermer { position: absolute; right: 12px; top: max(12px, env(safe-area-inset-top)); background: rgb(28 28 30 / .72) !important; color: #FFFFFF !important; border-color: rgb(255 255 255 / .28) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-vis-n { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom)); padding: 4px 12px; border-radius: 999px; background: rgb(28 28 30 / .72); color: #FFFFFF; font: 600 13px/1.4 var(--fd-police); }
+
+/* ══ 11. ORDINATEUR : la même fiche, en volet à droite (la liste reste visible à gauche), faits sur 4 colonnes ══ */
 @media (min-width: 768px) {
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi {
-    inset: 12px 12px 12px auto !important; width: min(460px, 42vw) !important; border-radius: 28px !important; overflow-x: hidden !important;
-    background: transparent !important; box-shadow: 0 30px 80px -30px rgb(4 12 26 / .7) !important;
+    inset: 12px 12px 12px auto !important; width: min(520px, 42vw) !important; border-radius: 20px !important; overflow-x: hidden !important;
+    border: 1px solid var(--fd-filet) !important; box-shadow: 0 30px 80px -30px rgb(4 12 26 / .55) !important;
   }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-cadre { border-radius: 28px; overflow: hidden; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-cadre { border-radius: 20px; }
   :root:root:root:root:root:root:root:root body .fd-fond { display: block !important; position: fixed !important; inset: 0 !important; z-index: 8999 !important; border: 0 !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; background: rgb(4 12 26 / .35) !important; box-shadow: none !important; transition: none !important; cursor: pointer; }
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi.sb-plan { z-index: 60 !important; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-ph { height: 300px; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-top { top: 14px; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-s { padding-bottom: 24px; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-plus { left: auto; right: 12px; top: 12px; bottom: 12px; width: min(460px, 42vw); border-radius: 28px; overflow: hidden; }
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-plus-f { max-height: 92%; border-radius: 28px 28px 0 0; }
-  /* Souris : les cibles restent confortables, et le survol se voit. */
-  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi :is(.fd-seg-b, .fd-tuile, .fd-plein):hover { filter: brightness(.97); }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-barre { padding: 12px 16px 8px; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-corps { padding: 4px 20px 24px; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-faits { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-fait.is-large { grid-column: span 2; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi .fd-tuiles { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (hover: hover) and (pointer: fine) {
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd :is(.fd-tuile, .fd-rond):hover { border-color: var(--fd-encre-2) !important; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plein:hover { filter: brightness(1.08); }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd button.fd-fait:hover .fd-fait-v { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd a.fd-site:hover b { text-decoration: underline; text-underline-offset: 3px; }
 }
 
-/* ══ (16 nov., intégration vague A) LES MESSAGES PASSAGERS PENDANT LA FICHE (téléphone) ══
-   Une fiche ouverte compte comme une feuille : la coque met alors ses messages EN HAUT (`data-toasts-place="haut"`,
-   23 oct. : jamais sous une feuille, jamais sur son pied). Sur la fiche D, le haut est la place de ‹ et ⋯ : un message
-   (« 24 nouvelles paires numérotées », lot 5.385) les couvrait 6 s et prenait le toucher. Tant qu'une fiche plein écran
-   est ouverte, les messages se posent JUSTE SOUS les deux ronds (sur la photo, rien à toucher) — toujours au-dessus de
-   la fiche, donc toujours lus. Banc ecrans-verre-2, F8. À l'ordinateur ils restent en bas à droite. */
+/* ══ 12. LES MESSAGES PASSAGERS PENDANT LA FICHE (téléphone) ══
+   Une fiche ouverte compte comme une feuille : la coque met ses messages EN HAUT (`data-toasts-place="haut"`). Sur la
+   fiche directe, le haut est la barre (‹, ⋯) puis la photo et le titre : un message (« 24 nouvelles paires numérotées »)
+   les couvrait six secondes (Julien, 19 nov. : « il passe en plein sur la photo »). Tant qu'une fiche plein écran est
+   ouverte, les messages se posent EN BAS de l'écran, au-dessus de la zone de l'iPhone — ni la tête ni la photo.
+   Banc fiche-directe (T). À l'ordinateur ils restent où ils étaient. */
 :root:root:root:root:root:root:root:root body:has(.vrm-fp.fd:not(.fd-ordi)) .vrm-toasts[data-toasts-place="haut"] {
-  top: calc(max(14px, calc(env(safe-area-inset-top) + 8px)) + 44px + 10px) !important;
+  top: auto !important; bottom: calc(16px + env(safe-area-inset-bottom)) !important;
 }
 
 } /* fin de @layer vrm-verre */

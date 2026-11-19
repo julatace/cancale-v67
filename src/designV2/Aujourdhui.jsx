@@ -73,8 +73,8 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
     bande: () => (n > 0 ? (
           <div className="v2-bande" role="list" aria-label={tr('v2.bande.aria')} data-v2-bande={String(colis.length)} data-v2-bloc="bande">
             {colis.slice(0, 12).map((c) => (
-              <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => onColis && onColis(c)} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
-                attrs={{ role: 'listitem', 'data-v2-colis': c.cle }}>
+              <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => { if (!(c.fl && c.fl['data-fiche-ligne']) && onColis) onColis(c); }} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
+                attrs={{ role: 'listitem', 'data-v2-colis': c.cle, ...(c.fl || {}) }}>
                 <span className="v2-bande-photo">{c.photo && Photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" width={104} height={104}/> : <Icon name="cintre" size={26}/>}
                   {c.num ? <span className="v2-bande-plaque"><Etiquette num={c.num} taille="moyen"/></span> : null}</span>
                 <span className="v2-bande-prix">{c.prix || ' '}</span>
