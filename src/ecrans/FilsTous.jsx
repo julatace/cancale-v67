@@ -415,7 +415,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
           {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
-        <div className="vrm-chat-column">{ordinateur && choisi ? enTete(choisi) : null}{panneau()}</div>
+        <div className="vrm-chat-column">{ordinateur && choisi && !(conv && conv.plateforme === 'vinted') ? enTete(choisi) : null}{panneau()}</div>
       </div>
     </div>
   );
