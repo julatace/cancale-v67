@@ -97,12 +97,12 @@ les jetons, que la couche `n-anciens` tient. Chacun part avec la réécriture de
 
 ### 3.3 Les chiffres (pour l'agent de `claude/vite-et-sans-bug`)
 
-| | origin/main (ed9399cb) | ce lot |
+| | origin/main (ed9399cb) | ce lot (après la fusion de main du 19 nov. après-midi) |
 |---|---|---|
-| CSS du build, total | 3 207 616 octets | 3 103 391 octets (−104 225, −3,2 %) |
+| CSS du build, total | 3 225 491 octets | 3 122 842 octets (−102 649, −3,2 %) |
 | `:has(` dans le CSS du build | 602 | 544 (−58) |
-| `!important` dans le CSS du build | 24 395 | 23 455 (−940) |
-| blocs de règles | 22 995 | 22 631 (−364) |
+| `!important` dans le CSS du build | 24 396 | 23 471 (−925) |
+| blocs de règles | 23 337 | 22 988 (−349) |
 | `:has()` ancrés sur `html` retirés | — | 2 (`html:has(.vrm-app-shell[data-espace])`, studio-verre §2) + ceux de l'habillage « VRM » |
 | JavaScript + CSS du démarrage (gzip, `audit-poids-demarrage`) | 1 980 Ko | 1 968 Ko (−12 Ko) ; budget 1 982 → 1 970 |
 
@@ -112,7 +112,35 @@ Avant = le build d'`origin/main`, habillage « VRM » (celui que Julien avait so
 Après = ce lot, natif. Mêmes états, mêmes règles, même base. Défauts des écrans de CE lot · (ceux des écrans
 réécrits par d'autres, listés à part).
 
-‹TABLEAU›
+Relevé `BASES=leger` (≈ 40 annonces : la machine partagée tuait la base de 1 000), `SOUSPAGES=non`, 390 et 1512,
+clair. Le relevé d'avant s'est arrêté net à 1512 (Chromium tué par la machine saturée : 63 états à 390, 10 à 1512) ;
+le tableau compare donc les **73 états ouverts des deux côtés** (`tableau.py --communs`). Après, à 390 + 1512, le
+banc ouvre 127 états.
+
+| écran | états (avant · après) | défauts de ce lot : avant → après | dont contraste + icône | écrans des autres chantiers : avant → après |
+|---|---|---|---|---|
+| Aujourd'hui | 6 · 6 | — (autre chantier) | — | 71 → 7 |
+| Annonces | 18 · 18 | 125 → 4 | 102 → 4 | 71 → 9 |
+| Ventes | 4 · 4 | — (autre chantier) | — | 39 → 0 |
+| Achats | 7 · 7 | 76 → 2 | 61 → 2 | 40 → 0 |
+| Stock | 2 · 2 | 4 → 0 | 2 → 0 | 11 → 0 |
+| Messages | 4 · 4 | 15 → 0 | 9 → 0 | 19 → 0 |
+| E-mails | 3 · 3 | 20 → 0 | 16 → 0 | 16 → 2 |
+| Argent | 7 · 7 | 36 → 0 | 29 → 0 | 32 → 0 |
+| Paramètres | 12 · 12 | 58 → 0 | 46 → 0 | 74 → 0 |
+| Communauté | 2 · 2 | 4 → 0 | 2 → 0 | 12 → 0 |
+| Coque (cloche, loupe, profil, aide, extension) | 5 · 5 | 10 → 0 | 3 → 0 | 0 → 0 |
+| Fiche d'un article | 1 · 1 | — (autre chantier) | — | 3 → 2 |
+| Connexion | 2 · 2 | 4 → 0 | 0 → 0 | 0 → 0 |
+| **total** | 73 · 73 | **352 → 6** | 270 → 6 | 388 → 20 |
+
+Avant, par règle (ce lot) : contraste 223 · icône 47 · dégradé bleu 60 · flou 3 · cibles 19. Après : icône 6
+(le logo d'un site sans compte dans la feuille « Plateformes », à 45 %), puis, sur les 127 états, 2 contrastes du
+Stock (numéro d'étape pendant le film) — **les deux corrigés au dernier commit** (§6 : le relevé final).
+
+Ce qui reste AUX AUTRES (après, 127 états) : la coque 65 (surtout « contenu sous la barre d'onglets » au téléphone
+et le flou de la barre de titre), Aujourd'hui 4 (« 15 » blanc sur le bleu du bouton principal, 3,88:1), la fiche et
+la rangée d'annonce 6 (« N° » de la plaque à 4,39:1, flou), Ventes 4.
 
 ## 5. Ce qui reste, et à qui
 
