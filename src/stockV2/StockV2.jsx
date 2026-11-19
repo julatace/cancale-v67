@@ -31,6 +31,7 @@ import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuill
 import MeubleDessin from './MeubleDessin.jsx';
 import './stock-v2.css';
 import './meubles.css';
+import './pont.css';   // sans couche : rend aux pièces natives du Stock ce que dit la couche natif
 
 const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 const DUREE_VOL = 260;          // ms : l'article vole dans sa case (NATIF.md : 200–300 ms)
@@ -386,6 +387,12 @@ export default function StockV2({ s }) {
           </Groupe>) : null}
         {nonRangees.length > aRangerVus.length ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sm-a-ranger-tous': '' }} onClick={() => { if (tousARanger) setMax((x) => x + PAR_PAGE); else setTousARanger(true); }}>{tr('sm.voirAutres', { n: nombre(Math.min(tousARanger ? PAR_PAGE : 9999, nonRangees.length - aRangerVus.length)) })}</Bouton></div> : null}
 
+        {/* LE geste de l'écran, sous la liste qu'il range (pas collé en bas : le Stock n'est pas un écran de la coque native). */}
+        {nPlein && !seanceOuverte ? (
+          <div className="sm-bloc sm-plein">
+            <Bouton variante="plein" icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
+              onClick={() => lancer(aRangerCles)}>{tr('sm.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom })}</Bouton>
+          </div>) : null}
         {/* Meubles · Articles : les deux façons de regarder le stock. */}
         <div className="sm-bloc" data-sr-segment={vue}>
           <Segmente libelle={tr('sr.seg.label')} valeur={vue} onChange={(v) => { setVue(v); setZoom(null); }}
@@ -404,12 +411,6 @@ export default function StockV2({ s }) {
         </>}
       </> : null}
       {s.blocs.modale}
-
-      {nPlein && !seanceOuverte ? (
-        <div className="n-page-plein sm-plein" data-n-plein="">
-          <Bouton variante="plein" icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
-            onClick={() => lancer(aRangerCles)}>{tr('sm.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom })}</Bouton>
-        </div>) : null}
 
       <Feuille ouverte={!!ficheF} onFermer={() => setFiche(null)} titre={ficheF ? 'N°' + ficheF.numero : ''} className="sr-feuille" attrs={{ 'data-sr-fiche': fiche || undefined }}>
         {ficheF ? <Reponse s={s} f={ficheF} onVoir={() => voir(ficheF)} onDeplacer={() => lancer([fiche], true)} onRanger={() => rangerA(fiche)}/> : null}

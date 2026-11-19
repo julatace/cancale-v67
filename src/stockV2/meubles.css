@@ -123,6 +123,11 @@
   .sm-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
   @keyframes sm-zoom { from { transform: scale(.94); opacity: .3; } to { transform: none; opacity: 1; } }
 
+  /* Dans le Stock, les groupes natifs prennent la largeur de l'écran (sa marge est celle de l'hôte, 16 px). */
+  .sm-ecran .n-groupe { margin-inline: 0; margin-bottom: 0; }
+  .n-feuille .sm-seance, .n-feuille .sm-fin { padding: 0 var(--n-marge) 16px; }
+  .sm-article-txt { align-items: flex-start; }
+
   /* ── LA SÉANCE « RANGER » (une feuille, à la demande) ──────────────────── */
   .sm-seance { display: flex; flex-direction: column; gap: 16px; }
   .sm-article { display: flex; align-items: center; gap: 16px; min-width: 0; }

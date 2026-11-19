@@ -1,0 +1,16 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE PONT DU STOCK NATIF (19 nov., lot stock-etiquetage) — comme src/coque-native.css, SANS couche et SANS valeur.
+   Les pièces natives de l'écran Stock (boutons et rangées `n-*`, tuiles et cases `sm-*`) vivent dans la couche
+   `vrm-natif` ; des règles d'avant sans couche (`:where(.vrm-app-shell) button { background: var(--fu-remplir) }`,
+   `.vrm-main button { transition… }`) les repeignaient en pavés gris (mesuré au banc stock-etiquetage, SONDE=1).
+   `all: revert-layer` rend à ces contrôles-là SEULEMENT ce que disent les couches. Les contrôles d'avant posés dans le
+   Stock (champ de recherche, blocs « à faire », inventaire) gardent leur dessin : ils ne portent ni `n-` ni `sm-`.
+   La feuille (`.n-feuille`) est déjà couverte par src/coque-native.css. L'identifiant de <main> passe devant les règles
+   d'avant par la spécificité, jamais par un `!important`.
+   ════════════════════════════════════════════════════════════════════════════ */
+:is(#vrm-contenu, html) .sm-ecran :is(button, a, input):is([class^="n-"], [class*=" n-"], [class^="sm-"], [class*=" sm-"]) {
+  all: revert-layer;
+}
+/* « Où est… » ne colle plus en haut dans le Stock natif : collé, il passait sur le segmenté Meubles · Articles et sur la
+   tête du meuble zoomé (capture du banc). Le champ reste en tête de l'écran ; « ⋯ » et la barre restent joignables. */
+:is(#vrm-contenu, html) .sm-ecran .sr-cherche-ligne { position: static; }
