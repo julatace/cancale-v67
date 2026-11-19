@@ -255,8 +255,8 @@
 /* ── 8. LE RAIL D'ICÔNES (1024–1199 px, et les petites fenêtres à la souris) ── */
 @media (max-width: 1199px) {
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] { width: var(--n2-rail) !important; padding: 12px 6px 6px !important; }
-  .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-main,
-  .vrm-app-shell:has(> nav.vrm-sidebar[data-nav-v2]) > .vrm-exemple-bandeau { margin-left: calc(var(--n2-rail) + var(--n2-marge) + 20px) !important; }
+  .vrm-app-shell[data-vrm-d23]:not(._):not(_) > .vrm-main,
+  .vrm-app-shell[data-vrm-d23]:not(._):not(_) > .vrm-exemple-bandeau { margin-left: calc(var(--n2-rail) + var(--n2-marge) + 20px) !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] > .vrm-sidebar-brand { justify-content: center !important; padding: 0 0 12px !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-sidebar-mot { display: none !important; }
   .vrm-app-shell nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { justify-content: center !important; padding: 0 !important; min-height: 40px !important; gap: 0 !important; }

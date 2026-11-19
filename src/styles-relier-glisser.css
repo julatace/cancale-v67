@@ -56,7 +56,7 @@
    Bénéfice … · Reçu · Annuler » s'y posent — jamais sur une ligne des listes. */
 /* (reprise) 116 px : la pilule du résultat, bénéfice en entier (jusqu'à trois lignes dans une autre langue). */
 .vrm-rg-corps { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
-body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+body[data-vrm-d35] .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
 /* (17 nov.) RELIER EN TOUCHANT : le choix se voit tout du long (bandeau fixe sous le titre, ligne surlignée) ; au
    téléphone, la liste du côté déjà choisi laisse sa place à la liste d'en face. */
 .vrm-rg-choisi { display: flex; align-items: center; gap: 10px; margin: 0 16px 6px; padding: 8px 10px; border-radius: 14px; flex: none;
@@ -77,7 +77,7 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
   .vrm-rg-col > .vrm-rg-h3 { display: none; }
   /* La pilule « Achat relié · Bénéfice … » (5 s) : la feuille s'arrête au-dessus d'elle, jamais une ligne dessous ;
      sans pilule, aucune bande vide. */
-  body:has([data-pilule]) .vrm-rg-corps { margin-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+  body[data-vrm-d36] .vrm-rg-corps { margin-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (min-width: 900px) { .vrm-rg-onglets, .vrm-rg-poignee { display: none; } .vrm-rg-corps { padding-bottom: 16px; } .vrm-rg-liste { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); } }
 .vrm-rg-cible { touch-action: pan-y; -webkit-touch-callout: none; }

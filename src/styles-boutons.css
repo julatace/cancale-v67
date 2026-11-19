@@ -186,7 +186,7 @@
     display: flex; gap: 8px; pointer-events: none;
   }
   .vrm-b-principal > .vrm-b { flex: 1; pointer-events: auto; box-shadow: 0 6px 18px rgba(0,0,0,.18) !important; }
-  .vrm-main:has(.vrm-b-principal)::after, .vrm-main:has(.vrm-b-barre)::after { content: ''; display: block; height: 64px; }
+  .vrm-main[data-vrm-d27]::after, .vrm-main[data-vrm-d28]::after { content: ''; display: block; height: 64px; }
 }
 
 /* ── 4. UN PARCOURS : <Avancement> (App.jsx) ─────────────────────────────── */

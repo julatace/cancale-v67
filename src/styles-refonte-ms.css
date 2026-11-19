@@ -28,10 +28,10 @@
 }
 :root:root body [data-ms-vise="1"] { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 4px !important; border-radius: 12px !important; transition: outline-color 1.2s ease-out !important; }
 /* La phrase d'explication sous le titre disparaît : le « ? » suffit, à côté du titre (AJOUT 3.8). */
-:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran { font-size: 0 !important; line-height: 0 !important; margin: 0 !important; min-height: 0 !important; }
-:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran > * { font-size: 15px !important; line-height: 1 !important; }
-:root:root body :is([data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) { display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 4px 8px !important; }
-:root:root body :is([data-tache-tete="messages"], .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand]) > h1 { margin-bottom: 0 !important; }
+:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran { font-size: 0 !important; line-height: 0 !important; margin: 0 !important; min-height: 0 !important; }
+:root:root body :is(.vrm-ms-stock, [data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) .vrm-phrase-ecran > * { font-size: 15px !important; line-height: 1 !important; }
+:root:root body :is([data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) { display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 4px 8px !important; }
+:root:root body :is([data-tache-tete="messages"], .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand]) > h1 { margin-bottom: 0 !important; }
 
 /* ── STOCK ──────────────────────────────────────────────────────────────── */
 :root:root body .vrm-ms-stock { gap: 12px !important; }
@@ -225,7 +225,7 @@
 :root:root body [data-tache-tete="messages"] { justify-content: flex-start !important; text-align: left !important; flex-direction: row !important; align-items: center !important; }
 :root:root body [data-tache-tete="messages"] > h1 { width: auto !important; flex: 0 1 auto !important; text-align: left !important; }
 /* ── E-MAILS — la boîte comme Mail : la liste d'abord, des rangées de 64–72 px, le code de retrait à droite ── */
-:root:root body .vrm-main:has([data-boite-emails]) .vrm-tache-tete[data-titre-ecran-grand] { justify-content: flex-start !important; }
+:root:root body .vrm-main[data-vrm-d34] .vrm-tache-tete[data-titre-ecran-grand] { justify-content: flex-start !important; }
 :root:root body .vrm-boite.vrm-boite { gap: 0 !important; }
 :root:root body .vrm-boite .vrm-boite-vues.vrm-boite-vues {
   display: inline-flex !important; width: auto !important; align-self: flex-start !important; gap: 2px !important; padding: 2px !important; margin: 0 0 10px !important;
@@ -285,7 +285,7 @@
 :root:root body .vrm-boite .vrm-boite-compte.vrm-boite-compte select { width: auto !important; max-width: 62vw !important; -webkit-appearance: none !important; appearance: none !important; }
 :root:root body .vrm-boite .vrm-boite-compte .vrm-boite-compte-chevron { position: absolute !important; right: 4px !important; left: auto !important; pointer-events: none !important; }
 :root:root body .vrm-app-shell .vrm-main header.vrm-tache-tete.vrm-market-heading:is([data-tache-tete="messages"], [data-titre-ecran-grand]):is([data-tache-tete="messages"], :has(~ * [data-boite-emails])),
-:root:root body .vrm-app-shell .vrm-main:has([data-boite-emails]) header.vrm-tache-tete.vrm-market-heading[data-titre-ecran-grand] {
+:root:root body .vrm-app-shell .vrm-main[data-vrm-d34] header.vrm-tache-tete.vrm-market-heading[data-titre-ecran-grand] {
   display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; justify-content: flex-start !important; gap: 8px !important;
 }
 :root:root body .vrm-app-shell .vrm-main header.vrm-tache-tete.vrm-market-heading:is([data-tache-tete="messages"], [data-titre-ecran-grand]) > h1 { flex: none !important; width: auto !important; white-space: nowrap !important; hyphens: none !important; }

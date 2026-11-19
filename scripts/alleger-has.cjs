@@ -11,11 +11,11 @@
 //  éléments sur Achats, 0,8 à 2,3 s au ×4, au toucher d'un onglet comme à la moindre insertion.
 //
 //  CE QUE FAIT LE SCRIPT : il remplace, dans la SOURCE, chaque `:has(ARG)` porté par une de ces ancres par un
-//  DRAPEAU, un mot de l'attribut `data-vrm-d` posé sur l'ancre par src/drapeauxRacine.js (qui évalue le MÊME
+//  DRAPEAU, l'attribut `data-vrm-<mot>` posé sur l'ancre par src/drapeauxRacine.js (qui évalue le MÊME
 //  `:has(ARG)` avec `element.matches`, donc la même sémantique) :
-//        .vrm-main:has(.vrm-fu-colis) .x        ⇒   .vrm-main:where([data-vrm-d~="d3"]):not(._) .x
-//  La spécificité est conservée à l'identique (`:where()` vaut 0 ; `:not(#_)`, `:not(._)`, `:not(_)` rendent
-//  exactement celle de l'argument le plus spécifique) : l'ordre de la cascade ne bouge pas. Le changement d'un
+//        .vrm-main:has(.vrm-fu-colis) .x        ⇒   .vrm-main[data-vrm-d3] .x
+//  La spécificité est conservée à l'identique (l'attribut vaut une classe ; `:not(#_)`, `:not(._)`, `:not(_)` rendent
+//  le reste de celle de l'argument le plus spécifique) : l'ordre de la cascade ne bouge pas. Le changement d'un
 //  attribut n'invalide que les descendants que SES règles nomment — plus jamais tout le document.
 //  La table des drapeaux (ancre, argument) est écrite dans src/drapeauxRacine.table.js.
 //
@@ -40,7 +40,7 @@ const RESERVEES = [/^src\/designV2\/interface\//, /^src\/designV2\/design-v2\.cs
   /^src\/design\/ventes-verre\.css$/, /^src\/design\/verre-[^/]*\.css$/, /^src\/design\/studio-verre\.css$/, /^src\/ventes\//, /^src\/natif\//];
 // Les ancres « qui contiennent tout » : un seul élément chacune dans la page (ou une poignée).
 const ANCRES = [['html', /^(?:html|:root)(?![\w-])/], ['body', /^body(?![\w-])/], ['#root', /#root(?![\w-])/], ['.vrm-app-shell', /\.vrm-app-shell(?![\w-])/], ['.vrm-main', /\.vrm-main(?![\w-])/]];
-const ATTR = 'data-vrm-d';
+const ATTR = 'data-vrm';   // un drapeau = l'attribut data-vrm-<mot>
 
 // ── Un tout petit lecteur de sélecteurs (parenthèses, crochets, chaînes) ──────────────────────
 function finParenthese(s, i) {   // s[i] === '(' ⇒ index de la parenthèse fermante
@@ -89,12 +89,20 @@ function specificite(sel) {
       if (deux || /^(before|after|first-line|first-letter)$/i.test(nom)) c++; else b++;
       k = j - 1; continue;
     }
-    if (/[a-zA-Z]/.test(ch) && (k === 0 || /[\s>+~(,|]/.test(s[k - 1]))) { c++; while (k + 1 < s.length && /[\w-]/.test(s[k + 1])) k++; continue; }
+    if (/[a-zA-Z_]/.test(ch) && (k === 0 || /[\s>+~(,|]/.test(s[k - 1]))) { c++; while (k + 1 < s.length && /[\w-]/.test(s[k + 1])) k++; continue; }
   }
   return [a, b, c];
 }
 function specListe(liste) { let m = [0, 0, 0]; for (const x of decouper(liste, ',')) { const v = specificite(x.trim()); if (v[0] > m[0] || (v[0] === m[0] && (v[1] > m[1] || (v[1] === m[1] && v[2] > m[2])))) m = v; } return m; }
 const rembourrage = ([a, b, c]) => ':not(#_)'.repeat(a) + ':not(._)'.repeat(b) + ':not(_)'.repeat(c);
+// La forme écrite (19 nov., au poids) : l'attribut `data-vrm-<mot>` vaut déjà (0,1,0) ; le reste de la spécificité de
+// l'argument est rendu par des `:not()` qui ne nient rien. Un argument de moins de (0,1,0) (une balise seule, rare) :
+// `:where([data-vrm-<mot>])` + toute sa spécificité. Nié : `:not([…])` puis la spécificité (celle de `:not(:has(ARG))`).
+const forme = (mot, [a, b, c], nie = false) => {
+  const att = `[${ATTR}-${mot}]`;
+  const [coeur, reste] = b >= 1 ? [att, [a, b - 1, c]] : [`:where(${att})`, [a, b, c]];
+  return (nie ? `:not(${coeur})` : coeur) + rembourrage(reste);
+};
 const normaliser = (x) => x.replace(/\s+/g, ' ').replace(/\s*([>+~,])\s*/g, '$1').trim();
 
 // Le composé qui porte le `:has(` placé en `i` : on recule jusqu'au combinateur (niveau 0 de CE groupe).
@@ -136,8 +144,8 @@ function reecrire(sel, drapeau) {
     const ancre = (nie || niveauZero(compose, i - d)) ? ancreDe(compose) : null;
     if (!ancre) { depuis = f + 1; continue; }
     const mot = drapeau(ancre, normaliser(arg));
-    if (nie) { const neuf = `:where([${ATTR}~="${mot}"]))${rembourrage(specListe(arg))}`; out = out.slice(0, i) + neuf + out.slice(f + 2); depuis = i + neuf.length; n++; continue; }
-    const neuf = `:where([${ATTR}~="${mot}"])${rembourrage(specListe(arg))}`;
+    if (nie) { const neuf = forme(mot, specListe(arg), true); out = out.slice(0, i - 5) + neuf + out.slice(f + 2); depuis = i - 5 + neuf.length; n++; continue; }
+    const neuf = forme(mot, specListe(arg));
     out = out.slice(0, i) + neuf + out.slice(f + 1);
     depuis = i + neuf.length; n++;
   }
@@ -182,7 +190,7 @@ function passer({ ecrire, tout }) {
     bilan.push({ f: rel, has, racine, reservee, ecrit: !!(ecrire && racine && (!reservee || tout) && neuf !== css), drapeaux: drapeaux.length - avant });
     if (ecrire && racine && (!reservee || tout) && neuf !== css) fs.writeFileSync(f, neuf);
   }
-  if (ecrire) fs.writeFileSync(TABLE, `// ⚠️ Fichier GÉNÉRÉ par \`node scripts/alleger-has.cjs --ecrire\` — ne pas modifier à la main.\n// Chaque drapeau : m = le mot posé dans \`${ATTR}\` de l'ancre a, quand a correspond à \`:has(s)\`.\nexport const DRAPEAUX = ${JSON.stringify(drapeaux, null, 1).replace(/\n\s+/g, ' ').replace(/\}, \{/g, '},\n {')};\n`);
+  if (ecrire) fs.writeFileSync(TABLE, `// ⚠️ Fichier GÉNÉRÉ par \`node scripts/alleger-has.cjs --ecrire\` — ne pas modifier à la main.\n// Chaque drapeau : m = le mot : l'ancre a porte \`${ATTR}-<m>\`, quand a correspond à \`:has(s)\`.\nexport const DRAPEAUX = ${JSON.stringify(drapeaux, null, 1).replace(/\n\s+/g, ' ').replace(/\}, \{/g, '},\n {')};\n`);
   return { bilan, drapeaux };
 }
 
@@ -195,7 +203,7 @@ function prouver() {
   const cas = [
     ['.vrm-main:has(.vrm-fu-colis) .x', 1], ['html:has(.vrm-pp) body::before', 1], ['html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"]', 1],
     ['html body .vrm-app-shell :is(.vrm-main:has(.vrm-fu-colis), .vrm-main .vrm-colis-section) .vrm-colis-carte', 1], ['html:not([data-theme]):has(.vrm-pp)', 1],
-    ['.vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) .y', 2], ['.vrm-sale-row:has(> img) .z', 0], ['div:has(> .a) span', 0], ['#root .v2-aujourdhui:has(> .v2-bande) .v2-pouce', 0],
+    ['.vrm-main:has(.vrm-fu-ecran):not(:has(.vrm-message-workspace)) .y', 2], ['.vrm-sale-row:has(> img) .z', 0], ['body:has(dialog[open]) .q', 1], ['body:not(:has(dialog)) .q', 1], ['div:has(> .a) span', 0], ['#root .v2-aujourdhui:has(> .v2-bande) .v2-pouce', 0],
     ['body:has([data-feuille-cadre], [role="dialog"][aria-modal="true"]) .vrm-tabbar', 1], ['.vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header', 1],
   ];
   for (const [sel, n] of cas) {

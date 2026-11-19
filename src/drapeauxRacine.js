@@ -5,9 +5,9 @@
 //  (tous ses descendants) à la moindre modification du DOM qui touche un mot d'un argument de `:has()` — mesuré : tout
 //  le document, 13 000 éléments sur Achats, 0,8 à 2,3 s au ×4 (scripts/alleger-has.cjs, banc onglets-trace).
 //  `scripts/alleger-has.cjs --ecrire` remplace dans les feuilles chaque `:has(ARG)` porté par html, body, #root,
-//  `.vrm-app-shell` ou `.vrm-main` par un MOT de l'attribut `data-vrm-d` de cette ancre, et écrit la table
-//  (src/drapeauxRacine.table.js). Ce module pose les mots : pour chaque drapeau, l'ancre porte le mot si et seulement
-//  si elle correspond à `:has(ARG)` — la question est posée au navigateur lui-même (`element.matches`), donc la même
+//  `.vrm-app-shell` ou `.vrm-main` par un ATTRIBUT `data-vrm-<mot>` de cette ancre, et écrit la table
+//  (src/drapeauxRacine.table.js). Ce module pose les attributs : pour chaque drapeau, l'ancre porte `data-vrm-<mot>` si et
+//  seulement si elle correspond à `:has(ARG)` — la question est posée au navigateur lui-même (`element.matches`), donc la même
 //  réponse que la règle d'avant. Un attribut qui change n'invalide que les descendants nommés par SES règles.
 //
 //  QUAND : à l'import (avant le premier rendu), puis à chaque modification du DOM qui PEUT changer une réponse — un
@@ -19,7 +19,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { DRAPEAUX } from './drapeauxRacine.table.js';
 
-export const ATTR_DRAPEAUX = 'data-vrm-d';
+export const ATTR_DRAPEAUX = 'data-vrm';   // l'attribut d'un drapeau : data-vrm-<mot> (« data-vrm-d5 »)
 const elementsDe = (a) => {
   try {
     if (a === 'html') return [document.documentElement];
@@ -47,10 +47,12 @@ export function evaluerDrapeaux() {
   let change = 0; evaluations++;
   for (const [a, liste] of PAR_ANCRE) {
     for (const el of elementsDe(a)) {
-      const mots = [];
-      for (const d of liste) { try { if (el.matches(':has(' + d.s + ')')) mots.push(d.m); } catch (_) { /* `:has` inconnu ici : la règle d'avant ne s'appliquait pas non plus */ } }
-      const v = mots.join(' '), avant = el.getAttribute(ATTR_DRAPEAUX) || '';
-      if (v !== avant) { change++; if (v) el.setAttribute(ATTR_DRAPEAUX, v); else el.removeAttribute(ATTR_DRAPEAUX); }
+      for (const d of liste) {
+        let oui = false;
+        try { oui = el.matches(':has(' + d.s + ')'); } catch (_) { /* `:has` inconnu ici : la règle d'avant ne s'appliquait pas non plus */ }
+        const nom = ATTR_DRAPEAUX + '-' + d.m;
+        if (oui !== el.hasAttribute(nom)) { change++; if (oui) el.setAttribute(nom, ''); else el.removeAttribute(nom); }
+      }
     }
   }
   return change;
@@ -59,7 +61,6 @@ const touche = (n) => { try { return n.nodeType === 1 && (n.matches(UNION) || !!
 function concerne(records) {
   for (const r of records) {
     if (r.type === 'attributes') {
-      if (r.attributeName === ATTR_DRAPEAUX) continue;
       if (r.attributeName !== 'class') return true;                       // un attribut nommé (le filtre de l'observateur)
       const av = new Set(String(r.oldValue || '').split(/\s+/)), ap = new Set(String(r.target.getAttribute('class') || '').split(/\s+/));
       for (const c of CLASSES) if (av.has(c) !== ap.has(c)) return true;
