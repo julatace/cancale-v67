@@ -85,6 +85,10 @@ const CARTE = '[data-compte-bloque]';
 const attendre = (pg, sel = CARTE, ms = 25000) => pg.locator(sel).first().waitFor({ timeout: ms }).then(() => true).catch(() => false);
 const capture = (pg, nom) => pg.screenshot({ path: path.join(CAPTURES, `compte-bloque-${nom}.png`) }).catch(() => {});
 const cibles44 = (pg) => pg.evaluate((sel) => [...document.querySelectorAll(`${sel} button, ${sel} a`)].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect()).filter((r) => r.height < 43.5).length, CARTE);
+// L'écran d'ouverture (#vrm-demarrage) couvre tout tant que l'app démarre : on mesure et on capture APRÈS.
+const ouvert = (pg) => pg.waitForFunction(() => !document.getElementById('vrm-demarrage') && !document.documentElement.hasAttribute('data-vrm-boot'), null, { timeout: 30000 }).then(() => true).catch(() => false);
+// La carte est-elle VUE (rien par-dessus son bouton plein) ?
+const vue = (pg) => pg.evaluate(() => { const b = document.querySelector('[data-compte-bloque] .vrm-cb-plein'); if (!b) return false; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!e && b.contains(e); });
 const choixLu = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_comptes_bloques') || 'null'); } catch (_) { return null; } });
 
 async function scenarioA(nav, largeur, sombre) {
@@ -93,6 +97,8 @@ async function scenarioA(nav, largeur, sombre) {
   const { ctx, pg, etat } = await ouvrir(nav, { b: base(), largeur, sombre });
   try {
     dit(await attendre(pg), `${nom} : la carte paraît`);
+    dit(await ouvert(pg), `${nom} : l’écran d’ouverture est parti`);
+    dit(await vue(pg), `${nom} : la carte est VUE (rien par-dessus)`);
     await pg.waitForFunction(() => { const c = document.querySelector('[data-compte-bloque]'); return c && c.getAttribute('data-compte-bloque-n') === '3'; }, null, { timeout: 12000 }).catch(() => {});
     const c = pg.locator(CARTE).first();
     const txt = await c.innerText();
@@ -131,6 +137,8 @@ async function scenarioB(nav, largeur) {
   const { ctx, pg, etat } = await ouvrir(nav, { b: base({ etat111: ACTIF, choix: { 111: { choix: 'pause', at: iso(2 * H), episode: DEPUIS, n: 3 } } }), largeur });
   try {
     dit(await attendre(pg), `${nom} : la carte paraît`);
+    dit(await ouvert(pg), `${nom} : l’écran d’ouverture est parti`);
+    dit(await vue(pg), `${nom} : la carte est VUE (rien par-dessus)`);
     const c = pg.locator(CARTE).first();
     const txt = await c.innerText();
     dit(await c.getAttribute('data-compte-bloque-phase') === 'remis' && /shop_cancale est débloqué : 3 annonces remises/.test(txt), `${nom} : « shop_cancale est débloqué : 3 annonces remises »`, txt);
@@ -160,7 +168,8 @@ async function scenarioD(nav, largeur, choix, attendu) {
   console.log(`\nD · Annonces, compte bloqué · ${nom}`);
   const { ctx, pg, etat } = await ouvrir(nav, { b: base({ choix: { 111: { choix, at: iso(30 * 60e3), episode: DEPUIS, n: 3 } } }), largeur, tab: 'annonces' });
   try {
-    await pg.waitForTimeout(9000);
+    await ouvert(pg);
+    await pg.waitForTimeout(6000);
     const enPause = await pg.locator('[data-annonces-en-pause]').first().getAttribute('data-annonces-en-pause').catch(() => null);
     const txt = await pg.locator('[data-annonces-en-pause]').first().innerText().catch(() => '');
     const page = await pg.evaluate(() => document.body.innerText);
