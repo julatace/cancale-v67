@@ -23,6 +23,7 @@ import { avecReprise, avecToutArrete, CLE_DISCRETION } from '../discretion.js';
 import { installerExtensionIci, pageExtensionsIci } from '../navigateurExtension.js';
 import { Icon, SUPABASE_URL, sbAuth, load, vmrCmd, lireCapturesDetail, useComptesAutresSites, faitsExtensionApp, useExtVivante, useSansSouris, brancherExtensionApp } from '../App.jsx';
 import { nomCompteLie } from '../comptesLies.js';
+import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
 const NOMS_SYS = { mac: 'Mac', windows: 'Windows', linux: 'Linux', iphone: 'iPhone', ipad: 'iPad', android: 'Android', chromeos: 'Chromebook' };

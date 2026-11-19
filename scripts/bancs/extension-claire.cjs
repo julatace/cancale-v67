@@ -122,6 +122,7 @@ const lireEcran = (pg) => pg.evaluate(() => {
   return { nav: r.getAttribute('data-ext-nav'), pastille: r.getAttribute('data-ext-pastille'), comptes, avert: [...r.querySelectorAll('[data-ext-avert]')].map((x) => x.getAttribute('data-ext-avert')),
     etapes: [...r.querySelectorAll('[data-ext-etape]')].map((x) => [x.getAttribute('data-ext-etape'), x.getAttribute('data-ext-fait')]), appareils: r.querySelectorAll('[data-ext-appareil]').length,
     plein: (r.querySelector('[data-ext-plein]') || { getAttribute: () => null }).getAttribute('data-ext-plein'),
+    coupes: [...r.querySelectorAll('.n-rangee-titre, .n-rangee-sous-texte')].filter((x) => x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 1).map((x) => (x.innerText || '').slice(0, 40)),
     deborde: de.scrollWidth - de.clientWidth, petites: cibles.filter((c) => c.h < 44 || c.w < 44), texte: (r.innerText || '').replace(/\s+/g, ' ') };
 }).catch(() => null);
 const attendreEcran = async (pg, bon, ms = 30000) => { const t0 = Date.now(); let e = null; while (Date.now() - t0 < ms) { e = await lireEcran(pg); if (e && bon(e)) return e; await attendre(500); } return e; };
@@ -148,7 +149,7 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       await pg.goto('https://vrm.center/?tab=extension', { waitUntil: 'domcontentloaded' });
       await attendreEcran(pg, (x) => x.nav === 'ok' && x.comptes.length === 2, 40000);
       await pg.evaluate(() => { for (const b of document.querySelectorAll('[data-ext-compte] .n-groupe-repli[aria-expanded="false"]')) b.click(); }).catch(() => {});
-      const e = await attendreEcran(pg, (x) => x.comptes.every((c) => c.gestes.length && c.jauge && c.jauge !== 'lecture'), 20000);
+      const e = await attendreEcran(pg, (x) => x.appareils >= 1 && x.comptes.every((c) => c.gestes.length && c.jauge && c.jauge !== 'lecture'), 20000);
       await attendre(600); await photo(pg, nom);
       const ca = e && e.comptes.find((c) => c.id === 'vinted:' + A), cb = e && e.comptes.find((c) => c.id === 'vinted:' + B);
       dit(!!e && e.nav === 'ok', 'la page est là, extension « à jour et branchée »', JSON.stringify(e && { nav: e.nav }));
@@ -157,6 +158,7 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       dit(!!e && e.etapes.length === 0, 'tout branché : le pas-à-pas n’est plus montré', JSON.stringify(e && e.etapes));
       dit(!!e && e.appareils === 1 && !e.plein, 'l’autre navigateur est listé ; aucun bouton plein (rien à faire)', JSON.stringify(e && { app: e.appareils, plein: e.plein }));
       dit(!!e && e.deborde <= 0, 'aucun débordement horizontal', e && e.deborde);
+      dit(!!e && !e.coupes.length, 'aucune phrase coupée en « … »', JSON.stringify(e && e.coupes.slice(0, 4)));
       dit(!!e && (!mobile || !e.petites.length), 'cibles au doigt ≥ 44 px', JSON.stringify(e && e.petites.slice(0, 5)));
       dit(!!e && !TECHNIQUES.test(e.texte), 'aucun mot technique dans le texte rendu', e && (e.texte.match(TECHNIQUES) || [])[0]);
       await ctx.close();
@@ -170,7 +172,7 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       dit(!!e && (e.nav === 'absente' || e.nav === 'ailleurs') && e.plein === 'installer', 'aucune extension : la phrase et UN bouton « Installer l’extension »', JSON.stringify(e && { nav: e.nav, plein: e.plein }));
       dit(!!e && e.comptes.length === 2 && e.comptes.every((c) => c.gestes.every((g) => !g.oui)), 'aucune extension : aucun geste « oui »', JSON.stringify(e && e.comptes.map((c) => c.gestes.filter((g) => g.oui))));
       dit(!!e && e.etapes.length === 4 && e.etapes[0][1] === '0', 'aucune extension : le pas-à-pas, étape 1 « pas encore »', JSON.stringify(e && e.etapes));
-      dit(!!e && e.deborde <= 0 && !e.petites.length, 'aucune extension : ni débordement ni petite cible', JSON.stringify(e && { d: e.deborde, p: e.petites }));
+      dit(!!e && e.deborde <= 0, 'aucune extension : aucun débordement', JSON.stringify(e && { d: e.deborde, p: e.petites }));
       await ctx.close(); }
     // ── freins : compte B ouvert, deux comptes dans les onglets, A à 45/50, B en prudence
     semer('freins');
@@ -188,6 +190,7 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       dit(!!e && e.avert.includes('deux-comptes'), '« deux comptes ouverts dans ce navigateur » dit une fois, en tête', JSON.stringify(e && e.avert));
       dit(!!cb && cb.ouverture === 'ici' && ['baisser', 'favoris', 'offres'].every((k) => { const g = cb.gestes.find((x) => x.cle === k); return g && g.oui && g.note === 'prudence'; }), 'atelier_b (ouvert, en prudence) : « oui, au ralenti jusqu’à … »', JSON.stringify(cb && cb.gestes));
       dit(!!ca && ca.gestes.length === 9 && ca.gestes.every((g) => !g.oui && g.raison === 'autre-ouvert') && ca.jauge === '45/50', 'boutique_a (pas ouvert, 45/50) : « non, c’est atelier_b qui est ouvert », jauge 45/50', JSON.stringify(ca));
+      dit(!!e && !e.coupes.length, 'freins : aucune phrase coupée en « … »', JSON.stringify(e && e.coupes.slice(0, 4)));
       dit(!!e && e.deborde <= 0 && (!mobile || !e.petites.length) && !TECHNIQUES.test(e.texte), 'freins : ni débordement, ni petite cible, ni mot technique', JSON.stringify(e && { d: e.deborde, p: e.petites.slice(0, 3) }));
       await ctx.close();
     }
