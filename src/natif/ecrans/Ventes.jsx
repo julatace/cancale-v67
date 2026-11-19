@@ -10,7 +10,7 @@
 // Aucun style en ligne, aucune classe de mise en page, aucune couleur : des composants de src/natif/.
 import React from 'react';
 import { tr } from '../../i18n/index.js';
-import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Affiche, Vide, Attente, Faits, Fait, Feuille, ContexteCoque, poserIcone, iconePosee } from '../index.js';
+import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Vide, Attente, Faits, Fait, Feuille, ContexteCoque, poserIcone, iconePosee } from '../index.js';
 import { filtrerRangs, rangChoisi } from '../../ventes/modeleVentes.js';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
@@ -143,6 +143,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
       </Bouton>
     : null;
   const ecart = joint(E.ecart.coches ? tr('vv.hero.coches', { n: E.ecart.coches }) : '', E.ecart.sans ? tr('v2v.ecart.sans', { n: E.ecart.sans }) : '', E.ecart.imprimes ? tr('vv.hero.imprimes', { n: E.ecart.imprimes }) : '');
+  // (audit d'utilité du 19 nov.) Plus de grand chiffre : le segment porte le nombre. L'en-tête de la liste dit ce que
+  // le nombre ne dit pas — ce qui part à l'impression, ce qui attend son bordereau, ce qui presse (« au moins » si le
+  // compte est partiel, §5 : un total partiel ne se présente jamais comme complet).
+  const teteListe = joint(m.auMoins && m.nEnv != null ? tr('vn.auMoins', { n: m.nEnv }) : '', m.presses > 0 ? tr('sv.presses.envoyer', { n: m.presses }) : '', ecart) || tr('vv.seg.expedier');
   // (audit d'utilité du 19 nov.) UN bouton « Filtrer » au lieu de la rangée des sites ; les gestes rares (Préparer mes colis,
   // Je dépose, la tournée, Emballer — décision n° 6 en attente de Julien : ils RESTENT) sont rangés derrière « ⋯ ».
   const filtre = plateforme ? <Bouton variante="texte" onClick={() => setFeuillePlateforme(true)} attrs={{ 'data-vn-plateforme': plateforme.cle }}>{plateforme.cle === 'toutes' ? tr('vn.filtrer') : plateforme.libelle}</Bouton> : null;
@@ -154,14 +158,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
         <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
           options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined }, { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined }, { cle: 'toutes', libelle: tr('vn.terminees') }]}/>
         {surEnvoyer ? <>
-          <Groupe attrs={{ 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
-            <Affiche valeur={m.nEnv == null ? null : String(m.nEnv)} libelle={joint(m.auMoins ? tr('sv.auMoins') : '', tr('sv.lib.envoyer', { n: m.nEnv || 0 }), m.presses > 0 ? tr('sv.presses.envoyer', { n: m.presses }) : '')}
-              ecart={ecart} tonEcart={m.presses > 0 ? 'ambre' : 'neutre'}/>
-          </Groupe>
           {!E.lu && !E.rangs.length ? <Attente forme="rangees" n={5} vignette={56} titre/>
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
-            : <Groupe titre={tr('vv.seg.expedier')} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length) }}>
+            : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
                 {rangs.map((r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Logo={Logo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
               </Groupe>}

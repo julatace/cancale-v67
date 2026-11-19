@@ -120,5 +120,6 @@ export default {
   "vn.filtrer": "Filter",
   "vn.plus": "More actions",
   "vn.terminees": "Completed",
+  "vn.auMoins": "at least {n} to send",
   "vn.detailVide": "Tap a sale to see it here."
 };

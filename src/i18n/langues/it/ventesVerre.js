@@ -120,5 +120,6 @@ export default {
   "vn.filtrer": "Filtra",
   "vn.plus": "Altre azioni",
   "vn.terminees": "Concluse",
+  "vn.auMoins": "almeno {n} da spedire",
   "vn.detailVide": "Tocca una vendita per vederla qui."
 };
