@@ -29,7 +29,7 @@ import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
 import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
 import MeubleDessin from './MeubleDessin.jsx';
-import { ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
+import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
 import DansFiche from '../DansFiche.jsx';
 import './stock-v2.css';
 import './meubles.css';
@@ -344,7 +344,7 @@ export default function StockV2({ s }) {
       sousTitre={l.cle ? [l.taille ? tr('v2.l.taille', { t: l.taille }) : '', place].filter(Boolean).join(' · ') : tr('sr.ligne.sansNum')} fin={l.cle ? 'chevron' : null}
       onClick={l.cle ? () => ouvrirFiche(l) : null}
       actions={l.cle && l.ou ? [{ cle: 'deplacer', libelle: tr('sr.glisse.deplacer'), onClick: () => lancer([l.cle], true) }] : null}
-      attrs={{ 'data-sr-ligne': l.cle || 'sans', 'data-sr-ligne-place': l.ou ? `${l.ou.meuble.name}|${l.ou.rangee}|${l.ou.colonne}` : (l.cle ? 'non-range' : 'sans-numero') }}/>;
+      attrs={{ ...(l.cle ? attrsFicheLigne({ contexte: 'stock', site: 'stock', cle: 's' + l.cle, nums: [String(l.numero)], photo: l.photo || '', titre: l.titre || '' }) : {}), 'data-sr-ligne': l.cle || 'sans', 'data-sr-ligne-place': l.ou ? `${l.ou.meuble.name}|${l.ou.rangee}|${l.ou.colonne}` : (l.cle ? 'non-range' : 'sans-numero') }}/>;
   };
   const aRangerVus = tousARanger ? nonRangees.slice(0, max) : nonRangees.slice(0, A_RANGER_MONTRES);
   const rangeesVues = rangees.slice(0, max);

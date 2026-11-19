@@ -86,6 +86,13 @@ function baseDirecte() {
   m.vinted_used_nums.push(3108);
   if (enl) enl.data.n = enl.data.ids.length;
   lst.data.nItems = lst.data.payload.items.length; lst.data.payload.pagination = { total_entries: lst.data.payload.items.length };
+  // (19 nov., lot stock-etiquetage) Un meuble et trois paires rangées : dans le Stock, la rangée qui ouvre la fiche est celle
+  // d'une paire DANS une case (une rangée « À ranger » range, à la demande de Julien). Inventé ; les autres chemins l'ignorent.
+  if (!Array.isArray(m.vrm_meubles) || !m.vrm_meubles.length) {
+    m.vrm_meubles = [{ id: 'mF', name: 'Étagère', cols: 4, rows: 2 }];
+    const nums = Object.values(num).map((x) => String(x && x.numero || '')).filter((n) => /^\d+$/.test(n)).slice(0, 3);
+    m.vrm_slots = Object.assign({}, m.vrm_slots || {}); nums.forEach((n, i) => { if (!m.vrm_slots[n]) m.vrm_slots[n] = { m: 'mF', i }; });
+  }
   return b;
 }
 
@@ -218,6 +225,9 @@ async function unToucher(nav, chemin, W, sombre) {
     const pg = o.pg;
     await pg.waitForTimeout(2200); await fermerToasts(pg);
     if (chemin === 'recherche') { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '3102' }))); await pg.waitForSelector('[data-tout-annonce]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600); }
+    // (19 nov., lot stock-etiquetage) Le Stock s'ouvre sur ses meubles, et le toucher d'une rangée « À ranger » RANGE (Julien) :
+    // la rangée qui ouvre la fiche est celle des paires déjà dans une case (segment « Paires »).
+    if (chemin === 'stock') { const seg = await pg.$('[data-sr-segment] .n-segmente-choix:nth-child(3)'); if (seg) { await seg.click(); await pg.waitForTimeout(500); } }
     const sel = chemin === 'recherche' ? '[data-tout-annonce]' : '[data-fiche-ligne]';
     await pg.waitForSelector(sel + (chemin === 'recherche' ? '' : '[data-fl-num]'), { timeout: 20000, state: 'attached' }).catch(() => {}); await pg.waitForTimeout(600);
     // La rangée VISIBLE (celle qu'un doigt atteint) et le N° qu'elle porte, par identité.
