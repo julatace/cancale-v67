@@ -101,3 +101,15 @@ beaucoup plus simple. »
   tête de src/emails-mail.css (même principe que src/coque-native.css), sans valeur ni `!important` hors du champ de
   recherche et du menu du compte (règle d'avant en `!important`, passée par `#vrm-contenu`).
 - Build : `NODE_OPTIONS=--max-old-space-size=6144` nécessaire (le tas par défaut de 2 Go casse `vite build`).
+
+## Résultats des restes (après le dernier `git merge origin/claude/integration-19nov`)
+
+- Bancs, sur le build de la branche fusionnée : `emails-mail` 110 verts · `boite-emails` 156 verts · `adresse-reception`
+  166 verts · `emails-densite` 108 verts — **0 rouge**.
+- `design-v2-messages` : la partie E-mails est verte (E1 segments = route, E2 rubriques et « À traiter », E3 plaques et
+  codes, E4 « Ranger », E5 « C'est à moi », tronqués, cibles, un plein). Restent rouges, HORS de ce lot : Messages
+  (« titre et cloche sur une ligne », « fil en bulles » — l'écran Messages, pas touché ici), « éteint : pas de référence »
+  (il faut `SIGNATURE_AVANT`), et par moments « 1512 E : CLS 0,019 » — les sources nommées commencent par la barre
+  du haut de l'app (`vrm-micro`, `kbd`) qui pousse le segmenté ; la place des nombres du segmenté est gardée.
+- Audits verts : traduction, tdz, variables, quoi-de-neuf, boite-emails, boite-mail, emails-html, emails-transfert,
+  relier-compte, email-rattacher, journal-emails, stockage-sur, icones, fonctions-api, colis-achat-auto.
