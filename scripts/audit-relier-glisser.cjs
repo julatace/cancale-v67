@@ -31,6 +31,11 @@ const MUTS = {
   'bord-inverse': ['src/relierGlisser.js', "  if (y < haut + BORD_DEFILEMENT_PX) return -Math.round(", "  if (y < haut + BORD_DEFILEMENT_PX) return Math.round("],
   'achats-tous': ['src/relierGlisser.js', '  const libres = tousAchatsLibres({ achats, liens });', '  const libres = achats.filter((a) => a && a.transaction_id != null);'],
   'propose-ailleurs': ['src/relierGlisser.js', "x.niveau === 'tres-probable' && cles.has(String(x.key))", "x.niveau === 'tres-probable'"],
+  'marque-sans-choix': ['src/relierGlisser.js', "const pour = (x) => !!(k && tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable' && String(p.key) === k));", "const pour = (x) => !!(tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable'));"],
+  'marque-autre-cible': ['src/relierGlisser.js', "p.niveau === 'tres-probable' && String(p.key) === k)", "p.niveau === 'tres-probable')"],
+  'relies-melanges': ['src/relierGlisser.js', "tousAchatsLibresDetail({ achats, liens }).pris.map(", "tousAchatsLibresDetail({ achats, liens }).liste.map("],
+  'filtre-cibles-inerte': ['src/relierGlisser.js', "filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;", "cs;"],
+  'badge-sans-choix': ['src/RelierGlisser.jsx', '{x.pour && !flottante ? <span className="vrm-rg-propose"', '{x.propose && !flottante ? <span className="vrm-rg-propose"'],
   'annuler-perd': ['src/relierGlisser.js', "avant: { buyPrice: f.buyPrice, buyFromId: f.buyFromId, buyFrom: f.buyFrom } });", "avant: {} });"],
   'sans-identite': ['src/relierGlisser.js', "  if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];", "  if (!cible || !w) return [];"],
   'vibre-partout': ['src/relierGlisser.js', "  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}\n  return false;", '  return true;'],
@@ -124,6 +129,24 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   const x5 = (L.achats || []).find((x) => x.tx === '5');
   dit(x5 && x5.propose === '', 'L5 un « très probable » vers une cible absente n’est pas marqué', JSON.stringify(x5 && x5.propose));
   dit(G.listesGlisser({ achats: undefined, cibles }).achats === undefined && G.listesGlisser({ achats: null, cibles }).achats === null, 'L6 achats en cours ⇒ undefined ; pas su ⇒ null (jamais une liste vide)');
+  // (19 nov., Julien) « Très probable » seulement pour la vente / l'annonce CHOISIE ; filtres « Déjà reliés » et « En ligne · Vendues ».
+  const TP = { 4: [{ key: 'a:10', niveau: 'tres-probable' }], 5: [{ key: 'a:99', niveau: 'tres-probable' }], 1: [{ key: 'v:77', niveau: 'possible' }] };
+  const M0 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, '') : null;
+  dit(Array.isArray(M0) && M0.length === (L.achats || []).length && M0.every((x) => !x.pour), 'L7 rien de choisi ⇒ AUCUN achat marqué « très probable »', JSON.stringify(M0 && M0.filter((x) => x.pour).map((x) => x.tx)));
+  const M1 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, 'a:10') : null;
+  dit(Array.isArray(M1) && M1[0] && M1[0].tx === '4' && M1[0].pour && M1.filter((x) => x.pour).length === 1, 'L8 l’annonce a:10 choisie ⇒ SON achat très probable marqué, en tête, et lui seul', JSON.stringify(M1 && M1.map((x) => [x.tx, x.pour])));
+  const M2 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, 'v:77') : null;
+  dit(Array.isArray(M2) && M2.every((x) => !x.pour), 'L9 la vente v:77 choisie ⇒ ni l’achat d’une AUTRE cible ni un simple « possible » n’est marqué', JSON.stringify(M2 && M2.filter((x) => x.pour).map((x) => x.tx)));
+  const RL = typeof G.achatsRelies === 'function' ? G.achatsRelies({ achats: A, liens: new Map([['2', 1]]) }) : null;
+  dit(Array.isArray(RL) && RL.length === 1 && RL[0].tx === '2' && RL[0].relie === true, 'L10 « Déjà reliés » : l’achat relié, lui seul (ni libre, ni remboursé, ni en retour)', JSON.stringify(RL && RL.map((x) => x.tx)));
+  dit(typeof G.achatsRelies === 'function' && G.achatsRelies({ achats: undefined }) === undefined && G.achatsRelies({ achats: null }) === null, 'L11 achats en cours ⇒ undefined ; pas su ⇒ null');
+  const NC = typeof G.compterCibles === 'function' ? G.compterCibles(cibles) : null;
+  dit(NC && NC.toutes === 2 && NC.annonce === 1 && NC.vente === 1, 'L12 les cibles comptées : toutes, en ligne, vendues', JSON.stringify(NC));
+  const FC = typeof G.filtrerCibles === 'function' ? [G.filtrerCibles(cibles, 'annonce'), G.filtrerCibles(cibles, 'vente'), G.filtrerCibles(cibles, 'toutes')] : null;
+  dit(FC && FC[0].length === 1 && FC[0][0].key === 'a:10' && FC[1].length === 1 && FC[1][0].key === 'v:77' && FC[2].length === 2, 'L13 le filtre « En ligne » ne garde que les annonces, « Vendues » que les ventes', JSON.stringify(FC && FC.map((l) => l.map((c) => c.key))));
+  { const src = fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8');
+    dit(/\{x\.pour && !flottante \? <span className="vrm-rg-propose"/.test(src) && !/\{x\.propose && !flottante/.test(src), 'L14 (écran) la marque « Très probable » dépend de la cible CHOISIE (`pour`), plus de `propose`');
+    dit(/data-glisser-filtre-achats=/.test(src) && /data-glisser-filtre-cibles=/.test(src), 'L15 (écran) les deux filtres sont rendus'); }
   if (H) H.publierHorsRelier(null);
 
   // ── P · la phrase ──
