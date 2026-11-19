@@ -286,7 +286,8 @@ const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
 const AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));   // (19 nov. soir) Paramètres → Automatisations
-import VentesTableau from './natif/ecrans/VentesTableau.jsx';   // (19 nov. soir) Ventes à l'ordinateur : le tableau de travail
+import VentesTableau from './natif/ecrans/VentesTableau.jsx';
+import AchatsTableau from './natif/ecrans/AchatsTableau.jsx';   // (19 nov. soir) Achats à l'ordinateur   // (19 nov. soir) Ventes à l'ordinateur : le tableau de travail
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -36649,6 +36650,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur, la liste d'Achats est le TABLEAU DE TRAVAIL (src/natif/ecrans/AchatsTableau.jsx).
+  const ordiAchats = Natif.useOrdinateur() && only === 'achats';
+  const [filtreAchatsT, setFiltreAchatsT] = useState({ compte: '', periode: 'tout' });
   // (31 oct., soir — Julien : « que dans les deux onglets il n'y ait pas la même
   // chose ») DEUX ÉCRANS sur les mêmes lectures (§11, aucune copie) :
   //   · « Colis à retirer » (`vueAchats='retraits'`) : l'étape « À retirer »
@@ -37035,6 +37039,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const rembAchatsParTx = useMemo(() => (retoursAchatLus ? remboursementsParTx(retoursAchatLus.remb) : undefined), [retoursAchatLus]);
   // Un achat REMBOURSÉ prouvé par e-mail (même n° de transaction, montant ≥ ce qu'il a payé) sort
   // des coûts tout de suite (`achatAnnule` le voit), sans attendre la relecture de ses achats.
+  // (19 nov. soir) « Mis à jour il y a … » du tableau d'Achats : l'heure où la liste lue est arrivée.
+  const achatsLusLe = useMemo(() => (Array.isArray(buys.items) ? Date.now() : buys.error ? null : undefined), [buys.items, buys.error]);
   const buysBase = useMemo(() => avecRemboursementsProuves((buys.items || []).filter(o => !acctOffOf(o)), rembAchatsParTx, montantCommandeLu),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx]);
@@ -52915,7 +52921,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        {!modeRetraits && <div className="vrm-achats-barre">
+        {!modeRetraits && !ordiAchats && <div className="vrm-achats-barre">
         <div className="vrm-seg vrm-seg-plein" role="group" aria-label={tr('achats.etapesAchats')}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
@@ -54091,7 +54097,34 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
             dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
-        {(()=>{ const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
+        {(()=>{
+          // (19 nov. soir) L'ordinateur : TOUS ses achats en tableau (les mêmes, la même étape, le même ordre), Statut à compteurs.
+          if (ordiAchats && !modeRetraits) {
+            const cpts = [...new Set(buysBase.map((o) => (o._acc ? accNameOf(o._acc) : '')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+            const depuis = { tout: null, j7: 7, j30: 30 }[filtreAchatsT.periode];
+            const lignesA = buys.error && !buysBase.length ? null : !Array.isArray(buys.items) ? undefined : ordreRecent(buysBase.filter((o) => (!filtreAchatsT.compte || (o._acc && accNameOf(o._acc) === filtreAchatsT.compte))
+              && (depuis == null || ((quandCommandeVinted(o) || 0) >= Date.now() - depuis * 86400000))), (o) => quandCommandeVinted(o)).map((o) => {
+              const tk = trackForBuy(o); const st = achatStage(o, tk); const su = (tk && tk.suivi ? String(tk.suivi) : '') || suivisAchat(o, indexSuivisAchats)[0] || '';
+              const e = entreeSuiviAchat(o); const car = (tk && tk.carrier) || (e && e.transporteur) || (su ? transporteurDeForme(su) : '') || '';
+              const ls = su && st.step !== 0 ? ligneSuiviAchat(o, su, car, transporteurColis(car, su), !st.retour && st.step >= 1 && st.step < 4) : null;
+              const m = montantCommande(o);
+              return { cle: String(o.transaction_id), o, tk, titre: o.title || '', photo: orderPhoto(o) || '', prix: m != null ? montant(m, { devise: o.price?.currency_code || 'EUR' }) : '', prixNombre: m,
+                t: quandCommandeVinted(o), num: buyNumByTxn[String(o.transaction_id)] || '', compte: o._acc ? accNameOf(o._acc) : '', etape: st,
+                transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '' };
+            });
+            const filtresA = [
+              ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreAchatsT.compte || 'tous', onChange: (v) => setFiltreAchatsT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
+                options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((x) => ({ cle: x, libelle: x }))] }] : []),
+              { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreAchatsT.periode, onChange: (v) => setFiltreAchatsT((f) => ({ ...f, periode: v })),
+                options: [{ cle: 'tout', libelle: tr('tableau.filtre.toutePeriode') }, { cle: 'j7', libelle: tr('tableau.filtre.jours', { n: 7 }) }, { cle: 'j30', libelle: tr('tableau.filtre.jours', { n: 30 }) }] },
+            ];
+            const ouvrirA = (l) => { const o = l.o; const numA = buyNumByTxn[String(o.transaction_id)];
+              const a = attrsFicheLigne({ contexte: 'achat', site: 'vinted', cle: 'b' + String(o.transaction_id), nums: numA != null && numA !== '' ? [String(numA)] : [], photo: orderPhoto(o) || '', titre: o.title || '', prix: l.prix });
+              const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); };
+            return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
+              onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}/>;
+          }
+          const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
           const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>

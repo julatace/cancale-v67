@@ -29,8 +29,10 @@ export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait,
     <RangeeTouchable className={'v2m-ligne' + (nonLu ? ' is-nonlu' : '') + (lectureSeule ? ' is-ro' : '') + (actif ? ' is-actif' : '')} label={label} onClick={onClick}
       attrs={{ 'data-v2-conv': '', 'aria-current': actif ? 'true' : undefined, ...attrs }}>
       <span className="v2m-point" aria-hidden="true" data-v2-conv-point={nonLu ? '1' : '0'}/>
-      <span className="v2m-av" aria-hidden="true">
-        {photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async"/> : <span className="v2m-ini vrm-sensible" data-stream-type="acheteur">{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>}
+      {/* (19 nov. soir, NATIF.md §2 bis — la liste « tableau de travail ») À gauche l'AVATAR de la personne (son initiale), à
+          droite la VIGNETTE de l'article ; les mêmes valeurs qu'avant. */}
+      <span className="v2m-av v2m-av-rond" aria-hidden="true">
+        <span className="v2m-ini vrm-sensible" data-stream-type="acheteur">{String(nom || '').trim().charAt(0).toUpperCase() || '·'}</span>
       </span>
       <span className="v2m-txt">
         <span className="v2m-l1">
@@ -45,6 +47,7 @@ export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait,
           {apres}
         </span> : null}
       </span>
+      {photo && Photo ? <span className="v2m-vignette" aria-hidden="true" data-v2-conv-vignette=""><Photo src={photo} alt="" loading="lazy" decoding="async"/></span> : null}
     </RangeeTouchable>
   );
 }

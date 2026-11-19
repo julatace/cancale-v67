@@ -41,6 +41,10 @@ html body button.v2-rangee.v2m-ligne.is-actif { background: var(--v2-socle); }
 .v2m-av { flex: none; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: var(--v2-socle); display: flex; align-items: center; justify-content: center; }
 .v2m-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v2m-ini { font-size: 20px; font-weight: 600; color: var(--v2-muet); }
+/* (19 nov. soir) L'avatar rond de la personne ; la vignette de l'article à droite (48, rayon 10). */
+.v2m-av.v2m-av-rond { width: 48px; height: 48px; border-radius: 999px; }
+.v2m-vignette { flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: var(--v2-socle); align-self: center; }
+.v2m-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v2m-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .v2m-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .v2m-nom { flex: 1 1 auto; min-width: 0; font-size: 17px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
