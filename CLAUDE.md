@@ -478,6 +478,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **19 nov. soir · L'app en tableaux de travail (NATIF §2 bis)** : `TableauTravail` (Statut à compteurs, colonnes mémorisées, tri, sélection) sur Annonces, Ventes « Toutes », Achats, Notifications à l'ordinateur ; écran Automatisations (réglages des moteurs existants ; négociation par paliers rangée `vinted_offres_nego`, « bientôt », rien envoyé ; pas de boost de favoris). `2026-11-19-app-tableaux.md`. Geste : aucun.
 - **19 nov. · Train du 19 nov. (ext. 5.409.0, branche `claude/integration-19nov`)** : un seul lot d'extension pour tout le train. Décisions « 1, 2, 3, 4 oui » : §3. `2026-11-19-demandes-julien.md`. Geste : installer 5.409, appliquer rien de neuf (048 déjà appliquée).
 - **19 nov. · VRM natif, coque (natif-fondation)** : 5 onglets égaux en bas, titre et barre latérale natifs, « Plus » derrière la photo du profil (`src/natif/`). `2026-11-19-natif-fondation.md`. Geste : aucun.
 - **19 nov. · Lisible partout (lisible-partout)** : un seul style, habillages « VRM »/« Apple »/ancien design retirés, aucun texte blanc sur clair. `2026-11-19-lisible-partout.md`. Geste : aucun.
