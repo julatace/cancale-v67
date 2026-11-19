@@ -118,6 +118,9 @@ async function fiche(pg, n) {
   // voir » la déplie, sur la fiche même. Le banc l'ouvre comme lui, puis lit les mêmes `data-fiche-etape`.
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fd-tout-voir][aria-expanded="false"]'); if (b) (b.querySelector('button') || b).click(); });
   await pg.waitForTimeout(400);
+  // … et la vue « Étapes » du parcours (la vue « Dans l'ordre » est celle par défaut ; ses `data-fiche-etape` sont ceux d'Étapes).
+  await pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fiche-vue-choix="etapes"][aria-pressed="false"]'); if (b) b.click(); });
+  await pg.waitForTimeout(300);
   return lire(pg);
 }
 const lire = (pg) => pg.evaluate(() => {
