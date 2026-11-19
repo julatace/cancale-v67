@@ -106,7 +106,7 @@ const lire = (pg) => pg.evaluate(() => {
     msgs: r.querySelectorAll('[data-conv]').length, volet: q('[data-volet-conv]') ? q('[data-volet-conv]').getAttribute('data-volet-conv') : null,
     convOuverte: Array.from(r.querySelectorAll('[data-conv-ouverte]')).filter(vis).map((x) => x.getAttribute('data-conv-ouverte')),
     repondre: Array.from(r.querySelectorAll('[data-geste="repondre"]')).filter(vis).map((a) => a.href),
-    fiche: q('[data-fiche]') ? { id: q('[data-fiche]').getAttribute('data-fiche'), faits: Object.fromEntries(Array.from(r.querySelectorAll('[data-fiche] [data-fait]')).map((f) => [f.getAttribute('data-fait'), f.querySelector('b').innerText])), photos: r.querySelectorAll('[data-fiche] .ph5 img').length, desc: !!q('[data-fiche] [data-desc]') } : null,
+    fiche: q('[data-fiche]') ? { id: q('[data-fiche]').getAttribute('data-fiche'), faits: Object.fromEntries(Array.from(r.querySelectorAll('[data-fiche] [data-fait]')).map((f) => [f.getAttribute('data-fait'), f.querySelector('b').innerText.replace(/\s/g, ' ')])), photos: r.querySelectorAll('[data-fiche] .ph5 img').length, desc: !!q('[data-fiche] [data-desc]') } : null,
     etape: q('[data-fav-etape]') ? q('[data-fav-etape]').getAttribute('data-fav-etape') : null, guide: q('[data-fav-guide]') ? q('[data-fav-guide]').innerText : '',
     rythme: q('[data-fav-rythme]') ? q('[data-fav-rythme]').getAttribute('data-fav-rythme') : null,
     secu: /Sécurité du compte/.test(texte), toutArreter: !!q('[data-tout-arreter]'),
@@ -156,7 +156,7 @@ const montrer = async (pg, mobile) => {
         a = await lire(t.pg);
         await cap(t.pg, `fiche-${largeur}-${scheme}`);
         const f = a.fiche || { faits: {} };
-        dit(f.id === 'a:7001' && f.photos === 3 && f.desc && f.faits.num === 'N° 121' && /46/.test(f.faits.mini) && f.faits.achat === '—' && f.faits.taille === '40' && f.faits.vues === '37', `${T} : toucher une annonce déplie sa fiche : photos, N°, prix mini, taille, vues ; acheté pas su ⇒ « — »`, JSON.stringify(f));
+        dit(f.id === 'a:7001' && f.photos === 3 && f.desc && f.faits.num === '121' && /46/.test(f.faits.mini) && f.faits.achat === '—' && f.faits.taille === '40' && f.faits.vues === '37', `${T} : toucher une annonce déplie sa fiche : photos, N°, prix mini, taille, vues ; acheté pas su ⇒ « — »`, JSON.stringify(f));
         await clic(t.pg, '[data-fiche-b="a:7001"]');
         a = await lire(t.pg);
         dit(!a.fiche, `${T} : la retoucher la replie`);
