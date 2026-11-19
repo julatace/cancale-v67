@@ -214,6 +214,11 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(/<ARegler onglet="argent"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8')) && /<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
     'S4 le bloc « À régler » est branché en tête de Ventes, Achats, Annonces (une ligne), du Stock et de « Tout va bien ? »');
   dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');
+  // (19 nov., audit d'utilité) Le plein d'Aujourd'hui IMPRIME : il demande `'imprimer'`, et le moteur des bordereaux de
+  // Ventes fait alors le geste de SON plein (`imprimerLot()` si quelque chose part d'office), pas la seule feuille du choix.
+  const pleinAuj = (app.match(/<AujourdhuiAvecChiffresV2[\s\S]*?\/>/) || [''])[0];
+  dit(/plein=\{[^\n]*_pendingBordPrint = 'imprimer'/.test(pleinAuj) && /_pendingBordPrint==='imprimer'/.test(app) && /imprimerDOfficeRef\.current = \(\) => \{[^\n]*imprimerLot\(\); return true; \}/.test(app),
+    'S6 « Imprimer N bordereaux » d’Aujourd’hui imprime (le geste du plein de Ventes), il ne fait pas qu’ouvrir Ventes');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-aujourdhui${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

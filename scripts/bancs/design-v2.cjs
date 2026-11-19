@@ -201,12 +201,16 @@ async function telephone(nav, sombre, b, sigs) {
   dit(String(j.ret || '0') === String(avant.journee.ret || '0'), `J « À retirer » (${j.ret}) = la case d’avant (${avant.journee.ret})`, { v2: j.ret, avant: avant.journee.ret });
   dit(j.plein && /\d/.test(j.pleinTexte) && j.pleinTexte.includes(j.plein), `J le plein dit son nombre : « ${j.pleinTexte} »`, j);
   dit(j.pouce && j.pouce.bas <= j.pouce.barre - 4, 'J le plein est au pouce, AU-DESSUS de la barre du bas', j.pouce);
-  dit(j.afaire > 0 && j.gestes <= j.afaire, `J « À faire » : ${j.afaire} groupes, UN geste au plus chacun`, j);
+  // (19 nov., décision de Julien : « ça doit être rangé dans les onglets dédiés justement à ça ») « À faire » QUITTE
+  // Aujourd'hui : chaque groupe est en tête de SON onglet (« À régler », banc aujourdhui-propre). Ici : plus aucun.
+  dit(j.afaire === 0, `J plus de liste « À faire » sur Aujourd’hui (${j.afaire}) — décision du 19 nov.`, j);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390-${th}.png`) });
   // Le bas du contenu, défilé tout en bas, reste au-dessus du plein (la marge est posée).
   const bas = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); m.scrollTo(0, m.scrollHeight); await new Promise((r) => setTimeout(r, 400));
-    const e = document.querySelector('.v2-ecran'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.children].filter((x) => !x.matches('[data-v2-pouce]') && x.getClientRects().length); const der = enf[enf.length - 1];
-    const po = pp.getBoundingClientRect(); return { der: Math.round(der.getBoundingClientRect().bottom), pouce: Math.round(po.top) }; });
+    // (19 nov.) L'écran est natif (src/natif/ecrans/Aujourdhui.jsx) : ses groupes portent `data-v2-bloc` (les colonnes
+    // s'effacent au téléphone, `display: contents` : on mesure les groupes eux-mêmes).
+    const e = document.querySelector('[data-v2-ecran="aujourdhui"]'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.querySelectorAll('[data-v2-bloc]')].filter((x) => x.getClientRects().length); if (!enf.length) return null;
+    const po = pp.getBoundingClientRect(); return { der: Math.round(Math.max(...enf.map((x) => x.getBoundingClientRect().bottom))), pouce: Math.round(po.top) }; });
   dit(!!bas && bas.der <= bas.pouce, 'J défilé en bas, le dernier groupe passe au-dessus du plein (rien de caché)', bas);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-bas-390-${th}.png`) });
   await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0));

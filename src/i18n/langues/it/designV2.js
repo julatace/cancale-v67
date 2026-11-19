@@ -224,8 +224,8 @@ export default {
   "v2.dv.vente": "Vendita {site}",
   "v2.dv.aVenir": "Denaro in arrivo",
   "v2.alerte.poster": {
-    "one": "{n} pacco da spedire · {quand}",
-    "other": "{n} pacchi da spedire · il più urgente {quand}"
+    "one": "{n} urgente · {quand}",
+    "other": "{n} urgenti · {quand}"
   },
   "v2.alerte.retour": {
     "one": "{n} reso da consegnare oggi o domani",

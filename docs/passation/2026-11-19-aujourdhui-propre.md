@@ -38,8 +38,9 @@
 |---|---|
 | le modèle des chiffres, des dernières ventes, de l'alerte (pur) | `src/aujourdhui/modele.js` |
 | où va chaque groupe, « Compléter », pastilles, publication (pur) | `src/designV2/aRegler.js` |
-| le bloc « À régler · N » | `src/designV2/ARegler.jsx` (+ `a-regler.css`) |
-| l'écran | `src/designV2/Aujourdhui.jsx` (+ `aujourdhui.css`) |
+| le bloc « À régler · N » | `src/designV2/ARegler.jsx` (un `Groupe` natif replié de `Rangee`) |
+| l'écran | `src/natif/ecrans/Aujourdhui.jsx` (composants natifs seulement ; l'ancien `src/designV2/Aujourdhui.jsx` et ses CSS sont retirés) |
+| ajoutés à `src/natif/` | `Barres`, `Vignettes`, `CodeRetrait`, `Colonnes` (`complements.css`, mode d'emploi dans `docs/design/NATIF-composants.md`) |
 | le branchement | `src/App.jsx` : `AujourdhuiAvecChiffresV2` (les chiffres), la branche « Aujourd'hui » de `Comptabilite only="journee"` (groupes publiés, alerte, dernières ventes), `rendreTache` (UNE ligne : `<ARegler onglet={t}/>` pour Ventes, Achats, Annonces), `badgesNav` ; `src/stockV2/StockV2.jsx` et `src/ecrans/Reglages.jsx` (une ligne chacun) |
 | les textes | `src/i18n/langues/{fr,en,es,it,de}/designV2.js` (`v2.jour.*`, `v2.mois.*`, `v2.dv.*`, `v2.alerte.*`, `v2.reg.*`) |
 

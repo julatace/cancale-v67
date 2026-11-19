@@ -163,3 +163,18 @@ dessin (voir `outils/natif-galerie/galerie.jsx`), sinon les glyphes sont vides �
 
 Une API ne se casse plus : on **ajoute** une prop (avec sa valeur par défaut), on ne renomme rien, on ne change pas le
 sens d'une valeur. Un besoin qui manque : ajoute-le dans `src/natif/`, montre-le dans la galerie, garde le banc vert.
+
+## Ajoutés pour « Aujourd'hui » (19 nov., `src/natif/complements.css`)
+
+**Barres** — une petite série (les 7 jours), dans une `<Affiche>` : `<Barres libelle="Les sept derniers jours" barres={[{ cle, lettre, libelle, valeur }]} choisie={6} onChoisir={setJour}/>` ; `valeur: null` = pas su (piste vide). Chaque barre est une cible ≥ 44.
+
+**Vignettes** — la bande des colis : `<Vignettes elements={[{ cle, src, numero, presse, libelle, onClick }]} total={8} libellePlus={(n) => …} onPlus={…}/>` ; chaque case a SA plaque, au plus un point ambre ; ce qui ne tient pas devient « +N » (mesuré).
+
+**CodeRetrait** — `<CodeRetrait code="416362" onClick={ouvrir} libelle="Voir les codes de retrait"/>` : le code en grand, centré.
+
+**Colonnes** / **Colonne** — à l'ordinateur, des colonnes de 320 au moins (trois à 1280 et 1512) ; au téléphone elles
+s'effacent et les groupes se suivent dans l'ordre écrit. Rends `<Colonnes>` directement dans `<Page>` : son plein se pose
+alors à droite, à sa largeur.
+```jsx
+<Page titre="Aujourd'hui" plein={…}><Colonnes><Colonne>…</Colonne><Colonne>…</Colonne></Colonnes></Page>
+```

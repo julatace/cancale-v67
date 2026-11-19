@@ -47576,13 +47576,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // relues…) annulait le minuteur APRÈS avoir effacé la demande — la feuille ne s'ouvrait jamais.
   React.useEffect(()=>{
     if(!prendImpression() || !_pendingBordPrint || !lotLu()) return;
-    const t=setTimeout(()=>{ if(!_pendingBordPrint || !prendImpression()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} }, 400);
+    // (19 nov., audit d'utilité : « Imprimer N bordereaux » d'Aujourd'hui doit IMPRIMER) La demande `'imprimer'` (le plein
+    // d'Aujourd'hui) fait le geste du plein de Ventes — `imprimerLot()` (l'aperçu de ce qui part d'office, puis « Imprimer »),
+    // ou la feuille du choix s'il n'y a rien d'office ; les autres demandes (extension, notification) ouvrent la feuille.
+    const t=setTimeout(()=>{ if(!_pendingBordPrint || !prendImpression()) return; const direct=_pendingBordPrint==='imprimer'; _pendingBordPrint=false;
+      try{ if(direct && imprimerDOfficeRef.current && imprimerDOfficeRef.current()) return; ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only, labelsPrets, sales.items]);
   // (9 nov., lot B) ⌘K « Imprimer les bordereaux du jour » quand Colis est DÉJÀ ouvert : la même
   // feuille « Tout imprimer » (rien n'est imprimé avant son clic).
   const ouvrirLotRef = React.useRef(null); ouvrirLotRef.current = ouvrirLot;
+  // Le plein de Ventes, tel quel : ce qui part d'office (ventes + retours cochés) ⇒ `imprimerLot()` ; rien ⇒ faux (la feuille).
+  const imprimerDOfficeRef = React.useRef(null);
+  imprimerDOfficeRef.current = () => { const Lt = lignesLotTous(); const n = resumeLot(Lt).partent + (colisDans !== 'achats' ? retoursChoisis(lignesRetoursImpr()).length : 0); if (n <= 0) return false; imprimerLot(); return true; };
   React.useEffect(()=>{
     if(only!=='bordereaux' || colisDans==='achats') return undefined;
     const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !lotLu()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
@@ -51183,7 +51190,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               colis={nE ? colisJournee : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
-              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
+              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onVentes={() => { if (onNav) onNav('cat_ventes'); }}

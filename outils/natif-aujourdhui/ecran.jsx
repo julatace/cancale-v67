@@ -9,7 +9,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import { ICON_PATHS } from 'vrm-icones-app';
 import { ajouterSourceApp } from '../../src/i18n/index.js';
-import frNatif from '../../src/i18n/langues/fr/natif.js';
+import frNatif from '../../src/i18n/langues/fr.js';   // tout le français de l'app (les textes v2.*, journee.*)
 import { poserIcone, Coque, Page } from '../../src/natif/index.js';
 import Aujourdhui from '../../src/natif/ecrans/Aujourdhui.jsx';
 import ARegler from '../../src/designV2/ARegler.jsx';
@@ -44,7 +44,7 @@ const VENTES = [
 const CAS = {
   capture: { pret: true, affiche: { n: 8, pasSu: false, sous: '3 pas encore prêts', ambre: true }, colis: colis(8), plein: { n: 5 },
     retraits: { n: 15, pasSu: false, nPoints: 6, points: [{ lieu: 'Relais Pickup Tabac-Presse du Marché Couvert de la Gare Centrale', code: '416362' }], premier: { txt: 'dernier jour', ambre: true } },
-    alerte: { id: 'poster', txt: '2 colis à poster · le plus pressé 1 j de retard', faire: () => {} }, ventes: { etat: 'lu', lignes: VENTES }, aVenir: { valeur: 952, partiel: false, texte: '952 €', ouvrir: () => {} },
+    alerte: { id: 'poster', txt: '2 pressés · 1 j de retard', faire: () => {} }, ventes: { etat: 'lu', lignes: VENTES }, aVenir: { valeur: 952, partiel: false, texte: '952 €', ouvrir: () => {} },
     chiffres: { etat: 'lu', jours: jours([69, 0, 47, 94, 246, 55, 102], [2, 0, 1, 2, 5, 1, 2]), montre: 6, mois: { nom: 'Novembre', vendu: { valeur: 968, partiel: true, note: '' }, recu: { valeur: 372, partiel: false, note: '' }, benefice: { valeur: 187, partiel: false, couverture: { k: 12, n: 30 }, libelle: 'Bénéfice brut' } } } },
   volume: { pret: true, affiche: { n: 30, pasSu: false, sous: '15 pas encore prêts' }, colis: colis(12), plein: { n: 15 },
     retraits: { n: 8, pasSu: false, nPoints: 8, points: [{ lieu: 'Relais 0', code: '100000' }], premier: { txt: 'dans 3 j', ambre: false } }, alerte: null, ventes: { etat: 'lu', lignes: VENTES }, aVenir: { valeur: 13630.5, partiel: true, texte: '13 630 €', ouvrir: () => {} },

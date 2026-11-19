@@ -29,3 +29,4 @@ export { Coque, Avatar, useOrdinateur, LARGEUR_ORDINATEUR } from './Coque.jsx';
 export { TIRET, estVide, cx } from './outils.js';
 export { Barres } from './Barres.jsx';
 export { Vignettes, CodeRetrait } from './Vignettes.jsx';   // (19 nov.) ajoutés pour « Aujourd'hui » : src/natif/complements.css
+export { Colonnes, Colonne } from './Colonnes.jsx';   // (19 nov.) deux colonnes à l'ordinateur, une au téléphone

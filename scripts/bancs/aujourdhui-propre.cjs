@@ -200,6 +200,9 @@ async function contrastes(pg, sel) {
   // Le décodeur PNG livré avec Playwright (aucune dépendance de plus).
   const { PNG } = (() => { try { return require(path.join(__dirname, '..', '..', 'node_modules', 'playwright-core', 'lib', 'utilsBundle')); } catch (_) { return {}; } })();
   if (!PNG) return { juges: 0, faibles: [{ t: 'décodeur PNG absent' }] };
+  // Les fondus en cours (le titre de la barre qui revient à 0 après un défilement) finissent d'abord : on juge l'état posé.
+  await pg.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})))).catch(() => {});
+  await pg.waitForTimeout(80);
   const textes = await pg.evaluate((s) => { const e = document.querySelector(s); if (!e) return [];
     const vis = (x) => x.getClientRects().length > 0 && getComputedStyle(x).visibility !== 'hidden';
     const out = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -208,6 +211,11 @@ async function contrastes(pg, sel) {
       const r = document.createRange(); r.selectNodeContents(n); const q = r.getBoundingClientRect(); if (q.width < 3 || q.height < 3 || q.bottom <= 0 || q.top >= innerHeight || q.right <= 0 || q.left >= innerWidth) continue;
       const cs = getComputedStyle(x); let op = 1; for (let y = x; y; y = y.parentElement) op *= Number(getComputedStyle(y).opacity);
       if (x.closest('[disabled], [aria-disabled="true"]')) continue;
+      // Un texte qu'on ne voit pas n'est pas lu : transparent (le titre réduit de la barre, en haut de page) ou RECOUVERT
+      // (une rangée qui passe sous le plein collé) — c'est le fond de ce qui le recouvre qu'on lirait, pas le sien.
+      if (op < 0.05) continue;
+      const hx = document.elementFromPoint(Math.min(innerWidth - 1, q.left + q.width / 2), Math.min(innerHeight - 1, q.top + q.height / 2));
+      if (!hx || !(hx === x || x.contains(hx) || hx.contains(x))) continue;
       const m = cs.color.match(/[\d.]+/g).map(Number); const px = parseFloat(cs.fontSize);
       out.push({ t: t.slice(0, 28), c: [m[0], m[1], m[2], (m.length > 3 ? m[3] : 1) * op], gros: px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700), px, q: [q.left, q.top, q.width, q.height] }); }
     return out; }, sel);

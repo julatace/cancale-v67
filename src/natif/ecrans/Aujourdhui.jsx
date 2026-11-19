@@ -18,7 +18,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Affiche, Faits, Fait, Vide, Barres, Vignettes, CodeRetrait } from '../index.js';
+import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Affiche, Faits, Fait, Vide, Barres, Vignettes, CodeRetrait, Colonnes, Colonne } from '../index.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -146,9 +146,16 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       actions={onScanner ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       plein={pret && plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n), 'data-v2-pouce': '' }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1' }}>
-      {chiffres ? <Chiffres chiffres={chiffres}/> : null}
-      {pret && rien ? <Groupe attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Groupe> : null}
-      {pret ? ordre.current.filter((k) => presents[k]).map((k) => <React.Fragment key={k}>{BLOCS[k]()}</React.Fragment>) : null}
+      {/* Trois colonnes à l'ordinateur (les chiffres · ce qui part et ce qui arrive · les dernières ventes) ; au téléphone
+          elles s'effacent et tout se suit, dans cet ordre. */}
+      <Colonnes>
+        <Colonne>{chiffres ? <Chiffres chiffres={chiffres}/> : null}</Colonne>
+        <Colonne>
+          {pret && rien ? <Groupe attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Groupe> : null}
+          {pret ? ordre.current.filter((k) => presents[k] && k !== 'ventes').map((k) => <React.Fragment key={k}>{BLOCS[k]()}</React.Fragment>) : null}
+        </Colonne>
+        <Colonne>{pret && presents.ventes ? BLOCS.ventes() : null}</Colonne>
+      </Colonnes>
     </Page>
   );
 }

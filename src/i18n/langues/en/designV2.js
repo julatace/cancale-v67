@@ -224,8 +224,8 @@ export default {
   "v2.dv.vente": "{site} sale",
   "v2.dv.aVenir": "Money on its way",
   "v2.alerte.poster": {
-    "one": "{n} parcel to post · {quand}",
-    "other": "{n} parcels to post · most urgent {quand}"
+    "one": "{n} urgent · {quand}",
+    "other": "{n} urgent · {quand}"
   },
   "v2.alerte.retour": {
     "one": "{n} return to drop off today or tomorrow",

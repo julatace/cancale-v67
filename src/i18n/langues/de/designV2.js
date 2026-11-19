@@ -224,8 +224,8 @@ export default {
   "v2.dv.vente": "{site}-Verkauf",
   "v2.dv.aVenir": "Geld unterwegs",
   "v2.alerte.poster": {
-    "one": "{n} Paket aufzugeben · {quand}",
-    "other": "{n} Pakete aufzugeben · das dringendste {quand}"
+    "one": "{n} dringend · {quand}",
+    "other": "{n} dringend · {quand}"
   },
   "v2.alerte.retour": {
     "one": "{n} Rücksendung heute oder morgen abzugeben",
