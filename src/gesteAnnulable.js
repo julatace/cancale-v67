@@ -194,6 +194,7 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
   };
   const emettre = () => { const s = instantane(); for (const f of abonnes) { try { f(s); } catch (_) {} } };
   // (19 nov., atelier « Compléter ») `duree` : un geste peut laisser « Annuler » plus longtemps (10 s dans l'atelier).
+  // (19 nov., liaison guidée) `g.duree` : un geste peut demander plus long que les 5 s (un lien entre deux sites : 10 s).
   const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : (g.duree || dureePilule));
   // (11 nov., lot DJ4) Seule une pilule qui porte un geste (« Annuler », « Réessayer ») se met en
   // pause sous le doigt ou la souris : « Annulation… » et « Annulé » n'ont rien à toucher, elles

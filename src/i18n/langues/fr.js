@@ -79,6 +79,7 @@ import ecran_republier_guide from './fr/republierGuide.js';
 import ecran_republication from './fr/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_prix_sans_manuel from './fr/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_liaisonSites from './fr/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './fr/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_compteBloque from './fr/compteBloque.js';   // (19 nov., lot compte-bloque)
@@ -2331,6 +2332,7 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
