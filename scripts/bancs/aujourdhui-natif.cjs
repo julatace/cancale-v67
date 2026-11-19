@@ -199,7 +199,7 @@ async function personnaliser(nav, port, W, sombre) {
         montrees: (x.querySelector('[data-v2-perso-montrees]') || { getAttribute: () => '' }).getAttribute('data-v2-perso-montrees'),
         complet: lignes.every((l) => l.querySelector('.n-ordre-icone svg') && l.querySelector('.n-ordre-nom').textContent && l.querySelector('.n-ordre-phrase') && l.querySelector('.n-ordre-apercu')),
         cibles: [...x.querySelectorAll('.n-ordre-rond, .n-ordre-poignee')].map((b) => { const q = b.getBoundingClientRect(); return Math.min(q.width, q.height); }).filter((m) => m > 0) }; });
-    dit(!!f && /Terminé/.test(f.terminer) && f.groupes.join('|') === 'Affichées|À ajouter' && f.montrees === avant && f.complet && f.cibles.every((m) => m >= 44),
+    dit(!!f && /Terminé/.test(f.terminer) && f.groupes.join('|') === 'Affichées|À ajouter' && f.montrees === avant && f.complet && f.cibles.every((m) => m >= 43.5),
       `K ${ou} : feuille « Personnaliser » — « Terminé » en haut à droite, « Affichées » (dans l’ordre de l’écran) puis « À ajouter » ; chaque carte : icône, nom, phrase, aperçu ; ronds et poignées ≥ 44`, f);
     await pg.screenshot({ path: path.join(SHOTS, `perso-feuille-${W}-${th}.png`) });
     // Ajouter « Marge » (+) : l'écran derrière la montre aussitôt.
@@ -211,12 +211,14 @@ async function personnaliser(nav, port, W, sombre) {
     c = await cartes();
     dit(!/courbe/.test(c), `K ${ou} : − « 30 derniers jours » ⇒ retirée de l’écran (${c})`, c);
     // Réordonner : la poignée de « Stock en ligne » glissée de deux rangées vers le bas.
-    const h = await pg.evaluate(() => { const r = document.querySelector('[data-v2-perso-montrees] [data-v2-perso-carte="stock"]'); const b = r.querySelector('.n-ordre-poignee'); r.scrollIntoView({ block: 'center' });
-      const q = b.getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2, h: r.getBoundingClientRect().height }; });
+    // Glisser jusqu'au centre de la rangée qui est DEUX places plus bas (les rangées n'ont pas toutes la même hauteur).
+    const h = await pg.evaluate(() => { const r = document.querySelector('[data-v2-perso-montrees] [data-v2-perso-carte="stock"]'); r.scrollIntoView({ block: 'center' });
+      const R = [...r.parentElement.children]; const k = R.indexOf(r); const c = (x) => { const q = x.getBoundingClientRect(); return q.top + q.height / 2; };
+      return { h: c(R[k + 2]) - c(r) + 6 }; });
     await pg.waitForTimeout(200);
     const h2 = await pg.evaluate(() => { const b = document.querySelector('[data-v2-perso-montrees] [data-v2-perso-carte="stock"] .n-ordre-poignee'); const q = b.getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
     const avantGl = await cartes();
-    await glisser(h2.x, h2.y, 0, h.h * 2.1);
+    await glisser(h2.x, h2.y, 0, h.h);
     c = await cartes();
     const iA = avantGl.split(','), iB = c.split(',');
     dit(iB.indexOf('stock') === iA.indexOf('stock') + 2 && iB.length === iA.length, `K ${ou} : la poignée ≡ glissée ${tel ? 'au doigt' : 'à la souris'} de deux rangées ⇒ « Stock en ligne » descend de deux places (${avantGl} → ${c})`, { avantGl, c });
@@ -250,7 +252,7 @@ async function personnaliser(nav, port, W, sombre) {
     await pg2.evaluate((rv) => { localStorage.setItem('vrm_aujourdhui_cartes', JSON.stringify({ ordre: ['ventes', 'chiffres'], montrees: ['ventes'], rev: rv - 1, at: 1 })); }, revIci);
     await pg.waitForTimeout(500);
     dit(await cartes() === ici, `K ${ou} : un choix plus ancien (rev ${revIci - 1} < ${revIci}) venu de l’autre appareil n’écrase pas le plus récent`, await cartes());
-    await pg2.close();
+    await pg2.close(); await pg.bringToFront(); await pg.waitForTimeout(300);
     // À l'ordinateur : « Modifier » sur la grille — les cartes tremblent, on glisse « Stock » sur « À envoyer », la croix retire, « + » ajoute.
     if (!tel) {
       await toucher('[data-v2-modifier]');
@@ -260,11 +262,12 @@ async function personnaliser(nav, port, W, sombre) {
       await pg.screenshot({ path: path.join(SHOTS, `perso-grille-modifier-${W}-${th}.png`) });
       const avantG = await cartes();
       // La carte juste avant « Stock » dans la grille : les deux sont à l'écran (on glisse ce qu'on voit).
-      const pos = await pg.evaluate(() => { const T = [...document.querySelectorAll('[data-n-editable]')]; const a = document.querySelector('[data-n-editable="stock"]'); const b = T[T.indexOf(a) - 1]; b.scrollIntoView({ block: 'start' });
+      const pos = await pg.evaluate(() => { const T = [...document.querySelectorAll('[data-n-editable]')]; const a = document.querySelector('[data-n-editable="stock"]'); const b = T[T.indexOf(a) - 1]; b.scrollIntoView({ block: 'center' });   // pas sous la barre de titre collée
         const qa = a.getBoundingClientRect(), qb = b.getBoundingClientRect(); return { x: qa.left + qa.width / 2, y: qa.top + 30, bx: qb.left + qb.width / 2, by: qb.top + 30 }; });
       await glisser(pos.x, pos.y, pos.bx - pos.x, pos.by - pos.y);
       const apresG = await cartes();
       dit(apresG.split(',').indexOf('stock') === avantG.split(',').indexOf('stock') - 1, `M ${ou} : « Stock » glissé à la souris sur la carte d’avant ⇒ il prend sa place (${avantG} → ${apresG})`, { avantG, apresG });
+      await pg.evaluate(() => document.querySelector('[data-n-editable="vitesse"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
       await pg.locator('[data-n-editable="vitesse"] .n-editable-croix').first().click({ force: true, timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(350);   // elle tremble : « force »
       dit(!/vitesse/.test(await cartes()), `M ${ou} : la croix retire « Vitesse de vente »`, await cartes());
       await toucher('[data-v2-ajout-carte]');

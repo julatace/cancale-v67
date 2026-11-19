@@ -147,7 +147,8 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
   const ptsMontres = pts.slice(0, 3), restePts = Math.max(0, (retraits && retraits.nPoints ? retraits.nPoints : pts.length) - ptsMontres.length);
   const alerteEnv = alerte && alerte.id === 'poster';
   const BLOCS = {
-    envoyer: () => (
+    // Rien à envoyer ni à retirer : à la place d'« À envoyer », UNE carte qui le dit (jamais deux cartes vides).
+    envoyer: () => (rien && !(n > 0) ? <Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte> : (
       <Carte titre={tr('v2.envoyer.titre')} n={nombre(n)} sousTitre={alerteEnv ? alerte.txt : (affiche.sous || '')} tonSous={alerteEnv ? 'ambre' : 'neutre'}
         action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
         attrs={{ 'data-v2-bloc': 'envoyer', 'data-v2-groupe': 'envoyer', 'data-v2-envoyer': String(n), 'data-v2-ecart': affiche.sous || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined, 'data-v2-bande': String(montres.length) }}>
@@ -159,7 +160,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
         ))}
         {resteEnv > 0 ? <Rangee titre={tr('v2.bande.plus', { n: resteEnv })} fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-n-plus': String(resteEnv) }}/> : null}
       </Carte>
-    ),
+    )),
     retirer: () => (
       <Carte titre={tr('v2.retirer.titre')} n={nombre(nRet)} tonSous={retraits.premier && retraits.premier.ambre ? 'ambre' : 'neutre'}
         sousTitre={[pts.length ? tr('v2.retirer.resume', { n: nRet, p: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}
@@ -282,7 +283,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       return (
         <Carte titre={tr('v2.st.marge.titre')} sousTitre={tr('v2.stats.' + p)} attrs={{ 'data-v2-bloc': 'marge', 'data-v2-marge': M && M.pct != null ? String(M.pct) : '' }}>
           <Faits colonnes={2}>
-            <Fait libelle={tr('v2.st.marge.pct')} valeur={M && M.pct != null ? M.pct + ' %' : null} detail={!P ? tr('v2.st.raison.releve') : M && M.pct != null ? tr('v2.st.marge.sur', { k: nombre(M.nCout), n: nombre(M.n) }) : (M && M.n ? tr('v2.st.raison.achats') : tr('v2.comptes.vide'))} onModifier={ouvrir}/>
+            <Fait libelle={tr('v2.st.marge.pct')} valeur={M && M.pct != null ? nombre(M.pct) + ' %' : null} detail={!P ? tr('v2.st.raison.releve') : M && M.pct != null ? tr('v2.st.marge.sur', { k: nombre(M.nCout), n: nombre(M.n) }) : (M && M.n ? tr('v2.st.raison.achats') : tr('v2.comptes.vide'))} onModifier={ouvrir}/>
             <Fait libelle={tr('v2.stats.beneficeBrut')} valeur={M && M.brut != null ? montant(M.brut) : null} detail={M && M.brut != null ? '' : ' '} onModifier={ouvrir}/>
           </Faits>
         </Carte>
@@ -336,7 +337,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       </Carte>
     ),
   };
-  const presents = { chiffres: !!chiffres, envoyer: n > 0, retirer: !!nRet, ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
+  const presents = { chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet, ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
   const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || pret));
@@ -368,7 +369,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       if (k === 'prevision') return S2.prevision && S2.prevision.etat === 'ok' ? montant(Math.round(S2.prevision.centre / 100)) : '—';
       if (k === 'courbe') return courbe && courbe.jours ? String(courbe.jours.length) + ' j' : '—';
       if (k === 'ventes') return nombre(lignesV.length);
-      if (k === 'marge') { const M = S2.parPeriode && S2.parPeriode[p] && S2.parPeriode[p].marge; return M && M.pct != null ? M.pct + ' %' : '—'; }
+      if (k === 'marge') { const M = S2.parPeriode && S2.parPeriode[p] && S2.parPeriode[p].marge; return M && M.pct != null ? nombre(M.pct) + ' %' : '—'; }
       if (k === 'dorment') return S2.dorment && S2.dorment.valeur != null ? nombre(S2.dorment.valeur) : '—';
       if (k === 'avenir') return S2.avenir && S2.avenir.valeur != null ? montant(S2.avenir.valeur) : '—';
       if (k === 'annonces') return capte ? nombre((capte.offres || 0) + (capte.messages || 0)) : '—';
@@ -394,7 +395,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
             </Editable>
           </Colonne>))}
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}
-        {pret && rien && !montrees.some((k) => k !== 'chiffres') ? <Colonne><Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte></Colonne> : null}
+        {pret && rien && !montrees.includes('envoyer') && !montrees.some((k) => k !== 'chiffres') ? <Colonne><Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte></Colonne> : null}
         {pret && presents.retour ? <Colonne>{BLOCS.retour()}</Colonne> : null}
         {cartes && cartes.poser ? <Colonne pleine><div className="n-ecran-outils">
           {ordinateur ? <Bouton variante="texte" onClick={() => setModifier(!modifier)} attrs={{ 'data-v2-modifier': modifier ? '1' : '0' }}>{modifier ? tr('v2.perso.fini') : tr('v2.perso.modifier')}</Bouton> : null}
