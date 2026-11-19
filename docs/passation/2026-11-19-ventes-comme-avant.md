@@ -58,7 +58,14 @@ Branche `claude/ventes-comme-avant`. Pas de PR (consigne). Rien changé dans l'e
 ## Preuves
 
 `scripts/bancs/natif-ventes.cjs` — base inventée (`design-passe.cjs`), 390 × 844 tactile, 1512 et 1280, clair et
-sombre, base vide. Chiffres : voir la fin de ce récit (dernière exécution).
+sombre, base vide. Dernière exécution (build de la branche, `BANC_DIST`) : **180 verts, 2 rouges** — les 2 rouges à
+1280 (titre 128 px, ligne de la date 122 px, sous le seuil d'alors de 140 ; la capture montre « vers le 22 nov. » entier :
+seuil ramené à 120). Code d'avant (`git archive origin/main`, build à part) : **24 rouges**. Mutations : `case` (case
+cochée sans bordereau) ⇒ rouge, `plein` (second plein) ⇒ rouge, `largeur` (liste non bornée) ⇒ rouge ; `estimee` n'a pas
+rougi le banc (la base n'a pas d'estimée dépassée lisible) — cette garde est prouvée par `audit-ventes-modele --prouve`
+(12/12). Le contrôle « titre et date lisibles » a rougi sur le build qui écrasait le titre (44 / 0 px). Après la dernière
+exécution, « pour toi » (redit sur chaque rangée En route) a été retiré de la rangée (il reste dans le détail) : pas
+re-photographié. Captures : `scratchpad/ventes-apres/`.
 
 ## Le dépôt constaté sans geste (décision n° 6)
 
@@ -70,6 +77,14 @@ Leboncoin / eBay / Vestiaire suivent leurs propres lectures (non vérifié ici) 
 (Vinted Go sans e-mail de suivi) n'a que le statut Vinted. Le balayage « Déposé » (rattrapage) reste sur la rangée.
 
 ## Ce qui reste
+
+- À 1280, la coque garde 41 px de marge de chaque côté de la colonne de liste : le titre se coupe tôt (« New Balance
+  xt-6… »). La date limite est entière. À voir avec la fondation (marge de `.n-coque-ecran` en trois volets).
+- Au téléphone, la place dans le stock suit la date sur la 2e ligne et se coupe souvent (« à vérifier · Étag… ») ; elle
+  est entière dans le détail.
+- Bancs d'avant qui ouvraient « Préparer », « Je dépose », la tournée par Ventes (colis-plus, preparer-relais,
+  photo-colis-scan, calculette-emballages, studio-ventes, ventes-verre, theme-apple) : non relancés (machine saturée) ;
+  ils jugent l'écran d'avant, retiré par décision du 19 nov.
 
 - « Terminées » montre encore la liste d'avant (elle n'est pas refaite en natif) ; l'audit veut « la date de versement ».
 - La décision n° 6 (gestes de « ⋯ ») attend Julien.

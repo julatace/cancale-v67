@@ -64,7 +64,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       plaque={r.num ? <Plaque numero={r.num}/> : null}
       sousTitre={joint(texteEtape(r.etapes), r.taille ? tr('vv.taille', { t: r.taille }) : '')}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
-      valeur={r.prix || null} valeurForte detailValeur={r.pourToi ? tr('vv.route.pourToi') : ''}
+      valeur={r.prix || null} valeurForte
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
       attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
