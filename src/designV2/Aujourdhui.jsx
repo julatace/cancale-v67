@@ -173,7 +173,8 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
   // ⚠️ (19 nov.) « À FAIRE » QUITTE CET ÉCRAN : ses groupes sont PUBLIÉS pour leurs onglets (Ventes, Achats, Annonces,
   // Stock, « Tout va bien ? »), chacun avec son geste. Publié seulement une fois les lectures arrivées (« pas su » ne
   // vaut pas « rien » : une liste encore vide n'efface pas la publication précédente).
-  React.useEffect(() => { if (pret && pretLu) publierARegler(groupes); });
+  // Des groupes absents (null) = la base ne répond pas (pas su) : rien n'est publié, la publication d'avant reste.
+  React.useEffect(() => { if (pret && pretLu && Array.isArray(groupes)) publierARegler(groupes); });
   const n = affiche && !affiche.pasSu ? affiche.n : null;
   const nRet = retraits && !retraits.pasSu ? retraits.n : null;
   const rien = pret && n === 0 && nRet === 0;
@@ -193,7 +194,9 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
             <b className="aj-n" data-v2-envoyer-n={String(n)}>{nombre(n)}</b>
             <span className="aj-n-txt">
               <span className="aj-n-mot">{tr('v2.aEnvoyer.mot', { n })}</span>
-              {affiche.sous ? <span className={'aj-n-sous' + (affiche.ambre ? ' is-ambre' : '')} data-v2-ecart="">{affiche.sous}</span> : null}
+              {affiche.sous ? <span className="aj-n-sous" data-v2-ecart="">{affiche.sous}</span> : null}
+              {/* L'alerte (au plus UNE sur l'écran) : une limite LUE qui presse — dite ICI, dans le bloc qu'elle concerne. */}
+              {alerte && alerte.id === 'poster' ? <span className="aj-n-alerte is-ambre" data-v2-alerte="poster"><i className="v2-point" aria-hidden="true"/>{alerte.txt}</span> : null}
             </span>
             <span className="aj-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
           </RangeeTouchable>
@@ -219,7 +222,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
           {premierPoint && premierPoint.code ? <b className="aj-passe-code" data-v2-passe-code="">{premierPoint.code}</b> : null}
           <span className="aj-passe-bas">
             <span data-v2-n={String(nRet)}>{premierPoint ? tr('v2.retirer.resume', { n: nRet, p: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet })}</span>
-            {retraits.premier ? <span className={'aj-passe-quand' + (retraits.premier.ambre ? ' is-ambre' : '')} data-v2-passe-urgence={retraits.premier.ambre ? '1' : '0'}>{retraits.premier.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{retraits.premier.txt}</span> : null}
+            {retraits.premier ? <span className={'aj-passe-quand' + (retraits.premier.ambre ? ' is-ambre' : '')} data-v2-passe-urgence={retraits.premier.ambre ? '1' : '0'} data-v2-alerte={alerte && alerte.id === 'retirer' ? 'retirer' : undefined}>{retraits.premier.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{retraits.premier.txt}</span> : null}
           </span>
         </RangeeTouchable>
       </section>
@@ -249,8 +252,16 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
       </section>
     ),
   };
-  const presents = { envoyer: n > 0, retirer: !!nRet, ventes: lignesV.length > 0 || !!aVenirLu };
-  if (pret) for (const k of ['envoyer', 'retirer', 'ventes']) if (presents[k] && !ordreBlocs.current.includes(k)) ordreBlocs.current.push(k);
+  // Un retour à déposer aujourd'hui ou demain n'a pas de bloc à lui sur cet écran : UNE rangée, en fin de page.
+  BLOCS.retour = () => (
+    <section className="aj-section" data-v2-bloc="retour">
+      <RangeeTouchable className="aj-retour" onClick={alerte.faire} attrs={{ 'data-v2-alerte': 'retour' }}>
+        <i className="v2-point" aria-hidden="true"/><span className="aj-retour-txt">{alerte.txt}</span><span className="aj-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
+      </RangeeTouchable>
+    </section>
+  );
+  const presents = { envoyer: n > 0, retirer: !!nRet, ventes: lignesV.length > 0 || !!aVenirLu, retour: !!alerte && alerte.id === 'retour' };
+  if (pret) for (const k of ['envoyer', 'retirer', 'ventes', 'retour']) if (presents[k] && !ordreBlocs.current.includes(k)) ordreBlocs.current.push(k);
   const blocs = ordreBlocs.current.filter((k) => presents[k]).map((k) => <React.Fragment key={k}>{BLOCS[k]()}</React.Fragment>);
   return (
     <div className="v2-ecran aj" data-v2-ecran="aujourdhui" data-espace="journee" data-v2-plein="0" data-v2-affiche={!pret || n == null ? '' : String(n)} data-v2-attente={pret ? undefined : '1'}>
@@ -260,12 +271,6 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
           {/* Le « Scanner » du disque d'hier : un code-barres de colis ⇒ SA vente ou SON achat (le même scanner). */}
           {onScanner ? <BoutonIconeV2 icone={<Icon name="scan" size={22}/>} label={tr('v2.scanner')} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
         </header>
-        {/* AU PLUS UNE ligne : une date limite LUE qui tombe aujourd'hui ou demain. Elle ouvre son onglet. */}
-        {pret && alerte ? (
-          <RangeeTouchable className="aj-alerte" onClick={alerte.faire} attrs={{ 'data-v2-alerte': alerte.id || '' }}>
-            <i className="v2-point" aria-hidden="true"/><span className="aj-alerte-txt">{alerte.txt}</span><span className="aj-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
-          </RangeeTouchable>
-        ) : null}
         {chiffres}
       </div>
       {!pret ? null : <>

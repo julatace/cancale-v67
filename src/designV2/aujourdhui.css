@@ -41,21 +41,23 @@ html[data-theme-style="apple"] .aj {
 }
 
 /* ── 1. LE HÉROS : le titre, l'alerte (au plus une), les chiffres ─────────────── */
-.aj-hero { margin: 0 -16px 24px; padding: 0 16px 20px; border-radius: 0 0 28px 28px; color: var(--aj-hero-encre);
+.aj-hero { margin: 0 -16px 32px; padding: 0 16px 20px; border-radius: 0 0 28px 28px; color: var(--aj-hero-encre);
   background: radial-gradient(120% 90% at 100% 0%, var(--aj-hero-lueur), transparent 62%), var(--aj-hero-fond); }
 html[data-theme-style="apple"] .aj-hero { background: none; border-radius: 0; margin-bottom: 16px; padding-bottom: 0; }
 .aj-hero .aj-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0; margin: 0; border: 0; }
 .aj-hero .aj-titre { margin: 0; min-width: 0; color: inherit; font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -.025em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.aj-alerte-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
-html body .aj button.v2-rangee.aj-alerte { min-height: 44px; margin: 4px 0 4px; padding: 0 8px 0 12px; gap: 8px; border-radius: 12px; background: var(--aj-hero-doux); color: var(--aj-hero-ambre); font-size: 15px; font-weight: 600; line-height: 20px; }
-.aj-alerte .v2-point, .aj .v2-point { margin-right: 0; background: var(--aj-ambre-point); }
+.aj .v2-point { margin-right: 0; background: var(--aj-ambre-point); }
+/* L'alerte (au plus une) : dans le bloc qu'elle concerne — une ligne ambre, jamais un bandeau qui pousse la page. */
+.aj-n-alerte { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--aj-ambre); }
+html body .aj button.v2-rangee.aj-retour { gap: 8px; min-height: 52px; padding: 0 12px 0 16px; background: var(--aj-carte); border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); color: var(--aj-ambre); font-size: 15px; font-weight: 600; line-height: 20px; }
+.aj-retour-txt { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aj-chevron { display: grid; place-items: center; flex: none; width: 20px; height: 20px; color: currentColor; opacity: .7; }
 
 .aj-chiffres { margin-top: 8px; }
-.aj-jour { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 12px; min-height: 52px; }
+.aj-jour { display: flex; flex-direction: column; gap: 0; height: 72px; }
 .aj-jour-n { font-size: 44px; line-height: 52px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1; white-space: nowrap; }
 .aj-jour-u { font-size: 26px; letter-spacing: 0; font-weight: 600; }
-.aj-jour-mot { font-size: 15px; line-height: 20px; color: var(--aj-hero-muet); min-width: 0; }
+.aj-jour-mot { font-size: 15px; line-height: 20px; color: var(--aj-hero-muet); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aj-attente { display: inline-block; width: 120px; height: 36px; border-radius: 10px; background: var(--aj-hero-doux); vertical-align: -4px; }
 /* Les sept jours : une barre par jour (une seule série), le jour choisi plein ; chaque barre se touche (≥ 44 × 72). */
 .aj-semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 8px -4px 0; padding: 0; list-style: none; }
@@ -82,7 +84,7 @@ html[data-theme-style="apple"] body .aj button.v2-rangee.aj-mois { padding: 12px
 .aj-mois-note { font-size: 12px; line-height: 16px; color: var(--aj-hero-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── 2. LES SECTIONS : un titre court HORS de la carte, la carte = le contenu ─── */
-.aj-section { margin: 0 0 24px; min-width: 0; }
+.aj-section { margin: 0 0 32px; min-width: 0; }
 .aj-h2 { margin: 0 4px 8px; font-size: 20px; line-height: 24px; font-weight: 700; letter-spacing: -.015em; color: var(--aj-encre); }
 .aj-carte, html body .aj button.v2-rangee.aj-passe, .aj-liste { background: var(--aj-carte); border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); box-shadow: 0 1px 2px rgb(24 36 57 / .04); color: var(--aj-encre); }
 html[data-theme-style="apple"] .aj-carte, html[data-theme-style="apple"] body .aj button.v2-rangee.aj-passe, html[data-theme-style="apple"] .aj-liste { border-color: transparent; box-shadow: none; }
@@ -138,7 +140,7 @@ html body .aj button.v2-rangee.aj-avenir { position: relative; gap: 8px; min-hei
 .aj-avenir-v small { font-size: 13px; font-weight: 400; color: var(--aj-muet); }
 
 /* « Rien à envoyer ni à retirer » : calme, à la place des deux blocs (les chiffres et les ventes restent). */
-.aj .v2-rien.is-compact { align-items: flex-start; text-align: left; margin: 0 0 24px; padding: 16px; border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); background: var(--aj-carte); color: var(--aj-encre); }
+.aj .v2-rien.is-compact { align-items: flex-start; text-align: left; margin: 0 0 32px; padding: 16px; border: 1px solid var(--aj-filet); border-radius: var(--aj-r-carte); background: var(--aj-carte); color: var(--aj-encre); }
 .aj .v2-rien.is-compact .v2-rien-titre { font-size: 17px; line-height: 22px; margin: 0 0 2px; }
 .aj .v2-rien.is-compact .v2-rien-sous { font-size: 15px; line-height: 20px; color: var(--aj-muet); max-width: none; }
 
