@@ -52,6 +52,25 @@ passes est donnée ci-dessous (colonnes « passe 1 / 2 »). Compter les règles 
   le cache affiché d'abord, l'instantané et les squelettes sont intacts — pour l'agent de `claude/capacite-3000`).
 - Bancs : `onglets-trace` (mesure), `parcours-erreurs` (tous les écrans, trois bases), `extension-detectee`.
 
+## 3 bis. Preuves que rien ne change à l'écran ni dans les chiffres
+
+- **Au pixel** (`node scripts/alleger-has.cjs --verifier <avant> <après>`, 10 écrans × 390 et 1512, base de volume) :
+  18 captures sur 20 identiques ; Annonces différait — mais le MÊME build comparé à lui-même diffère aussi sur Annonces
+  (A/A et B/B rouges, A/B vert sur la même passe) : écran instable dans ce banc, pas un effet de la réécriture. Le
+  bandeau « les photos de Vinted ne s'affichent pas » (bruit connu) est retiré des deux captures.
+- **Drapeaux jamais en retard** (`scripts/bancs/drapeaux-justes.cjs`) : à chaque écran (7 chargements, 13 changements
+  dans la page, 60 ms après le toucher puis au calme, 390 et 1512), chaque `data-vrm-<mot>` posé = la réponse en direct
+  de `:has()` : 66 vérifications, 0 faux. Mutation `MUTATION=sourd` (observateur coupé) : 327 faux, rouge.
+- **Chiffres** (`chiffres-volume`, main ⇄ branche, deux relevés de chaque) : tout ce qui est publié est identique
+  (`vrm_num_doublons`, `vrm_colis_aposter`, `vrm_stats_ventes`, `vrm_benefice_jours`, `vinted_nums_physiques`), aucune
+  erreur. Deux écarts, stables d'un relevé à l'autre et SANS valeur changée : Argent, l'ordre de deux attributs
+  identiques (un attribut posé après coup) ; Ventes, un « 30 € » de moins dans le texte rendu — le prix d'une carte de
+  colis caché par la règle d'origine `.vrm-main:has(.vrm-fu-colis) … .vrm-colis-prix {display:none}` : chargé
+  directement, main et la branche montrent tous deux 7 prix sur 14 (sonde) ; dans la suite du banc, main en montrait un
+  de plus le temps du chargement. Totaux à l'écran identiques (5 174 €, 8 470 €).
+- Bancs `source-unique` (24 verts), `versements-course` (26 verts), `temps-reel` (38 verts) ; audits `identite`, `tdz`,
+  `variables`, `traduction` verts. `alleger-has --prouve` : 13 cas, spécificité identique.
+
 ## 4. Avant / après, par passage (temps de fil ×4 jusqu'au contenu utile, ms)
 
 « main » = `ed9399cb` · « défilement seul » = la correction du défilement · « tout réécrit » = + les 197 `:has` de
