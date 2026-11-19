@@ -20421,20 +20421,28 @@ function MemoireDefilement({ ecran }) {
     const cible=positionAOuvrir({ premier: !MemoireDefilement.dejaRendu, retourOnglet: prendreRetourOnglet(), memorisee });
     // La même zone gardait le défilement de l'écran d'avant : remise à 0 — sauf si l'écran qui s'ouvre a DÉJÀ fait défiler
     // lui-même (un lien « aller à cet élément » : la position n'est plus celle laissée en partant).
-    if(cible===0 && main.scrollTop!==0 && (MemoireDefilement.sortie==null || Math.abs(main.scrollTop-MemoireDefilement.sortie)<2)) main.scrollTop=0;
+    // (19 nov., vite-et-sans-bug) LA POSITION SE SUIT, ELLE NE SE RELIT PAS EN PARTANT. Mesuré (trace Chrome, 390 ×4) : le
+    // nettoyage de cet effet lisait `main.scrollTop` au MILIEU du rendu validé du changement d'onglet (React nettoie les
+    // effets de mise en page pendant ses mutations) — l'écran qui part était encore dans la page et le document venait
+    // d'être invalidé en entier (`:has` sur html/body/la coque) : la lecture forçait le recalcul de style de TOUT, écran
+    // quitté compris (13 186 éléments en quittant Achats, ~6 000 en quittant Annonces : 0,8 à 2,3 s au ×4), pour un écran
+    // retiré juste après. `haut` = la dernière position connue (lue ici une fois, puis à chaque défilement) : le départ,
+    // un toucher et le minuteur la reprennent sans rien forcer. Même règle, mêmes valeurs (banc defilement-navigation).
+    let haut=main.scrollTop;
+    if(cible===0 && haut!==0 && (MemoireDefilement.sortie==null || Math.abs(haut-MemoireDefilement.sortie)<2)){ main.scrollTop=0; haut=0; }
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
     // d'un chargement (le navigateur ramène alors la position à 0). On tient la
     // position 2,5 s, sauf si la personne fait défiler elle-même.
-    const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2) main.scrollTop=cible; };
-    const lire=()=>{ if(!restauration) position=main.scrollTop; };
-    const garderPosition=()=>{try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,restauration?cible:main.scrollTop);}catch(_){}};
+    const restaurer=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2){ main.scrollTop=cible; haut=main.scrollTop; } };
+    const lire=()=>{ haut=main.scrollTop; if(!restauration) position=haut; };
+    const garderPosition=()=>{try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,restauration?cible:haut);}catch(_){}};
     // iOS ne promet pas `pagehide` quand on chasse l'app installée : on range
     // aussi quand elle passe en arrière-plan (le dernier moment sûr).
     const auMasquage=()=>{ if(document.visibilityState==='hidden') garderPosition(); };
     window.addEventListener('pagehide',garderPosition);
     document.addEventListener('visibilitychange',auMasquage);
-    const intervenir=()=>{ restauration=false; position=main.scrollTop; };
+    const intervenir=()=>{ restauration=false; position=haut; };
     main.addEventListener('scroll',lire,{passive:true});
     main.addEventListener('wheel',intervenir,{passive:true});
     main.addEventListener('touchstart',intervenir,{passive:true});
@@ -20449,11 +20457,11 @@ function MemoireDefilement({ ecran }) {
     // Au premier écran après une ouverture, les données arrivent du nuage : on
     // tient la position plus longtemps (6 s), sauf geste de la personne.
     const tenir=MemoireDefilement.dejaRendu?2500:6000; MemoireDefilement.dejaRendu=true;
-    const delai=setTimeout(()=>{restauration=false;position=main.scrollTop;cancelAnimationFrame(image);},tenir);
+    const delai=setTimeout(()=>{restauration=false;position=haut;cancelAnimationFrame(image);},tenir);
     return ()=>{
       arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);document.removeEventListener('visibilitychange',auMasquage);
       positions.current.set(owner+':'+ecran,position);
-      MemoireDefilement.sortie=main.scrollTop;
+      MemoireDefilement.sortie=haut;
       try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,position);}catch(_){}
       main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };

@@ -777,9 +777,11 @@ function ComptesAutresSites({ lu, relire }) {
     if (!(j && j.ok)) toast((j && j.error) || 'Je n’ai pas pu le délier — rien n’a changé, réessaie.');
     signalerComptesEbay(); relire();
   };
+  // (19 nov., banc parcours-erreurs, base en panne) `liste === null` (« pas su » : la lecture a raté) : `GroupeComptes`
+  // dit « — Réessayer », mais `enfants` était calculé quand même — `null.length` faisait tomber tout l'écran Comptes.
   const groupe = (plateforme, liste, carte) => (liste === undefined ? null
     : <GroupeComptes key={plateforme} plateforme={plateforme} n={Array.isArray(liste) && liste.length ? liste.length : null} pasSu={liste === null} onRelire={relire}
-        enfants={liste.length ? liste.map(carte) : <div className="vrm-cl-vide" data-comptes-vide={plateforme}>{ouvrir(plateforme)}</div>}/>);
+        enfants={Array.isArray(liste) && liste.length ? liste.map(carte) : <div className="vrm-cl-vide" data-comptes-vide={plateforme}>{ouvrir(plateforme)}</div>}/>);
   return (<>
     {groupe('vestiaire', lu.vestiaire, (c) => {
       const etat = etatCompteLie({ ouvert: c.ouvert, lu: c.lu, maintenant });

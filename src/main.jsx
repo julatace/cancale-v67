@@ -2,6 +2,8 @@
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import { exempleActif } from './modeExemple.js';
+// (19 nov.) Les drapeaux de racine (à la place des `:has()` portés par html, body, la coque) : posés avant le premier rendu.
+import './drapeauxRacine.js';
 import { garderCodePartenaire } from './partenaires/lien.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).

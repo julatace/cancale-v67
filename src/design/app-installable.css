@@ -57,4 +57,4 @@ html[data-theme="dark"] .vrm-maj, html[data-theme="dark"] .vrm-inst { background
 @media (prefers-reduced-motion: reduce) { .vrm-maj, .vrm-inst { animation: none; } }
 /* (11 nov., capture de Julien : la pilule couvrait la liste et le pied de « Bordereaux à imprimer »)
    Une feuille ou une fenêtre est ouverte ⇒ la pilule se range ; elle revient à la fermeture. */
-body:has([data-feuille-cadre], [role="dialog"][aria-modal="true"]) .vrm-maj { display: none; }
+body[data-vrm-d3]:not(._) .vrm-maj { display: none; }

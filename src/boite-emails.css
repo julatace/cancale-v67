@@ -72,7 +72,7 @@
 .vrm-boite-jour ul{list-style:none;margin:0;padding:0}
 /* Sur ordinateur, la barre du haut (recherche, 74 px) colle en haut de la page : le
    jour colle SOUS elle (sinon il passait derrière). */
-.vrm-main:has(> .vrm-barre-haut) .vrm-boite-jour-titre{top:74px}
+.vrm-main[data-vrm-d2] .vrm-boite-jour-titre{top:74px}
 /* Opaque (pas de flou sous un en-tête qui colle : mesuré au défilement, il coûtait
    des images à 1512 px) ; un filet fin le détache des lignes qui passent dessous. */
 .vrm-boite-jour-titre{position:sticky;top:0;z-index:3;margin:0;padding:14px 16px 6px;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--bx-encre);background:var(--bx-carte);box-shadow:0 .5px 0 var(--bx-fin)}
@@ -192,7 +192,7 @@
 
 /* ── Lire un e-mail ───────────────────────────────────────────────────────── */
 .vrm-boite-lecture-col{min-width:0;position:sticky;top:12px}
-.vrm-main:has(> .vrm-barre-haut) .vrm-boite-lecture-col{top:86px;max-height:calc(100vh - 98px);overflow:auto;border-radius:20px;overscroll-behavior:contain}
+.vrm-main[data-vrm-d2] .vrm-boite-lecture-col{top:86px;max-height:calc(100vh - 98px);overflow:auto;border-radius:20px;overscroll-behavior:contain}
 .vrm-boite-vide-lecture{display:grid;justify-items:center;gap:10px;margin:0;padding:72px 20px;border-radius:20px;background:var(--bx-carte);color:var(--bx-doux);text-align:center;box-shadow:var(--bx-ombre)}
 .vrm-boite-vide-lecture p{margin:0;font-size:17px}
 .vrm-boite-lecture{border-radius:20px;background:var(--bx-carte);padding:6px 28px 28px;min-width:0;overflow-wrap:anywhere;box-shadow:var(--bx-ombre);animation:vrm-boite-entre .22s var(--bx-sortie)}

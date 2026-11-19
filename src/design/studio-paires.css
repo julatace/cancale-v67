@@ -569,7 +569,7 @@
     border-radius: 28px !important; animation: sbp-plan var(--sbp-e-avant) both;
   }
   :root:root:root:root:root body .vrm-fp.sb-plan .vrm-fp-poignee { display: none !important; }
-  :root:root:root:root:root body:has(.vrm-fp.sb-plan) .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) { padding-right: calc(min(460px, 42vw) + 24px) !important; }
+  :root:root:root:root:root body[data-vrm-d14]:not(._) .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) { padding-right: calc(min(460px, 42vw) + 24px) !important; }
 }
 @keyframes sbp-plan { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -818,7 +818,7 @@
    se posait 6 s sur ces gestes et prenait le toucher (banc studio-paires « ⋯ ⇒ la fiche »). Le temps qu'une paire est
    montée, les messages passent EN HAUT, comme quand une feuille est ouverte. */
 @media (max-width: 760px) {
-  body:has([data-espace="paires"] [data-sb-avant="1"]) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
+  body[data-vrm-d15]:not(._) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
 }
 }
 
