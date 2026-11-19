@@ -149,7 +149,7 @@ async function scenario(b, nom, vue, LIGNES) {
   // (11 nov., lot suivi-commandes) L'ORDRE DE L'ÉCRAN (décision du 9 nov., lot AJ : la vente la plus récente en haut,
   // tous transporteurs mélangés ; « Tout imprimer » garde ses groupes par transporteur, CHACUN dans cet ordre).
   const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis], [data-vn-rang]')]
-    .map((el) => (el.hasAttribute('data-vn-rang') ? el.getAttribute('data-vn-rang') : el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
+    .map((el) => (el.hasAttribute('data-vn-rang') ? el.getAttribute('data-vn-rang').replace(/^v:/, '') : el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
     .filter((k, i, a) => k && a.indexOf(k) === i));
   await btn.click();
   await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});

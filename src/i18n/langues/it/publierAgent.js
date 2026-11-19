@@ -125,5 +125,13 @@ export default {
   "agent.origine.lu-site": "verificata sul sito all'invio",
   "agent.origine.traduit": "tradotto dalla scheda",
   "agent.origine.reponse": "la tua risposta",
-  "agent.origine.fiche": "dalla scheda"
+  "agent.origine.fiche": "dalla scheda",
+  "agent.champ.size": "Taglia (elenco Vinted)",
+  "agent.champ.condition": "Condizioni (elenco Vinted)",
+  "agent.champ.color": "Colore (elenco Vinted)",
+  "agent.champ.brand": "Marca (elenco Vinted)",
+  "agent.refus.vinted-onglet": "Apri vinted.fr in questo browser, collegato all'account su cui creare l'annuncio.",
+  "agent.refus.lbc-champ-obligatoire": "Leboncoin richiede «{champ}» per questa categoria e VRM non sa impostarlo: pubblicalo tu su Leboncoin.",
+  "agent.envoi.vinted": "Vinted: bozza creata — pubblicala dalle tue bozze Vinted.",
+  "agent.envoi.vintedQuestion": "Vinted chiede {champ}: rispondi, poi «Pubblica».",
 };

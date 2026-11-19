@@ -24,10 +24,10 @@ import { Plaque } from '../natif/Plaque.jsx';
 import { Vide } from '../natif/Vide.jsx';
 import { Attente } from '../natif/Attente.jsx';
 import { useOrdinateur } from '../natif/Coque.jsx';
-import { ficheArticle, planSite, questionsArticle, retenirReponses, envoiPour, noterEnvoi, relireEnvoi, couverture, lireMemoireAgent, CLE_AGENT, SITES_AGENT } from '../publier/agent.js';
+import { ficheArticle, planSite, questionsArticle, retenirReponses, envoiPour, noterEnvoi, noterRelu, relireEnvoi, couverture, lireMemoireAgent, CLE_AGENT, SITES_AGENT } from '../publier/agent.js';
 import { CATEGORIES_VRM, CLES_VRM } from '../publier/tables.js';
 import { CLE_CORRESPONDANCES } from '../correspondances.js';
-import { lireFichesPage, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, vmrCmd, extSait, relaisVivant, load, save, isCloudReady, appelEbay, __vmrJobs, __vmrNotifier } from '../App.jsx';
+import { lireFichesPage, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, vmrCmd, extSait, relaisVivant, load, save, isCloudReady, appelEbay, vintedDeChrome, __vmrJobs, __vmrNotifier } from '../App.jsx';
 import '../natif/jetons.css';
 import '../natif/natif.css';
 import './publierAgent.css';
@@ -48,13 +48,20 @@ function attendreFin(jobId, ms = 20 * 60000) {
 // Les lectures : fiches des pages Vinted (projetées, par clé), annonces Leboncoin et eBay. `null` = pas su.
 export async function lireSources(articles) {
   const ids = [...new Set(arr(articles).flatMap((a) => arr(a.annonces).filter((x) => x.site === 'vinted').map((x) => String(x.id))))];
-  const [vinted, lbc, eb] = await Promise.all([
+  const [vinted, lbc, eb, formes, listes] = await Promise.all([
     ids.length ? lireFichesPage(ids).catch(() => null) : Promise.resolve({}),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_listings&select=items:data->items`).catch(() => null),
     lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
+    // Les formulaires de dépôt Leboncoin appris (petite ligne, écrite par l'extension) et les couleurs de Vinted (libellés du site).
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_formulaires&select=data`).catch(() => null),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listes&select=c:data->couleurs`).catch(() => null),
   ]);
+  // La relecture Vinted : la catégorie du brouillon devenu annonce, lue sur SA page, par N° de l'article.
+  const vintedParNumero = {};
+  for (const a of arr(articles)) { const x = arr(a.annonces).find((y) => y.site === 'vinted'); const d = x && vinted && vinted[x.id]; if (a.numero && d && d.codes && d.codes.catalog_id != null) vintedParNumero[String(a.numero)] = { catalog_id: String(d.codes.catalog_id) }; }
   const ebay = eb && Array.isArray(eb.items) ? Object.fromEntries(eb.items.filter((x) => x && x.itemId != null).map((x) => [String(x.itemId), x.detail || {}])) : null;
-  return { vinted: vinted || {}, leboncoin: Array.isArray(lbc) ? ((lbc[0] && lbc[0].items) || {}) : null, ebay, ebayItems: eb && Array.isArray(eb.items) ? eb.items : null, manque: [vinted ? '' : 'vinted', Array.isArray(lbc) ? '' : 'leboncoin', ebay ? '' : 'ebay'].filter(Boolean) };
+  return { formulairesLbc: Array.isArray(formes) ? ((formes[0] && formes[0].data) || {}) : {}, couleursVinted: Array.isArray(listes) && listes[0] && listes[0].c && typeof listes[0].c === 'object' ? listes[0].c : null,
+    listesLues: Array.isArray(listes), vintedParNumero: vinted ? vintedParNumero : null, vinted: vinted || {}, leboncoin: Array.isArray(lbc) ? ((lbc[0] && lbc[0].items) || {}) : null, ebay, ebayItems: eb && Array.isArray(eb.items) ? eb.items : null, manque: [vinted ? '' : 'vinted', Array.isArray(lbc) ? '' : 'leboncoin', ebay ? '' : 'ebay'].filter(Boolean) };
 }
 
 // La feuille de la question groupée d'un article.
@@ -98,7 +105,7 @@ function FeuilleQuestion({ cible, onFermer, onEnregistrer }) {
           value={rep[cle(x)] || ''} onChange={(e) => poser(x, e.target.value)}/>
       </label>;
     }
-    const lib = (val) => (x.champ === 'categorie' ? libelleCategorie(val) : val);
+    const lib = (val) => (x.champ === 'categorie' ? libelleCategorie(val) : x.libelles ? (x.libelles[val] || val) : val);
     const cands = x.champ === 'categorie' && arr(x.candidates).length ? x.candidates : null;
     return <label className="n-pa-q n-pa-q-ligne" key={cle(x)} htmlFor={id} data-pa-q={cle(x)}>
       <span className="n-pa-q-nom">{libChamp(x)}</span>
@@ -134,6 +141,8 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
   const [question, setQuestion] = React.useState('');
   const [envois, setEnvois] = React.useState({});           // 'cle|site' → { etat, texte }
   const [enCours, setEnCours] = React.useState(false);
+  const [questionsVinted, setQuestionsVinted] = React.useState({});   // cle → { champ, options } : ce que Vinted a demandé
+  const listesDemandees = React.useRef(false);
   const arret = React.useRef(false);
   const cleListe = arr(articles).map((a) => a.cle).join(',');
   React.useEffect(() => { let vivant = true; setLu(undefined); lireSources(articles).then((r) => { if (vivant) setLu(r); }).catch(() => { if (vivant) setLu(null); }); return () => { vivant = false; };
@@ -141,26 +150,36 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
   }, [cleListe, tic]);
   const extOk = (relaisVivant() ? 'ok' : extSait('publierfiche')) === 'ok';
   const corr = load(CLE_CORRESPONDANCES, null);
+  const vc = vintedDeChrome();
+  const ctxBase = { corr, ext: { vinted: extOk, leboncoin: extOk, vestiaire: extOk }, compteVinted: vc || null, formulairesLbc: lu ? lu.formulairesLbc : {}, questionsVinted,
+    reglagesVinted: { etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) } };
+  // Les couleurs de Vinted pas encore publiées : l'extension les lit UNE fois (onglet vinted.fr, budget de lecture), puis on relit.
+  React.useEffect(() => {
+    if (!lu || lu.couleursVinted || !lu.listesLues || listesDemandees.current || extSait('listesvinted') !== 'ok') return;
+    listesDemandees.current = true;
+    vmrCmd({ cmd: 'listesVinted' }, 60000).then((r) => { if (r && r.accepte) setTic((t) => t + 1); }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lu]);
   const lignes = React.useMemo(() => {
     if (!lu) return lu;
     return arr(articles).map((a) => {
       const f = ficheArticle(a, lu, mem);
       const deja = Object.fromEntries(SITES_AGENT.map((s) => [s, arr(a.annonces).some((x) => x.site === s && ['enligne', 'aconfirmer', 'masquee', 'pause'].includes(x.etat))]));
-      const plans = SITES_AGENT.filter((s) => choix.has(s)).map((s) => planSite(f, s, mem, { corr, ext: { leboncoin: extOk, vestiaire: extOk }, deja }));
+      const plans = SITES_AGENT.filter((s) => choix.has(s)).map((s) => planSite(f, s, mem, { ...ctxBase, deja }));
       return { a, f, plans, q: questionsArticle(f, plans) };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lu, mem, choix, extOk]);
+  }, [lu, mem, choix, extOk, questionsVinted, vc && vc.uid]);
   const etatCase = (l, p) => {
     const e = envois[l.f.cle + '|' + p.site]; if (e) return e.etat;
     const env = l.f.numero ? mem.envois[p.site + ':' + l.f.numero] : null;
-    if (env && lu) { const r = relireEnvoi(env, { leboncoin: lu.leboncoin, ebay: lu.ebayItems }); return { ok: 'ok', ecart: 'ecart', 'pas-encore': 'pasEncore', 'non-relisible': 'nonRelisible', 'pas-su': 'pasEncore' }[r.etat] || 'pasEncore'; }
+    if (env && lu) { const r = relireEnvoi(env, { leboncoin: lu.leboncoin, ebay: lu.ebayItems, vinted: lu.vintedParNumero }); return { ok: 'ok', ecart: 'ecart', 'pas-encore': 'pasEncore', 'non-relisible': 'nonRelisible', 'pas-su': 'pasEncore' }[r.etat] || 'pasEncore'; }
     return p.etat;
   };
   const texteRelu = (l, p) => {
     const env = l.f.numero ? mem.envois[p.site + ':' + l.f.numero] : null;
     if (!env || !lu || envois[l.f.cle + '|' + p.site]) return (envois[l.f.cle + '|' + p.site] || {}).texte || '';
-    const r = relireEnvoi(env, { leboncoin: lu.leboncoin, ebay: lu.ebayItems });
+    const r = relireEnvoi(env, { leboncoin: lu.leboncoin, ebay: lu.ebayItems, vinted: lu.vintedParNumero });
     if (r.etat === 'ok') return tr('agent.relu.ok', { site: NOM[p.site], cat: (r.relu && (r.relu.categorie || r.relu.nom)) || '' });
     if (r.etat === 'ecart') return tr('agent.relu.ecart', { site: NOM[p.site], relu: (r.relu && (r.relu.categorie || r.relu.nom || r.relu.id)) || '', voulu: (r.voulu && (r.voulu.categorie || r.voulu.nom || r.voulu.id)) || '' });
     if (r.etat === 'non-relisible') return tr('agent.relu.nonRelisible');
@@ -176,9 +195,22 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
     for (const { l, p } of file) {
       if (arret.current) break;
       marquer(l, p.site, 'envoi');
-      const e = envoiPour(l.f, p);
+      const e = envoiPour(l.f, p, ctxBase);
       if (!e) { marquer(l, p.site, 'echec'); continue; }
       let r = null;
+      if (e.voie === 'vinted') {
+        // LE chemin de « Créer sur Vinted » : un brouillon depuis l'onglet vinted.fr, compte de l'onglet ; il publie lui-même.
+        try { r = await vmrCmd(e.msg, 480000); } catch (_) { r = null; }
+        if (r && r.code === 'question' && r.question && Array.isArray(r.question.options)) {
+          const qv = { champ: String(r.question.champ || ''), options: r.question.options.slice(0, 4000) };
+          setQuestionsVinted((x) => ({ ...x, [l.f.cle]: qv }));
+          marquer(l, 'vinted', 'echec', tr('agent.envoi.vintedQuestion', { champ: tr('agent.champ.' + qv.champ) }));
+        } else if (r && r.accepte && r.draftId) {
+          const m2 = noterEnvoi(load(CLE_AGENT, null), 'vinted', l.f.numero, p); if (isCloudReady()) save(CLE_AGENT, m2); setMem(m2);
+          marquer(l, 'vinted', 'parti', tr('agent.envoi.vinted'));
+        } else marquer(l, 'vinted', 'echec', (r && r.raison) || tr('agent.pasSu'));
+        continue;
+      }
       if (e.voie === 'extension') {
         try { r = await vmrCmd(e.msg, 30000); } catch (_) { r = null; }
         if (r && r.accepte && r.jobId) {
@@ -186,6 +218,9 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
           const m2 = noterEnvoi(load(CLE_AGENT, null), p.site, l.f.numero, p); if (isCloudReady()) save(CLE_AGENT, m2); setMem(m2);
           marquer(l, p.site, 'parti', tr('agent.envoi.parti', { site: NOM[p.site] }));
           const fin = await attendreFin(r.jobId);                // un dépôt à la fois : le suivant attend la fin de celui-ci
+          // Vestiaire : la catégorie lue par l'extension dans la réponse du dépôt (job `relu`) ⇒ gardée pour la relecture.
+          const jr = __vmrJobs[r.jobId];
+          if (p.site === 'vestiaire' && jr && jr.relu) { const m3 = noterRelu(load(CLE_AGENT, null), 'vestiaire', l.f.numero, jr.relu); if (isCloudReady()) save(CLE_AGENT, m3); setMem(m3); }
           marquer(l, p.site, fin === 'fait' ? 'parti' : 'echec', fin === 'fait' ? tr('agent.envoi.fini', { site: NOM[p.site] }) : tr('agent.envoi.abandonne', { site: NOM[p.site] }));
         } else marquer(l, p.site, 'echec', (r && r.raison) || tr('agent.pasSu'));
       } else {
@@ -200,6 +235,7 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
     const m2 = retenirReponses(load(CLE_AGENT, null), fiche, reponses);
     if (isCloudReady()) save(CLE_AGENT, m2);
     setMem(m2); setQuestion('');
+    if (reponses.some((x) => x.site === 'vinted')) { setQuestionsVinted((x) => { const n = { ...x }; delete n[fiche.cle]; return n; }); setEnvois((x) => { const n = { ...x }; delete n[fiche.cle + '|vinted']; return n; }); }
   };
   const lq = question && lignes ? lignes.find((l) => l.f.cle === question) : null;
   const sitesVus = SITES_AGENT.filter((s) => choix.has(s));

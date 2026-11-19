@@ -24,14 +24,17 @@
 //    (par identité : « Réf. VRM-{n°} », SKU `VRM-{n°}`), comparée à la voulue ; un écart dit quoi faire.
 // 5. LA COUVERTURE (`couverture`) : chaque catégorie du stock × site : sûre · à demander · impossible.
 // Module PUR : l'écran (src/ecrans/PublierAgent.jsx) et scripts/audit-publier-agent.cjs exécutent CES fonctions.
-import { ficheSite, criteresPourLbc, lireMemoire as lireCorr, choixDe, TABLE_VINTED } from '../correspondances.js';
+import { ficheSite, criteresPourLbc, lireMemoire as lireCorr, choixDe, TABLE_VINTED, LBC_RUBRIQUES } from '../correspondances.js';
+import { texteAnnonceVinted, payloadFiche } from '../annonceVinted.js';
 import { CATEGORIES_VRM, CLES_VRM, estCleVrm, depuisVinted, depuisLeboncoin, depuisEbay, vcDepuisVrm, choixVc, ETATS, etatNeutre, etatDepuisEbay,
   etatVersLbc, etatVersEbay, pointureEU, marqueVersLbc, marqueVersVc, marquesVcPermises, marquesLbcPermises, chercheExact, norm, cheminVinted } from './tables.js';
 
 const str = (v) => String(v == null ? '' : v).trim();
 const arr = (a) => (Array.isArray(a) ? a : []);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
-export const SITES_AGENT = Object.freeze(['leboncoin', 'vestiaire', 'ebay']);
+// (19 nov., « fais tout ») Vinted est une cible comme les autres : par le chemin EXISTANT `creerVintedFiche`
+// (un brouillon depuis l'onglet vinted.fr, compte de l'onglet ; il publie lui-même) — le même que « Créer sur Vinted ».
+export const SITES_AGENT = Object.freeze(['vinted', 'leboncoin', 'vestiaire', 'ebay']);
 export const CLE_AGENT = 'vrm_agent_publier';
 export const TITRE_MAX = Object.freeze({ leboncoin: 50, vestiaire: 80, ebay: 80 });
 export const PHOTOS_MAX = 10;
@@ -45,6 +48,9 @@ const cleNumero = (v) => { let s = str(v).toUpperCase().replace(/[\s\-_.]/g, '')
 //     marque: { leboncoin: { [marque lue, normalisée]: libellé du site }, vestiaire: { … } },
 //     envois: { ['site:N°']: { site, numero, voulu, at } } }
 // Une valeur hors de la liste du site n'y entre JAMAIS (relue à chaque lecture).
+export const CHAMPS_VINTED = Object.freeze(['size', 'condition', 'color', 'brand']);
+// Un choix Vinted = un IDENTIFIANT de la liste de Vinted (l'extension le revérifie) ; jamais un texte libre.
+const idVinted = (v) => /^\d{1,12}$/.test(str(v));
 const cleArt = (k) => (/^[\w:#.-]{1,80}$/.test(str(k)) ? str(k) : '');
 export function lireMemoireAgent(brut) {
   const b = obj(brut) || {};
@@ -57,7 +63,10 @@ export function lireMemoireAgent(brut) {
     if (pointureEU(a.pointure)) e.pointure = pointureEU(a.pointure);
     if (str(a.marque) && str(a.marque).length <= 40 && !/[<>]/.test(a.marque)) e.marque = str(a.marque);
     const sl = obj(a.sites) && obj(a.sites.leboncoin);
-    if (sl) { const l = {}; for (const ch of ['taille', 'etat', 'couleur']) if (str(sl[ch]) && str(sl[ch]).length <= 60) l[ch] = str(sl[ch]); if (Object.keys(l).length) e.sites = { leboncoin: l }; }
+    if (sl) { const l = {}; for (const ch of ['taille', 'etat', 'couleur', 'marque']) if (str(sl[ch]) && str(sl[ch]).length <= 60) l[ch] = str(sl[ch]); if (Object.keys(l).length) e.sites = { leboncoin: l }; }
+    // Vinted : SES choix dans les listes de Vinted (identifiants que l'extension revérifie contre la liste du site).
+    const sv = obj(a.sites) && obj(a.sites.vinted);
+    if (sv) { const l = {}; for (const ch of CHAMPS_VINTED) if (idVinted(sv[ch])) l[ch] = str(sv[ch]); if (Object.keys(l).length) e.sites = { ...(e.sites || {}), vinted: l }; }
     if (Object.keys(e).length) out.articles[c] = e;
   }
   for (const [k, x] of Object.entries(obj(b.cat) || {})) {
@@ -82,7 +91,8 @@ export function lireMemoireAgent(brut) {
   for (const [m, v] of Object.entries(obj(mq.vestiaire) || {})) { const ok = chercheExact(marquesVcPermises(), v); if (norm(m) && ok) out.marque.vestiaire[norm(m).slice(0, 40)] = ok; }
   for (const [k, x] of Object.entries(obj(b.envois) || {})) {
     const e = obj(x); if (!e || !SITES_AGENT.includes(e.site) || !NUM_OK.test(cleNumero(e.numero)) || k !== `${e.site}:${cleNumero(e.numero)}`) continue;
-    out.envois[k] = { site: e.site, numero: cleNumero(e.numero), voulu: obj(e.voulu) || {}, at: Number(e.at) || 0 };
+    const relu = obj(e.relu) && ['univers', 'categorie', 'sous'].every((c) => typeof e.relu[c] === 'string' && e.relu[c].length <= 80) ? { univers: e.relu.univers, categorie: e.relu.categorie, sous: e.relu.sous } : null;
+    out.envois[k] = { site: e.site, numero: cleNumero(e.numero), voulu: obj(e.voulu) || {}, at: Number(e.at) || 0, ...(relu ? { relu } : {}) };
   }
   return out;
 }
@@ -115,6 +125,11 @@ export function ficheArticle(article, lectures = {}, memoire = null) {
       const r = codes ? depuisVinted(codes.catalog_id) : null;
       if (r && r.cle) lu.categorie.push({ v: r.cle, de: s }); else if (r && r.inconnue) inconnues.push(s + ':' + r.inconnue);
       if (d && str(d.couleur)) lu.couleurs.push({ v: str(d.couleur).split(/\s*[/,]\s*/).filter(Boolean), de: s });
+      // Les CODES couleur de Vinted, traduits seulement par la liste que Vinted sert (lue par l'extension) ; un code absent ⇒ rien.
+      else if (codes && Array.isArray(codes.color_ids) && codes.color_ids.length && obj(lectures.couleursVinted)) {
+        const noms = codes.color_ids.map((id) => str(lectures.couleursVinted[String(id)]));
+        if (noms.every(Boolean)) lu.couleurs.push({ v: noms, de: s });
+      }
       if (d && str(d.description)) lu.description.push({ v: str(d.description), de: s });
       if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => (typeof p === 'string' ? p : p && p.url)).filter((u) => /^https:\/\//.test(str(u))), de: s });
     }
@@ -179,7 +194,7 @@ const v = (f, k) => (f && f.champs && f.champs[k] ? f.champs[k].v : null);
 // ctx : { corr (vrm_correspondances brut), ext: { leboncoin, vestiaire } (l'extension sait publier une fiche : true/false),
 //   deja: { [site]: true|false|null } (déjà en ligne sur ce site, par identité ; null = pas su) }.
 // Rend { site, etat: 'pret' | 'question' | 'refus' | 'deja', valeurs, origine, questions, refus: { code } | null, chemin }.
-const Q = (champ, choix, { site = '', bloque = true, saisie = '', candidates = null } = {}) => ({ champ, site, choix: choix || [], bloque: !!bloque, saisie, ...(candidates ? { candidates } : {}) });
+const Q = (champ, choix, { site = '', bloque = true, saisie = '', candidates = null, libelles = null } = {}) => ({ champ, site, choix: choix || [], bloque: !!bloque, saisie, ...(candidates ? { candidates } : {}), ...(libelles ? { libelles } : {}) });
 function questionsFiche(f, besoins) {
   const q = [];
   if (besoins.includes('categorie') && !v(f, 'categorie')) {
@@ -207,6 +222,7 @@ export function planSite(fiche, site, memoire, ctx = {}) {
   if (!v(f, 'prix')) return refuser('prix-pas-lu');
   if (!arr(v(f, 'photos')).length) return refuser('sans-photo');
   if (!v(f, 'titre')) return refuser('sans-titre');
+  if (site === 'vinted' && !ctx.compteVinted) return refuser('vinted-onglet');
   const besoins = site === 'ebay' ? ['categorie', 'etat'] : site === 'vestiaire' ? ['categorie', 'etat', 'pointure', 'marque'] : ['categorie', 'etat', 'pointure'];
   out.questions.push(...questionsFiche(f, besoins));
   const cle = v(f, 'categorie');
@@ -260,6 +276,16 @@ export function planSite(fiche, site, memoire, ctx = {}) {
     if (v(f, 'etat')) { out.valeurs.etat = v(f, 'etat'); out.origine.etat = 'fiche'; }
     if (v(f, 'pointure')) { out.valeurs.taille = v(f, 'pointure'); out.origine.taille = 'fiche'; }
   }
+  if (site === 'leboncoin' && C && out.valeurs.sousNom) appliquerFormulaireLbc(out, ctx.formulairesLbc, Q, marquesLbcPermises);
+  if (site === 'vinted' && C) {
+    out.chemin = cheminVinted(cle);
+    out.valeurs.catalog_id = C.vinted; out.origine.catalog_id = 'table';
+    for (const [k, x] of [['etat', v(f, 'etat')], ['taille', v(f, 'pointure') || (f.champs.taille && f.champs.taille.v)], ['marque', v(f, 'marque')], ['couleur', arr(v(f, 'couleurs'))[0]]]) if (x) { out.valeurs[k] = x; out.origine[k] = 'fiche'; }
+    out.reponses = { ...((repA.sites && repA.sites.vinted) || {}), catalog_id: C.vinted };
+    // Une question que Vinted a renvoyée (valeur hors de SA liste) : posée avec SES valeurs, jusqu'à la réponse.
+    const qv = ctx.questionsVinted && ctx.questionsVinted[f.cle];
+    if (qv && CHAMPS_VINTED.includes(qv.champ) && !out.reponses[qv.champ]) out.questions.push(Q(qv.champ, arr(qv.options).map((o) => str(o[0])), { site, libelles: Object.fromEntries(arr(qv.options).map((o) => [str(o[0]), str(o[1])])) }));
+  }
   if (site === 'ebay' && C) {
     const corr = lireCorr(ctx.corr);
     const me = (mem.cat[cle] && mem.cat[cle].ebay) || (corr.cat[C.vinted] && corr.cat[C.vinted].ebay) || null;
@@ -310,11 +336,12 @@ export function retenirReponses(memoire, fiche, reponses) {
       const ok = chercheExact(liste, val); if (src && ok) m.marque[site] = { ...m.marque[site], [norm(src).slice(0, 40)]: ok };
       continue;
     }
+    if (site === 'vinted' && CHAMPS_VINTED.includes(ch) && idVinted(val)) { art.sites = { ...(art.sites || {}), vinted: { ...((art.sites && art.sites.vinted) || {}), [ch]: str(val) } }; continue; }
     if (!cle) continue;
     const e = { ...(m.cat[cle] || {}) };
     if (site === 'vestiaire' && ['univers', 'categorie', 'sous'].includes(ch)) e.vestiaire = { ...(e.vestiaire || {}), [ch]: str(val) };
     else if (site === 'leboncoin' && ['sous', 'univers', 'type'].includes(ch)) { e.leboncoin = { ...(e.leboncoin || {}), [ch]: str(val) }; if (ch === 'sous') { delete e.leboncoin.univers; delete e.leboncoin.type; } }
-    else if (site === 'leboncoin' && ['taille', 'etat', 'couleur'].includes(ch)) { art.sites = { leboncoin: { ...((art.sites && art.sites.leboncoin) || {}), [ch]: str(val) } }; continue; }
+    else if (site === 'leboncoin' && ['taille', 'etat', 'couleur'].includes(ch)) { art.sites = { ...(art.sites || {}), leboncoin: { ...((art.sites && art.sites.leboncoin) || {}), [ch]: str(val) } }; continue; }
     else if (site === 'ebay' && ch === 'categorieEbay' && obj(val) && /^\d{1,9}$/.test(str(val.id))) e.ebay = { id: str(val.id), nom: str(val.nom), chemin: str(val.chemin) };
     else continue;
     m.cat[cle] = e;
@@ -333,13 +360,22 @@ export function titrePour(site, t) {
 }
 export const refVrm = (n) => `Réf. VRM-${n}`;
 // Rend { voie: 'extension', msg } · { voie: 'ebay-brouillon', p, categorie } · null (pas prêt : rien ne part).
-export function envoiPour(fiche, plan) {
+export function envoiPour(fiche, plan, ctx = {}) {
   if (!fiche || !plan || plan.etat !== 'pret') return null;
   const n = fiche.numero; if (!n) return null;
   const desc0 = str(v(fiche, 'description'));
   const description = new RegExp('VRM-' + n + '(?!\\d)').test(desc0) ? desc0 : (desc0 ? desc0 + '\n\n' : '') + refVrm(n);
   const base = { cle: fiche.cle, numero: n, titre: titrePour(plan.site, v(fiche, 'titre')), description, prix: v(fiche, 'prix'), photos: arr(v(fiche, 'photos')).slice(0, PHOTOS_MAX),
     ...(fiche.vintedId ? { vintedId: String(fiche.vintedId) } : {}) };
+  if (plan.site === 'vinted') {
+    // LE MÊME chemin que « Créer sur Vinted » : son texte (N° écrit selon SES réglages), sa liste blanche, sa commande.
+    const uid = str(ctx.compteVinted && ctx.compteVinted.uid);
+    if (!/^\d+$/.test(uid) || !plan.valeurs.catalog_id) return null;
+    const t = texteAnnonceVinted({ numero: n, titre: v(fiche, 'titre'), description: str(v(fiche, 'description')) }, ctx.reglagesVinted || {});
+    if (!t || t.ok === false) return null;
+    const fv = { id: 'agent-' + n.replace(/[^\w-]/g, ''), numero: n, marque: plan.valeurs.marque || '', taille: plan.valeurs.taille || '', etat: plan.valeurs.etat || '', couleur: plan.valeurs.couleur || '', categorie: '', prix: v(fiche, 'prix') };
+    return { voie: 'vinted', msg: { cmd: 'creerVintedFiche', uid, confirme: true, fiche: payloadFiche(fv, t, base.photos), reponses: { ...plan.reponses } } };
+  }
   if (plan.site === 'leboncoin') {
     const c = criteresPourLbc({ site: 'leboncoin', valeurs: plan.valeurs, ambigu: false });
     if (!c.categorie) return null;                                   // rien ne part sans catégorie sûre
@@ -365,6 +401,7 @@ export function voulu(plan) {
   if (plan.site === 'leboncoin') return { categorie: str(plan.valeurs.sousNom || plan.valeurs.sous), univers: str(plan.valeurs.univers), type: str(plan.valeurs.type) };
   if (plan.site === 'vestiaire') return { univers: plan.valeurs.univers, categorie: plan.valeurs.categorie, sous: plan.valeurs.sous };
   if (plan.site === 'ebay') return { id: plan.valeurs.categorie ? plan.valeurs.categorie.id : '', nom: plan.valeurs.categorie ? plan.valeurs.categorie.nom : '' };
+  if (plan.site === 'vinted') return { catalog_id: String(plan.valeurs.catalog_id || '') };
   return {};
 }
 export function noterEnvoi(memoire, site, numero, plan, at = Date.now()) {
@@ -374,6 +411,13 @@ export function noterEnvoi(memoire, site, numero, plan, at = Date.now()) {
   return lireMemoireAgent(m);
 }
 
+// Vestiaire : la catégorie que l'EXTENSION a lue dans la réponse du dépôt (job `relu`), gardée avec l'envoi.
+export function noterRelu(memoire, site, numero, relu) {
+  const m = lireMemoireAgent(memoire); const k = `${site}:${cleNumero(numero)}`;
+  if (!m.envois[k] || !obj(relu)) return m;
+  m.envois[k] = { ...m.envois[k], relu };
+  return lireMemoireAgent(m);
+}
 // ── 4. LA RELECTURE ────────────────────────────────────────────────────────
 // lectures : { leboncoin: items de `lbc_listings` (null = pas lu), ebay: items de `ebay_listings` (null = pas lu) }.
 // Rend { etat: 'ok' | 'ecart' | 'pas-encore' | 'pas-su' | 'non-relisible', voulu, relu }.
@@ -399,7 +443,17 @@ export function relireEnvoi(envoi, lectures = {}) {
     if (!str(d.categoryId)) return { etat: 'pas-encore', voulu: w };
     return { etat: str(d.categoryId) === str(w.id) ? 'ok' : 'ecart', voulu: w, relu: { id: str(d.categoryId), nom: str(d.categoryName) }, id: String(l[0].itemId || '') };
   }
-  // Vestiaire ne rend pas la catégorie dans ses annonces lues : posée telle quelle au dépôt, pas relue.
+  if (e.site === 'vestiaire' && obj(e.relu)) {
+    const r = e.relu;
+    return { etat: ['univers', 'categorie', 'sous'].every((c) => norm(r[c]) === norm(w[c])) ? 'ok' : 'ecart', voulu: { ...w, categorie: [w.univers, w.categorie, w.sous].join(' › ') }, relu: { categorie: [r.univers, r.categorie, r.sous].join(' › ') } };
+  }
+  if (e.site === 'vinted') {
+    // Le brouillon créé porte SA catégorie (`catalog_id` relu dans le dressing lu ensuite, par identité du brouillon).
+    const items = lectures.vinted; if (items == null) return { etat: 'pas-su', voulu: w };
+    const x = obj(items[n]); if (!x || !str(x.catalog_id)) return { etat: 'pas-encore', voulu: w };
+    return { etat: str(x.catalog_id) === str(w.catalog_id) ? 'ok' : 'ecart', voulu: { ...w, categorie: w.catalog_id }, relu: { categorie: str(x.catalog_id) } };
+  }
+  // Vestiaire sans catégorie dans la réponse du dépôt : posée telle quelle au dépôt, pas relue.
   return { etat: 'non-relisible', voulu: w };
 }
 
@@ -419,4 +473,40 @@ export function couverture(fiches, memoire, ctx = {}) {
     return { cle, n, chemin: cheminVinted(cle), sites: { leboncoin: lbcEtat, vestiaire: vcEtat, ebay: ebEtat } };
   });
   return { lignes, sansCategorie: sans };
+}
+
+// ── LEBONCOIN : LE FORMULAIRE APPRIS (la première fois qu'il est vu) ─────
+// `lbc_formulaires` (écrite par l'extension, lu tel quel : `formulaireLbcDe`, background.js) :
+//   { [id de catégorie Leboncoin]: { at, champs: [{ cle, libelle, obligatoire, choix: [libellés] }] } }.
+// Le formulaire VU remplace la liste « servie mais pas vue » : une valeur absente de SES choix est retirée et
+// demandée parmi eux ; un champ que le formulaire n'a pas n'est pas envoyé ; un champ obligatoire que VRM ne sait
+// pas poser ⇒ « pas vendable ici » tant qu'il n'est pas posé (jamais deviné).
+const CHAMP_DE_LIBELLE = [['univers', /^univers/i], ['type', /^type/i], ['taille', /^(taille|pointure)/i], ['etat', /^[ée]tat/i], ['couleur', /^couleur/i], ['marque', /^marque/i]];
+export function champsFormulaireLbc(form) {
+  const out = {}; const autres = [];
+  for (const c of arr(form && form.champs)) {
+    const k = (CHAMP_DE_LIBELLE.find(([, re]) => re.test(str(c.libelle))) || [])[0];
+    if (k && !out[k]) out[k] = { choix: arr(c.choix).map(str).filter(Boolean), obligatoire: !!c.obligatoire, libelle: str(c.libelle) };
+    else if (!k && c.obligatoire) autres.push(str(c.libelle));
+  }
+  return { champs: out, autres };
+}
+export const idCategorieLbc = (sousNom) => { for (const r of Object.values(LBC_RUBRIQUES)) if (r.sous[str(sousNom)]) return r.sous[str(sousNom)]; return ''; };
+function appliquerFormulaireLbc(out, formulaires, Qf, marques) {
+  const id = idCategorieLbc(out.valeurs.sousNom);
+  const form = id && obj(formulaires) ? obj(formulaires[id]) : null;
+  if (!form) return;
+  const { champs, autres } = champsFormulaireLbc(form);
+  out.formulaire = 'appris';
+  out.questions = out.questions.filter((q) => !(q.site === 'leboncoin' && ['univers', 'type', 'taille', 'etat', 'couleur', 'marque'].includes(q.champ)));
+  for (const k of ['univers', 'type', 'taille', 'etat', 'couleur', 'marque']) {
+    const c = champs[k];
+    if (!c) { if (k in out.valeurs) { delete out.valeurs[k]; delete out.origine[k]; } continue; }
+    const val = out.valeurs[k];
+    const ok = val != null && c.choix.some((x) => norm(x) === norm(val));
+    if (ok) { out.valeurs[k] = c.choix.find((x) => norm(x) === norm(val)); out.origine[k] = out.origine[k] === 'memoire' || out.origine[k] === 'reponse' ? out.origine[k] : 'formulaire'; continue; }
+    if (val != null) { delete out.valeurs[k]; delete out.origine[k]; }
+    if (c.choix.length) out.questions.push(Qf(k, c.choix.slice(), { site: 'leboncoin', bloque: c.obligatoire && k !== 'marque' && k !== 'couleur' }));
+  }
+  if (autres.length) { out.refus = { code: 'lbc-champ-obligatoire', champ: autres[0] }; out.etat = 'refus'; }
 }

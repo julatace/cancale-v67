@@ -104,20 +104,58 @@ annonces » (l'un après l'autre : chaque dépôt attend la fin du précédent ;
   audit-parite-sites (96), audit-correspondances (45), audit-publier-partout (75), audit-actions-gardees (12),
   audit-quoi-de-neuf, audit-icones.
 
-## 4. Ce qui reste (honnête)
+## 4. Deuxième passe (« fais tout », même jour)
+
+Mesuré d'abord (lecture seule) : le formulaire de dépôt Leboncoin d'une catégorie est entier dans la réponse
+`adsubmit/dynamic-deposit/config?category=N` (`definitions.items[]` : libellé, `associated_key`, codec
+`CODEC_TYPE_ATTRIBUTES`, `multiple_answers.choices[].label`, `static_rules.mandatory`) — pour la 53 : Univers (3,
+obligatoire), Type de chaussures (13), Pointure (69, obligatoire), État (5), Couleur (21), Marque (793) ; mais la clé du
+catalogue ignorait `?category=` (chaque catégorie vue écrasait la précédente). Les scripts de dépôt (lbc.js, vc-depot.js)
+ne téléchargent aucune photo : ils demandent les octets au fond (`photoBytes`), dont la liste d'hôtes n'avait pas
+i.ebayimg.com (pourtant au manifeste). `creerVintedFiche` n'acceptait que des photos images*.vinted.net ou data:.
+
+1. **Vinted comme cible** : colonne Vinted ; catégorie VRM sûre ⇒ `catalog_id` de la table ; envoi par le chemin EXISTANT
+   `creerVintedFiche` (brouillon depuis l'onglet vinted.fr, compte de l'onglet `vintedDeChrome`, confirmé ; il publie
+   lui-même), avec le MÊME texte et la MÊME liste blanche que « Créer sur Vinted » (`texteAnnonceVinted`,
+   `payloadFiche`, ses réglages de N° écrit). Une question renvoyée par Vinted (valeur hors de SA liste) est posée dans
+   la feuille avec SES valeurs ; la réponse (un identifiant, jamais un texte) est retenue par article. Sans onglet
+   vinted.fr ⇒ « Ouvre vinted.fr… ». Photos d'un autre site acceptées par `photoFicheOk` (hôtes du manifeste seulement).
+2. **Vestiaire relu** : vc-inject.js lit la catégorie dans la RÉPONSE de création (`categorieDeReponseVc`, noms connus
+   seulement : universe/category/subCategory → title|name|label), vc.js la passe, le fond la pose sur la commande
+   (`relu`, `categorieRelueVc` : trois libellés lisibles ou rien) ; l'app la garde avec l'envoi (`noterRelu`) ⇒ « Relu,
+   conforme » / « Catégorie différente ». Réponse sans catégorie ⇒ « Posée, pas relue » (la forme de cette réponse n'a
+   jamais été mesurée chez lui : à voir au premier dépôt).
+3. **Leboncoin hors chaussures** : la première fois que le formulaire d'une catégorie est vu, l'extension l'apprend
+   (`formulaireLbcDe` ⇒ ligne `lbc_formulaires`, critères seulement, libellés du site) ; l'agent l'applique
+   (`appliquerFormulaireLbc`) : une valeur absente de SES choix est retirée et demandée parmi eux, un critère absent du
+   formulaire n'est pas envoyé, un champ obligatoire que VRM ne sait pas poser (« Matière »…) ⇒ « pas vendable ici, publie
+   toi-même ». Clé du catalogue par catégorie (`…_cat47`).
+4. **Couleurs Vinted** : commande `listesVinted` — la liste des couleurs lue par le chemin existant (`couleursConnues` :
+   onglet vinted.fr, budget de LECTURE, une fois par 24 h) et publiée (`vinted_listes`) ; l'agent traduit les
+   `color_ids` (tous les codes connus, sinon rien). **Matières : laissées** — aucune liste de libellés mesurée.
+5. **Photos d'un autre hôte** — banc `scripts/bancs/photos-autre-hote.cjs` (vrai Chromium, vrais serveurs, noms des sites
+   résolus en local) : une page de dépôt vestiairecollective / leboncoin ne peut PAS lire une image i.ebayimg.com /
+   img.leboncoin.fr / images1.vinted.net (fetch refusé par CORS, no-cors opaque à 0 octet) ⇒ le chemin est le fond ;
+   le vrai background.js rend les octets pour ces trois hôtes et refuse un hôte inconnu, un nom qui finit pareil, un
+   sous-domaine, sans requête. `HOTES_PHOTOS` + `i.ebayimg.com` exact ; **aucun nouvel hôte au manifeste**. Sur le
+   background.js d'avant : rouge (i.ebayimg.com refusé).
+
+Capacités 5.409 : `publierfiche`, `listesvinted`, `lbcformulaire`, `vcrelu`. Preuves : audit-publier-agent **67
+contrôles, 26/26 mutations** (dont Vinted sans onglet, sans catégorie, réponse libre ; Vestiaire relu aveugle ; formulaire
+ignoré ; couleur devinée ; i.ebayimg refusé ; formulaire « tout gardé » ; relu partiel accepté) ; banc publier-agent
+**100 verts** (Vinted dans le tableau, l'article Leboncoin part aussi vers Vinted par `creerVintedFiche`, une commande en
+vol à la fois) ; banc photos-autre-hote **9 verts**.
+
+## 5. Ce qui reste (honnête)
 
 - **Rien n'a été essayé dans son vrai navigateur.** Le dépôt Leboncoin/Vestiaire d'une fiche venue d'un AUTRE site que
   Vinted réutilise lbc.js / vc-depot.js avec des photos d'un autre hôte (img.leboncoin.fr, i.ebayimg.com…) : leur
   téléchargement par la page de dépôt n'a pas été mesuré. Geste : installer la 5.409, publier UN article Leboncoin vers
   Vestiaire, regarder.
-- Vestiaire : la catégorie n'est pas relue (ses annonces lues ne la portent pas) — il faudrait capter la fiche
-  d'annonce Vestiaire après dépôt.
-- Vers **Vinted** : la catégorie VRM ⇒ `catalog_id` est connue (bijection), mais l'envoi passe toujours par « Créer sur
-  Vinted » (fiche À publier) ; pas branché dans « Publier sur… ».
-- Couleur et matière Vinted : rangées en CODES seulement, aucune liste de libellés captée ⇒ jamais traduites (ni
-  devinées). Les capter (formulaire de dépôt Vinted) les rendrait sûres.
-- Leboncoin : les critères des catégories autres que « Chaussures » viennent du fdata, formulaire pas vu
-  (`vu: 'liste'`, inchangé) ; marques hors chaussures « à lire sur le formulaire ».
+- Vestiaire : la catégorie n'est relue que si la réponse de création la porte (forme jamais mesurée chez lui).
+- Vinted : le brouillon est relu quand l'annonce publiée a été lue sur sa page (catalog_id) ; avant, « À relire ».
+- Matières Vinted : codes seulement, aucune liste de libellés mesurée ⇒ jamais traduites.
+- Leboncoin : un formulaire n'est appris qu'une fois vu (déposer UNE annonce de la catégorie avec l'extension 5.409).
 - eBay : un seul chemin de catégorie vu chez lui ; chaque catégorie se choisit une fois parmi celles qu'eBay propose.
 - 79 % de ses fiches Vinted n'ont pas de `catalog_id` lu : leur catégorie se demande (une fois, retenue par article) ;
   ouvrir l'annonce sur vinted.fr avec l'extension la lit.

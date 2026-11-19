@@ -54,6 +54,15 @@ const MUTATIONS = {
   'ext-deux-comptes': ['bg', "if (vus.size > 1) return { ok: false, code: 'deux-comptes', raison: 'deux comptes Leboncoin", "if (false) return { ok: false, code: 'deux-comptes', raison: 'deux comptes Leboncoin"],
   'ext-un-a-la-fois': ['bg', 'if (pend && pend.ad && Date.now() - Number(pend.at || 0) < 30 * 60000) return', 'if (false) return'],
   'sync-oublie': ['app', "  'vrm_agent_publier',", "  'vrm_agent_publier_x',"],
+  'vinted-sans-onglet': ['agent', "  if (site === 'vinted' && !ctx.compteVinted) return refuser('vinted-onglet');\n", ''],
+  'vinted-sans-categorie': ['agent', "out.reponses = { ...((repA.sites && repA.sites.vinted) || {}), catalog_id: C.vinted };", "out.reponses = { ...((repA.sites && repA.sites.vinted) || {}) };"],
+  'vinted-reponse-libre': ['agent', "const idVinted = (v) => /^\\d{1,12}$/.test(str(v));", "const idVinted = (v) => !!str(v);"],
+  'vc-relu-aveugle': ['agent', "etat: ['univers', 'categorie', 'sous'].every((c) => norm(r[c]) === norm(w[c])) ? 'ok' : 'ecart'", "etat: 'ok'"],
+  'formulaire-ignore': ['agent', "  if (!form) return;\n  const { champs, autres } = champsFormulaireLbc(form);", "  return;\n  const { champs, autres } = champsFormulaireLbc(form);"],
+  'couleur-devinee': ['agent', "if (noms.every(Boolean)) lu.couleurs.push({ v: noms, de: s });", "lu.couleurs.push({ v: noms.map((x) => x || 'Noir'), de: s });"],
+  'ext-ebayimg-refuse': ['bg', "|i\\.ebayimg\\.com)$/i;", ")$/i;"],
+  'ext-formulaire-tout': ['bg', "if (!rep || rep.codec_type !== 'CODEC_TYPE_ATTRIBUTES' || !rep.associated_key || rep.associated_key === 'donation') continue;", "if (!rep || !rep.associated_key) continue;"],
+  'ext-relu-libre': ['bg', "  return r.univers && r.categorie && r.sous ? r : null;\n}\n// Le compte ouvert", "  return r;\n}\n// Le compte ouvert"],
 };
 const arg = process.argv.slice(2);
 const mut = (arg.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
@@ -255,8 +264,81 @@ if (arg.includes('--prouve')) {
     dit(r4 && r4.accepte === false && r4.code === 'marque-hors-liste' && crees === 1 && !b.store.vrmPendingVc, 'G7 Vestiaire : marque absente de SA liste ⇒ pas vendable ici, rien ne part', r4);
     const r5 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'vestiaire', fiche: ficheV });
     dit(r5 && r5.accepte === true && b.store.vrmPendingVc && b.store.vrmPendingVc.ad.marque === 'Nike' && b.store.vrmPendingVc.ad.vcCategorie.sous === 'Baskets', 'G8 Vestiaire : marque listée, catégorie exacte ⇒ préparation ouverte', r5);
+    // P. photos d'un autre hôte : le fond les télécharge (droit d'hôte du manifeste), jamais un nom approchant.
+    dit(c.urlPhotoPermise('https://i.ebayimg.com/images/g/x/s-l1600.jpg') && c.urlPhotoPermise('https://img.leboncoin.fr/api/v1/a.jpg') && !c.urlPhotoPermise('https://x.i.ebayimg.com/a.jpg') && !c.urlPhotoPermise('https://evil-ebayimg.com/a.jpg') && !c.urlPhotoPermise('https://exemple.invalid/a.jpg'),
+      'P1 le fond accepte i.ebayimg.com (exact) et leboncoin.fr ; refuse un sous-domaine ou un nom qui finit pareil');
+    // K. le formulaire Leboncoin (forme mesurée le 19 nov. : definitions.items, codec, associated_key, choices).
+    const config = { navigation: {}, definitions: { items: [
+      { type: 'ITEM_TYPE_QUESTION', identifier: 'accessories_univers_id', decoration: { label: 'Univers' }, static_rules: { mandatory: {} }, answer_modelization: { representation: { codec_type: 'CODEC_TYPE_ATTRIBUTES', associated_key: 'accessories_univers' }, multiple_answers: { choices: [{ label: 'Femme', identifier: '1' }, { label: 'Homme', identifier: '2' }] } } },
+      { type: 'ITEM_TYPE_QUESTION', identifier: 'donation_id', decoration: { label: 'Je fais un don' }, answer_modelization: { representation: { codec_type: 'CODEC_TYPE_ATTRIBUTES', associated_key: 'donation' }, multiple_answers: { choices: [{ label: 'Oui' }, { label: 'Non' }] } } },
+      { type: 'ITEM_TYPE_QUESTION', identifier: 'subject_id', decoration: { label: "Titre de l'annonce" }, static_rules: { mandatory: {} }, answer_modelization: { representation: { codec_type: 'CODEC_TYPE_ROOT', associated_key: 'subject' }, single_answer: {} } }] } };
+    const fl = c.formulaireLbcDe(JSON.stringify(config));
+    dit(fl && fl.champs.length === 1 && fl.champs[0].libelle === 'Univers' && fl.champs[0].obligatoire === true && fl.champs[0].choix.join() === 'Femme,Homme', 'K4 extension : seuls les critères du formulaire (libellés du site) sont gardés ; ni le don ni le titre', fl);
+    await c.storeLbcCatalogue('https://api.leboncoin.fr/api/adsubmit/dynamic-deposit/config?user_id=x&category=47', JSON.stringify(config), false);
+    await new Promise((r) => setTimeout(r, 30));
+    dit(b.lignes.lbc_formulaires && b.lignes.lbc_formulaires['47'] && b.lignes.lbc_formulaires['47'].champs[0].libelle === 'Univers', 'K5 la première fois que le formulaire de la catégorie 47 est vu, il est appris (`lbc_formulaires`)', b.lignes.lbc_formulaires);
+    // J. Vestiaire : la catégorie relue, seulement trois libellés lisibles.
+    dit(JSON.stringify(c.categorieRelueVc({ univers: 'Mode homme', categorie: 'Chaussures', sous: 'Baskets' })) === JSON.stringify({ univers: 'Mode homme', categorie: 'Chaussures', sous: 'Baskets' }) && c.categorieRelueVc({ univers: 'Mode homme', categorie: 'Chaussures' }) === null && c.categorieRelueVc({ univers: '<b>', categorie: 'x', sous: 'y' }) === null,
+      'J5 extension : la catégorie relue n’est gardée qu’entière et lisible');
+    dit(/categorieDeReponseVc\(cand\)/.test(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'vc-inject.js'), 'utf8')) && /categorie: cat/.test(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'vc.js'), 'utf8')) && /const relu = categorieRelueVc\(msg\.categorie\)/.test(src.bg), 'J6 la réponse du dépôt Vestiaire porte la catégorie jusqu’à la commande (vc-inject → vc.js → fond)');
+    dit(typeof c.listesVintedPourApp === 'function' && /msg\.cmd === 'listesVinted'\) return await listesVintedPourApp\(\)/.test(src.bg) && /await couleursConnues\(uid, acc\)/.test(src.bg.slice(src.bg.indexOf('async function listesVintedPourApp'))), 'L3 extension : la liste des couleurs lue par le chemin existant (onglet vinted.fr, budget de lecture) et publiée');
     try { fs.unlinkSync(tmp); } catch (_) {}
   });
+
+  // ── I à L : « fais tout » (19 nov.) ──────────────────────────────────────
+  if (A && T) {
+    await essaie('I', async () => {
+      console.log('── I. Vinted comme cible : le chemin de « Créer sur Vinted »');
+      const lb = art('leboncoin#60', '60', [{ site: 'leboncoin', id: '60', titre: 'Baskets Nike', photo: 'https://img.leboncoin.fr/a.jpg', etat: 'enligne', marque: 'Nike', taille: '42', condition: 'Très bon état' }]);
+      const lect = { leboncoin: { 60: { category: 'Chaussures', body: 'Belle paire.', images: ['https://img.leboncoin.fr/a.jpg'] } } };
+      const m = A.retenirReponses(null, A.ficheArticle(lb, lect), [{ champ: 'categorie', valeur: 'chaussures/baskets/homme' }]);
+      const f = A.ficheArticle(lb, lect, m);
+      dit(A.planSite(f, 'vinted', m, {}).refus.code === 'vinted-onglet', 'I1 sans compte Vinted dans l’onglet ⇒ rien ne part');
+      const ctx = { compteVinted: { uid: '111' } };
+      const p = A.planSite(f, 'vinted', m, ctx); const e = A.envoiPour(f, p, ctx);
+      dit(p.etat === 'pret' && e && e.msg.cmd === 'creerVintedFiche' && e.msg.uid === '111' && e.msg.confirme === true && e.msg.reponses.catalog_id === '1242' && /^agent-60$/.test(e.msg.fiche.id) && e.msg.fiche.photos[0] === 'https://img.leboncoin.fr/a.jpg',
+        'I2 catégorie sûre ⇒ `creerVintedFiche` (compte de l’onglet, confirmé), catalog_id de la table, photos de l’annonce', e && e.msg);
+      const q = A.planSite(f, 'vinted', m, { ...ctx, questionsVinted: { 'leboncoin#60': { champ: 'brand', options: [['53', 'Nike'], ['14', 'Adidas']] } } });
+      dit(q.etat === 'question' && q.questions.some((x) => x.site === 'vinted' && x.champ === 'brand' && x.choix.includes('53') && x.libelles['53'] === 'Nike'), 'I3 Vinted renvoie une question ⇒ posée avec SES valeurs', q.questions);
+      const m2 = A.retenirReponses(m, f, [{ site: 'vinted', champ: 'brand', valeur: '53' }, { site: 'vinted', champ: 'size', valeur: 'quarante-deux' }]);
+      const p2 = A.planSite(A.ficheArticle(lb, lect, m2), 'vinted', m2, { ...ctx, questionsVinted: { 'leboncoin#60': { champ: 'brand', options: [['53', 'Nike']] } } });
+      dit(p2.etat === 'pret' && p2.reponses.brand === '53' && !('size' in p2.reponses), 'I4 sa réponse (un identifiant de la liste) est retenue et renvoyée ; un texte libre ne l’est jamais', p2.reponses);
+      dit(A.planSite(A.ficheArticle(art('vinted#61', '61', [vinted('61')]), lectV('61', 1242)), 'vinted', null, { ...ctx, deja: { vinted: true } }).etat === 'deja', 'I5 déjà sur Vinted ⇒ pas reproposé');
+    });
+    await essaie('J', async () => {
+      console.log('── J. Vestiaire : la catégorie relue dans la réponse du dépôt');
+      const w = { univers: 'Mode homme', categorie: 'Chaussures', sous: 'Baskets' };
+      dit(A.relireEnvoi({ site: 'vestiaire', numero: '42', voulu: w, relu: { ...w } }, {}).etat === 'ok', 'J1 relue identique ⇒ conforme');
+      dit(A.relireEnvoi({ site: 'vestiaire', numero: '42', voulu: w, relu: { ...w, sous: 'Mocassins' } }, {}).etat === 'ecart', 'J2 relue différente ⇒ écart dit');
+      dit(A.relireEnvoi({ site: 'vestiaire', numero: '42', voulu: w }, {}).etat === 'non-relisible', 'J3 pas dans la réponse ⇒ « posée, pas relue »');
+      const m = A.noterRelu(A.noterEnvoi(null, 'vestiaire', '42', { site: 'vestiaire', valeurs: w }), 'vestiaire', '42', { ...w, sous: 'Boots' });
+      dit(m.envois['vestiaire:42'].relu.sous === 'Boots' && A.relireEnvoi(m.envois['vestiaire:42'], {}).etat === 'ecart', 'J4 la relue est gardée avec l’envoi (synchronisée)');
+    });
+    await essaie('K', async () => {
+      console.log('── K. Leboncoin hors chaussures : le formulaire appris');
+      const lb = art('leboncoin#70', '70', [{ site: 'leboncoin', id: '70', titre: 'Sac', photo: 'https://img.leboncoin.fr/a.jpg', etat: 'enligne', marque: 'Longchamp' }]);
+      const lect = { leboncoin: { 70: { category: 'Accessoires & Bagagerie', body: 'Sac' } } };
+      const m = A.retenirReponses(null, A.ficheArticle(lb, lect), [{ champ: 'categorie', valeur: 'sacs/sac-a-main/femme' }, { champ: 'etat', valeur: 'Bon état' }]);
+      const f = A.ficheArticle(lb, lect, m);
+      const form = { champs: [{ libelle: 'Univers', obligatoire: true, choix: ['Femme', 'Homme'] }, { libelle: 'Type', obligatoire: true, choix: ['Pochette', 'Cabas'] }, { libelle: 'État', obligatoire: true, choix: ['Bon état'] }] };
+      const p = A.planSite(f, 'leboncoin', m, { formulairesLbc: { 47: form } });
+      dit(p.formulaire === 'appris' && p.valeurs.univers === 'Femme' && p.valeurs.type === undefined && p.questions.some((q) => q.champ === 'type' && q.choix.includes('Cabas')) && p.etat === 'question',
+        'K1 « Sac à main » absent du formulaire VU ⇒ retiré, demandé parmi SES choix (rien ne part)', { v: p.valeurs, q: p.questions.map((q) => q.champ) });
+      const p2 = A.planSite(f, 'leboncoin', m, { formulairesLbc: { 47: { champs: [...form.champs, { libelle: 'Matière', obligatoire: true, choix: ['Cuir'] }] } } });
+      dit(p2.etat === 'refus' && p2.refus.code === 'lbc-champ-obligatoire' && p2.refus.champ === 'Matière', 'K2 un champ obligatoire que VRM ne sait pas poser ⇒ pas vendable ici, dit', p2.refus);
+      const p3 = A.planSite(f, 'leboncoin', m, { formulairesLbc: { 47: { champs: [{ libelle: 'Univers', obligatoire: true, choix: ['Femme'] }, { libelle: 'Type', obligatoire: true, choix: ['Sac à main'] }] } } });
+      const e3 = A.envoiPour(f, p3, {});
+      dit(p3.etat === 'pret' && e3 && !('etat' in e3.msg.fiche.criteres), 'K3 un critère que le formulaire n’a pas n’est pas envoyé', e3 && e3.msg.fiche.criteres);
+    });
+    await essaie('L', async () => {
+      console.log('── L. couleurs Vinted : traduites par la liste que Vinted sert, sinon rien');
+      const f = A.ficheArticle(art('vinted#80', '80', [vinted('80')]), { ...lectV('80', 1242, { codes: { catalog_id: 1242, color_ids: [1, 12] } }), couleursVinted: { 1: 'Noir', 12: 'Blanc' } });
+      dit(f.champs.couleurs && f.champs.couleurs.v.join(',') === 'Noir,Blanc', 'L1 codes 1, 12 + liste lue ⇒ « Noir, Blanc »', f.champs.couleurs);
+      const g = A.ficheArticle(art('vinted#81', '81', [vinted('81')]), { ...lectV('81', 1242, { codes: { catalog_id: 1242, color_ids: [1, 99] } }), couleursVinted: { 1: 'Noir' } });
+      const h = A.ficheArticle(art('vinted#82', '82', [vinted('82')]), lectV('82', 1242, { codes: { catalog_id: 1242, color_ids: [1] } }));
+      dit(g.champs.couleurs === null && h.champs.couleurs === null, 'L2 un code absent de la liste, ou pas de liste ⇒ couleur pas lue (jamais devinée)');
+    });
+  }
 
   await essaie('H', async () => {
     console.log('── H. le câblage');

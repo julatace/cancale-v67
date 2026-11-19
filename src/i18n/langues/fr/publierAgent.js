@@ -114,4 +114,12 @@ export default {
   "agent.origine.traduit": "traduit de la fiche",
   "agent.origine.reponse": "ta réponse",
   "agent.origine.fiche": "de la fiche",
+  "agent.champ.size": "Taille (liste Vinted)",
+  "agent.champ.condition": "État (liste Vinted)",
+  "agent.champ.color": "Couleur (liste Vinted)",
+  "agent.champ.brand": "Marque (liste Vinted)",
+  "agent.refus.vinted-onglet": "Ouvre vinted.fr dans ce navigateur, connecté sur le compte où créer l'annonce.",
+  "agent.refus.lbc-champ-obligatoire": "Leboncoin exige « {champ} » pour cette catégorie et VRM ne sait pas le poser : publie-la toi-même sur Leboncoin.",
+  "agent.envoi.vinted": "Vinted : brouillon créé — publie-le depuis tes brouillons Vinted.",
+  "agent.envoi.vintedQuestion": "Vinted demande {champ} : réponds, puis « Publier ».",
 };
