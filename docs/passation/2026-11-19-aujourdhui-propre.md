@@ -123,3 +123,24 @@ suivent la même règle (`echeanceJ` : « à vérifier » pour une estimée).
   partiront avec l'ancien design.
 - « À régler » est calculé par Aujourd'hui puis publié (limite connue ci-dessus) : à sortir dans un sélecteur partagé.
 
+
+## Les chiffres Jour · Semaine · Mois (19 nov., soir)
+
+Julien : « je veux peut-être plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice etc. — là il y a
+beaucoup d'infos qui ne servent à rien et qui doivent être rangées autre part ».
+
+- En tête d'Aujourd'hui : un segmenté **Jour · Semaine · Mois**, le **CA vendu** en grand avec son **écart nommé**
+  (« +85 % vs hier à cette heure », « −12 % vs la semaine dernière », « vs octobre » — la période d'avant coupée au MÊME
+  moment), puis **Bénéfice · Ventes · Panier moyen**. Toucher un chiffre ouvre Argent sur la période
+  (`vrm_compta_periode`). Le reste de l'écran : À envoyer, À retirer, Dernières ventes. « Reçu », « Argent à venir » et
+  les 7 barres sont dans Argent.
+- Aucune règle neuve (`statsPeriodes`, `src/aujourdhui/modele.js`) : vendu et ventes = `valeurChiffre('vendu' | 'ventes')`
+  (`ventesFaites`) ; bénéfice du mois = celui d'Argent (net, sinon brut avec sa couverture) ; jour et semaine = `brut`
+  (`vrm_benefice_jours`), « au moins · 8/10 prix d'achat » quand des prix d'achat manquent ; panier = vendu ÷ ventes
+  seulement si les deux sont lus en entier (sinon « — ») ; écart seulement entre deux vendus complets et une période
+  d'avant qui a vendu. Une vente au prix illisible n'est pas une ligne de « Vendu » : le nombre de ventes dit alors
+  « au moins ». La boîte garde la même hauteur en lecture, lue, pas sue, et d'une période à l'autre.
+- Preuves : `audit-aujourdhui` 52 verts (E1–E6), mutations `panier_partiel`, `ecart_sans_avant`,
+  `stats_zero_pour_passu` rouges ; `aujourdhui-natif` (capture, vide, attente · 390 / 1512 · clair / sombre) 110 verts,
+  0 rouge ; `aujourdhui-propre` (l'app, capture et vide, 390 / 1512, clair et sombre) 118 verts, 0 rouge — vendu, ventes
+  et panier des trois périodes = les ventes semées, bénéfice du mois = l'écran Argent ; budget de démarrage 1982 Ko ≤ 1982.
