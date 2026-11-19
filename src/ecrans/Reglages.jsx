@@ -72,6 +72,7 @@ import SuiviComptes from '../SuiviComptes.jsx';
 import SanteComptes from '../SanteComptes.jsx';   // (11 nov., lot sante-comptes)
 // (8 nov.) Paramètres → « Tout va bien ? » (garde-fous de la capture, api/_lib/garde-capture.js).
 import { ToutVaBien } from '../ToutVaBien.jsx';
+import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « choses à trancher », comptes, santé : derrière « Tout va bien ? »
 import { VeilleJournee } from '../VeilleJournee.jsx';   // (15 nov., refonte-journee) le contrôle de cette nuit quitte Ma journée pour « Tout va bien ? »
 import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';
@@ -2124,7 +2125,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // pas (bancs, recherche) ; seuls les titres, l'ordre et les phrases changent.
     { id:'comptes', titre:tr('reglages.groupe.comptes'), items:[
       // (8 nov.) « Tout va bien ? » EN HAUT : chaque compte relu ou bloqué, chaque appareil et sa version (src/ToutVaBien.jsx).
-      { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<><ToutVaBien onComptes={()=>setTab('vintedaccounts')}/><VeilleJournee/></> },
+      { id:'toutvabien', type:'panneau', ic:'heart', lib:tr('reglages.toutvabien.lib'), desc:tr('reglages.toutvabien.desc'), data:{ 'data-reglage-toutvabien':'' }, el:<><ARegler onglet="sante" Icon={Icon}/><ToutVaBien onComptes={()=>setTab('vintedaccounts')}/><VeilleJournee/></> },
       // (11 nov., lot sante-donnees) Tout ce qui cloche dans tes données, le plus grave d'abord, un bouton par ligne (src/SanteDonnees.jsx).
       { id:'sante', type:'panneau', ic:'check', lib:tr('reglages.sante.lib'), desc:tr('reglages.sante.desc'), data:{ 'data-reglage-sante':'' }, el:<SanteDonnees/> },
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).

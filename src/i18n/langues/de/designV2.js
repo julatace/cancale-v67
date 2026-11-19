@@ -7,18 +7,12 @@ export default {
   "v2.passe.suivant": "Nächstes Paket",
   "v2.reglage.lib": "Altes Design",
   "v2.reglage.desc": "Auf diesem Gerät zum bisherigen Aussehen zurückkehren. Deine Daten und Einstellungen bleiben gleich.",
-  "v2.aEnvoyer.aria": "{n} Pakete zu versenden",
   "v2.aEnvoyer.mot": {
     "one": "Paket zu versenden",
     "other": "Pakete zu versenden"
   },
   "v2.pasLu": "noch nicht gelesen",
   "v2.rienAEnvoyer": "nichts zu versenden",
-  "v2.ecart": "{p} druckbereit · {r} noch nicht bereit",
-  "v2.prets": {
-    "one": "{n} Etikett bereit",
-    "other": "{n} Etiketten bereit"
-  },
   "v2.pretsAuMoins": {
     "one": "mindestens {n} Etikett bereit",
     "other": "mindestens {n} Etiketten bereit"
@@ -48,7 +42,6 @@ export default {
     "one": "das erste in {n} Tag",
     "other": "das erste in {n} Tagen"
   },
-  "v2.afaire.titre": "Zu erledigen",
   "v2.g.messages": {
     "one": "{n} Nachricht zu lesen",
     "other": "{n} Nachrichten zu lesen"
@@ -71,10 +64,8 @@ export default {
   "v2.passe.limiteInconnue": "Frist nicht angegeben",
   "v2.passe.qr": "Abhol-QR-Code",
   "v2.passe.codeAVenir": "Code noch nicht gelesen",
-  "v2.passe.enGrand": "Vollbild",
   "v2.passe.retire": "Abgeholt",
   "v2.passe.page": "{i} von {n}",
-  "v2.passe.aucun": "Derzeit kein Paket abzuholen.",
   "v2.passe.detail": "Alle Abholdetails",
   "v2.enRoute.titre": "Unterwegs",
   "v2.enRoute.sansTitre": "Kauf ohne Titel",
@@ -189,5 +180,49 @@ export default {
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Hellgrauer Hintergrund, weiße Karten, Schrift und Schalter wie auf dem iPhone.",
   "v2.style.studio": "Studio Blau",
-  "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas."
+  "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas.",
+  // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
+  "v2.jour.auj": "heute",
+  "v2.jour.hier": "gestern",
+  "v2.jour.le": "{quand}",
+  "v2.jour.vendus": {
+    "one": "{quand} verkauft",
+    "other": "{quand} verkauft"
+  },
+  "v2.jour.aucune": "kein Verkauf",
+  "v2.jour.ventes": {
+    "one": "{n} Verkauf",
+    "other": "{n} Verkäufe"
+  },
+  "v2.jour.pasSu": "Verkäufe noch nicht gelesen",
+  "v2.mois.vendu": "Verkauft",
+  "v2.mois.recu": "Erhalten",
+  "v2.mois.benefice": "Gewinn",
+  "v2.mois.sur": {
+    "one": "{k} Verkauf von {n}",
+    "other": "{k} Verkäufe von {n}"
+  },
+  "v2.envoyer.titre": "Zu versenden",
+  "v2.bande.plus": {
+    "one": "{n} weiteres Paket zu versenden",
+    "other": "{n} weitere Pakete zu versenden"
+  },
+  "v2.dv.titre": "Letzte Verkäufe",
+  "v2.dv.vente": "{site}-Verkauf",
+  "v2.dv.aVenir": "Geld unterwegs",
+  "v2.alerte.poster": {
+    "one": "{n} dringend · {quand}",
+    "other": "{n} dringend · {quand}"
+  },
+  "v2.alerte.retour": {
+    "one": "{n} Rücksendung heute oder morgen abzugeben",
+    "other": "{n} Rücksendungen heute oder morgen abzugeben"
+  },
+  "v2.reg.titre": "Zu erledigen",
+  "v2.reg.toutVoir": "Alle ansehen · {n}",
+  "v2.reg.moins": "Weniger anzeigen",
+  "v2.reg.completer": "Meine Anzeigen vervollständigen",
+  "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}",
+  "v2.jour.lecture": "wird gelesen…",
+  "v2.alerte.retourTitre": "Rücksendung abzugeben"
 };
