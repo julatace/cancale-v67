@@ -38,12 +38,15 @@ import { tr } from '../i18n/index.js';
 import { cx, mouvementReduit } from './outils.js';
 import { Glyphe } from './icones.jsx';
 
-export function Vignette({ src = '', alt = '', taille = 56, icone = null, className = '' }) {
+// `image` (ajout du 19 nov.) : un nœud qui dessine la photo lui-même (l'app passe sa <PhotoVinted> : sans référent,
+// relais de l'extension quand l'adresse Vinted a expiré) ; il remplit le cadre, la photo absente reste l'icône.
+export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
   const t = taille === 44 ? 44 : 56;
+  if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
-    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" draggable="false" onError={() => setRate(true)}/>;
+    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>;
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>

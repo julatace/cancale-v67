@@ -292,6 +292,8 @@
   .n-vignette { display: block; flex: 0 0 auto; width: 56px; height: 56px; border-radius: var(--n-r-vignette); object-fit: cover; background: var(--n-sous, var(--n-carte-2)); }
   .n-vignette[data-n-taille="44"] { width: 44px; height: 44px; }
   .n-vignette-vide { display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  .n-vignette-image { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  .n-vignette-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
   .n-interrupteur {
     appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 51px; height: 31px; margin: 0; border: 0;

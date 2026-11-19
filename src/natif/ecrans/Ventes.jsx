@@ -14,6 +14,9 @@ import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bo
 import { filtrerRangs, rangChoisi } from '../../ventes/modeleVentes.js';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
+// La photo d'une rangée : la <PhotoVinted> de l'app quand elle est passée (sans référent, relais de l'extension quand l'adresse
+// Vinted a expiré — sinon le CDN refuse et la vignette restait un carré vide), sinon l'icône dessinée.
+const vignette = (r, Photo) => <Vignette src={r.photo || ''} alt="" image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
 
 // La date limite en mots : LUE ⇒ « avant le 22 nov. · dans 3 j » ; ESTIMÉE ⇒ « vers le 22 nov. » (jamais « en retard », §5).
 function texteEcheance(e) {
@@ -29,7 +32,7 @@ function texteEtape(etapes) {
   return i < 0 ? tr('v2v.etapeAucune') : tr('vn.etape', { n: i + 1, m: etapes.length, mot: tr('vv.route.' + etapes[i].cle) });
 }
 
-function RangeeColis({ r, g, Icon, Logo, choisie, onOuvrir }) {
+function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
   const ech = texteEcheance(r.echeance);
   const actions = [
     r.gestes.depose ? { cle: 'depose', libelle: tr('vn.b.depose'), ton: 'neutre', icone: <Icon name="check" size={20}/>, onClick: r.gestes.depose } : null,
@@ -37,14 +40,13 @@ function RangeeColis({ r, g, Icon, Logo, choisie, onOuvrir }) {
   ].filter(Boolean);
   return (
     <Rangee
-      vignette={<Vignette src={r.photo || ''} alt=""/>}
-      titre={r.titre} lignes={2}
+      vignette={vignette(r, Photo)}
+      titre={r.titre}
       plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
-      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)}
+      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', r.taille ? tr('vv.taille', { t: r.taille }) : '', ech)}
       ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte
-      detailValeur={r.transporteur || ''}
-      note={joint(textePlace(r.place), r.taille ? tr('vv.taille', { t: r.taille }) : '', texteBordereau(r.bordereau), r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
+      detailValeur={textePlace(r.place) || r.transporteur || ''}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
@@ -54,16 +56,15 @@ function RangeeColis({ r, g, Icon, Logo, choisie, onOuvrir }) {
   );
 }
 
-function RangeeRoute({ r, Icon, Logo, choisie, onOuvrir }) {
+function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
   return (
     <Rangee
-      vignette={<Vignette src={r.photo || ''} alt=""/>}
-      titre={r.titre} lignes={2}
+      vignette={vignette(r, Photo)}
+      titre={r.titre}
       plaque={r.num ? <Plaque numero={r.num}/> : null}
-      sousTitre={texteEtape(r.etapes)}
+      sousTitre={joint(r.taille ? tr('vv.taille', { t: r.taille }) : '', texteEtape(r.etapes))}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       valeur={r.prix || null} valeurForte detailValeur={r.pourToi ? tr('vv.route.pourToi') : ''}
-      note={joint(r.etat.texte, r.taille ? tr('vv.taille', { t: r.taille }) : '', r.transporteur, r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
       attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
@@ -72,7 +73,7 @@ function RangeeRoute({ r, Icon, Logo, choisie, onOuvrir }) {
 }
 
 // LE DÉTAIL D'UNE VENTE (la fiche poussée ; à l'ordinateur, le volet de détail) : les faits, les étapes prouvées, les gestes en rangées.
-function DetailVente({ r, g, Icon, Generer }) {
+function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
   if (!r) return null;
   const d = r.detail || {};
   const route = Array.isArray(r.etapes);
@@ -83,8 +84,8 @@ function DetailVente({ r, g, Icon, Generer }) {
   return (
     <>
       <Groupe>
-        <Rangee vignette={<Vignette src={r.photo || ''} alt=""/>} titre={r.titre} lignes={2} plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
-          sousTitre={joint(r.taille ? tr('vv.taille', { t: r.taille }) : '', r.compte)} attrs={{ 'data-vn-detail-tete': r.cle }}/>
+        <Rangee vignette={vignette(r, Photo)} titre={r.titre} lignes={2} plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
+          sousTitre={joint(r.taille ? tr('vv.taille', { t: r.taille }) : '', r.compte, r.site !== 'vinted' && Logo ? Logo.nom(r.site) : '')} attrs={{ 'data-vn-detail-tete': r.cle }}/>
         <Faits colonnes={2}>
           <Fait libelle={tr('vv.fiche.vendu')} valeur={(route ? r.prix : d.vendu) || null}/>
           <Fait libelle={tr('vv.fiche.pourToi')} valeur={(route ? (r.pourToi ? r.prix : '') : d.pourToi) || null} detail={!route && d.sansFrais ? tr('vv.fiche.sansFrais') : ''}/>
@@ -118,7 +119,7 @@ function DetailVente({ r, g, Icon, Generer }) {
   );
 }
 
-export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, plateforme = null, avantRoute = null, apresListe = null, children = null }) {
+export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Generer = null, plateforme = null, avantRoute = null, apresListe = null, children = null }) {
   if (!iconePosee()) poserIcone(Icon);
   const [q, setQ] = React.useState('');
   const [choisie, setChoisie] = React.useState(null);
@@ -162,7 +163,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
             : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
-                {rangs.map((r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Logo={Logo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
+                {rangs.map((r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
               </Groupe>}
           {!E.rangs.length && filtre ? <Groupe nu>{filtre}</Groupe> : null}
@@ -178,7 +179,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
           {!R || !R.lu ? (R && R.erreur ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/> : <Attente forme="rangees" n={5} vignette={56} titre/>)
             : !R.rangs.length ? <Vide icone={<Icon name="truck" size={40}/>} phrase={tr('v2v.vide.route')}/>
             : <Groupe titre={tr('vv.seg.route')} action={actionPlateforme} attrs={{ 'data-vn-liste': 'route', 'data-vn-n': String(R.rangs.length) }}>
-                {rangs.map((r) => <RangeeRoute key={r.cle} r={r} Icon={Icon} Logo={Logo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
+                {rangs.map((r) => <RangeeRoute key={r.cle} r={r} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
               </Groupe>}
         </> : null}
@@ -187,7 +188,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Generer = null, p
       </Page>
       <PagePoussee ouverte={!!ouverte || (volet && m.onglet !== 'toutes')} titre={ouverte && ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : ouverte ? tr('vn.detail') : ''} libelleRetour={tr('vn.titre')} onRetour={() => setChoisie(null)}
         attrs={{ 'data-vn-detail': ouverte ? ouverte.cle : '' }}>
-        {ouverte ? <DetailVente r={ouverte} g={g} Icon={Icon} Generer={Generer}/> : <Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>}
+        {ouverte ? <DetailVente r={ouverte} g={g} Icon={Icon} Logo={Logo} Photo={Photo} Generer={Generer}/> : <Vide icone={<Icon name="box" size={40}/>} phrase={tr('vn.detailVide')}/>}
       </PagePoussee>
       <Feuille ouverte={feuilleGestes} onFermer={() => setFeuilleGestes(false)} titre={tr('v2v.outils.titre')} detente="moitie" detentes={['moitie', 'pleine']}>
         {/* (19 nov., décision de Julien « 4 oui ») « Préparer mes colis », « Je dépose », la tournée et « Emballer » sont RETIRÉS :

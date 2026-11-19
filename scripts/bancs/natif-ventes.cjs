@@ -116,6 +116,9 @@ function mesure(src) {
   const rg = rangs.map((r) => { const case_ = r.querySelector('input.n-case'); const t = r.querySelector('.n-rangee-titre'); const v = r.querySelector('.n-rangee-valeur');
     return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), coche: case_ ? (case_.checked ? 1 : 0) : null, dispo: case_ ? !case_.disabled : null, bord: r.getAttribute('data-vn-bordereau') || null, lim: r.getAttribute('data-vn-limite'), code: r.getAttribute('data-vn-limite-code'),
       num: !!r.querySelector('.n-plaque'), titre: !!(t && t.textContent.trim()), prix: !!(v && v.textContent.trim()), place: r.getAttribute('data-vn-place') || '', texte: r.textContent,
+      vig: (() => { const vg = r.querySelector('.n-vignette'); if (!vg) return 'absente'; const im = vg.tagName === 'IMG' ? vg : vg.querySelector('img');
+        if (im) return im.complete && im.naturalWidth > 0 ? 'photo' : 'vide'; return vg.querySelector('svg path, svg use, svg circle, svg rect') ? 'icone' : 'vide'; })(),
+      morceaux: [...r.querySelectorAll('.n-rangee-sous-texte, .n-rangee-note, .n-rangee-detail')].flatMap((e) => e.textContent.split(' · ').map((x) => x.trim()).filter(Boolean)),
       ecart: t && v ? Math.round(R(v).left - R(t).right) : null, haut: Math.round(R(r).top), bas: Math.round(R(r).bottom), larg: Math.round(R(r).width), gauche: Math.round(R(r).left) }; });
   const seg = [...document.querySelectorAll('[data-vn="ventes"] .n-segmente [role="tab"], [data-vn="ventes"] .n-segmente button')].filter(vis).map((b) => b.textContent.replace(/\s+/g, ' ').trim());
   const barre = [...document.querySelectorAll('.n-onglets, .vrm-tabbar, nav.v2-barre, [data-v2-barre]')].filter(vis).map((b) => Math.round(R(b).top));
@@ -169,6 +172,15 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(!m.vides.length, 'aucun bouton vide', m.vides);
       dit(m.deb <= 1, `rien ne déborde (${m.deb})`);
       dit(m.recherches === 1, `UNE recherche (${m.recherches})`);
+      // (19 nov., capture de Julien) Rangées de 72 : pas de 4 lignes ; pas la même phrase sur chaque ligne (§7) ; jamais une vignette vide.
+      const hauts = r.map((x) => x.bas - x.haut);
+      dit(hauts.every((h) => h <= 84), `rangées compactes (≤ 84 px, la plus haute : ${Math.max(...hauts)})`);
+      const freq = {}; for (const x of r) for (const k of new Set(x.morceaux)) freq[k] = (freq[k] || 0) + 1;
+      const partout = Object.keys(freq).filter((k) => r.length >= 3 && freq[k] === r.length);
+      dit(!partout.length, 'aucune phrase redite sur toutes les rangées', partout);
+      await pg.waitForTimeout(800);
+      const vigs = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-liste] [data-vn-rang] .n-vignette')].slice(0, 6).map((v) => { const im = v.tagName === 'IMG' ? v : v.querySelector('img'); return im ? (im.complete && im.naturalWidth > 0 ? 'photo' : 'vide') : (v.querySelector('svg path, svg use, svg circle, svg rect') ? 'icone' : 'vide'); }));
+      dit(vigs.length && vigs.every((x) => x !== 'vide'), `vignettes : une photo ou une icône dessinée, jamais vide (${vigs.join(',')})`);
       if (tel) {
         dit(m.rg[0] && m.rg[0].haut <= 340, `1re rangée utile à ≤ 340 px (${m.rg[0] && m.rg[0].haut})`);
         dit(m.pleinBas != null && m.pleinBas <= m.hautBarre + 1, `le plein est au-dessus de la barre du bas (${m.pleinBas} ≤ ${m.hautBarre})`);
