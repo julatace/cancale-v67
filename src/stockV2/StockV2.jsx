@@ -306,7 +306,11 @@ export default function StockV2({ s }) {
   const exact = s.qEstNum ? s.resultats.filter((f) => s.exactNum(f)) : [];
   const un = choisi ? s.resultats.find((f) => s.cleDe(f) === choisi) : (exact.length === 1 ? exact[0] : (s.resultats.length === 1 ? s.resultats[0] : null));
   React.useEffect(() => { setChoisi(null); }, [s.q]);
-  const nPlein = aRangerCles.length;
+  // Le compte du bouton ne bouge pas non plus sous la feuille (il suivait chaque pose : la ligne du titre sautait).
+  const nGel = React.useRef(null);
+  if (seanceOuverte && nGel.current == null) nGel.current = aRangerCles.length;
+  if (!seanceOuverte) nGel.current = null;
+  const nPlein = seanceOuverte && nGel.current != null ? nGel.current : aRangerCles.length;
   const chercheVide = !s.q.trim();
   const ficheF = fiche ? s.ficheDe(fiche) : null;
   const lignes = s.lignes;
@@ -346,7 +350,13 @@ export default function StockV2({ s }) {
       {s.blocs.inventaire}{s.blocs.annuel}
       <div className="sm-tete">
         <h1 className="sm-titre sr-titre">{tr('nav.garage')}</h1>
+        <span className="sm-tete-gestes">
+        {/* LE geste de l'écran, compact sur la ligne du titre (comme Annonces) : visible au premier écran, même à 375 px
+            en « Très grand », sans repousser la liste ; il reste posé pendant la séance (rien ne bouge sous la feuille). */}
+        {nPlein ? <Bouton variante="teinte" icone={<Icon name="box" size={18}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
+          onClick={() => lancer(aRangerCles)}>{tr('sr.lancerCourt', { n: nPlein })}</Bouton> : null}
         <BoutonIcone libelle={tr('sr.menu.ouvrir')} icone={<Icon name="more" size={22}/>} onClick={() => setPlus(true)} attrs={{ 'data-sr-plus-ouvrir': '', 'data-sr-etats': s.etats.length || undefined }}/>
+        </span>
       </div>
       {s.filtres ? <div className="v2-sous-titre sr-sous-titre"><MenuPlateforme id="stock" Icon={Icon} Retour={s.Retour} libelle={s.filtres.libelle} sous={s.filtres.sous}>{s.filtres.corps}</MenuPlateforme></div> : null}
       <ARegler onglet="stock" Icon={Icon}/>
@@ -385,13 +395,6 @@ export default function StockV2({ s }) {
         </Groupe>) : null}
 
       {chercheVide ? <>
-        {/* LE geste de l'écran, au-dessus de la liste qu'il range : visible au premier écran, même à 375 px en « Très grand » (pas collé
-            en bas : le Stock n'est pas un écran de la coque native). Il reste posé pendant la séance : rien ne bouge derrière la feuille. */}
-        {nPlein ? (
-          <div className="sm-bloc sm-plein">
-            <Bouton variante="plein" icone={<Icon name="box" size={20}/>} attrs={{ 'data-sr-lancer': nPlein, 'aria-label': tr('sr.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom }) }}
-              onClick={() => lancer(aRangerCles)}>{tr('sm.lancer', { n: nPlein, mot: nPlein > 1 ? mots.noms : mots.nom })}</Bouton>
-          </div>) : null}
         {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
         {s.nombres.enLigne == null ? <p className="sm-sans" data-stock-actuelles={s.nombres.etat}>{s.nombres.attente ? tr('stock.jeLisAnnonces') : tr('sr.pasLu')}</p> : null}
         {nonRangees.length ? (

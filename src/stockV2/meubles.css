@@ -102,6 +102,7 @@
   /* ── LE STOCK ──────────────────────────────────────────────────────────── */
   .sm-ecran { display: flex; flex-direction: column; gap: 16px; padding: 0; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .sm-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 8px 0 0; min-height: 44px; }
+  .sm-tete-gestes { display: flex; align-items: center; gap: 4px; flex: none; }
   .sm-titre { margin: 0; font: var(--n-t-grand); color: var(--n-encre); }
   .sm-bloc { padding: 0; display: flex; flex-direction: column; gap: 12px; }
   .sm-carte-pad { padding: 16px; }

@@ -78,7 +78,7 @@ async function rendre(b, port, { tel, sombre = false, v2, reduit = false, petit 
   // coche « fait » de la séance.
   await pg.addInitScript(() => {
     window.__cls = 0; window.__reponses = [];
-    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {}
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; (window.__sauts = window.__sauts || []).push(Math.round(e.value * 1000) / 1000 + ' ' + (e.sources || []).map((x) => x.node && x.node.nodeType === 1 ? (x.node.tagName + '.' + String(x.node.className).split(' ')[0] + (x.node.getAttribute('data-sr-ligne') ? '#' + x.node.getAttribute('data-sr-ligne') : '') + ' ' + Math.round(x.previousRect.y) + '→' + Math.round(x.currentRect.y) + '/' + Math.round(x.previousRect.x) + '→' + Math.round(x.currentRect.x)) : '?').join(',')); } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {}
     let t0 = 0;
     addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-sr-ranger-ici]')) t0 = performance.now(); }, true);
     new MutationObserver(() => { if (t0 && document.querySelector('.sr-coche')) { window.__reponses.push(Math.round(performance.now() - t0)); t0 = 0; } }).observe(document, { childList: true, subtree: true });
@@ -205,7 +205,7 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       const apres = await r.pg.evaluate(() => ({ courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant'), rep: window.__reponses.slice(), cls: window.__cls, slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null') }));
       dit(apres.rep.length && Math.max(...apres.rep) < 100, `${t} : Q — la coche « fait » arrive < 100 ms après le toucher`, apres.rep.join(',') + ' ms');
       dit(courant2 === '202' && apres.courant === '202' && apres.slots['201'] && apres.slots['201'].m === 'mA' && apres.slots['201'].i === 6 && !apres.slots['202'], `${t} : Q — un 2e toucher pendant le mouvement : la suivante arrive, rien n'est reposé`, JSON.stringify({ c: apres.courant, s201: apres.slots['201'], s202: apres.slots['202'] }));
-      dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4));
+      dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4) + ' ' + JSON.stringify(await r.pg.evaluate(() => (window.__sauts || []).slice(0, 6))));
       await r.ctx.close(); }
     { const r = await rendre(b, port, { tel, sombre, v2, petit, reduit: true });
       await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-ranger-ici]');
