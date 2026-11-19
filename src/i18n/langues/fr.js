@@ -22,6 +22,8 @@ import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
 import ecran_egalite from './fr/egalite.js';
+import ecran_tableau from './fr/tableau.js';   // (19 nov. soir) le tableau de travail
+import ecran_publierAgent from './fr/publierAgent.js';
 import ecran_ecrans_restes from './fr/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -77,6 +79,7 @@ import ecran_republier_guide from './fr/republierGuide.js';
 import ecran_republication from './fr/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_prix_sans_manuel from './fr/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_liaisonSites from './fr/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './fr/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_compteBloque from './fr/compteBloque.js';   // (19 nov., lot compte-bloque)
@@ -2329,6 +2332,7 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
@@ -2349,6 +2353,8 @@ export default {
   ...ecran_verre2,
   ...ecran_fiched,
   ...ecran_egalite,
+  ...ecran_tableau,
+  ...ecran_publierAgent,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,

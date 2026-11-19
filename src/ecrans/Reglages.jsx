@@ -167,7 +167,6 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composants du design du 17 nov. (le SEUL depuis le 19 nov.)
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
-import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.jsx';   // (17 nov.) « Barre d'onglets » : cinq styles
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -2495,6 +2494,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
   // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
+  const allerAutomatisations = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} };
   const rangeeCatV2 = (c) => {
     const pl = c.id === 'compte' ? (reglePlanCourante() || {}).plan : null;
     const v = c.id === 'compte' ? (pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : null) : c.id === 'securite-donnees' ? valeurCat({ ...c, id: 'donnees' }) : valeurCat(c);
@@ -2605,6 +2605,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
               <div data-categories-reglages="" data-onglets-reglages="">
                 <div className="v2-pm-liste" data-v2-pm-sections={catsV2.length}>{catsV2.map(rangeeCatV2)}</div>
+                {/* (19 nov. soir) Automatisations : l'écran des automatismes (src/automatisations/), hors des dix catégories. */}
+                <div className="v2-pm-liste" data-auto-entree=""><RangeeTouchable className="v2-pm-rangee" onClick={allerAutomatisations} attrs={{ 'data-auto-ouvrir': '' }}>
+                  <span className="v2-pm-ic" aria-hidden="true"><Icon name="spark" size={18}/></span><span className="v2-pm-lib">{tr('auto.titre')}</span><span className="v2-pm-chev" aria-hidden="true">{chevron}</span></RangeeTouchable></div>
               </div>
             </section>
             ) :
@@ -2623,6 +2626,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
               <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
                 {(designV2 ? catsV2 : categories).map((c) => ligneCategorie(c, { actif: designV2 ? idV2(catActive || cat || 'compte') === c.id : catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+                <button type="button" className="vrm-set-ligne vrm-pm-cat-ligne" data-auto-ouvrir="" onClick={allerAutomatisations}>
+                  <span className="vrm-pm-cat-ic" aria-hidden="true"><Icon name="spark" size={17}/></span><span className="vrm-set-lib"><b style={{color:C.text}}>{tr('auto.titre')}</b><small className="vrm-set-desc" style={{color:C.muted}}>{tr('auto.desc')}</small></span>{chevron}
+                </button>
               </div>
             </nav>
             <div className="vrm-pm-contenu">{designV2
@@ -4798,7 +4804,6 @@ function ReglagesStream() {
 // (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
-  const barre = useBarre();
   return (<>
     <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
       {APPARENCES.map((m) => (
@@ -4811,17 +4816,7 @@ function ApparenceSetting({ valeur, onChoisir }) {
       ))}
     </div>
     {/* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les réglages « Style » (Apple · Studio bleu) et « Ancien design » ont disparu. */}
-    {/* (17 nov., Julien : « prends la C et propose un menu déroulant, je choisirai le mieux ») LA BARRE D'ONGLETS : cinq
-        dessins de la même barre, un menu natif et un aperçu vivant ; appliqué tout de suite, synchronisé (src/designV2/barre.js). */}
-    <div className="vrm-apparence-barre" data-reglage-barre={barre} style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',borderTop:`1px solid ${C.border}`}}>
-      <label style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minHeight:44}}>
-        <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.barre.lib')}</b>
-        <select value={barre} onChange={(e) => poserBarre(e.target.value, save)} data-barre-choix="" style={{minHeight:44,fontSize:15,borderRadius:12,padding:'0 12px',border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
-          {STYLES_BARRE.map((k) => <option key={k} value={k}>{tr('v2.barre.' + k)}</option>)}
-        </select>
-      </label>
-      <ApercuBarre style={barre} Icon={Icon} onglets={[{ id: 'journee', icon: 'soleilLevant', label: tr('nav.journee.court') }, { id: 'annonces', icon: 'vitrine', label: tr('v2.barre.ann') }, { id: 'achats', icon: 'cart', label: tr('v2.barre.ach'), n: 8 }, { id: 'ventes', icon: 'bag', label: tr('v2.barre.ven'), n: 4 }, { id: 'argent', icon: 'euro', label: tr('v2.barre.arg') }]}/>
-    </div>
+    {/* (19 nov.) Le réglage « Barre d'onglets » (cinq dessins de l'ancienne barre) est RETIRÉ : la barre native n'a qu'un dessin, il n'avait plus d'effet. */}
   </>);
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue

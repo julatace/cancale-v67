@@ -42,8 +42,13 @@ sur `BarreOnglets` / `BarreLaterale` et leurs entrées.
 
 ## Bancs et audits
 
-Voir le rapport final de la session (chiffres) et `scripts/bancs/natif-coque.cjs` (K1–K8b, mutations `dessous`,
-`largeur`, `restyle`). Bancs de coque mis à jour : `barre-onglets` et `studio-coque` (retirés, ils lancent
+`scripts/bancs/natif-coque.cjs` (K1–K8b) sur le build de 58415065e : **103 verts, 4 rouges** (les 4 = K8b). K2 écran
+par écran (défilé jusqu'en bas, 1re visite et écran gardé, rectangle VISIBLE, fixes compris) : **30/30** à 390 clair,
+sombre, base vide (1cb8a2dff). Mutations : `largeur` ⇒ K1 rouge (120/78/78/78/78) ; `dessous` ⇒ K2 rouge (écran ↓821 >
+barre ↑761) ; `restyle` ⇒ K8a rouge (`BODY · data-mut-onglet`). Build d'avant (main ad73a3c7c) : pas de barre native
+⇒ rouge ; K8b y mesure 54–73 ms (même moteur). Démarrage : **1979 Ko** (main : 1980 Ko ; budget 1982).
+K8b (après) : 58–82 ms de thread selon la charge de la machine ; la tâche lourde restyle ~1 500–2 000 éléments = l'écran
+gardé qui ré-apparaît. `K8_SEUL=1`, `K2_SEUL=1`, `SEUL=tel` pour des mesures courtes. Bancs de coque mis à jour : `barre-onglets` et `studio-coque` (retirés, ils lancent
 natif-coque), `design-v2` (sélecteurs natifs, ordre des onglets), `theme-apple` (cibles), aides `_ecran-pret`,
 `_mesure-onglets`, `_a11y-mesure`, `onglets-rapides`. Audits réécrits (décision du 19 nov.) : `studio` (S2 data-espace
 sur `<main>` seul ; S3 plus d'ondulation), `reprise-ecran` (« Plus » = FeuillePlus), `profil-oauth`, `barre-achats`,

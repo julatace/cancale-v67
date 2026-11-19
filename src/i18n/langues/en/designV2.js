@@ -23,6 +23,10 @@ export default {
     "other": "Print {n} labels"
   },
   "v2.bande.aria": "Parcels to send",
+  "v2.retirer.autresPoints": {
+    "one": "{n} more point",
+    "other": "{n} more points"
+  },
   "v2.retirer.titre": "To pick up",
   "v2.retirer.voir": "See pickup codes",
   "v2.retirer.resume": {
@@ -67,6 +71,16 @@ export default {
   "v2.passe.retire": "I picked it up",
   "v2.passe.page": "{i} of {n}",
   "v2.passe.detail": "Full pickup details",
+  "v2.passe.consigne": "Locker · type the code on the screen",
+  "v2.passe.comptoir": "Counter · give the code to the shopkeeper",
+  "v2.passe.nouveau": "New",
+  "retraits.nouveau.code": "New pickup code",
+  "retraits.nouveau.codeLieu": "New pickup code · {lieu}",
+  "retraits.nouveau.qr": "New pickup QR",
+  "retraits.nouveau.qrLieu": "New pickup QR · {lieu}",
+  "retraits.nouveau.colis": "New parcel to collect",
+  "retraits.nouveau.colisLieu": "New parcel to collect · {lieu}",
+  "retraits.nouveaux.plusieurs": {"one": "{n} new pickup code", "other": "{n} new pickup codes"},
   "v2.enRoute.titre": "On the way",
   "v2.enRoute.sansTitre": "Untitled purchase",
   "v2.enRoute.pointPasDit": "pickup point not given yet",
@@ -165,16 +179,6 @@ export default {
   "v2.mail.boite": "Inbox",
   "v2.mail.relier": "Link my mailbox",
   "v2.passe.qrKo": "QR not readable here — the code below is enough",
-  "v2.barre.lib": "Tab bar",
-  "v2.barre.C": "C · Clean (default)",
-  "v2.barre.A": "A · Classic iOS",
-  "v2.barre.B": "B · Floating pill",
-  "v2.barre.D": "D · Line on top",
-  "v2.barre.E": "E · Kraft",
-  "v2.barre.ann": "Listings",
-  "v2.barre.ach": "Purchases",
-  "v2.barre.ven": "Sales",
-  "v2.barre.arg": "Money",
   "v2.mail.selectionner": "Select",
   "v2.style.lib": "Style",
   "v2.style.apple": "Apple",
@@ -182,26 +186,7 @@ export default {
   "v2.style.studio": "Blue studio",
   "v2.style.studio.desc": "The previous blue background and glass.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "today",
-  "v2.jour.hier": "yesterday",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "sold {quand}",
-    "other": "sold {quand}"
-  },
-  "v2.jour.aucune": "no sale",
-  "v2.jour.ventes": {
-    "one": "{n} sale",
-    "other": "{n} sales"
-  },
   "v2.jour.pasSu": "sales not read yet",
-  "v2.mois.vendu": "Sold",
-  "v2.mois.recu": "Received",
-  "v2.mois.benefice": "Profit",
-  "v2.mois.sur": {
-    "one": "{k} sale out of {n}",
-    "other": "{k} sales out of {n}"
-  },
   "v2.envoyer.titre": "To ship",
   "v2.bande.plus": {
     "one": "{n} more parcel to ship",
@@ -224,5 +209,95 @@ export default {
   "v2.reg.completer": "Complete my listings",
   "v2.reg.completerN": "Complete my listings · {n}",
   "v2.jour.lecture": "reading…",
+  "v2.stats.titre": "Your figures",
+  "v2.stats.ca": "Sales",
+  "v2.obj.fixer": "Set a monthly goal",
+  "v2.obj.titre": "Monthly goal",
+  "v2.obj.libelle": "Sales to reach this month",
+  "v2.obj.texte": "{v} / {c}",
+  "v2.obj.detail": {
+    "one": "{pct} % · {j} day left",
+    "other": "{pct} % · {j} days left"
+  },
+  "v2.obj.atteint": "reached · {pct} %",
+  "v2.obj.enregistrer": "Save",
+  "v2.obj.retirer": "Remove the goal",
+  "v2.obj.invalide": "An amount in euros, above 0.",
+  "v2.courbe.titre": "Last 30 days",
+  "v2.courbe.voir": "See the sales",
+  "v2.comptes.titre": "By account and site",
+  "v2.comptes.ventes": {
+    "one": "{n} sale",
+    "other": "{n} sales"
+  },
+  "v2.comptes.vide": "No sales in this period",
+  "v2.capte.titre": "On your listings today",
+  "v2.capte.favoris": "New favourites",
+  "v2.capte.offres": "Offers received",
+  "v2.capte.messages": "Messages",
+  "v2.capte.pasCapte": "not captured",
+  "v2.capte.pasLu": "not read yet",
+  "v2.vrm.titre": "What VRM did today",
+  "v2.vrm.rien": "Nothing yet today",
+  "v2.vrm.pasLu": "log not read",
+  "v2.vrm.baisses": {
+    "one": "{n} price drop",
+    "other": "{n} price drops"
+  },
+  "v2.vrm.favoris": {
+    "one": "{n} message to favourites",
+    "other": "{n} messages to favourites"
+  },
+  "v2.vrm.offres": {
+    "one": "{n} offer accepted",
+    "other": "{n} offers accepted"
+  },
+  "v2.vrm.republications": {
+    "one": "{n} relisting",
+    "other": "{n} relistings"
+  },
+  "v2.vrm.bordereaux": {
+    "one": "{n} label fetched",
+    "other": "{n} labels fetched"
+  },
+  "v2.vrm.messages": {
+    "one": "{n} message sent",
+    "other": "{n} messages sent"
+  },
+  "v2.vrm.offresFaites": {
+    "one": "{n} offer sent",
+    "other": "{n} offers sent"
+  },
+  "v2.perso.ouvrir": "Customise this screen",
+  "v2.perso.titre": "Today’s cards",
+  "v2.perso.pied": "Tick what you want to see; swipe a card to move it up or down.",
+  "v2.perso.monter": "Up",
+  "v2.perso.descendre": "Down",
+  "v2.perso.defaut": "Reset to default",
+  "v2.perso.carte.chiffres": "Your figures",
+  "v2.perso.carte.envoyer": "To send",
+  "v2.perso.carte.retirer": "To collect",
+  "v2.perso.carte.courbe": "Last 30 days",
+  "v2.perso.carte.ventes": "Latest sales",
+  "v2.perso.carte.comptes": "By account and site",
+  "v2.perso.carte.annonces": "On your listings",
+  "v2.perso.carte.vrm": "What VRM did",
+  "v2.stats.periode": "Period",
+  "v2.stats.jour": "Day",
+  "v2.stats.semaine": "Week",
+  "v2.stats.mois": "Month",
+  "v2.stats.vendus.jour": "sold today",
+  "v2.stats.vendus.semaine": "sold this week",
+  "v2.stats.vendus.mois": "sold in {mois}",
+  "v2.stats.ecart.jour": "{s} vs yesterday",
+  "v2.stats.ecart.semaine": "{s} vs last week",
+  "v2.stats.ecart.mois": "{s} vs {mois}",
+  "v2.stats.benefice": "Profit",
+  "v2.stats.beneficeBrut": "Gross profit",
+  "v2.stats.ventes": "Sales",
+  "v2.stats.panier": "Average sale",
+  "v2.stats.auMoinsSur": "at least · costs {c}",
+  "v2.stats.aucune": "no sales",
+  "v2.stats.pasTout": "not all read",
   "v2.alerte.retourTitre": "Return to drop off"
 };

@@ -56,7 +56,6 @@ import { CLE_JOURNEE_PERSO, lireJourneePerso, ordreJournee, visibiliteCarte, urg
 import { ordreSelonHeure, momentDuJour } from './journeeSelonHeure.js';
 import ConfortCoque from './ConfortCoque.jsx';
 import CapteNotif from './capteNotif/CapteNotif.jsx';   // (14 nov., ext. 5.377) « L'extension a capté » — le toast
-import FeuilleArrivee from './capteNotif/FeuilleArrivee.jsx';   // (19 nov., ext. 5.409) « Depuis ta dernière visite » — la feuille d'arrivée
 import { brancherExtensionCapte } from './capteNotif/regle.js';   // (14 nov., lots 118, 119, 120, 127) atelier, QR, lien d'aide, code local
 import { QrOrdinateur, ticketDeLAdresse } from './ConnexionQr.jsx';   // (14 nov., lot 119) connexion par QR
 import { VueLienAide, jetonAideDeLAdresse } from './LienAide.jsx';   // (14 nov., lot 120) la page de l'aide
@@ -125,6 +124,8 @@ import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 // ⟦→ ecrans/Reglages.jsx #3⟧
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import { sorteRetrait } from "./retraitSorte.js";   // (19 nov., retraits parfaits) consigne ou comptoir
+import { comparerRetraits, texteAnnonce, CLE_RETRAITS_VUS } from "./retraitsNouveaux.js";   // (19 nov.) « nouveau code de retrait » en direct
 import { preuvesTransporteur, fusionnerPreuves } from "./friseTransporteur.js";   // (17 nov.) la frise d'une vente : le transporteur tranche
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
 import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../api/_lib/suivi-commandes.js';
@@ -286,6 +287,7 @@ import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
+const AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));   // (19 nov. soir) Paramètres → Automatisations
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -345,6 +347,14 @@ function aLaDemandeDiscret(charger) {
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+// (19 nov., intégration — budget de démarrage) Hors du démarrage : la feuille « Depuis ta dernière visite » (ext. 5.409),
+// les tableaux de travail de l'ordinateur et Ventes natif, chargés quand ils s'affichent.
+const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
+const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
+const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
+const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
+const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
+const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('./OffresAuto.jsx'));
 const AchatsOutils = aLaDemande(() => import('./AchatsOutils.jsx'));
@@ -623,7 +633,6 @@ import { GuideDemarrage, BandeauExemple, CadreExemple, ChoixNumerotation, Verifi
 const ParcoursArrivee = aLaDemandeFeuille(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.ParcoursArrivee })));
 const CarteParcours = aLaDemandeDiscret(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.CarteParcours })));
 // (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
-import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
 import { CLE_ECRANS_VUS, poserStockageEcransVus, ecranNouveau, badgeAvecNouveau, abonnerEcransVus } from "./ecransVus.js";
 import { CLE_BILAN_MINUTE } from "./bilanMinute.js";
 import { CLE_PREMIER_COLIS, EVT_BORDEREAU_IMPRIME, bordereauxDejaImprimes } from "./premierColis.js";
@@ -760,7 +769,6 @@ import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau
 import { cochesEffectives, basculerCoche, memeQueDefaut, emplacementDe as emplacementVente, etapesRoute, etapesFicheVente, cleRecherche, contientRecherche } from "./ventesVerre.js";
 // (19 nov., « VRM natif ») Le fond de l'écran Ventes : les rangées en objets (src/ventes/modeleVentes.js), remplies ici.
 import { rangeeEnvoyer, rangeeRoute, ecartNomme, pleinImprimer } from "./ventes/modeleVentes.js";
-import VentesNatif from "./natif/ecrans/Ventes.jsx";
 import { ARegarder } from "./ventes/ARegarder.jsx";   // (16 nov., lot ventes-clair) « N choses à regarder » : les cartes d'information de Ventes dans UN repli
 import { SegmentVentes, HeroVentes, CaseCoche, Emplacement, PleinLarge, EtapesRoute, EtapesVente, DuoMontants, RangeeEntree, IconeV, texteEmplacement, FicheVenteBloc, VoletVente, useGrandEcran } from "./ventes/VentesVerre.jsx";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
@@ -857,6 +865,7 @@ import CarteStats from "./design/CarteStats.jsx";
 // ⟦→ ecrans/Stats.jsx #5⟧
 import { poserPastilleIcone } from "./pastilleIcone.js";
 import { CLE_CARTE_STATS, raisonCourte, recuPublieEntre, valeurObjectif, reglageDePage, publicationColisFraiche, valeurChiffre, sansCompteSur } from "./design/carteChiffres.js";
+const CLE_CARTES_AUJOURDHUI = 'vrm_aujourdhui_cartes';   // (19 nov.) les cartes d'Aujourd'hui, cochées et ordonnées par lui (synchronisé)
 import { aExpedierPourCarte } from "./resumeCarte.js";
 // ⟦→ ecrans/Compta.jsx #6⟧
 import { detailFraisFiche } from "./coutPlateformes.js";
@@ -879,7 +888,16 @@ import { chiffresRetirer, siteDuColisSorti } from "./retirerSite.js";
 import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
-import DansFiche from './DansFiche.jsx';
+import DansFiche, { useLigneIci } from './DansFiche.jsx';
+// (19 nov., fiche directe — « l'outil doit être pratique, pas chiant ») Les gestes rares d'une annonce (file Leboncoin, publier
+// partout, visuels, relier un achat, passeport, marquer vendue…) vivaient dans une feuille ouverte par « ⋯ » : depuis la fiche,
+// cela faisait « ⋯ » de la fiche → « ⋯ » de la ligne → le geste (trois touchers). Quand la fiche est ouverte DEPUIS cette ligne,
+// ils sont rendus à plat, à leur place dans la fiche ; dans la liste, la feuille d'avant. `rendre` n'est appelé que là où il sert.
+function MenuLigneFiche({ cle, ouvert, feuille, rendre }) {
+  const ici = useLigneIci(cle);
+  if (ici) return <div className="vrm-fiche-menu-plat" data-fiche-menu-inline="">{rendre()}</div>;
+  return ouvert ? feuille(rendre()) : null;
+}
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
@@ -971,9 +989,11 @@ import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétab
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 // (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
 import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
+import { publierLiaison, lireLiaison, ouvrirLiaison, EVT_OUVRIR_LIAISON, EVT_CHARGER_LIAISON, CLE_LIAISON } from "./liaisonEtat.js";   // (19 nov.) « Relier mes annonces » : les règles et les gestes arrivent à la demande
+import { LigneLiaison, texteLiaison, useLiaison } from "./LiaisonEntree.jsx";
 import { VERSION_FINE } from "./photoFine.js";
-import { publierMemePhoto, lireMemePhoto, ouvrirMemePhoto } from "./memePhotoEtat.js";
-import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, useMemePhoto } from "./MemePhoto.jsx";
+import { publierMemePhoto, lireMemePhoto, EVT_OUVRIR_MEME_PHOTO } from "./memePhotoEtat.js";
+import { LigneMemePhotoNumero } from "./MemePhoto.jsx";
 import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
@@ -1060,7 +1080,7 @@ import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
 import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT, rangerSessionOnglets, lireSessionOnglets } from "./sessionOnglets.js";
 import { modifierLigneCas, ecrireDifference } from "./ligneCas.js";
 import { fabriquerModifierCle } from "./modifierCle.js";
-import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
+import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps, appliquerOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
 import "./styles-corbeille.css";
@@ -1130,7 +1150,6 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
 // (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
 const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
-import { poserIcone } from "./natif/icones.jsx";   // les glyphes seuls, sans les feuilles de style
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -1658,7 +1677,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3271,7 +3290,6 @@ const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
   'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
-  'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
@@ -3326,6 +3344,7 @@ const SYNC_KEYS = [
   // (11 nov. soir) … et TOUS les paramètres de publication par défaut, par site (src/publierPartout.js).
   'vrm_partout_params',
   'vrm_correspondances',   // (15 nov.) SES réponses « quelle catégorie chez Leboncoin / Vestiaire / eBay ? », par catégorie Vinted
+  'vrm_agent_publier',     // (19 nov.) l'agent « Publier sur… » : SES réponses (par article, catégorie VRM, marque) et les envois à relire (src/publier/agent.js)
   'vinted_accounts','vinted_account_labels','vinted_account_emails','vinted_account_phones',
   'vinted_inventory','vinted_annonce_numeros','vinted_used_numeros','vinted_annonces_vendues','vinted_bords_shipped',
   'vinted_goal','vinted_regime','vrm_micro_options','vinted_tva','vinted_bordereau_formats',
@@ -3441,6 +3460,9 @@ const SYNC_KEYS = [
   'vrm_ebay_liens',
   // (15 nov., lot meme-photo) Ses « Ce n'est pas la même » : { 'Site:annonce|N°': date }, écrits sur SON toucher.
   'vrm_meme_photo_non',
+  // (19 nov., liaison guidée) Le journal du parcours « Relier mes annonces » (src/liaisonSites.js) : la preuve et la date
+  // de chaque lien posé ('lien:Site:id'), « plus tard », « pas sur Vinted », « garder » — écrits sur SON toucher seulement.
+  'vrm_liaison_sites',
   // (15 nov., lot deux-comptes) « Ce n'est pas la même paire » et les annonces ouvertes pour être retirées (src/deuxComptes.js).
   'vrm_deux_comptes_non', 'vrm_deux_comptes_retraits',
   // Le marqueur de la remise à zéro (migration 013) : ÉCRIT PAR LE SERVEUR SEUL
@@ -3450,7 +3472,8 @@ const SYNC_KEYS = [
   'vrm_securite_comptes',
   // (19 nov., lot compte-bloque) SON choix pour un compte bloqué par Vinted (pause / garder / plus tard), écrit sur SON toucher, lu par l'extension 5.409 (src/compteBloque.js).
   'vrm_comptes_bloques',
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numeros_a_ecrire',   // (19 nov.) les N° neufs donnés par VRM, à écrire sur les cartons (Stock), vidés sur SON « C'est écrit »
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vinted_baisse_regle','vinted_masquer_ailleurs','vinted_offres_nego','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -3612,6 +3635,8 @@ const SYNC_KEYS = [
   // lui (src/objectifMois.js) ; la barre de la carte sombre, Statistiques et Ventes
   // lisent CE réglage (plus `vrm_ca_objectif` ni `vinted_goal`, jamais posés en base).
   'vrm_objectif_mois',
+  // (19 nov.) « Personnaliser » Aujourd'hui : les cartes qu'il montre et leur ordre ({ ordre, montrees }) — aucun chiffre.
+  CLE_CARTES_AUJOURDHUI,
   // Comptabilité d'entreprise (onglet Comptabilité) : dépenses ponctuelles,
   // coûts fixes mensuels, packs de photos payants. OWNED par l'app (§11),
   // synchronisé entre appareils, jamais écrit par l'extension.
@@ -5347,7 +5372,7 @@ const _ecrivainVrm = creerEcrivainLocal({
 // `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
 let _dureeProchainGeste = 0;   // (19 nov.) l'atelier « Compléter » : « Annuler » 10 s pour le geste lancé juste après
 const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null, deux = null, duree = 0) => _gestes.lancer({
-  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree: duree || (() => { const d = _dureeProchainGeste; _dureeProchainGeste = 0; return d; })(),
+  texte, cles: clesDe(ops), acc, action, titre: (deux && deux.titre) || '', sous: (deux && deux.sous) || '', duree: duree || (deux && deux.duree) || (() => { const d = _dureeProchainGeste; _dureeProchainGeste = 0; return d; })(),
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -8906,7 +8931,10 @@ const URL_PAS_UN_QR = /\/tracking\/|\/open\/|\/o\/|pixel|spacer|1x1|banner|banni
 // récupérer » — une lettre puis cinq chiffres. On accepte donc au plus deux
 // lettres majuscules devant 3 à 10 chiffres ; « suivant » n'a aucun chiffre, il
 // reste écarté.
-const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) ? c : ''; };
+// (19 nov., retraits parfaits) LA forme est api/_lib/forme-code-retrait.js (+ les codes alphanumériques mêlés « 6A4B2C ») ;
+// recopiée ici, en une ligne autonome (des audits extraient `codeRetrait` seul), et comparée à l'originale sur un corpus
+// par scripts/audit-retraits-parfaits.cjs (§11 : une copie vérifiée, jamais réécrite à la main sans lui).
+const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0,2}\d{3,10}$/.test(c) || /^(?=(?:[A-HJ-NP-Z]*\d){2})(?=\d*[A-HJ-NP-Z])[A-HJ-NP-Z0-9]{5,10}$/.test(c) ? c : ''; };
 // L'image de QR réellement affichable pour ce colis (pièce jointe d'abord, puis
 // URL hébergée si elle est plausible). `null` = on n'affiche AUCUNE image.
 // ⚠️ LE VRAI PICKUP PASS EST SERVI PAR UN GÉNÉRATEUR (22 août).
@@ -16317,6 +16345,44 @@ async function alerteLocale(title, body, vers){
 // double d'une notification du serveur), et la carte de l'extension de CE navigateur (5.382,
 // `numerotes` : un lot « VRM a numéroté » par compte Vinted, identités `id:N°`, une fois).
 // Les mots suivent le profil du vendeur (« paires » / « articles ») : aucune règle n'en dépend.
+// (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
+const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
+let _toastNumeros = null; const _abToastNumeros = new Set();
+function poserToastNumeros(t) { _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
+// Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
+const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
+function ToastNumeros() {
+  const [t, setT] = React.useState(_toastNumeros);
+  const [cache, setCache] = React.useState(false);
+  React.useEffect(() => { _abToastNumeros.add(setT); return () => { _abToastNumeros.delete(setT); }; }, []);
+  // (le même message par le bus de l'app, `vrm:numeros-donnes` { message } : ce que pose aussi un autre appareil relu, et le banc natif-coque)
+  React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
+  React.useEffect(() => {
+    if (!t) return undefined;
+    const voir = () => setCache(recouvrementOuvert());
+    voir();
+    const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
+    return () => mo.disconnect();
+  }, [t]);
+  if (!t || cache) return null;
+  const fin = () => { _toastNumeros = null; setT(null); };
+  return <div data-toast-numeros=""><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+}
+// Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
+function NumerosAEcrire() {
+  const [d, setD] = React.useState(() => load(CLE_A_ECRIRE, null));
+  React.useEffect(() => { const f = () => setD(load(CLE_A_ECRIRE, null)); window.addEventListener('vrm:save', f); window.addEventListener('storage', f); return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('storage', f); }; }, []);
+  const items = d && Array.isArray(d.items) ? d.items : [];
+  if (!items.length) return null;
+  return (
+    <div data-numeros-a-ecrire={items.length} style={{ padding: '8px 0' }}>
+      <Natif.Groupe titre={tr('nn.stock.titre', { n: items.length })} pied={tr('nn.stock.pied')}>
+        <Natif.Rangee titre={listeNumeros(items.map((x) => x.numero))} lignes={2}/>
+        <Natif.Rangee titre={tr('nn.stock.ecrit')} ton="neutre" onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': '' }}/>
+      </Natif.Groupe>
+    </div>
+  );
+}
 function direNouveauxNumeros(liste) {
   try {
     const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim() && x.id != null);
@@ -16325,7 +16391,11 @@ function direNouveauxNumeros(liste) {
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
     // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
-    accompagner('numero.donne', { vars: { n: l.length, mot: titre, numeros: nums } }).fini();
+    // (19 nov., intégration) Plus une pilule posée sur l'écran (elle couvrait la fiche) : un Toast NATIF au-dessus de la barre
+    // d'onglets, une fois, fermable, jamais sur une page poussée ni une feuille ; le détail reste dans Stock (« À écrire sur tes cartons »).
+    poserToastNumeros({ id: Date.now(), message: `${titre} · ${nums}` });
+    try { const d = load(CLE_A_ECRIRE, null); const avant = d && Array.isArray(d.items) ? d.items : []; const vus = new Set(avant.map((x) => String(x.numero)));
+      save(CLE_A_ECRIRE, { v: 1, items: [...avant, ...l.filter((x) => !vus.has(String(x.numero))).map((x) => ({ numero: String(x.numero), id: String(x.id), at: Date.now() }))].slice(-500) }); } catch (_) {}
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
@@ -18675,7 +18745,7 @@ function titreEcran(tab) {
   if (tab === 'semaine') return tr('ecran.semaine');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
-  const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
+  const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', automatisations: 'auto.titre', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
   return cle ? tr(cle) : 'VRM';
 }
 // Les onglets d'hier → leur place d'aujourd'hui : [onglet, rubrique ou filtre].
@@ -18693,7 +18763,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['extension',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['extension',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -19327,7 +19397,7 @@ const NOM_SITE_PRIX = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Ve
 try { window.addEventListener('vrm:ext', (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'prix') tourPrixSuivis(); }); } catch (_) {}
 // La feuille « Changer le prix » d'un N° : ses sites (par identité), les baisses qui attendent déjà
 // pour CES annonces (lues dans sa base), les recettes Leboncoin / Vestiaire (apprise ou non).
-function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
+function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = false }) {
   const [att, setAtt] = useState(undefined);            // undefined en cours · null pas su · [] lu
   const [recettes, setRecettes] = useState(null);       // { leboncoin, vestiaire } : true · false · null (pas su)
   const [sait, setSait] = useState(() => extensionSaitAttendre());   // une extension qui relève les prix en attente est-elle connue ?
@@ -19392,7 +19462,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer }) {
   const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
     .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }));
   const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
-  return <PrixPartout key={num} num={rn.cle || num} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
+  return <PrixPartout key={num} num={rn.cle || num} focusPrix={focusPrix} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
     onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
     onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
     onAppliquer={async ({ coches, prix, surEtat }) => {
@@ -20582,7 +20652,10 @@ function CacheSiV2({ si, children }) {
 // ⚠️ UN ÉCRAN REFAIT EN NATIF (il rend sa propre `<Page titre=…>`) ajoute son identifiant ici : la coque dessine alors
 // SON grand titre (34/41, qui se réduit dans la barre) et sa `<Page>` n'ajoute que le contenu et le bouton plein.
 // (19 nov.) Annonces : src/ecrans/AnnoncesEgalite.jsx ; Ventes : src/natif/ecrans/Ventes.jsx (docs/passation/2026-11-19-ventes-comme-avant.md).
-const ECRANS_NATIFS = new Set(['annonces', 'ventes']);
+const ECRANS_NATIFS = new Set(['annonces', 'ventes', 'automatisations']);
+// (19 nov. soir, NATIF.md §2 bis) Un écran en TABLEAU DE TRAVAIL prend toute la largeur à l'ordinateur : pas de troisième volet
+// (le tableau ne tient pas dans une colonne de 520) ; sa fiche s'ouvre en panneau à droite (`.n-tt-fiche`).
+const ECRANS_TABLEAU = new Set(['annonces', 'automatisations']);
 const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: null });
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
 const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
@@ -27341,7 +27414,7 @@ async function defaireVc(productId) {
 // `photo_emprunte_{uid}` (Vinted, extension 5.358), `photo_empreinte_lbc` / `_vc` (extension 5.384),
 // `photo_empreinte_ebay` (calculées ICI, dans la page : `empreintesEbayPage`). Projections seulement
 // (§4.4), lecture ratée ⇒ `null` (« pas vérifié », jamais « rien à relier »).
-// ⚠️ §5 : la photo PROPOSE, SON toucher relie. `relierParPhoto` pose le MÊME lien que ses gestes
+// ⚠️ §5 : la photo PROPOSE, SON toucher relie. Le parcours « Relier mes annonces » (plus bas) pose le MÊME lien que ses gestes
 // à la main (`vrm_lbc_liens` · `vrm_ebay_liens` · `vrm_vc_liens`) : l'identité que lisent déjà le
 // retrait ailleurs, les ventes croisées et la garde des offres. Un N° d'avant la remise à zéro
 // garde sa règle (`numeroExterne`) : le N° posé est celui de la fiche Vinted, tel quel.
@@ -27392,8 +27465,14 @@ async function annoncesAutresMemePhoto() {
         const id = String(ad.id);
         if (!siens.has(idCompteLbcApp(ad.account || ad.lbcUser || '')) && !(liens[id] != null && String(liens[id]).trim())) continue;
         const n = numeroLbcIdentite({ itemId: ad.id }, ls.items, liens);
+        // (19 nov., liaison guidée) TOUTES les identités lues (le lien posé, chaque référence écrite, traduite par la
+        // remise à zéro) : deux qui désignent deux N° = un lien qui se contredit, montré, jamais tranché seul.
+        const idsL = [];
+        if (liens[id] != null && String(liens[id]).trim()) idsL.push({ sorte: 'lien', numero: cleNum(liens[id]) });
+        for (const r0 of [refVRMDe(ad.customRef), ad.ref ? cleNum(ad.ref) : '', numeroEcritLbc(ad)]) { const k0 = cleNum(r0); const t0 = k0 ? numeroExterne(k0, id, 'lbcAnnonces') : ''; if (t0 && !idsL.some((x) => x.sorte === 'reference' && x.numero === t0)) idsL.push({ sorte: 'reference', numero: t0 }); }
         autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
-          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });
+          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '',
+          prix: Number(ad.price) > 0 ? Number(ad.price) : null, identites: idsL, enVente: true });
       }
     }
   } catch (_) { illisibles.push('Leboncoin'); }
@@ -27406,8 +27485,14 @@ async function annoncesAutresMemePhoto() {
       for (const a of lu.items || []) {
         if (!a || a.itemId == null || /(ended|sold|inactive|supprim)/i.test(String(a.listingStatus || a.status || ''))) continue;
         const n = numEbayLu(a.sku, a.itemId, null, a.depuis);
+        const idsE = [];
+        { const le = lienEbay(a.itemId); const fe = le ? fichesPourEbay()[le.pairId] : null; if (fe && fe.numero != null && String(fe.numero).trim()) idsE.push({ sorte: 'lien', numero: cleNum(fe.numero) });
+          const la = le ? null : (load(LIENS_EBAY, {}) || {})[String(a.itemId)]; if (la && !la.pairId && la.article === true && cleNum(la.numero)) idsE.push({ sorte: 'lien', numero: cleNum(la.numero) });
+          const ke = numDeSkuEbay(a.sku); const te = ke ? numeroExterne(ke, a.itemId, 'ebayAnnonces', null) : ''; if (te) idsE.push({ sorte: 'reference', numero: te }); }
+        const pe = Number(String(a.price == null ? '' : a.price).replace(',', '.'));
         autres.push({ plateforme: 'eBay', id: String(a.itemId), compte: a._compte || 'principal', compteNom: a._compteNom || '', titre: a.title || '', photo: a.photo || null,
-          lien: /^\d+$/.test(String(a.itemId)) ? 'https://www.ebay.fr/itm/' + a.itemId : null, relie: !!n, numero: n || '' });
+          lien: /^\d+$/.test(String(a.itemId)) ? 'https://www.ebay.fr/itm/' + a.itemId : null, relie: !!n, numero: n || '',
+          prix: pe > 0 && (!a.currency || a.currency === 'EUR') ? pe : null, identites: idsE, enVente: true });
       }
     }
   } catch (_) { illisibles.push('eBay'); }
@@ -27418,10 +27503,17 @@ async function annoncesAutresMemePhoto() {
     else {
       const d = rows[0] || {}, liens = vcCarte('vrm_vc_liens');
       for (const [id, it] of Object.entries((d.items && typeof d.items === 'object') ? d.items : {})) {
-        if (!it || typeof it !== 'object' || etatAnnonceVcBrut(it, false, d.capturedAt) === 'retiree') continue;
+        const ev = it && typeof it === 'object' ? etatAnnonceVcBrut(it, false, d.capturedAt) : 'retiree';
+        if (ev === 'retiree' || ev === 'vendue') continue;
         const relie = !vcReliable({ productId: id, item: it, liensPub: d.liens || {}, liens, cleNum });
+        const idsV = [];
+        { const lv = lienDe(liens, id); if (lv) idsV.push({ sorte: 'lien', numero: cleNum(lv.numero) });
+          const pv = cleNum((d.liens || {})[String(id)] || ''); if (pv) idsV.push({ sorte: 'publication', numero: pv });
+          const rv = cleNum(it.ref || ''); if (rv) idsV.push({ sorte: 'reference', numero: rv }); }
+        const nVrm = carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)] || '';
         autres.push({ plateforme: 'Vestiaire', id: String(id), compte: String(it.compte || ''), compteNom: 'Vestiaire', titre: String(it.titre || ''), photo: it.photo || null, lien: null, relie,
-          numero: relie ? (numVcAnnonce(id, it, d.liens || {}, numerosVcEffectifs()) || '') : '' });
+          numero: relie ? (numVcAnnonce(id, it, d.liens || {}, numerosVcEffectifs()) || '') : '',
+          prix: it.prix && Number(it.prix.valeur) > 0 && (!it.prix.devise || it.prix.devise === 'EUR') ? Number(it.prix.valeur) : null, identites: idsV, enVente: ev === 'en-ligne' ? true : null, numeroSite: nVrm ? String(nVrm) : '' });
       }
     }
   } catch (_) { illisibles.push('Vestiaire'); }
@@ -27511,7 +27603,7 @@ async function chargerMemePhoto(force = false) {
     const empreintes = empV && empS ? { vinted: Object.fromEntries(Object.entries(empV).map(([cc, v]) => [cc.replace(/^vinted:/, ''), v])), ...empS } : null;
     let douteux = new Set(); try { douteux = lireNumerosAmbigus(); } catch (_) {}
     const res = propositionsMemePhoto({ vinted, autres: ext.autres, empreintes, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cle: cleNum, verifs });
-    const etat = { ...res, illisibles: ext.illisibles, vinted, at: Date.now() };
+    const etat = { ...res, illisibles: ext.illisibles, vinted, autres: ext.autres, at: Date.now() };
     _memePhotoAt = Date.now();
     publierMemePhoto(etat);
     // eBay : les photos sans empreinte se calculent ICI, puis tout est relu une fois.
@@ -27523,41 +27615,9 @@ async function chargerMemePhoto(force = false) {
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // Un lien posé, défait, ou un « pas la même » (ici ou sur un autre appareil) : tout est relu.
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireMemePhoto()) setTimeout(() => chargerMemePhoto(true), 50); });
-}
-// RELIER, sur SON toucher (proposition ou choix dans un cas ambigu). Le N° est celui de la
-// fiche Vinted ; `vintedId` l'annonce Vinted de cette fiche. Rend true si le lien est posé.
-async function relierParPhoto({ annonce, numero, vintedId }) {
-  if (!isCloudReady()) { toast(tr('memePhoto.pasPret')); return false; }
-  const n = String(numero || '').trim(), id = String((annonce && annonce.id) || '');
-  if (!n || !id) return false;
-  const relu = () => { _memePhotoAt = 0; setTimeout(() => chargerMemePhoto(true), 50); };
-  if (annonce.plateforme === 'Leboncoin') {
-    const avant = (load('vrm_lbc_liens', {}) || {})[id];
-    if (avant != null && String(avant).trim()) { toast(tr('memePhoto.dejaRelie')); return false; }
-    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: 'vrm_lbc_liens', type: 'cle', id, apres: n, avant }], {}, (sens) => {
-      try { const l = { ...(load('vrm_lbc_liens', {}) || {}) }; if (sens === 'apres') l[id] = n; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale('vrm_lbc_liens', l); } catch (_) {}
-      relu();
-    });
-    return true;
-  }
-  if (annonce.plateforme === 'eBay') {
-    if (!vintedId) return false;
-    const avant = (load(LIENS_EBAY, {}) || {})[id];
-    if (avant && avant.pairId) { toast(tr('memePhoto.dejaRelie')); return false; }
-    const lien = { pairId: String(vintedId), numero: n, at: Date.now(), par: 'photo' };
-    gesteVrm(tr('memePhoto.relie', { numero: n }), [{ k: LIENS_EBAY, type: 'cle', id, apres: lien, avant }], {}, (sens) => {
-      try { const l = { ...(load(LIENS_EBAY, {}) || {}) }; if (sens === 'apres') l[id] = lien; else if (avant === undefined) delete l[id]; else l[id] = avant; ecrireCopieLocale(LIENS_EBAY, l); } catch (_) {}
-      _fichesEbayMemo.at = 0; relu();
-    });
-    return true;
-  }
-  if (annonce.plateforme === 'Vestiaire') {
-    if (!vintedId) return false;
-    const ok = await relierVc({ productId: id, item: String(vintedId), numVinted: n, titre: annonce.titre });
-    if (ok) relu();
-    return ok;
-  }
-  return false;
+  // (19 nov., liaison guidée) Le même signal relit le parcours (un lien posé ou défait ici, ou sur un autre appareil).
+  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_LIAISON, CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireLiaison()) setTimeout(() => chargerLiaison(true), 120); });
+  window.addEventListener(EVT_CHARGER_LIAISON, (e) => { chargerLiaison(!!(e && e.detail && e.detail.force)); });
 }
 // « Ce n'est pas la même » : rangé par identité (site:annonce|N°), la proposition ne revient
 // plus pour ce couple. Annulable 5 s, comme ses autres gestes.
@@ -27573,11 +27633,114 @@ function refuserMemePhoto({ annonce, numero }) {
 // La photo d'une annonce, quel que soit son site (Vestiaire : son propre lecteur).
 const photoMemePhoto = (src) => (/vestiairecollective\./i.test(String(src || '')) ? <PhotoVc src={src} style={{ width: '100%', height: '100%' }}/> : <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>);
 const chargerMemePhotoUI = (force) => { chargerMemePhoto(force === true); };
-// L'hôte de la feuille « Même photo · à relier », monté une fois dans la coque.
-function MemePhotoCoque() {
-  return <MemePhotoHote charger={chargerMemePhotoUI} SheetShell={SheetShell} Photo={photoMemePhoto} onRelier={relierParPhoto} onRefuser={refuserMemePhoto}
-    extension={extSait('memephoto') === 'retard' ? 'retard' : 'ok'} versionExt={EXT_CAPACITES.memephoto.replace(/\.0$/, '')}
-    extensionSure={extSait('memephotosure') === 'ok' ? 'ok' : 'retard'} versionSure={EXT_CAPACITES.memephotosure.replace(/\.0$/, '')}/>;
+// ══ « RELIER MES ANNONCES » — LE PARCOURS GUIDÉ ENTRE VINTED ET LES AUTRES SITES (19 nov.) ══════════
+// Julien : « la liaison des articles entre les différentes applications […] ça doit être irréprochable.
+// Il ne peut pas y avoir d'erreur » — et « l'outil doit être pratique, pas chiant ».
+// UN parcours (src/LiaisonSites.jsx) remplace les entrées éparpillées (feuille « même photo », « Relier à
+// Vinted » de Leboncoin, « Relier » de Vestiaire) : elles y mènent toutes. Les RÈGLES (gardes, file,
+// contradictions) : src/liaisonSites.js ; les GESTES : src/liaisonActions.js — chargés à la demande, ils
+// reçoivent d'ici ce qui touche la base et le stockage (`deps`). Ce qui est publié : src/liaisonEtat.js.
+// ⚠️ §5 : rien n'est relié sans SON toucher. Les seules portes vers `relier` sont `ACTIONS_LIAISON`,
+// passées au parcours ; le calcul (`chargerLiaison`) ne relie rien (`audit-liaison-sites` I3-I5).
+// ⚠️ Lire-fusionner-réécrire : chaque geste part des cartes COURANTES (`lireCarteLiaison` : `undefined` =
+// pas su ⇒ refus) et s'écrit par `gesteVrm` (une sous-valeur par clé, annulable 10 s).
+const lireCarteLiaison = (k) => {
+  if (!isCloudReady()) return undefined;                                   // avant le nuage : pas su
+  if (k === 'vrm_vc_liens' && _vcMem[k] !== undefined) return _vcMem[k];      // la copie en mémoire d'un geste Vestiaire en route
+  let t; try { t = localStorage.getItem(k); } catch (_) { return undefined; }
+  if (t == null) return {};
+  try { const v = JSON.parse(t); return v && typeof v === 'object' && !Array.isArray(v) ? v : undefined; } catch (_) { return undefined; }
+};
+// Ses paires Vinted présentes et les pistes de publication : src/liaisonDonnees.js (chargé avec le parcours, hors démarrage).
+// « Elle n'est pas sur Vinted » (Leboncoin) : SON N°, par LA règle des numéros — `prochainLibre` sur TOUS les
+// numéros déjà servis (la même récolte que `numeroterVestiaire`), après le plus haut, jamais un trou, jamais un
+// N° d'archive ; le pool d'abord (append-only : un N° donné reste servi, même si le geste est annulé).
+// Il numérote lui-même ⇒ aucun N° neuf (`sans-numero`). Une lecture qui manque ⇒ `pas-su`, rien n'est donné.
+async function donnerNumeroLiaison() {
+  if (numeroEcritActif()) return { refus: 'sans-numero' };
+  if (!numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
+  const [jl, jv, jr] = await Promise.all([
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`),
+    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
+    lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
+  ]);
+  if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr) || !numerotationPermise() || !isCloudReady()) return { refus: 'pas-su' };
+  if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) return { refus: 'pas-su' };
+  const pris = new Set(), prisK = new Set();
+  const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
+  const L0 = jl[0] || {}, V0 = jv[0] || {};
+  Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values((L0.liens && typeof L0.liens === 'object') ? L0.liens : {}).forEach(add);
+  numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+  for (const it of Object.values((L0.items && typeof L0.items === 'object') ? L0.items : {})) if (it && it.ref) add(it.ref);
+  for (const v of Object.values((V0.ventes && typeof V0.ventes === 'object') ? V0.ventes : {})) if (v && v.ref) add(v.ref);
+  ajouterNumerosHorsEcran(pris, prisK);
+  const servis = new Set(prisK);
+  const numero = prochainLibre(pris, prisK, prefixeNumeros());
+  const ep = entreePool(numero);
+  if (ep == null || servis.has(cleNum(numero))) return { refus: 'pas-su' };
+  const pool = (load('vinted_used_numeros', []) || []).slice();
+  if (!pool.map(cleNum).includes(cleNum(ep))) { pool.push(ep); save('vinted_used_numeros', pool.sort(triPool)); emettreClesRelues(['vinted_used_numeros']); }
+  return { numero, servis };
+}
+// Les règles et les gestes, chargés à la demande (une fois), avec ce que l'app sait lire et écrire.
+let _liaisonVrm = null;
+const liaisonVrm = () => (_liaisonVrm || (_liaisonVrm = Promise.all([import('./liaisonActions.js'), import('./liaisonDonnees.js')]).then(([m, dd]) => { const D = dd.creerDonneesLiaison({ load, lireAnnoncesVintedEnLigne, chezMoiProposables, chezMoiEntrees, placesAnnonces, ouDansMeubles, lireBaseRelue, SUPABASE_URL }); return m.creerLiaison({
+  pret: () => isCloudReady(), proprio: () => (AUTH.user && AUTH.user.id) || '',
+  lireCarte: lireCarteLiaison,
+  geste: (texte, ops, apres, options) => gesteVrm(texte, ops, { vrm_vc_liens: vcSetter('vrm_vc_liens') }, (sens) => {
+    // L'écran relit tout de suite : la copie locale de chaque clé porte déjà le geste (ou son inverse).
+    try { for (const k of clesDe(ops)) if (k !== 'vrm_vc_liens') ecrireCopieLocale(k, appliquerOps(load(k, {}) || {}, ops, sens, k)); } catch (_) {}
+    _fichesEbayMemo.at = 0; _memePhotoAt = 0;
+    if (typeof apres === 'function') { try { apres(sens); } catch (_) {} }
+  }, '', null, { duree: (options && options.duree) || 0 }),
+  memePhoto: (force) => Promise.resolve(chargerMemePhoto(force === true)),
+  annoncesAutres: () => annoncesAutresMemePhoto(),
+  pairesVinted: D.pairesVinted, pistes: D.pistes,
+  douteux: () => lireNumerosAmbigus(),
+  numerosConnus: () => { const s = new Set(); const add = (v) => { const c = cleNum(v); if (c) s.add(c); }; Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((f) => add(f && f.numero)); Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((f) => add(f && f.numero)); return s.size ? s : null; },
+  numeroVcDe: (id) => carteNumerosVc(vcCarte('vrm_vc_numeros'))[String(id)] || '',
+  donnerNumero: donnerNumeroLiaison, refuserPhoto: refuserMemePhoto,
+  cleNum, marqueDe: extractBrand, tr, publier: publierLiaison, lire: lireLiaison,
+}); }).catch((e) => { _liaisonVrm = null; throw e; })));
+let _liaisonAttente = false;
+function chargerLiaison(force = false) {
+  // Les fiches et les liens viennent du nuage : avant lui, on attend (une fois), jamais un calcul sur du vide.
+  if (!isCloudReady()) { if (!_liaisonAttente) { _liaisonAttente = true; onCloudReady(() => { _liaisonAttente = false; chargerLiaison(force); }); } return Promise.resolve(null); }
+  if (!AUTH.user?.id) return Promise.resolve(null);
+  return liaisonVrm().then((L) => L.charger(force === true)).catch(() => null);
+}
+// Les SEULES portes vers une écriture de lien : passées au parcours, appelées sur SON toucher.
+const ACTIONS_LIAISON = {
+  relier: (x) => liaisonVrm().then((L) => L.relier(x)),
+  relierLot: (x) => liaisonVrm().then((L) => L.relierLot(x)),
+  remplacer: (x) => liaisonVrm().then((L) => L.remplacer(x)),
+  delier: (x) => liaisonVrm().then((L) => L.delier(x)),
+  plusTard: (x) => liaisonVrm().then((L) => L.plusTard(x)),
+  propre: (x) => liaisonVrm().then((L) => L.propre(x)),
+  garder: (x) => liaisonVrm().then((L) => L.garder(x)),
+  pasCellesCi: (x) => liaisonVrm().then((L) => L.pasCellesCi(x)),
+  verifier: (x) => liaisonVrm().then((L) => L.verifier(x)),
+  charger: (force) => { chargerLiaison(force === true); },
+};
+const LiaisonSitesParesseux = aLaDemandeFeuille(() => import('./LiaisonSites.jsx'));
+// L'hôte du parcours, monté une fois dans la coque : `ouvrirLiaison(…)` (src/liaisonEtat.js), l'ancien
+// `ouvrirMemePhoto(site)` et le « Relier » d'une annonce Vestiaire (`vrm:lien-vc`, sens 'vc') l'ouvrent.
+function LiaisonCoque() {
+  const [cible, setCible] = React.useState(null);
+  React.useEffect(() => {
+    const ouvrir = (e) => { const d = (e && e.detail) || {}; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, n: Date.now() }); chargerLiaison(true); };
+    const parVc = (e) => { const d = e && e.detail; if (d && d.sens === 'vc' && d.id != null) ouvrir({ detail: { site: 'Vestiaire', id: String(d.id) } }); };
+    window.addEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.addEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.addEventListener('vrm:lien-vc', parVc);
+    return () => { window.removeEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.removeEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.removeEventListener('vrm:lien-vc', parVc); };
+  }, []);
+  if (!cible) return null;
+  const fermer = () => setCible(null);
+  return <GardeEcran nom="liaison" feuille onFermer={fermer}>
+    <LiaisonSitesParesseux key={cible.n} cible={cible} actions={ACTIONS_LIAISON} Photo={photoMemePhoto} Icon={Icon} onFermer={fermer}/>
+  </GardeEcran>;
 }
 // Les N° à barrer (une liaison a remplacé un N° déjà donné), jusqu'à « C'est écrit ».
 function BlocBarrerVc({ titres = {} }) {
@@ -27642,7 +27805,7 @@ function GesteLienVcVinted({ it, num, style }) {
 function HoteLienVc({ comptes }) {
   const [cible, setCible] = React.useState(null);
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (!d || !['vc', 'vinted'].includes(d.sens) || d.id == null) return; setCible({ ...d, id: String(d.id) }); };
+    const f = (e) => { const d = e && e.detail; if (!d || d.sens !== 'vinted' || d.id == null) return; setCible({ ...d, id: String(d.id) }); };   // (19 nov.) sens 'vc' : le parcours « Relier mes annonces » (LiaisonCoque)
     window.addEventListener('vrm:lien-vc', f);
     return () => window.removeEventListener('vrm:lien-vc', f);
   }, []);
@@ -33720,25 +33883,46 @@ function useSourcesCarte(liveStats) {
 // MÊMES appels que l'écran Argent (`ArgentMoisV2`, src/ecrans/Compta.jsx : `questionsArgent`, le brut et sa couverture).
 // Trois états : en cours (la boîte, à sa taille) · pas su (« — » et la raison, jamais 0) · lu.
 const SEL_TOUT_V2 = { site: 'toutes', compte: null, periode: null };
+const OUTILS_AUJOURDHUI = { load: (k, d) => load(k, d), save: (k, v) => save(k, v), onCloudReady: (f) => onCloudReady(f), lireTout: (q) => lireTout(q), entete: () => enTeteSession(), cle: CLE_CARTES_AUJOURDHUI };
 function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const liveCoque = React.useContext(LiveStatsCarte);
   const live = liveStats || liveCoque;
   const S = useSourcesCarte(live);
   const maintenant = Date.now();
+  const [objectifMois, poserObjectif, objectifBrut] = useObjectifMois();
   // Le modèle (src/aujourdhui/modele.js, reçu en `Mo`) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
   const calculer = (Mo) => {
   const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
     etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
     mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
-  const jours = M.jours.map((j) => { const d = new Date(j.de); return { ...j, lettre: d.toLocaleDateString(localeCourante(), { weekday: 'narrow' }).toUpperCase(), long: majusculeJ(dateJourFr(d)),
-    court: d.toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric' }) }; });
-  const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
-    mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
-      benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
-  return { chiffres, aVenir: M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null };
+  const chiffres = { etat: M.etat, raison: M.raison, montant: somme,
+    mois: { nom: new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' }) } };
+  // (19 nov., Julien : « plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice ») Jour · Semaine · Mois :
+  // les mêmes `valeurChiffre` ; la période d'avant coupée au MÊME moment (règles de période de la carte, `REGLES_CARTE`).
+  const precedente = (p) => {
+    const de = p === 'jour' ? new Date(new Date(maintenant).setHours(0, 0, 0, 0)) : REGLES_CARTE.debutPeriode(maintenant, p);
+    const avant = p === 'jour' ? new Date(de.getFullYear(), de.getMonth(), de.getDate() - 1) : REGLES_CARTE.decalerPeriode(de, p, -1);
+    return { de: avant.getTime(), a: Math.min(de.getTime(), avant.getTime() + (maintenant - de.getTime())), label: '' };
   };
-  return <AujourdhuiV2 {...reste} calculer={calculer}/>;
+  const stats = Mo.statsPeriodes({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S), precedente, raisonCourte, beneficeMois: M.mois.benefice });
+  const moisAvant = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth() - 1, 1).toLocaleDateString(localeCourante(), { month: 'long' });
+  // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
+  const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
+  // (19 nov., « applique ce que tu proposes ») LES CARTES EN PLUS — mêmes `valeurChiffre`, aucune règle neuve :
+  //   la courbe des 30 jours, la table par compte et par site (la sélection { site, compte } de la carte des chiffres),
+  //   l'objectif du mois (src/objectifMois.js : `valeurObjectif`, `progressionObjectif`, les jours qui restent).
+  // Les cartes en plus (courbe, table par compte, objectif) se rangent DANS le morceau d'Aujourd'hui (src/aujourdhui/
+  // Branche.jsx) : l'app ne lui donne que la question au propriétaire (`valeurSel` = `valeurChiffre` avec une sélection).
+  const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, maintenant), S);
+  const objectif = { mois: objectifMois, brut: objectifBrut, poser: poserObjectif, valeur: (o) => valeurObjectif(o, S, REGLES_CARTE, maintenant) };
+  const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : null;
+  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null, plus: { valeurSel, objectif, lignes, maintenant } };
+  };
+  // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
+  // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
+  return <AujourdhuiV2 {...reste} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+    onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -34954,6 +35138,13 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
 }
 
+// (19 nov. soir) La question posée AVANT d'allumer l'acceptation automatique : UNE source, pour Annonces (« Offres auto ») et
+// pour Automatisations (`src/automatisations/Branchement.jsx`). Rien n'est allumé sans ce « Oui ».
+function confirmerOffresAuto() {
+  return askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
+      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
+      ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
+}
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
   const horsLigneVue = useHorsLigne();   // (11 nov.) hors ligne : pas de N° proposé à un nouvel achat (serveur seul)
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
@@ -36381,9 +36572,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const changerRefusVariantes = (l) => { const v = variantesLues(l); setRefusVariantes(v); save('vinted_offre_refus_variantes', v.map((t) => (t && erreurMessageAuto(t) ? '' : t))); };
   const basculerOffresAuto = async () => {
     if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
-    const ok = await askConfirm({ title: 'Accepter les offres tout seul sur Vinted ?',
-      desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
-      ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
+    const ok = await confirmerOffresAuto();
     if (!ok) return;
     setOffresAuto(true); save('vinted_offres_auto', true);
   };
@@ -36633,6 +36822,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Par défaut : « En attente » = ce que je dois recevoir (les annulées sont
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur, la liste d'Achats est le TABLEAU DE TRAVAIL (src/natif/ecrans/AchatsTableau.jsx).
+  const ordiAchats = Natif.useOrdinateur() && only === 'achats';
+  const [filtreAchatsT, setFiltreAchatsT] = useState({ compte: '', periode: 'tout' });
   // (31 oct., soir — Julien : « que dans les deux onglets il n'y ait pas la même
   // chose ») DEUX ÉCRANS sur les mêmes lectures (§11, aucune copie) :
   //   · « Colis à retirer » (`vueAchats='retraits'`) : l'étape « À retirer »
@@ -37019,6 +37211,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const rembAchatsParTx = useMemo(() => (retoursAchatLus ? remboursementsParTx(retoursAchatLus.remb) : undefined), [retoursAchatLus]);
   // Un achat REMBOURSÉ prouvé par e-mail (même n° de transaction, montant ≥ ce qu'il a payé) sort
   // des coûts tout de suite (`achatAnnule` le voit), sans attendre la relecture de ses achats.
+  // (19 nov. soir) « Mis à jour il y a … » du tableau d'Achats : l'heure où la liste lue est arrivée.
+  const achatsLusLe = useMemo(() => (Array.isArray(buys.items) ? Date.now() : buys.error ? null : undefined), [buys.items, buys.error]);
   const buysBase = useMemo(() => avecRemboursementsProuves((buys.items || []).filter(o => !acctOffOf(o)), rembAchatsParTx, montantCommandeLu),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx]);
@@ -37892,6 +38086,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         if (!avantC || JSON.stringify(avantC.codes) !== JSON.stringify(codes) || avantC.uid !== uidC) save('vrm_codes_hors_ligne', { at: Date.now(), vu: Date.now(), uid: uidC, codes });
         else if (!(Date.now() - (Number(avantC.vu) || 0) < 300000)) save('vrm_codes_hors_ligne', { ...avantC, vu: Date.now() });
       }
+      // (19 nov., retraits parfaits — Julien : « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été
+      // détecté ») CE QUI EST NOUVEAU dans la liste comptée, par identité (src/retraitsNouveaux.js) : un colis jamais vu
+      // sur cet appareil, un QR ou un code qui arrive sur un colis déjà là. La 1re fois, rien n'est annoncé. Toast une
+      // fois, la ligne marquée « nouveau » jusqu'à ce qu'il l'ouvre. Par appareil (une commodité, `localStorage`).
+      try {
+        const idsC = new Set(codes.map((c) => c.id));
+        const tous = codes.slice();
+        for (const t of pickupUnion.emailList) { const id = identRetraitEmail(t); if (!idsC.has(id)) tous.push({ id, code: '', qr: false, compte: true, lieu: (cleanLieu(t.lieu).nom || '').trim(), carrier: t.carrier || '' }); }
+        for (const o of pickupUnion.extra) { const id = identRetraitVinted(o); if (!idsC.has(id)) { const r = colisRelais[String((o && o.transaction_id) || '')] || null; tous.push({ id, code: '', qr: false, compte: true, lieu: nomPointRetrait(cleanLieu(r && r.lieu)) || '', carrier: (r && r.transporteur) || '' }); } }
+        let avantN = null; try { avantN = JSON.parse(localStorage.getItem(CLE_RETRAITS_VUS) || 'null'); } catch (_) { avantN = null; }
+        const { etat, annonces } = comparerRetraits(avantN, tous, Date.now());
+        try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(etat)); } catch (_) {}
+        if (annonces.length) {
+          const t = texteAnnonce(annonces, { tr, nomTransp: (k) => (CARRIERS[k] && CARRIERS[k].name) || '' });
+          if (t) toast(t, 'info');
+          try { window.dispatchEvent(new CustomEvent('vrm:retraits-nouveaux', { detail: { cles: annonces.map((a) => a.cle) } })); } catch (_) {}
+        }
+      } catch (_) {}
     } catch (_) {}
   }, [pickupUnion, tracking, buys.items, colisRelaisLu, suivisVinted, suivisManuels, transpMap]);
 
@@ -38502,7 +38714,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const [empreintesPhotos, setEmpreintesPhotos] = useState(undefined);
   const [photosComptesOuvert, setPhotosComptesOuvert] = useState(false);
   // (15 nov., lot meme-photo) « Même photo · à relier » (src/memePhoto.js), lu par Ma journée.
-  const memePhotoJ = useMemePhoto(only === 'journee' || only === 'annonces' ? chargerMemePhotoUI : null);
+  const liaisonJ = useLiaison(only === 'journee' || only === 'annonces');   // (19 nov.) LE compteur « N annonces à relier » (src/liaisonEtat.js)
   const relireEmpreintes = React.useCallback(() => { const owner = AUTH.user?.id; lireEmpreintesPhotos().then((e) => { if (AUTH.user?.id === owner) setEmpreintesPhotos(e); }); }, []);
   useEffect(() => { if (AUTH.user?.id && cleComptes) relireEmpreintes(); }, [cleComptes, relireEmpreintes]);
   const photosComptes = useMemo(() => {
@@ -42592,7 +42804,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
           continue;
         }
-        if (!['ventes', 'achats', 'annonces', 'suivi', 'transp'].includes(q.quoi)) continue;
+        // (19 nov., retraits parfaits) Un e-mail de colis rangé par le serveur (n'importe quelle boîte) : les suivis sont
+        // relus — seulement s'ils l'ont déjà été sur cet appareil (`_rowCache`) ; la liste « à retirer » se refait et le
+        // nouveau colis / code / QR est annoncé (toast, ligne « nouveau »). Une relecture par signal, au plus.
+        if (q.quoi === 'colis') { if (!deja.has('colis') && (_rowCache.has('email_track') || tracking != null)) { deja.add('colis'); lireSuivis({ force: true }); } continue; }
+        if (!['ventes', 'achats', 'annonces', 'suivi', 'transp', 'retrait'].includes(q.quoi)) continue;
         // Une relecture des ventes couvre tous les comptes touchés (leurs lignes viennent d'être oubliées).
         if ((q.quoi === 'ventes' || q.quoi === 'achats') && deja.has(q.quoi)) continue;
         deja.add(q.quoi);
@@ -47098,6 +47314,23 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (17 nov., chasse-bugs) Plus de pastille « + N retours » à côté du bouton : le bouton compte les retours cochés (`libelleImprimer`).
   const [progressionLot,setProgressionLot]=useState(null);
   const lotActuel=React.useRef(null);lotActuel.current={lignes:lignesLotTous,sig:sigLigneLot};
+  // (19 nov. soir, tableau de travail) « Imprimer les bordereaux » des ventes COCHÉES dans le tableau de Ventes : le moteur des
+  // colis à envoyer (jamais celui d'Achats) prend les lignes de SON lot dont le n° de transaction est coché — par identité —
+  // et les passe à `imprimerLot` (le papier demandé une fois, l'aperçu, puis Imprimer). Aucune ligne prête ⇒ dit, rien n'est imprimé.
+  React.useEffect(() => {
+    if (only !== 'bordereaux' || colisDans === 'achats') return undefined;
+    const f = (e) => {
+      const tx = new Set(((e && e.detail && e.detail.tx) || []).map(String)); if (!tx.size) return;
+      let L0 = []; try { L0 = (lotActuel.current && lotActuel.current.lignes()) || []; } catch (_) { L0 = []; }
+      const prets = L0.filter((l) => l && l.site === 'vinted' && tx.has(String(l.cle)));
+      if (!prets.length) { toast(tr('tableau.imprimer.aucunPret')); return; }
+      if (prets.length < tx.size) toast(tr('tableau.imprimer.partiel', { n: prets.length, total: tx.size }));
+      if (imprimerLotRef.current) imprimerLotRef.current(new Set(prets.map((l) => l.cle)));
+    };
+    window.addEventListener('vrm:imprimer-choix', f);
+    return () => window.removeEventListener('vrm:imprimer-choix', f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, colisDans]);
   // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
   // Chaque carte porte le groupe que lui donne une règle EXISTANTE (aucune règle
   // de classement neuve) : `expeditions()` + `pret` + `isShipDone` pour les
@@ -47255,6 +47488,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     };
     const codeDesSources = (sc, repli) => (sc && sc.code ? (sc.code.desaccord ? '' : (codeRetrait(sc.code.code) || repli || '')) : (repli || ''));
     const champsSources = (sc) => (sc ? { sources: sc.marques, verifieMs: sc.verifieMs, verifiePar: sc.verifiePar || null, codeSur: !!(sc.code && sc.code.sur), codeSources: (sc.code && sc.code.sources) || [], codesDesaccord: (sc.code && sc.code.desaccord) || null, codeRemplace: (sc.code && sc.code.remplace) || null } : {});
+    // (19 nov., retraits parfaits) CONSIGNE OU COMPTOIR (src/retraitSorte.js) : le lieu de CE colis, le drapeau de SON
+    // e-mail, le libellé du transporteur de SON n° — jamais un autre colis. Le point s'en sert (deux endroits) et la ligne le dit.
+    const libelleTranspDe = (k) => { try { const tr = k && tpmC && typeof tpmC.get === 'function' ? tpmC.get(normaliserSuivi(k)) : null; return (tr && tr.libelle) || ''; } catch (_) { return ''; } };
     for (const t of (pickupUnion.emailList || [])) {
       const a = achatDuColis(t, buysBase, indexSuivisAchats); const lu = lieuDeLigne(t, a); const eE = etatColisEmail(t, maintenant); const ej = eE.jours;
       const scE = sourcesCarte({ t, o: a || (pickupUnion.cmdParColis && pickupUnion.cmdParColis.get(colisKey(t))) || null }); const code = codeDesSources(scE, scE && scE.code && scE.code.desaccord ? '' : codeDeLigne(t));
@@ -47264,7 +47500,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47284,7 +47520,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
+        ...lu, sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -47296,7 +47532,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
       L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
-        ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
+        ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', sorte: sorteRetrait({ lieu: x.kind === 'email' ? (x.t && x.t.lieu) : (relaisDe(x.o) || {}).lieu, nom: lu.lieuNom, consigne: x.kind === 'email' ? (x.t && x.t.consigne) : (relaisDe(x.o) || {}).consigne, libelleTransp: libelleTranspDe(suX) }), transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
@@ -50973,7 +51209,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // (11 nov., lot photos-comptes) LA MÊME PHOTO SUR DEUX DE SES COMPTES : une carte AMBRE, seulement s'il y en a.
               const photosDouble = (photosComptes && photosComptes.groupes.length ? photosComptes.groupes : []).filter((g) => !g.annonces.every((a) => (a.plateforme || 'vinted') !== 'vinted' || idsDeuxComptes.has(String(a.id))));
               // (15 nov., lot meme-photo) UNE annonce d'ailleurs à la photo d'une paire Vinted : une carte AMBRE, seulement s'il y en a.
-              const memeJ = texteMemePhoto(memePhotoJ);
+              const memeJ = texteLiaison(liaisonJ);
               // (11 nov., lot journee-perso) Les cartes qu'il a cachées ne comptent pas dans « N gestes »
               // (elles ne sont pas à l'écran) ; leur nombre est dit à part (`nCacheesAF`).
               const nParCarteAF = { ailleurs: carteAilleurs ? 1 : 0, 'deux-fois': deuxFois.length || deuxComptesJ.length ? 1 : 0, 'photos-comptes': photosDouble.length ? 1 : 0, 'meme-photo': memeJ.n ? 1 : 0, 'a-relier': comptesARelierJour.length ? 1 : 0, 'stock-sortie': sortiesStock.length ? 1 : 0, 'pas-en-ligne': pasEnLigneJ && pasEnLigneJ.liste.length ? 1 : 0, 'sante-comptes': santeSurv.length ? 1 : 0, favoris: nouveauxFav && nouveauxFav.annonces > 0 ? 1 : 0, trancher: jobTrancher ? 1 : 0, republier: jobRepublier ? 1 : 0, autres: autres.length, urssaf: urssafJob ? 1 : 0, 'avis-bas': avisBasListe.length ? 1 : 0, suivi: aVerifier.n ? 1 : 0 };
@@ -51072,10 +51308,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 );
               };
               const carteMemePhoto = () => {
-                const l = memePhotoJ && memePhotoJ.lu ? [...memePhotoJ.propositions, ...memePhotoJ.ambigus.filter((x) => x.raison !== 'sans-numero')] : [];
+                const l = liaisonJ && liaisonJ.lu ? liaisonJ.file.filter((x) => !x.plusTard) : [];
                 return (
-                  <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.id).join(' ')} data-n={String(memeJ.n)}
-                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirMemePhoto(null)}>
+                  <button key="meme-photo" type="button" className="vrm-day-task vrm-fu-tache" data-journee-meme-photo={l.map((x) => x.cle).join(' ')} data-journee-liaison="" data-n={String(memeJ.n)}
+                    title={`${memeJ.titre}\n${memeJ.detail}`} aria-label={`${memeJ.titre} — ${memeJ.detail}`} onClick={() => ouvrirLiaison()}>
                     <PileVignettes srcs={l.map((x) => x.annonce.photo)} n={memeJ.n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="image" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{memeJ.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="meme-photo">{memeJ.detail}</span></span>
                     <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
@@ -51512,7 +51748,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
-              colis={nE ? colisJournee : []}
+              // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
+              // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
+              colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
@@ -52905,7 +53143,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        {!modeRetraits && <div className="vrm-achats-barre">
+        {!modeRetraits && !ordiAchats && <div className="vrm-achats-barre">
         <div className="vrm-seg vrm-seg-plein" role="group" aria-label={tr('achats.etapesAchats')}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
@@ -53010,11 +53248,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (6 nov., v36-visuel-2) La recherche et la période sur UNE ligne (la période sans valeur =
             son icône seule, le libellé reste lu au lecteur d'écran) : la liste remonte d'un cran. */}
         {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
-        {buysBase.length>0 && aFilter!=='attente' && (
+        {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
-        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
+        {ordiAchats ? null : <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>}{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,
@@ -54081,7 +54319,34 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
             dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
-        {(()=>{ const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
+        {(()=>{
+          // (19 nov. soir) L'ordinateur : TOUS ses achats en tableau (les mêmes, la même étape, le même ordre), Statut à compteurs.
+          if (ordiAchats && !modeRetraits) {
+            const cpts = [...new Set(buysBase.map((o) => (o._acc ? accNameOf(o._acc) : '')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+            const depuis = { tout: null, j7: 7, j30: 30 }[filtreAchatsT.periode];
+            const lignesA = buys.error && !buysBase.length ? null : !Array.isArray(buys.items) ? undefined : ordreRecent(buysBase.filter((o) => (!filtreAchatsT.compte || (o._acc && accNameOf(o._acc) === filtreAchatsT.compte))
+              && (depuis == null || ((quandCommandeVinted(o) || 0) >= Date.now() - depuis * 86400000))), (o) => quandCommandeVinted(o)).map((o) => {
+              const tk = trackForBuy(o); const st = achatStage(o, tk); const su = (tk && tk.suivi ? String(tk.suivi) : '') || suivisAchat(o, indexSuivisAchats)[0] || '';
+              const e = entreeSuiviAchat(o); const car = (tk && tk.carrier) || (e && e.transporteur) || (su ? transporteurDeForme(su) : '') || '';
+              const ls = su && st.step !== 0 ? ligneSuiviAchat(o, su, car, transporteurColis(car, su), !st.retour && st.step >= 1 && st.step < 4) : null;
+              const m = montantCommande(o);
+              return { cle: String(o.transaction_id), o, tk, titre: o.title || '', photo: orderPhoto(o) || '', prix: m != null ? montant(m, { devise: o.price?.currency_code || 'EUR' }) : '', prixNombre: m,
+                t: quandCommandeVinted(o), num: buyNumByTxn[String(o.transaction_id)] || '', compte: o._acc ? accNameOf(o._acc) : '', etape: st,
+                transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '' };
+            });
+            const filtresA = [
+              ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreAchatsT.compte || 'tous', onChange: (v) => setFiltreAchatsT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
+                options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((x) => ({ cle: x, libelle: x }))] }] : []),
+              { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreAchatsT.periode, onChange: (v) => setFiltreAchatsT((f) => ({ ...f, periode: v })),
+                options: [{ cle: 'tout', libelle: tr('tableau.filtre.toutePeriode') }, { cle: 'j7', libelle: tr('tableau.filtre.jours', { n: 7 }) }, { cle: 'j30', libelle: tr('tableau.filtre.jours', { n: 30 }) }] },
+            ];
+            const ouvrirA = (l) => { const o = l.o; const numA = buyNumByTxn[String(o.transaction_id)];
+              const a = attrsFicheLigne({ contexte: 'achat', site: 'vinted', cle: 'b' + String(o.transaction_id), nums: numA != null && numA !== '' ? [String(numA)] : [], photo: orderPhoto(o) || '', titre: o.title || '', prix: l.prix });
+              const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); };
+            return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
+              onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}/>;
+          }
+          const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
           const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
           const unCompte = cptes.length===1 ? (tranche.find(({o})=>o._acc)||{}).o._acc : null;
           return (<>
@@ -54470,7 +54735,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {/* (11 nov., décision C10 — Julien : « tranche ») L'ancien bloc « Annonces à compléter » est
                       FONDU dans la vue d'Annonces « À compléter » (un seul endroit, une seule règle :
                       src/annoncesACompleter.js) ; ici, une ligne qui y mène. */}
-                  {!noAcc && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
+                  {!noAcc && !designV2 && annACompleter && annACompleter.n > 0 ? <button type="button" className="vrm-outils vrm-outils-vers" data-outils-a-completer={annACompleter.n} onClick={()=>{ setAnnToolsOpen(false); setAnnSort('acompleter'); }}>{tr('annonces.completer')}<span>{annACompleter.n}</span></button> : null}
                   </div>
                   {[
                     /* ⚠️ (11 nov., lot DJ4 — Julien, mot pour mot : « L'inventaire physique n'est pas fiable.
@@ -54483,7 +54748,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {k:'deux-comptes', icon:'alert', lab:tr('deuxComptes.outil'), n:deuxComptes ? deuxComptes.groupes.length : 0, desc:tr('deuxComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setFeuilleDeuxComptes(true); }},
                     {k:'photos-comptes', icon:'image', lab:tr('photosComptes.outil'), n:photosComptes ? photosComptes.groupes.length : 0, desc:tr('photosComptes.outilDesc'), on:()=>{ setAnnToolsOpen(false); relireEmpreintes(); setPhotosComptesOuvert(true); }},
                     /* (15 nov., lot meme-photo) Une annonce d'ailleurs avec la photo d'une paire Vinted : la feuille « à relier ». */
-                    {k:'meme-photo', icon:'image', lab:tr('memePhoto.outil'), n:texteMemePhoto(memePhotoJ).n, desc:tr('memePhoto.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirMemePhoto(null); }},
+                    {k:'meme-photo', icon:'image', lab:tr('liaE.outil'), n:texteLiaison(liaisonJ).n, desc:tr('liaE.outilDesc'), on:()=>{ setAnnToolsOpen(false); ouvrirLiaison(); }},
                     {k:'studio', icon:'camera', lab:'Studio photo', desc:tr('annonces.cadreGuidePrise'), on:()=>{ setAnnToolsOpen(false); setStudioOpen(true); }},
                     {k:'seance-photo', icon:'camera', lab:tr('atelier.seance.titre'), desc:tr('atelier.seance.outil'), on:()=>{ setAnnToolsOpen(false); ouvrirAtelier('seance'); }},
                     /* (14 nov., lot messages-achats-plus, 110) Une sélection en un lien, lecture seule, révocable, qui expire. */
@@ -55123,8 +55388,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus" data-fiche-menu-ouvrir={String(it.id)} aria-haspopup="dialog" aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestesLeboncoin')}
                       onClick={()=>setFicheMenu(String(it._acc.vinted_user_id)+'_'+String(it.id))} style={geste}><Icon name="more" size={18}/></button>
                   </div>
-                  {ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id) && (
-                  <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>
+                  <MenuLigneFiche cle={flAnn['data-fiche-ligne']} ouvert={ficheMenu===String(it._acc.vinted_user_id)+'_'+String(it.id)}
+                    feuille={(contenu) => <SheetShell onClose={()=>setFicheMenu(null)} maxWidth={420} titre={it.title||it.brand||tr('annonces.annonce2')} sousTitre={num ? <Numero n={num} taille="petit"/> : tr('annonces.sansTouchePhoto')} data-fiche-menu={String(it.id)}>{contenu}</SheetShell>}
+                    rendre={() => (
                   <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button,a'); if (b && !b.hasAttribute('data-fiche-place')) setTimeout(()=>setFicheMenu(null), 0); }}>
                     {MP_PLACES_UI.map(pl => {
                       const on = mpChoisi(e, pl.cle);
@@ -55161,8 +55427,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <BoutonRappel variante="geste" style={geste} cible={{ sorte: 'article', num: num || '', item: String(it.id || '') }} libelle={num ? `N°${num}` : (it.title || '')}/>
                     <button type="button" className="vrm-fiche-geste" data-fiche-vendue="" onClick={()=>{ gesteVendues([it.id], true); }} title={tr('annonces.marquerVendueRetire')} style={geste}>{tr('annonces.marquerVendue')}</button>
                   </div>
-                  </SheetShell>
-                  )}
+                    )}/>
                   {/* (29 oct., revue) « il lui faut un N° pour aller sur Leboncoin »
                       était écrit sur CHAQUE fiche sans N° (§7) : la pastille « + N° »
                       de la fiche le montre déjà, et la raison se dit UNE fois
@@ -60746,6 +61011,9 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   // (19 nov., src/articles/numerosSites.js) Une annonce eBay qui n'est PAS sur Vinted : SON N°, donné par VRM
   // (`vrm_ebay_liens[id] = { numero, propre: true }`), par l'identifiant de l'annonce — jamais par son titre.
   if (id) { let l0 = null; try { l0 = (load(LIENS_EBAY, {}) || {})[id]; } catch (_) {} if (l0 && typeof l0 === 'object' && !l0.pairId && l0.propre && l0.numero != null && String(l0.numero).trim()) return cleNum(l0.numero); }
+  // (19 nov., « Vinted n'est pas le pivot ») Un lien vers un ARTICLE qui n'a pas d'annonce Vinted, posé sur SON toucher dans
+  // « Relier mes annonces » : { numero, article: true } (src/liaisonSites.js `opPorter`). Son N° est celui de l'article.
+  if (id) { let la = null; try { la = (load(LIENS_EBAY, {}) || {})[id]; } catch (_) { la = null; } const na = la && !la.pairId && la.article === true ? cleNum(la.numero) : ''; if (na && NUM_OK.test(na)) return na; }
   // (7 nov.) Il numérote lui-même : un SKU qui est SON numéro (« 123 », « B125 »,
   // « N° 123 ») compte comme « VRM-123 » — avec les mêmes gardes (une seule fiche le
   // porte, déjà avant la publication). Éteint : le SKU strict « VRM-… » seul.
@@ -62864,6 +63132,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // (lot AJ) Où commencent les ventes sans date lue (en bas), et combien : dit une fois.
   const sansDateT = React.useMemo(() => ({ i: debutSansDate(lignes, (x) => x.t), n: nbSansDate(lignes, (x) => x.t) }), [lignes]);
   const [n, setN] = React.useState(60);
+  // (19 nov. soir) Le tableau de l'ordinateur : ses filtres et l'heure de la dernière lecture des ventes reçue.
+  const ordiT = Natif.useOrdinateur();
+  const [filtreT, setFiltreT] = React.useState({ site: 'tous', compte: '', periode: 'tout' });
+  const [majLeT, setMajLeT] = React.useState(undefined);
+  React.useEffect(() => { if (Array.isArray(ventesVinted)) setMajLeT(Date.now()); else if (ventesVinted === null) setMajLeT(null); }, [ventesVinted, lbcVentes, ebayTous]);
   const NOM = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
   // Ce que chaque site a pu lire : dit UNE fois, en tête (jamais un « 0 » inventé).
   const etats = [];
@@ -62925,6 +63198,37 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // toucher redessinait tout l'écran Vinted (2 000 ventes : 3 s avant la première image, 15 s de calcul au téléphone)
   // et ne montrait même pas la vente touchée. Leboncoin, Vestiaire, eBay : leur écran, comme avant.
   const ficheToutes = (l) => (l.site === 'vinted' && l.id ? attrsFicheLigne({ contexte: 'vente', site: 'vinted', tx: l.id, cle: l.cle, photo: typeof l.photo === 'string' ? l.photo : '', titre: l.titre || '', prix: prix(l), sous: l.etat ? motEtatVente(l.etat) : '' }) : {});
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : le TABLEAU DE TRAVAIL (src/natif/ecrans/VentesTableau.jsx) — les MÊMES
+  // lignes, la même étiquette d'état, le même ordre ; ce qui change : Statut à compteurs, colonnes, tri, sélection, et
+  // « Imprimer les bordereaux » des ventes cochées (le chemin `imprimerLot` des colis, `vrm:imprimer-choix`).
+  if (ordiT) {
+    const sitesT = [...new Set(lignes.map((l) => l.site))];
+    const cptsT = [...new Set(lignes.filter((l) => filtreT.site === 'tous' || l.site === filtreT.site).map((l) => l.compte).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+    const depuisT = { tout: null, j7: 7, j30: 30 }[filtreT.periode];
+    const lignesT = enCours && !lignes.length ? undefined : (visibles.some((e) => e[1] === 'pas-su') && !lignes.length ? null
+      : lignes.filter((l) => (filtreT.site === 'tous' || l.site === filtreT.site) && (!filtreT.compte || l.compte === filtreT.compte)
+        && (depuisT == null || (l.t != null && Date.now() - l.t <= depuisT * 86400000))));
+    const filtresT = [
+      ...(sitesT.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sitesT.map((x) => ({ cle: x, libelle: NOM[x] || x }))] }] : []),
+      ...(cptsT.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
+        options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cptsT.map((x) => ({ cle: x, libelle: x }))] }] : []),
+      { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreT.periode, onChange: (v) => setFiltreT((f) => ({ ...f, periode: v })),
+        options: [{ cle: 'tout', libelle: tr('tableau.filtre.toutePeriode') }, { cle: 'j7', libelle: tr('tableau.filtre.jours', { n: 7 }) }, { cle: 'j30', libelle: tr('tableau.filtre.jours', { n: 30 }) }] },
+    ];
+    const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
+    return (
+      <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
+        <VentesTableau lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
+          compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
+          logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={20}/> : null)} Icon={Icon}
+          imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}
+          onImprimer={(ls) => { try { window.dispatchEvent(new CustomEvent('vrm:imprimer-choix', { detail: { tx: ls.filter((l) => l.site === 'vinted').map((l) => String(l.id)) } })); } catch (_) {} }}
+          onOuvrir={(l) => { const a = ficheToutes(l); if (a['data-fiche-ligne']) { const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); return; } onOuvrir(l); }}/>
+        <VentesAutresHorsPlan lignes={lignesHorsPlan.map((l) => ({ cle: l.cle, site: l.site, compteId: l.hp, compte: l.compte, titre: l.titre, prix: prix(l), aEnvoyer: geste(l) }))} onPro={onPro}/>
+      </div>
+    );
+  }
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
       {visibles.length > 0 && (
@@ -63159,7 +63463,6 @@ function CaptureVentes({ uid }) {
 function CaptureAnnonces({ uid }) {
   return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
 }
-poserIcone(Icon);   // (19 nov.) « VRM natif » : les glyphes internes des composants (chevron, coche…) sont les tracés de l'app
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.
@@ -63907,6 +64210,7 @@ function AppCoeur() {
   // (3 nov.) « Changer le prix » d'un N° : ouvert depuis la fiche, ou depuis une
   // ligne d'annonce (événement `vrm:prix-partout`, le N° en détail).
   const [prixNum,setPrixNum]=useState(null);
+  const prixFocus=useRef(false);   // (19 nov., fiche directe) « Prix partout » ouvert en touchant LA VALEUR du prix : le champ est prêt à taper
   // (14 nov., lot argent-prix) 121 « Prix d'un site à l'autre » et 114 « Remettre les prix » : deux feuilles de la coque.
   const [ecartsOuvert,setEcartsOuvert]=useState(null);
   const [remiseOuverte,setRemiseOuverte]=useState(null);
@@ -64118,7 +64422,7 @@ function AppCoeur() {
   // que la coque dit aux pages (`ContexteCoque`). Un écran d'avant : pas de détail, le contexte reste figé (aucun rendu de plus).
   const [fenteDetail, setFenteDetail] = React.useState(null);
   // Ventes · Terminées garde la liste d'avant (sa fiche s'ouvre ailleurs) : deux volets, pas de détail vide à droite.
-  const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab) && !(tab === 'ventes' && ongletColis === 'toutes'));
+  const troisVolets = !!(ordi && ECRANS_NATIFS.has(tab) && !ECRANS_TABLEAU.has(tab) && !(tab === 'ventes' && ongletColis === 'toutes'));
   const contexteCoque = React.useMemo(() => (troisVolets ? { titreRendu: true, voletDetail: fenteDetail, ordinateur: true } : CONTEXTE_COQUE_NATIVE), [troisVolets, fenteDetail]);
   // « / » ouvre la recherche (hors d'un champ de saisie), comme la maquette.
   React.useEffect(() => {
@@ -64967,6 +65271,8 @@ function AppCoeur() {
   const comptesSignales = useRef(null);      // Set des comptes signalés, 'tous', ou null
   // (19 nov., lot compte-bloque) Sa pause (ou le déblocage) change « en ligne » : le calcul repart.
   useEffect(() => { const f = () => setAnnoncesTick((t) => t + 1); window.addEventListener('vrm:comptes-bloques', f); return () => window.removeEventListener('vrm:comptes-bloques', f); }, []);
+  // (19 nov. soir, tableau de travail) ⟳ « Relire maintenant » d'un tableau : relance CETTE lecture (ventes, annonces, messages des comptes).
+  useEffect(() => { const f = () => setAnnoncesTick((t) => t + 1); window.addEventListener('vrm:relire-coque', f); return () => window.removeEventListener('vrm:relire-coque', f); }, []);
   useEffect(() => {
     const relire = (uids) => {
       const cur = comptesSignales.current;
@@ -66417,7 +66723,7 @@ function AppCoeur() {
         : t==='ventes' ? <><CarteStatsApp page="vestiaire" aide className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'vestiaire', compte: null, periode: null }}/><VentesVestiaire comptes={vintedAccounts}/></>
         : t==='annonces' ? <>
             {/* (14 nov.) « Publier sur Vestiaire » : le « + » de la barre de la liste (Vestiaire.jsx). */}
-            <LigneMemePhoto site="Vestiaire" charger={chargerMemePhotoUI}/>
+            <LigneLiaison site="Vestiaire"/>
             <AnnoncesVestiaire/>
             <PublierVestiaire comptes={vintedAccounts}/>
             <Card style={{padding:16}}>
@@ -66670,7 +66976,7 @@ function AppCoeur() {
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
           {/* (14 nov.) « Publier sur Leboncoin » : le « + » de la barre de la liste (Leboncoin.jsx), plus une carte en tête. */}
-          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneMemePhoto site="Leboncoin" charger={chargerMemePhotoUI}/><LeboncoinScreen/></>)}
+          {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneLiaison site="Leboncoin"/><LeboncoinScreen/></>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
           <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div>
@@ -66726,7 +67032,7 @@ function AppCoeur() {
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
           {sec==='offres'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
-          {sec==='annonces'&&!baseKO&&<LigneMemePhoto site="eBay" charger={chargerMemePhotoUI}/>}
+          {sec==='annonces'&&!baseKO&&<LigneLiaison site="eBay"/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };
   // Compte eBay : un panneau des Paramètres (« Comptes eBay »), dans le skin eBay.
@@ -67303,6 +67609,8 @@ function AppCoeur() {
             gestes: blocVenduAilleurs(p, rn, etat),
             questions: <>{questionChezToiFiche(p.num)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/></>,
             note: <NotePaireCoque numero={p.num} variante="bloc" ajout dicter/>,
+            // (19 nov., fiche directe) La note DÉJÀ écrite est une information : sous l'en-tête, sans rien toucher (rien quand il n'y en a pas).
+            noteLue: <NotePaireCoque numero={p.num} variante="ligne"/>,
             // (15 nov., lot securite-ventes ; rangé dans la fiche D le 16 nov.) « Où vendre cet article ? » avec les infos : une paire
             // déjà VENDUE (une vente lue sous ce N°, jamais réattribué) n'a plus à choisir où se vendre.
             infos: <><InfosPaireCoque numero={p.num}/>{!(rn.ventes && [rn.ventes.vinted, rn.ventes.lbc, rn.ventes.ebay].some((l) => Array.isArray(l) && l.length)) ? <OuVendreCoque annonces={rn.annonces || []} prixC={p.resume && p.resume.siVendue ? p.resume.siVendue.prix : null} stats={numData && numData.stats ? numData.stats : null} comptes={vintedAccounts} ebay={ebayCommandes} vc={ventesVcCoque}/> : null}</>,
@@ -67318,11 +67626,55 @@ function AppCoeur() {
               for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (commandeEbayEngagee(c)) out.push({ site: 'ebay', etat: 'vendue', compte: '', date: Date.parse(c.creationDate || '') || null, prix: null });
               const st = numData && numData.stats ? numData.stats : null;
               // Le prix : celui que la règle de « Prix partout » lit, sinon le prix LU dans le dressing (la lecture la plus fraîche).
+              const msLu = (d) => { if (d == null || d === '') return undefined; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : undefined; };
+              const autreSite = (x) => { try {
+                if (x.site === 'vinted') { const a = (rn.annonces || []).find((y) => String(y.id) === String(x.id)); return { photo: a ? (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || '')) : '' }; }
+                if (x.site === 'leboncoin') { const ad = ex && ex.lbcItems ? ex.lbcItems[x.id] : null; return ad ? { photo: (Array.isArray(ad.images) && ad.images[0]) || '', depuis: msLu(ad.publieeLe), favoris: ad.stats && Number.isFinite(ad.stats.favoris) ? ad.stats.favoris : undefined, compte: ad.accountName || x.compte || '' } : {}; }
+                if (x.site === 'ebay') { const a = (rn.annoncesEbay || []).find((y) => String(y.itemId) === String(x.id)); return a ? { photo: typeof a.photo === 'string' ? a.photo : '', depuis: msLu(a.depuis), favoris: Number.isFinite(a.observateurs) ? a.observateurs : undefined } : {}; }
+                if (x.site === 'vestiaire') { const it = ex && ex.vcItems ? ex.vcItems[x.id] : null; return it ? { photo: typeof it.photo === 'string' ? it.photo : '', depuis: msLu(it.depuis) } : {}; }
+              } catch (_) {} return {}; };
               const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+              // (19 nov., fiche directe) + l'identifiant de l'annonce et son prix mini (le fait « Prix mini », tapé sur place), ses vues
+              // (lues comme les favoris), son adresse sur le site (la rangée l'ouvre) — les mêmes lectures, rien de calculé.
               for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
-                favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
+                id: String(x.id || ''), mini: x.site === 'vinted' && x.mini != null ? Math.round(x.mini * 100) : null, miniPorte: x.site === 'vinted' && !!(numeros && numeros[String(x.id)]), lien: x.lien || '',
+                // (19 nov., Julien : « tout doit être parfait sur chaque application ») L'annonce d'un AUTRE site porte son titre, sa photo,
+                // sa date de mise en ligne et ses favoris LUS (Leboncoin : `publieeLe`, `stats.favoris` ; eBay : `depuis`, observateurs) :
+                // un article sans annonce Vinted a une fiche complète. Rien d'inventé : un champ pas lu reste absent.
+                titre: x.titre || '', ...autreSite(x),
+                favoris: x.site === 'vinted' ? (st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined) : autreSite(x).favoris,
+                vues: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].vues) ? st[x.id].vues : undefined });
             } catch (_) {}
             return out; })();
+          // (19 nov., fiche directe) Ce qui n'est PAS lu est dit sous les sites (« Pas lu : Leboncoin ») : les sites que la règle
+          // de « Prix partout » nomme (`manques`), une fois les lectures en plus arrivées (`ex`), pour les plateformes qu'il montre.
+          const sitesManquesFiche = (() => { if (!p || !rn || !ex) return undefined;
+            try { const aff = PROFIL_VENDEUR.uid === (AUTH.user?.id || '') && Array.isArray(PROFIL_VENDEUR.plateformes) ? PROFIL_VENDEUR.plateformes : null;
+              return sitesPrixDe(numF, rn, ex).manques.filter((m) => m !== 'le numéro' && (!aff || aff.includes(String(m).toLowerCase()))); } catch (_) { return undefined; } })();
+          // La taille : celle de la fiche de l'annonce, sinon de l'annonce lue, sinon celle écrite en fin de titre (la règle des listes).
+          const tailleFiche = (() => { if (!p) return ''; try { const f = p.idFiche && numeros ? numeros[p.idFiche] : null; const a = (rn.annonces || []).find((x) => String(x.id) === String(p.idFiche)) || (rn.annonces || [])[0] || null;
+            // (19 nov.) Un article sans annonce Vinted : la taille écrite en fin du titre de SON annonce (Leboncoin, eBay…).
+            const tf = [p.titre].concat((sitesFiche || []).map((s) => s && s.titre)).map((t) => tailleEnFin(t || '')).find(Boolean); return String((neuve && neuve.taille) || (f && (f.size || f.taille)) || (a && (a.size || a.size_title)) || (tf && tf.taille) || p.taille || '').trim(); } catch (_) { return ''; } })();
+          const photosFiche = p ? (rn.annonces || []).map((a) => (typeof a.photo === 'string' ? a.photo : ((a.photo && a.photo.url) || ''))).filter(Boolean) : [];
+          // « Acheté » et « Prix mini » se tapent SUR PLACE (Julien, 19 nov. : « l'outil doit être pratique, pas chiant ») : les
+          // MÊMES écritures qu'avant — `poserPrixAchatVente` (la feuille « prix d'achat ») et `montantSeuil` (la case « accepter
+          // dès » d'Annonces) —, chacune un geste annulable, sans confirmation.
+          // (19 nov., l'ARTICLE et pas l'annonce Vinted) Un N° sans fiche d'annonce Vinted (Leboncoin seul, eBay seul…) : son prix
+          // d'achat est celui posé PAR N° (`vinted_buyprice_by_num`, le miroir qui existe déjà) — lu ici, écrit par le même geste annulable.
+          const achatParNumFiche = (() => { if (!p || p.idFiche || !rn || !rn.cle) return null; const v = (load('vinted_buyprice_by_num', {}) || {})[String(rn.cle)]; const n = Number(String(v == null ? '' : v).replace(',', '.')); return v != null && String(v).trim() !== '' && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; })();
+          const editsFiche = p && !p.double && !p.ancienNumero ? {
+            achat: !p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok' || !rn.cle) return;
+              const buy = load('vinted_buyprice_by_num', {}) || {}; const k = String(rn.cle);
+              gesteVrm(`N°${k} : acheté ${String(w.patch.buyPrice).replace('.', ',')} €`, [{ k: 'vinted_buyprice_by_num', type: 'cle', id: k, apres: String(w.patch.buyPrice), avant: buy[k] }], {}, () => { setTimeout(() => { emettreClesRelues(['vinted_buyprice_by_num']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); }
+            : p.idFiche ? (texte) => { const w = ecriturePrixSaisi(String(texte)); if (w.etat === 'illisible') { toast(MONTANT_ILLISIBLE); return; } if (w.etat !== 'ok') return;
+              poserPrixAchatVente({ item: p.idFiche, num: String(p.num || '') }, texte); setTimeout(() => setFicheTick((t) => t + 1), 750); } : null,
+            mini: (id, texte) => { const fiches = load('vinted_annonce_numeros', {}) || {}; const f = fiches[String(id)];
+              if (!f) { toast(tr('fd.mini.sansFiche'), 'err'); return; }
+              const v = montantSeuil(texte); const n = Number(String(v).replace(',', '.'));
+              if (!(Number.isFinite(n) && n > 0)) { toast(MONTANT_ILLISIBLE); return; }
+              gesteVrm(tr('fd.mini.fait', { n: String(p.num || ''), prix: montant(n) }), [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { min: v }, avant: { min: f.min } }], {},
+                () => { setTimeout(() => { emettreClesRelues(['vinted_annonce_numeros']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); },
+          } : null;
           const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;
           const relierFiche = p && pf ? { proposition: pf.prop, onRelier: (pr) => relierAchatFiche(pf, pr),
             onAutre: async () => {
@@ -67333,10 +67685,12 @@ function AppCoeur() {
             } } : null;
           const lienF = p ? lienAchatDe(numF) : null;
           const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} sitesManques={sitesManquesFiche} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
+            siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
+            onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
-            onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
+            onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
               // (9 nov.) « Ouvrir dans … » : l'écran d'où vient l'étape, sur SON objet (par identité).
@@ -67400,8 +67754,8 @@ function AppCoeur() {
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>
-      {/* (15 nov., lot meme-photo) « Même photo · à relier » : la feuille, ouverte par Ma journée, Annonces → Outils, les écrans des sites et la fiche. */}
-      {AUTH.user && <MemePhotoCoque/>}
+      {/* (19 nov.) « Relier mes annonces » : LE parcours, ouvert par chaque entrée (rangées des sites, Annonces → Outils, la fiche, « même photo »). */}
+      {AUTH.user && <LiaisonCoque/>}
       {AUTH.user && <RattrapageNumerosRanges/>}
       {/* (15 nov.) L'atelier « achat arrivé → en ligne » prend l'événement de « Ranger cet achat » (sa première partie). */}
       {AUTH.user && <AtelierArriveeCoque/>}
@@ -67539,7 +67893,7 @@ function AppCoeur() {
             Feuille={SheetShell} Bouton={Bouton} Segmente={Segmente} toast={toast} onFermer={()=>setVisuels(null)}/>
         </GardeEcran>}
         {/* (3 nov.) LE PRIX PARTOUT : les sites de CE N° (par identité), UN clic. (19 nov.) « Appliquer » envoie la baisse par l'extension, ou la range (HotePrixPartout). */}
-        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>setPrixNum(null)}/></GardeEcran>}
+        {prixNum && <GardeEcran nom="prix" feuille resetKey={prixNum} onFermer={()=>setPrixNum(null)}><HotePrixPartout num={prixNum} focusPrix={prixFocus.current} numData={numData} comptes={vintedAccounts} extra={ficheExtra} onFermer={()=>{ prixFocus.current = false; setPrixNum(null); }}/></GardeEcran>}
         {pubAil && <GardeEcran nom="publier" feuille resetKey={pubAil.num||''} onFermer={()=>setPubAil(null)}><Differe rendre={()=>{
           // (5 nov.) LE PARCOURS « PUBLIER AILLEURS » : les sites de CE N° (par identité).
           const num = pubAil.num;
@@ -67869,6 +68223,8 @@ function AppCoeur() {
         }}/></GardeEcran>}
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
+        {/* (19 nov. soir, NATIF.md §2 bis) Automatisations : les automatismes existants, leur état LU, leurs réglages (src/automatisations/). */}
+        {tab==='automatisations' &&<GardeEcran nom="automatisations"><AutomatisationsLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}
@@ -67887,6 +68243,8 @@ function AppCoeur() {
           onNum={(n)=>{try{window.dispatchEvent(new CustomEvent('vrm:fiche-article',{detail:String(n)}));}catch(_){}}}
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
+        <ToastNumeros/>
+        {tab==='garage' ? <NumerosAEcrire/> : null}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
@@ -67983,4 +68341,4 @@ export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 export { fetchTxnItemIds };   // (11 nov., robustesse) la synchro de l'inventaire relie par identité
 export { reglageTamponsChoisi, ecrireReglageTampons, Z_CONFIRMATION };   // (16 nov., lot tampons-parametres)
-export { achatDuNumeroLu, annoncerFicheAPublier, modifierCle, sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi, demanderActionAnnonces };
+export { achatDuNumeroLu, annoncerFicheAPublier, modifierCle, sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };

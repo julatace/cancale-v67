@@ -27,9 +27,19 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (19 nov., fiche directe) Un toucher ouvre la fiche, qui montre tout : faits, sites, gestes — docs/passation/2026-11-19-fiche-directe.md.
+  { id: 'fiche-directe', date: '2026-11-19', titre: 'La fiche montre tout, d’un seul toucher', phrase: 'Prix, achat, bénéfice, sites, gestes : touche une valeur pour la changer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « la liaison des articles entre les différentes applications […] irréprochable ») docs/passation/2026-11-19-liaison-sites-guidee.md
+  { id: 'liaison-sites-guidee', date: '2026-11-19', titre: 'Relie tes annonces, photo contre photo', phrase: 'Leboncoin, eBay, Vestiaire : touche le bon article, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov. soir, NATIF.md §2 bis) docs/passation/2026-11-19-app-tableaux.md
+  { id: 'app-tableaux', date: '2026-11-19', titre: 'Annonces, ventes, achats en tableaux de travail', phrase: 'Statut à compteurs, colonnes, tri, sélection ; et l’écran Automatisations.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « un agent 100 % autonome, sans IA » ; « c'est l'extension qui va publier ») docs/passation/2026-11-19-publier-agent.md
+  { id: 'publier-agent', date: '2026-11-19', titre: 'Publier sur… : VRM remplit chaque site', phrase: 'Catégorie, marque, pointure posées seules ; une question s’il doute.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « l'onglet e-mails est absolument catastrophique » ; « relier la boîte : beaucoup plus accompagné ») docs/passation/2026-11-19-emails-mail.md
   { id: 'emails-mail', date: '2026-11-19', titre: 'E-mails comme Mail, plein écran', phrase: 'Segments en haut, la liste en grand, l’e-mail lisible à côté.', tab: 'emails', pour: 'tous', mode: 'tous' },
   { id: 'relier-boite-guide', date: '2026-11-19', titre: 'Relier ta boîte, pas à pas', phrase: 'Gmail, Outlook, iCloud : une étape par écran, essai vérifié en direct.', tab: 'emails', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « reconnaître absolument tous les types de code de retrait », « je dois voir quand un nouveau QR ou colis est détecté ») docs/passation/2026-11-19-retraits-parfaits.md
+  { id: 'retraits-parfaits', date: '2026-11-19', titre: 'Nouveau code de retrait : VRM te prévient', phrase: 'Consigne ou comptoir dit, colis retirés relus, codes de casier lus.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-natif', date: '2026-11-19', titre: 'Ventes redessinées, tes colis cochés d’office', phrase: 'À envoyer, en route, terminées ; sur ordinateur, la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (19 nov., ext. 5.409) docs/passation/2026-11-19-extension-utile.md
   { id: 'arrivee-capte', date: '2026-11-19', titre: 'Ce que l’extension a capté, à ton arrivée', phrase: 'Ventes, codes, messages : une feuille les dit, chacun mène à l’élément.', tab: 'journee', pour: 'tous', mode: 'tous' },
@@ -37,7 +47,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'compte-bloque', date: '2026-11-19', titre: 'Compte bloqué par Vinted : VRM te demande', phrase: 'Ses annonces en pause, remises seules quand Vinted le débloque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « ça doit être rangé dans les onglets dédiés […] d'autres choses plus intéressantes pour cet onglet »)
   // src/aujourdhui/modele.js, src/designV2/aRegler.js — docs/passation/2026-11-19-aujourdhui-propre.md
-  { id: 'aujourdhui-chiffres', date: '2026-11-19', titre: 'Aujourd’hui : tes chiffres d’abord', phrase: 'Vendu du jour, semaine, mois ; le reste « À régler » dans chaque onglet.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'aujourdhui-chiffres', date: '2026-11-19', titre: 'Aujourd’hui : tes chiffres d’abord', phrase: 'CA, bénéfice, ventes, panier : jour, semaine, mois. Le reste dans ses onglets.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (19 nov., photo du Mac de Julien : « Extension à installer » alors qu'elle vit dans un autre Chrome) docs/passation/2026-11-19-vite-et-sans-bug.md
   { id: 'page-extension', date: '2026-11-19', titre: 'Une page pour l’extension et tes comptes', phrase: 'Compte ouvert, ce que VRM peut faire, et pourquoi : en clair.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'extension-ou-elle-est', date: '2026-11-19', titre: 'VRM dit où est ton extension', phrase: 'Installée ici mais muette, ou vivante dans un autre navigateur : dit.', tab: 'settings', pour: 'tous', mode: 'tous' },

@@ -174,7 +174,9 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
       numero, cleNumero: k, numeros: nums, deuxNumeros: nums.length > 1, doublon,
       titre: str((g.find((a) => str(a.titre)) || t).titre), photo: (g.find((a) => a.photo) || t).photo || null,
       taille: str((g.find((a) => str(a.taille)) || t).taille), condition: str((g.find((a) => str(a.condition)) || t).condition),
-      annonces: g.map((a) => ({ site: a.site, id: String(a.id), compte: str(a.compte), pseudo: str(a.pseudo), prix: montantLu(a.prix), etat: a.etat, depuis: dateLue(a.depuis), url: str(a.url),
+      annonces: g.map((a) => ({ site: a.site, id: String(a.id), compte: str(a.compte), pseudo: str(a.pseudo), prix: montantLu(a.prix), etat: a.etat,
+        // (19 nov., publier-agent) ce que CETTE annonce dit d'elle-même — la fiche article neutre (src/publier/agent.js) les lit, site par site.
+        titre: str(a.titre), photo: a.photo || null, taille: str(a.taille), condition: str(a.condition), marque: str(a.marque), depuis: dateLue(a.depuis), url: str(a.url),
         favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), numero: numDe(a), relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
       sites: [...new Set(g.map((a) => a.site))],
       prix, prixAnnonce: { site: ref.site, id: String(ref.id) },
@@ -231,6 +233,28 @@ export function compterArticles(articles, opts = {}) {
   const out = {};
   for (const s of ['tous', ...SITES]) { out[s] = {}; for (const e of ['enligne', 'apublier', 'dorment', 'vendues', 'retirees']) out[s][e] = filtrerArticles(articles, { ...opts, site: s, etat: e, recherche: '' }).length; }
   return out;
+}
+// (19 nov. soir, le tableau de travail) L'état d'un article pour le site et le compte choisis : le MEILLEUR état de SES annonces
+// de ce site / de ce compte (l'ordre RANG, celui de `construireArticles`) ; aucune annonce ⇒ null (l'article n'y est pas).
+// Cocher En ligne · Masquée · En pause · À confirmer = le segment « En ligne » (`filtrerArticles` etat 'enligne') : même nombre.
+export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'brouillon', 'vendue', 'retiree'];
+export const STATUTS_EN_LIGNE = ETATS_FILTRE.enligne;
+export function statutTableau(a, { site = 'tous', compte = '' } = {}) {
+  const ann = arr(a && a.annonces).filter((x) => (site === 'tous' || x.site === site) && (!compte || str(x.compte) === str(compte)));
+  if (!ann.length) return null;
+  return ann.map((x) => x.etat).sort((x, y) => (RANG[x] ?? 9) - (RANG[y] ?? 9))[0] || null;
+}
+// Les comptes vus dans les annonces (un compte appartient à UN site) : [{ cle: 'site:compte', site, compte, pseudo }].
+export function comptesDesArticles(articles, site = 'tous') {
+  const m = new Map();
+  for (const a of arr(articles)) for (const x of arr(a.annonces)) {
+    if (site !== 'tous' && x.site !== site) continue;
+    if (!str(x.compte)) continue;
+    const c = x.site + ':' + str(x.compte);
+    if (!m.has(c)) m.set(c, { cle: c, site: x.site, compte: str(x.compte), pseudo: str(x.pseudo) });
+    else if (!m.get(c).pseudo && str(x.pseudo)) m.get(c).pseudo = str(x.pseudo);
+  }
+  return [...m.values()].sort((x, y) => (SITES.indexOf(x.site) - SITES.indexOf(y.site)) || (x.pseudo || x.compte).localeCompare(y.pseudo || y.compte, 'fr'));
 }
 // Le plus récent d'abord (date de mise en ligne lue) ; sans date : après, par N° puis titre — un ordre STABLE.
 export function trierArticles(articles) {

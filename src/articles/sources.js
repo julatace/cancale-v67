@@ -20,7 +20,7 @@ export function annoncesVinted(comptes) {
   for (const c of arr(comptes)) {
     if (!c || !c.ok) continue;
     const pousse = (it, etat) => { if (!it || it.id == null) return; out.push({ site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
-      prix: it.price, taille: str(it.size), condition: str(it.condition), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
+      prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
       favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url) }); };
     arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
     arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));

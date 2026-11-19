@@ -17,6 +17,7 @@ export { Affiche } from './Affiche.jsx';
 export { Vide } from './Vide.jsx';
 export { Attente } from './Attente.jsx';
 export { Faits, Fait } from './Faits.jsx';
+export { EnteteArticle, Photos, Herite } from './Article.jsx';
 export { Segmente } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
 export { Rangee, Vignette, Interrupteur } from './Rangee.jsx';
@@ -30,3 +31,6 @@ export { TIRET, estVide, cx } from './outils.js';
 export { Barres } from './Barres.jsx';
 export { Vignettes, CodeRetrait } from './Vignettes.jsx';   // (19 nov.) ajoutés pour « Aujourd'hui » : src/natif/complements.css
 export { Colonnes, Colonne } from './Colonnes.jsx';   // (19 nov.) deux colonnes à l'ordinateur, une au téléphone
+export { TableauTravail, depuisMaj } from './TableauTravail.jsx';   // (19 nov. soir) le tableau de travail des listes (NATIF.md §2 bis)
+export { Carte, Tuiles, Tuile } from './Carte.jsx';   // (19 nov.) carte-tableau à filet et tuiles de chiffres (« entre Vintex et celui-là »)
+export { Courbe, Progression, Champ } from './Courbe.jsx';   // (19 nov.) la courbe des 30 jours, la progression de l'objectif, un champ court

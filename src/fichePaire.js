@@ -88,6 +88,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     // VENTE (`vinted_sale_overrides`), pas seulement de la fiche — « Voir l'état »
     // et l'histoire lisent CET achat-là (jamais « saisi à la main » à tort).
     etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC, buyFromId: entree.buyFromId ? String(entree.buyFromId) : null,
+      vendeur: b.seller ? String(b.seller) : '', compteAchat: b.account ? String(b.account) : '',   // (19 nov., fiche directe) lus sur l'achat relié, pour l'histoire
       detail: [b.seller ? `vendeur « ${b.seller} »` : null, b.account || null, entree.buyFromId ? 'achat relié par son n° de transaction' : null].filter(Boolean).join(' · ') });
   } else if (achatC != null && entree.buyGros && origineDuPrix(entree, entree.buyGros.id).etat === 'lot') {
     // (5 nov., intégration) La part d'un ACHAT EN GROS reliée par SON clic
