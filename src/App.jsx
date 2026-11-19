@@ -36752,7 +36752,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // nombreuses et n'apparaissent que dans « Tous »).
   const [aFilterBrut, setAFilter] = useVueSession('achats-filtre', 'attente'); // attente | route | recus | all
   // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur, la liste d'Achats est le TABLEAU DE TRAVAIL (src/natif/ecrans/AchatsTableau.jsx).
-  const ordiAchats = Natif.useOrdinateur() && only === 'achats';
+  const ordiCompta = Natif.useOrdinateur();
+  const ordiAchats = ordiCompta && only === 'achats';
   const [filtreAchatsT, setFiltreAchatsT] = useState({ compte: '', periode: 'tout' });
   // (31 oct., soir — Julien : « que dans les deux onglets il n'y ait pas la même
   // chose ») DEUX ÉCRANS sur les mêmes lectures (§11, aucune copie) :
@@ -55896,9 +55897,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
-        {/* (19 nov. soir, NATIF.md §2 bis) La barre d'outils des listes : « Choisir une action ▾ » (les gestes d'hier du « ⋯ » :
-            filtres, mise à jour, réponses rapides) et le filtre Site (le même choix que le menu de plateforme). */}
-        {designV2 ? <div className="n-msg-outils" data-msg-outils-tableau="">
+        {/* (19 nov. soir, NATIF.md §2 bis) La barre d'outils des listes, à l'ordinateur : « Choisir une action ▾ » (les gestes d'hier du
+            « ⋯ » : filtres, mise à jour, réponses rapides) et le filtre Site (le même choix que le menu de plateforme). Au téléphone :
+            le « ⋯ » d'hier, la 1re conversation reste dans la moitié haute. */}
+        {designV2 && ordiCompta ? <div className="n-msg-outils" data-msg-outils-tableau="">
           <select className="n-au-choix" aria-label={tr('tableau.choisirAction')} value="" data-msg-action="" onChange={(e)=>{ const v=e.target.value; e.target.value='';
               if(v==='maj') loadConvs(true); else if(v==='rapides') setFeuilleQR(true); else if(v) { setMessageFilter(v); setConvMax(40); } }}>
             <option value="">{tr('tableau.choisirAction')}</option>
