@@ -10,7 +10,7 @@
    qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
    Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
    ════════════════════════════════════════════════════════════════════════════ */
-:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
   all: revert-layer;
 }
 /* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
