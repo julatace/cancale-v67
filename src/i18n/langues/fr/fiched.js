@@ -158,4 +158,5 @@ export default {
   "fd.photo.voirN": "Voir les {n} photos",
   "fd.mini.fait": "N°{n} : prix mini {prix}",
   "fd.mini.sansFiche": "Fiche introuvable — rien n’a été noté.",
+  "fd.relier.propose": "Achat proposé",
 };

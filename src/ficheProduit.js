@@ -288,18 +288,21 @@ export function venteDeLaPaire(rn, annulee = () => false) {
 // LES GESTES de la fiche (19 nov. : visibles SUR la fiche, plus derrière « ⋯ ») : chacun un geste qui existait (rien de
 // neuf), seulement ceux qui ont un sens dans l'état de l'article. `dispo` : ce que l'écran a fourni ; `dispo.action` : la
 // sorte du bouton principal — son geste n'est pas redit en tuile (« Baisser le prix » ⇒ pas de tuile « Prix »).
-export const TUILES = ['prix', 'photos', 'note', 'republier', 'publier', 'dupliquer', 'emballer', 'bordereau', 'numero', 'rappel', 'certificat', 'taille'];
+// (19 nov., audit d'utilité §4.6) Visibles, en rangées : Prix · Republier · Ailleurs · Dupliquer · Autre taille · Photos · Note ·
+// Bordereau. Derrière « ⋯ » (rare) : Certificat, Son N°. « Rappel » et « Emballer » ne sont plus des gestes de la fiche.
+export const TUILES = ['prix', 'republier', 'publier', 'dupliquer', 'taille', 'photos', 'note', 'bordereau', 'certificat', 'numero'];
+export const RARES = ['certificat', 'numero'];
 export function tuilesFiche(p, dispo = {}) {
   if (!p) return [];
   const neuve = !!dispo.neuve, rien = p.etat === 'rien', ancien = !!p.ancienNumero;
   // Seulement ce qui a un sens dans l'état de l'article : « Prix » et « Republier » d'une annonce en ligne, « Ailleurs » tant qu'elle n'est pas vendue.
   const sit = situation(p, dispo.sites || []); const enVente = sit === 'en-vente', vendue = sit === 'vendue';
   const ok = {
-    note: !!dispo.note && !ancien, photos: !!dispo.atelier && !ancien, certificat: !!dispo.atelier && !ancien, rappel: !!dispo.rappel && !ancien,
+    note: !!dispo.note && !ancien, photos: !!dispo.atelier && !ancien, certificat: !!dispo.atelier && !ancien,
     prix: !!dispo.onPrix && enVente && !neuve && !ancien && dispo.action !== 'baisser', publier: !!dispo.onPublierAilleurs && !vendue && !neuve && !rien && !ancien,
     republier: !!dispo.onRepublier && enVente && (dispo.sites || []).some((x) => x && x.site === 'vinted' && x.etat === 'en-ligne') && !neuve && !ancien && !p.double,
     dupliquer: !!dispo.onDupliquer && !rien && !ancien, taille: !!dispo.outilsIdees && !rien && !ancien && !p.double,
-    bordereau: !!dispo.onBordereau && !!p.aPoster && !!p.txAPoster && dispo.action !== 'bordereau', emballer: !!dispo.onEmballer && !!p.aPoster, numero: !!dispo.histoNum,
+    bordereau: !!dispo.onBordereau && !!p.aPoster && !!p.txAPoster && dispo.action !== 'bordereau', numero: !!dispo.histoNum,
   };
   return TUILES.filter((t) => ok[t]);
 }

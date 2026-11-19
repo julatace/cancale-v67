@@ -158,4 +158,5 @@ export default {
   "fd.photo.voirN": "Ver las {n} fotos",
   "fd.mini.fait": "N.º {n}: precio mínimo {prix}",
   "fd.mini.sansFiche": "Ficha no encontrada: no se ha guardado nada.",
+  "fd.relier.propose": "Compra propuesta",
 };

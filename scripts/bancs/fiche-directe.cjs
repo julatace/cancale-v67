@@ -128,7 +128,7 @@ function mesurerFiche() {
     b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
     b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°3245, 3246, 3247, 3248, 3249 +19 · à écrire sur leurs rangements</span>'; z.prepend(b);
     const bulles = [...z.children].filter(vis).map(R); b.remove();
-    const zones = [f.querySelector('[data-fd-barre]'), f.querySelector('[data-fiche-heros]')].filter(vis).map(R);
+    const zones = [f.querySelector('[data-fd-barre], .n-barre-titre'), f.querySelector('[data-fiche-heros]')].filter(vis).map(R);
     const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
     return { place: z.getAttribute('data-toasts-place'), bulles, zones: zones.length, couvre: zones.filter((r) => bulles.some((t) => coupe(t, r))).length }; })();
   const cadre = f.firstElementChild && f.scrollHeight;
@@ -199,6 +199,7 @@ function jugerFiche(m, n, suf, tel) {
 async function ouvrirParNum(pg, n) {
   await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: x })), n);
   await pg.waitForSelector(`[data-fiche-paire="${n}"]`, { timeout: 12000 }).catch(() => {});
+  await pg.waitForSelector(`[data-fiche-paire="${n}"][data-n-etat="ouverte"], [data-fiche-paire="${n}"]:not([data-n-etat])`, { timeout: 4000 }).catch(() => {});
   await pg.waitForFunction(() => !document.querySelector('[data-fd-propose="lecture"], [data-fiche-lecture-en-cours="1"]'), null, { timeout: 12000 }).catch(() => {});
   await pg.waitForTimeout(1300);
 }
