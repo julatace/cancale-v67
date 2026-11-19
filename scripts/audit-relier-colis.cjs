@@ -14,7 +14,10 @@
 //        feuille, `Math.ceil` d'instants, disait 4) ; la ligne (`delaiRetrait`) dit le même nombre ;
 //   R5 · branchement : la feuille du QR lit `qrView.delai` / `joursRestantsRetrait` (plus de `Math.ceil` sur la
 //        limite) ; la ligne passe SON délai (`ouvrirQr0(dl4…)`) ; « Afficher le QR » seulement avec `ouvrirQr` ;
-//        « Relier » seulement quand `commandeRetrait` ne trouve rien ; l'écriture passe par `ecritureRelierColis`.
+//        (19 nov., décision de Julien : « on ne doit pas avoir le bouton relier un achat ») PLUS de « Relier » sur un
+//        colis à retirer (ni `relierRetrait`, ni `relierDe`, ni `data-rp-relier-ouvrir`) : la feuille ne s'ouvre que
+//        depuis le scanner (`EV_RELIER_COLIS`) ; l'écriture passe toujours par `ecritureRelierColis`. Ce que la
+//        ligne dit à la place : scripts/audit-colis-achat-auto.cjs.
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
 const fs = require('fs');
@@ -77,7 +80,10 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(!/Math\.ceil\(\(new Date\(qrView\.limite/.test(APP) && /joursRestantsRetrait\(jour\)/.test(APP) && /const dl = qrView\.delai/.test(APP), 'R5 · la feuille du QR : le délai de la ligne, sinon `joursRestantsRetrait` (plus de Math.ceil d’instants)');
   dit(/ouvrirQr0\(dl4 && Number\.isFinite\(dl4\.jours\) \? dl4 : null\)/.test(CR) && /openQrView\([^;]*\{ delai: d \|\| delaiColisRetrait\(x\) \}\)/.test(APP), 'R5 · la ligne passe SON délai à la feuille du QR');
   dit(/\{ouvrirQr \? <button[^>]*data-rp-afficher-qr=/.test(CR) && !/vrm-rpf-qr-mini/.test(CR), 'R5 · « Afficher le QR » : un vrai bouton, seulement quand un QR existe (plus l’icône grise)');
-  dit(/const relierRetrait = \(x\) => \{[\s\S]{0,260}if \(!su \|\| commandeRetrait\(t\)\) return null;/.test(APP) && /relierDe=\{relierRetrait\}/.test(APP), 'R5 · « Relier » seulement quand aucune identité ne relie le colis (`commandeRetrait`)');
+  // (19 nov., décision de Julien) Avant : « Relier » quand aucune identité ne reliait le colis. Désormais : aucun geste « Relier »
+  // sur un colis à retirer ; la feuille n'a plus qu'une entrée, le scanner (un colis qu'il tient en main).
+  const ouvertures = (APP.match(/setRelierColis\(\{/g) || []).length, parScan = (APP.match(/setRelierColis\(\{[^}]*depuis: 'scan' \}\)/g) || []).length;
+  dit(!/relierRetrait/.test(APP) && !/relierDe\b/.test(APP) && !/relierDe\b|data-rp-relier-ouvrir|achats\.relier\.pasRelie/.test(CR) && ouvertures > 0 && ouvertures === parScan, 'R5 · plus de « Relier » sur un colis à retirer : la feuille ne s’ouvre que depuis le scanner (décision du 19 nov.)', `${parScan}/${ouvertures} ouverture(s) par le scanner`);
   dit(/const w = ecritureRelierColis\(relierColis, o\); if \(!w\) return;[\s\S]{0,200}await ecrireSuiviManuel\(w\.id, w\.patch\)/.test(APP), 'R5 · le clic écrit par `ecritureRelierColis` (le tx de LA ligne touchée)');
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);

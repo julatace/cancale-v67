@@ -20,3 +20,4 @@ button.v2r-haut:active { opacity: .7; }
   font: inherit; font-size: 15px; font-weight: 600; color: inherit; cursor: pointer; position: relative; }
 .v2r-retire::before { content: ""; position: absolute; inset: -4px 0; } /* cible au doigt 44 px */
 @media (max-width: 359px) { .v2r-code { font-size: 22px; } }
+.v2r-dedans { font-size: 13px; line-height: 18px; opacity: .78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

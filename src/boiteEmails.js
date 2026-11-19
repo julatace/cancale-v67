@@ -9,7 +9,7 @@
 //    titre (`nt`) ou un reçu délié par lui n'ouvre rien. Une seule règle (§11).
 // ⚠️ « Pas su » ≠ « rien » : pièces jointes non gardées (email classé avant le
 //    5 nov.) ⇒ `null` et la phrase le dit ; `[]` seulement si on a lu « aucune ».
-import { lectureEmail, expediteurLisible, codeLisible } from './journalEmail.js';
+import { lectureEmail, expediteurLisible, codeLisible, arriveeAchatVinted } from './journalEmail.js';
 
 export { expediteurLisible };
 
@@ -277,7 +277,9 @@ export function ligneEmail(e, delies = {}, maintenant = Date.now()) {
   // Un colis à retirer sans date lue reste un geste (l'e-mail le demande).
   if (!geste && r && r.t === 'suivi' && r.st === 'available' && r.sens !== 'sortant') geste = { k: 'retrait', mot: 'à retirer', proche: false, passe: false };
   // Un e-mail que VRM n'a pas su ranger : « à vérifier » prime (ambre).
-  if (e && e.etat && e.etat !== 'integre' && e.etat !== 'reessai') geste = { k: 'verifier', mot: e.etat === 'erreur' ? 'en attente' : 'à vérifier', proche: false, passe: false };
+  // (19 nov.) …sauf l'e-mail Vinted d'un achat arrivé, rangé avec SON achat par la conversation (`arriveeAchatVinted`) :
+  // classé « à vérifier » avant le 19 nov. faute de n° de suivi, il n'a rien à vérifier — il garde « à retirer ».
+  if (e && e.etat && e.etat !== 'integre' && e.etat !== 'reessai' && !(e.etat === 'a-verifier' && arriveeAchatVinted(e))) geste = { k: 'verifier', mot: e.etat === 'erreur' ? 'en attente' : 'à vérifier', proche: false, passe: false };
   const essentiel = garde.map((x, i) => [rang(x), i, x]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
   return { titre: NATURE_COURTE[t.titre] || t.titre, essentiel, geste, rien: !!t.rien && !geste };
 }

@@ -72,7 +72,6 @@ export default {
   "v2.passe.qr": "QR de retrait",
   "v2.passe.codeAVenir": "code pas encore lu",
   "v2.passe.enGrand": "En grand",
-  "v2.passe.relier": "Relier l’achat",
   "v2.passe.retire": "J’ai retiré",
   "v2.passe.page": "{i} sur {n}",
   "v2.passe.aucun": "Aucun colis à aller chercher pour l’instant.",

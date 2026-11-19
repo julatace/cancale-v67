@@ -9,6 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './design-v2.css';
 import './achats-v2.css';
 import { Etiquette, RangeeFaite } from './Signature.jsx';
@@ -27,6 +28,10 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
   const codesEnConflit = x.codesDesaccord?.length > 1;
   const code = codesEnConflit ? '' : (x.code || x.code2 || '');
   const fin = React.useCallback(() => aides.retirer(x), [aides, x]);
+  // Ce qu'il y a DEDANS (achat relié par identité : prix payé, compte), ou « Contenu pas encore lu » — jamais un bouton.
+  const contenu = x.contenu || null;
+  const contenuTxt = texteContenu(contenu, tr);
+  const rg = rangeeRetrait(x);
   const corps = (
     <>
       <span className="v2r-photo" aria-hidden="true">{photo || <Icon name="box" size={22}/>}</span>
@@ -35,6 +40,7 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
         <span className={'v2r-limite v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
           {ech ? ech.t : tr('v2.passe.limiteInconnue')}{qr ? ' · QR' : ''}
         </span>
+        {contenuTxt ? <span className={'v2r-dedans' + (contenu.etat === 'pas-lu' ? ' is-pas-lu' : '')} data-v2-contenu={contenu.etat} data-v2-contenu-tx={contenu.tx || undefined} data-v2-contenu-raison={contenu.etat === 'pas-lu' ? contenu.raison : undefined} data-v2-contenu-compte={contenu.compte || undefined}>{contenuTxt}</span> : null}
       </span>
       {code
         ? <b className="v2r-code" data-v2-code-grand="">{code}</b>
@@ -42,7 +48,7 @@ function LigneRetrait({ x, Icon, Photo, aides }) {
     </>
   );
   return (
-    <RangeeFaite fait={fait} onFin={fin} className="v2r-ligne" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '' }}>
+    <RangeeFaite fait={fait} onFin={fin} className="v2r-ligne" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '', 'data-v2-code-etat': rg.codeEtat, 'data-v2-qr-dispo': rg.qr ? '1' : '0', 'data-v2-limite-jour': rg.limite.jour || '', 'data-v2-limite-source': rg.limite.source, 'data-v2-titre-de': rg.titreDe || '', 'data-v2-transporteur': rg.transporteur.cle || '' }}>
       {ouvrir && (!codesEnConflit || qr)
         ? <button type="button" className="v2r-haut" onClick={ouvrir} data-v2-en-grand="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</button>
         : <div className="v2r-haut">{corps}</div>}

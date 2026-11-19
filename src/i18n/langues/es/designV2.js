@@ -72,7 +72,6 @@ export default {
   "v2.passe.qr": "QR de recogida",
   "v2.passe.codeAVenir": "código aún no leído",
   "v2.passe.enGrand": "En grande",
-  "v2.passe.relier": "Vincular la compra",
   "v2.passe.retire": "Ya lo recogí",
   "v2.passe.page": "{i} de {n}",
   "v2.passe.aucun": "Ningún paquete por recoger por ahora.",
