@@ -20745,7 +20745,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   );
   return (
     <>
-      <Natif.TetePage titre={titre} grandTitre={natif} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
+      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : titre} grandTitre={natif || (tab === 'journee' && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
         recherche={ordi || rechercheOuverte || sansRecherche ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
       {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
     </>
