@@ -104,7 +104,9 @@ async function muter(pg) {
   if (MUT === 'photo') await pg.addStyleTag({ content: '[data-fiche-heros]{min-height:560px!important}' });
   if (MUT === 'pleins') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const t = f && f.querySelector('[data-fd-tuile]'); if (t) t.setAttribute('data-fd-plein', ''); });
   if (MUT === 'onglets') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const g = f && f.querySelector('[data-fd-faits]'); if (g) { const t = document.createElement('div'); t.setAttribute('role', 'tablist'); t.innerHTML = '<button role="tab">Argent</button>'; g.before(t); g.hidden = true; } });
-  if (MUT === 'plus') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const s = f && f.querySelector('[data-fd-plus]'); const g = f && f.querySelector('[data-fd-tuiles]'); if (s && g) (s.querySelector('[role="dialog"]') || s).append(g); });
+  // « ⋯ » fermé : sa feuille n'est pas montée ⇒ la mutation pose une feuille FERMÉE (cachée) et y range les gestes.
+  if (MUT === 'plus') await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); const g = f && f.querySelector('[data-fd-tuiles]'); if (!f || !g) return;
+    let s = f.querySelector('[data-fd-plus]'); if (!s) { s = document.createElement('div'); s.setAttribute('data-fd-plus', '0'); s.hidden = true; f.append(s); } (s.querySelector('[role="dialog"]') || s).append(g); });
 }
 
 // ── La mesure de la fiche, DANS la page. ──
