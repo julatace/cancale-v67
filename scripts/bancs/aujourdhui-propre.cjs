@@ -367,7 +367,7 @@ async function onglets(nav, b, sombre) {
       const presse = attendus.some((g) => g.ambre && !['sans-numero', 'prix-mini-manquants', 'achat-a-relier'].includes(racine(g.id)));
       dit(x.ouvert === presse && x.presse === presse, `F2 ${onglet} : ${presse ? 'ouvert (un groupe presse)' : 'replié par défaut (rien ne presse) — une ligne, pas une pile de reproches'}`, { ouvert: x.ouvert, presse: x.presse });
       await pg.screenshot({ path: path.join(SHOTS, `a-regler-${onglet}-390-${th}.png`) });
-      if (!x.ouvert) { await pg.locator(`[data-v2-regler="${onglet}"] [data-v2-regler-bascule]`).first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500); x = (await lire()).blocs.find((k) => k.onglet === onglet) || x; }
+      if (!x.ouvert) { await pg.locator(`[data-v2-regler="${onglet}"] .n-groupe-repli`).first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500); x = (await lire()).blocs.find((k) => k.onglet === onglet) || x; }
       const tout = pg.locator(`[data-v2-regler="${onglet}"] [data-v2-regler-tout="0"]`).first(); if (await tout.count()) { await tout.tap({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(400); x = (await lire()).blocs.find((k) => k.onglet === onglet) || x; }
       const ids = x.groupes.map((g) => racine(g.id));
       const voulus = [...new Set(attendus.map((g) => (['sans-numero', 'prix-mini-manquants', 'achat-a-relier'].includes(racine(g.id)) ? 'completer' : racine(g.id))))];
