@@ -78,7 +78,7 @@ at, ecrit, par }` ; et, pour chaque lien, sa preuve et sa date dans `vrm_liaison
 
 ## 4. Les garde-fous et leur preuve
 
-`node scripts/audit-liaison-sites.cjs` — **95 contrôles**, qui EXÉCUTENT la règle, les gestes (avec le vrai moteur
+`node scripts/audit-liaison-sites.cjs` — **96 contrôles** (44 mutations, toutes rouges), qui EXÉCUTENT la règle, les gestes (avec le vrai moteur
 `ecrireOps`), la vraie règle « même photo », les vraies `numeroExterne` et `prochainLibre` d'App.jsx.
 `--mutation=toutes` : chaque garde réaffaiblie ⇒ rouge. Sur `git archive origin/main` : rouge (les modules n'existent pas).
 
@@ -98,6 +98,7 @@ at, ecrit, par }` ; et, pour chaque lien, sa preuve et sa date dans `vrm_liaison
 | les contradictions sont listées, jamais tranchées ; « garder » les fait taire | F1–F4 |
 | deux N° en jeu ⇒ DEMANDÉ ; l'autre N° reste servi ; garder le N° de l'annonce quand l'article a une annonce Vinted ⇒ refus expliqué | J2, J3, J4 |
 | « que sur ce site » ne redonne jamais un N° servi (`prochainLibre` : après le plus haut, jamais un trou), jamais un deuxième N° | H8, J4 |
+| une annonce que l'ancien écran disait « pas d'article à relier » (reliée, sans N°) ⇒ « que sur ce site », hors de la file | J5 |
 | relier n'est appelé que par les actions du parcours ; le calcul ne relie rien | I1–I6 (et `audit-meme-photo` F6) |
 
 Banc de rendu `scripts/bancs/liaison-sites.cjs` (390 × 844 tactile et 1512, clair et sombre, base inventée) : compte les
