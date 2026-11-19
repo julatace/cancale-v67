@@ -16360,19 +16360,20 @@ const recouvrementOuvert = () => { try { return !!document.querySelector('[data-
 function ToastNumeros() {
   const [t, setT] = React.useState(_toastNumeros);
   const [cache, setCache] = React.useState(false);
+  const [dessus, setDessus] = React.useState(0);   // la hauteur d'un plein collé (« Imprimer… ») : le toast se pose AU-DESSUS, jamais dessus
   React.useEffect(() => { _abToastNumeros.add(setT); return () => { _abToastNumeros.delete(setT); }; }, []);
   // (le même message par le bus de l'app, `vrm:numeros-donnes` { message } : ce que pose aussi un autre appareil relu, et le banc natif-coque)
   React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
   React.useEffect(() => {
     if (!t) return undefined;
-    const voir = () => setCache(recouvrementOuvert());
+    const voir = () => { setCache(recouvrementOuvert()); try { const p = [...document.querySelectorAll('.vrm-main .n-page-plein')].find((x) => x.getClientRects().length); setDessus(p ? Math.round(p.getBoundingClientRect().height) : 0); } catch (_) { setDessus(0); } };
     voir();
     const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
     return () => mo.disconnect();
   }, [t]);
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div data-toast-numeros=""><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+  return <div data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
 function NumerosAEcrire() {

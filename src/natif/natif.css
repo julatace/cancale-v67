@@ -459,8 +459,8 @@
 
   /* (19 nov., intégration) Le toast des N° neufs vit dans l'écran (qui remet --n-bas à 0) : il se pose quand même AU-DESSUS
      de la barre d'onglets au téléphone ; à l'ordinateur, il n'y a pas de barre en bas. */
-  [data-toast-numeros] { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur)); }
-  @media (min-width: 1024px) { [data-toast-numeros] { --n-bas: var(--n-bas-sur); } }
+  [data-toast-numeros] { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur) + var(--n-toast-dessus, 0px)); }
+  @media (min-width: 1024px) { [data-toast-numeros] { --n-bas: calc(var(--n-bas-sur) + var(--n-toast-dessus, 0px)); } }
 
   /* ── BarreOnglets ───────────────────────────────────────────────────────── */
   .n-onglets {
