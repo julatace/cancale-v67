@@ -128,7 +128,11 @@ function mesurer() {
     // le fond réel du champ : lui, ou son puits
     let e = el, c = null;
     for (let i = 0; e && i < 3; i++, e = e.parentElement) { const x = parse(getComputedStyle(e).backgroundColor); if (x && x[3] > 0) { c = x; break; } }
-    if (c && c[3] < 0.9) out.opaques.push(`${nom(el)} alpha ${c[3].toFixed(2)}`);
+    // (19 nov., « VRM natif ») un CHAMP peut porter le remplissage gris d'iOS (rgb(118 118 128 / .12–.24), contrat §1) :
+    // ce n'est pas du verre (aucun flou, aucun bleu). Une FEUILLE reste opaque.
+    const champ = el.matches('input, textarea, .sb-champ');
+    const remplirIos = c && Math.abs(c[0] - 118) <= 2 && Math.abs(c[1] - 118) <= 2 && Math.abs(c[2] - 128) <= 2 && c[3] <= 0.3;
+    if (c && c[3] < 0.9 && !(champ && remplirIos)) out.opaques.push(`${nom(el)} alpha ${c[3].toFixed(2)}`);
   }
 
   // V3 — le contraste, sur le fond RÉEL
