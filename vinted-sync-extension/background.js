@@ -4288,6 +4288,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const pid = String(msg.productId || '');
             if (!/^[\w-]{1,40}$/.test(pid)) { sendResponse({ ok: false }); return; }
             await chrome.storage.local.set({ vrmPendingVc: { ...p, productId: pid } });
+            // (19 nov., 5.409, publier-agent) La catégorie que Vestiaire a ENREGISTRÉE (lue dans la réponse du dépôt) ⇒ la commande
+            // la porte (`relu`) : l'app la compare à la voulue. Pas dans la réponse ⇒ rien (« posée, pas relue »).
+            const relu = categorieRelueVc(msg.categorie);
+            if (relu) await majCmd('vc:' + p.ad.id, { relu });
             const ok = await rangerVcAnnonces({ liens: { [pid]: String(p.ad.numero || '') } });
             sendResponse({ ok: ok === true }); return;
           }
@@ -14248,6 +14252,18 @@ async function couleursConnues(uid, acc) {
   }
   return { ...(liste || {}), ...COULEURS_VINTED_SURES };
 }
+async function listesVintedPourApp() {
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!uid) return { accepte: false, code: 'vinted-absent', raison: 'aucun compte Vinted connecté dans ce Chrome — ouvre vinted.fr' };
+  const accts = await getStoredAccounts();
+  const acc = (accts || []).find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const c = await couleursConnues(uid, acc);
+  const couleurs = {}; for (const [id, t] of Object.entries(c || {})) if (/^\d{1,6}$/.test(id) && typeof t === 'string') couleurs[id] = t;
+  if (Object.keys(couleurs).length < 3) return { accepte: false, code: 'pas-lu', raison: 'la liste des couleurs de Vinted n’a pas pu être lue (réessaie demain, ou ouvre « Vendre » sur vinted.fr)' };
+  const ok = await supabaseUpsert('app_data', [{ id: 'vinted_listes', data: { couleurs, at: new Date().toISOString() } }], 'id');
+  return ok === false ? { accepte: false, code: 'ecriture', raison: 'la base VRM n’a pas pris la liste' } : { accepte: true, etape: 'fait', n: Object.keys(couleurs).length };
+}
 function idsCouleurVinted(it, num) {
   if (!it || typeof it !== 'object') return [];
   const n = num || ((v) => (typeof v === 'number' && isFinite(v)) ? v : ((typeof v === 'string' && /^\d{1,12}$/.test(v)) ? Number(v) : null));
@@ -16426,7 +16442,9 @@ function blobPhotoFiche(u) {
   if (!m) return null;
   try { const bin = atob(m[2]); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: m[1] }); } catch (_) { return null; }
 }
-const photoFicheOk = (u) => /^data:image\/(?:jpeg|png|webp);base64,/.test(String(u || '')) || /^https:\/\/images\d*\.vinted\.net\//i.test(String(u || ''));
+// (19 nov., 5.409, publier-agent) + les photos d'un article venu d'un AUTRE site (Leboncoin, eBay, Vestiaire) : le fond
+// les télécharge (droit d'hôte déjà au manifeste : *.leboncoin.fr, i.ebayimg.com, *.vestiairecollective.com — aucun nouvel hôte).
+const photoFicheOk = (u) => /^data:image\/(?:jpeg|png|webp);base64,/.test(String(u || '')) || /^https:\/\/images\d*\.vinted\.net\//i.test(String(u || '')) || urlPhotoPermise(u);
 async function creerVintedFiche(msg) {
   const uid = String(msg.uid || '');
   const f = msg.fiche && typeof msg.fiche === 'object' ? msg.fiche : null;
@@ -21373,6 +21391,10 @@ async function executerCommande(msg) {
   if (msg && /^(vcPreparer|vcMarque)$/.test(String(msg.cmd || ''))) return await publierVestiaire(msg);
   // (19 nov., 5.409, publier-agent) Une fiche de l'agent, d'où qu'elle vienne, vers Leboncoin ou Vestiaire (`publierFicheSite`).
   if (msg && msg.cmd === 'publierFiche') return await publierFicheSite(msg);
+  // (19 nov., 5.409, publier-agent) La liste des COULEURS de Vinted (libellés du site), lue depuis l'onglet vinted.fr du compte
+  // connecté, dans le budget de LECTURE (une fois par 24 h au plus) et publiée pour l'app (`vinted_listes`) : l'agent traduit
+  // les codes `color_ids` des annonces. Les matières : aucune liste mesurée ⇒ rien (jamais devinées).
+  if (msg && msg.cmd === 'listesVinted') return await listesVintedPourApp();
   // 31 oct. (5.295) : répondre dans UNE conversation Vestiaire, sur son clic (voir `repondreVestiaire`).
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
@@ -26499,6 +26521,12 @@ async function lireMarquesVc() {
   try { _marquesVc = JSON.parse(r[0].c); _marquesVcAt = Date.now(); } catch (_) { return null; }
   return _marquesVc;
 }
+function categorieRelueVc(c) {
+  if (!c || typeof c !== 'object') return null;
+  const t = (v) => (typeof v === 'string' && v.trim() && v.length <= 80 && !/[<>]/.test(v) ? v.replace(/\s+/g, ' ').trim() : '');
+  const r = { univers: t(c.univers), categorie: t(c.categorie), sous: t(c.sous) };
+  return r.univers && r.categorie && r.sous ? r : null;
+}
 // Le compte ouvert dans les onglets du site : UN seul, sinon rien (jamais au nom d'un compte deviné).
 async function compteUniqueOnglets(site) {
   if (site === 'leboncoin') {
@@ -29851,9 +29879,51 @@ async function empreinteTexte(t) {
   } catch (_) { return 'taille:' + String(t).length; }
 }
 async function lireCatVu() { try { return (await chrome.storage.local.get(LBC_CAT_VU))[LBC_CAT_VU] || {}; } catch (_) { return null; } }
+// (19 nov., 5.409, publier-agent) LE FORMULAIRE DE DÉPÔT LEBONCOIN D'UNE CATÉGORIE, APPRIS LA PREMIÈRE FOIS QU'IL EST VU.
+// `adsubmit/dynamic-deposit/config?category=N` décrit le formulaire de la catégorie N (mesuré le 19 nov. sur la 53) :
+// `definitions.items[]` — une question par critère, `decoration.label` (« Univers », « Type de chaussures », « Pointure »,
+// « État », « Couleur », « Marque »), `answer_modelization.representation` (codec `CODEC_TYPE_ATTRIBUTES`, `associated_key`),
+// `multiple_answers.choices[].label`, `static_rules.mandatory`. On ne garde QUE ça : les libellés du site, rien de deviné.
+// Avant, la clé du catalogue ignorait `?category=` : chaque catégorie vue écrasait la précédente.
+function formulaireLbcDe(corps) {
+  let j; try { j = typeof corps === 'string' ? JSON.parse(corps) : corps; } catch (_) { return null; }
+  const items = j && j.definitions && Array.isArray(j.definitions.items) ? j.definitions.items : null;
+  if (!items) return null;
+  const champs = [];
+  for (const i of items) {
+    const am = i && i.answer_modelization; const rep = am && am.representation;
+    if (!rep || rep.codec_type !== 'CODEC_TYPE_ATTRIBUTES' || !rep.associated_key || rep.associated_key === 'donation') continue;
+    const ch = am.multiple_answers && Array.isArray(am.multiple_answers.choices) ? am.multiple_answers.choices : null;
+    if (!ch || !ch.length) continue;
+    const libelle = i.decoration && typeof i.decoration.label === 'string' ? i.decoration.label.trim().slice(0, 60) : '';
+    if (!libelle) continue;
+    champs.push({ cle: String(rep.associated_key).slice(0, 40), libelle, obligatoire: !!(i.static_rules && i.static_rules.mandatory),
+      choix: ch.map((c) => (c && typeof c.label === 'string' ? c.label.trim().slice(0, 80) : '')).filter(Boolean).slice(0, 1200) });
+  }
+  return champs.length ? { champs } : null;
+}
+let _lbcFormChaine = Promise.resolve();
+function noterFormulaireLbc(categorie, corps) {
+  const f = formulaireLbcDe(corps);
+  if (!f || !/^\d{1,6}$/.test(String(categorie))) return Promise.resolve(false);
+  const p = _lbcFormChaine.then(async () => {
+    const rows = await sbGet('app_data?id=eq.lbc_formulaires&select=data');
+    if (rows === null) return false;                                  // lecture ratée : rien n'est écrit
+    const prev = (rows[0] && rows[0].data) || {};
+    const avant = prev[String(categorie)];
+    if (avant && JSON.stringify(avant.champs) === JSON.stringify(f.champs)) return true;
+    return (await supabaseUpsert('app_data', [{ id: 'lbc_formulaires', data: { ...prev, [String(categorie)]: { at: new Date().toISOString(), champs: f.champs } } }], 'id')) !== false;
+  });
+  _lbcFormChaine = p.catch(() => {});
+  return p;
+}
 async function storeLbcCatalogue(url, body, coupe) {
   try {
-    const cle = String(url || '').replace(/^https?:\/\//, '').split('?')[0].replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
+    let cle = String(url || '').replace(/^https?:\/\//, '').split('?')[0].replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 80);
+    if (/adsubmit\/dynamic-deposit\/config/.test(String(url || ''))) {
+      let cat = ''; try { cat = new URL(String(url)).searchParams.get('category') || ''; } catch (_) { cat = ''; }
+      if (/^\d{1,6}$/.test(cat)) { cle = (cle + '_cat' + cat).slice(0, 90); if (!coupe) await noterFormulaireLbc(cat, body); }
+    }
     if (!cle || cle === 'index' || cle === 'updatedAt') return;
     const h = await empreinteTexte(String(body) + '|' + (coupe ? 1 : 0));
     const vu = await lireCatVu();
@@ -30439,7 +30509,11 @@ async function handleLbcRaw(url, body, sessionPage,ownerAttendu=null) {
 //    télécharger, puis revérifié), 60 Mo pour toute la série ; une réponse qui
 //    n'est pas une image est refusée.
 const PHOTOS_MAX = 15, PHOTO_MAX_OCTETS = 12000000, PHOTOS_MAX_OCTETS = 60000000;
-const HOTES_PHOTOS = /^(?:[a-z0-9-]+\.)*(?:vinted\.(?:net|fr|com|it|de)|leboncoin\.fr|vestiairecollective\.com)$/i;
+// (19 nov., 5.409, publier-agent) + `i.ebayimg.com` EXACTEMENT (droit d'hôte déjà au manifeste) : un article eBay publié
+//    ailleurs part avec SES photos. Mesuré au banc (scripts/bancs/photos-autre-hote.cjs) : la page de dépôt ne peut PAS
+//    lire une image d'un autre hôte (CORS) ; seul le fond le peut — c'est ce chemin (`photoBytes`) que lbc.js et
+//    vc-depot.js prennent déjà.
+const HOTES_PHOTOS = /^(?:(?:[a-z0-9-]+\.)*(?:vinted\.(?:net|fr|com|it|de)|leboncoin\.fr|vestiairecollective\.com)|i\.ebayimg\.com)$/i;
 function urlPhotoPermise(u, hotes) {
   try {
     const x = new URL(String(u || ''));
