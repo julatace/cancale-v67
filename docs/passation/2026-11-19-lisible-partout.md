@@ -99,12 +99,12 @@ les jetons, que la couche `n-anciens` tient. Chacun part avec la réécriture de
 
 | | origin/main (ed9399cb) | ce lot |
 |---|---|---|
-| CSS du build, total | 3 207 616 octets | ‹CSS_APRES› |
-| `:has(` dans le CSS du build | 602 | ‹HAS_APRES› |
-| `!important` dans le CSS du build | 24 395 | ‹IMP_APRES› |
-| blocs de règles | 22 995 | ‹REGLES_APRES› |
+| CSS du build, total | 3 207 616 octets | 3 103 391 octets (−104 225, −3,2 %) |
+| `:has(` dans le CSS du build | 602 | 544 (−58) |
+| `!important` dans le CSS du build | 24 395 | 23 455 (−940) |
+| blocs de règles | 22 995 | 22 631 (−364) |
 | `:has()` ancrés sur `html` retirés | — | 2 (`html:has(.vrm-app-shell[data-espace])`, studio-verre §2) + ceux de l'habillage « VRM » |
-| JavaScript + CSS du démarrage (gzip, `audit-poids-demarrage`) | 1 980 Ko | ‹DEM_APRES› |
+| JavaScript + CSS du démarrage (gzip, `audit-poids-demarrage`) | 1 980 Ko | 1 968 Ko (−12 Ko) ; budget 1 982 → 1 970 |
 
 ## 4. L'inventaire, avant et après
 

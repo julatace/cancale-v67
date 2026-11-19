@@ -44,7 +44,7 @@
 //  Restent à ce lot : Annonces, Achats, Stock, Messages, E-mails, Argent, Paramètres, les feuilles, les ateliers.
 //
 //  Sous-ensembles : `ECRANS=annonces,param*` (id ou groupe, `*` en fin) · `LARGEURS=390,1512,1280` ·
-//  `THEMES=clair,sombre` · `BASES=volume,vide` · `HABILLAGES=natif` · `PAGES=2` (écrans de défilement lus par état) ·
+//  `THEMES=clair,sombre` · `BASES=volume,vide` (ou `leger` : ~40 annonces, pour une machine chargée) · `HABILLAGES=natif` · `PAGES=2` (écrans de défilement lus par état) ·
 //  `DETAIL=4` (exemples par état sur la console) · `SHOTS=<dossier>` · `CAPTURES=jpg|png|non` · `CAPTURES_TOUTES=1` ·
 //  `BANC_DIST=<dist>` (juger un autre arbre : celui d'avant doit être ROUGE) · `SOUSPAGES=non` (sans les
 //  sous-pages de Paramètres).
@@ -436,6 +436,16 @@ function baseLisible() {
   return b;
 }
 
+// La base LÉGÈRE (`BASES=leger`) : celle de la passe de design (3 comptes, ~40 annonces, ventes, achats, messages) + les
+// colis au point relais. Les mêmes écrans, dix fois moins de rangées : pour une machine chargée (un onglet de 1 000
+// annonces y est tué faute de mémoire). Le verdict de référence reste `volume`.
+function baseLegere() {
+  const b = P.base();
+  const ch = fabriquer({ comptes: 3, qr: true }).rows.filter((r) => /^email_track_chronopost_/.test(r.id));
+  if (ch[1] && ch[0]) ch[1].data.lieu = ch[0].data.lieu;
+  b.rows.push(...ch.slice(0, 12));
+  return b;
+}
 // La base VIDE : un vendeur qui vient d'arriver (accueil déjà vu), aucun compte, aucune ligne, aucun e-mail.
 function baseVide() {
   const b = P.base(); const m = b.main[0].data;
@@ -448,7 +458,7 @@ const defauts = [];          // { groupe, ecran, hab, W, th, regle, sel, texte, 
 const etats = [];            // { groupe, ecran, hab, W, th, textes, inter, n, joignable }
 const injoignables = [];
 
-async function toucher(o, sel, t = 3500) {
+async function toucher(o, sel, t = 7000) {
   const l = o.pg.locator(sel).locator('visible=true').first();
   try { await l.waitFor({ state: 'visible', timeout: t }); } catch (_) { return false; }
   try { await l.scrollIntoViewIfNeeded({ timeout: 1500 }); } catch (_) {}
@@ -466,7 +476,7 @@ async function jouer(o, etapes) {
   for (const e of etapes || []) {
     if (e.si && !e.si(o.c)) continue;
     if (e.aller) { await pg.evaluate((q) => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })), e.aller); await pg.waitForTimeout(350); await calme(pg, 300, 3000); }
-    else if (e.clic) { let ok = await toucher(o, e.clic, e.facultatif ? 1200 : 3500); if (!ok && e.ou) { ok = true; for (const x of e.ou) { if (!(await jouer(o, [x]))) { ok = false; break; } } } if (!ok && !e.facultatif) return false; await pg.waitForTimeout(350); await calme(pg, 300, 3500); }
+    else if (e.clic) { let ok = await toucher(o, e.clic, e.facultatif ? 1500 : 7000); if (!ok && e.ou) { ok = true; for (const x of e.ou) { if (!(await jouer(o, [x]))) { ok = false; break; } } } if (!ok && !e.facultatif) return false; await pg.waitForTimeout(350); await calme(pg, 300, 3500); }
     else if (e.evt) { await pg.evaluate(([n, d]) => window.dispatchEvent(d === undefined ? new Event(n) : new CustomEvent(n, { detail: d })), e.evt); await pg.waitForTimeout(450); await calme(pg, 300, 4000); }
     else if (e.ls) { await pg.evaluate(([k, v]) => { try { localStorage.setItem(k, v); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch (_) {} }, e.ls); }
     else if (e.reglage) { for (let i = 0; i < 6; i++) { const r = await pg.evaluate(pasVersReglage, e.reglage).catch(() => 'rien'); if (r !== 'retour' && r !== 'categorie') break; await pg.waitForTimeout(280); } await calme(pg, 250, 2500); }
@@ -512,7 +522,7 @@ async function relever(o, opts) {
   return { col, jug, a };
 }
 
-async function mesurerEtat(o, ecran) {
+async function mesurerEtat(o, ecran, jeton) {
   const pg = o.pg, c = o.c;
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .vrm-toasts button[aria-label]')) { try { t.click(); } catch (_) {} } }).catch(() => {});
   await pg.evaluate(defiler, 'haut').catch(() => {});
@@ -534,6 +544,7 @@ async function mesurerEtat(o, ecran) {
   else if (!d.fait) { // une page qui tient dans l'écran : le bas, c'est ici
     const col = await pg.evaluate(collecter, { tel: o.tel, premier: false, bas: true }).catch(() => null); if (col) ranger(col.geo.filter((x) => x.regle === 'sous-barre')); }
   await pg.evaluate(defiler, 'haut').catch(() => {});
+  if (jeton && jeton.abandonne) return;   // l'essai a dépassé son délai : c'est l'essai rejoué qui compte
   const liste = [...vus.values()].map((x) => { const y = { groupe: ecran.groupe, ecran: ecran.id, hab: c.hab, W: c.W, th: c.th, ...x }; y.chantier = chantierDe(y, c); return y; });
   defauts.push(...liste);
   etats.push({ groupe: ecran.groupe, ecran: ecran.id, hab: c.hab, W: c.W, th: c.th, textes: nT, inter: nI, n: liste.filter((x) => !x.chantier).length, autres: liste.filter((x) => x.chantier).length });
@@ -588,10 +599,10 @@ async function genererParametres(o) {
   const t0 = Date.now();
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
-  const bases = { volume: BASES.includes('volume') ? baseLisible() : null, vide: BASES.includes('vide') ? baseVide() : null };
+  const bases = { volume: BASES.includes('volume') ? baseLisible() : null, leger: BASES.includes('leger') ? baseLegere() : null, vide: BASES.includes('vide') ? baseVide() : null };
   try {
     for (const base of BASES) for (const hab0 of HABILLAGES) for (const W of LARGEURS) for (const th of THEMES) {
-      const hab = hab0 + (base === 'vide' ? '-vide' : ''); const b = bases[base]; if (!b) continue;
+      const hab = hab0 + (base === 'volume' ? '' : '-' + base); const b = bases[base]; if (!b) continue;
       const c = { hab, hab0, base, W, th, tel: W < 600, v2: hab0 !== 'ancien' };
       console.log(`\n══ ${hab} · ${W} · ${th} ══`);
       let o = null;
@@ -601,22 +612,25 @@ async function genererParametres(o) {
         const bon = attr.main && (th === 'sombre') === (attr.t === 'dark') && (hab0 === 'natif' || ((hab0 === 'ancien' ? attr.d === null : attr.d === 'v2') && (hab0 === 'apple' ? attr.s === 'apple' : attr.s !== 'apple')));
         if (!bon) { injoignables.push({ ecran: '(habillage)', hab, W, th, note: JSON.stringify(attr) }); console.log(`⚠️  l’habillage n’est pas posé : ${JSON.stringify(attr)}`); }
         let liste = ECRANS.filter((e) => !e.si || e.si(c));
-        if (base === 'volume' && (!VOULUS.length || VOULUS.some((v) => /^param/i.test(v)))) { try { const gen = await genererParametres(o); const i = liste.findIndex((e) => e.id === 'param-securite-donnees'); liste = [...liste.slice(0, i + 1), ...gen, ...liste.slice(i + 1)]; } catch (e) { console.log('⚠️  Paramètres : sous-pages pas lues — ' + String(e.message || e).slice(0, 160)); } }
+        if (base !== 'vide' && (!VOULUS.length || VOULUS.some((v) => /^param/i.test(v)))) { try { const gen = await genererParametres(o); const i = liste.findIndex((e) => e.id === 'param-securite-donnees'); liste = [...liste.slice(0, i + 1), ...gen, ...liste.slice(i + 1)]; } catch (e) { console.log('⚠️  Paramètres : sous-pages pas lues — ' + String(e.message || e).slice(0, 160)); } }
         // Un état qui plante (onglet tué par manque de mémoire, capture trop lente sur une machine chargée) est REJOUÉ une fois
         // sur une page neuve ; s'il plante encore, il est dit « pas joignable » — jamais compté vert.
         for (const ecran of liste.filter(veut)) {
           for (let essai = 1; essai <= 2; essai++) {
+            const jeton = { abandonne: false };
             try {
               await avecDelai((async () => {
                 const tj = Date.now(); const ok = await jouer(o, ecran.etapes);
-                const la = ok && (!ecran.preuve || await o.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 3500 }).then(() => true, () => false));
+                const la = ok && (!ecran.preuve || await o.pg.locator(ecran.preuve).locator('visible=true').first().waitFor({ state: 'visible', timeout: 7000 }).then(() => true, () => false));
+                if (jeton.abandonne) return;
                 if (!la) { injoignables.push({ ecran: ecran.id, hab, W, th, note: ok ? 'preuve absente : ' + ecran.preuve : 'une étape n’a pas pu se jouer' }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : pas joignable (${ok ? 'preuve absente' : 'étape'})`); }
-                else { const tm = Date.now(); await mesurerEtat(o, ecran); if (process.env.TEMPS) console.log(`     (jeu ${tm - tj} ms · mesure ${Date.now() - tm} ms)`); }
+                else { const tm = Date.now(); await mesurerEtat(o, ecran, jeton); if (process.env.TEMPS) console.log(`     (jeu ${tm - tj} ms · mesure ${Date.now() - tm} ms)`); }
                 if (ecran.apres) await jouer(o, ecran.apres);
                 await remettre(o).catch(() => {});
               })(), DELAI_ETAT, ecran.id);
               break;
             } catch (err) {
+              jeton.abandonne = true;
               const mot = String(err.message || err).slice(0, 160);
               if (essai === 2) { injoignables.push({ ecran: ecran.id, hab, W, th, note: mot }); console.log(`⚠️  ${ecran.id} · ${hab} · ${W} · ${th} : ${mot}`); }
               else console.log(`   (${ecran.id} : ${mot} — rejoué sur une page neuve)`);
