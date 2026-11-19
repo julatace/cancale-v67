@@ -385,7 +385,7 @@ html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity
 html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: color-mix(in srgb, var(--ap-bleu) 82%, var(--ap-encre)) !important; padding-left: 0 !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
 /* Achats à l'ordinateur : « Calculette » était rogné dans sa propre boîte. */
-@media (min-width: 1024px) { html body .vrm-achats-filtres > [data-achats-calculette] { width: auto !important; max-width: none !important; overflow: visible !important; white-space: nowrap !important; flex: none !important; } }
+@media (min-width: 1024px) { html body .vrm-achats-filtres > [data-achats-calculette] { width: auto !important; max-width: none !important; overflow: visible !important; white-space: nowrap !important; flex: none !important; padding: 0 14px 0 12px !important; gap: 6px !important; justify-content: center !important; } }
 /* La barre d'un e-mail ouvert : aucun flou dans le contenu. */
 html body .vrm-boite-lecture-barre { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--ap-carte) !important; }
 /* « Qui dorment » : la case à cocher d'une ligne fait 44 px de large au doigt (36 mesurés). */
