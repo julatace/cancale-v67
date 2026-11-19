@@ -39,17 +39,17 @@
     background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; outline: 2px solid var(--n-accent); outline-offset: 0;
   }
 
-  /* ── Gestes : une GRILLE de rangées (2 colonnes au téléphone, 4 à l'ordinateur), traits entre les cases ── */
+  /* ── Gestes : une GRILLE de rangées (2 colonnes au téléphone, 3 à l'ordinateur), traits entre les cases ── */
   .n-gestes > .n-groupe-carte { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .n-gestes[data-n-colonnes="3"] > .n-groupe-carte { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .n-gestes > .n-groupe-carte > * { position: relative; min-width: 0; background: var(--n-surface, var(--n-carte)); }
   .n-gestes > .n-groupe-carte > .n-rangee::before { display: none; }
   .n-gestes > .n-groupe-carte > *:nth-child(n+3)::after { content: ""; position: absolute; z-index: 2; top: 0; left: 0; right: 0; border-top: .5px solid var(--n-trait); pointer-events: none; }
   .n-gestes > .n-groupe-carte > .n-rangee:nth-child(even) { box-shadow: inset .5px 0 0 var(--n-trait); }
-  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > *:nth-child(n+3)::after { display: none; }
-  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > *:nth-child(n+5)::after { display: block; }
-  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > .n-rangee:nth-child(even) { box-shadow: none; }
-  .n-gestes[data-n-colonnes="4"] > .n-groupe-carte > .n-rangee:not(:nth-child(4n+1)) { box-shadow: inset .5px 0 0 var(--n-trait); }
+  .n-gestes[data-n-colonnes="3"] > .n-groupe-carte > *:nth-child(n+3)::after { display: none; }
+  .n-gestes[data-n-colonnes="3"] > .n-groupe-carte > *:nth-child(n+4)::after { display: block; }
+  .n-gestes[data-n-colonnes="3"] > .n-groupe-carte > .n-rangee:nth-child(even) { box-shadow: none; }
+  .n-gestes[data-n-colonnes="3"] > .n-groupe-carte > .n-rangee:not(:nth-child(3n+1)) { box-shadow: inset .5px 0 0 var(--n-trait); }
   .n-gestes .n-rangee-corps { padding-inline: 12px; gap: 10px; }
   /* « Vendu ailleurs » (une rangée ; ouvert : son prix et sa date) : toute la largeur, sous les gestes. */
   .n-gestes > .n-groupe-carte > .n-gestes-case { grid-column: 1 / -1; }
@@ -65,6 +65,14 @@
   .n-herite { box-sizing: border-box; margin: 0 var(--n-marge) 24px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); min-width: 0; overflow-wrap: anywhere; }
   .n-herite:empty { display: none; }
   .n-herite[data-n-nu] { padding: 0; background: transparent; }
+  /* La fiche à l'ordinateur, hors du volet de la coque (les écrans d'avant n'ont que deux volets) : un VOLET À DROITE,
+     la liste reste visible et touchable à gauche — toucher une autre rangée change la fiche. */
+  @media (min-width: 1024px) {
+    .n-poussee.n-fiche[data-n-large] {
+      left: auto; width: clamp(560px, 46vw, 720px); border-left: .5px solid var(--n-trait);
+      box-shadow: -12px 0 32px -16px rgb(0 0 0 / .28);
+    }
+  }
   .n-poussee[data-n-volet] .n-article, .n-poussee[data-n-large] .n-article { grid-template-columns: 140px minmax(0, 1fr); }
   .n-poussee[data-n-volet] .n-article-photo, .n-poussee[data-n-large] .n-article-photo { width: 140px; height: 140px; }
 }

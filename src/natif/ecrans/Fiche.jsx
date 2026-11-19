@@ -46,11 +46,13 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
   const allerAchat = () => setToutHist(true);
   const toucher = (g) => { if (g.contenu) setOuvert(g); else if (g.onClick) g.onClick(); };
   // Un geste = une rangée (icône + libellé). Sur la fiche, les gestes forment une GRILLE de rangées (2 colonnes au téléphone,
-  // 4 à l'ordinateur) : tous visibles, la fiche tient sur un écran et demi ; dans « ⋯ », une liste (avec son chevron).
+  // 3 à l'ordinateur) : tous visibles, la fiche tient sur un écran et demi ; dans « ⋯ », une liste (avec son chevron).
+  // À l'ordinateur, aucun « ⋯ » : les gestes rares rejoignent la grille (il y a la place).
+  const visibles = ordi ? gestes.concat(rares) : gestes;
   const rangeeGeste = (g, grille = false) => <Rangee key={g.cle} icone={rendre.icone(g.icone, 22)} titre={g.libelle} lignes={grille ? 2 : 1} fin={grille ? null : 'chevron'} onClick={() => { setPlus(false); toucher(g); }} attrs={{ 'data-fd-tuile': g.cle, ...(g.attrs || {}) }}/>;
   return (
-    <PagePoussee ouverte titre={titreBarre} libelleRetour={libelleRetour} onRetour={onRetour}
-      actions={rares.length ? <BoutonIcone libelle={T.plus} icone={rendre.icone('more', 22)} onClick={() => setPlus(true)} attrs={{ 'data-fd-plus-ouvrir': '' }}/> : null}
+    <PagePoussee ouverte titre={titreBarre} libelleRetour={libelleRetour} onRetour={onRetour} className="n-fiche"
+      actions={rares.length && !ordi ? <BoutonIcone libelle={T.plus} icone={rendre.icone('more', 22)} onClick={() => setPlus(true)} attrs={{ 'data-fd-plus-ouvrir': '' }}/> : null}
       plein={plein ? <Bouton variante="plein" large icone={plein.icone ? rendre.icone(plein.icone, 20) : null} onClick={plein.onClick} attrs={{ 'data-fd-plein': '', ...(plein.attrs || {}) }}>{plein.libelle}</Bouton> : null}
       attrs={attrs}>
       {A || sans ? <EnteteArticle
@@ -90,8 +92,8 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
       </Groupe> : null}
       {blocs.sansPaire || null}
       {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
-      {gestes.length || blocs.vendueAilleurs ? <Groupe titre={T.gestes} className="n-gestes" attrs={{ 'data-fd-tuiles': gestes.map((g) => g.cle).join(','), 'data-n-colonnes': ordi ? 4 : 2 }}>
-        {gestes.map((g) => rangeeGeste(g, true))}
+      {visibles.length || blocs.vendueAilleurs ? <Groupe titre={T.gestes} className="n-gestes" attrs={{ 'data-fd-tuiles': visibles.map((g) => g.cle).join(','), 'data-n-colonnes': ordi ? 3 : 2 }}>
+        {visibles.map((g) => rangeeGeste(g, true))}
         {blocs.vendueAilleurs ? <div className="n-gestes-case" data-fd-gestes="">{blocs.vendueAilleurs}</div> : null}
       </Groupe> : null}
       {blocs.contexte || null}
