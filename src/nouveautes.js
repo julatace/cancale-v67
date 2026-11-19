@@ -28,6 +28,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») docs/passation/2026-11-19-colis-achat-auto.md
+  // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
+  { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'interface-vrm-bleu-nuit', date: '2026-11-18', titre: 'VRM adopte le design de l’aperçu', phrase: 'Bleu nuit, nouveaux boutons, photos des colis et factures visibles.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil

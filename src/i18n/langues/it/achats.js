@@ -366,6 +366,7 @@ export default {
   "achats.suivi.copie": "copiato",
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
   "achats.contenu.pasLu": "Contenuto non ancora letto",
+  "achats.retirer.aucunSite": "Nessun pacco {site} da ritirare.",
   "achats.contenu.pasLuCompte": "Contenuto non ancora letto · apri vinted.fr con {compte}",
   "achats.contenu.paye": "Pagato {prix}",
   "achats.contenu.payeCompte": "Pagato {prix} · {compte}",

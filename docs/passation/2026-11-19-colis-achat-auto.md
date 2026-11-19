@@ -243,3 +243,34 @@ tant que la fonction ne change pas de nom.
   audit `relier-colis` (R5).
 - Preuves de rendu « VRM natif » : à faire quand la fondation sera fusionnée ; d'ici là ce sont les données et
   l'absence du bouton qui sont jugées (consigne du coordinateur).
+
+## 9. Achats · Leboncoin : « À retirer · 15 » sur une liste vide (capture iPhone de Julien, 19 nov., 15 h 34)
+
+**Le constat.** Sous le filtre « Leboncoin », la tête d'Achats disait « À retirer · 15 · 2 d'ici demain · 15 avec code ·
+5 à vérifier », « Mode relais », « Ajouter un QR Mondial Relay · 11 sans QR », « Sortis de à retirer · 13 », et aucun
+colis dessous. Ce n'était pas la liste qui était vidée à tort (ses 15 colis sont des colis Vinted : sous Leboncoin, la
+colonne filtrée est bien vide) — c'étaient **les nombres qui ne suivaient pas le filtre** : le grand chiffre et
+« d'ici demain » lisaient la publication de tous les sites (`vrm_colis_retirer`), « avec code » / « à vérifier »,
+« Mode relais », le bloc Mondial Relay et « Sortis » lisaient `pickupUnion` (tous les sites), la liste lisait
+`colonnesColis(cartes, site)`. Deux règles pour une notion.
+
+**La correction** (`src/retirerSite.js`, branchée dans `src/App.jsx`) : `chiffresRetirer({ site, pub, union, colRet, lu })`.
+« toutes » (Achats · Vinted, l'écran d'arrivée qui montre tout) ⇒ la publication, inchangée (Ma journée, cloche,
+widget) ; un site ⇒ les nombres se comptent sur les cartes de la colonne de CE site (une carte `horsCompte` visible,
+jamais comptée ; « d'ici demain » = `jours ≤ 1` ; « avec code » = code ou QR — la règle de la carte d'une ville) ;
+e-mails pas lus ⇒ « — ». Suivent aussi le filtre : « Mode relais » (montré seulement si le site a des colis), le bloc
+Mondial Relay (les colis MR de SA liste), « Sortis de à retirer » (`siteDuColisSorti` : le site par le n° de suivi d'un
+achat d'un autre site, comme la carte), la ligne « adresse reliée à aucun compte », les achats Vinted en route et les
+colis redirigés (Vinted seulement). Vide ⇒ une ligne sobre « Aucun colis Leboncoin à retirer. »
+(`achats.retirer.aucunSite`, 5 langues, `data-retraits-vide="site"`). Le badge de la barre du bas (15) reste le
+total de tous les sites : c'est celui de l'app.
+
+**Preuves.** `node scripts/audit-retirer-site.cjs` (la vraie règle exécutée + le branchement) ; `--prouve` : témoin vert,
+5 mutations rouges. Banc `scripts/bancs/achats-retirer-site.cjs` (deux colis Vinted au relais ; Achats · Vinted / eBay
+/ Leboncoin, 390 clair et 1512 sombre) : sur le build d'avant (`BANC_DIST`), rouge (« 2 » sous eBay et Leboncoin,
+« 2 avec code », « Mode relais ») ; vert après.
+
+**Le bouton « Ajouter » d'Achats** (pas retiré : l'écran sera refait) : il envoie `vrm:v2-ajouter-achat`, que seul le
+formulaire « Achats hors plateforme » (`src/ecrans/Achats.jsx`) écoute — il ouvre la saisie d'un achat hors
+plateforme (vide-grenier, boutique). Ce formulaire n'est monté que dans la liste des achats Vinted : sur les autres
+sites, personne n'écoute et le toucher ne fait rien (mesuré par le banc, ligne « ajouter »).
