@@ -23,6 +23,10 @@ export default {
     "other": "Imprimer {n} bordereaux"
   },
   "v2.bande.aria": "Les colis à envoyer",
+  "v2.retirer.autresPoints": {
+    "one": "{n} autre point",
+    "other": "{n} autres points"
+  },
   "v2.retirer.titre": "À retirer",
   "v2.retirer.voir": "Voir les codes de retrait",
   "v2.retirer.resume": {
@@ -67,6 +71,16 @@ export default {
   "v2.passe.retire": "J’ai retiré",
   "v2.passe.page": "{i} sur {n}",
   "v2.passe.detail": "Tout le détail des retraits",
+  "v2.passe.consigne": "Consigne · code à taper sur l’écran",
+  "v2.passe.comptoir": "Comptoir · code à donner au commerçant",
+  "v2.passe.nouveau": "Nouveau",
+  "retraits.nouveau.code": "Nouveau code de retrait",
+  "retraits.nouveau.codeLieu": "Nouveau code de retrait · {lieu}",
+  "retraits.nouveau.qr": "Nouveau QR de retrait",
+  "retraits.nouveau.qrLieu": "Nouveau QR de retrait · {lieu}",
+  "retraits.nouveau.colis": "Nouveau colis à retirer",
+  "retraits.nouveau.colisLieu": "Nouveau colis à retirer · {lieu}",
+  "retraits.nouveaux.plusieurs": {"one": "{n} nouveau code de retrait", "other": "{n} nouveaux codes de retrait"},
   "v2.enRoute.titre": "En route",
   "v2.enRoute.sansTitre": "Achat sans titre",
   "v2.enRoute.pointPasDit": "point pas encore dit",
@@ -165,16 +179,6 @@ export default {
   "v2.mail.boite": "Boîte de réception",
   "v2.mail.relier": "Relier ma boîte",
   "v2.passe.qrKo": "QR pas lisible ici — le code dessous suffit",
-  "v2.barre.lib": "Barre d'onglets",
-  "v2.barre.C": "C · Épurée (par défaut)",
-  "v2.barre.A": "A · iOS classique",
-  "v2.barre.B": "B · Pilule flottante",
-  "v2.barre.D": "D · Trait au-dessus",
-  "v2.barre.E": "E · Kraft",
-  "v2.barre.ann": "Annonces",
-  "v2.barre.ach": "Achats",
-  "v2.barre.ven": "Ventes",
-  "v2.barre.arg": "Argent",
   "v2.mail.selectionner": "Sélectionner",
   "v2.style.lib": "Style",
   "v2.style.apple": "Apple",
@@ -182,26 +186,7 @@ export default {
   "v2.style.studio": "Studio bleu",
   "v2.style.studio.desc": "Le fond bleu et le verre d'avant.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "aujourd’hui",
-  "v2.jour.hier": "hier",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "vendu {quand}",
-    "other": "vendus {quand}"
-  },
-  "v2.jour.aucune": "aucune vente",
-  "v2.jour.ventes": {
-    "one": "{n} vente",
-    "other": "{n} ventes"
-  },
   "v2.jour.pasSu": "ventes pas encore lues",
-  "v2.mois.vendu": "Vendu",
-  "v2.mois.recu": "Reçu",
-  "v2.mois.benefice": "Bénéfice",
-  "v2.mois.sur": {
-    "one": "{k} vente sur {n}",
-    "other": "{k} ventes sur {n}"
-  },
   "v2.envoyer.titre": "À envoyer",
   "v2.bande.plus": {
     "one": "{n} autre colis à envoyer",
@@ -224,5 +209,95 @@ export default {
   "v2.reg.completer": "Compléter mes annonces",
   "v2.reg.completerN": "Compléter mes annonces · {n}",
   "v2.jour.lecture": "lecture…",
+  "v2.stats.titre": "Tes chiffres",
+  "v2.stats.ca": "CA vendu",
+  "v2.obj.fixer": "Fixer un objectif du mois",
+  "v2.obj.titre": "Objectif du mois",
+  "v2.obj.libelle": "CA vendu à atteindre ce mois",
+  "v2.obj.texte": "{v} / {c}",
+  "v2.obj.detail": {
+    "one": "{pct} % · il reste {j} jour",
+    "other": "{pct} % · il reste {j} jours"
+  },
+  "v2.obj.atteint": "atteint · {pct} %",
+  "v2.obj.enregistrer": "Enregistrer",
+  "v2.obj.retirer": "Retirer l’objectif",
+  "v2.obj.invalide": "Un montant en euros, plus grand que 0.",
+  "v2.courbe.titre": "30 derniers jours",
+  "v2.courbe.voir": "Voir les ventes",
+  "v2.comptes.titre": "Par compte et par site",
+  "v2.comptes.ventes": {
+    "one": "{n} vente",
+    "other": "{n} ventes"
+  },
+  "v2.comptes.vide": "Aucune vente sur la période",
+  "v2.capte.titre": "Sur tes annonces aujourd’hui",
+  "v2.capte.favoris": "Nouveaux favoris",
+  "v2.capte.offres": "Offres reçues",
+  "v2.capte.messages": "Messages",
+  "v2.capte.pasCapte": "pas capté",
+  "v2.capte.pasLu": "pas encore lu",
+  "v2.vrm.titre": "Ce que VRM a fait aujourd’hui",
+  "v2.vrm.rien": "Rien encore aujourd’hui",
+  "v2.vrm.pasLu": "journal pas lu",
+  "v2.vrm.baisses": {
+    "one": "{n} baisse",
+    "other": "{n} baisses"
+  },
+  "v2.vrm.favoris": {
+    "one": "{n} message aux favoris",
+    "other": "{n} messages aux favoris"
+  },
+  "v2.vrm.offres": {
+    "one": "{n} offre acceptée",
+    "other": "{n} offres acceptées"
+  },
+  "v2.vrm.republications": {
+    "one": "{n} republication",
+    "other": "{n} republications"
+  },
+  "v2.vrm.bordereaux": {
+    "one": "{n} bordereau récupéré",
+    "other": "{n} bordereaux récupérés"
+  },
+  "v2.vrm.messages": {
+    "one": "{n} message envoyé",
+    "other": "{n} messages envoyés"
+  },
+  "v2.vrm.offresFaites": {
+    "one": "{n} offre envoyée",
+    "other": "{n} offres envoyées"
+  },
+  "v2.perso.ouvrir": "Personnaliser cet écran",
+  "v2.perso.titre": "Cartes d’Aujourd’hui",
+  "v2.perso.pied": "Coche ce que tu veux voir ; balaie une carte pour la monter ou la descendre.",
+  "v2.perso.monter": "Monter",
+  "v2.perso.descendre": "Descendre",
+  "v2.perso.defaut": "Remettre par défaut",
+  "v2.perso.carte.chiffres": "Tes chiffres",
+  "v2.perso.carte.envoyer": "À envoyer",
+  "v2.perso.carte.retirer": "À retirer",
+  "v2.perso.carte.courbe": "30 derniers jours",
+  "v2.perso.carte.ventes": "Dernières ventes",
+  "v2.perso.carte.comptes": "Par compte et par site",
+  "v2.perso.carte.annonces": "Sur tes annonces",
+  "v2.perso.carte.vrm": "Ce que VRM a fait",
+  "v2.stats.periode": "Période",
+  "v2.stats.jour": "Jour",
+  "v2.stats.semaine": "Semaine",
+  "v2.stats.mois": "Mois",
+  "v2.stats.vendus.jour": "vendus aujourd’hui",
+  "v2.stats.vendus.semaine": "vendus cette semaine",
+  "v2.stats.vendus.mois": "vendus en {mois}",
+  "v2.stats.ecart.jour": "{s} vs hier",
+  "v2.stats.ecart.semaine": "{s} vs sem. passée",
+  "v2.stats.ecart.mois": "{s} vs {mois}",
+  "v2.stats.benefice": "Bénéfice",
+  "v2.stats.beneficeBrut": "Bénéfice brut",
+  "v2.stats.ventes": "Ventes",
+  "v2.stats.panier": "Panier moyen",
+  "v2.stats.auMoinsSur": "au moins · achats {c}",
+  "v2.stats.aucune": "aucune vente",
+  "v2.stats.pasTout": "pas tout lu",
   "v2.alerte.retourTitre": "Retour à déposer"
 };

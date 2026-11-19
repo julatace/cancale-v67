@@ -35,6 +35,8 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
+  ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
+  ['src/BoiteEmails.jsx', ['Compris', 'Lecture', 'Ligne', 'Pile', 'ARelier', 'Quarantaine', 'MessageOrigine', 'PuceCode']],   // (19 nov., emails-mail) E-mails comme Mail
   ['src/communaute/Accompagnement.jsx', ['*']],
   ['src/communaute/CoucouCarte.jsx', ['*']],   // (17 nov., carte-coucou) le coucou de la carte   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée

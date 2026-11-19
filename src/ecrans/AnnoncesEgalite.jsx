@@ -20,7 +20,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
-import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES } from '../articles/modele.js';
+import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
@@ -36,8 +36,11 @@ const ACTIONS = [
   { cle: 'enLigne', libelle: 'egalite.action.enLigne', icone: 'play', etats: ['brouillon'], robot: true },
   { cle: 'baisser', libelle: 'egalite.action.baisser', icone: 'tag', etats: ['enligne'] },
   { cle: 'partout', libelle: 'egalite.action.partout', icone: 'link', etats: ['enligne'], tousSites: true },
+  // (19 nov., publier-agent) « Publier sur… » : l'agent sans IA remplit chaque site depuis la fiche article neutre (src/publier/).
+  { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
 const cleActionTr = { recreer: 'republier', main: 'main', versBrouillon: 'versBrouillon', enLigne: 'enLigne', baisser: 'baisser', partout: 'partout' };
+const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'));
 const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
@@ -103,12 +106,17 @@ export async function lireAnnoncesEgalite(accounts) {
 export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', onEcranSite = null }) {
   const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
+  // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
+  const [majLe, setMajLe] = React.useState(undefined);
+  const [relit, setRelit] = React.useState(false);
+  const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
+  const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) setLu(r); }).catch(() => { if (vivant) setLu(null); });
+    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, tic]);
@@ -144,7 +152,7 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     return { ok: true };
   };
   const actions = ACTIONS.map((A) => ({
-    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
+    cle: A.cle, libelle: tr(A.libelle), icone: A.icone, phrase: A.cle === 'agent' ? tr('agent.action.phrase') : tr('egalite.action.' + cleActionTr[A.cle] + '.phrase'),
     pour: (a) => (A.tousSites ? !!a.numero && a.annonces.some((x) => x.etat === 'enligne') : (() => { const v = vintedDe(a); return !!v && A.etats.includes(v.etat); })()),
     juger: (sel) => {
       if (!sel.length) return { ok: false, raison: tr('egalite.selection.aucune') };
@@ -153,18 +161,49 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
     },
   }));
   const onAction = (k, choisis) => {
+    if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
     const sel = choisis.map(vintedDe).filter(Boolean).map((v) => ({ uid: v.compte, id: v.id }));
     if (!sel.length) { toast(tr('egalite.action.vintedSeul')); return; }
     demanderActionAnnonces(k, sel);
   };
+  // (19 nov. soir) Le TABLEAU de l'ordinateur : les articles au site et au compte choisis, chacun avec SON état (`statutTableau`) ;
+  // « Dorment » = la règle du segment (`filtrerArticles` etat 'dorment'), au même site et au même compte.
+  const cpts = modele ? comptesDesArticles(modele.articles, filtreT.site) : [];
+  const cptChoisi = filtreT.compte ? cpts.find((c) => c.cle === filtreT.compte) || null : null;
+  const siteT = cptChoisi ? cptChoisi.site : filtreT.site, compteT = cptChoisi ? cptChoisi.compte : '';
+  const lignesT = React.useMemo(() => {
+    if (!modele) return modele;
+    const dort = filtreT.dort === 'dorment' ? new Set(filtrerArticles(modele.articles, { ...opts, site: siteT, compte: compteT, etat: 'dorment' }).map((a) => a.cle)) : null;
+    const out = [];
+    for (const a of trierArticles(modele.articles)) { if (dort && !dort.has(a.cle)) continue; const st = statutTableau(a, { site: siteT, compte: compteT }); if (st) out.push({ a, statut: st }); }
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modele, siteT, compteT, filtreT.dort, seuil]);
+  const nomCompte = (c) => (c.pseudo || ('#' + c.compte)) + (filtreT.site === 'tous' && sites.length > 1 ? ' · ' + nomSite(c.site) : '');
+  const tableau = {
+    articles: lignesT, majLe, rafraichit: relit, onRafraichir: () => { setRelit(true); setTic((t) => t + 1); },
+    compte: cptChoisi ? nomCompte(cptChoisi) : '',
+    onAutomatisations: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} },
+    filtres: [
+      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
+      ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
+        options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
+      { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => setFiltreT((f) => ({ ...f, dort: v })),
+        options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }] },
+    ],
+  };
   return (
-    <VueAnnonces articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <>
+    <VueAnnonces travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}
       onPublier={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}
       onEcranSite={onEcranSite} limites={limites} manque={manque}
       euros={(n) => fmt(n)} depuisTexte={(ms) => tr('egalite.jours', { n: Math.max(0, Math.floor((Date.now() - ms) / JOUR)) })} nomSite={nomSite} Icon={Icon}/>
+    {agent ? <React.Suspense fallback={null}><PublierAgent ouverte articles={agent} onRetour={() => setAgent(null)}/></React.Suspense> : null}
+    </>
   );
 }

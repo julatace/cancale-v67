@@ -44,14 +44,14 @@ import { Glyphe } from './icones.jsx';
 export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
-  const t = taille === 44 ? 44 : 56;
+  const t = taille === 44 ? 44 : taille === 48 ? 48 : 56;   // (19 nov. soir) 48 : la vignette d'un tableau de travail
   if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
     return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>;
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>
-      {icone || <Glyphe nom="image" taille={t === 44 ? 20 : 24}/>}
+      {icone || <Glyphe nom="image" taille={t === 56 ? 24 : 20}/>}
     </span>
   );
 }

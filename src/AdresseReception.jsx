@@ -77,7 +77,8 @@ const heure = (ms) => (ms ? new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-
 const espaceCode = (c) => String(c || '').replace(/(\d{3})(?=\d)/g, '$1 ');
 
 // ── La lecture de l'adresse (et sa relecture, page visible) ─────────────────
-function useAdresseVrm(headers) {
+// (19 nov., lot emails-mail) Exporté : « Relier ma boîte » accompagné (src/RelierMaBoite.jsx) lit LA MÊME route.
+export function useAdresseVrm(headers) {
   const [d, setD] = useState(undefined);
   const [luA, setLuA] = useState(0);
   const [manuel, setManuel] = useState(false);
@@ -170,7 +171,7 @@ function Pas({ n, t, children }) {
 }
 
 // Pas encore ouverte, vue du PROPRIÉTAIRE : ce qui manque (états de la route).
-function MiseEnService({ m }) {
+export function MiseEnService({ m }) {
   const g = gestesMiseEnService(m);
   const MOT = { fait: 'Fait', 'a-faire': 'À faire', 'a-verifier': 'À vérifier' };
   return (

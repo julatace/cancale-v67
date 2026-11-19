@@ -12,6 +12,7 @@ import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Ac
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_emails_mail from './fr/emailsMail.js';   // (19 nov.) E-mails comme Mail, « Relier ma boîte » accompagné
 import ecran_design_v2 from './fr/designV2.js';   // (17 nov.) le nouveau design, en essai
 import ecran_argent_v2 from './fr/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
 import ecran_v2_ventes from './fr/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
@@ -21,6 +22,8 @@ import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
 import ecran_egalite from './fr/egalite.js';
+import ecran_tableau from './fr/tableau.js';   // (19 nov. soir) le tableau de travail
+import ecran_publierAgent from './fr/publierAgent.js';
 import ecran_ecrans_restes from './fr/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -76,6 +79,7 @@ import ecran_republier_guide from './fr/republierGuide.js';
 import ecran_republication from './fr/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_prix_sans_manuel from './fr/prixSansManuel.js';   // (19 nov.) « Changer le prix » en UN geste : l'extension baisse, ou la baisse attend
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_liaisonSites from './fr/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './fr/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_compteBloque from './fr/compteBloque.js';   // (19 nov., lot compte-bloque)
@@ -2322,12 +2326,14 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_emails_mail,
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
@@ -2348,6 +2354,8 @@ export default {
   ...ecran_verre2,
   ...ecran_fiched,
   ...ecran_egalite,
+  ...ecran_tableau,
+  ...ecran_publierAgent,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,

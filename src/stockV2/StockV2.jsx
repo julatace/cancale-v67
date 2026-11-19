@@ -29,6 +29,8 @@ import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
 import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
 import MeubleDessin from './MeubleDessin.jsx';
+import { ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
+import DansFiche from '../DansFiche.jsx';
 import './stock-v2.css';
 import './meubles.css';
 import './pont.css';   // sans couche : rend aux pièces natives du Stock ce que dit la couche natif
@@ -176,21 +178,21 @@ function Seance({ s, seance, ouverte, fermer }) {
 }
 
 // ── LA PLACE D'UN ARTICLE (« Où est… », le toucher d'une rangée « Dans une case ») ─────
-function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
+function Reponse({ s, f, onDeplacer, onRanger, onVoir, sansTete = false }) {
   const { Icon } = s;
   const ou = s.ouEst(f);
   const vendue = s.estVendu(f);
   const k = s.cleDe(f);
   return (
     <div className="sm-seance" data-sr-reponse={k} data-sr-reponse-ou={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : 'non-range'}>
-      <div className="sm-article">
+      {sansTete ? null : <div className="sm-article">
         <span className="sm-article-photo">{f.photo ? <img src={f.photo} alt="" loading="lazy" decoding="async"/> : <Icon name="box" size={30}/>}</span>
         <span className="sm-article-txt">
           <Plaque numero={f.numero} grand doublon={s.estDouble(k)}/>
           <span className="sm-article-titre">{f.title || '—'}</span>
           {vendue ? <span className="sm-article-ou" data-sr-vendue="">{tr('sr.reponse.vendue')}</span> : null}
         </span>
-      </div>
+      </div>}
       {ou ? <>
         <p className="sm-propose" data-sr-etiquette-place="">
           <span className="sm-propose-l">{tr('sm.reponse.ici')}</span>
@@ -202,7 +204,7 @@ function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
         {!ou && !vendue && s.peutRanger(k) ? <Bouton variante="teinte" attrs={{ 'data-sr-ranger-maintenant': '' }} onClick={onRanger}>{tr('sr.reponse.ranger')}</Bouton> : null}
         {ou ? <Bouton variante="teinte" attrs={{ 'data-sr-voir': '' }} onClick={onVoir}>{tr('sr.reponse.voir')}</Bouton> : null}
         {ou && !vendue ? <Bouton variante="teinte" attrs={{ 'data-sr-deplacer': '' }} onClick={onDeplacer}>{tr('sr.reponse.deplacer')}</Bouton> : null}
-        <Bouton variante="texte" attrs={{ 'data-sr-tout-sur': k }} onClick={() => { const n = String(f.numero); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }}>{tr('sr.reponse.fiche')}</Bouton>
+        {sansTete ? null : <Bouton variante="texte" attrs={{ 'data-sr-tout-sur': k }} onClick={() => { const n = String(f.numero); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }}>{tr('sr.reponse.fiche')}</Bouton>}
       </div>
     </div>
   );
@@ -285,11 +287,10 @@ export default function StockV2({ s }) {
   const [zoom, setZoom] = React.useState(null);          // le meuble zoomé (son id)
   const [vise, setVise] = React.useState(null);          // { m, i } : la case montrée (« Voir sur le plan »)
   const [plus, setPlus] = React.useState(false);
-  const [fiche, setFiche] = React.useState(null);        // l'article touché (sa place, en feuille)
   const [tousARanger, setTousARanger] = React.useState(false);
   const [max, setMax] = React.useState(PAR_PAGE);
   const aRangerCles = s.aRanger.map(s.cleDe).filter(Boolean);
-  const lancer = (cles, deplacer = false) => { if (cles.length) { setFiche(null); setSeance({ cles, deplacer, id: Date.now() }); setSeanceOuverte(true); } };
+  const lancer = (cles, deplacer = false) => { if (cles.length) { fermerLigne(); setSeance({ cles, deplacer, id: Date.now() }); setSeanceOuverte(true); } };
   const rangerA = (k) => lancer([k, ...aRangerCles.filter((x) => x !== k)]);
   // La feuille anime sa sortie (300 ms) avant que la séance soit oubliée ; une séance relancée entre-temps reste.
   const fermerSeance = () => { const id = seance ? seance.id : null; setSeanceOuverte(false); setTimeout(() => setSeance((x) => (x && x.id === id ? null : x)), 320); };
@@ -302,7 +303,7 @@ export default function StockV2({ s }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.place]);
   // « Voir sur le plan » : Meubles, CE meuble zoomé, SA case qui respire.
-  const voir = (f) => { const ou = s.ouEst(f); setFiche(null); if (ou) { setVue('meubles'); setZoom(String(ou.meuble.id)); setVise({ m: String(ou.meuble.id), i: ou.i }); setTimeout(() => setVise(null), 4000); } s.montrer(f); };
+  const voir = (f) => { const ou = s.ouEst(f); if (ou) { setVue('meubles'); setZoom(String(ou.meuble.id)); setVise({ m: String(ou.meuble.id), i: ou.i }); setTimeout(() => setVise(null), 4000); } s.montrer(f); };
   const exact = s.qEstNum ? s.resultats.filter((f) => s.exactNum(f)) : [];
   const un = choisi ? s.resultats.find((f) => s.cleDe(f) === choisi) : (exact.length === 1 ? exact[0] : (s.resultats.length === 1 ? s.resultats[0] : null));
   React.useEffect(() => { setChoisi(null); }, [s.q]);
@@ -312,7 +313,6 @@ export default function StockV2({ s }) {
   if (!seanceOuverte) nGel.current = null;
   const nPlein = seanceOuverte && nGel.current != null ? nGel.current : aRangerCles.length;
   const chercheVide = !s.q.trim();
-  const ficheF = fiche ? s.ficheDe(fiche) : null;
   const lignes = s.lignes;
   const nonRangeesVives = lignes.filter((l) => l.cle && !l.ou), rangees = lignes.filter((l) => !l.cle || l.ou);
   // Pendant la séance, la liste « À ranger » de l'écran (sous la feuille) ne bouge pas : elle se met à jour à la fermeture
@@ -321,7 +321,14 @@ export default function StockV2({ s }) {
   if (seanceOuverte && !gel.current) gel.current = nonRangeesVives;
   if (!seanceOuverte && gel.current) gel.current = null;
   const nonRangees = seanceOuverte && gel.current ? gel.current : nonRangeesVives;
-  const ouvrirFiche = (l) => { if (l.cle && s.ficheDe(l.cle)) setFiche(l.cle); };
+  // (19 nov., « fiche directe », lot fiche-directe fusionné) La fiche d'un article est LA fiche de la paire (src/ficheLigne.js) :
+  // sa place (le meuble dessiné, la case qui respire) et ses gestes « Voir », « Déplacer », « Ranger » y sont posés par
+  // `DansFiche` (place « contexte »). « À ranger » garde SON toucher : il range (Julien) ; la fiche y est un balayage.
+  const lireLigneDe = (x) => ({ cle: 'stock:stock:s' + x.cle, contexte: 'stock', site: 'stock', nums: [String(x.numero)], item: '', tx: '', suivi: '', photo: x.photo || '', titre: x.titre || '', prix: '', sous: '' });
+  const ouvrirFiche = (l) => { if (l.cle && s.ficheDe(l.cle)) ouvrirLigne(lireLigneDe(l)); };
+  const dansFiche = (l) => { const f = l.cle ? s.ficheDe(l.cle) : null; return f ? <DansFiche key={'df' + l.key} cle={'stock:stock:s' + l.cle} place="contexte" seulementFiche>
+    <Reponse s={s} f={f} sansTete onVoir={() => { fermerLigne(); voir(f); }} onDeplacer={() => { fermerLigne(); lancer([l.cle], true); }} onRanger={() => { fermerLigne(); rangerA(l.cle); }}/>
+  </DansFiche> : null; };
   // « À RANGER » : la rangée entière range CET article (Julien : plus de « toucher l'article, puis à droite »).
   const ligneARanger = (l) => {
     const peut = s.peutRanger(l.cle);
@@ -403,6 +410,7 @@ export default function StockV2({ s }) {
         {nonRangees.length ? (
           <Groupe titre={tr('sm.aRanger', { n: nombre(nonRangees.length) })} action={imprimer} attrs={{ 'data-sr-groupe': 'aranger', 'data-sm-a-ranger': nonRangees.length }}>
             {aRangerVus.map(ligneARanger)}
+            {aRangerVus.map(dansFiche)}
           </Groupe>) : null}
         {nonRangees.length > aRangerVus.length ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sm-a-ranger-tous': '' }} onClick={() => { if (tousARanger) setMax((x) => x + PAR_PAGE); else setTousARanger(true); }}>{tr('sm.voirAutres', { n: nombre(Math.min(tousARanger ? PAR_PAGE : 9999, nonRangees.length - aRangerVus.length)) })}</Bouton></div> : null}
 
@@ -416,6 +424,7 @@ export default function StockV2({ s }) {
           {rangees.length ? (
             <Groupe titre={tr('sm.dansCase', { n: nombre(rangees.length) })} attrs={{ 'data-sr-groupe': 'rangees', 'data-sr-liste': lignes.length, 'data-stock-actuelles': s.nombres.etat }}>
               {rangeesVues.map(ligneRangee)}
+              {rangeesVues.map(dansFiche)}
             </Groupe>) : null}
           {rangees.length > max ? <div className="sm-gestes"><Bouton variante="texte" attrs={{ 'data-sr-liste-plus': '' }} onClick={() => setMax((x) => x + PAR_PAGE)}>{tr('sr.liste.plus', { n: nombre(Math.min(PAR_PAGE, rangees.length - max)) })}</Bouton></div> : null}
           {s.blocs.aFaire}
@@ -425,9 +434,6 @@ export default function StockV2({ s }) {
       </> : null}
       {s.blocs.modale}
 
-      <Feuille ouverte={!!ficheF} onFermer={() => setFiche(null)} titre={ficheF ? 'N°' + ficheF.numero : ''} className="sr-feuille" attrs={{ 'data-sr-fiche': fiche || undefined }}>
-        {ficheF ? <Reponse s={s} f={ficheF} onVoir={() => voir(ficheF)} onDeplacer={() => lancer([fiche], true)} onRanger={() => rangerA(fiche)}/> : null}
-      </Feuille>
       <FeuillePlus s={s} ouverte={plus} fermer={() => setPlus(false)}/>
       <Seance key={seance ? seance.id : 'aucune'} s={s} seance={seance} ouverte={seanceOuverte && !!seance} fermer={fermerSeance}/>
     </div>

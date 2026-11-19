@@ -1,0 +1,111 @@
+/* ── « Relier ma boîte », accompagné (19 nov., lot emails-mail) ─────────────────────────────────────
+   Jetons du natif seulement (src/natif/jetons.css) : une carte, une étape, UN plein en bas. Les captures
+   sont DESSINÉES (une fenêtre neutre « exemple »), muettes pour le lecteur d'écran. Pas d'ombre, pas de
+   dégradé ; l'ambre seulement pour « pas encore reçu ». Mouvement réduit : rien ne bouge. */
+@layer vrm-natif {
+
+.n-relier { --n-relier-l: 560px; display: grid; gap: 12px; max-width: var(--n-relier-l); margin: 0; padding: 0 0 24px; color: var(--n-encre); font: var(--n-t-corps); }
+.n-relier * { box-sizing: border-box; }
+.n-relier-carte { background: var(--n-carte); border-radius: 12px; padding: 20px 16px; display: grid; gap: 14px; min-width: 0; }
+.n-relier-ecran { animation: n-relier-entree .26s cubic-bezier(.32,.72,0,1) both; }
+@keyframes n-relier-entree { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.n-relier-titre { margin: 0; font: var(--n-t-section); letter-spacing: -.01em; }
+.n-relier-phrase { margin: -6px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
+.n-relier-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+.n-relier-note { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+.n-relier-note code { font: var(--n-t-second-fort); color: var(--n-encre); }
+
+/* La progression : « Étape 2 sur 5 » et un filet qui se remplit. */
+.n-relier-tete { display: grid; gap: 6px; padding: 0 4px; }
+.n-relier-etape { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+.n-relier-barre { display: block; height: 4px; border-radius: 2px; background: var(--n-trait); overflow: hidden; }
+.n-relier-barre i { display: block; height: 100%; background: var(--n-accent); border-radius: 2px; transition: width .3s cubic-bezier(.32,.72,0,1); }
+
+/* Le choix de la messagerie : des tuiles, une rangée entière se touche. */
+.n-relier-tuiles { display: grid; gap: 8px; grid-template-columns: 1fr; }
+@media (min-width: 600px) { .n-relier-tuiles { grid-template-columns: 1fr 1fr; } }
+.n-relier-tuile { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border: 1px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-corps-fort); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.n-relier-tuile:active { background: var(--n-appui); }
+.n-relier-tuile[aria-checked="true"], .n-relier-tuile[data-detectee="1"] { border-color: var(--n-accent); }
+.n-relier-tuile:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+.n-relier-tuile-lettre { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-section); }
+.n-relier-tuile-nom { min-width: 0; overflow-wrap: anywhere; }
+.n-relier-tuile-det { font: var(--n-t-legende); font-weight: 600; color: var(--n-sur-teinte); background: var(--n-teinte); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.n-relier-tuile .n-glyphe { color: var(--n-encre-3); }
+
+/* L'adresse VRM : en grand, coupée seulement avant le @. */
+.n-relier-adresse-carte { display: grid; gap: 12px; padding: 16px; border-radius: 12px; background: var(--n-carte-2); }
+.n-relier-adresse { margin: 0; font: 600 22px/28px var(--n-police); overflow-wrap: anywhere; color: var(--n-encre); }
+.n-relier-domaine { color: var(--n-encre-2); }
+.n-relier-objet { margin: 0; font: 600 20px/26px var(--n-police); color: var(--n-encre); letter-spacing: .02em; }
+.n-relier-compte { display: grid; gap: 8px; }
+
+/* La capture dessinée. */
+.n-relier-scene { margin: 0; }
+.n-relier-fen { border: 1px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
+.n-relier-fen-barre { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--n-carte-2); border-bottom: 1px solid var(--n-trait); font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-relier-fen-barre i { width: 9px; height: 9px; border-radius: 50%; background: var(--n-trait); flex: 0 0 auto; }
+.n-relier-fen-barre span { margin-left: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.n-relier-fen-corps { padding: 14px; }
+.n-relier-sc-menu { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.n-relier-sc-menu li { position: relative; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: 8px; font: var(--n-t-second); color: var(--n-encre-2); }
+.n-relier-sc-puce { width: 14px; height: 14px; border-radius: 4px; background: var(--n-trait); flex: 0 0 auto; }
+.n-relier-scene [data-surligne="1"] { color: var(--n-encre); font-weight: 600; box-shadow: 0 0 0 2px var(--n-accent); background: var(--n-teinte); border-radius: 8px; }
+.n-relier-sc-champ { display: grid; gap: 10px; justify-items: start; }
+.n-relier-sc-lib { margin: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+.n-relier-sc-saisie { position: relative; display: flex; align-items: center; gap: 2px; min-height: 36px; width: 100%; padding: 6px 10px; border: 1px solid var(--n-trait); border-radius: 8px; font: var(--n-t-second); color: var(--n-encre); }
+.n-relier-sc-curseur { width: 1.5px; height: 18px; background: var(--n-accent); animation: n-relier-clignote 1s steps(1) infinite; }
+@keyframes n-relier-clignote { 50% { opacity: 0; } }
+.n-relier-sc-btn { position: relative; display: inline-block; padding: 7px 14px; border-radius: 8px; background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-second-fort); }
+.n-relier-sc-cases { display: flex; gap: 6px; padding: 6px; }
+.n-relier-sc-cases i { width: 26px; height: 32px; border-radius: 6px; border: 1px solid var(--n-trait); background: var(--n-carte-2); }
+.n-relier-sc-coches { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+.n-relier-sc-coches li { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; font: var(--n-t-second); color: var(--n-encre-2); }
+.n-relier-sc-rond { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--n-encre-3); flex: 0 0 auto; }
+.n-relier-sc-coches li[data-coche="1"] .n-relier-sc-rond { border: 5px solid var(--n-accent); }
+.n-relier-sc-regle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; font: var(--n-t-second); color: var(--n-encre-2); }
+.n-relier-sc-regle .n-relier-sc-saisie { width: auto; flex: 1 1 120px; }
+.n-relier-sc-menu-d { padding: 6px 10px; border: 1px solid var(--n-trait); border-radius: 8px; color: var(--n-encre); }
+.n-relier-fleche { position: absolute; right: -6px; bottom: -14px; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .2)); animation: n-relier-pointe 1.6s cubic-bezier(.32,.72,0,1) infinite; }
+@keyframes n-relier-pointe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-3px, -3px); } }
+
+/* Le geste de l'étape : toute la largeur. */
+.n-relier-geste { display: grid; gap: 10px; }
+.n-relier-geste[data-geste="aucun"] { display: none; }
+.n-relier-ouvrir, .n-relier-lien { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 16px; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-corps-fort); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.n-relier-ouvrir:active, .n-relier-lien:active { filter: brightness(.92); }
+.n-relier-ouvrir:focus-visible, .n-relier-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+
+/* Le code de la messagerie, en direct. */
+.n-relier-code { display: grid; gap: 10px; padding: 16px; border-radius: 12px; background: var(--n-carte-2); }
+.n-relier-code-sur { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-relier-code-valeur { margin: 0; font: var(--n-t-affiche); font-variant-numeric: tabular-nums; letter-spacing: .04em; color: var(--n-encre); }
+
+/* Les états en direct (attente, pas encore reçu). */
+.n-relier-etat { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); }
+.n-relier-etat-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--n-carte); color: var(--n-encre-2); }
+.n-relier-etat-ic[data-ton="ambre"] { color: var(--n-ambre); background: var(--n-ambre-fond); }
+.n-relier-etat-txt { display: grid; gap: 2px; min-width: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+.n-relier-etat-txt b { font: var(--n-t-second-fort); color: var(--n-encre); }
+.n-relier-roue { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--n-trait); border-top-color: var(--n-accent); animation: n-relier-tourne .8s linear infinite; }
+@keyframes n-relier-tourne { to { transform: rotate(360deg); } }
+
+/* Reçu ✓ */
+.n-relier-fini { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 8px 0; }
+.n-relier-fini .n-relier-phrase { margin: 0; }
+.n-relier-fini-rond { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--n-teinte); color: var(--n-sur-teinte); }
+.n-relier-fini-gestes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
+.n-relier-fini .vrm-pv-etat, .n-relier .vrm-pv-etat { text-align: left; width: 100%; }
+
+/* Le pied : LE plein, puis « Retour ». */
+.n-relier-pied { display: grid; gap: 4px; padding: 12px 16px 8px; border-radius: 12px; background: var(--n-carte); }
+.n-relier-pied .n-bouton-bloc { width: 100%; }
+.n-relier-plein-lien { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; border-radius: 14px; background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-corps-fort); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.n-relier-plein-lien:active { filter: brightness(.92); }
+.n-relier-plein-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .n-relier-ecran, .n-relier-fleche, .n-relier-sc-curseur, .n-relier-roue { animation: none; }
+  .n-relier-barre i { transition: none; }
+}
+}
