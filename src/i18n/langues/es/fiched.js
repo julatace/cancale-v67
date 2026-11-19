@@ -173,4 +173,5 @@ export default {
   "fd.col.vues": "Vistas",
   "fd.col.favoris": "Favoritos",
   "fd.col.etat": "Estado",
+  "fd.actions.court": "Acciones",
 };

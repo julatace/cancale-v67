@@ -34,7 +34,9 @@ const CAS = { 3119: 'vendue sans achat', 3120: 'vendue reliée', 3102: 'en vente
 const VOULUS = liste('CAS', Object.keys(CAS).join(','));
 const LARGEURS = liste('LARGEURS', '390,1512,1280').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
-const CHEMINS = liste('CHEMINS', 'annonces,ventes,stock,journee,recherche');
+// (19 nov. soir) Ventes et Aujourd'hui natifs (lots ventes-natif, aujourdhui-propre) : toucher une vente ouvre SON détail de
+// vente (colis, versement), d'où la fiche est à un toucher ; ils ne sont plus joués par défaut (`CHEMINS=ventes,journee`).
+const CHEMINS = liste('CHEMINS', 'annonces,stock,recherche');
 const DSF = Number(process.env.DSF || 1);
 const MUT = process.env.MUTATION || '';
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-fiche-directe');
@@ -130,8 +132,8 @@ function mesurerFiche() {
   const sonde = (() => { const z = document.querySelector('.vrm-toasts'); if (!z) return null; const b = document.createElement('div'); b.className = 'vrm-toast';
     b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
     b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°3245, 3246, 3247, 3248, 3249 +19 · à écrire sur leurs rangements</span>'; z.prepend(b);
-    const bulles = [...z.children].filter(vis).map(R); b.remove();
-    const zones = [f.querySelector('[data-fd-barre], .n-barre-titre'), f.querySelector('[data-fiche-heros]')].filter(vis).map(R);
+    const bulles = [...z.children].filter(vis).map(R);
+    const zones = [f.querySelector('[data-fd-barre], .n-barre-titre'), f.querySelector('[data-fiche-heros]')].filter(vis).map(R); b.remove();
     const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
     return { place: z.getAttribute('data-toasts-place'), bulles, zones: zones.length, couvre: zones.filter((r) => bulles.some((t) => coupe(t, r))).length }; })();
   const cadre = f.firstElementChild && f.scrollHeight;
@@ -227,15 +229,16 @@ async function unToucher(nav, chemin, W, sombre) {
     const pg = o.pg;
     await pg.waitForTimeout(2200); await fermerToasts(pg);
     if (chemin === 'recherche') { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: '3102' }))); await pg.waitForSelector('[data-tout-annonce]', { timeout: 12000 }).catch(() => {}); await pg.waitForTimeout(600); }
-    const sel = chemin === 'recherche' ? '[data-tout-annonce]' : '[data-fiche-ligne]';
-    await pg.waitForSelector(sel + (chemin === 'recherche' ? '' : '[data-fl-num]'), { timeout: 20000, state: 'attached' }).catch(() => {}); await pg.waitForTimeout(600);
+    // Annonces natives (une liste pour tous les sites) : la rangée porte `data-eg-numero` ; les autres listes `data-fl-num`.
+    const sel = chemin === 'recherche' ? '[data-tout-annonce]' : '[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])';
+    await pg.waitForSelector(sel, { timeout: 20000, state: 'attached' }).catch(() => {}); await pg.waitForTimeout(600);
     // La rangée VISIBLE (celle qu'un doigt atteint) et le N° qu'elle porte, par identité.
     const chercher = ([sel, rech]) => { for (const e of document.querySelectorAll(sel)) { const r = e.getBoundingClientRect(); if (r.width < 40 || r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue;
       const x = Math.min(innerWidth - 8, r.left + Math.min(r.width * 0.5, 190)), y = r.top + r.height / 2; const t = document.elementFromPoint(x, y); if (!t || !e.contains(t)) continue;
-      const num = rech ? '3102' : (e.getAttribute('data-fl-num') || ''); if (!num || num.includes(',')) continue; return { x, y, num }; } return null; };
+      const num = rech ? '3102' : (e.getAttribute('data-fl-num') || e.getAttribute('data-eg-numero') || ''); if (!num || num.includes(',')) continue; return { x, y, num }; } return null; };
     let cible = await pg.evaluate(chercher, [sel, chemin === 'recherche']);
     // À l'ordinateur, une liste peut commencer plus bas que le premier écran : on défile jusqu'à sa première rangée (comme lui).
-    if (!cible) { await pg.evaluate((sel) => { const e = [...document.querySelectorAll(sel + '[data-fl-num]')].find((x) => x.getClientRects().length); if (e) e.scrollIntoView({ block: 'center' }); }, sel); await pg.waitForTimeout(700); cible = await pg.evaluate(chercher, [sel, chemin === 'recherche']); }
+    if (!cible) { await pg.evaluate((sel) => { const e = [...document.querySelectorAll(sel)].find((x) => x.getClientRects().length); if (e) e.scrollIntoView({ block: 'center' }); }, sel); await pg.waitForTimeout(700); cible = await pg.evaluate(chercher, [sel, chemin === 'recherche']); }
     if (!dit(!!cible, `U ${suf} : une rangée d'article est à l'écran`)) return;
     if (MUT === 'montee') await pg.evaluate(() => document.addEventListener('click', (e) => { if (e.target.closest('[data-fiche-ligne]')) { e.preventDefault(); e.stopImmediatePropagation(); } }, true));
     if (o.tel) await pg.touchscreen.tap(cible.x, cible.y); else await pg.mouse.click(cible.x, cible.y);
@@ -341,6 +344,8 @@ async function appareil(nav, A, sombre) {
       dit(!!m.plein && m.plein.bas <= m.H - m.bas + 0.5 && m.plein.haut >= m.haut, `I4 ${suf} : le plein visible sans défiler, au-dessus de la barre du bas`, m.plein);
       dit(m.choisirBas != null && m.choisirBas <= m.H - m.bas + 0.5, `I4 ${suf} : « Choisir une action » visible sans défiler`, String(m.choisirBas));
       dit(m.cote <= 1 && m.defile <= 1, `I5 ${suf} : aucun défilement de côté`, { page: m.cote, fiche: m.defile });
+      // (les messages passagers rangés dans la fiche ont leur propre dessin : jugés ailleurs, pas ici)
+      await o.pg.addStyleTag({ content: '[data-fiche-messages]{display:none!important}' });
       const q = await o.pg.evaluate(P.mesurer, { tactile: A.tel, sombre, racines: ['[data-fiche-paire]'] });
       dit(!q.cibles.length, `I6 ${suf} : cibles ≥ ${A.tel ? 44 : 36} px (${q.nCibles})`, q.cibles.slice(0, 4));
       dit(!q.contraste.length, `I7 ${suf} : contrastes ≥ 4,5:1 (${q.nTextes} textes)`, q.contraste.slice(0, 4));

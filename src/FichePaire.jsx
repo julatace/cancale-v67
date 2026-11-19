@@ -277,7 +277,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     etatSite: (s) => (s.etat === 'vendue' ? (s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue')) : tr('fd.sites.enLigne')),
     euros: eur, signe, date: dateFd, jours: (n) => tr('fd.f.jours', { n }),
     // (19 nov. soir) la fiche produit : « Ajouter » d'une valeur qui manque, les pastilles, le tableau, les colonnes des sites.
-    ajouter: tr('fd.ajouter'), relier: tr('fd.relierCourt'), choisirAction: tr('fd.actions.choisir'), infos: tr('fd.infos.titre'),
+    ajouter: tr('fd.ajouter'), relier: tr('fd.relierCourt'), choisirAction: tr('fd.actions.choisir'), actionsCourt: tr('fd.actions.court'), infos: tr('fd.infos.titre'),
     court: (k) => tr('fd.court.' + (k === 'si-vendue' ? 'benefice' : k)), photoN: (i, n) => tr('fd.photo.n', { i, n }),
     col: { site: tr('fd.col.site'), compte: tr('fd.col.compte'), prix: tr('fd.col.prix'), vues: tr('fd.col.vues'), favoris: tr('fd.col.favoris'), etat: tr('fd.col.etat') },
     // Les `data-*` d'avant restent sur leur fait (résumé achat / bénéfice / si vendue, état « prix-achat »).

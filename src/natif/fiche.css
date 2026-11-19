@@ -20,7 +20,7 @@
 
   /* ── 1. La galerie ── */
   .nf-galerie { position: relative; margin: 0 0 16px; background: var(--n-carte); }
-  .nf-defile { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; aspect-ratio: 1 / 1; width: 100%; max-height: 46svh; }
+  .nf-defile { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; aspect-ratio: 1 / 1; width: 100%; max-height: 42svh; }
   /* (iPhone, onglet Safari : 664 px utiles) la photo garde toute la largeur mais ne passe pas 46 % de la hauteur : le prix et le plein restent au premier écran. */
   .nf-defile::-webkit-scrollbar { display: none; }
   .nf-galerie[data-nf-sans] .nf-defile { aspect-ratio: 16 / 9; }
@@ -82,11 +82,16 @@
   .nf-raison { color: var(--n-encre-2); }
 
   /* ── 4. Les actions : UN plein + « Choisir une action ▾ » ── */
-  .nf-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px var(--n-marge) 0; }
+  /* Téléphone : le plein et « Actions ▾ » sur UNE rangée (le plein visible sans défiler, même dans l'onglet Safari). */
+  .nf-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 8px var(--n-marge) 0; }
+  .nf-actions[data-nf-un] { grid-template-columns: minmax(0, 1fr); }
+  .nf-choisir-long { display: none; }
+  .nf-actions[data-nf-un] .nf-choisir-long { display: inline; }
+  .nf-actions[data-nf-un] .nf-choisir-court { display: none; }
   .nf-actions .n-bouton { width: 100%; }
   .nf-choisir {
     appearance: none; -webkit-appearance: none; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
-    width: 100%; min-height: 44px; margin: 0; padding: 0 14px; border: 0; border-radius: var(--n-r-bouton); background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait);
+    width: 100%; min-height: var(--n-h-plein); margin: 0; padding: 0 14px; border: 0; border-radius: var(--n-r-plein); background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait);
     color: var(--n-encre); font: var(--n-t-corps); cursor: pointer; -webkit-tap-highlight-color: transparent;
   }
   .nf-choisir:active { background: var(--n-carte-2); }
@@ -165,7 +170,8 @@
     .nf[data-nf-ordi] .nf-titre { font: var(--n-t-grand); letter-spacing: -.5px; }
     .nf[data-nf-ordi] .nf-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-left: 0; padding-right: 0; }
     .nf[data-nf-ordi] .nf-actions[data-nf-un] { grid-template-columns: minmax(0, 1fr); max-width: 50%; }
-    .nf[data-nf-ordi] .nf-choisir { min-height: var(--n-h-plein); }
+    .nf[data-nf-ordi] .nf-choisir-long { display: inline; }
+    .nf[data-nf-ordi] .nf-choisir-court { display: none; }
     .nf[data-nf-ordi] .nf-situe, .nf[data-nf-ordi] .nf-section-titre, .nf[data-nf-ordi] .nf-tableau, .nf[data-nf-ordi] .nf-sites,
     .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
     .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
