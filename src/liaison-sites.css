@@ -1,7 +1,10 @@
 /* « Relier mes annonces » — le parcours (19 nov.). Design « VRM natif » (docs/design/NATIF.md) : la page
    (`PagePoussee`), les listes (`Groupe`, `Rangee`), les boutons, la plaque et l'état vide viennent de
    src/natif/. Ici : ce qui est propre à CET écran — les volets, l'annonce, les cartes « photo contre
-   photo », la relecture du lot. Jetons `--n-*` seulement ; aucun `!important`, aucun `:has()`. */
+   photo », la relecture du lot. Jetons `--n-*` seulement ; aucun `!important`, aucun `:has()`.
+   Dans la couche `vrm-natif` : le pont `src/coque-native.css` renvoie les contrôles des pièces natives (`.n-poussee`…) aux
+   COUCHES (`all: revert-layer`) — une règle hors couche sur un bouton ou un lien d'ici serait effacée. */
+@layer vrm-natif {
 .n-lia-corps { display: flex; flex-direction: column; min-width: 0; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
 .n-lia-position { font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; padding-right: 8px; }
 .n-lia-colonne { display: flex; flex-direction: column; min-width: 0; }
@@ -110,3 +113,4 @@
 }
 @media (hover: hover) and (pointer: fine) { .n-lia-carte:hover { box-shadow: inset 0 0 0 999px var(--n-appui); } }
 @media (prefers-reduced-motion: reduce) { .n-lia-carte { transition: none; } }
+}

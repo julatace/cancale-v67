@@ -113,8 +113,8 @@ Ce que le banc a attrapé à la reprise (corrigé) :
 - **Toucher la photo d'une candidate ouvrait la visionneuse** (« la photo en grand, partout ») au lieu de relier : la carte,
   la ligne du lot et la file portent `data-sans-visionneuse` — toucher la carte, photo comprise, relie.
 - **Les composants natifs rendus à 34 px** : les règles « bouton » d'`index.html` (hors couche) écrasaient la couche
-  `vrm-natif` (plein 50 → 34, « Retour » 30). Elles ne s'appliquent plus aux classes `n-*` (`:where`, même spécificité) —
-  vaut pour TOUT écran natif, pas seulement celui-ci.
+  `vrm-natif` (plein 50 → 34, « Retour » 30). Réglé par la fondation (`src/coque-native.css`, `all: revert-layer` dans
+  `.n-poussee` et les autres pièces natives) : fusionnée, mon correctif d'`index.html` est retiré.
 - **« Relier » d'une rangée Leboncoin montrait la PREMIÈRE annonce, pas celle touchée** : l'effet « reprendre sur la
   première » écrasait l'annonce demandée dans le même rendu (mise à jour fonctionnelle, l'annonce demandée gagne ; une
   annonce demandée absente d'un calcul d'avant l'ouverture attend le calcul relancé).
