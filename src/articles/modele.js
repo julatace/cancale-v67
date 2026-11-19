@@ -57,7 +57,7 @@ export const montantLu = (v, { zero = false } = {}) => {
 };
 const dateLue = (d) => { if (d == null || d === '') return null; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : null; };
 const entier = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
-const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, vendue: 4, retiree: 5 };
+const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, brouillon: 4, vendue: 5, retiree: 6 };
 
 // ── CE QUE CHAQUE SITE PERMET (le tableau de parité : une seule source pour l'écran, le récit et l'audit) ──
 // 'oui' · 'lecture' (VRM le lit quand le site le donne) · 'extension' (geste joué par l'extension, capacité nommée) ·
@@ -159,7 +159,7 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
     let achat = montantLu(ach.v, { zero: true }), achatDe = ach.de;
     // Le miroir par N° (import, atelier d'arrivée) : seulement quand rien d'autre ne le dit, et que le N° désigne UN article.
     if (achat == null && k && !doublon && rempli(PN[numero] != null ? PN[numero] : PN[k])) { achat = montantLu(PN[numero] != null ? PN[numero] : PN[k], { zero: true }); achatDe = achat != null ? 'numero' : ''; }
-    const enVente = g.filter((a) => !['vendue', 'retiree'].includes(a.etat));
+    const enVente = g.filter((a) => !['vendue', 'retiree', 'brouillon'].includes(a.etat));
     const ref = enVente[0] || t;
     const prix = montantLu(ref.prix);
     const frais = fiche ? coutsVente(fiche) : { valid: true, cents: 0 };
@@ -201,26 +201,35 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
 }
 
 // ── FILTRER, TRIER, COMPTER (l'écran) ─────────────────────────────────────────
-export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], vendues: ['vendue'], retirees: ['retiree'] };
-// Un article est dans un état de filtre par CE qu'une de ses annonces (du site choisi) est.
-export function filtrerArticles(articles, { site = 'tous', etat = 'enligne', recherche = '', cle = cleDefaut } = {}) {
+export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], apublier: ['brouillon'], dorment: ['enligne'], vendues: ['vendue'], retirees: ['retiree'] };
+// Les segments de l'écran (audit d'utilité du 19 nov. : « En ligne · À publier · Dorment ») ; vendues / retirées restent
+// filtrables (la fiche, la recherche), pas en segment.
+export const SEGMENTS = ['enligne', 'apublier', 'dorment'];
+export const JOUR_MS = 24 * 3600 * 1000;
+// Un article est dans un segment par CE qu'une de ses annonces (du site et du compte choisis) est :
+//   · « En ligne » : une annonce présente (en ligne, masquée, en pause, à confirmer) ;
+//   · « À publier » : un brouillon, et aucune annonce présente ;
+//   · « Dorment » : une annonce EN LIGNE (lecture fraîche) dont la date de mise en ligne LUE a au moins `seuil` jours
+//     (la règle de src/quiDorment.js : date inconnue ⇒ dans aucune liste ; « à confirmer » n'y entre jamais).
+export function filtrerArticles(articles, { site = 'tous', etat = 'enligne', recherche = '', compte = '', seuil = 30, maintenant = Date.now(), cle = cleDefaut } = {}) {
   const q = str(recherche).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const mots = q.split(/\s+/).filter(Boolean);
   const dans = ETATS_FILTRE[etat] || ETATS_FILTRE.enligne;
   return arr(articles).filter((a) => {
-    const ann = a.annonces.filter((x) => site === 'tous' || x.site === site);
+    const ann = a.annonces.filter((x) => (site === 'tous' || x.site === site) && (!compte || str(x.compte) === str(compte)));
     if (!ann.length) return false;
     const enVente = ann.some((x) => ETATS_FILTRE.enligne.includes(x.etat));
-    if (etat === 'enligne' ? !enVente : (enVente || !ann.some((x) => dans.includes(x.etat)))) return false;
+    if (etat === 'enligne') { if (!enVente) return false; }
+    else if (etat === 'dorment') { if (!ann.some((x) => x.etat === 'enligne' && x.depuis != null && maintenant - x.depuis >= seuil * JOUR_MS)) return false; }
+    else if (enVente || !ann.some((x) => dans.includes(x.etat))) return false;
     if (!mots.length) return true;
     const texte = [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + cle(a.numero) : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + NOM_SITE[x.site])].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     return mots.every((m) => texte.includes(m));
   });
 }
-export function compterArticles(articles) {
-  const out = { tous: { enligne: 0, vendues: 0, retirees: 0 } };
-  for (const s of SITES) out[s] = { enligne: 0, vendues: 0, retirees: 0 };
-  for (const e of ['enligne', 'vendues', 'retirees']) for (const s of ['tous', ...SITES]) out[s][e] = filtrerArticles(articles, { site: s, etat: e }).length;
+export function compterArticles(articles, opts = {}) {
+  const out = {};
+  for (const s of ['tous', ...SITES]) { out[s] = {}; for (const e of ['enligne', 'apublier', 'dorment', 'vendues', 'retirees']) out[s][e] = filtrerArticles(articles, { ...opts, site: s, etat: e, recherche: '' }).length; }
   return out;
 }
 // Le plus récent d'abord (date de mise en ligne lue) ; sans date : après, par N° puis titre — un ordre STABLE.

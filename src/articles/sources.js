@@ -27,6 +27,8 @@ export function annoncesVinted(comptes) {
     arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
     arr(c.vendues).forEach((it) => pousse(it, 'vendue'));
     arr(c.retirees).forEach((it) => pousse(it, 'retiree'));
+    // Ses brouillons (lus sous SA session : `fetchVintedListings` → `brouillons`) : « À publier ».
+    arr(c.brouillons).forEach((it) => pousse(it, 'brouillon'));
   }
   return out;
 }

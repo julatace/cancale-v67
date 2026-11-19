@@ -14,6 +14,7 @@ export default {
   "egalite.favoris": { one: "{n} favourite", other: "{n} favourites" },
   "egalite.vues": { one: "{n} view", other: "{n} views" },
   "egalite.ligneFaits": "min {mini} · bought {achat}",
+  "egalite.jours": { one: "{n} d", other: "{n} d" },
   "egalite.numeroCourt": "No.{n}",
   "egalite.placeCase": "slot {i}",
   "egalite.touteLaFiche": "Full item sheet",

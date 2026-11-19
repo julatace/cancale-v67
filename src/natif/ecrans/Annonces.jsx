@@ -42,7 +42,8 @@ import '../natif.css';
 import './annonces.css';
 
 const PAR_PAGE = 60;
-const ETATS = ['enligne', 'vendues', 'retirees'];
+// Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
+const ETATS = ['enligne', 'apublier', 'dorment'];
 const etatMot = (e) => tr('egalite.etatAnnonce.' + e);
 
 // Ce que dit la 2e ligne d'une rangée : « 42 · Leboncoin · atelier-nord » (un site) ou « 42 · sur 3 sites ».
@@ -122,7 +123,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions = [], onAction, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '',
-  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null }) {
+  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null }) {
   const ordinateur = useOrdinateur();
   const [reglerOuvert, setReglerOuvert] = React.useState(false);
   const [menuSites, setMenuSites] = React.useState(false);
@@ -163,7 +164,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           <Bouton variante="texte" onClick={toutCocher} attrs={{ 'data-eg-tout': '' }}>{liste.filter(cochable).every((a) => sel.has(a.cle)) && sel.size ? tr('egalite.selection.rien') : tr('egalite.selection.tout')}</Bouton>
           <Bouton variante="texte" onClick={quitter} attrs={{ 'data-eg-annuler': '' }}>{tr('egalite.selection.annuler')}</Bouton>
         </> : <>
-          {sites.length > 1 ? <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-eg-filtre': filtre.site }}>{filtre.site === 'tous' ? tr('egalite.site.tous') : nomSite(filtre.site)}</Bouton> : null}
+          {sites.length > 1 ? <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-eg-filtre': filtre.site }}>{filtre.site === 'tous' ? tr('egalite.site.titre') : tr('egalite.site.titre') + ' · ' + nomSite(filtre.site)}</Bouton> : null}
           {actions.length ? <Bouton variante="teinte" onClick={() => setMenuActions(true)} attrs={{ 'data-eg-actions': '' }}>{tr('egalite.actions')}</Bouton> : null}
         </>}
       </div>
@@ -236,6 +237,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           : ordinateur ? tableau
           : <Groupe attrs={{ 'data-eg-liste': '' }}>{visibles.map(rangee)}</Groupe>}
         {liste.length > max ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: liste.length - max })}</Bouton></Groupe> : null}
+        {onEcranSite && filtre.site !== 'tous' && !A ? <Groupe><Rangee titre={tr('egalite.ecranSite', { site: nomSite(filtre.site) })} sousTitre={tr('egalite.ecranSite.sous')} fin="chevron"
+          onClick={() => onEcranSite(filtre.site)} attrs={{ 'data-eg-ecran-site': filtre.site }}/></Groupe> : null}
         {Array.isArray(articles) && (manque || limites.length) ? <Groupe nu pied={[manque, ...limites].filter(Boolean).join(' ')} attrs={{ 'data-eg-pied': '' }}/> : null}
       </Page>
 

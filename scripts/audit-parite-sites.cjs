@@ -303,6 +303,18 @@ const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().
     dit(d.achat == null && s8.achat === 22 && s8.achatDe === 'numero', 'le prix saisi par N° (import, arrivée) vaut pour le N° qui désigne UN article — jamais pour un doublon', [d.achat, s8.achat]);
     const n = M.compterArticles(A.articles);
     dit(n.tous.enligne === 3 && n.leboncoin.enligne === 2 && n.ebay.enligne === 1 && n.leboncoin.vendues === 1 && n.vinted.enligne === 0, 'comptes par site et par état', n);
+    // « À publier » et « Dorment » (les segments de l'écran) : la même règle pour chaque site.
+    const J = 24 * 3600e3, now = Date.parse('2026-11-19T12:00:00Z');
+    const seg = M.construireArticles({ annonces: [
+      { site: 'leboncoin', id: 'v1', etat: 'enligne', depuis: now - 40 * J, numero: '31' },
+      { site: 'ebay', id: 'v2', etat: 'enligne', depuis: now - 5 * J, numero: '32' },
+      { site: 'vestiaire', id: 'v3', etat: 'aconfirmer', depuis: now - 90 * J, numero: '33' },
+      { site: 'vinted', id: 'v4', etat: 'brouillon', numero: '' },
+      { site: 'leboncoin', id: 'v5', etat: 'enligne', depuis: null, numero: '35' },
+    ], cle: cleNum }).articles;
+    const ids = (e) => M.filtrerArticles(seg, { etat: e, maintenant: now, seuil: 30 }).map((a) => a.annonces[0].id).sort().join();
+    dit(ids('dorment') === 'v1', '« Dorment » : en ligne (lecture fraîche) depuis 30 j ou plus — date inconnue ou « à confirmer » ⇒ non', ids('dorment'));
+    dit(ids('apublier') === 'v4' && !ids('enligne').includes('v4'), '« À publier » : un brouillon, jamais compté « en ligne »', [ids('apublier'), ids('enligne')]);
     dit(M.filtrerArticles(A.articles, { site: 'ebay' }).length === 1 && M.filtrerArticles(A.articles, { etat: 'vendues' }).length === 1 && M.filtrerArticles(A.articles, { recherche: 'reebok' }).length === 1 && M.filtrerArticles(A.articles, { recherche: 'n8' }).length === 1, 'filtre par site, par état, recherche par titre et par N°');
     const t = M.trierArticles(A.articles).map((a) => a.cle);
     dit(JSON.stringify(t) === JSON.stringify(M.trierArticles([...A.articles].reverse()).map((a) => a.cle)), 'un ordre STABLE (le même quelle que soit l’arrivée des lectures)');
