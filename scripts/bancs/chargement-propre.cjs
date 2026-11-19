@@ -36,6 +36,9 @@ const seuls = process.env.ECRANS ? process.env.ECRANS.split(',') : null;
 const CAPTURES = process.env.CAPTURES ? path.resolve(process.env.CAPTURES) : null;
 const SEUIL = Number(process.env.BANC_SEUIL_CLS) || 0;
 const DUREE_FILM = Number(process.env.BANC_FILM_MS) || 8000;
+// Sur un téléphone en 4G, l'écran n'arrive qu'après ~14 s : le film peut commencer plus tard.
+const DEBUT_FILM = Number(process.env.BANC_FILM_DEBUT_MS) || 0;
+const PAS_FILM = Number(process.env.BANC_FILM_PAS_MS) || 100;
 const FENETRE = { auMoins: 12000, auPlus: 30000 };
 
 // Dans la page, avant tout script : les décalages, et le premier texte de la zone principale.
@@ -50,7 +53,20 @@ function observer() {
         if (e.value >= 0.005) {
           M.sauts++;
           const s = (e.sources || []).map((x) => { const n = x.node; return n && n.nodeType === 1 ? (n.tagName.toLowerCase() + (n.className && typeof n.className === 'string' ? '.' + n.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) : (n ? '#text' : '?'); }).slice(0, 3);
-          M.liste.push({ t: Math.round(e.startTime), v: Math.round(e.value * 1000) / 1000, s });
+          // Ce qui est AU-DESSUS de l'élément qui a bougé : les frères qui le précèdent dans sa chaîne
+          // d'ancêtres (classe et hauteur) — c'est là qu'est ce qui a poussé.
+          const dessus = [];
+          try {
+            const n0 = (e.sources || [])[0] && e.sources[0].node;
+            for (let n = n0; n && n.parentElement && dessus.length < 6; n = n.parentElement) {
+              for (let f = n.previousElementSibling; f && dessus.length < 6; f = f.previousElementSibling) {
+                const h = Math.round(f.getBoundingClientRect().height);
+                if (h > 0) dessus.push((f.tagName.toLowerCase() + (typeof f.className === 'string' && f.className ? '.' + f.className.trim().split(/\s+/).slice(0, 2).join('.') : '')) + ':' + h);
+              }
+            }
+          } catch (_) {}
+          const r0 = (e.sources || [])[0];
+          M.liste.push({ t: Math.round(e.startTime), v: Math.round(e.value * 1000) / 1000, s, dessus, de: r0 && r0.previousRect ? Math.round(r0.previousRect.y) : null, a: r0 && r0.currentRect ? Math.round(r0.currentRect.y) : null });
         }
         if (e.value > M.grand) M.grand = e.value;
       }
@@ -72,12 +88,13 @@ function film(dossier, prefixe) {
     if (!dossier) return null;
     fs.mkdirSync(dossier, { recursive: true });
     const vues = [];
+    if (DEBUT_FILM) await new Promise((r) => setTimeout(r, DEBUT_FILM));
     const debut = Date.now();
     while (Date.now() - debut < DUREE_FILM) {
       const t = Date.now() - debut;
-      const f = path.join(dossier, `${prefixe}-${String(t).padStart(5, '0')}.png`);
+      const f = path.join(dossier, `${prefixe}-${String(t + DEBUT_FILM).padStart(5, '0')}.png`);
       try { await pg.screenshot({ path: f, timeout: 2000 }); vues.push(t); } catch (_) {}
-      const reste = 100 - ((Date.now() - debut) - t);
+      const reste = PAS_FILM - ((Date.now() - debut) - t);
       if (reste > 0) await new Promise((r) => setTimeout(r, reste));
     }
     return vues.length;
@@ -109,7 +126,7 @@ function film(dossier, prefixe) {
         const ko = SEUIL && m.cls > SEUIL;
         if (ko) rouge++;
         console.log(`  ${ko ? '❌' : 'ℹ️ '} ${nom} · ${q} : CLS ${m.cls} · ${m.sauts} saut(s) visibles · le plus grand ${m.grand} · coque ${m.coque} ms · 1er texte ${m.texte} ms`);
-        for (const s of m.liste) console.log(`       ${s.t} ms  ${s.v}  ${s.s.join(' | ')}`);
+        for (const s of m.liste) console.log(`       ${s.t} ms  ${s.v}  ${s.s.join(' | ')}  (y ${s.de} → ${s.a})  au-dessus : ${(s.dessus || []).join(' · ')}`);
       }
     }
   } finally {

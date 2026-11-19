@@ -131,8 +131,51 @@ faite** (le seul poste qui grandit au carré).
 | **Migration 048** (pas appliquée) : l'index des preuves d'adresse par adresse, et la purge du journal des écritures | la réception d'un e-mail lit tout le registre (293 pages pour 3 000 vendeurs inventés) | **6 pages** pour l'adresse reçue, même réponse ; purge bornée (≥ 30 jours, clé de service seule) | `scripts/audit-capacite-sql.cjs` sur PostgreSQL jetable (9 verts) |
 | **Banc `chargement-propre`** : décalage de la mise en page (CLS), sauts visibles, captures toutes les 100 ms (390 px tactile, processeur ×4, 4G) | n'existait pas | mesure avant/après de Ma journée, Ventes, Annonces, Achats | `scripts/bancs/chargement-propre.cjs` |
 
-*(Les mesures du banc de démarrage et du banc `chargement-propre` sont ajoutées
-ci-dessous dès qu'elles ont tourné — la machine des bancs est partagée.)*
+### Le démarrage mesuré au banc (19 nov., `main` ad73a3c + cette branche)
+
+Base inventée au poids de celle de Julien, téléphone 390 px.
+
+| Ma journée | lectures | octets lus | lectures en double | JS + CSS |
+|---|---|---|---|---|
+| appareil neuf | 147 | 2,9 Mo | 13 (budget 27) | **2 010 Ko** (budget 1 982 : +28 Ko, déjà sur `main` — cette branche n'ajoute que quelques octets à `main.jsx`) |
+| lancement suivant | 141 | 0,48 Mo | 12 | 24 Ko |
+
+### Le chargement est-il propre ? (banc `chargement-propre`, 390 tactile, processeur ×4, 4G lente)
+
+Deux passages (le second avec captures toutes les 400 ms, regardées).
+
+| écran | 1er lancement : coque · CLS · sauts | lancement suivant : coque · CLS · sauts |
+|---|---|---|
+| Ma journée | 14 s · **0,25** · 5 | 2,2 s · 0 (ou 0,138, voir 1) · 0-1 |
+| Ventes | 14 s · 0,02 à 0,16 · 1-2 | 2,8 s · 0 (ou 0,138, voir 1) · 0-1 |
+| Annonces | 15 s · 0,002 · 0 | 3,4 s · 0,002 · 0 |
+| Achats | 13,5 s · 0,002 à 0,06 · 0-1 | 2,8 s · 0,003 · 0 — **mais le premier texte à 9,8 à 12,8 s** |
+
+Ce que montrent les captures :
+
+1. **Le plus gros saut (0,138)** : la phrase « Les photos de Vinted ne s'affichent pas ici… »
+   arrive en haut de la coque ~15 s après l'ouverture et pousse tout l'écran de 138 px. Au
+   banc, c'est parce que le banc coupe toutes les photos ; chez un vendeur, seulement quand
+   ses photos Vinted ne passent vraiment pas. *Pas corrigé* : la phrase est tenue « en haut,
+   visible » par le banc `photos-vinted` — la déplacer (en bas de l'écran, ou au prochain
+   changement d'écran) est une décision de présentation (§ 7).
+2. **Ma journée, premier lancement** : l'écran s'affiche avec « lecture… » dans les chiffres
+   du mois, puis les chiffres arrivent (la tuile grandit : « prix d'achat manquants » sur trois
+   lignes), puis la carte « 63 colis pressés » s'insère au-dessus du montant du jour et pousse
+   la grille de 86 px — trois temps au lieu d'un. Au lancement suivant, l'instantané
+   (`src/journeeInstantanee.js`) supprime tout cela (CLS 0).
+3. **Achats n'a pas d'instantané** : au lancement suivant, la coque est là en 2,8 s mais le
+   squelette reste 7 à 10 s avant le premier texte (Ma journée, Ventes, Annonces : < 1 s).
+4. **Premier lancement : 14 s avant la coque** en 4G lente (≈ 2 Mo compressés à 1,6 Mbit/s
+   puis l'analyse du code au processeur ×4). C'est le poids du démarrage (étape 8).
+
+À faire (code, dans cet ordre) : un instantané pour Achats (la même règle que Ventes et
+Annonces, `src/instantaneEcran.js`) ; la carte « colis pressés » à sa place dès le premier
+rendu de Ma journée (sa place tenue tant que la donnée est en lecture) ; la hauteur de la
+tuile du mois tenue (trois lignes) pendant « lecture… ».
+
+`origin/claude/natif-fondation` (la bibliothèque `src/natif/`, composant `Attente`) n'est
+utilisée par aucun écran actuel et porte un « travail en cours » : pas fusionnée ici.
 
 ---
 
@@ -201,3 +244,6 @@ geste dans un tableau de bord ou une décision.
 - **Les deux copies de sauvegarde de septembre/octobre** (111 Mo dans la base) : les
   exporter puis les retirer, ou les garder.
 - **Quand monter le serveur de base** (étape 4) : à la première soirée où il dépasse 50 %.
+- **La phrase « Les photos de Vinted ne s'affichent pas ici »** : quand elle arrive après
+  l'affichage, elle pousse l'écran (le plus gros saut mesuré). La garder en haut (comme
+  aujourd'hui), la poser en bas de l'écran, ou la garder pour le prochain écran ouvert ?
