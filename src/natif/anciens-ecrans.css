@@ -370,6 +370,11 @@ html body .vrm-sx-etape > b { color: var(--n-encre, #111114) !important; }
 html body .vrm-sel-sites > button[data-sans-compte][aria-pressed="false"] .vrm-ss-in { opacity: 1 !important; color: var(--ap-gris) !important; }
 /* Cibles au doigt : « À compléter » de la feuille des outils (34 px de haut), « Tout » des périodes (43 px de large). */
 html body .v2-outils-feuille .vrm-outils-vers { min-height: 44px !important; }
+/* La feuille « ⋯ » d'Annonces : le tri, « À compléter » et « Régler par paire » gardaient le cadre noir carré du
+   navigateur (déjà sur main) — le remplissage et le rayon du natif, sans bord ; « Régler par paire » est un lien. */
+html body .v2-outils-feuille :is(button.vrm-outils-vers, .v2-ann-menu-tri select) { border: 0 !important; border-radius: 10px !important; background: var(--ap-remplir) !important; color: var(--ap-encre) !important; box-shadow: none !important; }
+html body .v2-outils-feuille .v2-ann-menu-tri select { padding: 0 10px !important; }
+html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--ap-bleu) !important; padding-left: 0 !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
 /* Achats à l'ordinateur : « Calculette » était rogné dans sa propre boîte. */
 @media (min-width: 1024px) { html body .vrm-achats-filtres > [data-achats-calculette] { width: auto !important; max-width: none !important; overflow: visible !important; white-space: nowrap !important; flex: none !important; } }
