@@ -20,7 +20,7 @@
 //  qui quittent l'app (déconnexion, paiement, suppression du compte) ne sont jamais touchés.
 //
 //  ⚠️ Machine partagée : UN navigateur, UNE page à la fois, chaque contexte est fermé ; jamais
-//  de `pkill`. `LARGEURS=390` `ECRANS=ventes,achats` `PROFONDEUR=1|2` `MAX_CLICS=60` `MAX_ENFANTS=10`.
+//  de `pkill`. `LARGEURS=390` `ECRANS=ventes,achats` `PROFONDEUR=1|2` `MAX_CLICS=40` `MAX_ENFANTS=6`.
 //  Sorties : `docs/design/inventaire-gestes.json` (tout) et
 //  `docs/design/2026-11-19-inventaire-gestes.md` (les tables, par écran) — `SORTIE=<dossier>`.
 //  Ce que le banc N'ATTEINT PAS (états rares, extension requise, eBay / Vestiaire connectés,
@@ -35,10 +35,13 @@ const R = path.join(__dirname, '..');
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
 const LARGEURS = liste('LARGEURS', '390,1512').map(Number);
 const PROFONDEUR = Number(process.env.PROFONDEUR || 2);
-const MAX_CLICS = Number(process.env.MAX_CLICS || 60);
-const MAX_ENFANTS = Number(process.env.MAX_ENFANTS || 10);
+const MAX_CLICS = Number(process.env.MAX_CLICS || 40);
+const MAX_ENFANTS = Number(process.env.MAX_ENFANTS || 6);
 const SORTIE = process.env.SORTIE || path.join(R, 'docs', 'design');
 const VOULUS = liste('ECRANS', '');
+const ATTENTE_RECHARGE = Number(process.env.ATTENTE_RECHARGE || 900);
+const ATTENTE_GESTE = Number(process.env.ATTENTE_GESTE || 380);
+let BASE = null;
 
 // [identifiant, adresse, nom lisible, touchers pour l'atteindre au téléphone, à l'ordinateur, par où]
 // Les touchers d'accès sont ceux de la coque d'aujourd'hui (barre du bas : Aujourd'hui · Annonces ·
@@ -160,8 +163,9 @@ function sorteDe(x) {
   if (x.tag === 'a' || ['barre du bas', 'colonne', 'navigation'].includes(x.zone) || x.role === 'link' || /^(voir|ouvrir|retour|fermer|aller|tout voir|‹|←|×|✕)/.test(n) || /(^| )(nav|aller|ouvrir|onglet|retour|fermer|lien|sous-ouvrir)/.test(d)) return 'navigation';
   return 'action';
 }
+const normNom = (s) => String(s || '').toLowerCase().replace(/\d+([.,]\d+)?/g, '#').replace(/\s+/g, ' ').trim();
 const DANGER = /d[ée]conn|supprimer (mon|le|ce) compte|payer|s.abonner|r[ée]silier|stripe|quitter/i;
-const touchable = (x) => !x.inactif && !['input', 'select', 'textarea'].includes(x.tag) && !['barre du bas', 'colonne', 'navigation'].includes(x.zone) && !DANGER.test(x.nom) && !(x.tag === 'a' && /^(https?:|mailto:|tel:)/.test(x.href));
+const touchable = (x) => !x.inactif && !('aller-contenu' in (x.data || {})) && !['input', 'select', 'textarea'].includes(x.tag) && !['barre du bas', 'colonne', 'navigation'].includes(x.zone) && !DANGER.test(x.nom) && !(x.tag === 'a' && /^(https?:|mailto:|tel:)/.test(x.href));
 
 const INIT = () => {
   try {
@@ -191,14 +195,24 @@ async function toucher(pg, cle, tel) {
 async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) {
   const tel = W < 600, base = tel ? tTel : tOrdi;
   const lignes = [];
-  let o = null, clics = 0, recharges = 0;
+  let o = null, clics = 0, recharges = 0, rates = 0, depot = null;
   const noter = (els, chemin, parent) => { for (const x of els) lignes.push({ ecran: id, nomEcran: nom, largeur: W, chemin, touchers: base + chemin.length + 1, sorte: sorteDe(x), nom: x.nom, zone: x.zone, tag: x.tag, role: x.role, type: x.type, etat: x.etat, n: x.n, repete: x.repete, inactif: x.inactif, sansDefiler: x.sansDefiler, h: x.h, data: x.data, href: x.href, cle: x.cle, parent: parent || '' }); };
   const ouvrirEcran = async () => {
-    if (o) await o.ctx.close().catch(() => {});
-    o = await P.ouvrir(nav, { W, sombre: false, b: V.baseVolume(), url, api: V.apiVolume });
-    o.pg.on('dialog', (d) => d.dismiss().catch(() => {}));
-    await o.pg.evaluate(INIT).catch(() => {});
-    await P.pret(o.pg);
+    if (!o) {
+      o = await P.ouvrir(nav, { W, sombre: false, b: BASE || (BASE = V.baseVolume()), url, api: V.apiVolume });
+      o.pg.on('dialog', (d) => d.dismiss().catch(() => {}));
+      await o.pg.addInitScript(INIT);
+      await P.pret(o.pg);
+      // L'état rangé sur l'appareil au départ : un filtre touché (site, vue) s'y enregistre — on le REPOSE à chaque
+      // rechargement, sinon l'écran rouvre sur le filtre du toucher d'avant et plus rien du départ n'est retrouvé.
+      depot = await o.pg.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)])).catch(() => null);
+    } else {
+      if (depot) await o.pg.evaluate((d) => { try { const [l, s] = JSON.parse(d); localStorage.clear(); for (const [k, v] of l) localStorage.setItem(k, v); sessionStorage.clear(); for (const [k, v] of s) sessionStorage.setItem(k, v); } catch (_) {} }, depot).catch(() => {});
+      // Même contexte (une seule page) : on recharge l'écran, le cache du navigateur fait le reste.
+      await o.pg.goto(`http://localhost:${P.PORT}${url}`, { waitUntil: 'domcontentloaded' });
+      await o.pg.waitForSelector('.vrm-main', { timeout: 25000 }).catch(() => {});
+      await o.pg.waitForTimeout(ATTENTE_RECHARGE);
+    }
     await o.pg.evaluate(INIT).catch(() => {});
     if (special === 'fiche') {
       await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1205' })));
@@ -217,50 +231,61 @@ async function inventorier(nav, [id, url, nom, tTel, tOrdi, acces, special], W) 
     await ouvrirEcran();
     const e0 = await etat();
     const cles0 = new Set(e0.elements.map((x) => x.cle));
+    // « Neuf » après un toucher : un NOM (chiffres neutralisés) ou une liste que l'écran de départ ne portait pas,
+    // dans l'écran ou une feuille — un élément de l'en-tête ou de la barre qui change de libellé n'est pas neuf.
+    const idDe = (x) => (x.repete ? '*' + x.cle : normNom(x.nom) || x.cle);
+    const ids0 = new Set(e0.elements.map(idDe));
+    const estNeuf = (x, connus) => !['en-tête', 'barre du bas', 'colonne', 'navigation'].includes(x.zone) && !connus.has(idDe(x));
     // Sur la fiche et la loupe, on ne relève que la feuille ouverte (le reste est l'écran dessous).
     const depart = special ? e0.elements.filter((x) => x.zone === 'feuille' || x.zone === 'menu' || x.zone === 'hors écran principal') : e0.elements;
     noter(depart.length ? depart : e0.elements, []);
-    const memeEtat = async () => { const e = await etat(); const la = new Set(e.elements.map((x) => x.cle)); let n = 0; for (const k of cles0) if (la.has(k)) n++; return e.tab === e0.tab && e.feuilles === e0.feuilles && n >= cles0.size * 0.97; };
+    // « De retour » : le même écran, autant de feuilles ouvertes, et 92 % des éléments du départ (par nom neutralisé :
+    // une heure ou un compteur qui bouge ne compte pas pour un autre état).
+    const memeEtat = async () => { const e = await etat(); const la = new Set(e.elements.map(idDe)); let n = 0; for (const k of ids0) if (la.has(k)) n++; return e.tab === e0.tab && e.feuilles === e0.feuilles && n >= ids0.size * 0.92; };
     const revenir = async () => {
       for (let i = 0; i < 2; i++) { await o.pg.keyboard.press('Escape').catch(() => {}); await o.pg.waitForTimeout(220); if (await memeEtat()) { await etat(); return; } }
-      recharges++; await ouvrirEcran(); await etat();
+      recharges++; await ouvrirEcran();
+      // L'écran rechargé est « de retour » quand il porte de nouveau ce que le départ portait (au plus 8 s).
+      for (let i = 0; i < 12; i++) { if (await memeEtat()) break; await o.pg.waitForTimeout(300); }
     };
     if (PROFONDEUR >= 1) for (const c of (depart.length ? depart : e0.elements).filter(touchable)) {
       if (clics >= MAX_CLICS) break;
+      const T0 = Date.now();
       await etat();   // repose `__inv` sur l'état de départ
-      if (!(await toucher(o.pg, c.cle, tel))) continue;
+      if (!(await toucher(o.pg, c.cle, tel))) { rates++; continue; }
       clics++;
-      await o.pg.waitForTimeout(480);
+      await o.pg.waitForTimeout(ATTENTE_GESTE);
       const e1 = await etat();
       const ligne = lignes.find((l) => l.cle === c.cle && !l.chemin.length);
       if (e1.tab && e1.tab !== e0.tab) { if (ligne) { ligne.mene = 'écran ' + e1.tab; ligne.sorte = 'navigation'; } await revenir(); continue; }
-      const neufs = e1.elements.filter((x) => !cles0.has(x.cle));
+      const neufs = e1.elements.filter((x) => estNeuf(x, ids0));
       if (!neufs.length) { if (ligne) ligne.mene = e1.elements.length < e0.elements.length * 0.7 ? 'remplace l’écran' : 'sur place'; if (!(await memeEtat())) await revenir(); continue; }
       const feuille = neufs.some((x) => x.zone === 'feuille' || x.zone === 'menu');
       if (ligne) ligne.mene = (feuille ? 'ouvre une feuille' : 'déplie sur place') + ' (' + neufs.length + ')';
       noter(neufs, [c.nom || c.tag], c.cle);
+      if (process.env.TEMPS) console.log('    ', Date.now() - T0, 'ms ·', c.nom.slice(0, 40), '→', neufs.length);
       if (PROFONDEUR >= 2 && feuille) {
-        const cles1 = new Set([...cles0, ...neufs.map((x) => x.cle)]);
+        const ids1 = new Set([...ids0, ...neufs.map(idDe)]);
         let k = 0;
         for (const d of neufs.filter(touchable).filter((x) => x.zone === 'feuille' || x.zone === 'menu')) {
           if (k >= MAX_ENFANTS || clics >= MAX_CLICS * 2) break;
           if (/^(fermer|annuler|×|✕|retour|ok|terminé)$/i.test(d.nom.trim())) continue;
           // revenir à la feuille du parent
-          if (k > 0) { await revenir(); await etat(); if (!(await toucher(o.pg, c.cle, tel))) break; await o.pg.waitForTimeout(480); await etat(); }
+          if (k > 0) { await revenir(); await etat(); if (!(await toucher(o.pg, c.cle, tel))) break; await o.pg.waitForTimeout(ATTENTE_GESTE); await etat(); }
           if (!(await toucher(o.pg, d.cle, tel))) continue;
           k++; clics++;
-          await o.pg.waitForTimeout(480);
+          await o.pg.waitForTimeout(ATTENTE_GESTE);
           const e2 = await etat();
           const l2 = lignes.find((l) => l.cle === d.cle && l.parent === c.cle);
           if (e2.tab && e2.tab !== e0.tab) { if (l2) { l2.mene = 'écran ' + e2.tab; l2.sorte = 'navigation'; } continue; }
-          const neufs2 = e2.elements.filter((x) => !cles1.has(x.cle));
+          const neufs2 = e2.elements.filter((x) => estNeuf(x, ids1));
           if (l2) l2.mene = neufs2.length ? 'ouvre (' + neufs2.length + ')' : 'sur place / ferme';
           if (neufs2.length) noter(neufs2, [c.nom || c.tag, d.nom || d.tag], d.cle);
         }
       }
       await revenir();
     }
-    console.log(`  ${String(W).padStart(4)} · ${id.padEnd(15)} ${String(lignes.length).padStart(4)} éléments · ${clics} touchers · ${recharges} rechargements` + (o.erreurs.length ? ' · erreurs JS : ' + o.erreurs.slice(0, 1).join(' | ') : ''));
+    console.log(`  ${String(W).padStart(4)} · ${id.padEnd(15)} ${String(lignes.length).padStart(4)} éléments · ${clics} touchers · ${recharges} rechargements${rates ? ' · ' + rates + ' introuvables après rechargement' : ''}` + (o.erreurs.length ? ' · erreurs JS : ' + o.erreurs.slice(0, 1).join(' | ') : ''));
   } catch (e) { console.log(`  ${W} · ${id} : ÉCHEC ${String(e.message || e).slice(0, 160)}`); }
   finally { if (o) await o.ctx.close().catch(() => {}); }
   return lignes.map(({ cle, parent, ...l }) => l);
