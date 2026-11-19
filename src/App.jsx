@@ -45283,7 +45283,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let neuves = [];
     try { const portes = new Set(); for (const f of Object.values(numeros || {})) if (f && f.numero) portes.add(cleNum(f.numero)); neuves = fichesAPublier(load('vrm_fiches_neuves', {}) || {}, portes, cleNum); } catch (_) { neuves = []; }
     return {
-      annonces: luA ? annSelectionnables.filter((a) => a.etat === 'en-ligne').map((a) => ({ ...a, favoris: fav.get(String(a.id)) || 0 })) : null,
+      annonces: luA ? annSelectionnables.filter((a) => a.etat === 'en-ligne').map((a) => ({ ...a, favoris: fav.get(String(a.id)) || 0, compte: accounts.length > 1 ? a.compte : '' })) : null,
       numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; },
       ventes: fileVendus ? fileVendus.map((x) => ({ tx: String(x.o.transaction_id), idf: x.idf, uid: String((x.o._acc && x.o._acc.vinted_user_id) || ''), titre: x.o.title || '',
         prix: x.o.price && x.o.price.currency_code && x.o.price.currency_code !== 'EUR' ? null : (x.o.price && x.o.price.amount), photo: (x.cible && x.cible.photo) || '',

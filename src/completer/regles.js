@@ -143,6 +143,14 @@ export function filtrer(res, sujet = 'tout') {
   const l = Array.isArray(r.file) ? r.file : [];
   return l.filter((a) => questionsDe(a, sujet, r.miniActif).length > 0);
 }
+// Le filtre « Toutes · En ligne · Vendues » (19 nov., la même attente que « Relier achats et ventes ») : la file
+// d'un GENRE d'article ('annonce' = en ligne, 'vente' = vendue). « Toutes » rend la file telle quelle.
+export const GENRES = ['tous', 'annonce', 'vente'];
+export function parGenre(res, genre = 'tous') {
+  if (!res || genre === 'tous' || !GENRES.includes(genre)) return res;
+  const g = (a) => a.genre === genre;
+  return { ...res, file: (res.file || []).filter(g), anciennes: (res.anciennes || []).filter(g) };
+}
 // Les compteurs PAR SORTE (ce que l'entrée de l'atelier dit ; `null` = pas su, jamais 0).
 export function compteurs(res) {
   if (!res || !res.etat) return null;
@@ -275,14 +283,15 @@ export function opsPrixAchat({ article, patch, fiches = {}, ventes = {}, prixPar
     if (n) ops.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: n, apres: String(patch.buyPrice), avant: (prixParNum || {})[n] });
     return ops;
   }
+  // Une entrée à CRÉER (annonce sans fiche, vente sans ligne) : par « fusion » — jamais un remplacement, ce qu'un autre
+  // geste y a posé entre-temps (le N° donné tout seul à une vente) reste ; « Annuler » ne retire que ce que ce geste a mis.
+  const creer = (k, id, champs, cur) => { const c = cur && typeof cur === 'object' ? cur : {}; return [{ k, type: 'fusion', id, apres: champs, avant: Object.fromEntries(Object.keys(champs).map((x) => [x, c[x]])) }]; };
   if (article.genre === 'annonce' && article.id != null && ficheNeuve && typeof ficheNeuve === 'object') {
-    return [{ k: 'vinted_annonce_numeros', type: 'cle', id: String(article.id), apres: { ...ficheNeuve, buyPrice: patch.buyPrice, buyFromId: null, buyFrom: null }, avant: undefined }];
+    return creer('vinted_annonce_numeros', String(article.id), { ...ficheNeuve, buyPrice: patch.buyPrice, buyFromId: null, buyFrom: null }, null);
   }
   if (article.genre === 'vente' && article.tx != null && String(article.tx) !== '') {
-    const tx = String(article.tx), cur = (ventes || {})[tx];
-    const apres = { ...(cur && typeof cur === 'object' ? cur : {}), buyPrice: patch.buyPrice };
-    delete apres.buyFromId; delete apres.buyFrom;
-    return [{ k: 'vinted_sale_overrides', type: 'cle', id: tx, apres, avant: cur && typeof cur === 'object' ? cur : undefined }];
+    const tx = String(article.tx);
+    return creer('vinted_sale_overrides', tx, { buyPrice: patch.buyPrice, buyFromId: undefined, buyFrom: undefined }, (ventes || {})[tx]);
   }
   return [];
 }
@@ -295,7 +304,7 @@ export function opsMini(ecritures, { fiches = {}, ficheNeuveDe = null } = {}) {
     if (f && typeof f === 'object') ops.push({ k: 'vinted_annonce_numeros', type: 'champs', id: k, apres: { min: String(w.min) }, avant: { min: f.min } });
     else {
       const neuve = typeof ficheNeuveDe === 'function' ? ficheNeuveDe(k) : null;
-      if (neuve && typeof neuve === 'object') ops.push({ k: 'vinted_annonce_numeros', type: 'cle', id: k, apres: { ...neuve, min: String(w.min) }, avant: undefined });
+      if (neuve && typeof neuve === 'object') { const champs = { ...neuve, min: String(w.min) }; ops.push({ k: 'vinted_annonce_numeros', type: 'fusion', id: k, apres: champs, avant: Object.fromEntries(Object.keys(champs).map((x) => [x, undefined])) }); }
     }
   }
   return ops;
@@ -349,7 +358,7 @@ export function opsPrixCertains(certains, { fiches = {}, ventes = {}, prixParNum
       if (n) ops.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: n, apres: String(c.buyPrice), avant: (prixParNum || {})[n] });
     } else if (c.ou === 'vente') {
       const v = (ventes || {})[c.cle]; if (!v || typeof v !== 'object') continue;
-      ops.push({ k: 'vinted_sale_overrides', type: 'cle', id: c.cle, apres: { ...v, buyPrice: c.buyPrice }, avant: v });
+      ops.push({ k: 'vinted_sale_overrides', type: 'champs', id: c.cle, apres: { buyPrice: c.buyPrice }, avant: { buyPrice: v.buyPrice } });
     }
   }
   return ops;

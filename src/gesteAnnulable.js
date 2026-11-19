@@ -64,6 +64,10 @@ export function natureEchec(statut, raison) {
 //   type 'champs'   : fusionne les champs `apres` dans valeur[id] (un objet) ;
 //                     une fiche absente n'est jamais créée par ce geste ; un
 //                     champ `undefined` est retiré.
+//   type 'fusion'   : (19 nov., atelier « Compléter ») comme 'champs', mais l'entrée
+//                     absente est CRÉÉE avec ces champs — et une entrée que l'inverse
+//                     laisse VIDE est retirée. Jamais un remplacement : ce qu'un autre
+//                     geste a posé entre-temps sur la même entrée (un N°) reste.
 // `sens` : 'apres' (le geste) ou 'avant' (son inverse). Les deux sont
 // IDEMPOTENTS : rejouer une écriture ne change rien de plus.
 const estObjet = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Set);
@@ -84,6 +88,13 @@ export function appliquerOp(valeur, op, sens = 'apres') {
     const n = { ...f };
     for (const [c, v] of Object.entries(cible || {})) { if (v === undefined) delete n[c]; else n[c] = v; }
     return { ...base, [id]: n };
+  }
+  if (op.type === 'fusion') {
+    const n = { ...(estObjet(base[id]) ? base[id] : {}) };
+    for (const [c, v] of Object.entries(cible || {})) { if (v === undefined) delete n[c]; else n[c] = v; }
+    const r = { ...base };
+    if (Object.keys(n).length) r[id] = n; else delete r[id];
+    return r;
   }
   const n = { ...base };
   if (cible === undefined) delete n[id]; else n[id] = cible;

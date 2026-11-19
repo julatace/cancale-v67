@@ -1,227 +1,200 @@
 /* ── L'ATELIER « COMPLÉTER » (19 nov. 2026, lot completer-infos) ─────────────────────────
-   Plein écran (portail). Téléphone : la carte (photo en grand, puis la question au pouce) ;
-   ordinateur (≥ 900 px) : la file à gauche, la carte à droite. Un geste répété des dizaines de
-   fois : UN seul bouton plein (« OK » / « Poser N »), cibles ≥ 44 px, rien sous la barre du bas
-   ni sous un clavier (le pavé est dans l'écran), aucune attente (la carte suivante est déjà là).
-   Couleurs : des jetons à lui (--cp-*), un jeu par habillage (VRM par défaut, Apple, ancien
-   design « verre »), clair et sombre. Ambre = un avertissement dit ; aucun rouge, aucun violet. */
+   Une page poussée du design « VRM natif » (docs/design/NATIF.md) : barre de titre (‹ retour, titre
+   17/600, une action), la photo, le titre, ses faits, puis la question au pouce. Rangées groupées
+   (achats proposés), bouton plein 50 (un seul par écran), boutons teintés, boutons texte, feuilles
+   (« Ce qui reste », la règle en lot), bandeau « Annuler » (10 s). Ordinateur (≥ 1024) : la file
+   380 à gauche, le détail borné à 760.
+   Jetons : ceux du natif (--n-*), avec leur valeur de repli tant que src/natif/jetons.css n'est pas
+   chargé ; clair / sombre par `vinted_dark` (data-theme). Typo : 34/41 · 22/28 · 17/22 · 15/20 ·
+   13/18, graisses 400 / 600 / 700, chiffres tabulaires. Aucune ombre (sauf la feuille), aucun
+   dégradé, aucun flou, aucun violet ; ambre = un avertissement dit. */
 .vrm-cp {
-  --cp-fond: #edf1f8; --cp-carte: #ffffff; --cp-creux: #e1e8f3; --cp-filet: #cdd8e9; --cp-encre: #182439; --cp-gris: #475973;
-  --cp-accent: #304e92; --cp-plein: #243a70; --cp-sur-plein: #ffffff; --cp-ambre: #764300; --cp-ombre: 0 1px 2px rgb(24 36 57 / .06), 0 8px 24px -12px rgb(24 36 57 / .22);
-  --cp-police: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  position: fixed; inset: 0; height: 100vh; height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column;
+  --cp-fond: var(--n-fond, #F2F2F7); --cp-carte: var(--n-carte, #FFFFFF); --cp-carte-2: var(--n-carte-2, #F2F2F7); --cp-creux: #E5E5EA;
+  --cp-trait: var(--n-trait, rgb(60 60 67 / .18)); --cp-encre: var(--n-encre, #111114); --cp-encre-2: var(--n-encre-2, #6C6C70); --cp-encre-3: var(--n-encre-3, #8E8E93);
+  --cp-accent: var(--n-accent, #0068D6); --cp-plein: var(--n-plein, #0068D6); --cp-sur-plein: var(--n-sur-plein, #FFFFFF); --cp-teinte: var(--n-teinte, rgb(0 104 214 / .12));
+  --cp-ambre: var(--n-ambre, #8A4B00); --cp-courbe: cubic-bezier(.32, .72, 0, 1); --cp-marge: 16px;
+  position: fixed; inset: 0; z-index: 1290; height: 100vh; height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  background: var(--cp-fond); color: var(--cp-encre); font-family: var(--cp-police); font-size: 16px; line-height: 1.3;
-  overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+  background: var(--cp-fond); color: var(--cp-encre); font-family: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif; font-size: 17px; line-height: 22px; font-weight: 400;
+  font-variant-numeric: tabular-nums; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
 }
 html[data-theme="dark"] .vrm-cp {
-  --cp-fond: #121a2b; --cp-carte: #1b2539; --cp-creux: #24314b; --cp-filet: #3a4b69; --cp-encre: #eff3ff; --cp-gris: #b6c3dd;
-  --cp-accent: #b7c8ff; --cp-plein: #3c5597; --cp-sur-plein: #ffffff; --cp-ambre: #ffb340; --cp-ombre: 0 0 0 1px rgb(255 255 255 / .05);
+  --cp-fond: var(--n-fond, #000000); --cp-carte: var(--n-carte, #1C1C1E); --cp-carte-2: var(--n-carte-2, #2C2C2E); --cp-creux: #2C2C2E;
+  --cp-trait: var(--n-trait, rgb(84 84 88 / .60)); --cp-encre: var(--n-encre, #FFFFFF); --cp-encre-2: var(--n-encre-2, #98989F); --cp-encre-3: var(--n-encre-3, #636366);
+  --cp-accent: var(--n-accent, #409CFF); --cp-plein: var(--n-plein, #0068D6); --cp-sur-plein: var(--n-sur-plein, #FFFFFF); --cp-teinte: var(--n-teinte, rgb(64 156 255 / .20));
+  --cp-ambre: var(--n-ambre, #FFB340);
 }
-html[data-theme-style="apple"] .vrm-cp {
-  --cp-fond: #F2F2F7; --cp-carte: #FFFFFF; --cp-creux: #E4E4EA; --cp-filet: #D1D1D6; --cp-encre: #000000; --cp-gris: #6C6C70;
-  --cp-accent: #0068D6; --cp-plein: #0068D6; --cp-sur-plein: #FFFFFF; --cp-ambre: #8A4B00; --cp-ombre: 0 1px 2px rgb(0 0 0 / .05), 0 10px 28px -14px rgb(0 0 0 / .2);
-  --cp-police: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
-}
-html[data-theme-style="apple"][data-theme="dark"] .vrm-cp {
-  --cp-fond: #000000; --cp-carte: #1C1C1E; --cp-creux: #2C2C2E; --cp-filet: #38383A; --cp-encre: #FFFFFF; --cp-gris: #98989F;
-  --cp-accent: #409CFF; --cp-plein: #0068D6; --cp-sur-plein: #FFFFFF; --cp-ambre: #FF9F0A; --cp-ombre: 0 0 0 1px rgb(255 255 255 / .06);
-}
-/* L'ancien design (« verre dépoli ») : la porcelaine opaque des feuilles — on y lit de près et on y tape. */
-html:not([data-design="v2"]):not([data-theme-style="apple"]) .vrm-cp {
-  --cp-fond: #F2F6FB; --cp-carte: #FFFFFF; --cp-creux: #E3EBF4; --cp-filet: #C9D6E4; --cp-encre: #0C1D30; --cp-gris: #3F5468;
-  --cp-accent: #004A9F; --cp-plein: #0C1D30; --cp-sur-plein: #FFFFFF; --cp-ambre: #764300;
-}
-html:not([data-design="v2"]):not([data-theme-style="apple"])[data-theme="dark"] .vrm-cp {
-  --cp-fond: #0A1626; --cp-carte: #16273C; --cp-creux: #1F3550; --cp-filet: #2F4864; --cp-encre: #EAF2FB; --cp-gris: #9CB0C6;
-  --cp-accent: #6CB4FF; --cp-plein: #EAF2FB; --cp-sur-plein: #0C1D30; --cp-ambre: #F2B65E;
-}
+@media (min-width: 430px) { .vrm-cp { --cp-marge: 20px; } }
 .vrm-cp *, .vrm-cp *::before, .vrm-cp *::after { box-sizing: border-box; }
-html body .vrm-cp button { font: inherit; color: inherit; margin: 0; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; letter-spacing: inherit; text-transform: none; }
+html body .vrm-cp button { font: inherit; color: inherit; margin: 0; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  letter-spacing: 0; text-transform: none; box-shadow: none; transition: filter 80ms linear, background-color 80ms linear; }
 html body .vrm-cp button:disabled { cursor: default; }
-html body .vrm-cp :is(button, input, a):focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 2px; box-shadow: none; }
-html body .vrm-cp p, html body .vrm-cp h2 { margin: 0; color: inherit; font-family: inherit; }
-.vrm-cp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-/* La pilule commune se tait : son visage est le bandeau de l'atelier (le même moteur, la même annulation). */
-body[data-completer-ouvert] .vrm-pil-zone { display: none !important; }
+html body .vrm-cp button:active:not(:disabled) { filter: brightness(.92); }
+html body .vrm-cp :is(button, input):focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 2px; }
+html body .vrm-cp :is(p, h2, dl, dd, dt, ul) { margin: 0; padding: 0; color: inherit; font-family: inherit; }
+/* La pilule commune se tait pendant l'atelier : son visage est le bandeau (le même moteur, la même annulation). */
+html body[data-completer-ouvert] .vrm-pil-zone { display: none; }
 
-/* ── La tête : revenir · « 12 sur 51 » (ouvre « Ce qui reste ») · fermer ── */
-html body .vrm-cp .vrm-cp-tete { flex: none; display: flex; align-items: center; gap: 4px; height: 52px; padding: 0 6px; background: transparent; border: 0; }
-html body .vrm-cp .vrm-cp-rond { flex: none; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 22px; background: transparent; color: var(--cp-encre); display: grid; place-items: center; box-shadow: none; }
-html body .vrm-cp .vrm-cp-rond:disabled { opacity: .28; }
-html body .vrm-cp .vrm-cp-rond:active:not(:disabled) { background: var(--cp-creux); }
-html body .vrm-cp .vrm-cp-progres { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 8px; border: 0; background: transparent; box-shadow: none;
-  font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--cp-encre); border-radius: 12px; }
-html body .vrm-cp .vrm-cp-progres:active { background: var(--cp-creux); }
-.vrm-cp-progres-s { font-weight: 500; color: var(--cp-gris); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-cp-progres svg { flex: none; color: var(--cp-gris); }
-.vrm-cp-barre { flex: none; height: 3px; margin: 0 16px; border-radius: 2px; background: var(--cp-creux); overflow: hidden; }
-.vrm-cp-barre span { display: block; height: 100%; background: var(--cp-accent); transform-origin: left center; transition: transform 240ms cubic-bezier(.2, .8, .2, 1); }
+/* ── La barre de titre : ‹ retour · « 12 sur 51 » (ouvre « Ce qui reste ») · revoir la réponse d'avant ── */
+html body .vrm-cp .vrm-cp-barre { flex: none; display: grid; grid-template-columns: minmax(44px, 1fr) minmax(0, auto) minmax(44px, 1fr); align-items: center; width: 100%; height: 44px; margin: 0; padding: 0 4px; background: transparent; border: 0; }
+html body .vrm-cp .vrm-cp-nav { justify-self: start; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 12px; background: transparent; color: var(--cp-accent); display: grid; place-items: center; }
+html body .vrm-cp .vrm-cp-nav:disabled { color: var(--cp-encre-3); opacity: .5; }
+.vrm-cp-barre-droite { justify-self: end; display: flex; align-items: center; gap: 4px; }
+html body .vrm-cp .vrm-cp-progres { min-width: 0; max-width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 0; background: transparent;
+  font-size: 17px; line-height: 22px; font-weight: 600; color: var(--cp-encre); border-radius: 12px; }
+.vrm-cp-progres-n { white-space: nowrap; }
+.vrm-cp-progres-s { font-weight: 400; color: var(--cp-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-cp-progres svg { flex: none; color: var(--cp-encre-3); }
+.vrm-cp-avance { flex: none; display: block; width: auto; height: 3px; margin: 0 var(--cp-marge); border: 0; border-radius: 2px; overflow: hidden; background: var(--cp-creux); color: var(--cp-accent); appearance: none; -webkit-appearance: none; }
+.vrm-cp-avance::-webkit-progress-bar { background: var(--cp-creux); }
+.vrm-cp-avance::-webkit-progress-value { background: var(--cp-accent); transition: width 250ms var(--cp-courbe); }
+.vrm-cp-avance::-moz-progress-bar { background: var(--cp-accent); }
 
-/* ── Le bandeau « Annuler » (10 s) : posé sur le haut de la photo, jamais sur une touche ── */
-.vrm-cp-bandeau-zone { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 62px); z-index: 5; display: flex; justify-content: center; pointer-events: none; }
-.vrm-cp-bandeau { pointer-events: auto; display: flex; align-items: center; gap: 4px; max-width: 520px; min-height: 44px; padding: 0 4px 0 16px; border-radius: 22px;
-  background: var(--cp-encre); color: var(--cp-fond); font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .45); animation: vrm-cp-bandeau 180ms cubic-bezier(.2, .8, .2, 1) both; }
-.vrm-cp-bandeau-txt { min-width: 0; padding: 8px 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.vrm-cp-bandeau-txt small { font-size: inherit; font-weight: 500; opacity: .8; }
-html body .vrm-cp .vrm-cp-bandeau-b { flex: none; min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: var(--cp-fond); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; box-shadow: none; border-radius: 22px; }
-@keyframes vrm-cp-bandeau { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+/* ── Le bandeau « Annuler » (10 s) : sur le haut de la photo, jamais sur une touche ── */
+.vrm-cp-toast-zone { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 56px); z-index: 5; display: flex; justify-content: center; pointer-events: none; }
+.vrm-cp-toast { pointer-events: auto; display: flex; align-items: center; gap: 4px; max-width: 520px; min-height: 44px; padding: 0 4px 0 16px; border-radius: 14px;
+  background: var(--cp-encre); color: var(--cp-fond); font-size: 15px; line-height: 20px; font-weight: 600; box-shadow: 0 8px 30px rgb(0 0 0 / .12); animation: vrm-cp-toast 250ms var(--cp-courbe) both; }
+.vrm-cp-toast-txt { min-width: 0; padding: 8px 0; overflow-wrap: anywhere; }
+.vrm-cp-toast-txt small { font-size: inherit; font-weight: 400; }
+html body .vrm-cp .vrm-cp-toast-b { flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--cp-fond); font-size: 15px; line-height: 20px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; border-radius: 12px; }
+@keyframes vrm-cp-toast { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* ── Le corps : la scène et ses cartes (la courante, la suivante déjà dessinée) ── */
 .vrm-cp-corps { flex: 1; min-height: 0; display: flex; }
 .vrm-cp-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .vrm-cp-scene { flex: 1; min-height: 0; position: relative; }
-.vrm-cp-carte { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 10px 16px 12px; }
+.vrm-cp-carte { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 12px var(--cp-marge); }
 .vrm-cp-carte.is-suivante { visibility: hidden; opacity: 0; pointer-events: none; }
-.vrm-cp-carte.is-courante { animation: vrm-cp-entre 180ms cubic-bezier(.2, .8, .2, 1) both; }
-@keyframes vrm-cp-entre { from { opacity: 0; transform: translate3d(16px, 0, 0); } to { opacity: 1; transform: none; } }
-.vrm-cp-etat { margin: auto; padding: 24px; text-align: center; color: var(--cp-gris); font-size: 15px; }
+.vrm-cp-carte.is-courante { animation: vrm-cp-entre 200ms var(--cp-courbe) both; }
+@keyframes vrm-cp-entre { from { opacity: 0; transform: translate3d(20px, 0, 0); } to { opacity: 1; transform: none; } }
+.vrm-cp-etat { margin: auto; padding: 24px; text-align: center; color: var(--cp-encre-2); font-size: 15px; line-height: 20px; }
 
-.vrm-cp-article { flex: 1 1 0; min-height: 132px; display: flex; flex-direction: column; gap: 8px; }
-.vrm-cp-photo { flex: 1 1 0; min-height: 72px; position: relative; border-radius: 20px; overflow: hidden; background: var(--cp-creux); }
-.vrm-cp-photo img, .vrm-cp-achat-photo img, .vrm-cp-lot-photo img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
+.vrm-cp-article { flex: 1 1 0; min-height: 168px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-cp-photo { flex: 1 1 0; min-height: 72px; position: relative; border-radius: 12px; overflow: hidden; background: var(--cp-creux); }
+.vrm-cp-photo img, .vrm-cp-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
 .vrm-cp-photo-vide { display: block; width: 100%; height: 100%; background: var(--cp-creux); }
-.vrm-cp-plaque { position: absolute; left: 10px; bottom: 10px; display: inline-flex; border-radius: 8px; box-shadow: 0 2px 8px rgb(0 0 0 / .28); }
-.vrm-cp-qui { flex: none; padding: 0 2px; }
-.vrm-cp-titre { font-size: 17px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.vrm-cp-sous { margin-top: 2px !important; font-size: 13px; color: var(--cp-gris); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-cp-plaque { position: absolute; left: 12px; bottom: 12px; display: inline-flex; border-radius: 8px; }
+.vrm-cp-titre { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+/* Les faits : libellé 13 gris, valeur 17/600 ; ils passent à la ligne plutôt que d'être coupés. */
+.vrm-cp-faits { flex: none; display: flex; flex-wrap: wrap; gap: 4px 24px; }
+.vrm-cp-fait { min-width: 56px; max-width: 100%; }
+.vrm-cp-fait dt { font-size: 13px; line-height: 18px; color: var(--cp-encre-2); }
+.vrm-cp-fait dd { font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
 
 .vrm-cp-question { flex: none; display: flex; flex-direction: column; gap: 10px; }
-.vrm-cp-q { font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -.02em; }
-.vrm-cp-deja, .vrm-cp-attente, .vrm-cp-fin-note { font-size: 13px; color: var(--cp-gris); }
+.vrm-cp-q { font-size: 22px; line-height: 28px; font-weight: 700; }
+.vrm-cp-legende { font-size: 13px; line-height: 18px; color: var(--cp-encre-2); }
 
-/* Les achats proposés : des cartes photo, toute la carte se touche. */
-.vrm-cp-achats { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.vrm-cp-achats[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.vrm-cp-achats[data-n="1"] { grid-template-columns: minmax(0, 1fr); }
-html body .vrm-cp .vrm-cp-achat { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 44px; padding: 8px; text-align: left; border-radius: 16px; border: 1px solid var(--cp-filet); background: var(--cp-carte); color: var(--cp-encre);
-  box-shadow: var(--cp-ombre); transition: transform 100ms ease-out; }
-html body .vrm-cp .vrm-cp-achat:active:not(:disabled) { transform: scale(.97); background: var(--cp-creux); }
-.vrm-cp-achats[data-n="1"] .vrm-cp-achat { flex-direction: row; align-items: center; gap: 12px; }
-.vrm-cp-achat-photo { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 132px; border-radius: 11px; overflow: hidden; background: var(--cp-creux); flex: none; }
-.vrm-cp-achats[data-n="1"] .vrm-cp-achat-photo { width: 104px; }
-.vrm-cp-achats[data-n="2"] .vrm-cp-achat-photo { aspect-ratio: 4 / 3; }
-.vrm-cp-achat-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.vrm-cp-achat-prix { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; overflow-wrap: anywhere; }
-.vrm-cp-achat-titre, .vrm-cp-achat-qui, .vrm-cp-achat-pourquoi { font-size: 12px; line-height: 1.3; color: var(--cp-gris); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
-.vrm-cp-achat-titre { -webkit-line-clamp: 1; }
-.vrm-cp-achat-qui { -webkit-line-clamp: 2; font-variant-numeric: tabular-nums; }
-.vrm-cp-achat-qui .is-meme { color: var(--cp-encre); font-weight: 600; }
-.vrm-cp-achat-pourquoi { -webkit-line-clamp: 2; font-size: 11px; }
+/* Les rangées groupées (achats proposés, « Ce qui reste », la règle en lot). */
+.vrm-cp-groupe { list-style: none; border-radius: 12px; background: var(--cp-carte); overflow: hidden; }
+html body .vrm-cp .vrm-cp-rangee { position: relative; width: 100%; display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 8px 16px 8px 8px; border: 0; border-radius: 0; background: var(--cp-carte); color: var(--cp-encre); text-align: left; }
+.vrm-cp-rangee + .vrm-cp-rangee::before { content: ""; position: absolute; top: 0; left: 76px; right: 0; height: 1px; background: var(--cp-trait); }
+.vrm-cp-vignette { flex: none; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--cp-creux); display: block; }
+.vrm-cp-vignette.is-petite { width: 44px; height: 44px; }
+.vrm-cp-rangee-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vrm-cp-rangee-titre { font-size: 17px; line-height: 22px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-cp-rangee-sous { font-size: 13px; line-height: 18px; color: var(--cp-encre-2); overflow-wrap: anywhere; }
+.vrm-cp-rangee-sous.is-ambre { color: var(--cp-ambre); font-weight: 600; }
+.vrm-cp-rangee-valeur { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; white-space: nowrap; }
 .vrm-cp-raccourci { display: none; }
+.vrm-cp-nom { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 15px; line-height: 20px; font-weight: 600; }
+.vrm-cp-nom > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Les puces du prix mini : la règle DITE, la valeur en grand. */
 .vrm-cp-puces { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-html body .vrm-cp .vrm-cp-puce { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-height: 64px; padding: 8px 14px; text-align: left; border-radius: 16px;
-  border: 1px solid var(--cp-filet); background: var(--cp-carte); color: var(--cp-encre); box-shadow: var(--cp-ombre); transition: transform 100ms ease-out; }
-html body .vrm-cp .vrm-cp-puce:active:not(:disabled) { transform: scale(.97); background: var(--cp-creux); }
-.vrm-cp-puce-regle { font-size: 13px; font-weight: 500; color: var(--cp-gris); font-variant-numeric: tabular-nums; }
-.vrm-cp-puce-val { font-size: 22px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.vrm-cp-puce-note { font-size: 11px; font-weight: 600; color: var(--cp-ambre); }
+html body .vrm-cp .vrm-cp-puce { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 68px; padding: 8px 16px; text-align: left; border-radius: 12px; border: 0; background: var(--cp-carte); color: var(--cp-encre); }
+.vrm-cp-puce-regle { font-size: 13px; line-height: 18px; color: var(--cp-encre-2); }
+.vrm-cp-puce-val { font-size: 22px; line-height: 28px; font-weight: 700; }
+.vrm-cp-puce-note { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--cp-ambre); }
 
 /* Le pavé : au pouce, dans l'écran (aucun clavier du téléphone ne le recouvre). */
 .vrm-cp-pave { display: grid; gap: 8px; }
-.vrm-cp-affiche { display: flex; align-items: baseline; gap: 6px; min-height: 46px; padding: 0 4px 4px; border-bottom: 2px solid var(--cp-filet); font-variant-numeric: tabular-nums; }
+.vrm-cp-affiche { display: flex; align-items: baseline; gap: 6px; min-height: 48px; padding: 0 4px 2px; border-bottom: 2px solid var(--cp-trait); }
 .vrm-cp-affiche.is-ambre { border-bottom-color: var(--cp-ambre); }
-.vrm-cp-affiche-n { font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
-.vrm-cp-affiche-e { font-size: 20px; font-weight: 500; color: var(--cp-gris); }
-.vrm-cp-affiche-note { margin-left: auto; align-self: center; max-width: 60%; text-align: right; font-size: 12px; font-weight: 600; color: var(--cp-gris); }
+.vrm-cp-affiche-n { font-size: 34px; line-height: 41px; font-weight: 700; }
+.vrm-cp-affiche-e { font-size: 22px; line-height: 28px; font-weight: 400; color: var(--cp-encre-2); }
+.vrm-cp-affiche-note { margin-left: auto; align-self: center; max-width: 62%; text-align: right; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--cp-encre-2); }
 .vrm-cp-affiche.is-ambre .vrm-cp-affiche-note { color: var(--cp-ambre); }
 .vrm-cp-touches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-html body .vrm-cp .vrm-cp-t { height: clamp(44px, 6.2vh, 54px); min-height: 44px; padding: 0; border: 0; border-radius: 14px; background: var(--cp-carte); color: var(--cp-encre); box-shadow: 0 1px 0 var(--cp-filet);
-  font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; display: grid; place-items: center; transition: transform 90ms ease-out, background-color 90ms ease-out; }
-html body .vrm-cp .vrm-cp-t:active { transform: scale(.96); background: var(--cp-creux); }
-/* LE bouton plein (un seul par écran). */
-html body .vrm-cp .vrm-cp-ok { width: 100%; min-height: 52px; padding: 0 20px; border: 0; border-radius: 16px; background: var(--cp-plein); color: var(--cp-sur-plein); font-size: 17px; font-weight: 700; letter-spacing: -.01em;
-  box-shadow: none; font-variant-numeric: tabular-nums; transition: transform 100ms ease-out, opacity 120ms ease-out; }
-html body .vrm-cp .vrm-cp-ok:active:not(:disabled) { transform: scale(.98); filter: brightness(.92); }
-html body .vrm-cp .vrm-cp-ok:disabled { opacity: .32; }
-.vrm-cp-liens { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 2px; margin: -2px -6px 0; }
-html body .vrm-cp .vrm-cp-lien { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--cp-accent); font-size: 14px; font-weight: 600; box-shadow: none; border-radius: 10px; text-align: left; }
-html body .vrm-cp .vrm-cp-lien:active:not(:disabled) { background: var(--cp-creux); }
-html body .vrm-cp .vrm-cp-lien:disabled { opacity: .5; }
-html body .vrm-cp .vrm-cp-touche { min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--cp-filet); background: var(--cp-carte); color: var(--cp-encre); font-size: 16px; font-weight: 600; box-shadow: none; }
+html body .vrm-cp .vrm-cp-t { height: clamp(44px, 6.2vh, 52px); min-height: 44px; padding: 0; border: 0; border-radius: 12px; background: var(--cp-carte); color: var(--cp-encre); font-size: 22px; line-height: 28px; font-weight: 400; display: grid; place-items: center; }
+/* LE bouton plein (un seul par écran) · le bouton teinté · le bouton texte. */
+html body .vrm-cp .vrm-cp-plein { width: 100%; min-height: 50px; padding: 0 20px; border: 0; border-radius: 14px; background: var(--cp-plein); color: var(--cp-sur-plein); font-size: 17px; line-height: 22px; font-weight: 600; }
+html body .vrm-cp .vrm-cp-plein:disabled { opacity: .35; }
+.vrm-cp-gestes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+html body .vrm-cp .vrm-cp-teinte { min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background-color: var(--cp-carte); background-image: linear-gradient(var(--cp-teinte), var(--cp-teinte)); color: var(--cp-accent); font-size: 17px; line-height: 22px; font-weight: 600; text-align: center; }
+html body .vrm-cp .vrm-cp-teinte:disabled, html body .vrm-cp .vrm-cp-texte:disabled { opacity: .5; }
+.vrm-cp-liens { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -8px 0; }
+html body .vrm-cp .vrm-cp-texte { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--cp-accent); font-size: 17px; line-height: 22px; font-weight: 400; border-radius: 12px; text-align: left; }
 
 /* La fin. */
-.vrm-cp-fin { align-items: stretch; justify-content: center; gap: 12px; text-align: center; max-width: 480px; margin: 0 auto; }
-.vrm-cp-fin-coche { align-self: center; width: 56px; height: 56px; border-radius: 28px; display: grid; place-items: center; background: var(--cp-creux); color: var(--cp-encre); }
-.vrm-cp-fin-coche svg { width: 26px; height: 26px; }
-.vrm-cp-fin .vrm-cp-lien { align-self: center; text-align: center; }
+.vrm-cp-carte.vrm-cp-fin { align-items: stretch; justify-content: center; gap: 12px; text-align: center; max-width: 480px; margin: 0 auto; }
+.vrm-cp-fin-coche { align-self: center; width: 56px; height: 56px; border-radius: 28px; display: grid; place-items: center; background: var(--cp-teinte); color: var(--cp-accent); }
+html body .vrm-cp .vrm-cp-fin .vrm-cp-texte { align-self: center; text-align: center; }
 
-/* « Ce qui reste ». */
-.vrm-cp-voile { position: absolute; inset: 0; z-index: 6; background: rgb(0 0 0 / .42); display: flex; align-items: flex-end; justify-content: center; }
-.vrm-cp-reste { width: 100%; max-width: 520px; max-height: 86%; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; background: var(--cp-fond); color: var(--cp-encre);
-  animation: vrm-cp-monte 220ms cubic-bezier(.2, .8, .2, 1) both; }
-@keyframes vrm-cp-monte { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-.vrm-cp-reste-h { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 8px !important; }
-.vrm-cp-reste ul { list-style: none; margin: 0 0 8px; padding: 0; border-radius: 14px; background: var(--cp-carte); overflow: hidden; }
-.vrm-cp-reste li { display: flex; align-items: center; }
-.vrm-cp-reste li + li { border-top: 1px solid var(--cp-filet); }
-html body .vrm-cp .vrm-cp-reste-l { flex: 1; min-width: 0; min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border: 0; background: transparent; color: var(--cp-encre); font-size: 16px; font-weight: 500; text-align: left; box-shadow: none; border-radius: 0; }
-html body .vrm-cp .vrm-cp-reste-l b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--cp-gris); }
-html body .vrm-cp .vrm-cp-reste-l[aria-current="true"] { font-weight: 700; }
-html body .vrm-cp .vrm-cp-reste-l[aria-current="true"] b { color: var(--cp-encre); }
-html body .vrm-cp .vrm-cp-reste > .vrm-cp-reste-l { width: 100%; border-radius: 14px; background: var(--cp-carte); margin-bottom: 8px; }
-.vrm-cp-reste-mis { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 0 14px; font-size: 14px; color: var(--cp-gris); }
-.vrm-cp-clavier { margin-top: 8px !important; font-size: 12px; color: var(--cp-gris); }
-
-/* ── La règle en lot ── */
-.vrm-cp-lot { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px 16px 0; }
-.vrm-cp-lot-regles { display: flex; flex-wrap: wrap; gap: 8px; }
-html body .vrm-cp .vrm-cp-segment { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--cp-filet); background: var(--cp-carte); color: var(--cp-encre); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; box-shadow: none; }
-html body .vrm-cp .vrm-cp-segment[aria-pressed="true"] { background: var(--cp-encre); border-color: var(--cp-encre); color: var(--cp-fond); }
-html body .vrm-cp .vrm-cp-segment:active { transform: scale(.97); }
-.vrm-cp-lot-autre { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--cp-gris); }
-html body .vrm-cp .vrm-cp-lot-autre input, html body .vrm-cp .vrm-cp-case { height: 44px; width: 72px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--cp-filet); background: var(--cp-carte); color: var(--cp-encre); font: inherit; font-size: 16px; font-variant-numeric: tabular-nums; text-align: right; box-shadow: none; }
-.vrm-cp-lot-liste { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0 -16px; padding: 0 16px; }
-.vrm-cp-lot-l { content-visibility: auto; contain-intrinsic-size: auto 60px; border-bottom: 1px solid var(--cp-filet); }
-.vrm-cp-lot-l label { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 6px 0; cursor: pointer; }
-.vrm-cp-lot-l input[type="checkbox"] { flex: none; width: 22px; height: 22px; margin: 0 2px; accent-color: var(--cp-accent); }
-.vrm-cp-lot-photo { flex: none; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; background: var(--cp-creux); display: block; }
-.vrm-cp-lot-txt, .vrm-cp-file-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.vrm-cp-lot-nom { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; font-weight: 600; }
-.vrm-cp-lot-nom > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vrm-cp-lot-txt small, .vrm-cp-file-txt small { font-size: 12px; color: var(--cp-gris); }
-.vrm-cp-lot-l.is-ecartee .vrm-cp-lot-txt small { color: var(--cp-ambre); font-weight: 600; }
-.vrm-cp-lot-prix { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; color: var(--cp-gris); font-variant-numeric: tabular-nums; }
-.vrm-cp-lot-prix b { font-size: 16px; font-weight: 700; color: var(--cp-encre); }
-.vrm-cp-lot-l[data-cp-lot-coche="0"] .vrm-cp-lot-prix b { color: var(--cp-gris); font-weight: 500; }
-.vrm-cp-lot-pied { flex: none; display: grid; gap: 8px; padding: 10px 0 12px; border-top: 1px solid var(--cp-filet); margin-top: -1px; background: var(--cp-fond); }
+/* ── Les feuilles : « Ce qui reste » (moitié), la règle en lot (pleine) ── */
+.vrm-cp-voile { position: absolute; inset: 0; z-index: 6; background: rgb(0 0 0 / .4); display: flex; align-items: flex-end; justify-content: center; }
+.vrm-cp-feuille { width: 100%; max-width: 560px; max-height: 88%; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; padding: 8px var(--cp-marge) calc(16px + env(safe-area-inset-bottom, 0px));
+  border-radius: 14px 14px 0 0; background: var(--cp-fond); color: var(--cp-encre); box-shadow: 0 8px 30px rgb(0 0 0 / .12); animation: vrm-cp-monte 300ms var(--cp-courbe) both; }
+.vrm-cp-feuille.is-pleine { height: calc(100% - env(safe-area-inset-top, 0px) - 12px); max-height: none; overflow: hidden; padding-bottom: 0; }
+@keyframes vrm-cp-monte { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.vrm-cp-poignee { flex: none; align-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--cp-encre-3); opacity: .5; }
+.vrm-cp-feuille-tete { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: -4px -8px 0; }
+.vrm-cp-feuille-tete > :last-child { justify-self: end; }
+.vrm-cp-feuille-titre { font-size: 17px; line-height: 22px; font-weight: 600; text-align: center; }
+.vrm-cp-groupe li { position: relative; display: flex; align-items: center; }
+.vrm-cp-groupe li + li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--cp-trait); }
+html body .vrm-cp .vrm-cp-ligne { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border: 0; border-radius: 0; background: transparent; color: var(--cp-encre); font-size: 17px; line-height: 22px; font-weight: 400; text-align: left; }
+html body .vrm-cp .vrm-cp-ligne b { font-weight: 400; color: var(--cp-encre-2); }
+html body .vrm-cp .vrm-cp-ligne[aria-current="true"] { font-weight: 600; }
+html body .vrm-cp .vrm-cp-ligne[aria-current="true"] b { font-weight: 600; color: var(--cp-accent); }
+.vrm-cp-mis { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 16px; font-size: 15px; line-height: 20px; color: var(--cp-encre-2); }
+/* Le contrôle segmenté (la règle, En ligne · Vendues). */
+.vrm-cp-segmente { flex: none; display: flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 10px; background: var(--cp-creux); }
+html body .vrm-cp .vrm-cp-segment { flex: 1 1 auto; min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--cp-encre); font-size: 15px; line-height: 20px; font-weight: 400; white-space: nowrap; }
+html body .vrm-cp .vrm-cp-segment[aria-pressed="true"] { background: var(--cp-carte); font-weight: 600; }
+.vrm-cp-champ { flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; line-height: 20px; color: var(--cp-encre-2); }
+html body .vrm-cp .vrm-cp-champ input, html body .vrm-cp .vrm-cp-case { height: 44px; width: 72px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--cp-trait); background: var(--cp-carte); color: var(--cp-encre); font: inherit; font-size: 17px; text-align: right; box-shadow: none; }
+.vrm-cp-lot-liste { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.vrm-cp-lot-l { content-visibility: auto; contain-intrinsic-size: auto 60px; }
+.vrm-cp-lot-l label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 16px 8px 12px; cursor: pointer; }
+.vrm-cp-lot-l input[type="checkbox"] { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--cp-accent); }
+.vrm-cp-lot-prix { flex: none; display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; line-height: 18px; color: var(--cp-encre-2); }
+.vrm-cp-lot-prix b { font-size: 17px; line-height: 22px; font-weight: 600; color: var(--cp-encre); }
+.vrm-cp-lot-l[data-cp-lot-coche="0"] .vrm-cp-lot-prix b { color: var(--cp-encre-2); font-weight: 400; }
+.vrm-cp-pied { flex: none; display: grid; gap: 8px; padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--cp-fond); }
 
 /* ── La grille (ordinateur) ── */
 .vrm-cp-grille { flex: 1; min-height: 0; overflow: auto; padding: 8px 24px 24px; }
-.vrm-cp-grille table { width: 100%; max-width: 1040px; margin: 0 auto; border-collapse: collapse; font-size: 14px; }
-.vrm-cp-grille th { position: sticky; top: 0; z-index: 1; padding: 8px 10px; text-align: left; font-size: 12px; font-weight: 600; color: var(--cp-gris); background: var(--cp-fond); border-bottom: 1px solid var(--cp-filet); }
-.vrm-cp-grille td { padding: 6px 10px; border-bottom: 1px solid var(--cp-filet); vertical-align: middle; font-variant-numeric: tabular-nums; }
+.vrm-cp-grille table { width: 100%; max-width: 1040px; margin: 0 auto; border-collapse: collapse; font-size: 15px; line-height: 20px; background: var(--cp-carte); border-radius: 12px; overflow: hidden; }
+.vrm-cp-grille th { position: sticky; top: 0; z-index: 1; padding: 8px 12px; text-align: left; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--cp-encre-2); background: var(--cp-carte); border-bottom: 1px solid var(--cp-trait); }
+.vrm-cp-grille td { padding: 6px 12px; border-bottom: 1px solid var(--cp-trait); vertical-align: middle; }
 .vrm-cp-grille .is-n { text-align: right; white-space: nowrap; }
-.vrm-cp-grille-titre { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.vrm-cp-grille-titre { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html body .vrm-cp .vrm-cp-case { height: 36px; width: 96px; }
 html body .vrm-cp .vrm-cp-case[data-cp-case-pose] { border-color: var(--cp-accent); font-weight: 600; }
 
-/* ── Ordinateur : la file à gauche, la carte à droite ── */
-.vrm-cp.is-large .vrm-cp-tete { height: 56px; padding: 0 16px; }
-.vrm-cp.is-large .vrm-cp-progres { flex: 0 1 auto; margin: 0 auto 0 4px; justify-content: flex-start; }
-.vrm-cp.is-large .vrm-cp-barre { margin: 0 24px; }
-.vrm-cp-file { flex: none; width: 340px; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--cp-filet); padding: 8px; }
-.vrm-cp-file ul { list-style: none; margin: 0; padding: 0; }
-html body .vrm-cp .vrm-cp-file-l { width: 100%; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: 12px; background: transparent; color: var(--cp-encre); text-align: left; box-shadow: none; content-visibility: auto; contain-intrinsic-size: auto 56px; }
-html body .vrm-cp .vrm-cp-file-l[aria-current="true"] { background: var(--cp-carte); box-shadow: var(--cp-ombre); }
+/* ── Ordinateur (≥ 1024) : la file 380 à gauche, le détail borné à 760 ── */
+.vrm-cp.is-large .vrm-cp-barre { height: 52px; padding: 0 12px; }
+.vrm-cp-file { flex: none; width: 380px; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--cp-trait); padding: 8px; }
+.vrm-cp-file ul { list-style: none; }
+html body .vrm-cp .vrm-cp-file-l { width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--cp-encre); text-align: left; content-visibility: auto; contain-intrinsic-size: auto 56px; }
+html body .vrm-cp .vrm-cp-file-l[aria-current="true"] { background: var(--cp-teinte); }
+html body .vrm-cp .vrm-cp-file-l[aria-current="true"] .vrm-cp-nom { color: var(--cp-accent); }
 .vrm-cp.is-large .vrm-cp-carte { left: 50%; right: auto; width: min(560px, 100% - 48px); transform: translateX(-50%); padding: 16px 0 20px; }
 .vrm-cp.is-large .vrm-cp-carte.is-courante { animation-name: vrm-cp-entre-large; }
-@keyframes vrm-cp-entre-large { from { opacity: 0; transform: translate3d(calc(-50% + 16px), 0, 0); } to { opacity: 1; transform: translateX(-50%); } }
+@keyframes vrm-cp-entre-large { from { opacity: 0; transform: translate3d(calc(-50% + 20px), 0, 0); } to { opacity: 1; transform: translateX(-50%); } }
 .vrm-cp.is-large .vrm-cp-photo { max-height: 360px; }
-.vrm-cp.is-large .vrm-cp-raccourci { display: grid; place-items: center; position: absolute; top: 6px; left: 6px; width: 20px; height: 20px; border-radius: 6px; background: var(--cp-carte); color: var(--cp-encre); border: 1px solid var(--cp-filet); font: 700 11px/1 var(--cp-police); }
-.vrm-cp.is-large .vrm-cp-puce .vrm-cp-raccourci { top: 8px; left: auto; right: 8px; }
-.vrm-cp.is-large .vrm-cp-voile { align-items: flex-start; justify-content: flex-start; background: transparent; }
-.vrm-cp.is-large .vrm-cp-reste { margin: 60px 0 0 60px; width: 360px; border-radius: 18px; box-shadow: 0 18px 48px -12px rgb(0 0 0 / .35), 0 0 0 1px var(--cp-filet); animation-name: vrm-cp-bandeau; }
-.vrm-cp.is-large .vrm-cp-lot { width: min(760px, 100% - 48px); margin: 0 auto; }
-.vrm-cp.is-large .vrm-cp-bandeau-zone { top: auto; bottom: 20px; }
+.vrm-cp.is-large .vrm-cp-raccourci { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--cp-trait); color: var(--cp-encre-2); font-size: 13px; line-height: 18px; font-weight: 600; font-family: inherit; }
+.vrm-cp.is-large .vrm-cp-puce .vrm-cp-raccourci { position: absolute; top: 10px; right: 12px; }
+.vrm-cp.is-large .vrm-cp-voile { align-items: center; }
+.vrm-cp.is-large .vrm-cp-feuille { border-radius: 14px; max-height: 84%; padding-bottom: 16px; }
+.vrm-cp.is-large .vrm-cp-feuille.is-pleine { height: 84%; padding-bottom: 0; }
+.vrm-cp.is-large .vrm-cp-toast-zone { top: auto; bottom: 24px; }
 @media (hover: hover) and (pointer: fine) {
-  html body .vrm-cp :is(.vrm-cp-achat, .vrm-cp-puce, .vrm-cp-t, .vrm-cp-touche, .vrm-cp-segment):hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--cp-gris); }
-  html body .vrm-cp :is(.vrm-cp-lien, .vrm-cp-rond, .vrm-cp-progres, .vrm-cp-file-l, .vrm-cp-reste-l):hover:not(:disabled) { background: var(--cp-creux); }
+  html body .vrm-cp :is(.vrm-cp-rangee, .vrm-cp-puce, .vrm-cp-t, .vrm-cp-ligne, .vrm-cp-file-l):hover:not(:disabled):not([aria-current="true"]) { background: var(--cp-carte-2); }
+  html body .vrm-cp :is(.vrm-cp-texte, .vrm-cp-nav, .vrm-cp-progres):hover:not(:disabled) { background: var(--cp-teinte); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .vrm-cp-carte.is-courante, .vrm-cp-bandeau, .vrm-cp-reste { animation: none !important; }
-  .vrm-cp-barre span, html body .vrm-cp :is(.vrm-cp-achat, .vrm-cp-puce, .vrm-cp-t, .vrm-cp-ok) { transition: none !important; }
-  html body .vrm-cp :is(.vrm-cp-achat, .vrm-cp-puce, .vrm-cp-t, .vrm-cp-ok, .vrm-cp-segment):active { transform: none !important; }
+  .vrm-cp .vrm-cp-carte.is-courante, .vrm-cp .vrm-cp-toast, .vrm-cp .vrm-cp-feuille { animation: none; }
+  .vrm-cp .vrm-cp-avance::-webkit-progress-value { transition: none; }
 }

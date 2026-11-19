@@ -36,6 +36,7 @@ const MUTS = {
   'pas-su-zero': [REG, 'articles: lu && luV ? tout.filter(Boolean).length : null,', 'articles: tout.filter(Boolean).length,'],
   'anciennes-melees': [REG, 'if (art.ts != null && maintenant - art.ts <= joursVentes * J) recentes.push(art); else anciennes.push(art);', 'recentes.push(art);'],
   'sans-ignore': [REG, 'const garde = (cle, manques) => manques.filter((m) => { if (S[cleSans(cle, m)] == null) return true; mis.push({ cle, sujet: m }); return false; });', 'const garde = (cle, manques) => manques;'],
+  'genre-ignore': [REG, "return { ...res, file: (res.file || []).filter(g), anciennes: (res.anciennes || []).filter(g) };", "return res;"],
   'mini-eteint-demande': [REG, "(q !== 'mini' || miniActif !== false)", 'true'],
   'puce-flottante': [REG, 'const c = Math.floor((cts(p) * Math.round((100 - q) * 100)) / 1000000) * 100;', 'const c = Math.round(p * (1 - q / 100)) * 100;'],
   'sous-achat-tu': [REG, 'out.push({ id, sorte, v, valeur, sousAchat: j.sousAchat, cout: j.cout });', 'out.push({ id, sorte, v, valeur, sousAchat: false, cout: j.cout });'],
@@ -48,7 +49,7 @@ const MUTS = {
   'relie-repropose': [REG, '    if (!achatDisponible(achat, liens || new Map())) return;\n', ''],
   'lot-jamais-repropose': ['src/suggestionsAchat.js', 'return l.lot && (l.n == null || n < l.n);', 'return false;'],
   'hors-relier-propose': [REG, "    if (typeof horsRelier === 'function' && horsRelier(achat)) return;\n", ''],
-  'ecriture-sans-identite': [REG, "    const apres = { ...(cur && typeof cur === 'object' ? cur : {}), buyPrice: patch.buyPrice };", "    const apres = { buyPrice: patch.buyPrice };"],
+  'ecriture-qui-ecrase': [REG, "return [{ k, type: 'fusion', id, apres: champs, avant:", "return [{ k, type: 'cle', id, apres: champs, avant_: 0, avant_2:"],
   'sans-ecrit-un-prix': [REG, "return [{ k: CLE_SANS, type: 'cle', id, apres: at, avant: (sans || {})[id] }];", "return [{ k: CLE_SANS, type: 'cle', id, apres: at, avant: (sans || {})[id] }, { k: 'vinted_annonce_numeros', type: 'champs', id: String(article.idf), apres: { buyPrice: '0' }, avant: {} }];"],
   'certain-lot': [REG, "if (!a || String(a.transaction_id) !== String(e.buyFromId) || lotDe(a).lot) continue;", "if (!a || String(a.transaction_id) !== String(e.buyFromId)) continue;"],
   'certain-autre-achat': [REG, "if (!a || String(a.transaction_id) !== String(e.buyFromId) || lotDe(a).lot) continue;", "if (!a || lotDe(a).lot) continue;",
@@ -56,9 +57,12 @@ const MUTS = {
   'certain-ecrase': [REG, "    if (e.buyPrice != null && String(e.buyPrice).trim() !== '') continue;\n    if (e.buyFrom && e.buyFrom.aSaisir) continue;", "    if (e.buyFrom && e.buyFrom.aSaisir) continue;"],
   'lecture-ratee-ecrit': ['src/gesteAnnulable.js', "    if (v === undefined) return { ok: false, definitif: true, ecrit: false, raison: 'lecture' };", ''],
   'pave-trois-decimales': [REG, 'if (d !== undefined) return d.length >= 2 ? t : t + touche;', 'if (d !== undefined) return t + touche;'],
-  'ecran-relie-le-premier': ['src/completer/Completer.jsx', 'ok = await onRelier(article, c.achat);', 'ok = await onRelier(article, cand.liste[0].achat);'],
-  'ecran-confirme': ['src/completer/Completer.jsx', "    geste(r, ops); noter(a, 'mini', r); return true;", "    if (!window.confirm('?')) return false; geste(r, ops); noter(a, 'mini', r); return true;"],
-  'ecran-deux-ecritures': ['src/completer/Completer.jsx', "    geste(r, ops); noter(a, 'achat', r); return true;", "    geste(r, ops); geste(r, ops); noter(a, 'achat', r); return true;"],
+  'ecran-relie-le-premier': ['src/completer/Completer.jsx', "apresPeinture(async () => { let ok = false; try { ok = await onRelier(a, c.achat); }", "apresPeinture(async () => { let ok = false; try { ok = await onRelier(a, cand.liste[0].achat); }"],
+  'ecran-confirme': ['src/completer/Completer.jsx', "    ecrire(r, ops); noter(a, 'mini', r); return true;", "    if (!window.confirm('?')) return false; ecrire(r, ops); noter(a, 'mini', r); return true;"],
+  'ecran-deux-ecritures': ['src/completer/Completer.jsx', "    ecrire(r, ops); noter(a, 'achat', r, {", "    ecrire(r, ops); ecrire(r, ops); noter(a, 'achat', r, {"],
+  'ecran-attend-l-app': ['src/completer/Completer.jsx', "    setRepondues((r) => new Set(r).add(a.cle + '|' + q));\n", ''],
+  'ecran-annuler-sans-retour': ['src/completer/Completer.jsx', "if (e === 'annulation' || e === 'annule' || e === 'echec' || e === 'echec-annulation') {", "if (e === 'jamais') {"],
+  'ecran-style-en-ligne': ['src/completer/Completer.jsx', '<header className="vrm-cp-barre">', '<header className="vrm-cp-barre" style={{ height: 44 }}>'],
   'app-carte-revenue': ['src/App.jsx', "jobs.push({ id: 'completer', n: nC,", "jobs.push({ id: 'prix-mini-manquants', n: nC,"],
   'app-ecran-au-demarrage': ['src/App.jsx', "const Completer = aLaDemande(() => import('./completer/Completer.jsx'), true);", "import Completer from './completer/Completer.jsx';"],
   'app-annuler-5s': ['src/App.jsx', "'completer', null, null, 10000);", "'completer', null, null, 0);"],
@@ -76,7 +80,7 @@ if (process.argv.includes('--prouve')) {
 // ── La copie de travail : seulement les modules lus (fermeture des imports relatifs) ──
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 const ENTREES = [REG, 'src/gesteAnnulable.js', 'src/prixAuNumerotage.js', 'src/prixAchatPropose.js', 'src/relierGlisser.js'];
-const TEXTES = ['src/completer/Completer.jsx', 'src/completer/porte.js', 'src/App.jsx'];
+const TEXTES = ['src/completer/Completer.jsx', 'src/completer/completer.css', 'src/completer/porte.js', 'src/App.jsx'];
 let BASE = R, TMP = null;
 const fermeture = () => {
   const vus = new Set(); const pile = [...ENTREES];
@@ -166,6 +170,10 @@ async function principal() {
   dit(M.filtrer(res, 'anciennes').length === 6 && !f.some((a) => a.tx && a.tx.startsWith('72')), 'F12 les ventes de plus de 30 jours : comptées à part, jamais mêlées, jamais cachées');
   dit(M.indexNumero(f, 'N°110') === f.findIndex((a) => a.numero === '110') && M.indexNumero(f, '99999') === -1 && M.indexReprise(f, { sujet: 'tout', cle: 'a:9020' }, 'tout') === f.findIndex((a) => a.cle === 'a:9020') && M.indexReprise(f, { sujet: 'mini', cle: 'a:9020' }, 'tout') === 0,
     'F13 il reprend où il s’est arrêté ; ouvert sur un N°, il arrive sur cet article');
+
+  const gV = M.parGenre(res, 'vente'), gA = M.parGenre(res, 'annonce');
+  dit(gV.file.length === 4 && gV.file.every((a) => a.genre === 'vente') && gV.anciennes.length === 6 && gA.file.length === 51 && gA.anciennes.length === 0 && M.parGenre(res, 'tous') === res && M.compteurs(gA).achat === 33,
+    'F14 le filtre « En ligne · Vendues » : la file d’un genre, rien d’autre ; « Toutes » la rend telle quelle', { v: gV.file.length, a: gA.file.length });
 
   // ── P. les puces du prix mini ──
   console.log('\n── P. les puces du prix mini');
@@ -270,8 +278,16 @@ async function principal() {
   const vente = f.find((a) => a.genre === 'vente');
   const oV = M.opsPrixAchat({ article: vente, patch: w52, fiches: E.numeros, ventes: { [vente.tx]: { numero: '201', fees: '2' } }, prixParNum: {} });
   const oVf = M.opsPrixAchat({ article: { ...vente, idf: '9010' }, patch: w52, fiches: E.numeros, ventes: {}, prixParNum: {} });
-  dit(oV.length === 1 && oV[0].k === 'vinted_sale_overrides' && oV[0].id === vente.tx && oV[0].apres.buyPrice === '52,50' && oV[0].apres.fees === '2' && oVf[0].k === 'vinted_annonce_numeros' && oVf[0].id === '9010',
+  const lv = (v, sens) => G.appliquerOps(v, oV, sens, 'vinted_sale_overrides')[vente.tx];
+  dit(oV.length === 1 && oV[0].k === 'vinted_sale_overrides' && oV[0].id === vente.tx && egal(lv({ [vente.tx]: { numero: '201', fees: '2' } }, 'apres'), { numero: '201', fees: '2', buyPrice: '52,50' })
+    && oVf[0].k === 'vinted_annonce_numeros' && oVf[0].id === '9010',
     'E2 une vente : sur la fiche de SON annonce (par identité) quand elle existe, sinon sur la ligne de la vente (ses autres champs gardés)', { oV, oVf });
+  // La ligne d'une vente qui n'existait pas au toucher, et qui reçoit SON N° entre-temps (donné tout seul) : rien n'est écrasé.
+  const oV0 = M.opsPrixAchat({ article: vente, patch: w52, fiches: E.numeros, ventes: {}, prixParNum: {} });
+  const entreTemps = { [vente.tx]: { numero: '201', autoAssigned: true } };
+  const apV = G.appliquerOps(entreTemps, oV0, 'apres', 'vinted_sale_overrides'), avV = G.appliquerOps(apV, oV0, 'avant', 'vinted_sale_overrides');
+  dit(egal(apV[vente.tx], { numero: '201', autoAssigned: true, buyPrice: '52,50' }) && egal(avV, entreTemps) && egal(G.appliquerOps(G.appliquerOps({}, oV0, 'apres', 'vinted_sale_overrides'), oV0, 'avant', 'vinted_sale_overrides'), {}),
+    'E2b une entrée à créer passe par « fusion » : ce qu’un autre geste y a posé entre-temps (un N°) reste ; « Annuler » ne retire que SON prix', { apV, avV });
   dit(M.opsPrixAchat({ article: { cle: 'x', genre: 'vente', tx: null, idf: null }, patch: w52 }).length === 0 && M.opsPrixAchat({ article: art, patch: PN.ecriturePrixSaisi('abc').patch }).length === 0 && M.opsMini([{ id: '1', min: '' }], { fiches: {} }).length === 0,
     'E3 sans identité, ou montant illisible ⇒ aucune écriture');
   const oS = M.opsSans({ article: art, sujet: 'achat', sans: {}, at: 'T' });
@@ -323,10 +339,14 @@ async function principal() {
   dit(!cartes.length && (app.match(/id: 'completer'/g) || []).length === 1 && /avant: \(\) => \{ ouvrirCompleter\(\); \}/.test(app), 'S3 Ma journée : les quatre cartes « N sans … » retirées (décision du 19 nov.), UNE entrée « à compléter »', cartes);
   dit(/'completer', null, null, 10000\)/.test(app) && /only === 'completer' \? 10000 : 0\)/.test(app) && /duree: Number\(duree\) > 0/.test(sansCommentaires(lire('src/gesteAnnulable.js'))) && M.DUREE_ANNULER === 10000,
     'S4 chaque réponse (et chaque liaison) est annulable 10 s, par le moteur des gestes');
-  dit(/ok = await onRelier\(article, c\.achat\);/.test(ecran) && /relierGlisse\(a, art\.genre === 'vente' \? \{ genre: 'vente', tx: art\.tx, idf: art\.idf/.test(app), 'S5 relier = SON toucher sur UNE carte : l’achat de cette carte, l’identité de l’article (l’écriture de « Relier »)');
+  const nRelier = (ecran.match(/\bonRelier\(/g) || []).length, nRelierCarte = (ecran.match(/\bonRelier\(a, c\.achat\)/g) || []).length;
+  dit(nRelier === 2 && nRelierCarte === 2 && /relierGlisse\(a, art\.genre === 'vente' \? \{ genre: 'vente', tx: art\.tx, idf: art\.idf/.test(app), 'S5 relier = SON toucher sur UNE rangée : l’achat de cette rangée, l’identité de l’article (l’écriture de « Relier »)', { nRelier, nRelierCarte });
   dit(!/askConfirm|window\.confirm|\bconfirm\(/.test(ecran), 'S6 aucune confirmation dans l’atelier (« Annuler » suffit)');
-  const gestesParReponse = ['poserPrixAchat', 'poserMini', 'poserPrix', 'neSaitPlus'].map((nom) => { const m = new RegExp('const ' + nom + ' = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\};').exec(ecran); return m ? (m[1].match(/\bgeste\(/g) || []).length : -1; });
-  dit(gestesParReponse.every((x) => x === 1), 'S7 une réponse = UNE écriture (un seul geste par réponse)', gestesParReponse);
+  dit(!/\bstyle=\{/.test(ecran) && !/!important/.test(sansCommentaires(lire('src/completer/completer.css'))) && !/:has\(/.test(lire('src/completer/completer.css')), 'S10 design natif : aucun style en ligne, aucun `!important`, aucun `:has()`');
+  const gestesParReponse = ['poserPrixAchat', 'poserMini', 'poserPrix', 'neSaitPlus'].map((nom) => { const m = new RegExp('const ' + nom + ' = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\};').exec(ecran); return m ? (m[1].match(/\becrire\(/g) || []).length + (m[1].match(/\bgeste\(/g) || []).length : -1; });
+  dit(gestesParReponse.every((x) => x === 1) && /const ecrire = \(texte, ops\) => apresPeinture\(\(\) => geste\(texte, ops\)\);/.test(ecran), 'S7 une réponse = UNE écriture (un seul geste par réponse)', gestesParReponse);
+  dit(/setRepondues\(\(r\) => new Set\(r\)\.add\(a\.cle \+ '\|' \+ q\)\);/.test(ecran) && /!repondues\.has\(a\.cle \+ '\|' \+ q\)/.test(ecran) && /if \(e === 'annulation' \|\| e === 'annule' \|\| e === 'echec' \|\| e === 'echec-annulation'\) \{ setRepondues\(/.test(ecran),
+    'S11 aucune attente : la réponse fait avancer tout de suite, l’écriture part après la carte suivante ; « Annuler » ou un refus ⇒ l’article revient');
   dit(/'vrm_completer_sans',/.test(app) && /poserNumero\(it, v, '', \{ sansPrix: true \}\)/.test(app) && (app.match(/if \(!opts\.sansPrix\) await demanderPrixAchat\(/g) || []).length === 4,
     'S8 « Je ne sais plus » est synchronisé ; le N° passe par `poserNumero` (ses garde-fous), sans redemander le prix d’achat');
   dit(/prixCertains\(\{ entrees: liees/.test(ecran) && /par: 'lien'/.test(app), 'S9 le prix certain vient de l’achat qu’il a relié (`par: \'lien\'`), jamais d’une proposition');
