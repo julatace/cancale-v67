@@ -21012,7 +21012,7 @@ function PorteMfa({ session }) {
               {plusieurs
                 ? <><b style={{color:C.text}}>Un appareil perdu ou changé ?</b> Entre avec un AUTRE appareil, puis retire le perdu (Paramètres → Double vérification).</>
                 : <><b style={{color:C.text}}>Plus accès à ton app (téléphone perdu ou changé) ?</b> La double vérification ne se retire pas depuis cet écran. Écris à VRM depuis l'adresse e-mail de ton compte : {contact
-                  ? <a href={`mailto:${contact}`} style={{color:C.accentTexte,textDecoration:'none'}}>{contact}</a>
+                  ? <a href={`mailto:${contact}`} style={{color:C.accentTexte,textDecoration:'none',display:'inline-flex',alignItems:'center',minHeight:44}}>{contact}</a>
                   : <span data-contact-absent="">{CONTACT_A_VENIR}</span>}.</>}
             </div>
           </>)}

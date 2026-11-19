@@ -7,7 +7,7 @@
 .nc-sous { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--vrm-muted); }
 .nc-note { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--vrm-muted); }
 .nc-note:empty { display: none; }
-.nc-lien { border: 0; background: none; font: inherit; color: var(--vrm-accent, #0060CC); cursor: pointer; min-height: 44px; padding: 0 6px; }
+.nc-lien { border: 0; background: none; font: inherit; color: var(--vrm-accent, #0060CC); cursor: pointer; min-height: 44px; min-width: 44px; padding: 0 6px; }
 
 .nc-barre { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .nc-seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--vrm-line, rgb(0 0 0 / .06)); }
