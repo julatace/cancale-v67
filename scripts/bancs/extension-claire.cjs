@@ -146,12 +146,14 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       console.log(`\n── ${nom}`);
       const ctx = await contexte(nav, 'ok', { mobile, sombre }); const pg = await ctx.newPage();
       await pg.goto('https://vrm.center/?tab=extension', { waitUntil: 'domcontentloaded' });
-      const e = await attendreEcran(pg, (x) => x.nav === 'ok' && x.comptes.length === 2 && x.comptes.every((c) => c.jauge && c.jauge !== 'lecture'), 40000);
+      await attendreEcran(pg, (x) => x.nav === 'ok' && x.comptes.length === 2, 40000);
+      await pg.evaluate(() => { for (const b of document.querySelectorAll('[data-ext-compte] .n-groupe-repli[aria-expanded="false"]')) b.click(); }).catch(() => {});
+      const e = await attendreEcran(pg, (x) => x.comptes.every((c) => c.gestes.length && c.jauge && c.jauge !== 'lecture'), 20000);
       await attendre(600); await photo(pg, nom);
       const ca = e && e.comptes.find((c) => c.id === 'vinted:' + A), cb = e && e.comptes.find((c) => c.id === 'vinted:' + B);
       dit(!!e && e.nav === 'ok', 'la page est là, extension « à jour et branchée »', JSON.stringify(e && { nav: e.nav }));
       dit(!!ca && ca.ouverture === 'ici' && ca.gestes.length === 9 && ca.gestes.every((g) => g.oui) && ca.jauge === '12/50', 'boutique_a : « ouvert dans ce navigateur », 9 gestes sur 9, 12/50 cette heure', JSON.stringify(ca));
-      dit(!!cb && cb.ouverture === 'autre-ici' && cb.gestes.every((g) => !g.oui && g.raison === 'autre-ouvert'), 'atelier_b : chaque geste « non, c’est boutique_a qui est ouvert »', JSON.stringify(cb));
+      dit(!!cb && cb.ouverture === 'autre-ici' && cb.gestes.length === 9 && cb.gestes.every((g) => !g.oui && g.raison === 'autre-ouvert'), 'atelier_b : chaque geste « non, c’est boutique_a qui est ouvert »', JSON.stringify(cb));
       dit(!!e && e.etapes.length === 0, 'tout branché : le pas-à-pas n’est plus montré', JSON.stringify(e && e.etapes));
       dit(!!e && e.appareils === 1 && !e.plein, 'l’autre navigateur est listé ; aucun bouton plein (rien à faire)', JSON.stringify(e && { app: e.appareils, plein: e.plein }));
       dit(!!e && e.deborde <= 0, 'aucun débordement horizontal', e && e.deborde);
@@ -160,11 +162,11 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       await ctx.close();
     }
     // ── aucune extension
-    console.log('\n── aucune-390-clair');
-    { const ctx = await contexte(nav, 'aucune', { mobile: true, sombre: false }); const pg = await ctx.newPage();
+    console.log('\n── aucune-1512-clair (au téléphone, la règle dit « depuis ton ordinateur » : pas d’installation)');
+    { const ctx = await contexte(nav, 'aucune', { mobile: false, sombre: false }); const pg = await ctx.newPage();
       await pg.goto('https://vrm.center/?tab=extension', { waitUntil: 'domcontentloaded' });
       const e = await attendreEcran(pg, (x) => x.nav === 'absente' || x.nav === 'ailleurs', 40000);
-      await attendre(600); await photo(pg, 'aucune-390-clair');
+      await attendre(600); await photo(pg, 'aucune-1512-clair');
       dit(!!e && (e.nav === 'absente' || e.nav === 'ailleurs') && e.plein === 'installer', 'aucune extension : la phrase et UN bouton « Installer l’extension »', JSON.stringify(e && { nav: e.nav, plein: e.plein }));
       dit(!!e && e.comptes.length === 2 && e.comptes.every((c) => c.gestes.every((g) => !g.oui)), 'aucune extension : aucun geste « oui »', JSON.stringify(e && e.comptes.map((c) => c.gestes.filter((g) => g.oui))));
       dit(!!e && e.etapes.length === 4 && e.etapes[0][1] === '0', 'aucune extension : le pas-à-pas, étape 1 « pas encore »', JSON.stringify(e && e.etapes));
@@ -177,12 +179,15 @@ const photo = async (pg, nom) => { if (!CAPT) return; try { fs.mkdirSync(CAPT, {
       console.log(`\n── ${nom}`);
       const ctx = await contexte(nav, 'freins', { mobile, sombre }); const pg = await ctx.newPage();
       await pg.goto('https://vrm.center/?tab=extension', { waitUntil: 'domcontentloaded' });
-      const e = await attendreEcran(pg, (x) => x.nav === 'ok' && x.comptes.length === 2 && x.comptes.every((c) => c.jauge && c.jauge !== 'lecture'), 40000);
+      await attendreEcran(pg, (x) => x.nav === 'ok' && x.comptes.length === 2, 40000);
+      // Un compte pas ouvert ici est replié : le déplier (son toucher), comme le vendeur.
+      await pg.evaluate(() => { for (const b of document.querySelectorAll('[data-ext-compte] .n-groupe-repli[aria-expanded="false"]')) b.click(); }).catch(() => {});
+      const e = await attendreEcran(pg, (x) => x.comptes.every((c) => c.gestes.length && c.jauge && c.jauge !== 'lecture'), 20000);
       await attendre(600); await photo(pg, nom);
       const ca = e && e.comptes.find((c) => c.id === 'vinted:' + A), cb = e && e.comptes.find((c) => c.id === 'vinted:' + B);
       dit(!!e && e.avert.includes('deux-comptes'), '« deux comptes ouverts dans ce navigateur » dit une fois, en tête', JSON.stringify(e && e.avert));
       dit(!!cb && cb.ouverture === 'ici' && ['baisser', 'favoris', 'offres'].every((k) => { const g = cb.gestes.find((x) => x.cle === k); return g && g.oui && g.note === 'prudence'; }), 'atelier_b (ouvert, en prudence) : « oui, au ralenti jusqu’à … »', JSON.stringify(cb && cb.gestes));
-      dit(!!ca && ca.gestes.every((g) => !g.oui && g.raison === 'autre-ouvert') && ca.jauge === '45/50', 'boutique_a (pas ouvert, 45/50) : « non, c’est atelier_b qui est ouvert », jauge 45/50', JSON.stringify(ca));
+      dit(!!ca && ca.gestes.length === 9 && ca.gestes.every((g) => !g.oui && g.raison === 'autre-ouvert') && ca.jauge === '45/50', 'boutique_a (pas ouvert, 45/50) : « non, c’est atelier_b qui est ouvert », jauge 45/50', JSON.stringify(ca));
       dit(!!e && e.deborde <= 0 && (!mobile || !e.petites.length) && !TECHNIQUES.test(e.texte), 'freins : ni débordement, ni petite cible, ni mot technique', JSON.stringify(e && { d: e.deborde, p: e.petites.slice(0, 3) }));
       await ctx.close();
     }
