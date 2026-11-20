@@ -76,7 +76,7 @@ const MUTATIONS = {
   // Délier.
   delierJournal: [R, "  if (lienJ) ops.push({ k: CLE_LIAISON, type: 'cle', id: cleJournal('lien', k), apres: undefined, avant: lienJ });\n", ''],
   delierEcrit: [R, "  if (!deja && !lienJ) return { refus: 'ecrit-sur-le-site' };\n", "  if (!deja && !lienJ) return { ops: [{ k: CLES_LIENS[annonce.plateforme], type: 'cle', id, apres: undefined, avant: undefined }], numero: '' };\n"],
-  delierSonNumero: [R, "    const retour = annonce.plateforme === 'Leboncoin' && pr && cle(pr.numero || '') ? String(pr.numero).trim() : undefined;", '    const retour = undefined;'],
+  delierSonNumero: [R, "    const retour = !propre ? undefined : annonce.plateforme === 'Leboncoin' ? propre : { numero: propre, propre: true };", '    const retour = undefined;'],
   // Les contradictions.
   deuxNumeros: [R, "    if (nums.length >= 2 && !vus.has('reference')) pousser(", '    if (false) pousser('],
   deuxAnnonces: [R, '    if (l.length < 2) continue;\n    const declarees', '    if (l.length < 3) continue;\n    const declarees'],
@@ -85,7 +85,7 @@ const MUTATIONS = {
   deuxNSansDemander: [R, "    const g = cle((accepte && accepte.garder) || '');", "    const g = cle((accepte && accepte.garder) || n);"],
   garderVinted: [R, "    if (g === a && vintedDe(paire)) return { ok: false, refus: 'garder-vinted', numero: n, garder: a };\n", ''],
   articleSansVinted: [R, "    if (!a || a.id == null || !SITES_LIAISON.includes(a.plateforme) || a.enVente === false) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();", "    if (true) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();"],
-  sonNumeroPasUnLien: [R, "    return pr && cle(pr.numero || '') === cle(v) ? null : { numero: String(v) };", '    return null;'],
+  sonNumeroPasUnLien: [R, "    return propre && cle(propre) === cle(v) ? null : { numero: String(v) };", '    return null;'],
   sansArticle: [R, "  const propre = !relie && !reunie && (sansArticle || (!!pr && pr.actif !== false));", "  const propre = !relie && !reunie && (!!pr && pr.actif !== false);"],
   // Le SKU / la référence écrite qu'aucune règle ne croit : proposée seulement, une seule.
   refPasProposee: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });", ''],
