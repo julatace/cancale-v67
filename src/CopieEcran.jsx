@@ -26,6 +26,13 @@ export function ageCopieTexte(min) {
 // Où poser la mention : sur une ligne d'en-tête qui EXISTE déjà (le grand titre de la coque, l'en-tête d'un groupe, le
 // titre de l'écran), à droite, là où rien n'est dessiné — jamais une ligne de plus (rien ne saute au remplacement),
 // jamais sur un bouton ou un texte. `portee` : où chercher le grand titre (la coque copiée), sinon le document.
+// Après la prochaine image (et au repos si possible) ; rend de quoi annuler.
+function apresImage(f) {
+  let a = 0, b = 0, c = 0, mort = false;
+  const go = () => { if (!mort) f(); };
+  try { a = requestAnimationFrame(() => { b = setTimeout(() => { try { c = (window.requestIdleCallback || ((g) => setTimeout(g, 0)))(go, { timeout: 600 }); } catch (_) { go(); } }, 0); }); } catch (_) { b = setTimeout(go, 50); }
+  return () => { mort = true; try { cancelAnimationFrame(a); } catch (_) {} clearTimeout(b); try { if (window.cancelIdleCallback) window.cancelIdleCallback(c); } catch (_) {} };
+}
 const LARGEUR_MENTION = 170;
 function placeMention(hote, enveloppe, portee = null) {
   try {
@@ -90,7 +97,8 @@ export function CoqueCopie({ copie, maintenant = null }) {
     try { h.inert = true; } catch (_) {}
     h.setAttribute('inert', '');
     const z = h.querySelector('.vrm-ce-zone'); if (z) z.setAttribute('data-copie-contenu', '');
-    if (enveloppe.current) setPlace(placeMention(h, enveloppe.current, h) || { dans: 'aucune' });
+    // La place de la mention se cherche APRÈS la première image (mesurer la copie coûte au téléphone : la copie d'abord).
+    return apresImage(() => { if (enveloppe.current && hote.current) setPlace(placeMention(hote.current, enveloppe.current, hote.current) || { dans: 'aucune' }); });
   }, [copie && copie.coque && copie.coque.html]);
   if (!copie || !copie.coque || !copie.coque.html) return null;
   const age = ageCopieMin(copie, maintenant || Date.now());
@@ -119,7 +127,8 @@ export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant =
     h.setAttribute('inert', '');
     const parent = h.parentElement;
     if (parent && getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
-    if (parent) setPlace(placeMention(h, parent) || { dans: 'aucune' });
+    if (parent) return apresImage(() => { if (hote.current) setPlace(placeMention(hote.current, parent) || { dans: 'aucune' }); });
+    return undefined;
   }, [copie && copie.html]);
   if (!copie || !copie.html) return null;
   const age = ageCopieMin(copie, maintenant || now);
