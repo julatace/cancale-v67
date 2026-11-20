@@ -20896,7 +20896,7 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     // Un titre posé dans un bloc passe EN LIGNE (style posé sur lui : aucune règle d'avant ne le bat) pour que les pastilles
     // tiennent à côté de lui.
     const marquer = (t) => { if (!t || !t.parentElement || getComputedStyle(t.parentElement).display.indexOf('flex') >= 0) return;
-      if (t.style.display !== 'inline-block') { t.style.display = 'inline-block'; t.style.verticalAlign = 'middle'; t.style.width = 'auto'; }
+      if (t.style.display !== 'inline-block') { t.style.setProperty('display', 'inline-block', 'important'); t.style.verticalAlign = 'middle'; t.style.setProperty('width', 'auto', 'important'); t.style.setProperty('max-width', '50%', 'important'); }
       if (!t.hasAttribute('data-avec-pastilles')) t.setAttribute('data-avec-pastilles', ''); };
     // Le titre de la coque peut être re-rendu (et l'hôte, posé à côté, retiré avec lui) : on le repose à chaque changement.
     const placer = () => {
@@ -20915,7 +20915,7 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
       else if (titre && (titre.style.display !== 'inline-block' || !titre.hasAttribute('data-avec-pastilles'))) marquer(titre);
     });
     mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'style'] });
-    return () => { mo.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.display = ''; titre.style.verticalAlign = ''; titre.style.width = ''; } };
+    return () => { mo.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.removeProperty('display'); titre.style.verticalAlign = ''; titre.style.removeProperty('width'); titre.style.removeProperty('max-width'); } };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
     nombres={nombres} tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
