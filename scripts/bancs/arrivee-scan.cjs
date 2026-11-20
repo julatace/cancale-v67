@@ -301,11 +301,15 @@ async function passe(b, vp, sombre) {
     const { ctx, pg, errs, tactile } = await ouvrir(b, vp, sombre, base());
     try {
       // H — hors ligne : l'achat reconnu, le N° attend le réseau.
+      // En ligne d'abord (une arrivée ouverte puis fermée : les écrans et les données sont en mémoire), puis le réseau tombe.
       await scannerArrivee(pg, tactile);
-      await pg.waitForTimeout(2500);   // Achats a lu ses achats (puis le réseau tombe)
+      await taper(pg, mr(8));
+      await attendreArrivee(pg); await fermerArrivee(pg);
+      await scannerArrivee(pg, tactile);
       await ctx.setOffline(true);
       await pg.evaluate(() => window.dispatchEvent(new Event('offline')));
       await taper(pg, mr(7));
+      if (process.env.DEBUG_H) console.log('     (H : ' + await pg.evaluate(() => location.search + ' · onglets ' + [...document.querySelectorAll('[data-ecran]')].map((e) => e.getAttribute('data-ecran')).join(',') + ' · ' + ((document.querySelector('[data-scan-r]') || {}).innerText || '').slice(0, 160).replace(/\n/g, ' / ')) + ')');
       const h = await attendre(async () => { const x = await ecran(pg); return x.ouvert && x.etat ? x : null; }, 15000);
       dit(!!h && h.tx === '9407' && h.etat === 'horsLigne', `${T} H1 · hors ligne : l’achat reconnu (cache), « le N° attend le réseau »`, h || (await ecran(pg)));
       await juger(pg, T, 'H1', tactile);

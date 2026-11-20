@@ -191,7 +191,7 @@ function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa }) {
 // (20 nov., lot arrivee-scan) `arrivee` : le scanner de l'ARRIVÉE (« j'ai un colis en main, lequel est-ce ? ») — seuls les
 // ACHATS répondent (`achatDuScan`, src/arriveeAchat.js : n° de suivi exact) ; un seul ⇒ `onArrivee(achat, lu)` (l'écran
 // d'arrivée s'ouvre), plusieurs ⇒ la liste (SON toucher choisit), aucun ⇒ dit. Les étiquettes de VENTES ne sont pas fouillées.
-export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = null, onAttendreSources = null, onRelier = null, codeInitial = '', zIndex = 18000, children = null, arrivee = false, onArrivee = null }) {
+export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = null, onAttendreSources = null, onRelier = null, codeInitial = '', zIndex = 18000, children = null, arrivee = false, onArrivee = null, indexHorsLigne = null }) {
   useLangue();
   const video = React.useRef(null);
   const saisieRef = React.useRef(null);
@@ -223,8 +223,8 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       return;
     }
     setIndice('');
-    const finir = (incomplet) => {
-      const S = lireSourcesColis();
+    const finir = (incomplet, Sf = null) => {
+      const S = Sf || lireSourcesColis();
       if (arrivee) {
         n.current += 1;
         if (!lu) { if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); } else { setRes(null); setIndice(court(brut)); } return; }
@@ -278,6 +278,12 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       // (20 nov., lot arrivee-scan) L'arrivée ne cherche que des ACHATS : leur liste lue (même en cache, hors ligne) suffit,
       // les ventes et bordereaux pas lus ne peuvent pas porter un achat. Achats pas lus ⇒ on attend, comme avant.
       if (arrivee && achatsLus(S)) { finir(false); return; }
+      // Hors ligne, les écrans ne relisent rien : les achats connus de CET appareil (l'index gardé à la dernière lecture
+      // complète, par n° de suivi — src/App.jsx `garderIndexArrivee`) reconnaissent le colis. Jamais en ligne (on relit).
+      if (arrivee && typeof indexHorsLigne === 'function' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        const L = indexHorsLigne();
+        if (Array.isArray(L) && L.length) { finir(false, { pret: true, enregistrements: L, manques: [] }); return; }
+      }
       // Une source pas lue n'est jamais « rien » (ni « un seul » : l'autre source pourrait porter le même n°) :
       // on attend qu'elles soient lues ; au-delà de 10 s, on dit ce qui manque.
       if (Date.now() - t0 >= ATTENTE_SOURCES_MS) { finir(true); return; }
@@ -287,7 +293,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     if (enCours.current) clearTimeout(enCours.current);
     if (!lireSourcesColis().pret && onAttendreSources) { try { onAttendreSources(); } catch (_) {} }
     essayer();
-  }, [onAttendreSources, arrivee, onArrivee]);
+  }, [onAttendreSources, arrivee, onArrivee, indexHorsLigne]);
 
   // La caméra lit en continu ; une fiche montrée, elle ne remplace plus rien tant qu'il ne rescanne pas.
   const traiter = React.useCallback((brut) => {

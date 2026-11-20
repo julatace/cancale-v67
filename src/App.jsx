@@ -20000,6 +20000,23 @@ async function texteEtiquetteScan(capteRow, mailRow) {
   if (typeof t === 'string') TEXTES_ETIQUETTES.set(k, t);
   return typeof t === 'string' ? t : null;
 }
+// (20 nov., lot arrivee-scan) L'INDEX DE L'ARRIVÉE HORS LIGNE : à chaque lecture des sources du scanner (achats lus), les
+// achats qui ont un n° de suivi sont gardés sur CET appareil (`vrm_arrivee_index`, 400 au plus) : n° de suivi, titre, photo
+// et l'entrée de l'écran d'arrivée (sans fonction : les opérations du retrait ne s'écrivent qu'en ligne). Hors ligne, le
+// scanner de l'arrivée reconnaît un colis par ce n° EXACT ; en ligne il relit toujours les vraies sources.
+const CLE_INDEX_ARRIVEE = 'vrm_arrivee_index';
+let _indexArriveeAt = 0;
+function garderIndexArrivee(E) {
+  if (Date.now() - _indexArriveeAt < 30000) return; _indexArriveeAt = Date.now();
+  try {
+    const L = [];
+    for (const x of E) { if (!x || x.sorte !== 'achat' || !Array.isArray(x.suivis) || !x.suivis.length || typeof x.entree !== 'function') continue;
+      let en = null; try { en = x.entree(); } catch (_) { en = null; } if (!en || !en.tx) continue;
+      L.push({ sorte: 'achat', site: x.site || 'vinted', cle: x.cle, suivis: x.suivis.slice(0, 6), titre: x.titre || '', photo: x.photo || null, entree: sansFonctions(en) }); if (L.length >= 400) break; }
+    localStorage.setItem(CLE_INDEX_ARRIVEE, JSON.stringify({ at: Date.now(), l: L }));
+  } catch (_) {}
+}
+const lireIndexArrivee = () => { try { const v = JSON.parse(localStorage.getItem(CLE_INDEX_ARRIVEE) || 'null'); return v && Array.isArray(v.l) ? v.l : []; } catch (_) { return []; } };
 function HoteRetrouver({ onAttendreSources, onChercher }) {
   const [ouvert, setOuvert] = useState(false);
   const [code0, setCode0] = useState('');
@@ -20016,11 +20033,11 @@ function HoteRetrouver({ onAttendreSources, onChercher }) {
   const fermer = () => { setOuvert(false); setCode0(''); setArrivee(false); };
   // L'achat trouvé par SON n° de suivi : le scanner se ferme, l'écran d'arrivée de CET achat s'ouvre (`e.entree`, l'achat
   // tel que l'écran Achats le connaît : prix payé du reçu, et les opérations du retrait si le colis n'est pas noté retiré).
-  const versArrivee = (e) => { let en = null; try { en = e && typeof e.entree === 'function' ? e.entree() : null; } catch (_) { en = null; } if (!en) return; fermer(); setTimeout(() => { ouvrirAtelierArrivee([en], { scan: true }); }, 60); };
+  const versArrivee = (e) => { let en = null; try { en = e && typeof e.entree === 'function' ? e.entree() : (e && e.entree && typeof e.entree === 'object' ? e.entree : null); } catch (_) { en = null; } if (!en) return; fermer(); setTimeout(() => { ouvrirAtelierArrivee([en], { scan: true }); }, 60); };
   // (19 nov., Julien redemande : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » depuis le
   // scanner : un colis inconnu se dit (transporteur, n°, « Chercher »), il ne se relie plus à la main. Le lien vient de
   // l'identité (n° de suivi lu par l'extension, conversation, code), docs/passation/2026-11-19-colis-achat-auto.md.
-  return <ScannerRetrouver key={arrivee ? 'arrivee' : 'retrouver'} Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2} arrivee={arrivee} onArrivee={versArrivee}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  return <ScannerRetrouver key={arrivee ? 'arrivee' : 'retrouver'} Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2} arrivee={arrivee} onArrivee={versArrivee} indexHorsLigne={lireIndexArrivee}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -47937,6 +47954,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           lien: `?tab=achats&cible=retour&tx=${encodeURIComponent(c.tx)}` });
       }
     } catch (_) {}
+    // (20 nov., lot arrivee-scan) L'index de l'arrivée hors ligne : les achats lus ICI, par n° de suivi (cet appareil seulement).
+    if (achatsLus) garderIndexArrivee(E);
     return { pret: ventesLues && achatsLus && bordsLus && retoursAchatLus !== undefined, enregistrements: E, manques,
       // (17 nov., lot scan-bordereau-vente) Un code qui n'est pas un n° de suivi connu : cherché dans le texte des
       // étiquettes de SES ventes (src/etiquettesScan.js) — une identité exacte, l'étiquette de CETTE transaction.

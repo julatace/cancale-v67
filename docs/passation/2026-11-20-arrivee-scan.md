@@ -53,7 +53,9 @@ Branche `claude/arrivee-scan` (depuis `origin/main`), poussée à chaque commit,
 5. **« Arrivés · à ranger »** : Stock (`src/ArrivesARanger.jsx`, au-dessus de « À ranger ») et Aujourd'hui (la carte
    existante, renommée « N arrivés à ranger »). `arrivesARanger` : un achat rangé (une fiche porte SON n° de transaction)
    n'y est plus ; fiches pas lues ⇒ rien (pas « rien à ranger »). Rouvrir un achat rangé ⇒ « Déjà rangé · N°13 ».
-6. **Hors ligne** : l'achat est reconnu sur les données en cache ; le N° n'est PAS donné (les N° servis ne peuvent pas être
+6. **Hors ligne** : l'achat est reconnu sur les données en cache — les écrans ne relisant rien hors ligne, la coque garde à
+   chaque lecture des sources un INDEX de l'appareil (`vrm_arrivee_index` : n° de suivi ⇒ l'entrée de l'achat, 400 au plus),
+   consulté par le scanner de l'arrivée SEULEMENT quand `navigator.onLine` est faux (même égalité exacte du n°) ; le N° n'est PAS donné (les N° servis ne peuvent pas être
    relus — un N° donné hors ligne pourrait l'être aussi sur un autre appareil) : « Hors ligne : le N° attend le réseau » ;
    « Noter l'arrivée » note l'achat (Arrivés · à ranger) et met le retrait dans la file d'envoi existante ; au retour du
    réseau l'écran se relit seul.

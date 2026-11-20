@@ -216,6 +216,7 @@ if (PROUVE) prouver();
     dit(/arrivee\) \{[\s\S]{0,600}achatDuScan\(lu, S\.enregistrements\)/.test(sr), 'B3 · le scanner de l’arrivée passe par `achatDuScan` (achats seulement, n° exact)');
     dit(!/fetch\(|save\(|localStorage\.setItem/.test(jsx), 'B4 · l’écran d’arrivée n’écrit rien lui-même (la coque écrit sur SON toucher)');
     dit(/horsLigne/.test(corps) && /noterArrivees\(\[sansFonctions\(e\)\]\)/.test(corps), 'B5 · hors ligne : aucun N° donné, l’arrivée notée, le retrait dans la file');
+    dit(/indexHorsLigne === 'function' && typeof navigator !== 'undefined' && navigator\.onLine === false/.test(sr) && /if \(arrivee && achatsLus\(S\)\)/.test(sr), 'B6 · l’index de l’appareil ne sert QUE hors ligne (en ligne, les vraies sources sont relues)');
   }
 
   console.log(`\n${ko ? '❌' : '✅'} audit-arrivee-scan : ${ok} verts, ${ko} rouge(s)`);
