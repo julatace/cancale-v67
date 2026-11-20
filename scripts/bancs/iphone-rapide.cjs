@@ -66,8 +66,10 @@ function jalons() {
     const t = Math.round(performance.now());
     if (J.coque == null && document.querySelector('[data-n-onglets] [data-n-onglet]')) J.coque = t;
     if (J.utile == null && document.querySelector('[data-attente-ecran="journee"][data-attente="pret"], [data-attente-ecran="journee"][data-attente="plafond"]')) J.utile = t;
-    if (J.chiffres == null && document.querySelector('[data-v2-chiffres="lu"]')) J.chiffres = t;
+    if (J.chiffres == null && document.querySelector('[data-v2-chiffres="lu"], [data-vendu-mois]:not([data-vendu-mois=""])')) J.chiffres = t;
   };
+  // Les chiffres d'Aujourd'hui (« Vendu · mois » suivi d'un montant) : lus dans le texte, toutes les 100 ms.
+  const iv = setInterval(() => { if (J.chiffres != null) return clearInterval(iv); const m = document.querySelector('main') || document.body; if (m && /Vendu\s*·\s*mois\s*[\d\s\u202f\u00a0]+(,\d+)?\s*€/.test(m.innerText || '')) J.chiffres = Math.round(performance.now()); }, 100);
   document.addEventListener('DOMContentLoaded', () => { voir(); new MutationObserver(voir).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-attente', 'data-v2-chiffres'] }); });
 }
 
@@ -75,7 +77,7 @@ async function preparer(ctx) {
   await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await ctx.addInitScript(jalons);
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /vinted\.net\//i.test(r.request().url()) ? r.abort() : r.fallback()));
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
@@ -101,19 +103,49 @@ async function memoire(cdp) {
   return { tasMo: Math.round(m.JSHeapUsedSize / 1048576 * 10) / 10, noeuds: m.Nodes, ecouteurs: m.JSEventListeners };
 }
 
+// Profil CPU agrégé par fonction (propre et inclusif) — PROFIL=<fichier> PROFIL_QUAND=froid|'chaud 2'.
+function agreger(profil) {
+  const parId = new Map(); for (const n of profil.nodes) parId.set(n.id, n);
+  const parent = new Map(); for (const n of profil.nodes) for (const c of n.children || []) parent.set(c, n.id);
+  const propre = new Map(), inclusif = new Map();
+  const nom = (n) => (n.callFrame.functionName || '(anonyme)') + ':' + (n.callFrame.lineNumber + 1) + ':' + (n.callFrame.columnNumber + 1) + '@' + path.basename(n.callFrame.url || '?');
+  const dt = profil.timeDeltas || [], ech = profil.samples || [];
+  for (let i = 0; i < ech.length; i++) {
+    const ms = (dt[i + 1] || dt[i] || 0) / 1000; let id = ech[i]; const n0 = parId.get(id);
+    if (!n0 || /^\((idle|program)\)$/.test(n0.callFrame.functionName)) continue;
+    propre.set(nom(n0), (propre.get(nom(n0)) || 0) + ms);
+    const vus = new Set();
+    while (id != null) { const n = parId.get(id); const k = nom(n); if (!vus.has(k)) { vus.add(k); inclusif.set(k, (inclusif.get(k) || 0) + ms); } id = parent.get(id); }
+  }
+  const top = (m, k) => [...m].sort((a, b) => b[1] - a[1]).slice(0, k).map(([f, ms]) => [f, Math.round(ms)]);
+  return { propre: top(propre, 80), inclusif: top(inclusif, 200) };
+}
+
 // ── Une ouverture : de la navigation à l'écran utile, puis au calme ──
 async function ouvrirApp(ctx, quand) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   pg.on('crash', () => console.log('  ⚠️ la page a planté (' + quand + ')'));
-  if (process.env.DEBUG) { pg.on('close', () => console.log('  (page fermée : ' + quand + ')')); pg.on('framenavigated', (f) => { if (f === pg.mainFrame()) console.log('  (navigation : ' + f.url() + ')'); }); pg.on('console', (m) => { if (/error|warn/.test(m.type())) console.log('  (console ' + m.type() + ' : ' + m.text().slice(0, 160) + ')'); }); }
+  if (process.env.DEBUG) { pg.on('close', () => console.log('  (page fermée : ' + quand + ')')); pg.on('framenavigated', (f) => { if (f === pg.mainFrame()) console.log('  (navigation : ' + f.url() + ')'); }); pg.on('requestfailed', (q) => { if (q.resourceType() !== 'image') console.log('  (échec ' + q.resourceType() + ' ' + q.url().slice(0, 140) + ' ' + ((q.failure() || {}).errorText || '') + ')'); }); pg.on('response', (x) => { if (x.status() >= 400) console.log('  (' + x.status() + ' ' + x.url().slice(0, 140) + ')'); }); }
   const cdp = await cdpDe(pg);
   servis = [];
+  const profiler = process.env.PROFIL && quand === process.env.PROFIL_QUAND;
+  if (profiler) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   const t0 = Date.now();
-  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await pg.waitForFunction(() => { const J = window.__vrmIphone; return J && J.utile != null && J.chiffres != null; }, null, { timeout: 120000, polling: 100 }).catch(() => {});
+  const aller = async () => { await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 }); };
+  const pretO = () => { const J = window.__vrmIphone; return J && J.utile != null && J.chiffres != null; };
+  let traceO = null;
+  if (process.env.OUVERTURE_NOMS && quand === process.env.OUVERTURE_NOMS) { traceO = await tracer(pg, cdp, aller, pretO); console.log('  (trace de l\'ouverture ' + quand + ' : CPU ' + traceO.cpu + ' ms · style ' + traceO.style + ' · mise en page ' + traceO.page + ')'); }
+  else {
+    await aller();
+    if (profiler && process.env.PROFIL_COQUE) { await pg.waitForFunction(() => window.__vrmIphone && window.__vrmIphone.coque != null, null, { timeout: 120000, polling: 50 }).catch(() => {}); const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL, JSON.stringify(agreger(profile), null, 1)); }
+    await pg.waitForFunction(pretO, null, { timeout: 120000, polling: 100 }).catch(() => {});
+  }
   const J = await pg.evaluate(() => window.__vrmIphone);
+  if (profiler && !process.env.PROFIL_COQUE) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL, JSON.stringify(agreger(profile), null, 1)); }
+  if (process.env.JALONS) console.log('  (jalons ' + quand + ' : ' + JSON.stringify(await pg.evaluate(() => ({ marques: performance.getEntriesByType('mark').map((m) => m.name + '@' + Math.round(m.startTime)).slice(0, 40), longues: window.__vrmIphone.longues.slice(0, 40), coque: window.__vrmIphone.coque, chiffres: window.__vrmIphone.chiffres, ressources: performance.getEntriesByType('resource').filter((r) => /\.(js|css)$/.test(r.name)).map((r) => r.name.split('/').pop() + '@' + Math.round(r.startTime) + '-' + Math.round(r.responseEnd)).slice(0, 30) }))) + ')');
   if (process.env.DEBUG) console.log('  (états : ' + JSON.stringify(await pg.evaluate(() => [...document.querySelectorAll('[data-v2-chiffres],[data-attente-ecran]')].map((e) => (e.getAttribute('data-v2-chiffres') || '') + '/' + (e.getAttribute('data-attente-ecran') || '') + ':' + (e.getAttribute('data-attente') || '')))) + ')');
+  if (process.env.SHOTS) { fs.mkdirSync(process.env.SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(process.env.SHOTS, 'ouverture-' + quand.replace(/\s+/g, '') + '.png') }).catch(() => {}); }
   await attendre(4000);   // le calme (lectures de fond, rangement du service worker)
   const sw = await pg.evaluate(() => !!(navigator.serviceWorker && navigator.serviceWorker.controller)).catch(() => false);
   const fichiers = servis.filter((x) => /\.(js|css)$/.test(x.f) && !x.sw);
@@ -133,13 +165,15 @@ async function tracer(pg, cdp, geste, pret) {
   const evts = [];
   const surDonnees = (d) => { for (const e of d.value) evts.push(e); };
   cdp.on('Tracing.dataCollected', surDonnees);
-  await cdp.send('Tracing.start', { categories: 'devtools.timeline,toplevel,disabled-by-default-devtools.timeline', transferMode: 'ReportEvents' });
+  await cdp.send('Tracing.start', { categories: 'devtools.timeline,toplevel,disabled-by-default-devtools.timeline' + (process.env.SELECTEURS ? ',disabled-by-default-blink.debug' : '') + (process.env.INVAL ? ',disabled-by-default-devtools.timeline.invalidationTracking' : ''), transferMode: 'ReportEvents' });
   await attendre(150);
+  if (process.env.PROFIL_ONGLETS) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   const t0 = Date.now();
   await geste();
   let mur = null;
   try { await pg.waitForFunction(pret, null, { timeout: 30000, polling: 16 }); mur = Date.now() - t0; } catch (_) {}
   await attendre(1500);
+  if (process.env.PROFIL_ONGLETS) { const { profile } = await cdp.send('Profiler.stop'); (global.__profils = global.__profils || []).push(agreger(profile)); fs.writeFileSync(process.env.PROFIL_ONGLETS, JSON.stringify(global.__profils, null, 1)); }
   const fini = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
   await cdp.send('Tracing.end'); await fini;
   cdp.off('Tracing.dataCollected', surDonnees);
@@ -150,12 +184,47 @@ async function tracer(pg, cdp, geste, pret) {
   const fil = [...noms.entries()].sort((a, b) => b[1] - a[1])[0];
   const miennes = fil ? taches.filter((e) => e.pid + ':' + e.tid === fil[0]) : [];
   const td = (e) => (e.tdur != null ? e.tdur : e.dur) / 1000;
-  const cpu = miennes.reduce((a, e) => a + td(e), 0);
-  const plusLongue = miennes.reduce((m, e) => Math.max(m, e.dur / 1000), 0);
-  const longues = miennes.filter((e) => e.dur / 1000 > 50).length;
+  // Seulement les tâches de PREMIER niveau (une tâche du planificateur en contient une autre : ne pas compter deux fois).
+  const tri = miennes.slice().sort((a, b) => a.ts - b.ts || b.dur - a.dur);
+  const hautes = []; let finHaut = -1;
+  for (const e of tri) { if (e.ts >= finHaut) { hautes.push(e); finHaut = e.ts + e.dur; } }
+  const cpu = hautes.reduce((a, e) => a + td(e), 0);
+  const plusLongue = hautes.reduce((m, e) => Math.max(m, e.dur / 1000), 0);
+  const longues = hautes.filter((e) => e.dur / 1000 > 50).length;
   const style = evts.filter((e) => e.ph === 'X' && e.name === 'UpdateLayoutTree' && fil && e.pid + ':' + e.tid === fil[0]);
   const pireStyle = style.reduce((m, e) => Math.max(m, td(e)), 0);
-  return { cpu: Math.round(cpu), plusLongue: Math.round(plusLongue), longues, mur, pireStyle: Math.round(pireStyle * 10) / 10 };
+  const surFil = (nom) => evts.filter((e) => e.ph === 'X' && e.name === nom && fil && e.pid + ':' + e.tid === fil[0]);
+  const somme = (l) => Math.round(l.reduce((a, e) => a + td(e), 0));
+  if (process.env.GROS) {
+    const gros = style.map((e) => ({ el: (e.args && (e.args.elementCount || (e.args.data && e.args.data.elementCount))) || 0, ms: Math.round(td(e)), pile: ((e.args && e.args.beginData && e.args.beginData.stackTrace) || []).slice(0, 4).map((f) => `${f.functionName || '?'}:${f.lineNumber}@${String(f.url || '').split('/').pop()}`).join(' < ') }))
+      .filter((x) => x.ms >= 20).sort((a, b) => b.ms - a.ms).slice(0, 8);
+    for (const x of gros) console.log(`      style ${x.ms} ms · ${x.el} él. · ${x.pile || '(pas forcé par du script)'}`);
+    const lay = evts.filter((e) => e.ph === 'X' && e.name === 'Layout' && fil && e.pid + ':' + e.tid === fil[0]);
+    const pileDe = (e) => ((e.args && e.args.beginData && e.args.beginData.stackTrace) || []).slice(0, 3).map((f) => `${f.functionName || '?'}:${f.lineNumber}`).join(' < ');
+    console.log(`      mises en page : ${lay.length}, dont ${lay.filter((e) => td(e) >= 20).length} ≥ 20 ms : ` + lay.filter((e) => td(e) >= 20).sort((a, b) => td(b) - td(a)).slice(0, 6).map((e) => Math.round(td(e)) + ' ms (' + ((e.args && e.args.beginData && (e.args.beginData.dirtyObjects + '/' + e.args.beginData.totalObjects)) || '?') + ' ' + (pileDe(e) || 'non forcée') + ')').join(' · '));
+  }
+  if (process.env.SELECTEURS) {
+    const par = global.__selecteurs = global.__selecteurs || new Map(); let total = 0;
+    for (const e of evts) { if (e.name !== 'SelectorStats') continue; const l = e.args && e.args.selector_stats && e.args.selector_stats.selector_timings; if (!Array.isArray(l)) continue;
+      for (const x of l) { const us = Number(x['elapsed (us)']) || 0; total += us; const k = String(x.selector || ''); const o = par.get(k) || { us: 0, essais: 0, touches: 0, rejets: 0, style: x.style_sheet_id }; o.us += us; o.essais += Number(x.match_attempts) || 0; o.touches += Number(x.match_count) || 0; o.rejets += Number(x.fast_reject_count) || 0; par.set(k, o); } }
+    console.log(`      sélecteurs : ${Math.round(total / 1000)} ms mesurés`);
+    fs.writeFileSync(process.env.SELECTEURS, JSON.stringify([...par.entries()].sort((a, b) => b[1].us - a[1].us).map(([k, o]) => [Math.round(o.us), o.essais, o.touches, o.rejets, k])));
+  }
+  if (process.env.INVAL) {
+    const par = new Map();
+    for (const e of evts) { if (!/InvalidationTracking/.test(e.name)) continue; const d = (e.args && e.args.data) || {}; const k = e.name.replace('InvalidationTracking', '') + ' · ' + (d.reason || '') + ' · ' + String(d.nodeName || '').slice(0, 60) + (d.changedAttribute ? ' @' + d.changedAttribute : '') + (d.changedClass ? ' .' + d.changedClass : '') + (d.subtree ? ' · SOUS-ARBRE' : ''); par.set(k, (par.get(k) || 0) + 1); }
+    console.log([...par].sort((a, b) => b[1] - a[1]).filter(([k]) => /SOUS-ARBRE|HTML|BODY|n-coque|vrm-main|app-shell/.test(k)).slice(0, 14).map(([k, n]) => '        ' + n + ' × ' + k).join('\n'));
+  }
+  if (process.env.NOMS) {
+    const xs = evts.filter((e) => e.ph === 'X' && fil && e.pid + ':' + e.tid === fil[0]).sort((a, b) => a.ts - b.ts || b.dur - a.dur);
+    const propre = new Map(); const pile = [];
+    const fermer = (x) => propre.set(x.e.name, (propre.get(x.e.name) || 0) + Math.max(0, td(x.e) - x.enf));
+    for (const e of xs) { while (pile.length && e.ts >= pile[pile.length - 1].fin) fermer(pile.pop()); if (pile.length) pile[pile.length - 1].enf += td(e); pile.push({ e, fin: e.ts + e.dur, enf: 0 }); }
+    while (pile.length) fermer(pile.pop());
+    console.log('      ' + [...propre.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => k + ' ' + Math.round(v)).join(' · '));
+  }
+  const elementsStyle = style.reduce((a, e) => a + ((e.args && (e.args.elementCount || (e.args.data && e.args.data.elementCount))) || 0), 0);
+  return { cpu: Math.round(cpu), plusLongue: Math.round(plusLongue), longues, mur, pireStyle: Math.round(pireStyle * 10) / 10, style: somme(style), page: somme(surFil('Layout')), script: somme(surFil('FunctionCall').concat(surFil('EvaluateScript'), surFil('TimerFire'), surFil('EventDispatch'), surFil('FireAnimationFrame'), surFil('RunMicrotasks'))), elementsStyle };
 }
 
 const CLE = (id) => (id === 'annonces' ? 'paires' : id);
@@ -169,7 +238,7 @@ async function onglets(pg, cdp) {
     for (const id of ordre) {
       const m = await tracer(pg, cdp, toucher(id), surEcran(id));
       sortie.push({ geste: `${t === 1 ? '1er' : '2e'} → ${id}`, ...m, memoire: await memoire(cdp) });
-      console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style max ${m.pireStyle} ms`);
+      console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
     }
   }
   // « Plus » (la feuille derrière la photo du profil), puis la fermer.
@@ -181,7 +250,8 @@ async function onglets(pg, cdp) {
   }
   // Une fiche depuis Annonces, et le retour.
   {
-    await pg.locator(`[data-n-onglet="paires"]`).first().tap({ timeout: 30000 }); await attendre(2500);
+    await pg.locator(`[data-n-onglet="paires"]`).first().tap({ timeout: 30000 });
+    await pg.waitForSelector('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])', { timeout: 30000 }).catch(() => {}); await attendre(1500);
     const cible = await pg.evaluate(() => { for (const e of document.querySelectorAll('[data-fiche-ligne][data-fl-num], [data-eg-article]:not([data-eg-numero=""])')) { const r = e.getBoundingClientRect(); if (r.height < 30 || r.top < 110 || r.bottom > innerHeight - 110) continue; const x = r.left + Math.min(r.width / 2, 190), y = r.top + r.height / 2; if (e.contains(document.elementFromPoint(x, y))) return { x, y }; } return null; });
     if (cible) {
       const m = await tracer(pg, cdp, () => pg.touchscreen.tap(cible.x, cible.y), () => !!document.querySelector('[data-fiche-paire]'));
@@ -202,7 +272,7 @@ async function defiler(pg, cdp, id) {
   for (let i = 0; i < 6; i++) await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 600, yDistance: -1400, speed: 1600, gestureSourceType: 'touch', repeatCount: 1 });
   const duree = Date.now() - t0;
   const r = await pg.evaluate(() => { cancelAnimationFrame(window.__vrmRaf); try { window.__vrmObsL.disconnect(); } catch (_) {} const im = window.__vrmImages; const ecarts = im.slice(1).map((t, i) => t - im[i]);
-    const s = (document.querySelector('.n-coque-ecran') || document.scrollingElement); return { images: im.length, duree: im.length > 1 ? im[im.length - 1] - im[0] : 0, pireImage: ecarts.length ? Math.round(Math.max(...ecarts)) : 0, saccades: ecarts.filter((x) => x > 50).length, longues: window.__vrmLongues, haut: Math.round((s && s.scrollTop) || window.scrollY), noeuds: document.getElementsByTagName('*').length }; });
+    let haut = window.scrollY; for (const e of document.querySelectorAll('*')) if (e.scrollTop > haut) haut = e.scrollTop; return { images: im.length, duree: im.length > 1 ? im[im.length - 1] - im[0] : 0, pireImage: ecarts.length ? Math.round(Math.max(...ecarts)) : 0, saccades: ecarts.filter((x) => x > 50).length, longues: window.__vrmLongues, haut: Math.round(haut), noeuds: document.getElementsByTagName('*').length }; });
   const ips = r.duree ? Math.round(r.images / (r.duree / 1000)) : 0;
   const out = { ecran: id, ips, pireImageMs: r.pireImage, saccades: r.saccades, longues: r.longues.length, plusLongue: r.longues.length ? Math.max(...r.longues) : 0, defile: r.haut, noeuds: r.noeuds, mur: duree, memoire: await memoire(cdp) };
   console.log(`  défilement ${id.padEnd(8)} ${ips} images/s · pire image ${r.pireImage} ms · ${r.saccades} saccade(s) > 50 ms · ${out.longues} tâche(s) longue(s) (max ${out.plusLongue} ms) · défilé ${r.haut} px · ${r.noeuds} nœuds`);
