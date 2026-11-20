@@ -29,9 +29,9 @@ export default {
   },
   "v2.retirer.titre": "To pick up",
   "v2.retirer.voir": "See pickup codes",
-  "v2.retirer.resume": {
-    "one": "{n} parcels · {p} point",
-    "other": "{n} parcels · {p} points"
+  "v2.retirer.points": {
+    "one": "{n} point",
+    "other": "{n} points"
   },
   "v2.retirer.resumeN": {
     "one": "{n} parcel",
@@ -310,7 +310,7 @@ export default {
     "other": "{n} more days to forecast"
   },
   "v2.st.prev.rien": "nothing sold this month",
-  "v2.st.prev.jours": "in {n} days of {m}",
+  "v2.st.prev.jours": {"one": "in {n} day of {m}", "other": "in {n} days of {m}"},
   "v2.st.marge.titre": "Margin",
   "v2.st.marge.pct": "Margin",
   "v2.st.marge.sur": "on {k} sales with known cost (of {n})",

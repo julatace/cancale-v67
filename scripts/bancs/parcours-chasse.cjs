@@ -103,7 +103,7 @@ const sonde = (pg, tactile) => pg.evaluate((tactile) => {
       if (b.bottom < 0 || b.top > window.innerHeight * 3) continue;
       // La zone étendue (::before / ::after en absolu) compte.
       let w = b.width, h = b.height;
-      for (const ps of ['::before', '::after']) { const s = getComputedStyle(e, ps); if (s.position === 'absolute' && s.content !== 'none') { const ins = (k) => parseFloat(s[k]) || 0; w = Math.max(w, b.width - ins('left') - ins('right')); h = Math.max(h, b.height - ins('top') - ins('bottom')); } }
+      for (const ps of ['::before', '::after']) { const s = getComputedStyle(e, ps); if (s.position === 'absolute' && s.content !== 'none') { const ins = (k) => parseFloat(s[k]) || 0; w = Math.max(w, b.width - ins('left') - ins('right'), parseFloat(s.width) || 0); h = Math.max(h, s.height !== 'auto' && parseFloat(s.height) ? parseFloat(s.height) : b.height - ins('top') - ins('bottom')); } }
       if (w < 43.5 || h < 43.5) petites.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 24)} ${Math.round(w)}×${Math.round(h)}`);
     }
   }

@@ -29,9 +29,9 @@ export default {
   },
   "v2.retirer.titre": "Abzuholen",
   "v2.retirer.voir": "Abholcodes ansehen",
-  "v2.retirer.resume": {
-    "one": "{n} Pakete · {p} Abholpunkt",
-    "other": "{n} Pakete · {p} Abholpunkte"
+  "v2.retirer.points": {
+    "one": "{n} Abholpunkt",
+    "other": "{n} Abholpunkte"
   },
   "v2.retirer.resumeN": {
     "one": "{n} Paket",
@@ -310,7 +310,7 @@ export default {
     "other": "noch {n} Tage bis zur Prognose"
   },
   "v2.st.prev.rien": "diesen Monat nichts verkauft",
-  "v2.st.prev.jours": "in {n} von {m} Tagen",
+  "v2.st.prev.jours": {"one": "an {n} von {m} Tagen", "other": "in {n} von {m} Tagen"},
   "v2.st.marge.titre": "Marge",
   "v2.st.marge.pct": "Marge",
   "v2.st.marge.sur": "bei {k} Verkäufen mit bekanntem Preis (von {n})",

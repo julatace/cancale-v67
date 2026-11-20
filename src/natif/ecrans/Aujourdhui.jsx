@@ -163,7 +163,8 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
     )),
     retirer: () => (
       <Carte titre={tr('v2.retirer.titre')} n={nombre(nRet)} tonSous={retraits.premier && retraits.premier.ambre ? 'ambre' : 'neutre'}
-        sousTitre={[pts.length ? tr('v2.retirer.resume', { n: nRet, p: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}
+        // (20 nov., chasse-bugs-2) Chaque nombre a SON pluriel : « 2 colis · 1 points » (l'ancienne clé accordait les points au nombre de colis).
+        sousTitre={[pts.length ? tr('v2.retirer.resumeN', { n: nRet }) + ' · ' + tr('v2.retirer.points', { n: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}
         attrs={{ 'data-v2-bloc': 'retirer', 'data-v2-groupe': 'retirer', 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined }}>
         {ptsMontres.length ? ptsMontres.map((pt, k) => (
           <Rangee key={(pt.lieu || '?') + k} icone={<Icon name="pin" size={22}/>} titre={pt.lieu || tr('v2.retirer.pointInconnu')}
