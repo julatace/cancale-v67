@@ -68,6 +68,17 @@ function placeMention(hote, enveloppe, portee = null) {
     }
     cands.sort((a, b) => a.r.top - b.r.top);
     for (const c of cands) { const y = c.r.top + c.r.height / 2; if (!occupe(y)) return { top: Math.round(y - base.top), dans: c.dans }; }
+    // Aucune ligne de titre libre (Achats : boutons à droite du titre et des en-têtes) : la première ligne de TEXTE courte
+    // du haut de l'écran dont la droite est vide (« 8 avec code · 140 à vérifier »).
+    const lignes = [];
+    for (const e of (hote.querySelector('.vrm-ce-zone') || hote).querySelectorAll('p, small, span, div')) {
+      if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+      const r = e.getBoundingClientRect();
+      if (r.height < 12 || r.height > 30 || r.top < base.top || r.top > H * 0.6) continue;
+      lignes.push(r);
+    }
+    lignes.sort((a, b) => a.top - b.top);
+    for (const r of lignes) { const y = r.top + r.height / 2; if (!occupe(y)) return { top: Math.round(y - base.top), dans: 'ligne' }; }
   } catch (_) {}
   return null;
 }

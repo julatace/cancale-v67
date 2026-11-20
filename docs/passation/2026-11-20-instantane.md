@@ -95,3 +95,15 @@ sombre (Annonces, Achats, Argent) ou rien ; après : la copie dès 300 ms, ident
 - La coque copiée est peinte à la même largeur et dans le même thème que la capture ; une rotation, un autre thème ⇒ l'ouverture
   d'avant (puis la copie dans l'app). Un bandeau passager (fraîcheur, photos) qui apparaît APRÈS la copie la pousse d'autant.
 - Les chiffres d'Argent et d'Aujourd'hui d'une copie sont ceux de la dernière visite DU JOUR (jamais d'un autre jour), datés.
+
+## 6. Fusion de `origin/main` (Ventes en tableau #1279, vitesse #1280)
+
+Vrai merge ; conflits réglés en gardant les deux intentions (banc `iphone-rapide` : `SESSION=1` de lectures-legeres + routes
+d'abonnement de l'instantané ; README des bancs ; Quoi de neuf ; CLAUDE.md §9, deux plus vieilles lignes déplacées telles
+quelles dans `historique-divers.md`). Après la fusion :
+- les `id` sont GARDÉS dans la copie (des feuilles visent `#vrm-achats-retirer-corps` : Achats se décalait de 16 px) et la
+  copie est posée APRÈS l'écran vrai caché (`getElementById` rend l'écran vrai) — le banc le vérifie (« aucun id devant ») ;
+- la mention cherche aussi une ligne de texte courte libre (Achats : « 8 avec code · 140 à vérifier ») ;
+- copie Ventes en tableau (1512) et Achats (390) : identiques à l'écran vrai (mêmes positions mesurées).
+Bancs : copie-ecran 20 verts (mutations compte et panne : rouges), ventes-tableau 180, natif-ventes 58, retraits-jamais-muet 12,
+chiffres-volume contre `origin/main` : 34 identiques, 1 différence = le drapeau `data-attente-instantane=1` ; poids 1 992 Ko.
