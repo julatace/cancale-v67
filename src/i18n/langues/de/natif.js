@@ -30,7 +30,7 @@ export default {
   "site.tous": "Alle",
   "site.libelle": "Angezeigte Plattform",
   "site.plus.titre": "Plattformen",
-  "site.tousSeulement": "Diese Seite umfasst alle Plattformen.",
+  "site.tousSeulement": "Alle Plattformen",
   "achats.site.enRoute": "Unterwegs",
   "achats.site.recus": "Erhalten",
   "achats.site.annules": "Storniert",

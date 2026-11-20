@@ -66,7 +66,18 @@ export function useSiteCourant() {
 // Les sites RELIÉS (posés par la coque à chaque rendu) : le site effectif d'un écran qui n'a pas la coque sous la main
 // (« À régler », Aujourd'hui) — un site plus relié vaut « Tous ».
 let _relies = null;
-export function poserSitesRelies(l) { _relies = Array.isArray(l) ? l : null; }
+const _ecouteRelies = new Set();
+// (20 nov., sélecteur en pastilles) Un changement des sites reliés RÉVEILLE les sélecteurs montés (avant, un sélecteur rendu
+// avant la lecture des sites restait vide à l'ordinateur).
+export function poserSitesRelies(l) {
+  const n = Array.isArray(l) ? l : null;
+  const meme = (n || []).join('|') === (_relies || []).join('|') && !!n === !!_relies;
+  _relies = n;
+  if (!meme) for (const f of [..._ecouteRelies]) { try { f(); } catch (_) {} }
+}
+let _reliesSnap = null, _reliesCle = '';
+const lireRelies = () => { const c = (_relies || []).join('|'); if (c !== _reliesCle || !_reliesSnap) { _reliesCle = c; _reliesSnap = [...(_relies || [])]; } return _reliesSnap; };
+export function useSitesRelies() { return React.useSyncExternalStore((f) => { _ecouteRelies.add(f); return () => _ecouteRelies.delete(f); }, lireRelies, lireRelies); }
 export const sitesRelies = () => (_relies || []);
 export function siteCourantEffectif(brut = lireSiteCourant()) { return _relies ? siteEffectif(brut, _relies) : brut; }
 export function useSiteEffectif() { const [s] = useSiteCourant(); return siteCourantEffectif(s); }

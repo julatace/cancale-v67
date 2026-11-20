@@ -23,6 +23,7 @@ import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
+import { poserNombreAnnonces } from '../plateformes/nombresAnnonces.js';   // (20 nov. soir) le compteur des pastilles
 import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
@@ -180,6 +181,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   }, [modele, lu]);
   const opts = { seuil, maintenant: Date.now(), cle: cleNum };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
+  // (20 nov. soir) Les pastilles de plateforme disent les annonces EN LIGNE de chaque site : le même compte que le segment
+  // « En ligne » (src/articles/modele.js), publié pour le sélecteur de la coque. Pas lu ⇒ rien de posé (jamais « 0 »).
+  React.useEffect(() => { if (!comptes) return; for (const x of ['vinted', 'leboncoin', 'ebay', 'vestiaire']) { const c = comptes[x]; if (c && Number.isFinite(c.enligne)) poserNombreAnnonces(x, c.enligne); } }, [comptes]);
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
   const nomSite = (s) => NOM_SITE[s] || s;
   const limites = limitesDe(sites).map((l) => tr('egalite.limite.' + l.quoi, { site: nomSite(l.site) }));

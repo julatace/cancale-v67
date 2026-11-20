@@ -30,7 +30,7 @@ export default {
   "site.tous": "Tous",
   "site.libelle": "Plateforme regardée",
   "site.plus.titre": "Plateformes",
-  "site.tousSeulement": "Cette page porte sur tous les sites.",
+  "site.tousSeulement": "Tous les sites",
   "achats.site.enRoute": "En route",
   "achats.site.recus": "Reçus",
   "achats.site.annules": "Annulés",

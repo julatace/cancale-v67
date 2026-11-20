@@ -941,7 +941,7 @@ import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
 import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
-import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
+import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne, useSitesRelies } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta, questionsArgent } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOIS } from "./cibleNotif.js";
@@ -1014,7 +1014,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
-import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
+import { viderNombresAnnonces, abonnerNombresAnnonces, lireNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
@@ -20878,10 +20878,38 @@ const groupePlateformes = (tab, setTab) => {
       DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
     attrs: { 'data-plus-site': x } })) };
 };
-function SelecteurSiteCoque({ indisponible = false, raison = '' } = {}) {
+// (20 nov. soir, « un bel affichage ») Les pastilles de plateforme. Au téléphone : sous le grand titre. À l'ordinateur : À CÔTÉ
+// du titre de l'écran (portail dans un hôte posé juste après le titre visible le plus proche). `nombres` : le compteur de
+// chaque pastille, quand l'onglet le sait (Annonces : les annonces en ligne de chaque site, `nombresAnnonces`).
+function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null } = {}) {
   const [brut, poser] = useSiteCourant();
-  return <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={SITES_RELIES_COQUE.v} valeur={siteCourantCoque(brut)} onChange={poser} nom={nomPlateforme} Logo={(x) => <LogoSite site={x}/>}
-    tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
+  const relies = useSitesRelies();
+  const ordi = useOrdinateur();
+  const refAncre = React.useRef(null);
+  const [hote, setHote] = React.useState(null);
+  React.useLayoutEffect(() => {
+    if (!ordi) { setHote(null); return undefined; }
+    const vis = (e) => e && e.getClientRects().length;
+    let titre = null;
+    for (let p = refAncre.current && refAncre.current.parentElement; p && !titre; p = p.parentElement) titre = [...p.querySelectorAll('h1')].find(vis) || null;
+    if (!titre || !titre.parentElement) { setHote(null); return undefined; }
+    const h = document.createElement('span'); h.className = 'n-site-hote'; h.setAttribute('data-site-hote', '');
+    titre.insertAdjacentElement('afterend', h);
+    if (getComputedStyle(titre.parentElement).display.indexOf('flex') < 0) titre.setAttribute('data-avec-pastilles', '');
+    setHote(h);
+    return () => { h.remove(); titre.removeAttribute('data-avec-pastilles'); };
+  }, [ordi]);
+  const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
+    nombres={nombres} tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
+  if (ordi) return <span ref={refAncre} className="n-site-ancre" hidden={!!hote || undefined}>{hote ? createPortal(noeud, hote) : noeud}</span>;
+  return noeud;
+}
+// Annonces : le compteur de chaque pastille = ses annonces en ligne (publiées par l'écran Annonces, `poserNombreAnnonces`).
+function SelecteurSiteAnnonces() {
+  const nb = React.useSyncExternalStore(abonnerNombresAnnonces, lireNombresAnnonces, lireNombresAnnonces);
+  const relies = useSitesRelies();
+  const tous = relies.every((x) => Number.isFinite(nb[x])) ? relies.reduce((t, x) => t + nb[x], 0) : null;
+  return <SelecteurSiteCoque nombres={{ ...nb, ...(tous != null ? { toutes: tous } : {}) }}/>;
 }
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
 const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
@@ -68150,7 +68178,7 @@ function AppCoeur() {
         {tab==='annonces'&&<GardeEcran nom="annonces">{!baseKO && !annoncesAncien && sectionDeTache('annonces', platSub)==='annonces'
           ? <>
               {/* (20 nov.) LE sélecteur de plateforme en tête d'Annonces (la liste de tous les sites suit le site choisi). */}
-              <SelecteurSiteCoque/>
+              <SelecteurSiteAnnonces/>
               <AnnoncesEgaliteLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}
                 onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }} site={siteGlobal}/>
               {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si>{rendreVinted('annonces')}</CacheSiV2> : null}

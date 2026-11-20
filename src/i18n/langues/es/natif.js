@@ -30,7 +30,7 @@ export default {
   "site.tous": "Todas",
   "site.libelle": "Plataforma mostrada",
   "site.plus.titre": "Plataformas",
-  "site.tousSeulement": "Esta página abarca todos los sitios.",
+  "site.tousSeulement": "Todos los sitios",
   "achats.site.enRoute": "En camino",
   "achats.site.recus": "Recibidos",
   "achats.site.annules": "Cancelados",

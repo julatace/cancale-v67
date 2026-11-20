@@ -1,33 +1,60 @@
-/* Le sélecteur de plateforme (src/natif/SelecteurSite.jsx) : un segmenté natif à la marge de la page ; logo 18 + nom.
-   Au téléphone, à quatre ou cinq choix, le logo seul (le nom reste lu par `aria-label`). */
+/* Le sélecteur de plateforme (src/natif/SelecteurSite.jsx) — une rangée de PASTILLES qui défile (20 nov. soir).
+   Sous le grand titre au téléphone (collant sous la barre du titre réduit), à côté du titre à l'ordinateur (portail). */
 @layer vrm-natif {
-  /* (20 nov., « disposition parfaite ») Sous le grand titre, pleine largeur de la colonne de lecture (marge 16 au téléphone,
-     24 à l'ordinateur), COLLANT au défilement juste sous la barre du titre réduit ; le fond de la page derrière lui (le
-     contenu ne passe jamais visible dessous). Cibles 44 au doigt, 36 à la souris. */
   .n-selecteur-site { position: sticky; top: calc(var(--n-h-barre, 44px) + var(--n-haut-sur, 0px)); z-index: 25; box-sizing: border-box;
-    margin: 0 0 8px; padding: 4px var(--n-marge, 16px) 8px; background: var(--n-fond); }
+    margin: 0 0 12px; padding: 4px 0 8px; background: var(--n-fond); min-width: 0; }
+  .n-pastilles-site { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    padding: 4px var(--n-marge, 16px); scroll-padding-inline: var(--n-marge, 16px); -webkit-mask-image: none; mask-image: none; }
+  .n-pastilles-site::-webkit-scrollbar { display: none; }
+  /* Fondu au bord, seulement du côté où il reste des pastilles. */
+  .n-selecteur-site[data-bord-d] .n-pastilles-site { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent); }
+  .n-selecteur-site[data-bord-g] .n-pastilles-site { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px); mask-image: linear-gradient(90deg, transparent, #000 32px); }
+  .n-selecteur-site[data-bord-g][data-bord-d] .n-pastilles-site { -webkit-mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
+
+  .n-pastille-site { position: relative; flex: 0 0 auto; box-sizing: border-box; display: inline-flex; align-items: center; gap: 8px;
+    height: 36px; padding: 0 14px 0 10px; border-radius: 999px; border: 1px solid transparent;
+    background: var(--n-carte, #fff); color: var(--n-encre); font: var(--n-t-second-fort);
+    letter-spacing: -0.01em; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: background-color .2s ease, border-color .2s ease, transform .15s ease; }
+  .n-pastille-site::before { content: ""; position: absolute; inset: -4px -2px; }   /* cible 44 */
+  .n-pastille-site:active { transform: scale(.97); }
+  .n-pastille-site[aria-checked="true"] { background: var(--n-teinte);
+    border-color: var(--n-accent, #0068D6); }
+  .n-pastille-site:focus-visible { outline: 2px solid var(--n-accent, #0068D6); outline-offset: 2px; }
+  .n-pastille-n { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+
+  /* Le logo en couleur : la forme du fichier (masque), la couleur du site (lisible en clair ET en sombre). */
+  .n-pastille-logo { display: inline-block; flex: 0 0 auto; -webkit-mask: var(--n-logo) center / contain no-repeat; mask: var(--n-logo) center / contain no-repeat; background: var(--n-encre); }
+  .n-pastille-logo[data-site="vinted"] { background: #007782; }
+  .n-pastille-logo[data-site="leboncoin"] { background: #EC5A13; }
+  .n-pastille-logo[data-site="ebay"] { background: linear-gradient(90deg, #E53238 0 30%, #0064D2 30% 52%, #F5AF02 52% 74%, #86B817 74%); }
+  .n-pastille-logo[data-site="vestiaire"] { background: var(--n-encre); }
+  :root[data-theme="dark"] .n-pastille-logo[data-site="vinted"] { background: #2FB4BE; }
+  :root[data-theme="dark"] .n-pastille-logo[data-site="leboncoin"] { background: #FF7A3D; }
+  :root[data-theme="dark"] .n-pastille-logo[data-site="ebay"] { background: linear-gradient(90deg, #FF5A5F 0 30%, #4D9BFF 30% 52%, #F5AF02 52% 74%, #9BD13A 74%); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .n-pastille-logo[data-site="vinted"] { background: #2FB4BE; }
+    :root:not([data-theme="light"]) .n-pastille-logo[data-site="leboncoin"] { background: #FF7A3D; }
+    :root:not([data-theme="light"]) .n-pastille-logo[data-site="ebay"] { background: linear-gradient(90deg, #FF5A5F 0 30%, #4D9BFF 30% 52%, #F5AF02 52% 74%, #9BD13A 74%); }
+  }
+  /* « Tous » : une petite pile de logos, chacun sur une pastille ronde du fond de la carte. */
+  .n-pastille-pile { display: inline-flex; align-items: center; }
+  .n-pastille-pile-logo { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--n-carte, #fff); box-shadow: 0 0 0 1.5px var(--n-carte, #fff), 0 0 0 2px var(--n-trait); }
+  .n-pastille-pile-logo + .n-pastille-pile-logo { margin-left: -6px; }
+
+  /* Une page sans règle par site : UNE ligne discrète, pas de pastilles grisées. */
+  .n-site-tous-seul { margin: 0; padding: 0 var(--n-marge, 16px); font: var(--n-t-legende, 13px/18px system-ui); color: var(--n-encre-2); }
+
   @media (min-width: 1024px) {
-    .n-selecteur-site { top: 0; padding: 12px 24px; }
-    .n-selecteur-site .n-segmente { height: 36px; max-width: 560px; }
+    .n-selecteur-site { top: 0; padding: 8px 0; }
+    .n-pastilles-site { padding: 4px 24px; }
+    /* À côté du titre (portail de la coque : `.n-site-hote`), sans fond ni collant. */
+    .n-site-hote { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 auto; margin-inline: 20px auto; vertical-align: middle; }
+    .n-site-hote .n-selecteur-site { position: static; margin: 0; padding: 0; background: none; }
+    .n-site-hote .n-pastilles-site { padding: 4px 2px; }
+    .n-site-hote .n-site-tous-seul { padding: 0; }
+    [data-avec-pastilles] { display: inline-block; vertical-align: middle; }
   }
-  .n-site-option { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
-  .n-site-logo { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; align-items: center; justify-content: center; }
-  .n-site-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-site-logo { color: currentColor; }
-  .n-site-court { display: none; }
-  /* Au téléphone, à quatre ou cinq choix : le nom COURT en texte (« Tous · Vinted · LBC · eBay · VC »), lisible en clair
-     comme en sombre (l'encre du segmenté) ; le logo et le nom long sont lus par `aria-label`. */
-  @media (max-width: 599px) {
-    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) :is(.n-site-logo, .n-site-nom) { display: none; }
-    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-court { display: inline; }
-  }
-  /* (20 nov., intégration 5.410 — planche 1512) Dans une colonne ÉTROITE à l'ordinateur (liste de Ventes à côté du détail,
-     ~420 px), les noms longs étaient coupés (« Vint… », « Leb… ») : la règle suit la place de la colonne, pas l'écran. */
-  .n-selecteur-site { container-type: inline-size; }
-  @container (max-width: 560px) {
-    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) :is(.n-site-logo, .n-site-nom) { display: none; }
-    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-court { display: inline; }
-  }
-  .n-selecteur-site[data-site-indisponible] .n-selecteur-site-seg { opacity: .45; }
-  .n-selecteur-site-raison { margin: 6px 0 0; font: var(--n-t-legende, 13px/18px system-ui); color: var(--n-encre-2); }
+  @media (prefers-reduced-motion: reduce) { .n-pastille-site { transition: none; } .n-pastille-site:active { transform: none; } }
 }
