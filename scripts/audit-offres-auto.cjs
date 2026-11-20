@@ -119,7 +119,10 @@ essaie('app', () => {
   // Chaque acceptation part d'un clic. On prend chaque `actionOffre('accept'`
   // et on vérifie qu'un `onClick` l'introduit (sur la portée qui précède).
   const accepts = [...APP.matchAll(/actionOffre\(\s*['"]accept['"]/g)];
-  dit(accepts.length > 0, "la messagerie accepte bien une offre précise (actionOffre('accept'))");
+  // (20 nov., décision « toute action se fait dans l'extension ») L'app n'accepte plus rien : la messagerie Vinted et
+  // l'interrupteur vivent dans le PANNEAU de l'extension. Une acceptation dans l'app, s'il en reste, part d'un clic (ci-dessous).
+  const PAN = (() => { try { return lire('vinted-sync-extension/vrm-badge.js') + lire('vinted-sync-extension/vrm-ui.js'); } catch (_) { return ''; } })();
+  dit(accepts.length > 0 || /offer_requests\/\$\{[^}]+\}\/accept|\/accept[`'"]/.test(PAN + lire('vinted-sync-extension/background.js')), "une offre précise s'accepte (messagerie de l'app, ou panneau de l'extension)");
   const sansClic = accepts.filter((a) => !/onClick=\{\s*\(?\)?\s*=>\s*$/.test(APP.slice(Math.max(0, a.index - 40), a.index)));
   dit(sansClic.length === 0, "chaque acceptation d'offre part d'un clic (jamais une boucle)",
     sansClic.map((a) => 'l.' + ligneDe(APP, a.index)).join(' · '));
@@ -140,10 +143,11 @@ essaie('app', () => {
   // on lit l'interrupteur ET la question qu'il pose.
   const iConf = /await confirmerOffresAuto\(\)/.test(iBasc >= 0 ? APP.slice(iBasc, iBasc + 400) : '') ? APP.indexOf('function confirmerOffresAuto()') : -1;
   const corpsBasc = (iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '') + (iConf >= 0 ? APP.slice(iConf, iConf + 1500) : '');
-  dit(/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc),
+  const panneauAvertit = /autoChoisie === 'offres' \? TU\('ra_confirme_offres'\)/.test(PAN) && /ra_confirme_offres: \{ fr: "[^"]*accepte à ta place[^"]*(robot|risque pour le compte)/.test(PAN);
+  dit(panneauAvertit || (/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc)),
     "l'interrupteur AVERTIT que VRM accepte à ta place et nomme le risque (honnêteté retournée : il prévient, il ne rassure pas)",
-    iBasc < 0 ? 'basculerOffresAuto introuvable' : '');
-  dit(/data-offres-auto-toggle/.test(APP), "l'interrupteur d'acceptation auto existe dans l'app (data-offres-auto-toggle)");
+    iBasc < 0 && !panneauAvertit ? 'basculerOffresAuto introuvable (ni dans le panneau)' : '');
+  dit(/data-offres-auto-toggle/.test(APP) || /if \(auto === 'offres'\) return \{ cle: 'vinted_offres_auto', valeur: actif \}/.test(PAN), "l'interrupteur d'acceptation auto existe (app, ou panneau de l'extension : `vinted_offres_auto`)");
 });
 
 // ── 4. L'autre sens : la voie manuelle reste, et l'ancien réglage reste éteint
