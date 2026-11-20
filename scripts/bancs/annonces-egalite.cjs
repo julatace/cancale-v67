@@ -17,7 +17,7 @@
 //   T. cibles ≥ 44 × 44 au doigt (390) ;
 //   D. aucun débordement horizontal ;
 //   A. « Actions » ⇒ la liste passe en sélection (cases), le plein « {Action} · N » ;
-//   V. vide ⇒ l'état vide dessiné ; volume ⇒ 60 rangées puis « Voir N de plus ».
+//   V. vide ⇒ l'état vide dessiné ; volume ⇒ 60 rangées (au téléphone : 60 par compte, 20 nov.) puis « Voir N de plus ».
 //  `--prouve` : chaque mesure, faussée dans la page (un plein posé dans une rangée, une
 //  cellule vidée, une colonne retirée), doit rougir. SHOTS : le dossier des captures.
 // ═══════════════════════════════════════════════════════════
@@ -76,6 +76,8 @@ const MESURE = () => {
   r.lignes = [...document.querySelectorAll('tr[data-eg-article]')].slice(0, 40).map((tr) => [...tr.querySelectorAll('[data-eg-col]')].map((td) => ({ c: td.getAttribute('data-eg-col'), v: td.textContent.trim().length > 0 })));
   r.rangees = [...document.querySelectorAll('.n-rangee[data-eg-article], [data-eg-article].n-rangee, [data-eg-liste] [data-eg-article]')].slice(0, 40).map((e) => ({ faits: !/mini —|acheté —/.test(e.textContent), prix: /€|—/.test(e.textContent) }));
   r.nRangees = document.querySelectorAll('[data-eg-article]').length;
+  // (20 nov., « divise par comptes ») Au téléphone, chaque compte montre ses 60 premières annonces : le plus long des groupes.
+  r.maxGroupe = Math.max(0, ...[...document.querySelectorAll('[data-eg-groupe]')].map((g) => g.querySelectorAll('[data-eg-article]').length));
   return r;
 };
 const COLS = ['article', 'numero', 'sites', 'prix', 'prixMini', 'achat', 'benefice', 'depuis'];
@@ -110,7 +112,7 @@ async function juger(nav, mutant = '') {
           dit(r.rangees.length > 0 && r.rangees.every((x) => x.faits && x.prix), `P ${ou} : chaque rangée dit son prix, et jamais « mini — » / « acheté — » (un manque est dit une fois, en tête du compte — 20 nov.)`, r.rangees.find((x) => !x.faits || !x.prix));
           dit(r.cibles.length === 0, `T ${ou} : cibles ≥ 44 × 44`, r.cibles.slice(0, 6));
         }
-        if (v === 'volume') dit(r.nRangees === 60 && r.plus, `V ${ou} : 60 rangées puis « Voir N de plus »`, r.nRangees);
+        if (v === 'volume') dit((r.maxGroupe ? r.maxGroupe === 60 : r.nRangees === 60) && r.plus, `V ${ou} : 60 rangées (par compte au téléphone) puis « Voir N de plus »`, { n: r.nRangees, maxGroupe: r.maxGroupe });
       }
       dit(r.contrastes.length === 0, `C ${ou} : contrastes ≥ 4,5:1`, r.contrastes.slice(0, 6));
       dit(r.debord <= 0, `D ${ou} : aucun débordement horizontal`, r.debord);

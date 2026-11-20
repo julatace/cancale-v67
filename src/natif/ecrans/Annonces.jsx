@@ -156,7 +156,10 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const liste = Array.isArray(articles) ? articles : [];
   const visibles = liste.slice(0, max);
   // (20 nov., Julien : « divise par comptes ») Un groupe par compte, au site choisi ; seuls les groupes qui ont un résultat.
-  const groupes = React.useMemo(() => groupesParCompte(visibles, filtre.site), [visibles, filtre.site]);
+  // Chaque compte montre ses `max` premières annonces (« Voir N de plus » les allonge toutes) : un compte n'est jamais caché
+  // derrière la pagination d'un autre.
+  const groupes = React.useMemo(() => groupesParCompte(liste, filtre.site), [liste, filtre.site]);
+  const resteGroupes = groupes.reduce((n, g) => n + Math.max(0, g.articles.length - max), 0);
   const A = action ? actions.find((x) => x.cle === action) : null;
   const cochable = (a) => !A || !A.pour || A.pour(a);
   const choisis = liste.filter((a) => sel.has(a.cle));
@@ -294,10 +297,10 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                   repli={{ ouvert: !replis.has(g.cle), onBascule: () => basculerRepli(g.cle), n: tr('egalite.groupe.n', { n }) }}
                   attrs={{ 'data-eg-groupe': g.cle, 'data-eg-groupe-n': String(n) }}>
                   {sansAchat && onCompleter && !A ? <Rangee titre={tr('egalite.groupe.achats', { n: sansAchat })} ton="ambre" fin="chevron" onClick={() => onCompleter('achat')} attrs={{ 'data-eg-manque': 'achat', 'data-eg-manque-n': String(sansAchat) }}/> : null}
-                  {g.articles.map((a) => rangee(a, g.cle))}
+                  {g.articles.slice(0, max).map((a) => rangee(a, g.cle))}
                 </Groupe>);
             })}</div>}
-        {liste.length > max ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: liste.length - max })}</Bouton></Groupe> : null}
+        {(ordinateur ? liste.length > max : resteGroupes > 0) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
         {/* (20 nov., « téléphone bâclé ») Sous la liste, seulement ce qui MANQUE (un site pas lu : « rien lu » n'est pas « rien ») ;
             les limites techniques d'un site et « Tout l'écran {site} » ne s'y écrivent plus (l'écran du site est dans « ⋯ »). */}
         {Array.isArray(articles) && manque ? <Groupe nu pied={manque} attrs={{ 'data-eg-pied': '' }}/> : null}
