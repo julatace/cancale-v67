@@ -471,6 +471,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Affichage instantané (instantane)** : chaque onglet s'ouvre sur SA copie (`src/copieEcran.js`, IndexedDB `vrm_copie_{owner}_{ecran}`, du jour, par compte, effacée à la déconnexion), inerte et datée, peinte même avant l'app ; base injoignable ⇒ « Pas à jour · Réessayer » ; squelettes natifs ≤ 6 %. `2026-11-20-instantane.md`. Geste : aucun.
 - **20 nov. · Ext. 5.410.2 : le panneau reste ouvert, bordereau et livreur, « pas revue »** : seuls son × / Échap le ferment (hôte replacé, état par onglet en `storage.session` via `panneauEtat`) ; Commandes et Accueil : transporteur, suivi, date limite, « Imprimer le bordereau » (`bordereauCarte`, lecture seule) ; « à confirmer » ⇒ « Pas revue depuis N j » (app et extension). `2026-11-20-extension-5412.md`. Geste : installer la 5.410.2.
 - **20 nov. · Ventes en tableau de travail (ventes-tableau)** : à l'ordinateur, À envoyer / En route = `TableauTravail` (transporteur en logo, statut en étiquette, cases = le lot, « Imprimer N » dans la barre, détail au toucher seulement) ; téléphone : logo + étiquette ; Terminées garde le segmenté. `2026-11-20-ventes-tableau.md`. Geste : aucun.
 - **20 nov. · Lectures légères (lectures-legeres)** : commandes par `/api/compte?mode=commandes-lire` (session, compressées, ETag/304 ; repli sur la lecture d'avant) 2 069 → 303 Ko à froid ; dressings après les commandes ; preuves de vente sur la famille `txn2` gardée ; `src/memoCourt.js`. `2026-11-20-lectures-legeres.md`. Geste : aucun.

@@ -57,6 +57,19 @@ export function finDemarrage(raison = '') {
 
 // Une page qui ne montre qu'une attente garde l'écran de démarrage.
 export const pageEnAttente = (root) => !root || !root.childElementCount || !!root.querySelector(SELECTEUR_ATTENTE);
+// (20 nov., affichage instantané) La copie d'un écran a été peinte AVANT l'app (src/OuvertureInstantanee.jsx,
+// `window.__vrmApercuEcran`) : tant que la coque de l'app montre un AUTRE écran (elle part sur Aujourd'hui puis
+// reprend l'écran demandé), l'écran de démarrage — et la copie — restent devant ; 8 s au plus. Pas de coque
+// (connexion, porte, double vérification) : rien n'est retenu.
+export const DELAI_ECRAN_COPIE_MS = 8000;
+export function autreEcranQueLaCopie(root) {
+  try {
+    const e = typeof window !== 'undefined' && window.__vrmApercuEcran;
+    if (!e || !e.ecran || performance.now() - (e.t || 0) > DELAI_ECRAN_COPIE_MS) return false;
+    const m = root && root.querySelector('.vrm-main[data-ecran]');
+    return !!m && m.getAttribute('data-ecran') !== e.ecran;
+  } catch (_) { return false; }
+}
 
 export function suivreDemarrage() {
   if (typeof document === 'undefined' || fini) return;
@@ -65,13 +78,15 @@ export function suivreDemarrage() {
   etapeDemarrage('lancee');
   if (!root) { finDemarrage('sans-racine'); return; }
   const voir = () => {
-    if (!pageEnAttente(root)) { finDemarrage('contenu'); return; }
+    if (!pageEnAttente(root) && !autreEcranQueLaCopie(root)) { finDemarrage('contenu'); return; }
     // La coque est montée et attend ses données (src/AttenteEcran.jsx) : un jalon de plus.
     try { if (root.querySelector('[data-demarrage-attente]')) etapeDemarrage('coque'); } catch (_) {}
   };
   try {
     obs = new MutationObserver(voir);
-    obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-demarrage-attente', 'data-confidentialite', 'data-equipe-attente', 'data-demarrage-vrm'] });
+    obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-demarrage-attente', 'data-confidentialite', 'data-equipe-attente', 'data-demarrage-vrm', 'data-ecran'] });
+    // La retenue de la copie a une fin : on revoit la page à son terme.
+    setTimeout(() => { if (!fini) voir(); }, DELAI_ECRAN_COPIE_MS + 50);
   } catch (_) { finDemarrage('sans-observateur'); return; }
   voir();
 }

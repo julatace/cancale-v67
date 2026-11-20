@@ -45,10 +45,16 @@ import { Glyphe } from './icones.jsx';
 export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
+  // (20 nov., affichage instantané) La photo arrive en FONDU sur un fond neutre doux (jamais un trou qui « claque ») ;
+  // déjà en cache ⇒ montrée telle quelle, sans fondu. Taille fixée (`width`/`height`) : rien ne saute.
+  const refImg = React.useRef(null);
+  const [chargee, setChargee] = React.useState(false);
+  React.useLayoutEffect(() => { const i = refImg.current; setChargee(i && i.complete && i.naturalWidth > 0 ? 'deja' : false); }, [src]);
   const t = taille === 44 ? 44 : taille === 48 ? 48 : 56;   // (19 nov. soir) 48 : la vignette d'un tableau de travail
   if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
-    return <img className={cx('n-vignette', className)} data-n-taille={t} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>;
+    return <img ref={refImg} className={cx('n-vignette', className)} data-n-taille={t} data-n-photo={chargee || 'attente'} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false"
+      onLoad={() => setChargee((c) => c || 'la')} onError={() => setRate(true)}/>;
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>

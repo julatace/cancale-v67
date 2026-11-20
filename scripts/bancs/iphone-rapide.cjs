@@ -103,9 +103,16 @@ async function preparer(ctx) {
     LECTURES.push({ u: plein.slice(0, 140), plein: plein + '\n' + (h.range || ''), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
-  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: SESSION && r.request().url().includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
-    : SESSION && r.request().url().includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
-    : SESSION && r.request().url().includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{"pret":true,"devices":1}' }));
+  // (20 nov., instantane) Les routes que le démarrage lit, à LEUR forme (comme le banc ouverture-instantanee) : un vendeur
+  // abonné, sa propre boutique — c'est ce qui permet à l'app de peindre avant d'être chargée (porte hors ligne).
+  await ctx.route('**/api/**', (r) => { const u = r.request().url();
+    // (lectures-legeres) Connecté (`SESSION=1`) : la porte de confidentialité, l'abonnement du propriétaire, l'équipe non installée.
+    if (SESSION) return r.fulfill({ status: 200, contentType: 'application/json', body: u.includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
+      : u.includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
+      : u.includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{"pret":true,"devices":1}' });
+    const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
+      : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }); });
   if (SESSION) {
     await ctx.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated', role: 'authenticated', email_confirmed_at: '2026-01-01T00:00:00Z', identities: [], app_metadata: { provider: 'email' }, user_metadata: {} } : /factors|aal/.test(r.request().url()) ? { currentLevel: 'aal1', nextLevel: 'aal1', all: [], totp: [] } : { access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
     // La VRAIE route des commandes (enregistrée après `**/api/**` : Playwright prend la dernière d'abord).
@@ -326,6 +333,119 @@ async function defiler(pg, cdp, id) {
   return out;
 }
 
+// ── (20 nov., instantane) L'AFFICHAGE INSTANTANÉ : du toucher (ou de l'ouverture) au PREMIER CONTENU RÉEL ──
+//  ETAPES=…,instantane · PLANCHE=<dossier> (captures 0 / 300 / 1 000 / 3 000 ms, clair et sombre) · ETIQUETTE=avant|apres.
+//  « Contenu réel » = une rangée ou un chiffre de l'écran visé VISIBLE dans le premier écran (pas un squelette) : celui
+//  de la copie de l'appareil (`[data-copie-ecran]`) OU celui de l'écran vrai. Règle `contenuVisible` ci-dessous.
+//  Chaque mesure : une page NEUVE (service worker actif), Aujourd'hui ouvert et calme, puis le toucher de l'onglet —
+//  c'est la 1re visite de l'onglet dans la page (celle qui montrait le squelette gris géant).
+const ECRANS_INSTANTANE = ['annonces', 'ventes', 'achats', 'compta', 'messages', 'journee'];
+function contenuVisible(id) {
+  const H = innerHeight;
+  // La copie peinte AVANT l'app, dans l'écran de démarrage (src/OuvertureInstantanee.jsx).
+  { const z = document.querySelector('#vrm-demarrage [data-copie-ecran="' + id + '"] [data-copie-contenu]'); if (z) { const r = z.getBoundingClientRect(); if (r.height > 8 && r.top < H - 60) return 'copie-avant-app'; } }
+  const m = document.querySelector('#root .vrm-main');
+  if (!m || m.getAttribute('data-ecran') !== id) return null;
+  const vu = (e) => { const r = e.getBoundingClientRect(); if (r.height < 8 || r.bottom < 60 || r.top > H - 60 || r.width < 40) return false; const st = getComputedStyle(e); return st.visibility !== 'hidden' && +st.opacity > 0.5 && !e.closest('.vrm-attente-cache,[aria-hidden="true"],[data-squelette],.vrm-squelette'); };
+  // La copie de l'appareil : ses rangées / chiffres.
+  for (const e of m.querySelectorAll('[data-copie-ecran][data-copie-contenu], [data-copie-ecran] [data-copie-contenu]')) if (vu(e)) return 'copie';
+  // L'instantané d'avant (Ma journée, Ventes, Annonces : src/instantaneEcran.js), s'il est montré.
+  for (const e of m.querySelectorAll('[data-attente="instantane"] .vrm-ji:not([data-copie-ecran])')) if (vu(e) && /\d/.test(e.textContent || '')) return 'instantane';
+  // L'écran vrai, prêt (ou au plafond) : une rangée, une vignette ou un chiffre lu.
+  const att = m.querySelector('[data-attente-ecran="' + id + '"]');
+  if (att && att.getAttribute('data-attente') === 'attente') return null;
+  const SEL = '[data-fiche-ligne], [data-eg-article], [data-tt-ligne], [data-n-rangee], .n-rangee, [data-v2-chiffres="lu"], [data-vendu-mois]:not([data-vendu-mois=""]), [data-achat-rangee], [data-conv], [data-vente], li, [data-msg-groupe] > :not(:first-child)';
+  const zone = att && att.getAttribute('data-attente') !== 'instantane' ? att : null;
+  if (!zone) return null;
+  for (const e of zone.querySelectorAll(SEL)) if (vu(e) && /\S/.test(e.textContent || '')) return 'vrai';
+  return null;
+}
+// Une page neuve (service worker actif), le thème posé avant tout script.
+async function pageNeuve(ctx, theme) {
+  const pg = await ctx.newPage();
+  await pg.addInitScript((s) => { try { localStorage.setItem('vinted_dark', JSON.stringify(s)); localStorage.setItem('vrm_apparence', JSON.stringify(s ? 'sombre' : 'clair')); } catch (_) {} }, theme === 'sombre');
+  const cdp = await cdpDe(pg);
+  return { pg, cdp };
+}
+const calme = (pg, sans = 1500, max = 25000) => pg.evaluate(([sans, max]) => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > sans || performance.now() - t0 > max) { clearInterval(iv); ok(); } }, 200); }), [sans, max]);
+const ONGLET_DE = (id) => (id === 'annonces' ? 'paires' : id);
+// La sonde posée dans la page : le premier instant (performance.now) où le contenu est visible, et qui l'a montré.
+async function poserSonde(pg, id, depuisToucher) {
+  await pg.evaluate(([src, id, depuisToucher]) => {
+    const f = new Function('id', src); const C = window.__vrmContenu = { t0: 0, t: null, par: null };
+    const boucle = () => { if (C.t != null) return; let r = null; try { r = f(id); } catch (_) {} if (r) { C.t = performance.now() - C.t0; C.par = r; return; } requestAnimationFrame(boucle); };
+    if (depuisToucher) document.addEventListener('pointerdown', () => { C.t0 = performance.now(); requestAnimationFrame(boucle); }, { once: true, capture: true });
+    else requestAnimationFrame(boucle);
+  }, [`return (${contenuVisible.toString()})(id);`, id, depuisToucher]);
+}
+async function instantane(ctx) {
+  const out = { ouverture: [], toucher: [] };
+  const dossier = process.env.PLANCHE || '';
+  const etiquette = process.env.ETIQUETTE || 'mesure';
+  if (dossier) fs.mkdirSync(dossier, { recursive: true });
+  const themes = String(process.env.THEMES || (dossier ? 'clair,sombre' : 'clair')).split(',');
+  const ecrans = String(process.env.ECRANS || ECRANS_INSTANTANE.join(',')).split(',');
+  for (const theme of themes) {
+    // 0) Une visite de chaque onglet (la même avant et après) : l'app range ce qu'elle range (copies, mémoires).
+    {
+      const { pg, cdp } = await pageNeuve(ctx, theme);
+      await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await pg.waitForSelector('[data-attente-ecran="journee"][data-attente="pret"]', { timeout: 120000 }).catch(() => {});
+      for (const id of ecrans) {
+        if (id === 'messages') await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'messages' })));
+        else await pg.locator(`[data-n-onglet="${ONGLET_DE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+        await pg.waitForSelector(`[data-attente-ecran="${id}"][data-attente="pret"]`, { timeout: 60000 }).catch(() => {});
+        await calme(pg, 1500, 15000); await attendre(3500);
+      }
+      await cdp.detach().catch(() => {}); await pg.close();
+    }
+    // A) L'OUVERTURE sur l'écran (page neuve, `?tab=`) : de la navigation au premier contenu ; captures 0 / 300 / 1 000 / 3 000 ms.
+    for (const id of ecrans) {
+      const { pg, cdp } = await pageNeuve(ctx, theme);
+      await pg.addInitScript(([src, id]) => {
+        const f = new Function('id', src); const C = window.__vrmContenu = { t0: 0, t: null, par: null };
+        const boucle = () => { if (C.t != null) return; let r = null; try { r = f(id); } catch (_) {} if (r) { C.t = performance.now(); C.par = r; return; } requestAnimationFrame(boucle); };
+        requestAnimationFrame(boucle);
+        try { window.__vrmEcrituresCopie = 0; } catch (_) {}
+      }, [`return (${contenuVisible.toString()})(id);`, id]);
+      await pg.goto(`http://localhost:${PORT}/?tab=${id}`, { waitUntil: 'commit', timeout: 120000 });
+      for (const ms of [0, 300, 1000, 3000]) {
+        for (let k = 0; k < 400; k++) { const n = await pg.evaluate(() => performance.now()).catch(() => 0); if (n >= ms) break; await attendre(15); }
+        if (dossier) await pg.screenshot({ path: path.join(dossier, `${etiquette}-${theme}-ouverture-${id}-${ms}.png`), scale: 'css' }).catch(() => {});
+        if (process.env.APERCU && ms === 3000) console.log('     (essai : ' + JSON.stringify(await pg.evaluate(() => { const h = document.querySelector('#root [data-copie-ecran]'); if (!h) return null; const pad = () => getComputedStyle(h).paddingLeft; const out = { base: pad() }; for (const a of ['aria-busy', 'inert', 'data-copie-contenu', 'data-copie-ecran', 'data-copie-etat', 'data-copie-age', 'data-copie-t']) { const v = h.getAttribute(a); if (v == null) continue; h.removeAttribute(a); out[a] = pad(); h.setAttribute(a, v); } for (const c of ['vrm-ce', 'vrm-ce-contenu', 'vrm-attente-sans-fondu']) { h.classList.remove(c); out[c] = pad(); h.classList.add(c); } out.prec = h.previousElementSibling && h.previousElementSibling.className; return out; }).catch((e) => String(e))) + ')');
+        if (process.env.APERCU && ms === 3000) console.log('     (copie dans l\'app : ' + JSON.stringify(await pg.evaluate(() => { const r0 = document.querySelector('#root [data-copie-ecran] .n-rangee'); const out = []; for (let x = r0; x && x !== document.body; x = x.parentElement) { const r = x.getBoundingClientRect(); const st = getComputedStyle(x); out.push(String(x.className || x.tagName).slice(0, 34) + ':' + Math.round(r.left) + '/' + Math.round(r.width) + ':' + st.display + (st.minWidth !== 'auto' && st.minWidth !== '0px' ? ':minw=' + st.minWidth : '') + ':m=' + st.margin + ':p=' + st.padding); } return out; }).catch((e) => String(e))) + ')');
+        if (process.env.APERCU && ms === 300) console.log('     (largeurs : ' + JSON.stringify(await pg.evaluate(() => { const h = document.querySelector('#vrm-apercu .vrm-ce-contenu'); if (!h) return null; const out = []; let e = h; const n0 = document.querySelector('#vrm-apercu nav [data-n-onglet], #vrm-apercu nav button, #vrm-apercu nav a') || document.querySelector('#vrm-apercu nav'); for (let x = n0; x && x !== document.body; x = x.parentElement) { const r = x.getBoundingClientRect(); const st = getComputedStyle(x); out.push((x.className || x.tagName).toString().slice(0, 30) + ':' + Math.round(r.left) + '/' + Math.round(r.width) + ':' + st.display + ':' + st.position + (st.transform !== 'none' ? ':T' : '') + (st.contain !== 'none' ? ':C' + st.contain : '') + (st.backdropFilter !== 'none' ? ':B' : '') + (st.filter !== 'none' ? ':F' : '') + ':r=' + st.borderRadius + ':o=' + st.overflow + (st.clipPath !== 'none' ? ':clip=' + st.clipPath : '') + (st.maskImage && st.maskImage !== 'none' ? ':mask=' + st.maskImage.slice(0, 60) : '') + ':op=' + st.opacity); } const n = document.querySelector('#vrm-apercu nav'); const pile = (x, y) => document.elementsFromPoint(x, y).slice(0, 6).map((e) => (e.id ? '#' + e.id : '') + String(e.className || e.tagName).slice(0, 30) + ':' + getComputedStyle(e).opacity + ':' + (getComputedStyle(e).clipPath !== 'none' ? 'clip' : '') + (getComputedStyle(e).maskImage && getComputedStyle(e).maskImage !== 'none' ? 'mask' : '')); return { pile1: pile(30, 815), pile2: pile(8, 60), chaine: out, nav: n && Math.round(n.getBoundingClientRect().width), html: document.documentElement.getAttribute('style'), vw: innerWidth }; }).catch((e) => String(e))) + ')');
+      }
+      await pg.waitForFunction(() => window.__vrmContenu && window.__vrmContenu.t != null, null, { timeout: 30000, polling: 50 }).catch(() => {});
+      const C = await pg.evaluate(() => window.__vrmContenu).catch(() => null);
+      const av = await pg.evaluate(() => [window.__vrmApercuCopie, window.__vrmApercu, (performance.getEntriesByName('vrm:apercu-copie')[0] || {}).startTime, Object.keys(localStorage).filter((k) => /porte_ok|abo_dernier|equipe_cache|copie_index|journee_inst/.test(k))]).catch(() => []);
+      const r = { theme, ecran: id, premierContenuMs: C && C.t != null ? Math.round(C.t) : null, par: C && C.par, avantApp: av };
+      if (process.env.DEBUG || process.env.APERCU) console.log('     (avant l\'app : ' + JSON.stringify(av) + ')');
+      out.ouverture.push(r);
+      console.log(`  ${theme.padEnd(6)} ouverture ?tab=${id.padEnd(8)} premier contenu ${r.premierContenuMs == null ? '— (rien en 30 s)' : r.premierContenuMs + ' ms'} (${r.par || '—'})`);
+      await cdp.detach().catch(() => {}); await pg.close();
+    }
+    // B) LE TOUCHER de l'onglet, 1re visite dans la page (page neuve sur Aujourd'hui, calme) : du toucher au premier contenu.
+    if (theme === themes[0]) for (const id of ecrans) {
+      const { pg, cdp } = await pageNeuve(ctx, theme);
+      const depart = id === 'journee' ? 'annonces' : 'journee';
+      await pg.goto(`http://localhost:${PORT}/?tab=${depart}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      await pg.waitForSelector('[data-n-onglet]', { timeout: 120000 }).catch(() => {});
+      await calme(pg, 1500, 20000);
+      await poserSonde(pg, id, id !== 'messages');
+      if (id === 'messages') await pg.evaluate(() => { window.__vrmContenu.t0 = performance.now(); window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'messages' })); });
+      else await pg.locator(`[data-n-onglet="${ONGLET_DE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {});
+      await pg.waitForFunction(() => window.__vrmContenu && window.__vrmContenu.t != null, null, { timeout: 30000, polling: 50 }).catch(() => {});
+      const C = await pg.evaluate(() => window.__vrmContenu).catch(() => null);
+      const r = { theme, ecran: id, premierContenuMs: C && C.t != null ? Math.round(C.t) : null, par: C && C.par };
+      out.toucher.push(r);
+      console.log(`  ${theme.padEnd(6)} toucher → ${id.padEnd(8)} premier contenu ${r.premierContenuMs == null ? '— (rien en 30 s)' : r.premierContenuMs + ' ms'} (${r.par || '—'})`);
+      await cdp.detach().catch(() => {}); await pg.close();
+    }
+  }
+  return out;
+}
+
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server', '--explicitly-allowed-ports=' + PORT] });
   const sortie = { dist: DIST, cpu: CPU, reseau: '4G 150 ms · 9 Mbit/s', base: { annonces: 1200, ventes: 1500, achats: 800 } };
@@ -343,12 +463,14 @@ async function defiler(pg, cdp, id) {
     await attendre(6000);
     await froid.pg.close();
     // 2) les ouvertures suivantes (service worker) — deux, la 2e fait foi
-    const chaud1 = await ouvrirApp(ctx, 'chaud 1'); dire(chaud1.r); await chaud1.pg.close();
-    const chaud = await ouvrirApp(ctx, 'chaud 2'); dire(chaud.r);
-    sortie.demarrage = { froid: froid.r, chaud1: chaud1.r, chaud2: chaud.r };
+    const seulInstantane = ETAPES.every((e) => e === 'instantane');
+    const chaud1 = seulInstantane ? null : await ouvrirApp(ctx, 'chaud 1'); if (chaud1) { dire(chaud1.r); await chaud1.pg.close(); }
+    const chaud = seulInstantane ? { r: {}, pg: null, cdp: null } : await ouvrirApp(ctx, 'chaud 2'); if (chaud.pg) dire(chaud.r);
+    sortie.demarrage = { froid: froid.r, chaud1: chaud1 && chaud1.r, chaud2: chaud.r };
     if (ETAPES.includes('onglets')) { console.log('Changements d\'onglet (temps de fil, CPU ×' + CPU + ')'); sortie.onglets = await onglets(chaud.pg, chaud.cdp); }
     if (ETAPES.includes('defilement')) { console.log('Défilement'); sortie.defilement = []; for (const id of ['annonces', 'ventes', 'achats']) { try { sortie.defilement.push(await defiler(chaud.pg, chaud.cdp, id)); } catch (e) { console.log(`  défilement ${id} : pas mesuré (${String(e.message || e).split('\n')[0].slice(0, 100)})`); } } }
-    sortie.memoireFin = await memoire(chaud.cdp);
+    if (ETAPES.includes('instantane')) { console.log('Affichage instantané (1re visite de chaque onglet, page neuve, service worker)'); sortie.instantane = await instantane(ctx); }
+    sortie.memoireFin = chaud.cdp ? await memoire(chaud.cdp) : null;
     await ctx.close();
   } finally { await nav.close(); srv.close(); }
   // Résumé

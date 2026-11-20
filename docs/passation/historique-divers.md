@@ -2095,6 +2095,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **19 nov. · Colis : ce qu'il y a dedans, seul (colis-achat-auto + codes de retrait en liste, PR #1273)** : plus de « Relier l'achat » (ext. `suivicolis`). `2026-11-19-colis-achat-auto.md`. Geste : aucun.
 - **19 nov. · E-mails comme Mail (emails-mail)** : segments en haut, liste en grand, l'e-mail à côté ; « Relier ma boîte » pas à pas (Gmail, Outlook, iCloud), essai vérifié en direct. `2026-11-19-emails-mail.md`. Geste : aucun.
 
+### Lignes de CLAUDE.md §9 déplacées telles quelles le 20 nov. (fusion de main dans instantane)
 ## Lignes du 20 nov. retirées de CLAUDE.md §9 (déplacées telles quelles)
 - **20 nov. · Colis à retirer visuels (retraits-visuel)** : une carte par point, le contenu d'abord (photo de l'achat relié), barre du trajet sur dates LUES (`src/retraitTrajet.js`), QR à droite du code ; rétention : un « à vérifier » (date limite dépassée) garde code et QR jusqu'à une fin PROUVÉE ; « Je suis au point » retiré (sa décision). `2026-11-20-retraits-visuel.md`. Geste : aucun.
 - **20 nov. · Ce qui manque (ce-qui-manque)** : vues et favoris lus dans le dressing (aucune requête de plus, `vrm_vues_lues`, carte d'Aujourd'hui, colonnes du tableau) ; stock au prix affiché (`vrm_stock_valeur`, une paire comptée une fois) ; Messages très grand texte ; compte bloqué : changer d'avis depuis la page Extension ; Stock « Personnaliser », « La pièce », glisser à la souris. `2026-11-20-ce-qui-manque.md`. Geste : aucun.
