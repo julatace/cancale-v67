@@ -36,7 +36,8 @@ const serveur = (DIST) => { const s = http.createServer((q, r) => { let f = q.ur
 function releve() {
   const cle = (e) => { const l = []; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const p = x.parentElement; const i = p ? Array.prototype.indexOf.call(p.children, x) : 0; l.push(x.tagName.toLowerCase() + (typeof x.className === 'string' && x.className ? '.' + x.className.trim().split(/\s+/).sort().join('.') : '') + ':' + i); } return l.reverse().join('>'); };
   // (L'ordre des variables CSS énumérées change d'une ouverture à l'autre : trié.)
-  const texte = (cs) => { const l = []; for (let i = 0; i < cs.length; i++) l.push(cs[i] + '=' + cs.getPropertyValue(cs[i])); return l.sort().join('\u0001'); };
+  // (Les deux builds sont servis sur deux ports : une adresse absolue `http://localhost:<port>/…` est ramenée à `/…`.)
+  const texte = (cs) => { const l = []; for (let i = 0; i < cs.length; i++) l.push(cs[i] + '=' + cs.getPropertyValue(cs[i]).replace(/https?:\/\/localhost:\d+/g, '')); return l.sort().join('\u0001'); };
   const pseudo = (e, q) => { const cs = getComputedStyle(e, q); const c = cs.getPropertyValue('content'); return c && c !== 'none' && c !== 'normal' ? texte(cs) : ''; };
   const out = {};
   for (const e of document.querySelectorAll('*')) {
@@ -88,9 +89,12 @@ function comparer(a, b) {
   try {
     for (const W of LARGEURS) for (const theme of THEMES) for (const ecran of ECRANS) {
       const sombre = theme === 'sombre';
-      const A1 = await ouvrir(nav, DA, sa.address().port, W, sombre, ecran);
-      const A2 = await ouvrir(nav, DA, sa.address().port, W, sombre, ecran);
-      const B = await ouvrir(nav, DB, sb.address().port, W, sombre, ecran);
+      const nom0 = `${ecran} · ${W} · ${theme}`;
+      let A1, A2, B;
+      try {
+      A1 = await ouvrir(nav, DA, sa.address().port, W, sombre, ecran);
+      A2 = await ouvrir(nav, DA, sa.address().port, W, sombre, ecran);
+      B = await ouvrir(nav, DB, sb.address().port, W, sombre, ecran);
       // Les propriétés qui bougent SEULES d'une ouverture à l'autre (une variable posée avec l'heure…) : lues sur <html> en A/A.
       const [h1, h2] = await Promise.all([A1, A2].map((o) => o.pg.evaluate(detailDe, ['html:0'])));
       const p1 = props(h1['html:0'] && h1['html:0'].s), p2 = props(h2['html:0'] && h2['html:0'].s);
@@ -115,6 +119,7 @@ function comparer(a, b) {
       if (vrais.length || ab.diff.length > 400) { ko++; console.log(`  ❌ ${nom} : ${vrais.length} propriété(s) calculée(s) différente(s) sur ${ab.jumeaux} éléments jumeaux (${ab.diff.length} empreintes différentes)`); for (const x of vrais.slice(0, 8)) console.log(`       …${x.k.slice(-120)} ${x.part === 's' ? '' : (x.part === 'b' ? '::before ' : '::after ')}${x.p} : « ${String(x.a).slice(0, 60)} » ≠ « ${String(x.b).slice(0, 60)} »`); }
       else { ok++; console.log(`  ✅ ${nom} : ${ab.jumeaux} éléments jumeaux, toutes leurs propriétés calculées identiques (${ab.seuls} sans jumeau ; ${ab.diff.length} empreintes différentes, toutes instables en A/A)`); }
       if (ab.jumeaux < 50) { ko++; console.log(`  ❌ ${nom} : trop peu d'éléments comparés (${ab.jumeaux}) — l'écran n'est pas monté ?`); }
+      } catch (e) { ko++; console.log(`  ❔ ${nom0} : pas mesuré (${String(e.message || e).split('\n')[0].slice(0, 120)})`); for (const o of [A1, A2, B]) if (o) await o.ctx.close().catch(() => {}); }
     }
   } finally { await nav.close(); sa.close(); sb.close(); }
   console.log(`\n${ko ? '❌' : '✅'} ${ok} écran(s) identiques, ${ko} rouge(s) — ${totalJumeaux} éléments comparés`);
