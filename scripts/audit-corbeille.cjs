@@ -126,7 +126,8 @@ const J = (v) => JSON.stringify(v);
   dit(/gesteCorbeille\(\{ type: 'fiche'/.test(A) && !/Retirer la fiche N°\$\{f\.numero\} \?/.test(A), 'G6 fiche à publier : à la corbeille, même N°');
   dit(/gesteCorbeille\(\{ type: 'note'/.test(A), 'G7 note effacée : à la corbeille');
   dit(/gesteCorbeille\(\{ type: 'fournisseur'/.test(A) && /gesteCorbeille\(\{ type: 'achat-gros'/.test(A) && /title: `Retirer \$\{p\.nom\} \?`/.test(A), 'G8 fournisseur / achat en gros : confirmation gardée (plusieurs prix), puis corbeille');
-  dit(/title: l\.length > 1 \? `Supprimer \$\{l\.length\} annonces de Leboncoin \?`/.test(A) && /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(sansCommentaires(lire('src/ecrans/Ebay.jsx'))), 'G9 supprimer SUR Leboncoin / eBay garde sa confirmation (pas de corbeille)');
+  // (20 nov.) Leboncoin : la suppression se fait dans le PANNEAU de l'extension (il confirme) — l'app n'ouvre que le lien.
+  dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' \}\)/.test(A) && /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(sansCommentaires(lire('src/ecrans/Ebay.jsx'))), 'G9 supprimer SUR Leboncoin / eBay garde sa confirmation (pas de corbeille)');
   dit(/id:'corbeille', type:'panneau'[\s\S]{0,300}el:<CorbeilleSetting\/>/.test(regl) && /data-corbeille-restaurer=\{e\.id\}/.test(A), 'G10 Paramètres → Corbeille : la liste et « Restaurer »');
   const corps = A.slice(A.indexOf('const gesteMorceaux'), A.indexOf('function CorbeilleSetting'));
   dit(/ecrireMorceaux\(/.test(corps) && !/vmrCmd|appelEbay|\/api\//.test(corps.replace(/rest\/v1\/app_data/, '')), 'G11 la corbeille n’écrit que ses clés (aucune commande à l’extension, aucun site)');
