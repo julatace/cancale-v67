@@ -82,4 +82,7 @@
   }
   .vrm-aller-contenu:focus, .vrm-aller-contenu:focus-visible { transform: none !important; }
   main#vrm-contenu:focus { outline: none !important; box-shadow: none !important; }
+  /* (20 nov., intégration) Le titre de « Bien démarrer » reçoit le focus à chaque page pour le lecteur d'écran (tabIndex -1, rien à
+     toucher) : pas d'anneau (il entourait « Bien démarrer » à l'ouverture ; la règle de demarrage.css ne passe pas un !important de couche). */
+  #dm-titre:focus, #dm-titre:focus-visible { outline: none !important; box-shadow: none !important; }
 }

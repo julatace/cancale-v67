@@ -76,10 +76,10 @@
   /* (20 nov.) Le N° tient TOUJOURS entier (« B230 » coupé en « B23… » dans une case étroite au téléphone) : la taille suit
      la largeur de la case ET le nombre de caractères (--sm-len, posé par MeubleDessin) — jamais coupé. */
   .sm-n { display: block; font-family: var(--n-police); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.15;
-    font-size: max(7px, min(30px, 30cqi, calc(125cqi / var(--sm-len, 3)))); white-space: nowrap; overflow: hidden; text-overflow: clip; }
-  .sm-meuble[data-sm-affichage="rayonnage"] .sm-n { font-size: max(7px, min(34px, 36cqi, calc(125cqi / var(--sm-len, 3)))); }
+    font-size: max(7px, min(30px, 30cqi, calc(100cqi / var(--sm-len, 3)))); white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  .sm-meuble[data-sm-affichage="rayonnage"] .sm-n { font-size: max(7px, min(34px, 36cqi, calc(100cqi / var(--sm-len, 3)))); }
   .sm-photo ~ .sm-etiq { position: absolute; left: 6%; bottom: 6%; min-width: 0; max-width: 88%; }
-  .sm-photo ~ .sm-etiq .sm-n { font-size: max(7px, min(22px, 22cqi, calc(125cqi / var(--sm-len, 3)))); }
+  .sm-photo ~ .sm-etiq .sm-n { font-size: max(7px, min(22px, 22cqi, calc(100cqi / var(--sm-len, 3)))); }
   @container (max-width: 30px) { .sm-etiq { display: none; } }
   @container (max-width: 64px) { .sm-photo { display: none; } .sm-photo ~ .sm-etiq { position: relative; left: auto; bottom: auto; } }
 

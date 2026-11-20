@@ -187,7 +187,9 @@ function mesure(tactile) {
   const cibles = tactile ? [...racine.querySelectorAll('button, a[href], input, [role="button"]')].filter(vis).filter((e) => !e.closest('.sm-meuble') && Math.min(e.offsetWidth || 99, e.offsetHeight || 99) < 43.5).map((e) => nom(e) + ' ' + e.offsetWidth + '×' + e.offsetHeight) : [];
   const debord = [...f.querySelectorAll('*')].filter(vis).filter((e) => { if (e.closest('.arv-dessin, .arv-meubles')) return false; const r = e.getBoundingClientRect(); return r.right > R.right + 1.5 || r.left < R.left - 1.5; }).slice(0, 4).map((e) => e.className + ' ' + nom(e));
   const cles = ((racine.innerText || '').match(/\b(?:arv|scan|arr|sm)\.[a-zA-Z.]+\b/g) || []).slice(0, 4);
-  return { pleins, cibles, debord, cles, page: document.documentElement.scrollWidth - window.innerWidth };
+  // (20 nov., intégration) Le N° d'une case du meuble dessiné tient ENTIER (« B230 » était coupé en « B23 » au téléphone).
+  const nCoupes = [...f.querySelectorAll('.sm-n')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent + ' ' + e.scrollWidth + '>' + e.clientWidth);
+  return { pleins, cibles, debord, cles, nCoupes, page: document.documentElement.scrollWidth - window.innerWidth };
 }
 const juger = async (pg, T, quoi, tactile) => {
   const m = await pg.evaluate(mesure, tactile);
@@ -196,6 +198,7 @@ const juger = async (pg, T, quoi, tactile) => {
   if (tactile) dit(!m.cibles.length, `${T} ${quoi} : cibles ≥ 44 px`, m.cibles);
   dit(!m.debord.length && m.page <= 1, `${T} ${quoi} : rien ne déborde`, m);
   dit(!m.cles.length, `${T} ${quoi} : aucune clé brute`, m.cles);
+  dit(!m.nCoupes.length, `${T} ${quoi} : chaque N° du meuble tient entier (jamais coupé)`, m.nCoupes);
 };
 const toucher = async (pg, sel, tactile) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); if (tactile) await l.tap(); else await l.click(); };
 const fermerArrivee = async (pg) => { await pg.keyboard.press('Escape'); await attendre(() => pg.evaluate(() => !document.querySelector('[data-arv]')), 5000); await pg.waitForTimeout(600); };
