@@ -4015,6 +4015,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.409 : répondre depuis le volet Messages du panneau — SEULEMENT depuis la carte de l'onglet vinted.fr.
+    // 5.410 (20 nov.) : les INTÉRESSÉS d'une annonce Leboncoin (lecture, panneau sur leboncoin.fr), puis « Leur écrire »
+    // (série sur SON toucher, récapitulatif confirmé) — `interessesLbcPanneau`, `ecrireInteressesLbc`.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'interessesLbc') {
+      interessesLbcPanneau(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'ecrireInteressesLbc') {
+      ecrireInteressesLbc(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'repondreCarte') {
       repondreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -11917,9 +11927,9 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -17990,10 +18000,12 @@ const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // mêmes règles que les favoris Vinted (Tout arrêter, vérification, 15/h par sorte, ouverture du site,
 // un compte à la fois, série décalée), chacune SITE PAR SITE — un geste Vestiaire ne retient pas un
 // compte Vinted, et l'inverse. Les autres Chrome ne sont lus que pour Vinted (leur ligne n'existe que là).
-const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || ''));
-const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : 'vinted');
-const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : 'vrmVerrouCompte');
-const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : sorte);
+// (20 nov., 5.410) … et un compte LEBONCOIN (`lbc:{id}`) pour la série « Écrire aux intéressés » : mêmes règles, site
+// par site (verrou `vrmVerrouCompteLbc`, série `lbc:favori`) — un geste Leboncoin ne retient ni Vinted ni Vestiaire.
+const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || '')) || /^lbc:[0-9a-z_-]{1,64}$/i.test(String(u || ''));
+const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : /^lbc:/.test(String(u || '')) ? 'lbc' : 'vinted');
+const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : siteDiscretion(u) === 'lbc' ? 'vrmVerrouCompteLbc' : 'vrmVerrouCompte');
+const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : siteDiscretion(u) === 'lbc' ? 'lbc:' + sorte : sorte);
 // Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
 function jourParis(t) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); }
@@ -18315,7 +18327,7 @@ async function phaseRythme(uid, t) {
 // Un bordereau (une obligation d'envoi) n'attend que la vérification.
 async function porteDiscretion(uid, sorte, opts = {}) {
   const u = String(uid || '');
-  if (!cleDiscretionOk(u)) return null;                   // Leboncoin : pas cette porte (Vestiaire : `vc:{id}`, 5.392)
+  if (!cleDiscretionOk(u)) return null;                   // un compte de site inconnu : pas cette porte (Vestiaire `vc:{id}` 5.392, Leboncoin `lbc:{id}` 5.410)
   const t = Date.now();
   // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres) — Vinted seulement.
   const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) && siteDiscretion(u) === 'vinted' ? await actionsAutresNavigateurs(u) : null);
@@ -18333,7 +18345,7 @@ async function porteDiscretion(uid, sorte, opts = {}) {
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
   const ouv = (await lireLocal('vrmOuverture'))[u];
-  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
+  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : siteDiscretion(u) === 'lbc' ? 'Leboncoin' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
   const v = await lireLocal(cleVerrouCompte(u));
   if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
   if (SORTES_SERIE.includes(sorte)) {
@@ -22706,8 +22718,8 @@ async function regleBaisseTickUn() {
 // + 10 % ; sans plancher ⇒ aucune baisse. « Depuis » = la mise en ligne lue (`publieeLe`) ou la dernière baisse rangée.
 // Rien ne part d'ici : une commande `cmd_prix_*` (site leboncoin) est DÉPOSÉE, exécutée par `prixAttenteTick` via
 // `baisserPrixLbc` (sa recette apprise, prix relu, sécurité du compte, 45/h), comme une baisse de la règle Vinted.
-// Vestiaire : AUCUNE date de mise en ligne n'est lue ⇒ « depuis combien de jours sans vente » n'est pas su ⇒ pas de
-// baisse automatique (dit dans l'app et le panneau), jamais une date inventée.
+// Vestiaire : depuis la 5.410 (20 nov.), la date de mise en ligne est LUE (`listingDate`) ou, à défaut, BORNÉE par la
+// 1re lecture (« au moins ») — voir `regleBaisseVcTick` plus bas. Jamais une date inventée.
 const REGLE_PROCHAIN_LBC = 'vrmRegleBaisseProchainLbc';
 let _regleLbcEnVol = null;
 function regleBaisseLbcTick(source) {
@@ -22768,6 +22780,118 @@ async function regleBaisseLbcTickUn() {
   const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + t.toString(36) + alea, data }], 'id');
   if (ok === false) { noterDiag('regle_baisse_lbc_ecriture_ratee'); return { lu: true, n: dues.length, depose: null }; }
   noterDiag('regle_baisse_lbc_rangee');
+  return { lu: true, n: dues.length, depose: x.id, prix: x.vouluC / 100 };
+}
+// ══ 5.410 (20 nov.) — LA BAISSE PAR RÈGLE SUR VESTIAIRE (même règle, mêmes planchers, ÉTEINTE par défaut) ══════════
+// Julien (20 nov.) : « pour Vestiaire trouve une solution ». Il manquait la DATE de mise en ligne. MESURÉ le 20 nov. :
+// « Mes articles » la porte (`listingDate`, lue par vc-inject `dateMiseVc`) ; sinon l'article est daté à sa 1re
+// lecture (`vueDepuis`) — une BORNE BASSE : la vraie mise en ligne est au moins aussi ancienne, donc la règle ne
+// baisse jamais plus tôt qu'avec la vraie date (`depuisAnnonceVc`).
+// La règle d'UN compte Vestiaire : `vinted_baisse_regle.comptes['vc:{compte}']` (posée dans l'app, son clic). Le
+// compte est celui que la PAGE et l'onglet ont dit à la lecture (`it.compte`) — jamais prêté. Le plancher :
+//  · les faits de l'annonce (`vrm_articles_sites['Vestiaire:{id}']` : prix mini, achat) ;
+//  · la fiche du N° de l'annonce (lien posé par SON clic `vrm_vc_liens`, puis le lien de publication
+//    `vc_listings.liens`, puis la référence « VRM-{n°} », puis le N° Vestiaire donné `vrm_vc_numeros`) — un N°
+//    porté par deux fiches ⇒ rien ;
+//  · plusieurs planchers ⇒ le PLUS HAUT (jamais sous aucun) ; aucun ⇒ AUCUNE baisse.
+// Rien ne part d'ici : une commande `cmd_prix_*` (site vestiaire) est DÉPOSÉE, exécutée par `prixAttenteTick` via
+// `baisserPrixVestiaire` (sa recette APPRISE `vc_prix_recette`, prix lu = celui de l'aperçu, compte de l'onglet,
+// 45/h, prix RELU). Sans recette apprise : rien n'est déposé (`sansRecette`, dit par l'app).
+const REGLE_PROCHAIN_VC = 'vrmRegleBaisseProchainVc';
+// Le N° d'une annonce Vestiaire, dans l'ordre de l'app (src/lienVestiaire.js, src/numerosVestiaire.js) — ou ''.
+function numeroAnnonceVc(id, it, m, liensListe) {
+  const l = m && m.vrm_vc_liens && typeof m.vrm_vc_liens === 'object' ? m.vrm_vc_liens[id] : null;
+  if (l && typeof l === 'object' && l.numero != null && String(l.numero).trim()) return String(l.numero).trim();
+  const p = liensListe && liensListe[id] != null ? String(liensListe[id]).trim() : '';
+  if (p) return p;
+  const r = /^VRM-?([A-Z]?\d{1,6})$/i.exec(String((it && it.ref) || '').trim());
+  if (r) return r[1].toUpperCase();
+  const a = m && m.vrm_vc_numeros && typeof m.vrm_vc_numeros === 'object' ? m.vrm_vc_numeros[id] : null;
+  if (a == null) return '';
+  return typeof a === 'object' ? String(a.numero == null ? '' : a.numero).trim() : String(a).trim();
+}
+// Le plancher d'une annonce Vestiaire (centimes) — le plus haut de ceux qu'on SAIT, ou null.
+function plancherAnnonceVc(id, it, m, liensListe, parNum) {
+  const cands = [];
+  const faits = m && m.vrm_articles_sites && typeof m.vrm_articles_sites === 'object' ? m.vrm_articles_sites['Vestiaire:' + id] : null;
+  const num = numeroAnnonceVc(id, it, m, liensListe);
+  if (faits && typeof faits === 'object') { const p = plancherBaisse({ min: faits.min, buyPrice: faits.buyPrice, numero: num }, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+  if (num) {
+    const f = parNum.get(cleNum(num));
+    if (f === null) return { c: null, doublon: true };            // deux fiches sous ce N° : rien n'est deviné
+    if (f) { const p = plancherBaisse(f, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+    else if (!faits) { const p = plancherBaisse({ numero: num }, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+  }
+  if (!cands.length) return null;
+  return cands.reduce((a, b) => (b.c > a.c ? b : a));
+}
+let _regleVcEnVol = null;
+function regleBaisseVcTick(source) {
+  if (_regleVcEnVol) return _regleVcEnVol;
+  _regleVcEnVol = regleBaisseVcTickUn(source).catch(() => ({ erreur: true })).finally(() => { _regleVcEnVol = null; });
+  return _regleVcEnVol;
+}
+async function regleBaisseVcTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  const t = Date.now();
+  const m0 = await lireMain([REGLE_BAISSE_CLE, 'vrm_vc_liens', 'vrm_vc_numeros', 'vrm_articles_sites', 'vinted_annonce_numeros', 'vinted_buyprice_by_num']);
+  if (m0 === null) return { lu: false };
+  const regles = {};
+  const cs = m0[REGLE_BAISSE_CLE] && m0[REGLE_BAISSE_CLE].comptes && typeof m0[REGLE_BAISSE_CLE].comptes === 'object' ? m0[REGLE_BAISSE_CLE].comptes : {};
+  for (const k of Object.keys(cs)) { const mm = /^vc:(\d{1,20})$/.exec(k); if (!mm) continue; const r = regleBaisseDe(m0[REGLE_BAISSE_CLE], k); if (r) regles[mm[1]] = r; }
+  if (!Object.keys(regles).length) return { saute: 'eteinte' };                 // ÉTEINTE par défaut : rien
+  if (await pauseVc()) return { saute: 'pause' };
+  let rec = null; try { rec = (await chrome.storage.local.get(VC_RECETTE_PRIX))[VC_RECETTE_PRIX] || null; } catch (_) { return { saute: 'stockage' }; }
+  if (!(rec && rec.recette && rec.recette.rejouable === true)) return { saute: 'sansRecette' };   // la baisse ne saurait pas partir : rien n'est déposé
+  const la = await sbGet('app_data?id=eq.vc_listings&select=it:data->items,liens:data->liens');
+  if (!Array.isArray(la)) return { lu: false };
+  const cmds = await sbGet(`app_data?id=like.cmd_prix_*&select=id,cle:meta->>cle,etat:meta->>etat,demandeLe:meta->>demandeLe,source:meta->>source,uidRegle:meta->>uidRegle&order=id.desc&limit=400`);
+  if (!Array.isArray(cmds)) return { lu: false };
+  const items = (la[0] && la[0].it && typeof la[0].it === 'object') ? la[0].it : {};
+  const liensListe = (la[0] && la[0].liens && typeof la[0].liens === 'object') ? la[0].liens : {};
+  const fiches = m0.vinted_annonce_numeros && typeof m0.vinted_annonce_numeros === 'object' ? m0.vinted_annonce_numeros : {};
+  const parNum = new Map();
+  for (const f of Object.values(fiches)) { if (!f || typeof f !== 'object' || f.numero == null) continue; const k = cleNum(f.numero); parNum.set(k, parNum.has(k) ? null : f); }
+  const dues = [], raisons = {};
+  const compte = (r) => { raisons[r] = (raisons[r] || 0) + 1; };
+  for (const [compteVc, regle] of Object.entries(regles)) {
+    const cleRegle = 'vc:' + compteVc;
+    if (await secuRobotDit('vestiaire', compteVc)) { compte('securite'); continue; }
+    const p = await prochainPasse(REGLE_PROCHAIN_VC, compteVc, t);
+    if (p === null) return { saute: 'stockage' };
+    if (p > t) { compte('espace'); continue; }
+    if (cmds.filter((c) => c && c.source === 'regle' && String(c.uidRegle || '') === cleRegle && t - Number(c.demandeLe || 0) < 864e5).length >= REGLE_PAR_JOUR) { compte('jour'); continue; }
+    if (!(await poserProchain(REGLE_PROCHAIN_VC, compteVc, t + tirerEntre(25 * 60000, 55 * 60000)))) return { saute: 'stockage' };
+    for (const [id, it] of Object.entries(items)) {
+      if (!it || typeof it !== 'object' || !/^\d{3,15}$/.test(id)) continue;
+      if (String(it.compte || '') !== compteVc) { if (!it.compte) compte('sansCompte'); continue; }   // jamais prêté au compte de l'onglet
+      if (!/^published$/i.test(String(it.statut || ''))) continue;
+      const prixC = centsPrixVc(it.prix);
+      if (prixC == null) { compte('prix'); continue; }
+      const cle = 'vestiaire:' + id, lies = cmds.filter((c) => c && c.cle === cle);
+      if (lies.some((c) => c.etat === 'attente' || c.etat === 'pris')) continue;
+      const dep = depuisAnnonceVc(it);
+      if (!dep) { compte('sansDate'); continue; }
+      const derniere = lies.reduce((x, c) => Math.max(x, Number(c.demandeLe) || 0), 0);
+      const pl = plancherAnnonceVc(id, it, m0, liensListe, parNum);
+      if (pl && pl.doublon) { compte('numeroDouble'); continue; }
+      const due = baisseDue({ prixC, depuis: Math.max(dep.t, derniere), regle, plancher: pl, maintenant: t });
+      if (due.non) { compte(due.non); continue; }
+      dues.push({ id, cle, cleRegle, regle, prixC, vouluC: due.vouluC, num: numeroAnnonceVc(id, it, m0, liensListe).slice(0, 12), exacte: dep.exacte });
+    }
+  }
+  if (!dues.length) return { lu: true, n: 0, raisons };
+  const x = dues[tirerEntre(0, dues.length - 1)];
+  const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
+  const data = { v: 1, site: 'vestiaire', args: { id: x.id, prix: x.vouluC / 100, prixAvant: x.prixC / 100 }, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS,
+    etat: 'attente', reports: 0, cle: x.cle, prix: x.vouluC / 100, prixAvant: x.prixC / 100, num: x.num, source: 'regle', uidRegle: x.cleRegle, regle: { pct: x.regle.pct, jours: x.regle.jours },
+    // « depuis » : la date LUE chez Vestiaire, ou la borne basse — dit tel quel au journal (jamais « mise en ligne le » sans preuve).
+    depuisExacte: x.exacte === true, pasAvant: t + tirerEntre(2 * 60000, 40 * 60000) };
+  if (prixAttCommande(data).refus) return { lu: true, n: dues.length, saute: 'forme' };
+  const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + t.toString(36) + alea, data }], 'id');
+  if (ok === false) { noterDiag('regle_baisse_vc_ecriture_ratee'); return { lu: true, n: dues.length, depose: null }; }
+  noterDiag('regle_baisse_vc_rangee');
   return { lu: true, n: dues.length, depose: x.id, prix: x.vouluC / 100 };
 }
 // Le registre de ce que VRM a masqué : lire-fusionner-réécrire, une lecture ratée n'écrit RIEN.
@@ -27358,7 +27482,34 @@ function ficheVcAnnonce(x, prev, compte, maintenant) {
     photo: (/^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String(x.photo || '')) ? String(x.photo).slice(0, 400) : '') || prev.photo || '',
     prix: prix || prev.prix || null,
     statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
-    compte: compte || prev.compte || '' };
+    compte: compte || prev.compte || '',
+    // 5.410 (20 nov.) — DEPUIS QUAND L'ARTICLE EST EN LIGNE (`dateMiseVc`) :
+    //  · `misEnLigne` : la date LUE chez Vestiaire (`listingDate` de « Mes articles », mesurée le 20 nov.) — EXACTE ;
+    //  · `vueDepuis`  : la PREMIÈRE lecture de l'article par l'extension, jamais avancée ensuite — une BORNE BASSE
+    //    (« vue en ligne depuis au moins le … »), jamais présentée comme la date de mise en ligne.
+    ...dateMiseVcFiche(x, prev, maintenant),
+    negos: negosVcFiche(x.negos) || prev.negos || null };
+}
+// La date d'un article Vestiaire : exacte si Vestiaire la dit, sinon « au moins » depuis la 1re lecture.
+function dateMiseVcFiche(x, prev, maintenant) {
+  const lue = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String((x && x.misEnLigne) || '')) && Number.isFinite(Date.parse(x.misEnLigne)) && Date.parse(x.misEnLigne) <= Date.now() + 864e5 ? String(x.misEnLigne).slice(0, 30) : '';
+  const avant = /^\d{4}-\d{2}-\d{2}T/.test(String((prev && prev.vueDepuis) || '')) ? String(prev.vueDepuis) : '';
+  return { misEnLigne: lue || (prev && prev.misEnLigne) || '', vueDepuis: avant && avant < maintenant ? avant : maintenant };
+}
+function negosVcFiche(n) {
+  if (!n || typeof n !== 'object') return null;
+  const e = (v) => (Number.isInteger(v) && v >= 0 && v < 100000 ? v : null);
+  const r = { total: e(n.total), enCours: e(n.enCours), aToi: e(n.aToi) };
+  return r.total == null && r.enCours == null && r.aToi == null ? null : r;
+}
+// Le « depuis » d'une baisse par règle : la date EXACTE si Vestiaire l'a dite, sinon la BORNE BASSE (1re lecture) —
+// l'article est en ligne depuis AU MOINS cette date : la règle ne baisse jamais plus tôt qu'elle ne le ferait en
+// connaissant la vraie date. Rien de lu ⇒ null (aucune baisse).
+function depuisAnnonceVc(it) {
+  const m = Date.parse(String((it && it.misEnLigne) || ''));
+  if (Number.isFinite(m) && m > 0) return { t: m, exacte: true };
+  const v = Date.parse(String((it && it.vueDepuis) || ''));
+  return Number.isFinite(v) && v > 0 ? { t: v, exacte: false } : null;
 }
 // ── 5.315 — « TOUT VESTIAIRE, GARDÉ TEL QUEL » : RETIRÉ EN 5.323 ─────────────
 // `rangerVcBrut` / `rangerVcPdf` rangeaient la réponse entière de chaque appel
@@ -28406,11 +28557,19 @@ async function rangerLbcFilMaintenant(m, compte, deVrm) {
     ...(deVrm === true ? { envoyeParVrm: true } : {}) })).filter((x) => x.t);
   const { liste, change } = fusionMessagesVc(cur && cur.messages, neufs);
   const compteFil = (cur && cur.compte) || compte || '';
-  if (cur && !change && (cur.compte || '') === compteFil) return true;
   const garde = liste.slice(-LBC_FIL_MAX);
   const dernier = garde[garde.length - 1] || null;
   const now = new Date().toISOString();
+  // 5.410 (20 nov.) — LES INTÉRESSÉS : l'annonce dont la conversation parle (`conversationContext.itemId`, lue par la
+  // page ; un fil ne change jamais d'annonce) et ce que la PERSONNE a écrit (combien, la 1re fois) — jamais qui.
+  const annonceLue = /^\d{6,12}$/.test(String((m && m.annonce) || '')) ? String(m.annonce) : '';
+  const annonceFil = (cur && /^\d{6,12}$/.test(String(cur.annonce || '')) ? String(cur.annonce) : '') || annonceLue;
+  const deLui = garde.filter((x) => x.deMoi === false);
+  const premierDeLui = deLui.map((x) => x.at).filter(Boolean).sort()[0] || '';
+  const changeAnnonce = !!(annonceLue && !(cur && cur.annonce));
+  if (cur && !change && !changeAnnonce && (cur.compte || '') === compteFil) return true;
   const data = { v: 1, conv, compte: compteFil, messages: garde, n: garde.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? coupeVc(dernier.t, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
+    annonce: annonceFil, deLuiN: deLui.length, premierDeLuiAt: premierDeLui,
     page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
@@ -28461,7 +28620,10 @@ async function pauseLbcMsg() {
 async function poserPauseLbcMsg(statut) {
   try { await chrome.storage.local.set({ [LBC_PAUSE_MSG]: { jusqua: Date.now() + LBC_PAUSE_MSG_MS, statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
 }
-async function repondreLeboncoin(msg) {
+async function repondreLeboncoin(msg, opts = {}) {
+  // 5.410 : `opts.serie` — un message d'une SÉRIE « Écrire aux intéressés » (son toucher l'a lancée) : la sécurité du
+  // compte en mode série (sorte « favori »), et la réserve de 5 gestes gardée à ses clics (45/h), comme les favoris.
+  const serie = !!(opts && opts.serie);
   const conv = String((msg && msg.conv) || '');
   const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
   if (!ID_CONV_LBC.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
@@ -28489,11 +28651,13 @@ async function repondreLeboncoin(msg) {
     // 19 nov. (5.409, audit-actions-gardees) : la réponse Leboncoin passait le plafond (50/h) mais PAS la
     // sécurité du compte (anti-robot, « Tout arrêter », repos, plafonds du jour) — comme Vestiaire, désormais.
     { const rbR = await secuRobotDit('leboncoin', compte); if (rbR) return { accepte: false, code: rbR.code, raison: rbR.error }; }
-    const secuR = await secuGeste('leboncoin', compte, 'reponse', 'clic');
+    if (serie && opts.compte && idCompteLbc(opts.compte) !== compte) return { accepte: false, code: 'autre-compte', raison: "cette conversation n'est pas sur le compte de la série — rien n'est parti" };
+    const secuR = await secuGeste('leboncoin', compte, serie ? 'favori' : 'reponse', serie ? 'serie' : 'clic');
     if (secuR) return { accepte: false, code: secuR.code, raison: secuR.error };
-    const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    const plafondR = serie ? ACTIONS_MAX_HEURE - RESERVE_GESTES : ACTIONS_MAX_HEURE;
+    const cpt = await compterAction('lbc:' + compte, plafondR);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
-    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${plafondR} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcRepondre', conv, texte, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
@@ -28520,6 +28684,203 @@ async function repondreLeboncoin(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a répondu ${statut} — le message n'est pas parti` };
   } finally { LBC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEBONCOIN : LES INTÉRESSÉS D'UNE ANNONCE, ET LEUR ÉCRIRE (20 nov., 5.410, lot lbc-vc-interesses)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien (20 nov.) : « regarde tout ce que tu peux faire, parce qu'on reçoit quand une personne est intéressée sur
+// Leboncoin ». MESURÉ (lecture seule, 20 nov., sa base) :
+//  · AUCUN e-mail Leboncoin « X est intéressé » n'arrive dans VRM (7 e-mails Leboncoin en tout, tous du 21 oct. :
+//    suppression, nouvel appareil, « boostez », « N annonces ont besoin de vous ») ;
+//  · Leboncoin ne dit QUI a mis une annonce en favori nulle part (statistiques = des NOMBRES ; `myfavorites` = SES
+//    favoris d'acheteur ; `followme` = ses abonnés, pas les favoris) — VRM n'écrit donc à AUCUN « favori » ;
+//  · la personne qui ÉCRIT est identifiée : la conversation (`…/hal/{moi}/conversations/{conv}/messages`) porte
+//    `conversationContext.itemId` (l'annonce) — lue depuis la 5.410 (`annonce` du fil, lbc-inject.js).
+// « Intéressé » = une conversation de CE compte, sur CETTE annonce, où la PERSONNE a écrit au moins une fois
+// (`deLuiN ≥ 1`). Une conversation où personne d'autre n'a écrit n'en est pas une ; une personne qui n'a jamais pris
+// contact n'est jamais contactée (elle n'est même pas identifiable). Jamais un nom : le fil ne garde que des textes.
+// Le bloc <interesses-lbc-regle> est le MÊME ici et dans src/interessesLbc.js (audit-lbc-vc-interesses).
+// <interesses-lbc-regle>
+const INTERESSES_PAR_TOUCHER = 10;
+const INTERESSES_ECART_S = [40, 90];       // l'écart entre deux messages : le rythme des favoris (19 nov., « on garde toujours le temps aléatoire »)
+const INTERESSES_TEXTES_MAX = 5;
+// Les intéressés d'une annonce (ou de toutes) d'UN compte : une ligne par conversation où la personne a écrit, la
+// plus récente d'abord. `fils` : [{ conv, compte, annonce, deLuiN, premierDeLuiAt, dernierAt, dernierDeMoi }].
+function interessesLbcDe(fils, { compte = '', annonce = '' } = {}) {
+  const out = [];
+  for (const f of Array.isArray(fils) ? fils : []) {
+    if (!f || typeof f !== 'object') continue;
+    const conv = String(f.conv == null ? '' : f.conv);
+    const a = String(f.annonce == null ? '' : f.annonce);
+    if (!/^[\w-]{3,64}$/.test(conv) || !/^\d{6,12}$/.test(a)) continue;          // l'annonce pas lue : pas un intéressé de CETTE annonce
+    if (compte && String(f.compte || '') !== String(compte)) continue;           // jamais un autre compte
+    if (annonce && a !== String(annonce)) continue;
+    const n = Number(f.deLuiN);
+    if (!(Number.isInteger(n) && n >= 1)) continue;                              // la personne n'a jamais écrit : pas un intéressé
+    const dm = f.dernierDeMoi === true || f.dernierDeMoi === 'true' ? true : f.dernierDeMoi === false || f.dernierDeMoi === 'false' ? false : null;
+    out.push({ conv, annonce: a, compte: String(f.compte || ''), messagesDeLui: n, depuis: String(f.premierDeLuiAt || ''), dernierAt: String(f.dernierAt || ''), attendTaReponse: dm === false, canal: 'message' });
+  }
+  return out.sort((x, y) => (y.dernierAt || '').localeCompare(x.dernierAt || ''));
+}
+// Les textes d'une série : 1 à 5, non vides, 2 000 caractères au plus — sinon null (rien ne part).
+function textesInteresses(textes) {
+  const l = (Array.isArray(textes) ? textes : []).map((t) => (typeof t === 'string' ? t.replace(/\r\n?/g, '\n').trim() : '')).filter(Boolean);
+  if (!l.length || l.length > INTERESSES_TEXTES_MAX || l.some((t) => t.length > 2000)) return null;
+  return l;
+}
+// </interesses-lbc-regle>
+const LBC_INTERESSES_FILE = 'vrmLbcInteressesFile';
+const LBC_INTERESSES_FAITS = 'vrmLbcInteressesFaits';
+const LBC_INTERESSES_ECART_DERNIER = 'vrmLbcInteressesEcartDernier';
+let _lbcInteressesIci = false;
+const attendreLbc = (ms) => new Promise((r) => setTimeout(r, ms));
+async function lireFileInteressesLbc() { try { const v = (await chrome.storage.local.get(LBC_INTERESSES_FILE))[LBC_INTERESSES_FILE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return undefined; } }
+async function poserFileInteressesLbc(f) { try { if (f) await chrome.storage.local.set({ [LBC_INTERESSES_FILE]: f }); else await chrome.storage.local.remove(LBC_INTERESSES_FILE); return true; } catch (_) { return false; } }
+// Le compte Leboncoin de l'onglet du panneau (identité privée de CET onglet) — ou ''.
+async function compteOngletLbc(tabId) {
+  if (tabId == null) return '';
+  try { const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tabId]; return c && c.source === 'prive' && !c.ambigue && c.compte ? idCompteLbc(c.compte) : ''; } catch (_) { return ''; }
+}
+// Les fils du compte (scalaires seulement, jamais les messages : §4.4).
+async function filsLbcDuCompte(compte) {
+  const rows = await sbGetTout(`app_data?id=like.lbc_fil_*&select=conv:data->>conv,compte:data->>compte,annonce:data->>annonce,deLuiN:data->>deLuiN,premierDeLuiAt:data->>premierDeLuiAt,dernierAt:data->>dernierAt,dernierDeMoi:data->>dernierDeMoi`);
+  if (!Array.isArray(rows)) return null;
+  return rows.map((r) => Object.assign({}, r, { deLuiN: r && r.deLuiN != null ? Number(r.deLuiN) : 0 })).filter((r) => idCompteLbc(r.compte || '') === compte);
+}
+// LECTURE pour le panneau (aucune requête vers Leboncoin, rien dans le plafond) : les intéressés du compte de
+// l'onglet, par annonce, avec ce que VRM leur a déjà écrit, la série en cours, et si l'envoi est appris.
+async function interessesLbcPanneau(msg, sender) {
+  let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+  if (!/(^|\.)leboncoin\.fr$/i.test(dom)) return { ok: false, code: 'site', raison: 'ouvre leboncoin.fr' };
+  const compte = await compteOngletLbc(sender.tab.id);
+  if (!compte) return { ok: false, code: 'compte', raison: "connecte-toi sur Leboncoin dans cet onglet : VRM ne sait pas sur quel compte tu es" };
+  const fils = await filsLbcDuCompte(compte);
+  if (fils === null) return { ok: false, code: 'lecture', raison: "la base VRM n'a pas répondu" };
+  let faits = {}, rec = null, file = null;
+  try { const o = await chrome.storage.local.get([LBC_INTERESSES_FAITS, LBC_RECETTE, LBC_INTERESSES_FILE]); faits = o[LBC_INTERESSES_FAITS] || {}; rec = o[LBC_RECETTE] || null; file = o[LBC_INTERESSES_FILE] || null; } catch (_) {}
+  const liste = interessesLbcDe(fils, { compte, annonce: /^\d{6,12}$/.test(String((msg && msg.annonce) || '')) ? String(msg.annonce) : '' })
+    .map((x) => Object.assign(x, { dejaEcrit: !!faits[x.annonce + '|' + x.conv] }));
+  const parAnnonce = {};
+  for (const x of liste) { const e = parAnnonce[x.annonce] = parAnnonce[x.annonce] || { annonce: x.annonce, n: 0, aEcrire: 0, attendent: 0, dernierAt: '' }; e.n++; if (!x.dejaEcrit) e.aEcrire++; if (x.attendTaReponse) e.attendent++; if (x.dernierAt > e.dernierAt) e.dernierAt = x.dernierAt; }
+  const sansAnnonce = fils.filter((f) => Number(f.deLuiN) >= 1 && !/^\d{6,12}$/.test(String(f.annonce || ''))).length;
+  return { ok: true, compte, liste, annonces: Object.values(parAnnonce), sansAnnonce, appris: !!(rec && rec.recette && rec.recette.rejouable === true),
+    serie: file && file.suivi ? Object.assign({}, file.suivi, { reste: Array.isArray(file.reste) ? file.reste.length : 0 }) : null, parToucher: INTERESSES_PAR_TOUCHER, ecartS: INTERESSES_ECART_S.slice() };
+}
+// Un « non » avant un message de la série : la raison dite, sinon ''.
+async function arretAvantMessageLbc(compte) {
+  try { if ((await toutArreteDepuis(null)) > 0) return phraseArret('tout'); } catch (_) {}
+  try { const sa = await secuLire(); if (sa && secuArretEffectif(sa.evts).arrete) return phraseArret('tout'); } catch (_) {}
+  const rb = await secuRobotDit('leboncoin', compte); if (rb) return rb.error;
+  const pz = await pauseLbcMsg(); if (pz) return `Leboncoin a demandé de ralentir (${pz.statut || 'refus'}) — rien n'est parti`;
+  const o = await ongletLbcDuCompte(compte);
+  if (!o.ok) return o.raison || (o.autres && o.autres.length ? "Leboncoin est passé sur un autre compte dans ce Chrome — la suite n'est pas partie" : "l'onglet leboncoin.fr de ce compte est fermé — la suite n'est pas partie");
+  return '';
+}
+async function tenirAttenteLbc(compte, jusqua) {
+  for (;;) {
+    const non = await arretAvantMessageLbc(compte);
+    if (non) return { ok: false, raison: non };
+    const r = Number(jusqua) - Date.now();
+    if (!(r > 0)) return { ok: true };
+    await attendreLbc(Math.min(FAVORI_ATTENTE_TRANCHE_MS, r));
+  }
+}
+// ÉCRIRE AUX INTÉRESSÉS, SUR SON TOUCHER (panneau de l'extension, onglet leboncoin.fr, récapitulatif confirmé) :
+// `{ annonce, convs: [conv…], textes: [1 à 5 variantes], confirme: true }`. Chaque conversation doit être un
+// intéressé de CETTE annonce, sur le compte de CET onglet (sinon RIEN ne part, dit) ; une personne n'est écrite
+// qu'UNE fois par annonce (posé avant l'envoi) ; 10 par toucher ; puis une à la fois : Tout arrêter, anti-robot,
+// pause 429/403, onglet du compte, porte des favoris (`lbc:{id}`, 15/h, un compte à la fois, série), sécurité du
+// compte (série), 45/h ; 40 à 90 s au hasard entre deux, jamais deux fois de suite le même ; un texte jamais
+// deux fois de suite le même (`texteJamaisRepete`). Un refus arrête tout.
+async function ecrireInteressesLbc(msg, sender) {
+  let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+  if (!/(^|\.)leboncoin\.fr$/i.test(dom) || (sender && sender.frameId > 0)) return { accepte: false, code: 'site', raison: 'depuis le panneau de VRM sur leboncoin.fr seulement' };
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'confirme le récapitulatif d’abord — rien n’est parti' };
+  const annonce = String(msg.annonce || '');
+  if (!/^\d{6,12}$/.test(annonce)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  const textes = textesInteresses(msg.textes);
+  if (!textes) return { accepte: false, code: 'invalide', raison: `1 à ${INTERESSES_TEXTES_MAX} messages, 2 000 caractères au plus chacun` };
+  const voulues = [...new Set((Array.isArray(msg.convs) ? msg.convs : []).map(String))];
+  if (!voulues.length) return { accepte: false, code: 'invalide', raison: 'choisis au moins une personne' };
+  if (_lbcInteressesIci || LBC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'un autre message Leboncoin part en ce moment — un à la fois' };
+  const enFile = await lireFileInteressesLbc();
+  if (enFile && Array.isArray(enFile.reste) && enFile.reste.length) return { accepte: false, code: 'en-cours', raison: 'une série de messages Leboncoin est déjà en cours — une à la fois' };
+  if (await sansSessionPourEcrire()) return { accepte: false, code: 'sans-session', raison: 'Connecte d’abord l’extension à VRM.' };
+  const compte = await compteOngletLbc(sender.tab.id);
+  if (!compte) return { accepte: false, code: 'compte', raison: "connecte-toi sur Leboncoin dans cet onglet : VRM ne sait pas sur quel compte tu es — rien n'est parti" };
+  const pause = await pauseLbcMsg();
+  if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti` };
+  let rec = null, faits = {};
+  try { const o = await chrome.storage.local.get([LBC_RECETTE, LBC_INTERESSES_FAITS]); rec = o[LBC_RECETTE] || null; faits = o[LBC_INTERESSES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: RAISON_STOCKAGE }; }
+  if (!(rec && rec.recette)) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin envoie un message — réponds UNE fois toi-même à une conversation sur leboncoin.fr, dans ce Chrome : VRM apprendra" };
+  if (rec.recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin envoie un message n'est pas encore sûre à refaire (${rec.recette.raison || 'forme inconnue'}) — rien n'est parti` };
+  const fils = await filsLbcDuCompte(compte);
+  if (fils === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+  const eligibles = new Set(interessesLbcDe(fils, { compte, annonce }).map((x) => x.conv));
+  const horsListe = voulues.filter((c) => !eligibles.has(c));
+  // ⚠️ Jamais une personne qui n'a pas pris contact sur CETTE annonce, ni une conversation d'un autre compte.
+  if (horsListe.length) return { accepte: false, code: 'pas-interesse', n: horsListe.length, raison: `${horsListe.length === 1 ? 'une personne choisie n’a' : horsListe.length + ' personnes choisies n’ont'} pas écrit pour cette annonce sur ce compte — VRM n’écrit qu’aux personnes qui t’ont écrit ; rien n’est parti` };
+  const aEcrire = voulues.filter((c) => !faits[annonce + '|' + c]);
+  if (!aEcrire.length) return { accepte: false, code: 'personne', raison: "VRM a déjà écrit à ces personnes pour cette annonce — rien n'est reparti" };
+  { const p = await porteDiscretion('lbc:' + compte, 'favori'); if (p) return { accepte: false, code: p.code, raison: p.error, attendreMs: p.attendreMs || 0 }; }
+  const o = await ongletLbcDuCompte(compte);
+  if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "l'onglet leboncoin.fr de ce compte n'est plus là — rien n'est parti" };
+  const lot = aEcrire.slice(0, INTERESSES_PAR_TOUCHER);
+  const suivi = { annonce, at: new Date().toISOString(), n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
+  if (!(await poserFileInteressesLbc({ annonce, compte, textes, reste: lot, prochain: Date.now(), recents: [], suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+  deroulerInteressesLbc().catch(() => {});
+  return { accepte: true, etape: 'encours', n: lot.length, reste: aEcrire.length - lot.length };
+}
+async function deroulerInteressesLbc() {
+  if (_lbcInteressesIci) return 0;
+  _lbcInteressesIci = true;
+  let f = null, n = 0;
+  const finir = async (fin, raison) => { if (!f) return; f.suivi.fin = fin; if (raison) f.suivi.raison = String(raison).slice(0, 300); f.reste = []; await poserFileInteressesLbc(Object.assign({}, f, { fini: Date.now() })); };
+  try {
+    for (;;) {
+      f = await lireFileInteressesLbc();
+      if (!f || !Array.isArray(f.reste) || !f.suivi || !/^\d{6,12}$/.test(String(f.annonce || '')) || !/^[0-9a-z_-]{1,64}$/i.test(String(f.compte || ''))) { f = null; break; }
+      if (!f.reste.length) { if (!f.suivi.fin) await finir('fini', ''); break; }
+      if (Date.now() > Number(f.prochain) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('arret', "l'extension s'était arrêtée trop longtemps — la suite n'est pas partie"); break; }
+      const compte = String(f.compte), annonce = String(f.annonce), conv = String(f.reste[0]);
+      const att = await tenirAttenteLbc(compte, f.prochain);
+      if (!att.ok) { await finir('arret', att.raison); break; }
+      // Revérifié AVANT chaque message : toujours un intéressé de cette annonce, sur ce compte.
+      const fils = await filsLbcDuCompte(compte);
+      if (fils === null) { await finir('arret', "la base VRM n'a pas répondu — la suite n'est pas partie"); break; }
+      if (!interessesLbcDe(fils, { compte, annonce }).some((x) => x.conv === conv)) { f.reste = f.reste.slice(1); await poserFileInteressesLbc(f); continue; }
+      const p = await porteDiscretion('lbc:' + compte, 'favori');
+      if (p) { await finir('arret', p.error); break; }
+      // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas).
+      const noter = async (etat) => { try { const o = await chrome.storage.local.get(LBC_INTERESSES_FAITS); const fa = o[LBC_INTERESSES_FAITS] || {}; if (etat) fa[annonce + '|' + conv] = { at: new Date().toISOString(), etat }; else delete fa[annonce + '|' + conv]; const cles = Object.keys(fa); if (cles.length > 2000) for (const k of cles.sort((a, b) => String(fa[a].at).localeCompare(String(fa[b].at))).slice(0, cles.length - 2000)) delete fa[k]; await chrome.storage.local.set({ [LBC_INTERESSES_FAITS]: fa }); return true; } catch (_) { return false; } };
+      if (!(await noter('envoi'))) { await finir('arret', RAISON_STOCKAGE); break; }
+      // Le texte : la variante suivante, jamais deux fois de suite le même mot pour mot.
+      const brut = f.textes[(Number(f.suivi.faites) + Number(f.suivi.incertaines)) % f.textes.length];
+      const texte = texteJamaisRepete(brut, '', f.recents || []) || null;
+      if (!texte) { await noter(null); await finir('arret', "toutes les variantes ont déjà servi juste avant — ajoute un autre message"); break; }
+      f.reste = f.reste.slice(1);
+      const s = await tirerSansRepeter(LBC_INTERESSES_ECART_DERNIER, INTERESSES_ECART_S[0], INTERESSES_ECART_S[1]);
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['lbcinteresses:ecart', s * 1000]); } catch (_) {}
+      f.prochain = Date.now() + s * 1000;
+      f.recents = [...(f.recents || []), empreinteMessage(texte)].slice(-3);
+      await poserFileInteressesLbc(f);
+      const r = await repondreLeboncoin({ conv, texte }, { serie: true, compte });
+      if (r && r.accepte === true && r.etape === 'fait') { await noter('faite'); f.suivi.faites++; n++; await noterGesteAuto('lbc:' + compte, 'favori'); await noterJournal('lbc:' + compte, 'favori', {}); }
+      else if (r && r.accepte === true && r.etape === 'incertain') { await noter('incertaine'); f.suivi.incertaines++; await finir('arret', r.raison || 'je ne sais pas si le message est parti — regarde la conversation sur Leboncoin'); break; }
+      else { await noter(r && r.accepte === true ? 'refusee' : null); await finir('arret', (r && r.raison) || 'refusé'); break; }
+      await poserFileInteressesLbc(f);
+    }
+  } catch (_) { try { await finir('arret', 'interrompu'); } catch (_e) {} }
+  finally { _lbcInteressesIci = false; }
+  return n;
+}
+// Le réveil `vrm-offres` (1 min) : une série que personne ne tient plus (worker endormi puis réveillé).
+async function reprendreInteressesLbc() {
+  if (_lbcInteressesIci || LBC_REPONSE_EN_VOL) return 0;
+  const f = await lireFileInteressesLbc();
+  if (!f || !Array.isArray(f.reste) || !f.reste.length) return 0;
+  return deroulerInteressesLbc();
 }
 
 async function buildLbcData() {
