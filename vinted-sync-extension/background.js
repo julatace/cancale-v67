@@ -19004,10 +19004,10 @@ async function noterVersionRefusee(uid, texte) {
 function versionsEnvoyables(versions, refusees) {
   return (Array.isArray(versions) ? versions : []).filter((v) => v && texteSurVinted(v.texte).ok && !(refusees && refusees.has(empreinteMessage(v.texte))));
 }
-// Le prix mini posé dans VRM pour CETTE annonce (centimes), lu en scalaire ; null = pas posé ou pas su.
+// Le prix mini posé dans VRM pour CETTE annonce (centimes), lu en scalaire (clé ENTRE GUILLEMETS, X4) ; null = pas posé ou pas su.
 async function prixMiniAnnonce(itemId) {
   if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
-  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->${itemId}->>min`); } catch (_) { r = null; }
+  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
   return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
 async function executerMessageFavori(uid,acc,body){
