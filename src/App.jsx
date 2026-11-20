@@ -1213,13 +1213,13 @@ import { trj, useLangue } from './i18n/react.js';
 const CollerPrixAchatFeuille = aLaDemandeFeuille(() => import('./composants/CollerPrixAchat.jsx').then((m) => ({ default: m.CollerPrixAchatFeuille })));
 import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
-import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
+import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, reglagePlateformes, ETAPES_NOUVEAU, installationIci, etatExtensionDirect, comptesCaptes } from "./parcoursNouveau/regle.js";
+import { etatNavigateur as etatNavigateurPN } from "./extension/peutFaire.js";   // (20 nov.) l'état de la page Extension, dans « Bien démarrer »
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
 // (19 nov., lot compte-bloque) « Vinted a bloqué {compte} » : ses annonces en pause sur SON choix (src/compteBloque.js).
 import { useComptesBloques, uidsEnPauseConnus, uidsBloquesConnus } from "./compteBloqueEtat.js";
 import { CLE_AIDES as CLE_AIDES_PN, noterVisiteVue as noterVisiteVuePN } from "./accueilReste/aides.js";
 import { ACCES_OFFERT as ACCES_OFFERT_PN, PRIX_MOIS as PRIX_MOIS_PN, PRIX_PRO_MOIS as PRIX_PRO_MOIS_PN, PRO_OUVERT as PRO_OUVERT_PN } from "./accueil-reglages.js";
-const ParcoursNouveau = aLaDemande(() => import('./parcoursNouveau/ParcoursNouveau.jsx'));
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -24203,7 +24203,7 @@ function GuideDemarrageApp(props) {
 // d'écriture) : la session, « Où vends-tu ? » (`vrm_plateformes_affichees`), le pont et
 // la première lecture (`useParcoursArrivee`, la même règle que la carte « Démarrer »),
 // « qui numérote » (`vrm_numero_ecrit`), l'import des 12 mois (`import_vinted_{uid}`,
-// projeté), l'abonnement LU du serveur. L'écran (ParcoursNouveau.jsx) ne fait que dessiner.
+// projeté), l'abonnement LU du serveur. L'écran (Demarrage.jsx) ne fait que dessiner.
 // Écritures : seulement sur SES gestes — la position (`vrm_parcours_nouveau`), ses sites,
 // sa numérotation — par `save`, comme partout. Dans le bac à sable du propriétaire
 // (src/modeExemple.js) le même code tourne, en mémoire : rien ne sort.
@@ -24216,45 +24216,102 @@ function useAbonnementLu() {
   }, []);
   return x;
 }
+// (20 nov., Julien : « un parcours de 5 minutes ») « BIEN DÉMARRER » (src/parcoursNouveau/Demarrage.jsx) : un sommaire
+// et six pages poussées, style Paramètres. Les preuves EN DIRECT, relues toutes les 5 s pendant qu'une page attend :
+//   · l'extension — la règle de la page « Extension » (`etatNavigateur`, src/extension/peutFaire.js) sur les faits
+//     de CE navigateur (`faitsExtensionApp`), qui changent dès que le pont répond (`useExtVivante`) ;
+//   · les comptes captés — `fetchVintedAccounts` (Vinted), `useComptesAutresSites` (Leboncoin, Vestiaire, eBay) ;
+//   · la méthode d'étiquetage — les trois clés de src/etiquetage/methode.js (`EtiquetageReglage`, le même écran
+//     que Paramètres → Stock, qui n'écrit QUE ces clés) ;
+//   · le premier import — `import_vinted_{uid}` (`lireImportDepart`, lu, jamais deviné).
+// Écritures : la position (`vrm_parcours_nouveau`), ses sites, sa méthode d'étiquetage — sur SES gestes, par `save`.
+const Demarrage = aLaDemande(() => import('./parcoursNouveau/Demarrage.jsx'));
+const EtiquetageReglageParcours = aLaDemande(() => import('./etiquetage/EtiquetageReglage.jsx'));
+const CLES_ETIQUETAGE_PN = ['vrm_numero_ecrit', 'vrm_num_prefixe', 'vrm_etiquetage'];
+const lireEtiquetagePN = () => ({ numeroEcrit: load('vrm_numero_ecrit', null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load('vrm_etiquetage', null) });
+const ecrireEtiquetagePN = (ecritures) => Promise.all((ecritures || []).filter((w) => CLES_ETIQUETAGE_PN.includes(w.cle)).map((w) => new Promise((res) => {
+  if (w.cle === 'vrm_num_prefixe' && !ecrireCopieLocale('vrm_num_prefixe', w.valeur)) { res(false); return; }
+  save(w.cle, w.valeur, (ok) => res(ok !== false));
+  try { window.dispatchEvent(new Event(w.cle === 'vrm_num_prefixe' ? 'vrm-prefixe' : w.cle === 'vrm_numero_ecrit' ? 'vrm-numero-ecrit' : 'vrm-etiquetage')); } catch (_) {}
+}))).then((r) => r.every(Boolean));
 function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
   const [, maj] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || [CLE_PARCOURS_NOUVEAU, CLE_PLATEFORMES, CLE_NUMERO_ECRIT].includes(k)) maj(); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || [CLE_PARCOURS_NOUVEAU, CLE_PLATEFORMES, ...CLES_ETIQUETAGE_PN].includes(k)) maj(); };
     window.addEventListener('vrm:save', f);
     const off = onCloudReady(maj);
     return () => { window.removeEventListener('vrm:save', f); if (typeof off === 'function') off(); };
   }, []);
+  const sansSouris = useSansSouris();
+  useExtVivante();
   const pret = isCloudReady();
   const pos = pret ? lireParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null)) : null;
-  const [ici, setIci] = React.useState(() => etapeForcee || (pos && pos.etape) || 'bienvenue');
-  React.useEffect(() => { if (etapeForcee) setIci(etapeForcee); }, [etapeForcee]);
-  const { etat: arrivee } = useParcoursArrivee({ comptes, actif: true });
-  const abo = useAbonnementLu();
+  // Ouvert à SON étape (reprise) ; jamais commencé ⇒ le sommaire. `etapeForcee` 'sommaire' : depuis Paramètres.
+  const forcee = ETAPES_NOUVEAU.includes(etapeForcee) ? etapeForcee : null;
+  const [ici, setIci] = React.useState(() => (etapeForcee ? forcee : (pos && pos.vues && pos.vues.length ? pos.etape : null)));
+  React.useEffect(() => { if (etapeForcee) setIci(forcee); }, [etapeForcee]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Relire pendant qu'une page attend une preuve (extension, comptes, import) : toutes les 5 s, page visible.
+  const [tour, setTour] = React.useState(0);
+  const attend = ici === 'extension' || ici === 'comptes' || ici === 'historique' || ici === null || ici === 'pret';
+  React.useEffect(() => {
+    if (!attend) return undefined;
+    const pousse = () => { if (document.visibilityState === 'visible') setTour((t) => t + 1); };
+    const t = setInterval(pousse, 5000);
+    window.addEventListener('focus', pousse); document.addEventListener('visibilitychange', pousse);
+    return () => { clearInterval(t); window.removeEventListener('focus', pousse); document.removeEventListener('visibilitychange', pousse); };
+  }, [attend]);
+  const { etat: arrivee } = useParcoursArrivee({ comptes, actif: true, tour });
+  const [vinted, setVinted] = React.useState(() => (Array.isArray(comptes) ? comptes : undefined));
+  React.useEffect(() => {
+    if (!tour) return undefined;
+    let mort = false;
+    fetchVintedAccounts().then((r) => { if (!mort) setVinted(Array.isArray(r) ? r : null); }).catch(() => { if (!mort) setVinted(null); });
+    return () => { mort = true; };
+  }, [tour]);
+  const [autres, relireAutres] = useComptesAutresSites(true);
+  React.useEffect(() => { if (tour && ici === 'comptes') relireAutres(); }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
   const [imports, setImports] = React.useState(undefined);
-  const uids = (Array.isArray(comptes) ? comptes : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).join(',');
+  const listeVinted = Array.isArray(vinted) ? vinted : (Array.isArray(comptes) ? comptes : vinted);
+  const uids = (Array.isArray(listeVinted) ? listeVinted : []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).join(',');
   React.useEffect(() => {
     let mort = false;
     lireImportDepart(uids ? uids.split(',') : [], (q) => lireTout(q)).then((r) => { if (!mort) setImports(r); }).catch(() => { if (!mort) setImports(null); });
     return () => { mort = true; };
-  }, [uids, ici]);
+  }, [uids, ici, tour]);
   const plateformes = pret ? lirePlateformes(load(CLE_PLATEFORMES, null)) : undefined;
   const numerotation = pret ? load(CLE_NUMERO_ECRIT, null) : undefined;
-  const etats = etatsParcoursNouveau({ session: !!(AUTH.user && AUTH.user.id), plateformes, arrivee, numerotation, imports, abonnement: etatAbonnement(abo) });
+  const etats = etatsParcoursNouveau({ session: !!(AUTH.user && AUTH.user.id), plateformes, arrivee, numerotation, imports, etiquetage: pret ? lireEtiquetagePN() : undefined });
+  const navExt = (() => { try { return etatNavigateurPN(faitsExtensionApp(sansSouris)); } catch (_) { return null; } })();
+  const ext = etatExtensionDirect(navExt, etats.extension);
+  const sites = plateformes && plateformes.sites && plateformes.sites.length ? plateformes.sites : ['vinted'];
+  const captes = comptesCaptes(sites, {
+    vinted: Array.isArray(listeVinted) ? listeVinted.map((a) => ({ nom: (a && (a.login || a.username)) || '' })) : listeVinted,
+    leboncoin: autres ? autres.leboncoin : undefined, vestiaire: autres ? autres.vestiaire : undefined, ebay: autres ? autres.ebay : undefined,
+  });
+  const etatsVus = { ...etats, extension: ext, comptes: { etat: sites.every((s) => captes[s] && captes[s].etat === 'fait') ? 'fait' : sites.some((s) => captes[s] && captes[s].etat === 'encours') ? 'encours' : 'afaire' } };
   const ranger = (geste, etape) => save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), geste, { etape }));
-  const aller = (e) => { if (!ETAPES_NOUVEAU.includes(e)) return; setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {} };
+  const aller = (e) => {
+    if (e === null) { setIci(null); return; }
+    if (!ETAPES_NOUVEAU.includes(e)) return;
+    setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {}
+  };
   const ecrire = (cle, v) => new Promise((res) => save(cle, v, (ok) => res(ok !== false)));
-  const sombre = (() => { try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (_) { return false; } })();
   const prenom = String(load('vrm_prenom', '') || '').trim().slice(0, 30);
-  return <><FermeAuRetour fermer={() => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); }}/>
-    <Suspense fallback={null}><ParcoursNouveau etape={ici} etats={etats} appareil={appareilParcoursNouveau(undefined, bacASableAppareil())} dansOrion={dansOrionIci()} sombre={sombre} prenom={prenom} vend={vendActuel()}
-      prix={{ solo: PRIX_MOIS_PN, pro: PRIX_PRO_MOIS_PN, proOuvert: PRO_OUVERT_PN, accesOffert: ACCES_OFFERT_PN }}
-      plateformesDepart={plateformes && plateformes.sites ? plateformes.sites : []} numerosDepart={etats.numeros.choix || null}
+  const fermerPlusTard = () => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); };
+  const allerAilleurs = (url) => { ranger('aller', ici || 'plateformes'); if (onFermer) onFermer('plusTard'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: url })); } catch (_) {} };
+  return <><FermeAuRetour fermer={() => { if (ici) setIci(null); else fermerPlusTard(); }}/>
+    <Suspense fallback={null}><Demarrage etape={ici} etats={etatsVus} ext={ext} navExt={navExt} inst={installationIci({ liens: LIENS_BOUTIQUES })} pageExt={NAV.pageExt || ''}
+      captes={captes} sites={sites} telephone={!!sansSouris} prenom={prenom}
+      plateformesDepart={plateformes && plateformes.sites ? plateformes.sites : []}
+      etiquetage={ici === 'etiquetage' ? <Suspense fallback={null}><EtiquetageReglageParcours lire={lireEtiquetagePN} archive={archiveNumeros()} ecrire={ecrireEtiquetagePN}/></Suspense> : null}
       onAller={aller}
-      onPlusTard={() => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); }}
+      onPlusTard={fermerPlusTard}
       onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); if (onFermer) onFermer('fin'); }}
-      onChoisirPlateformes={(sites) => { const v = reglagePlateformes(sites); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
-      onChoisirNumeros={(choix) => { const v = reglageNumerotation(choix, new Date().toISOString(), load(CLE_NUMERO_ECRIT, null)); return v ? ecrire(CLE_NUMERO_ECRIT, v) : Promise.resolve(false); }}
-      onOuvrirReglage={(id) => { ranger('aller', ici); if (onFermer) onFermer('plusTard'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: id === 'ebay' ? '?tab=plat_ebay&section=compte' : '?tab=settings' })); } catch (_) {} }}
+      onChoisirPlateformes={(s) => { const v = reglagePlateformes(s); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
+      onBrancher={navExt && navExt.geste === 'brancher' ? () => { brancherExtensionApp(); setTimeout(() => setTour((t) => t + 1), 1500); } : null}
+      onExemple={bacASableEtape() ? null : () => entrerModeExemple()}
+      onEbay={() => allerAilleurs('?tab=plat_ebay&section=compte')}
+      onDetailsExtension={() => { ranger('aller', ici || 'extension'); if (onFermer) onFermer('plusTard'); setTimeout(ouvrirPageExtension, 0); }}
     /></Suspense></>;
 }
 // Préférences synchronisées et cloisonnées par le stockage du compte VRM.

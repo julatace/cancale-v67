@@ -37,6 +37,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'meuble-personnaliser', date: '2026-11-20', titre: 'Personnalise tes meubles, range la pièce', phrase: 'Style, couleur, cases, nom ; à la souris, glisse une paire.', tab: 'garage', pour: 'tous', mode: 'complet' },
   // (20 nov., Julien : « l'app lui donne son N°, te dit dans quelle case la ranger ») docs/passation/2026-11-20-arrivee-scan.md
   { id: 'arrivee-scan', date: '2026-11-20', titre: 'Un colis arrive : son N°, sa case', phrase: '« J’ai retiré » ou le scan : range-le en un toucher.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « un parcours de 5 minutes […] une démo […] Tout va bien ? qui dit exactement quoi faire ») docs/passation/2026-11-20-demarrage-store.md
+  { id: 'bien-demarrer', date: '2026-11-20', titre: 'Bien démarrer en 5 minutes', phrase: 'Sites, extension, comptes, étiquetage, import : rouvrable depuis Paramètres.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'tout-va-bien-points', date: '2026-11-20', titre: 'Tout va bien ? dit quoi faire', phrase: 'Chaque point a son geste, le plus important d’abord.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
   // (20 nov.) Colis à retirer : contenu d'abord, trajet, QR à droite, code gardé jusqu'à la fin prouvée — docs/passation/2026-11-20-retraits-visuel.md.
   { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite.', tab: 'achats', pour: 'tous', mode: 'tous' },

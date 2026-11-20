@@ -41,7 +41,7 @@ const MIGRES = [
   ['src/communaute/CoucouCarte.jsx', ['*']],   // (17 nov., carte-coucou) le coucou de la carte   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
-  ['src/parcoursNouveau/ParcoursNouveau.jsx', ['*']],   // (15 nov., parcours nouveau) les huit étapes
+  ['src/parcoursNouveau/Demarrage.jsx', ['*']],   // (20 nov.) « Bien démarrer », le parcours en pages poussées
   ['src/parcoursNouveau/NouveauxComptes.jsx', ['*']],   // (15 nov., parcours nouveau) l'onglet du propriétaire
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles

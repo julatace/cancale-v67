@@ -16,6 +16,8 @@ export default {
   "pn.court.historique": "History",
   "pn.court.journee": "Your day",
   "pn.court.abonnement": "Subscription",
+  "pn.court.etiquetage": "Labelling",
+  "pn.court.pret": "All set",
   "pn.etat.fait": "Done",
   "pn.etat.afaire": "To do",
   "pn.etat.encours": "Checking…",
