@@ -21019,7 +21019,13 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
 }
 // Annonces : le compteur de chaque pastille = ses annonces en ligne (publiées par l'écran Annonces, `poserNombreAnnonces`).
 function SelecteurSiteAnnonces() {
-  const nb = React.useSyncExternalStore(abonnerNombresAnnonces, lireNombresAnnonces, lireNombresAnnonces);
+  const nbLu = React.useSyncExternalStore(abonnerNombresAnnonces, lireNombresAnnonces, lireNombresAnnonces);
+  // Les derniers comptes LUS, gardés par compte VRM sur l'appareil : pendant la copie instantanée, les pastilles disent ce
+  // que la copie montre (la même lecture), jamais un nombre inventé ; la lecture vraie les remplace.
+  const cle = 'vrm_nb_annonces:' + String(AUTH.user?.id || '');
+  const vide = !Object.keys(nbLu || {}).length;
+  const nb = React.useMemo(() => { if (!vide) return nbLu; try { const v = JSON.parse(localStorage.getItem(cle) || 'null'); if (v && typeof v === 'object') return v; } catch (_) {} return nbLu; }, [nbLu, vide, cle]);
+  React.useEffect(() => { if (vide || !AUTH.user?.id) return; try { localStorage.setItem(cle, JSON.stringify(nbLu)); } catch (_) {} }, [nbLu, vide, cle]);
   const relies = useSitesRelies();
   const tous = relies.every((x) => Number.isFinite(nb[x])) ? relies.reduce((t, x) => t + nb[x], 0) : null;
   return <SelecteurSiteCoque nombres={{ ...nb, ...(tous != null ? { toutes: tous } : {}) }}/>;
