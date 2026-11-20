@@ -162,6 +162,7 @@ async function v1v3() {
   await S.ch.appel('GET', URL_LISTE + '&_=2', { data: [annonce(ART, 24900, exacte), annonce(ART2, 15000), annonce(ART3, 9000)], meta: { count: 3, offset: 0 } }); await attendre(80);
   const it2 = S.fond.lignes.vc_listings.items;
   dit(!!avant && Date.parse(it2[ART2].vueDepuis) < Date.now() - 11 * J && it2[ART2].misEnLigne === '', 'V2 · une relecture garde la 1re date vue (jamais avancée), toujours sans date exacte', it2[ART2]);
+  dit(!!post && post.items.every((x) => !JSON.stringify(x.negos || {}).includes('99887766')) && JSON.stringify(Object.keys(post.items[0].negos || {}).sort()) === JSON.stringify(['aToi', 'enCours', 'total']), 'V3 · dès la page : les négociations ne portent que trois nombres', post && post.items[0].negos);
   dit(it2[ART].negos && it2[ART].negos.total === 2 && it2[ART].negos.aToi === 1 && !JSON.stringify(S.fond.lignes.vc_listings).includes('99887766'), 'V3 · les négociations : des nombres (2 · 1 à toi), aucun identifiant de personne', it2[ART].negos);
 }
 
@@ -350,6 +351,23 @@ async function l2l3() {
   const f2 = await finSerie(S);
   dit(f2 && f2.fin === 'arret' && S.envois.length === 3 && f2.faites === 2, 'L3 · Leboncoin répond 429 au 3e : la série s’arrête, la suite ne part pas', { f2, n: S.envois.length });
   dit(!!(S.f.store.vrmPauseLbcMsg && S.f.store.vrmPauseLbcMsg.jusqua > Date.now()), 'L3 · … et la messagerie Leboncoin est mise en pause 30 min', S.f.store.vrmPauseLbcMsg);
+  // Un seul texte pour deux personnes : le 2e n'est jamais le même mot pour mot (la salutation change).
+  S = systemeLbc({ fils: [fil(C1), fil(C2)] });
+  r = await S.panneau({ action: 'ecrireInteressesLbc', annonce: AD, convs: [C1, C2], textes: ['Bonjour, elle est toujours disponible.'], confirme: true });
+  await finSerie(S);
+  dit(S.envois.length === 2 && S.envois[0].texte !== S.envois[1].texte, 'L3 · UNE seule variante : le 2e message n’est jamais le même mot pour mot', S.envois.map((e) => e.texte));
+  // Un refus qui n'est pas un 429/403 (500) : la série s'arrête quand même.
+  S = systemeLbc({ fils: [fil(C1), fil(C2), fil(C3)] });
+  S.poserStatut((k) => (k === 1 ? 500 : 200));
+  r = await S.panneau({ action: 'ecrireInteressesLbc', annonce: AD, convs: [C1, C2, C3], textes: t, confirme: true });
+  const f5 = await finSerie(S);
+  dit(S.envois.length === 1 && f5 && f5.fin === 'arret', 'L3 · Leboncoin refuse (500) : la série s’arrête, personne d’autre n’est écrit', { n: S.envois.length, f5 });
+  // La porte des favoris PENDANT la série : 14 messages aux favoris déjà partis cette heure (15/h) ⇒ le 1er part, le 2e non.
+  S = systemeLbc({ fils: [fil(C1), fil(C2)] });
+  S.f.store.vrmSortes = { ['lbc:' + MOI_LBC]: { favori: Array.from({ length: 14 }, (_, i) => Date.now() - 60000 * (i + 1)), at: Date.now() } };
+  r = await S.panneau({ action: 'ecrireInteressesLbc', annonce: AD, convs: [C1, C2], textes: t, confirme: true });
+  const f6 = await finSerie(S);
+  dit(r && r.accepte === true && S.envois.length === 1 && f6 && f6.fin === 'arret', 'L3 · 15 messages par heure (réglage des favoris) : la porte est revérifiée avant CHAQUE message', { r, n: S.envois.length, f6 });
   // Le plafond : 45 actions déjà prises ⇒ rien ne part.
   S = systemeLbc({ fils: [fil(C1)] });
   const now = Date.now();
