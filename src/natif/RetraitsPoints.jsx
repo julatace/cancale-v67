@@ -3,8 +3,7 @@
 //  Julien : « Colis à retirer beaucoup plus visuel, c'est pas exceptionnel, tu peux encore faire ».
 //  Style natif « entre Vintex et natif » (docs/design/NATIF.md §2 bis) : cartes à filet, petites capitales grises,
 //  étiquettes douces, accent rare, ambre = urgent. AUCUNE règle ici : les points arrivent de `pointsARetirer`
-//  (src/relaisColis.js) sur la liste `pickupUnion`, chaque geste est celui d'avant (`retirer` = markCollected /
-//  markPickupDone, `enGrand` = openQrView). Tri, résumé, compte à rebours, itinéraire : src/retraitsVue.js.
+//  (src/relaisColis.js) sur la liste `pickupUnion`, chaque geste est celui d'avant (`enGrand` = openQrView). Tri, résumé, compte à rebours, itinéraire : src/retraitsVue.js.
 //    · une bande résumé et le plan des points (liste ordonnée, aucune carte payante) ;
 //    · une carte par point : nom en grand, sorte (consigne / comptoir), transporteur et logo, adresse + Itinéraire,
 //      horaires LUS, compte à rebours de la limite LUE, mini-carte seulement si un repère sûr existe ;
@@ -13,11 +12,10 @@
 //    · (20 nov., suite) la BARRE DU TRAJET de chaque colis (Payé · Expédié · En transit · Au point · Retiré), chaque
 //      étape sur sa date LUE (src/retraitTrajet.js), grise sinon ; le QR à DROITE du code, en grand, sur blanc ;
 //      la RÉTENTION : un colis « à vérifier » (date limite dépassée…) reste dans sa carte, code et QR visibles ;
-//    · « Je suis au point » : plein écran sombre, tous les codes l'un sous l'autre, QR sur blanc, écran gardé allumé
-//      (`navigator.wakeLock`), « J'ai tout retiré » ou colis par colis — annulable 10 s.
+//    · (20 nov., Julien : « je ne veux plus de Je suis au point ») plus d'écran plein : le contenu, le code et le QR
+//      restent dans la carte du point ; toucher le code ou le QR l'ouvre en grand (`enGrand` = openQrView, comme avant).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { tr, localeCourante } from '../i18n/index.js';
 import { CLE_RETRAITS_VUS, estNouveau, marquerVu } from '../retraitsNouveaux.js';
 import { trierPoints, resumeRetraits, limiteDuPoint, compteARebours, lienItineraire, appareilApple, colisDuPoint, mentionVerif } from '../retraitsVue.js';
@@ -26,7 +24,6 @@ import { MiniCarte } from './MiniCarte.jsx';
 import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './retraits.css';
 
-const ANNULER_MS = 10000;
 // (20 nov., rétention) Tout colis que `pickupUnion` n'a pas FINI par une preuve reste dans la carte de son point :
 // les comptés, puis les « à vérifier » (date limite dépassée…), code et QR visibles (src/retraitsVue.js `colisDuPoint`).
 const MENTION = { depasse: 'retraits.m.depasse', 'trop-long': 'retraits.m.tropLong', 'sans-code': 'retraits.m.sansCode', transporteur: 'retraits.m.transporteur', doute: 'retraits.m.doute', autre: 'retraits.m.autre' };
@@ -38,31 +35,6 @@ const texteRebours = (c) => {
   if (c.cle === 'demain') return c.heure ? tr('retraits.v.demainHeure', { h: c.heure }) : tr('retraits.v.demain');
   return tr('retraits.v.dans', { n: c.n });
 };
-
-// Les retraits « en cours » (annulables 10 s) : une clé ⇒ minuterie ; à l'échéance, le geste d'avant.
-function useRetraitsDiffere(retirer) {
-  const [enCours, setEnCours] = React.useState({});
-  const minut = React.useRef(new Map());
-  React.useEffect(() => () => { for (const [, id] of minut.current) clearTimeout(id); }, []);
-  const lancer = React.useCallback((colis) => {
-    const fin = Date.now() + ANNULER_MS;
-    for (const x of colis) {
-      const k = x.cle || x.id;
-      if (minut.current.has(k)) continue;
-      minut.current.set(k, setTimeout(() => {
-        minut.current.delete(k);
-        try { retirer(x); } catch (_) {}
-        setEnCours((e) => { const n = { ...e }; delete n[k]; return n; });
-      }, ANNULER_MS));
-    }
-    setEnCours((e) => { const n = { ...e }; for (const x of colis) n[x.cle || x.id] = fin; return n; });
-  }, [retirer]);
-  const annuler = React.useCallback((cles) => {
-    for (const k of cles) { const id = minut.current.get(k); if (id) clearTimeout(id); minut.current.delete(k); }
-    setEnCours((e) => { const n = { ...e }; for (const k of cles) delete n[k]; return n; });
-  }, []);
-  return { enCours, lancer, annuler };
-}
 
 function Copier({ code }) {
   const [fait, setFait] = React.useState(false);
@@ -96,14 +68,14 @@ function Trajet({ t }) {
 }
 
 // Ce qu'il y a dans le colis : { photo, titre (2 lignes), taille · prix · compte, lot } — ou « pas encore lu ».
-function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, ap = false }) {
+function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
   const relie = !!(c && c.etat === 'relie');
   const pasLu = !!(c && c.etat === 'pas-lu');
   const titre = relie ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
   const phrase = texteContenu(c, tr);
   const details = relie ? [c.taille ? tr('retraits.c.taille', { t: c.taille }) : '', phrase].filter(Boolean) : [];
   return (
-    <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '') + (ap ? ' is-ap' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
+    <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
       <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={photo && relie && c.photo ? c.photo : undefined} data-v2-photo-article={photo ? '' : undefined}>
         {photo || <Icon name="box" size={26}/>}
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
@@ -123,7 +95,7 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, ap = false }) {
   );
 }
 
-function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
+function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
   const neuf = !!(nouveaux && estNouveau(nouveaux.etat, x.cle || x.id));
   const conflit = x.codesDesaccord && x.codesDesaccord.length > 1;
   const code = conflit ? '' : (x.code || '');
@@ -136,12 +108,11 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
   const prix = contenuTxt ? '' : (aides.prixDe ? aides.prixDe(x) : '');
   const rg = rangeeRetrait(x) || { codeEtat: '', qr: false, limite: {}, titreDe: '', transporteur: {} };
   const photo = x.photo && Photo ? Photo(x.photo) : null;
-  const retireBientot = !!enCours[x.cle || x.id];
   const voirQr = ouvrir && qr ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
   const voirCode = ouvrir ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
   const long = code.length > 7;
   return (
-    <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '') + (retireBientot ? ' is-retire' : '') + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
+    <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '')  + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
       data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
       {/* (20 nov., Julien : « même quand c'est à retirer, on doit voir ce qu'il y a à l'intérieur ») LE CONTENU D'ABORD, EN GRAND :
           la photo et le titre de l'achat relié PAR IDENTITÉ (x.contenu), sa taille, le prix payé, le compte, « lot » s'il l'est ;
@@ -164,7 +135,7 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
   );
 }
 
-function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, enCours, onAuPoint, apple }) {
+function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple }) {
   const { comptes, verif } = colisDuPoint(p);
   const colis = [...comptes, ...verif];
   const transp = (p.transporteurs || [])[0] || '';
@@ -191,72 +162,16 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, enCours, onAuPoint,
       </header>
       {p.repere && !p.sansCarte ? <MiniCarte lat={p.repere.lat} lon={p.repere.lon}/> : null}
       <ul className="n-rp-liste">
-        {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} enCours={enCours}/>)}
+        {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
       </ul>
       {verif.length ? <>
         <p className="n-rp-verif-tete" data-rp-verif-tete={verif.length}>{tr('retraits.m.horsCompte')}</p>
         <ul className="n-rp-liste" data-rp-verif-liste="">
-          {verif.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux} enCours={enCours}/>)}
+          {verif.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
         </ul>
       </> : null}
-      <div className="n-rp-pied">
-        <button type="button" className="n-rp-plein" onClick={() => onAuPoint(p)} data-rp-au-point="">{tr('retraits.v.auPoint')}</button>
-      </div>
     </article>
   );
-}
-
-// ── « JE SUIS AU POINT » ─────────────────────────────────────────────────────
-function AuPoint({ p, aides, onFermer, differe, Photo, Icon }) {
-  const ref = React.useRef(null);
-  React.useEffect(() => {
-    let verrou = null, vivant = true;
-    const demander = async () => { try { if (navigator.wakeLock && document.visibilityState === 'visible') { const v = await navigator.wakeLock.request('screen'); if (vivant) verrou = v; else v.release().catch(() => {}); } } catch (_) {} };
-    demander();
-    const vis = () => { if (document.visibilityState === 'visible') demander(); };
-    document.addEventListener('visibilitychange', vis);
-    const esc = (e) => { if (e.key === 'Escape') onFermer(); };
-    window.addEventListener('keydown', esc);
-    try { ref.current && ref.current.focus(); } catch (_) {}
-    return () => { vivant = false; document.removeEventListener('visibilitychange', vis); window.removeEventListener('keydown', esc); try { if (verrou) verrou.release().catch(() => {}); } catch (_) {} };
-  }, [onFermer]);
-  // Les comptés d'abord, puis les « à vérifier » qui ont encore un code ou un QR (il est peut-être encore là).
-  const { comptes: cAp, verif: vAp } = colisDuPoint(p);
-  const colis = [...cAp, ...vAp];
-  const cles = colis.map((x) => x.cle || x.id);
-  const tousEnCours = cles.every((k) => differe.enCours[k]);
-  const noeud = (
-    <div className="n-rp-aupoint" role="dialog" aria-modal="true" aria-label={tr('retraits.v.auPointAria', { lieu: p.nom || '' })} data-rp-aupoint="" tabIndex={-1} ref={ref}>
-      <div className="n-rp-ap-tete">
-        <div className="n-rp-ap-titres">
-          <span className="n-rp-ap-sur">{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span>
-          <h2 className="n-rp-ap-nom">{p.nom || tr('v2.retirer.pointInconnu')}</h2>
-          <span className="n-rp-ap-n">{tr('v2.passe.colis', { n: colis.length })}</span>
-        </div>
-        <button type="button" className="n-rp-ap-fermer" onClick={onFermer} data-rp-aupoint-fermer="">{tr('retraits.v.fermer')}</button>
-      </div>
-      <ol className="n-rp-ap-liste">
-        {colis.map((x) => { const k = x.cle || x.id; const conflit = x.codesDesaccord && x.codesDesaccord.length > 1; const code = conflit ? '' : (x.code || ''); const qr = aides.qrSrc(x); const ec = differe.enCours[k];
-          return (
-            <li key={k} className={'n-rp-ap-colis' + (ec ? ' is-retire' : '')} data-rp-ap-colis={k} data-rp-ap-code={code}>
-              <Contenu x={x} c={x.contenu || null} rg={rangeeRetrait(x)} photo={x.photo && Photo ? Photo(x.photo) : null} aides={aides} Icon={Icon} prix="" neuf={false} ap/>
-              {mentionVerif(x) ? <span className="n-rp-ap-verif" data-rp-ap-verif={mentionVerif(x)}>{tr(MENTION[mentionVerif(x)] || MENTION.autre)}</span> : null}
-              {code ? <b className="n-rp-ap-code" data-rp-ap-code-grand="">{code}</b> : <span className="n-rp-ap-sans">{tr(conflit ? 'v2.passe.codesEnConflit' : 'retraits.v.codePasLu')}</span>}
-              {x.code2 ? <span className="n-rp-ap-code2">{tr('retraits.v.identifiant', { c: x.code2 })}</span> : null}
-              {qr ? <span className="n-rp-ap-qr" data-rp-ap-qr=""><img src={qr} alt={tr('v2.passe.qr')}/></span> : null}
-              {ec
-                ? <button type="button" className="n-rp-ap-annuler" onClick={() => differe.annuler([k])} data-rp-ap-annuler={k}>{tr('retraits.v.annuler')}</button>
-                : <button type="button" className="n-rp-ap-un" onClick={() => differe.lancer([x])} data-rp-ap-retire={k}>{tr('v2.passe.retire')}</button>}
-            </li>); })}
-      </ol>
-      <div className="n-rp-ap-pied">
-        {tousEnCours
-          ? <button type="button" className="n-rp-ap-tout is-annuler" onClick={() => differe.annuler(cles)} data-rp-ap-tout-annuler="">{tr('retraits.v.toutRetireAnnuler')}</button>
-          : <button type="button" className="n-rp-ap-tout" onClick={() => differe.lancer(colis.filter((x) => !differe.enCours[x.cle || x.id]))} data-rp-ap-tout="">{tr('retraits.v.toutRetire')}</button>}
-      </div>
-    </div>
-  );
-  return typeof document !== 'undefined' ? createPortal(noeud, document.body) : noeud;
 }
 
 // L'illustration de « Rien à retirer » : un colis ouvert, sobre (traits seulement, jetons de l'encre).
@@ -282,15 +197,9 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo }) {
   const [etatN, setEtatN] = React.useState(lireNouveaux);
   React.useEffect(() => { const f = () => setEtatN(lireNouveaux()); window.addEventListener('vrm:retraits-nouveaux', f); return () => window.removeEventListener('vrm:retraits-nouveaux', f); }, []);
   const nouveaux = React.useMemo(() => ({ etat: etatN, vu: (cle) => { const e = marquerVu(lireNouveaux(), cle); if (!e) return; try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(e)); } catch (_) {} setEtatN(e); } }), [etatN]);
-  const differe = useRetraitsDiffere(aides.retirer);
-  const [auPoint, setAuPoint] = React.useState(null);
   const apple = React.useMemo(() => appareilApple(), []);
-  const fermer = React.useCallback(() => setAuPoint(null), []);
   if (!avec.length) return null;
   const r = resumeRetraits(avec);
-  const pOuvert = auPoint ? avec.find((p) => (p.cle || p.numero) === auPoint) : null;
-  // Il ouvre « Je suis au point » : les colis de ce point ne sont plus « nouveaux ».
-  const ouvrirAuPoint = (p) => { for (const x of p.arrives) if (estNouveau(etatN, x.cle || x.id)) nouveaux.vu(x.cle || x.id); setAuPoint(p.cle || p.numero); };
   const aller = (p) => { try { document.getElementById('n-rp-' + (p.cle || p.numero)).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} };
   return (
     <div className="n-rp" data-rp="" data-rp-points={String(avec.length)} data-rp-colis={String(r.colis)}>
@@ -311,9 +220,8 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo }) {
         </ol>
       </section>
       <div className="n-rp-cartes" data-v2-bloc="passes">
-        {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} enCours={differe.enCours} onAuPoint={ouvrirAuPoint} apple={apple}/>)}
+        {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple}/>)}
       </div>
-      {pOuvert ? <AuPoint p={pOuvert} aides={aides} onFermer={fermer} differe={differe} Photo={Photo} Icon={Icon}/> : null}
     </div>
   );
 }

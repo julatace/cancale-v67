@@ -1,8 +1,8 @@
 /* ── src/natif/retraits.css — Colis à retirer, une carte par point (20 nov.) ───────────────────────────────
    Contrat : docs/design/NATIF.md (§1 jetons, §2 bis « entre Vintex et natif ») : cartes à FILET (1 px, rayon 12, aucune
    ombre), petites capitales grises, étiquettes douces, accent rare, ambre = urgent. Jetons `--n-*` seulement, ni
-   `!important`, ni `:has()`. Cibles ≥ 44. Le plein écran « Je suis au point » est sombre dans les deux thèmes (une carte
-   d'embarquement) : ses couleurs sont ses propres jetons `--n-rp-ap-*`, écrits une fois ici. */
+   `!important`, ni `:has()`. Cibles ≥ 44. (20 nov.) Plus de « Je suis au point » (Julien : « je ne veux plus ») : le contenu, le
+   code et le QR vivent dans la carte du point. */
 @layer vrm-natif {
   .n-rp { container-type: inline-size; display: flex; flex-direction: column; gap: 16px; margin: 4px 0 12px; font-family: var(--n-police); color: var(--n-encre); }
 
@@ -101,47 +101,11 @@
   .n-rp-verif .n-rp-etiquette { white-space: normal; }
   .n-rp-verif-raison { font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-rp-verif-tete { margin: 0; padding: 10px 16px; border-top: 1px solid var(--n-trait); background: var(--n-carte-2); font: var(--n-t-legende); color: var(--n-encre-2); }
-  .n-rp-ap-verif { font: var(--n-t-legende-fort); color: #FFB340; }
-
-  .n-rp-pied { padding: 12px 16px 16px; border-top: 1px solid var(--n-trait); }
-  .n-rp-plein { appearance: none; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; margin: 0; padding: 0 16px; border: 0; border-radius: 14px;
-    background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-corps-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .n-rp-plein:active { filter: brightness(.92); }
-  .n-rp-plein:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 3px; }
 
   /* Rien à retirer */
   .n-rp-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 16px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre-3); text-align: center; }
   .n-rp-vide-phrase { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); }
 
-  /* « Je suis au point » — une carte d'embarquement, sombre dans les deux thèmes */
-  .n-rp-aupoint { --n-rp-ap-fond: #000000; --n-rp-ap-encre: #FFFFFF; --n-rp-ap-encre-2: #C7C7CC; --n-rp-ap-carte: #1C1C1E; --n-rp-ap-trait: rgb(84 84 88 / .65);
-    position: fixed; inset: 0; z-index: 2147482000; display: flex; flex-direction: column; background: var(--n-rp-ap-fond); color: var(--n-rp-ap-encre); font-family: var(--n-police);
-    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); outline: none; }
-  .n-rp-ap-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid var(--n-rp-ap-trait); }
-  .n-rp-ap-titres { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .n-rp-ap-sur { font: var(--n-t-legende-fort); color: var(--n-rp-ap-encre-2); text-transform: uppercase; letter-spacing: .04em; }
-  .n-rp-ap-nom { margin: 0; font: var(--n-t-section); overflow-wrap: anywhere; }
-  .n-rp-ap-n { font: var(--n-t-legende); color: var(--n-rp-ap-encre-2); }
-  .n-rp-ap-fermer, .n-rp-ap-un, .n-rp-ap-annuler { appearance: none; flex: none; min-height: 44px; padding: 0 16px; margin: 0; border: 0; border-radius: 22px; background: rgb(255 255 255 / .16); color: var(--n-rp-ap-encre);
-    font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .n-rp-ap-annuler { background: #FFB340; color: #000000; }
-  .n-rp-ap-fermer:focus-visible, .n-rp-ap-un:focus-visible, .n-rp-ap-annuler:focus-visible, .n-rp-ap-tout:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
-  .n-rp-ap-liste { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: auto; overscroll-behavior: contain; list-style: none; margin: 0; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
-  .n-rp-ap-colis { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; border-radius: 16px; background: var(--n-rp-ap-carte); }
-  .n-rp-ap-colis.is-retire { opacity: .55; }
-  .n-rp-ap-titre { font: var(--n-t-second); color: var(--n-rp-ap-encre-2); overflow-wrap: anywhere; }
-  .n-rp-ap-code { font: 700 64px/68px var(--n-police); letter-spacing: .06em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-  .n-rp-ap-code2 { font: var(--n-t-corps-fort); color: var(--n-rp-ap-encre-2); font-variant-numeric: tabular-nums; }
-  .n-rp-ap-sans { font: var(--n-t-corps); color: var(--n-rp-ap-encre-2); }
-  .n-rp-ap-qr { display: grid; place-items: center; width: min(100%, 300px); aspect-ratio: 1; padding: 16px; border-radius: 12px; background: #FFFFFF; box-sizing: border-box; }
-  .n-rp-ap-qr img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-  .n-rp-ap-pied { padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--n-rp-ap-trait); }
-  .n-rp-ap-tout { appearance: none; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin: 0; border: 0; border-radius: 14px; background: #FFFFFF; color: #000000;
-    font: var(--n-t-corps-fort); cursor: pointer; }
-  .n-rp-ap-tout.is-annuler { background: #FFB340; }
-  @media (min-width: 1024px) { .n-rp-ap-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-content: start; } .n-rp-ap-pied { display: flex; justify-content: center; } .n-rp-ap-tout { max-width: 420px; } }
-  @media (prefers-reduced-motion: no-preference) { .n-rp-aupoint { animation: nRpEntre .24s cubic-bezier(.32,.72,0,1); } }
-  @keyframes nRpEntre { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 }
 @layer vrm-natif {
   .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
@@ -162,8 +126,4 @@
   .n-rp-pas-lu { font: var(--n-t-second); color: var(--n-encre-2); }
   .n-rp-pas-lu.is-seul { font: var(--n-t-corps-fort); color: var(--n-encre-2); }
   @media (min-width: 1024px) { .n-rp-contenu .n-rp-vignette { width: 88px; height: 88px; } }
-  .n-rp-contenu.is-ap { width: 100%; }
-  .n-rp-contenu.is-ap .n-rp-vignette { width: 64px; height: 64px; background: var(--n-rp-ap-carte); }
-  .n-rp-contenu.is-ap .n-rp-colis-titre { color: var(--n-rp-ap-encre); }
-  .n-rp-contenu.is-ap .n-rp-pas-lu, .n-rp-contenu.is-ap .n-rp-colis-meta, .n-rp-contenu.is-ap .n-rp-dedans, .n-rp-contenu.is-ap .n-rp-num { color: var(--n-rp-ap-encre-2); }
 }

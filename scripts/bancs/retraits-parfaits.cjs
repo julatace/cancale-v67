@@ -81,8 +81,8 @@ async function attendrePasses(pg, attendreNouveau = true) {
       const passe = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="333333"]') }).first();
       if (await passe.count()) await passe.screenshot({ path: path.join(SHOTS, `passe-casier-${W}.png`) }).catch(() => {});
       // Il ouvre la ligne : plus « Nouveau ».
-      // (20 nov.) Il ouvre « Je suis au point » de ce point : ses colis ne sont plus « nouveaux ».
-      const btn = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="333333"]') }).locator('[data-rp-au-point]').first();
+      // (20 nov.) Il touche le code (en grand) : la ligne n'est plus « nouvelle » (« Je suis au point » retiré, sa décision).
+      const btn = pg.locator('li[data-rp-colis][data-rp-code="333333"] [data-v2-en-grand]').first();
       if (await btn.count()) { if (tel) await btn.tap().catch(() => {}); else await btn.click().catch(() => {}); await pg.waitForTimeout(700); }
       await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
       const apres = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_retraits_vus') || 'null'); } catch (_) { return null; } });
