@@ -352,71 +352,6 @@ function formes(dossiers) {
   const md = l.join('\n'); fs.writeFileSync(path.join(SORTIE, 'formes.md'), md + `\n\nÉcarts : ${ecarts}\n`); console.log(md + `\n\nÉcarts : ${ecarts}`);
 }
 
-// `--selecteur` : LE sélecteur de plateforme global (décision du 20 nov.). Sur une base Vinted + Leboncoin + eBay :
-//   S1 il est en tête de Ventes, avec « Tous » et les trois sites reliés (Vestiaire, pas relié, n'y est pas) ;
-//   S2 choisir Leboncoin sur Ventes ⇒ Aujourd'hui, Annonces, Achats, Messages s'ouvrent sur Leboncoin (un seul choix) ;
-//   S3 « Tous » ⇒ les chiffres d'Aujourd'hui sont ceux d'avant (`AVANT=<json>` : relevé du build d'avant, même base) ;
-//   S4 vendeur Leboncoin seul ⇒ aucun sélecteur ; S5 plus aucun filtre de site local (FiltreSites, menu des sites).
-// `MUTATION=local` : le choix n'est plus partagé (chaque écran repart de « Tous ») ⇒ S2 rougit.
-async function selecteur() {
-  await new Promise((r) => P.srv.listen(P.PORT, r));
-  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
-  let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 300))); };
-  const multi = () => ajouterSite(ajouterSite(E.baseFiches(), 'leboncoin'), 'ebay');
-  const lire = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-selecteur-site]'); const t = document.querySelector('.vrm-tache');
-    return { sel: s ? s.getAttribute('data-site-courant') : null, choix: s ? [...s.querySelectorAll('[data-site-choix]')].map((b) => b.getAttribute('data-site-choix')) : [],
-      tache: t ? t.getAttribute('data-tache-site') : null, eg: (document.querySelector('[data-eg-ecran][data-eg-site]') || { getAttribute: () => null }).getAttribute('data-eg-site'),
-      // À l'ordinateur, le tableau de travail : chaque rangée dit ses sites (`data-eg-sites`).
-      egSites: [...document.querySelectorAll('[data-eg-article]')].map((x) => x.getAttribute('data-eg-sites') || ''),
-      tuiles: [...document.querySelectorAll('.n-tuile-valeur')].map((x) => x.textContent.trim()),
-      locaux: document.querySelectorAll('[data-eg-filtre], [data-vn-plateforme], .vrm-filtre-sites, [data-filtre-sites]').length }; });
-  const aller = async (o, url) => { await o.pg.goto(`http://localhost:${P.PORT}/${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE); };
-  try {
-    for (const W of [390, 1512]) {
-      console.log(`\n── sélecteur · ${W}`);
-      const o = await P.ouvrir(nav, { W, sombre: false, b: multi(), url: '/?tab=journee', api: B.apiVolume });
-      await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} }); await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE);
-      const j0 = await lire(o.pg);
-      fs.writeFileSync(path.join(SORTIE, `tuiles-tous-${W}.json`), JSON.stringify(j0.tuiles));
-      if (process.env.AVANT) { let av = null; try { av = JSON.parse(fs.readFileSync(process.env.AVANT.replace('{W}', W), 'utf8')); } catch (_) {}
-        dit(!!av && JSON.stringify(av) === JSON.stringify(j0.tuiles), `S3 ${W} « Tous » : les chiffres d'Aujourd'hui sont ceux d'avant`, { avant: av, apres: j0.tuiles }); }
-      await aller(o, '?tab=ventes');
-      const v0 = await lire(o.pg);
-      dit(v0.sel === 'toutes' && v0.choix.join(',') === 'toutes,vinted,leboncoin,ebay', `S1 ${W} Ventes : le sélecteur, « Tous » + les sites reliés`, v0);
-      await o.pg.locator('[data-selecteur-site] [data-site-choix="leboncoin"]').first().click({ timeout: 5000 }).catch(() => {});
-      await o.pg.waitForTimeout(1500);
-      if (MUT === 'local') await o.pg.evaluate(() => { try { localStorage.removeItem('vrm_site_courant'); } catch (_) {} });
-      const v1 = await lire(o.pg);
-      dit(v1.sel === 'leboncoin' && v1.tache === 'leboncoin', `S2 ${W} Ventes suit le choix (Leboncoin)`, v1);
-      for (const [url, cle] of [['?tab=journee', 'journee'], ['?tab=annonces', 'annonces'], ['?tab=achats', 'achats'], ['?tab=messages', 'messages']]) {
-        await aller(o, url);
-        const x = await lire(o.pg);
-        const egOk = x.eg === 'leboncoin' || (W >= 1024 && x.egSites.length > 0 && x.egSites.every((v) => v.split(',').includes('leboncoin')));
-        const ok = x.sel === 'leboncoin' && (cle === 'journee' || (cle === 'annonces' ? egOk : x.tache === 'leboncoin'));
-        dit(ok, `S2 ${W} ${cle} s'ouvre sur Leboncoin`, x);
-        dit(x.locaux === 0, `S5 ${W} ${cle} : aucun filtre de site local`, x.locaux);
-        await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `selecteur-${cle}-${W}.png`) }).catch(() => {});
-      }
-      await aller(o, '?tab=ventes');
-      await o.pg.locator('[data-selecteur-site] [data-site-choix="toutes"]').first().click({ timeout: 5000 }).catch(() => {});
-      await o.pg.waitForTimeout(1200);
-      await aller(o, '?tab=journee');
-      // Les chiffres se lisent après la coque : attendre qu'ils soient LUS (plus « — » partout), 10 s au plus.
-      await o.pg.waitForFunction(() => [...document.querySelectorAll('.n-tuile-valeur')].some((x) => x.textContent.trim() !== '—'), null, { timeout: 10000 }).catch(() => {});
-      const j1 = await lire(o.pg);
-      dit(j1.sel === 'toutes' && JSON.stringify(j1.tuiles) === JSON.stringify(j0.tuiles), `S3 ${W} revenu à « Tous » : les mêmes chiffres qu'au départ`, { j0: j0.tuiles, j1: j1.tuiles });
-      dit(!o.erreurs.length, `${W} aucune erreur de page`, o.erreurs.slice(0, 3));
-      await o.ctx.close();
-      const o2 = await P.ouvrir(nav, { W, sombre: false, b: baseSite('leboncoin'), url: '/?tab=ventes', api: B.apiVolume });
-      await o2.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} }); await o2.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o2.pg); await o2.pg.waitForTimeout(ATTENTE);
-      const l = await lire(o2.pg);
-      dit(l.sel === null, `S4 ${W} vendeur Leboncoin seul : aucun sélecteur`, l);
-      await o2.ctx.close();
-    }
-  } finally { await nav.close(); P.srv.close(); }
-  console.log(rouges ? `\n❌ sélecteur : ${rouges} rouge(s)` : '\n✅ sélecteur : tout est vert'); if (rouges) process.exitCode = 1;
-}
-
 // `--annonces` (20 nov., Julien : « améliore le visuel » + « divise par comptes ») : 3 comptes Vinted + 1 Leboncoin.
 //   A1 un groupe par compte (Vinted d'abord, Leboncoin ensuite), chacun « N annonces » ; A2 aucune rangée ne dit « mini — » ni
 //   « acheté — » ; un manque est une rangée en tête du groupe ; A3 pas de pastille teintée sous le titre (« Actions » = rond ⋯) ;
@@ -477,104 +412,69 @@ async function annoncesComptes() {
   console.log(rouges ? `\n❌ annonces par compte : ${rouges} rouge(s)` : '\n✅ annonces par compte : tout est vert'); if (rouges) process.exitCode = 1;
 }
 
-// `--sites` (20 nov., Julien : « pour toutes les plateformes tout doit être parfait » ; « même squelette, le contenu s'adapte ») :
-// une base Vinted (3 comptes) + Leboncoin + eBay + Vestiaire ; pour CHAQUE choix du sélecteur (Tous, Vinted, Leboncoin, eBay,
-// Vestiaire) × les 5 onglets (Aujourd'hui, Annonces, Ventes, Achats, Argent) × (390 clair, 390 sombre, 1512 clair) : une capture,
-// et le SQUELETTE relevé — grand titre, sélecteur (haut, bord, hauteur, site choisi), segments de la tâche (libellés, haut),
-// bord gauche des groupes et des rangées, place du plein (écart à la barre d'onglets). PARITÉ : entre les 4 sites, le squelette
-// d'un onglet est le même (tolérance 1 px) ; un écart est NOMMÉ et rougit. Planches : SORTIE/planche-sites-<fen>-<thème>.png
-// (5 lignes = onglets, 5 colonnes = choix). `VARIANTES=390:clair,1512:clair` `ONGLETS=journee,annonces`.
-const SITES_PLANCHE = ['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'];
+// `--sites` (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme, ça ne marche pas du tout ») : PLUS DE
+// SÉLECTEUR. Une base Vinted (3 comptes) + Leboncoin + eBay + Vestiaire, et `vrm_site_courant = "leboncoin"` RANGÉ (la valeur
+// d'hier, qu'on ne supprime pas) : rien ne doit rester coincé sur un site. Pour les 5 onglets (Aujourd'hui, Annonces, Ventes,
+// Achats, Argent) × (390 clair, 390 sombre, 1512 clair) :
+//   N1 aucun sélecteur de plateforme ni ligne « Tous les sites » ;
+//   N2 tout est mélangé : Annonces et Ventes montrent des rangées de PLUSIEURS sites, chacune avec le logo de son site
+//      (`.n-logo-site[data-site]`) ; Achats montre les achats Vinted ET ceux des autres sites (`[data-achats-autre]`) ;
+//   N3 aucune page plus large que l'écran, aucune erreur.
+// Planche : SORTIE/planche-sites-<fen>-<thème>.png (une colonne par onglet). `VARIANTES=390:clair` `ONGLETS=ventes,annonces`.
 const ONGLETS_PLANCHE = [['journee', '?tab=journee'], ['annonces', '?tab=annonces'], ['ventes', '?tab=ventes'], ['achats', '?tab=achats'], ['argent', '?tab=dashboard']];
-function squelette() {
-  const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
-  const R = (e) => { if (!vis(e)) return null; const r = e.getBoundingClientRect(); return { t: Math.round(r.top + scrollY), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; };
-  const racine = document.querySelector('#vrm-contenu, .vrm-main') || document.body;
-  const titre = [...document.querySelectorAll('.n-grand-titre, h1')].find(vis);
-  const sel = document.querySelector('[data-selecteur-site]');
-  const seg = [...racine.querySelectorAll('.n-segmente')].filter((x) => vis(x) && !x.closest('[data-selecteur-site]'))[0] || null;
-  const minL = (q) => { const l = [...racine.querySelectorAll(q)].filter(vis).map((e) => Math.round(e.getBoundingClientRect().left)); return l.length ? Math.min(...l) : null; };
-  // La PLACE du plein : sa bande (`.n-page-plein`) — le bouton lui-même peut porter sa raison dessous (« Coche un colis… »).
-  const plein = [...document.querySelectorAll('.n-page-plein, [data-n-plein]')].find(vis) || [...document.querySelectorAll('[data-n-variante="plein"]')].find(vis);
-  const onglets = document.querySelector('.n-onglets');
-  return {
-    titre: titre ? { txt: titre.innerText.trim().slice(0, 30), ...R(titre) } : null,
-    sel: sel ? { site: sel.getAttribute('data-site-courant'), ...R(sel) } : null,
-    seg: seg ? { libelles: [...seg.querySelectorAll('.n-segmente-libelle')].map((x) => x.textContent.trim()), ...R(seg) } : null,
-    bordGroupes: minL('.n-groupe-carte, .n-carte-corps, .n-tt-cadre, .vrm-buy-list, [data-achats-site] .n-groupe-carte'), bordRangees: minL('.n-rangee, .n-tt-tr, .vrm-buy-row, .vrm-buy-list > *'),   // (les achats Vinted d'avant comptent : même bord)
-    plein: plein ? { ecartOnglets: onglets && vis(onglets) ? Math.round(onglets.getBoundingClientRect().top - plein.getBoundingClientRect().bottom) : null, l: Math.round(plein.getBoundingClientRect().left), w: Math.round(plein.getBoundingClientRect().width) } : null,
-    debord: document.documentElement.scrollWidth > innerWidth + 1,
-  };
-}
 async function sitesPlanches() {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   const base = () => ['leboncoin', 'ebay', 'vestiaire'].reduce((b, s) => ajouterSite(b, s), E.baseFiches());
   const variantes = liste('VARIANTES', '390:clair,390:sombre,1512:clair').map((v) => v.split(':'));
   const ongletsVoulus = liste('ONGLETS', ONGLETS_PLANCHE.map((o) => o[0]).join(','));
-  const releve = [];
   let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 500))); };
   try {
-    for (const [fen, th] of variantes) for (const site of SITES_PLANCHE) {
+    for (const [fen, th] of variantes) {
       const o = await P.ouvrir(nav, { W: Number(fen), sombre: th === 'sombre', b: base(), url: '/?tab=journee', api: B.apiVolume });
-      await o.pg.evaluate((s) => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_site_courant', JSON.stringify(s)); } catch (_) {} }, site);
+      await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_site_courant', JSON.stringify('leboncoin')); } catch (_) {} });
       for (const [cle, url] of ONGLETS_PLANCHE.filter((x) => ongletsVoulus.includes(x[0]))) {
         try {
           await o.pg.goto(`http://localhost:${P.PORT}/${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE);
-          await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast button')) t.click(); }).catch(() => {});
-          await o.pg.waitForTimeout(300);
-          const sq = await o.pg.evaluate(squelette);
-          const f = path.join(SORTIE, 'ecrans', `site-${cle}-${site}-${fen}-${th}.png`);
-          await o.pg.screenshot({ path: f }).catch(() => {});
-          releve.push({ fen, th, site, onglet: cle, sq, erreurs: o.erreurs.slice(0, 3) });
-          console.log(`· ${fen} ${th} ${site} ${cle} : titre ${sq.titre ? sq.titre.txt : '—'} · sélecteur ${sq.sel ? sq.sel.site + '@' + sq.sel.t : '—'} · segments ${sq.seg ? sq.seg.libelles.join('/') : '—'} · bords ${sq.bordGroupes}/${sq.bordRangees} · plein ${sq.plein ? sq.plein.ecartOnglets : '—'}`);
-        } catch (e) { console.log(`❌ ${fen} ${th} ${site} ${cle} : ${String(e.message || e).slice(0, 160)}`); }
+          if (cle === 'annonces') await o.pg.waitForSelector('[data-eg-article]', { timeout: 20000 }).catch(() => {});
+          if (cle === 'achats') await o.pg.waitForSelector('[data-achats-autre]', { timeout: 15000 }).catch(() => {});
+          const m = await o.pg.evaluate(() => {
+            const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .vrm-attente-cache');
+            const logos = [...document.querySelectorAll('.n-logo-site[data-site]')].filter(vis).map((e) => e.getAttribute('data-site'));
+            return { selecteur: [...document.querySelectorAll('[data-selecteur-site], [data-site-raison], .n-selecteur-site')].filter(vis).length,
+              sitesLogos: [...new Set(logos)], nLogos: logos.length, filtreSite: [...document.querySelectorAll('[data-tt-filtre="site"]')].filter(vis).map((e) => e.getAttribute('data-tt-filtre-valeur')), autres: [...document.querySelectorAll('[data-achats-autre]')].filter(vis).map((e) => e.getAttribute('data-achats-autre')),
+              debord: document.documentElement.scrollWidth > innerWidth + 1 };
+          });
+          await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `site-${cle}-${fen}-${th}.png`) }).catch(() => {});
+          const ou = `${fen} ${th} ${cle}`;
+          dit(m.selecteur === 0, `N1 ${ou} : aucun sélecteur de plateforme (vrm_site_courant = leboncoin rangé, ignoré)`, m);
+          // À l'ordinateur, le tableau d'Annonces montre ses 50 premières lignes (le premier compte, Vinted) : le mélange s'y prouve
+          // par son filtre « Site » (dans ses filtres, sur « Tous »), les logos par la colonne « Site ».
+          if (cle === 'annonces' && Number(fen) >= 1024) dit(m.filtreSite.length === 1 && m.nLogos > 0, `N2 ${ou} : tableau de tous les sites, filtre « Site » dans ses filtres, logo du site sur chaque ligne`, m);
+          else if (cle === 'annonces' || cle === 'ventes') dit(m.sitesLogos.length >= 2, `N2 ${ou} : plusieurs sites mêlés, chaque rangée avec le logo de son site (${m.sitesLogos.join(', ')} · ${m.nLogos} logos)`, m);
+          if (cle === 'achats') dit(m.autres.length >= 1, `N2 ${ou} : les achats Vinted et ceux des autres sites (${m.autres.join(', ')})`, m);
+          dit(!m.debord, `N3 ${ou} : rien ne déborde`, m);
+        } catch (e) { rouges++; console.log(`  ❌ ${fen} ${th} ${cle} : ${String(e.message || e).slice(0, 160)}`); }
       }
+      dit(!o.erreurs.length, `N3 ${fen} ${th} : aucune erreur de page`, o.erreurs.slice(0, 3));
       await o.ctx.close();
-      fs.writeFileSync(path.join(SORTIE, 'sites.json'), JSON.stringify(releve, null, 1));
     }
-    // PARITÉ du squelette entre les 4 sites (Tous a le sien : la même chose, sans sélection de site).
-    console.log('\n── Parité du squelette (Vinted · Leboncoin · eBay · Vestiaire)');
-    const t1 = (a, b) => a == null || b == null ? a === b : Math.abs(a - b) <= 1;
-    for (const [fen, th] of variantes) for (const cle of ongletsVoulus) {
-      const l = releve.filter((r) => r.fen === fen && r.th === th && r.onglet === cle && r.site !== 'toutes');
-      if (l.length < 2) continue;
-      const ref = l[0].sq; const ecarts = [];
-      for (const r of l.slice(1)) {
-        const q = r.sq, n = r.site;
-        if (!!q.titre !== !!ref.titre || (q.titre && !t1(q.titre.t, ref.titre.t))) ecarts.push(n + ' : titre');
-        if (!!q.sel !== !!ref.sel || (q.sel && (!t1(q.sel.t, ref.sel.t) || !t1(q.sel.l, ref.sel.l) || !t1(q.sel.h, ref.sel.h)))) ecarts.push(n + ` : sélecteur ${q.sel ? q.sel.t : '—'} ≠ ${ref.sel ? ref.sel.t : '—'}`);
-        if (!!q.seg !== !!ref.seg || (q.seg && (q.seg.libelles.join('/') !== ref.seg.libelles.join('/') || !t1(q.seg.t, ref.seg.t)))) ecarts.push(n + ' : segments ' + (q.seg ? q.seg.libelles.join('/') + '@' + q.seg.t : '—') + ' ≠ ' + (ref.seg ? ref.seg.libelles.join('/') + '@' + ref.seg.t : '—'));
-        if (q.bordGroupes != null && ref.bordGroupes != null && !t1(q.bordGroupes, ref.bordGroupes)) ecarts.push(n + ` : bord des groupes ${q.bordGroupes} ≠ ${ref.bordGroupes}`);
-        // Le bord des rangées se compare dans la colonne de lecture (la moitié gauche) : une rangée d'une colonne de droite (une
-        // carte d'aide à l'ordinateur) n'est pas le bord de la liste.
-        const gauche = (x) => x != null && x < Number(fen) * 0.4;
-        if (gauche(q.bordRangees) && gauche(ref.bordRangees) && !t1(q.bordRangees, ref.bordRangees)) ecarts.push(n + ` : bord des rangées ${q.bordRangees} ≠ ${ref.bordRangees}`);
-        if (q.plein && ref.plein && (!t1(q.plein.l, ref.plein.l) || !t1(q.plein.w, ref.plein.w) || !t1(q.plein.ecartOnglets, ref.plein.ecartOnglets))) ecarts.push(n + ' : place du plein');
-        if (q.debord) ecarts.push(n + ' : page plus large que l\'écran');
-        if (r.erreurs.length) ecarts.push(n + ' : erreur ' + r.erreurs[0]);
-      }
-      dit(!ecarts.length, `${fen} ${th} ${cle} : même squelette sur les 4 sites (réf. ${l[0].site})`, ecarts);
-    }
-    // Planches : une par variante, 5 lignes (onglets) × 5 colonnes (choix du sélecteur).
     for (const [fen, th] of variantes) {
       const tel = Number(fen) < 600;
       const img = (f) => (fs.existsSync(f) ? `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}">` : '<i>—</i>');
-      const lignes = ongletsVoulus.map((cle) => `<tr><th>${cle}</th>${SITES_PLANCHE.map((s) => `<td>${img(path.join(SORTIE, 'ecrans', `site-${cle}-${s}-${fen}-${th}.png`))}</td>`).join('')}</tr>`).join('');
-      const html = `<!doctype html><meta charset="utf-8"><style>body{margin:12px;font:14px -apple-system,system-ui,sans-serif;background:#ccc}td{padding:4px;vertical-align:top}th{writing-mode:vertical-rl;transform:rotate(180deg)}img{width:${tel ? 390 : 756}px;display:block;border:1px solid #999}</style>
-        <h1>Sélecteur × onglets · ${fen} · ${th}</h1><table><tr><th></th>${SITES_PLANCHE.map((s) => `<td><b>${s}</b></td>`).join('')}</tr>${lignes}</table>`;
+      const html = `<!doctype html><meta charset="utf-8"><style>body{margin:12px;font:14px -apple-system,system-ui,sans-serif;background:#ccc}td{padding:4px;vertical-align:top}img{width:${tel ? 390 : 756}px;display:block;border:1px solid #999}</style>
+        <h1>Sans sélecteur · ${fen} · ${th} · vrm_site_courant = leboncoin rangé</h1><table><tr>${ongletsVoulus.map((c) => `<td><b>${c}</b>${img(path.join(SORTIE, 'ecrans', `site-${c}-${fen}-${th}.png`))}</td>`).join('')}</tr></table>`;
       const f = path.join(SORTIE, `planche-sites-${fen}-${th}.html`); fs.writeFileSync(f, html);
-      const ctx = await nav.newContext({ viewport: { width: tel ? 2050 : 3900, height: 1200 } }); const pg = await ctx.newPage();
+      const ctx = await nav.newContext({ viewport: { width: tel ? 2050 : 3900, height: 1000 } }); const pg = await ctx.newPage();
       await pg.goto('file://' + f); await pg.screenshot({ path: path.join(SORTIE, `planche-sites-${fen}-${th}.png`), fullPage: true }); await ctx.close(); fs.unlinkSync(f);
       console.log('planche : ' + path.join(SORTIE, `planche-sites-${fen}-${th}.png`));
     }
   } finally { await nav.close(); P.srv.close(); }
-  console.log(rouges ? `\n❌ parité des sites : ${rouges} écart(s)` : '\n✅ parité des sites : même squelette partout'); if (rouges) process.exitCode = 1;
+  console.log(rouges ? `\n❌ sans sélecteur : ${rouges} rouge(s)` : '\n✅ sans sélecteur : tout est mêlé, rien ne reste coincé'); if (rouges) process.exitCode = 1;
 }
 
 if (require.main === module && process.argv[2] === '--sites') sitesPlanches();
 else if (require.main === module && process.argv[2] === '--annonces') annoncesComptes();
-else if (require.main === module && process.argv[2] === '--selecteur') selecteur();
 else if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }
 else if (require.main === module && process.argv[2] === '--compare') compare(process.argv.slice(3));

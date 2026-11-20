@@ -296,4 +296,5 @@ export default {
   "vt.relier": "Mit seinem Kauf verknüpfen",
   "vt.achatRelie": "Gekauft {prix} — Kauf ansehen",
   "vt.achetePrix": "gekauft {prix}",
+  "tableau.site.tous": "Alle Plattformen"
 };

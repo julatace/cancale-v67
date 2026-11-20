@@ -296,4 +296,5 @@ export default {
   "vt.relier": "Relier à son achat",
   "vt.achatRelie": "Acheté {prix} — voir l’achat",
   "vt.achetePrix": "acheté {prix}",
+  "tableau.site.tous": "Tous les sites"
 };

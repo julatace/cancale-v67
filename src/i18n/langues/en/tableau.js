@@ -296,4 +296,5 @@ export default {
   "vt.relier": "Link to its purchase",
   "vt.achatRelie": "Bought {prix} — see the purchase",
   "vt.achetePrix": "bought {prix}",
+  "tableau.site.tous": "All sites"
 };

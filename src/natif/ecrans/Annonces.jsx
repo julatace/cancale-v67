@@ -34,6 +34,7 @@ import { Segmente } from '../Segmente.jsx';
 import { Feuille } from '../Feuille.jsx';
 import { Faits, Fait } from '../Faits.jsx';
 import { Plaque } from '../Plaque.jsx';
+import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque annonce
 import { Vide } from '../Vide.jsx';
 import { Attente } from '../Attente.jsx';
 import { Toast } from '../Toast.jsx';
@@ -57,7 +58,7 @@ const etatMot = (e) => tr('egalite.etatAnnonce.' + e);
 function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
   const bouts = [];
   if (a.taille) bouts.push(tr('egalite.taille', { t: a.taille }));
-  if (a.sites.length > 1 && (!filtreSite || filtreSite === 'tous')) bouts.push(tr('egalite.surSites', { n: a.sites.length }));
+  // (20 nov. soir) Les sites de l'article sont dits par leurs logos, devant le N° : plus de « sur N sites ».
   if (a.etat !== 'enligne') bouts.push(etatMot(a.etat));
   if (a.achat != null) bouts.push(tr('egalite.achete', { p: euros(a.achat) }));
   // (20 nov.) « à relier » n'est plus sur la ligne : il est dit UNE fois, en tête du groupe (« N à relier › »).
@@ -204,7 +205,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       ? [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), ton: l.prop.niveau === 'sur' ? 'ambre' : 'accent', onClick: () => liaison.relier(l), franc: true }]
       : [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'propre', libelle: tr('liaL.propreCourt'), onClick: () => liaison.propre(l) }];
     return <React.Fragment key={a.cle + (cleCompte ? '|' + cleCompte : '')}><Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
-      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton="neutre"
+      plaque={<>{a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}</>} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton="neutre"
       valeur={a.prix != null ? euros(a.prix) : null} valeurForte
       detailValeur={a.prixMini != null ? tr('egalite.mini', { p: euros(a.prixMini) }) : ''}
       fin={A ? (sel.has(a.cle) ? 'coche' : <span className="n-eg-case" aria-hidden="true"/>) : 'chevron'} selectionnee={A ? sel.has(a.cle) : ouvert === a.cle}
