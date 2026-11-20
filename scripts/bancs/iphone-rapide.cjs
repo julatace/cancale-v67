@@ -30,6 +30,13 @@ const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
 const base = fabriquer({ volumeReel: true, qr: true, ventes: 1500, achats: 800, annonces: 1200 });
+// (20 nov., lectures-legeres) `FORME=reelle` : les commandes à la forme et au poids de SA base (`_commandes-forme` :
+// mêmes champs, mêmes longueurs, ~2 Mo — sans le `'x'.repeat` qui fausserait une compression). `SESSION=1` : l'app
+// ouvre comme lui, connectée (session, base cloisonnée), et la route `/api/compte?mode=commandes-lire` est la VRAIE
+// (api/_lib/commandes-lecture.js EXÉCUTÉE ici, loi 10), servie au même débit sur ses octets COMPRESSÉS.
+if (process.env.FORME === 'reelle') require(path.join(__dirname, '_commandes-forme.cjs')).formeReelle(base);
+const SESSION = process.env.SESSION ? { access_token: 'aaa.bbb.banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } } : null;
+const routeCommandesDuBanc = SESSION ? require(path.join(__dirname, '_route-commandes.cjs')).routeCommandes({ base, repondre, uid: SESSION.user.id, panne: process.env.ROUTE === 'panne' ? 'base' : null }) : null;
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || (21000 + Math.floor(Math.random() * 9000)));
 const CPU = +(process.env.CPU || 4);
@@ -75,27 +82,50 @@ function jalons() {
 }
 
 async function preparer(ctx) {
-  await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (SESSION) await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); } catch (_) {} }, SESSION);
+  else await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await ctx.addInitScript(jalons);
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
-    if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
+    // (20 nov., lectures-legeres) En SESSION, un PATCH gardé (`data->>rev=eq.`, `return=representation`) rend la
+    // ligne écrite, comme Supabase quand l'échange réussit : avec `[]`, l'app se croyait devancée et relisait
+    // `main` en boucle (×35 en 40 s, 3 Mo) — une boucle du BANC, pas de l'app. Rien n'est rangé (base figée).
+    if (rq.method() !== 'GET') { await attendre(RTT); const idP = SESSION && rq.method() === 'PATCH' ? (/[?&]id=eq\.([^&]+)/.exec(rq.url()) || [])[1] : null; return route.fulfill({ status: idP ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: idP ? JSON.stringify([{ id: decodeURIComponent(idP) }]) : '[]' }); }
     const h = await rq.allHeaders();
+    if (SESSION && /select=owner\b/.test(decodeURIComponent(rq.url()))) { await attendre(RTT); return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
     const rep = repondre(rq.url(), h.range, base);
     const body = JSON.stringify(rep.body);
     const debut = Date.now() - T_NAV;
     await attendre(RTT + Math.round(body.length / DEBIT * 1000));
-    LECTURES.push({ u: decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140), o: body.length, d: debut, f: Date.now() - T_NAV });
+    const plein = decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, ''));
+    LECTURES.push({ u: plein.slice(0, 140), plein: plein + '\n' + (h.range || ''), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
   // (20 nov., instantane) Les routes que le démarrage lit, à LEUR forme (comme le banc ouverture-instantanee) : un vendeur
   // abonné, sa propre boutique — c'est ce qui permet à l'app de peindre avant d'être chargée (porte hors ligne).
   await ctx.route('**/api/**', (r) => { const u = r.request().url();
+    // (lectures-legeres) Connecté (`SESSION=1`) : la porte de confidentialité, l'abonnement du propriétaire, l'équipe non installée.
+    if (SESSION) return r.fulfill({ status: 200, contentType: 'application/json', body: u.includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
+      : u.includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
+      : u.includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{"pret":true,"devices":1}' });
     const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
       : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }); });
+  if (SESSION) {
+    await ctx.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated', role: 'authenticated', email_confirmed_at: '2026-01-01T00:00:00Z', identities: [], app_metadata: { provider: 'email' }, user_metadata: {} } : /factors|aal/.test(r.request().url()) ? { currentLevel: 'aal1', nextLevel: 'aal1', all: [], totp: [] } : { access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+    // La VRAIE route des commandes (enregistrée après `**/api/**` : Playwright prend la dernière d'abord).
+    await ctx.route('**/api/compte?mode=commandes-lire*', async (route) => {
+      const rq = route.request(); const h = await rq.allHeaders();
+      const debut = Date.now() - T_NAV;
+      const rep = await routeCommandesDuBanc(rq.url(), { authorization: h.authorization, 'accept-encoding': 'br, gzip', 'if-none-match': h['if-none-match'] });
+      await attendre(RTT + Math.round(rep.octets / DEBIT * 1000));
+      LECTURES.push({ u: 'ROUTE ' + decodeURIComponent(rq.url().replace(/^.*\/api\//, '')).slice(0, 130), o: rep.octets, d: debut, f: Date.now() - T_NAV });
+      // Playwright remet le corps tel quel : on le donne DÉCOMPRESSÉ (le temps a été compté sur les octets compressés).
+      return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.etag ? { etag: rep.etag } : {}), ...(rep.cache ? { 'cache-control': rep.cache } : {}) }, body: rep.status === 304 ? '' : rep.clair });
+    });
+  }
 }
 async function cdpDe(pg) {
   const cdp = await pg.context().newCDPSession(pg);
@@ -169,7 +199,9 @@ async function ouvrirApp(ctx, quand) {
       doublons: LECTURES.length - new Set(LECTURES.map((x) => x.u)).size, lourdes: LECTURES.slice().sort((a, b) => b.o - a.o).slice(0, 8).map((x) => `${Math.round(x.o / 1024)} Ko ${x.d}→${x.f} ms ${x.u}`) },
   };
   if (process.env.LECTURES) { console.log(`  (base ${quand} : ${r.base.lectures} lectures, ${r.base.ko} Ko ; avant « prêt » ${r.base.avantPret} / ${r.base.koAvantPret} Ko ; ${r.base.doublons} en double)`); for (const x of r.base.lourdes) console.log('     ' + x); }
-  if (process.env.LECTURES === '2') { const par = new Map(); for (const x of LECTURES) (par.get(x.u) || par.set(x.u, []).get(x.u)).push(x); for (const [u, l] of par) if (l.length > 1) console.log(`     ×${l.length} ${l.map((x) => x.d + '→' + x.f).join(' ')} ${Math.round(l[0].o / 1024)} Ko ${u.slice(0, 110)}`); }
+  if (process.env.LECTURES === '2') { const par = new Map(); for (const x of LECTURES) { const k = x.plein || x.u; (par.get(k) || par.set(k, []).get(k)).push(x); } for (const [u, l] of par) if (l.length > 1) console.log(`     ×${l.length} ${l.map((x) => x.d + '→' + x.f).join(' ')} ${l.map((x) => Math.round(x.o / 1024)).join('+')} Ko ${u.replace(/\n.*$/, '').slice(0, 110)}`);
+    // (20 nov., lectures-legeres) Les octets lus EN DOUBLE (même adresse complète, même page) : tout sauf la 1re de chaque.
+    let dbl = 0; for (const [, l] of par) for (const x of l.slice(1)) dbl += x.o; console.log(`     octets en double : ${Math.round(dbl / 1024)} Ko`); }
   return { pg, cdp, r };
 }
 

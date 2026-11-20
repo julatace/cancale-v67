@@ -51,20 +51,44 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
 
 (async () => {
   const base = fabriquer({ volumeReel: true, ventes: Number(process.env.VENTES) || 0 });
+  // (20 nov., lectures-legeres) `FORME=reelle` : commandes à la forme de SA base (`_commandes-forme`) ;
+  // `SESSION=1` : connecté, base cloisonnée, et `/api/compte?mode=commandes-lire` = la VRAIE route
+  // (`_route-commandes`, exécutée ici) ; `ROUTE=panne` : sa base répond 500 (l'app doit retomber sur la
+  // lecture d'avant) ; `ROUTE=absente` : 404 (un déploiement sans la route).
+  if (process.env.FORME === 'reelle') require(path.join(__dirname, '_commandes-forme.cjs')).formeReelle(base);
+  const SESSION = process.env.SESSION ? { access_token: 'aaa.bbb.banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } } : null;
+  const executer = SESSION ? require(path.join(__dirname, '_route-commandes.cjs')).routeCommandes({ base, repondre, uid: SESSION.user.id, panne: process.env.ROUTE === 'panne' ? 'base' : null }) : null;
+  const routeVue = [];
   const b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
   const res = { ventes: Number(process.env.VENTES) || 0, ecrans: {}, publie: {}, erreurs: [] };
   try {
     const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 1512, height: 982 } });
-    await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} });
+    if (SESSION) await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} }, SESSION);
+    else await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} });
     let derniere = Date.now();
     await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await ctx.route('**/rest/v1/**', async (route) => {
       const rq = route.request(); derniere = Date.now();
       if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
-      const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
+      const h = await rq.allHeaders();
+      if (SESSION && /select=owner\b/.test(decodeURIComponent(rq.url()))) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      const rep = repondre(rq.url(), h.range, base);
       return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body: JSON.stringify(rep.body) });
     });
-    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: !SESSION ? '{}' : r.request().url().includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
+      : r.request().url().includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
+      : r.request().url().includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{}' }));
+    if (SESSION) {
+      await ctx.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated', role: 'authenticated', email_confirmed_at: '2026-01-01T00:00:00Z', identities: [], app_metadata: { provider: 'email' }, user_metadata: {} } : /factors|aal/.test(r.request().url()) ? { currentLevel: 'aal1', nextLevel: 'aal1', all: [], totp: [] } : { access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+      await ctx.route('**/api/compte?mode=commandes-lire*', async (route) => {
+        derniere = Date.now();
+        if (process.env.ROUTE === 'absente') { routeVue.push(404); return route.fulfill({ status: 404, contentType: 'text/html', body: '<html>404</html>' }); }
+        const h = await route.request().allHeaders();
+        const rep = await executer(route.request().url(), { authorization: h.authorization, 'accept-encoding': 'gzip' });
+        routeVue.push(rep.status); derniere = Date.now();
+        return route.fulfill({ status: rep.status, contentType: 'application/json', body: rep.clair });
+      });
+    }
     const pg = await ctx.newPage();
     pg.on('pageerror', (e) => res.erreurs.push(e.message.slice(0, 200)));
     for (const tab of ONGLETS) {
@@ -79,7 +103,9 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         const montants = texte.match(/-?\d[\d ]*(?:,\d{1,2})? ?€/g) || [];
         const comptes = texte.match(/\b\d[\d ]* (?:ventes?|achats?|colis|annonces?|paires?|comptes?|bordereaux?)\b/g) || [];
         const attrs = [];
-        for (const e of main.querySelectorAll('*')) for (const a of e.attributes) if (a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)) attrs.push(a.name + '=' + a.value);
+        // (20 nov., bugs-terrain) Les attributs d'UN élément dans l'ordre de leur NOM : leur ordre dans le DOM dit seulement à quel
+        // rendu chacun a été posé (un attribut posé par un second rendu passe en dernier), pas un chiffre.
+        for (const e of main.querySelectorAll('*')) attrs.push(...[...e.attributes].filter((a) => a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)).map((a) => a.name + '=' + a.value).sort());
         return { montants, comptes, attrs };
       });
     }
@@ -89,5 +115,6 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
   } finally { await b.close(); srv.close(); }
   const s = JSON.stringify(res, null, 1);
   if (SORTIE) fs.writeFileSync(SORTIE, s);
+  if (SESSION) console.log(`route des commandes : ${routeVue.length} appel(s) ${JSON.stringify(routeVue.reduce((m, x) => ((m[x] = (m[x] || 0) + 1), m), {}))}`);
   console.log(`chiffres relevés : ${Object.entries(res.ecrans).map(([t, e]) => `${t} ${e.montants.length} € · ${e.comptes.length} n · ${e.attrs.length} data`).join(' | ')} · publiés ${Object.keys(res.publie).length} · erreurs ${res.erreurs.length}`);
 })();

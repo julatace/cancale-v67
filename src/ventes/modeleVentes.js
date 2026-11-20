@@ -58,6 +58,26 @@ export function placeDeRangee(e) {
   return { nom: str(e.nom) || null, rangee: e.rangee, colonne: e.colonne };
 }
 
+// LA DATE DE VENTE d'une rangée (ms) : la première valeur LUE qui se date ; rien ⇒ null (« — », jamais devinée).
+export function tempsVente(...cands) {
+  for (const c of cands.flat()) {
+    if (c == null || c === '') continue;
+    const n = typeof c === 'number' ? c : Date.parse(String(c));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+// (20 nov., Ventes en tableau) L'ÉTIQUETTE D'ÉTAT d'une rangée — lue sur ce que la rangée porte déjà, aucune règle neuve :
+// une rangée « À envoyer » ⇒ 'envoyer' ; « En route » ⇒ la dernière étape PROUVÉE (`etapesRoute`) : validée ⇒ 'terminee',
+// livrée ⇒ 'livree', sinon 'route'. Jamais « à déposer » (décision « 4 oui » : le départ est constaté par le suivi).
+export function statutRangee(r) {
+  if (!r) return null;
+  if (!Array.isArray(r.etapes)) return 'envoyer';
+  const ici = r.etapes.find((e) => e && e.ici);
+  return ici && ici.cle === 'valide' ? 'terminee' : ici && ici.cle === 'livre' ? 'livree' : 'route';
+}
+
 // UNE RANGÉE « À ENVOYER ». `f` = les faits lus par l'écran (aucun n'est calculé ici).
 export function rangeeEnvoyer(f = {}) {
   const autreSite = !!f.autreSite;
@@ -65,7 +85,7 @@ export function rangeeEnvoyer(f = {}) {
     cle: str(f.cle), site: str(f.site) || 'vinted', tx: str(f.tx), compte: str(f.compte), acheteur: str(f.acheteur),
     num: str(f.num), numDouble: !!f.numDouble, numAttendu: !str(f.num) && !autreSite,
     titre: str(f.titre), taille: str(f.taille), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
-    prix: str(f.prix), transporteur: str(f.transporteur),
+    prix: str(f.prix), transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t),
     bordereau: etatBordereau({ pdf: !!f.pdf, imprime: !!f.imprime, autreSite }),
     coche: caseDeRangee(f.ligneLot || null, f.coches || null),
     echeance: echeanceRangee(f.echeance || null, { estimee: !!f.limiteEstimee, presse: !!f.presse }),
@@ -87,7 +107,7 @@ export function rangeeRoute(f = {}) {
     prix: str(f.prix), pourToi: !!f.pourToi && !!str(f.prix),
     etapes: etapesRoute(f.lues || {}),
     etat: { texte: str(f.etat), ambre: !!f.etatAmbre },
-    transporteur: str(f.transporteur), suivi: str(f.suivi), lienSuivi: str(f.lienSuivi),
+    transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t), suivi: str(f.suivi), lienSuivi: str(f.lienSuivi),
     fiche: f.fiche || null, detail: f.detail || null, gestes: f.gestes || {},
   };
 }
