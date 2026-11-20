@@ -38,12 +38,13 @@ const VUS = JSON.stringify({ v: 1, vus: { 'e:87000001': 'c', 'e:87000002': 'c' }
 
 async function releve(pg) {
   return pg.evaluate(() => {
-    const passes = [...document.querySelectorAll('[data-v2-passe]')].map((p) => ({
-      n: Number(p.getAttribute('data-v2-passe-n')), sorte: (p.querySelector('[data-v2-sorte]') || { getAttribute: () => '' }).getAttribute('data-v2-sorte'),
-      sorteTexte: (p.querySelector('.v2-passe-sorte') || { textContent: '' }).textContent.trim(),
-      codes: [...p.querySelectorAll('[data-v2-code-grand]')].map((e) => e.textContent.trim()),
-      nouveaux: [...p.querySelectorAll('[data-v2-face]')].filter((f) => f.querySelector('[data-v2-nouveau]')).map((f) => f.getAttribute('data-v2-code')),
-      lieu: (p.querySelector('.v2-passe-lieu b') || { textContent: '' }).textContent.trim() }));
+    // (20 nov.) Les colis à retirer sont des cartes par point (src/natif/RetraitsPoints.jsx, `data-rp-*`).
+    const passes = [...document.querySelectorAll('[data-rp-point]')].map((p) => ({
+      n: Number(p.getAttribute('data-rp-n')), sorte: p.getAttribute('data-rp-sorte') || '',
+      sorteTexte: (p.querySelector('.n-rp-sorte') || { textContent: '' }).textContent.trim(),
+      codes: [...p.querySelectorAll('[data-rp-code-grand]')].map((e) => e.textContent.trim()),
+      nouveaux: [...p.querySelectorAll('[data-rp-colis]')].filter((f) => f.querySelector('[data-rp-nouveau]')).map((f) => f.getAttribute('data-rp-code')),
+      lieu: (p.querySelector('.n-rp-nom') || { textContent: '' }).textContent.trim() }));
     const toasts = (window.__toasts || []).slice();
     return { passes, toasts };
   });
@@ -77,10 +78,11 @@ async function attendrePasses(pg, attendreNouveau = true) {
       dit(!!casier && casier.nouveaux.length === 1 && casier.nouveaux[0] === '333333' && !!comptoir && comptoir.nouveaux.length === 0, `N ${W} : seule la ligne du casier (nouvelle) porte « Nouveau »`, { casier: casier && casier.nouveaux, comptoir: comptoir && comptoir.nouveaux });
       dit(r.toasts.some((t) => /Nouveau code de retrait · Mondial Relay/.test(t)), `N ${W} : le toast « Nouveau code de retrait · Mondial Relay … »`, r.toasts);
       await pg.screenshot({ path: path.join(SHOTS, `retraits-${W}.png`), fullPage: false });
-      const passe = pg.locator('[data-v2-passe]', { has: pg.locator('[data-v2-code="333333"]') }).first();
+      const passe = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="333333"]') }).first();
       if (await passe.count()) await passe.screenshot({ path: path.join(SHOTS, `passe-casier-${W}.png`) }).catch(() => {});
       // Il ouvre la ligne : plus « Nouveau ».
-      const btn = pg.locator('[data-v2-face][data-v2-code="333333"] [data-v2-en-grand]').first();
+      // (20 nov.) Il ouvre « Je suis au point » de ce point : ses colis ne sont plus « nouveaux ».
+      const btn = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="333333"]') }).locator('[data-rp-au-point]').first();
       if (await btn.count()) { if (tel) await btn.tap().catch(() => {}); else await btn.click().catch(() => {}); await pg.waitForTimeout(700); }
       await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
       const apres = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_retraits_vus') || 'null'); } catch (_) { return null; } });
