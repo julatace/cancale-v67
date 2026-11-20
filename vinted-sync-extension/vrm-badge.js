@@ -939,6 +939,7 @@
   .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
   .au6-d .conf5 { margin: 12px 24px 0; }
+  .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
   .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
@@ -2025,7 +2026,7 @@
       const cleDe = { offres: 'vinted_offres_auto', paliers: 'vinted_offres_paliers', baisse: 'vinted_baisse_regle' }[autoChoisie];
       const on = autoChoisie === 'offres' ? (o ? o.actif === true : null) : autoChoisie === 'paliers' ? (pa ? pa.actif === true : null) : (ba ? ba.actif === true : null);
       const b0 = raBrouillon[autoChoisie] || {};
-      const bascule = on == null ? '' : `<div class="rg6"><span><b>${esc(TU('ra_etat'))}</b><small>${esc(TU('ra_confirme_note'))}</small></span><button type="button" class="vu-btn${on ? '' : ' vu-plein'}" data-ra-bascule="${autoChoisie}" aria-pressed="${on}">${esc(TU(on ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`;
+      const bascule = on == null ? '' : `<div class="rg6"><span><b>${esc(TU('ra_etat'))}</b><small>${esc(TU('ra_confirme_note'))}</small></span><button type="button" class="vu-btn ra6" data-ra-bascule="${autoChoisie}" aria-pressed="${on}">${esc(TU(on ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`;
       const conf = raConfirme && raConfirme.auto === autoChoisie ? `<div class="conf5" role="alertdialog" data-ra-confirme="${esc(raConfirme.cle)}"><p>${esc(TU('ra_confirme_q', { nom: TU(ch.titre) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
       const etat = raEtat && raEtat.auto === autoChoisie ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
       let corpsR = '';
