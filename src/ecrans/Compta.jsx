@@ -3146,7 +3146,7 @@ function SuiviUrssaf({ onNav, sansTitre = false }) {
                       {edit.erreur ? <div role="alert" style={{ fontSize: 13, color: ambre }}>{edit.erreur}</div> : null}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button type="button" data-suivi-edit-ok="" onClick={enregistrer} style={{ ...btn, background: C.accent, color: C.onAccent || '#fff', border: 'none' }}>{tr('lbcplus.remise.enregistrer')}</button>
-                        <button className="vrm-b vrm-b-discret" type="button" onClick={() => setEdit(null)} style={btn}>{tr('achats.annuler')}</button>
+                        <Bouton variante="discret" onClick={() => setEdit(null)} style={btn}>{tr('achats.annuler')}</Bouton>
                       </div>
                       <div style={{ fontSize: 12, color: C.muted }}>{tr('compta.seulsCesDeux')}</div>
                     </div>

@@ -169,6 +169,8 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composants du design du 17 nov. (le SEUL depuis le 19 nov.)
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
+import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -1358,7 +1360,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
             </div>
             <div style={{borderTop:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}}>
               <div style={{display:'flex',gap:8}}>
-                <button className="vrm-b vrm-b-discret" type="button" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+                <Bouton variante="discret" onClick={()=>!delBusy&&setDelCible(null)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Annuler</Bouton>
                 <button type="button" onClick={confirmerSuppression} disabled={delBusy||rienCoche} style={{flex:2,border:'none',background:rienCoche?C.border:C.danger,color:'#fff',borderRadius:12,padding:'12px',fontSize:15,fontWeight:700,cursor:(delBusy||rienCoche)?'default':'pointer',fontFamily:'inherit',opacity:delBusy?0.6:1}}>{delBusy?'…':rienCoche?'Coche au moins une case':'Supprimer'}</button>
               </div>
               {/* ── POUR DE BON : par catégorie (26 oct., demande de Julien) ──────
@@ -2280,6 +2282,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'carte-merci', type:'panneau', nu:true, ic:'cadeau', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
     ]},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
+      // (20 nov.) « Bien démarrer » : le parcours de 5 minutes (src/parcoursNouveau/Demarrage.jsx), rouvert à son sommaire.
+      { id:'bien-demarrer', type:'action', ic:'drapeau', lib:tr('dm.reglage.lib'), desc:tr('dm.reglage.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: 'sommaire' })); } catch (_) {} }, data:{ 'data-reglage-bien-demarrer':'' } },
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
@@ -2570,18 +2574,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerSous} data-sous-retour="" aria-label={titreRetour}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
+          <BoutonIconeNatif libelle={titreRetour} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerSous} attrs={{ 'data-sous-retour': '' }}/>
           <span className="vg-pm-nav-txt"><small aria-hidden="true">{titreRetour}</small><h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2></span>
           <StatutSauvegardeReglages/>
         </div>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
         <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} data-categorie-retour="" aria-label={tr('ecran.settings')}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
+          <BoutonIconeNatif libelle={tr('ecran.settings')} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '' }}/>
           <span className="vg-pm-nav-txt"><small aria-hidden="true">{tr('ecran.settings')}</small><h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2></span>
           <StatutSauvegardeReglages/>
         </div>
@@ -2904,7 +2904,7 @@ function DoubleVerification({ onEtat } = {}) {
       {f === undefined && <div style={txt}>Lecture de l'état de la double vérification…</div>}
       {f === null && (<>
         <div style={txt}>Double vérification pas lue (connexion muette). Rien n'a changé.</div>
-        <button type="button" data-mfa-relire="" onClick={relire} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>Réessayer</button>
+        <Bouton variante="secondaire" data-mfa-relire="" onClick={relire}  style={{marginTop:10}}>Réessayer</Bouton>
       </>)}
       {f && !actif && !cours && (<>
         <div style={txt}>
@@ -2912,7 +2912,7 @@ function DoubleVerification({ onEtat } = {}) {
           <Pourquoi label="Comment ça marche">Après ton mot de passe, VRM demande le code affiché par une app d'authentification (Mots de passe de l'iPhone, Google Authenticator, Microsoft Authenticator, Authy). Quelqu'un qui connaîtrait ton mot de passe ne pourrait pas entrer sans ton téléphone.</Pourquoi>
         </div>
         {champDuNom}
-        <button type="button" data-mfa-activer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire" style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</button>
+        <Bouton variante="primaire" data-mfa-activer="" disabled={busy} onClick={creer}  style={{marginTop:10}}>{busy ? 'Préparation…' : 'Activer'}</Bouton>
       </>)}
       {cours && cours.etape === 'qr' && (<>
         {cours.ajout && <div data-mfa-ajout-consigne="" style={{...txt,marginBottom:6}}>Prends <b style={{color:C.text}}>l'autre appareil</b> (« {cours.nom} »), pas celui des codes actuels.</div>}
@@ -2924,20 +2924,20 @@ function DoubleVerification({ onEtat } = {}) {
           <p>Choisis « saisir une clé ». Garde-la privée, jamais en capture.</p>
           <div data-mfa-cle="" style={{fontFamily:'ui-monospace,Menlo,monospace',fontSize:15,color:C.text,wordBreak:'break-all',userSelect:'all'}}>{cours.secret.replace(/(.{4})/g, '$1 ').trim()}</div>
         </details>
-        <button type="button" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation} className="vrm-b vrm-b-secondaire" style={{marginBottom:10}}>Remplacer cette configuration</button>
+        <Bouton variante="secondaire" data-mfa-recommencer="" disabled={busy} onClick={recommencerActivation}  style={{marginBottom:10}}>Remplacer cette configuration</Bouton>
         <div style={txt}><b style={{color:C.text}}>2.</b> Tape le code à 6 chiffres que {cours.ajout ? 'ce nouvel appareil' : "l'app"} affiche pour VRM :</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-activer="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : 'Confirmer'}</button>
-          <button className="vrm-b vrm-b-discret" type="button" data-mfa-annuler="" disabled={busy} onClick={annulerActivation}>Annuler</button>
+          <Bouton variante="primaire" data-mfa-confirmer="" disabled={busy || code.length !== 6} onClick={confirmerActivation}>{busy ? 'Vérification…' : 'Confirmer'}</Bouton>
+          <Bouton variante="discret" data-mfa-annuler="" disabled={busy} onClick={annulerActivation}>Annuler</Bouton>
         </div>
       </>)}
       {actif && cours && cours.etape === 'nom' && (<>
         <div style={txt}>Un autre téléphone ou une tablette, en secours.</div>
         {champDuNom}
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-          <button type="button" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer} className="vrm-b vrm-b-primaire">{busy ? 'Préparation…' : 'Afficher le code QR'}</button>
-          <button className="vrm-b vrm-b-discret" type="button" disabled={busy} onClick={() => { setCours(null); setMsg(null); }}>Annuler</button>
+          <Bouton variante="primaire" data-mfa-ajouter-continuer="" disabled={busy} onClick={creer}>{busy ? 'Préparation…' : 'Afficher le code QR'}</Bouton>
+          <Bouton variante="discret" disabled={busy} onClick={() => { setCours(null); setMsg(null); }}>Annuler</Bouton>
         </div>
       </>)}
       {actif && !cours && (<>
@@ -2952,13 +2952,13 @@ function DoubleVerification({ onEtat } = {}) {
                 {x.created_at && <div style={{fontSize:12,color:C.muted}}>ajouté le {new Date(x.created_at).toLocaleDateString('fr-FR')}</div>}
               </div>
               {seul
-                ? <button type="button" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Désactiver…</button>
-                : <button type="button" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)} className="vrm-b vrm-b-secondaire">Retirer…</button>}
+                ? <Bouton variante="secondaire" data-mfa-desactiver="" onClick={() => ouvrirRetrait(x)}>Désactiver…</Bouton>
+                : <Bouton variante="secondaire" data-mfa-retirer={String(x.id)} onClick={() => ouvrirRetrait(x)}>Retirer…</Bouton>}
             </div>
           ))}
         </div>
         {seul && <div data-mfa-conseil-secours="" style={{...txt,marginTop:10}}>Un seul appareil : perdu, plus d'accès. Ajoute un secours.</div>}
-        <button type="button" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }} className="vrm-b vrm-b-secondaire" style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</button>
+        <Bouton variante="secondaire" data-mfa-ajouter="" onClick={() => { setNom(nomParDefaut(verifies, true)); setCours({ etape: 'nom' }); setMsg(null); }}  style={{marginTop:10}}>{seul ? 'Ajouter un appareil de secours' : 'Ajouter un autre appareil'}</Bouton>
       </>)}
       {actif && cours && cours.etape === 'off' && (<>
         <div style={txt}>{seul
@@ -2966,8 +2966,8 @@ function DoubleVerification({ onEtat } = {}) {
           : <>Pour retirer <b style={{color:C.text}}>« {cours.nom} »</b>, tape le code actuel de <b style={{color:C.text}}>l'un</b> de tes appareils — celui d'un autre si « {cours.nom} » est perdu. Les autres restent actifs.</>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
           <input data-mfa-code-desactiver="" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} style={champ}/>
-          <button type="button" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer} className="vrm-b vrm-b-primaire">{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</button>
-          <button type="button" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }} className="vrm-b vrm-b-discret">Garder</button>
+          <Bouton variante="primaire" data-mfa-confirmer-off="" disabled={busy || code.length !== 6} onClick={retirer}>{busy ? 'Vérification…' : seul ? 'Désactiver' : 'Retirer'}</Bouton>
+          <Bouton variante="discret" disabled={busy} onClick={() => { setCours(null); setCode(''); setMsg(null); }}>Garder</Bouton>
         </div>
       </>)}
       {bandeau}
@@ -3702,7 +3702,7 @@ function MonAbonnement() {
         {groupeOffres}
         {annule && (
           <div className="vrm-abo-actions" style={{ padding: '0 0' }}>
-            <button type="button" disabled={!!occupe} onClick={() => resilierOuReprendre(true)} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</button>
+            <Bouton variante="primaire" plein disabled={!!occupe} onClick={() => resilierOuReprendre(true)}  style={{ marginTop: 12 }}>{occupe === 'reprendre' ? 'Un instant…' : 'Reprendre mon abonnement'}</Bouton>
           </div>
         )}
         {groupePaiement}
@@ -3726,7 +3726,7 @@ function MonAbonnement() {
       <div data-abonnement="impaye" data-abonnement-etat="impaye">
         <Tete etat="Paiement en échec" titre="Le dernier prélèvement n'est pas passé"
           phrase="Le dernier prélèvement n'est pas passé. Mets à jour ta carte : Stripe réessaie pendant 14 jours, puis l'app passe en lecture seule (tes données restent intactes).">
-          <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+          <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe} onClick={() => agir('portail')}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</Bouton></div>
         </Tete>
         {texteCarte && <GroupeIos titre="Paiement"><RangeeIos titre="Carte enregistrée" detail={<span data-carte="">{texteCarte}</span>}/></GroupeIos>}
         {erreur}
@@ -3743,12 +3743,12 @@ function MonAbonnement() {
         <Tete etat="Abonnement terminé" titre={et.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}
           phrase={`Tes données sont là, rien n’est supprimé : ${e.lecture === true ? 'un aperçu reste visible, le reste est masqué' : 'elles reviennent telles quelles'}. Pour tout retrouver et agir à nouveau, ${et.impaye ? 'mets ta carte à jour' : `reprends l’abonnement${portePaiementFerme ? '' : ` : ${prixLisible(e.prix)}, sans engagement`}`}.`}>
           {et.impaye
-            ? <div className="vrm-abo-actions"><button type="button" disabled={!!occupe} onClick={() => agir('portail')} className="vrm-b vrm-b-primaire vrm-b-plein">{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</button></div>
+            ? <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe} onClick={() => agir('portail')}>{occupe ? 'Ouverture…' : 'Mettre à jour ma carte'}</Bouton></div>
             : portePaiementFerme
               ? <div className="vrm-abo-phrase" data-paiement-ferme="">Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie un peu plus tard.</div>
               : <>
                   <CaseCgv cases={cases} onChange={setCases}/>
-                  <div className="vrm-abo-actions"><button type="button" disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</button></div>
+                  <div className="vrm-abo-actions"><Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : (et.ancien ? "Reprendre l'abonnement" : "S'abonner")}</Bouton></div>
                 </>}
         </Tete>
         {erreur}
@@ -3778,7 +3778,7 @@ function MonAbonnement() {
         <OffresSoloPro x={e} prixSolo={prixLisible(e.prix)} prixProAffiche={`${PRIX_PRO_MOIS} € / mois`}/>
         <CaseCgv cases={cases} onChange={setCases}/>
         <div className="vrm-abo-actions">
-          <button type="button" disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')} className="vrm-b vrm-b-primaire vrm-b-plein" title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</button>
+          <Bouton variante="primaire" plein disabled={!!occupe || !cgv} data-sabonner="" data-essai={e.essaiDispo ? '' : undefined} onClick={() => agir('checkout')}  title={cgv ? undefined : 'Coche d’abord les conditions de vente'}>{occupe ? 'Ouverture…' : e.essaiDispo ? `Commencer l'essai gratuit de ${e.essaiJours || 7} jours` : "S'abonner"}</Bouton>
         </div>
         {e.essaiDispo && <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.5 }}>Essai gratuit <b>une seule fois</b> — par adresse e-mail et par compte Vinted. Ta carte n'est débitée qu'après {e.essaiJours || 7} jours ; tu peux résilier avant sans rien payer.</div>}
       </Tete>
@@ -3862,9 +3862,9 @@ function NomParrain({ nom, onChange }) {
       <div style={{ fontSize: 13, color: C.muted, marginTop: 6, lineHeight: 1.45 }}>Ton prénom ou un pseudo VRM, jamais ton pseudo Vinted. Rien d’autre ne se voit.</div>
       {msg ? <div role="alert" data-parrainage-nom-refus="" style={{ fontSize: 13, color: C.text, marginTop: 6 }}>{msg}</div> : null}
       <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-        <button type="button" className="vrm-b vrm-b-primaire" disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</button>
-        {nom ? <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</button> : null}
-        <button type="button" className="vrm-b vrm-b-secondaire" disabled={occupe} onClick={() => setOuvert(false)}>Annuler</button>
+        <Bouton variante="primaire"  disabled={occupe || !v.trim()} onClick={() => envoyer(v)} data-parrainage-nom-enregistrer="">{occupe ? 'Enregistrement…' : 'Enregistrer'}</Bouton>
+        {nom ? <Bouton variante="secondaire"  disabled={occupe} onClick={() => envoyer('')}>Ne plus montrer de nom</Bouton> : null}
+        <Bouton variante="secondaire"  disabled={occupe} onClick={() => setOuvert(false)}>Annuler</Bouton>
       </div>
     </div>
   );
@@ -3913,8 +3913,8 @@ function Parrainage() {
           <div data-parrainage-titre="" style={{ fontSize: 17, fontWeight: 600, color: C.text, lineHeight: 1.35, marginBottom: 10 }}>{PHRASE_PARRAINAGE}</div>
           <div className="vrm-abo-lien"><code data-lien-parrainage="">{lien}</code></div>
           <div className="vrm-abo-actions" style={{ marginTop: 10 }}>
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={copier} data-copier-parrainage="">Copier le lien</button>
-            {peutPartager ? <button type="button" className="vrm-b vrm-b-secondaire" onClick={partager} data-partager-parrainage="">Partager</button> : null}
+            <Bouton variante="primaire"  onClick={copier} data-copier-parrainage="">Copier le lien</Bouton>
+            {peutPartager ? <Bouton variante="secondaire"  onClick={partager} data-partager-parrainage="">Partager</Bouton> : null}
           </div>
         </div>
         <RangeeIos titre="Mois gagnés" detail={s.enAttente ? `${s.enAttente} en attente de ton premier abonnement` : undefined} valeur={<span data-chiffre-mois="">{gagnes == null ? '—' : gagnes}</span>}/>
@@ -4014,8 +4014,8 @@ function DiscordCompte() {
     <div data-discord-compte={lu.discord ? 'relie' : 'aucun'} style={{ fontSize: 13, color: C.text, padding:'10px 14px 10px 16px',minHeight:56,boxSizing:'border-box',borderTop:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
       <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><span aria-hidden="true" style={{width:32,height:32,display:'grid',placeItems:'center',borderRadius:12,background:'#5865F218'}}><BrandMark id="discord"/></span><span>{lu.discord ? <>Discord relié : <b data-discord-compte-pseudo={lu.discord}>{lu.discord}</b></> : <><b>Profil Discord</b><span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Ton pseudo et ton avatar Discord dans VRM</span></>}</span></div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {lu.connexion && <button type="button" data-discord-compte-connecter="" disabled={occupe} onClick={connecter} className="vrm-b vrm-b-secondaire">{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</button>}
-        {lu.discord && <button type="button" data-discord-compte-retirer="" disabled={occupe} onClick={retirer} className="vrm-b vrm-b-discret">Retirer</button>}
+        {lu.connexion && <Bouton variante="secondaire" data-discord-compte-connecter="" disabled={occupe} onClick={connecter}>{occupe ? 'Un instant…' : lu.discord ? 'Changer de compte' : 'Connecter Discord'}</Bouton>}
+        {lu.discord && <Bouton variante="discret" data-discord-compte-retirer="" disabled={occupe} onClick={retirer}>Retirer</Bouton>}
       </div>
       {!lu.connexion && !lu.discord && <span data-discord-compte-indispo="" title={DISCORD_ERREURS['non-configure']} style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>Bientôt</span>}
       {note}
@@ -4057,7 +4057,7 @@ function EquipeSetting() {
   if (lu === undefined) return <div data-equipe-reglage="chargement" style={{ fontSize: 13, color: C.muted }}>Lecture de ton équipe…</div>;
   if (lu === null) return (
     <div data-equipe-reglage="pas-su" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <button type="button" onClick={relire} className="vrm-b vrm-b-secondaire" style={{ marginLeft: 6 }}>Réessayer</button>
+      Je n'ai pas pu lire ton équipe — la base n'a pas répondu. <Bouton variante="secondaire" onClick={relire}  style={{ marginLeft: 6 }}>Réessayer</Bouton>
     </div>
   );
   // (8 nov.) Tant que la 016 n'est pas appliquée : la phrase (la même que l'écran de
@@ -4092,23 +4092,23 @@ function EquipeSetting() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail de la personne" aria-label="E-mail à inviter" data-equipe-email=""
           style={{ flex: '1 1 200px', minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 15, background: C.bg, color: C.text, outline: 'none', fontFamily: 'inherit' }}/>
-        <button type="button" data-equipe-inviter="" disabled={!!occupe} onClick={inviter} className="vrm-b vrm-b-primaire">{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</button>
+        <Bouton variante="primaire" data-equipe-inviter="" disabled={!!occupe} onClick={inviter}>{occupe === 'inviter' ? 'Invitation…' : 'Inviter'}</Bouton>
       </div>
       <div style={{ color: C.muted, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>VRM n'envoie aucun e-mail. Touche « Envoyer l'invitation ».</div>
       {msg && <div data-equipe-msg="" style={{ color: C.warn, marginTop: 8 }}>{msg}</div>}
       {retiree && <div data-equipe-retiree={retiree} role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10, color: C.text }}>
         <span style={{ flex: '1 1 200px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{retiree}</b> ne voit plus tes colis, depuis maintenant.</span>
-        <button type="button" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })} className="vrm-b vrm-b-secondaire">Réinviter</button>
+        <Bouton variante="secondaire" data-equipe-reinviter="" disabled={!!occupe} onClick={() => agir('inviter', 'inviter', { email: retiree }, () => { setRetiree(''); setMsg('Invitée à nouveau. Envoie-lui le message.'); })}>Réinviter</Bouton>
       </div>}
       {vivants.length > 0 && <div style={{ marginTop: 12 }}>
         {vivants.map((x) => (
           <div key={x.id} data-equipe-membre={x.statut} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{x.email}</b> <span style={{ color: C.muted }}>· {x.statut === 'actif' ? 'membre' : 'invitée'}</span></span>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
-            {x.statut !== 'actif' && <button type="button" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }} className="vrm-b vrm-b-secondaire">Envoyer l'invitation</button>}
+            {x.statut !== 'actif' && <Bouton variante="secondaire" data-equipe-partager={x.id} onClick={async () => { const r = await partagerInvitationEquipe(x.email); setMontre(r === 'montre' ? x.id : ''); setMsg(r === 'copie' ? 'Message copié. Colle-le-lui.' : ''); }}>Envoyer l'invitation</Bouton>}
             {/* (13 nov., lot 58) RÉVOCATION EN UN GESTE : un toucher, effet immédiat (la base coupe la lecture tout de suite).
                 Revenir en arrière = « Réinviter » (une NOUVELLE invitation, qu'il devra accepter) — jamais un accès rendu en silence. */}
-            <button type="button" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })} className="vrm-b vrm-b-discret">{occupe === x.id ? 'Retrait…' : 'Retirer'}</button>
+            <Bouton variante="discret" data-equipe-revoquer={x.id} disabled={!!occupe} aria-label={`Retirer l'accès de ${x.email}`} onClick={() => agir(x.id, 'revoquer', { id: x.id }, () => { setRetiree(x.email); setMsg(''); })}>{occupe === x.id ? 'Retrait…' : 'Retirer'}</Bouton>
             </span>
             {montre === x.id && <div data-equipe-message={x.id} style={{ flex: '1 1 100%', whiteSpace: 'pre-line', userSelect: 'text', WebkitUserSelect: 'text', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', color: C.text }}>{texteInvitationEquipe(x.email)}</div>}
           </div>
@@ -4118,14 +4118,14 @@ function EquipeSetting() {
         {lu.invitations.map((inv) => (
           <div key={inv.id} data-invitation={inv.id} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}><b>{inv.de || 'Un vendeur'}</b> t'invite à préparer ses colis</span>
-            <button type="button" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })} className="vrm-b vrm-b-primaire">Accepter</button>
+            <Bouton variante="primaire" data-accepter={inv.id} disabled={!!occupe} onClick={() => agir(inv.id, 'accepter', { id: inv.id })}>Accepter</Bouton>
           </div>
         ))}
         {lu.membreDe.map((m) => (
           <div key={m.id} data-membre-de={m.vendeur} style={ligne}>
             <span style={{ flex: '1 1 180px', minWidth: 0, overflowWrap: 'anywhere' }}>Tu prépares les colis de <b>{m.de || 'un vendeur'}</b>{m.acces === false ? <span style={{ color: C.muted }}> · son abonnement n'est plus actif</span> : null}</span>
-            <button type="button" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }} className="vrm-b vrm-b-primaire">Ouvrir ses colis</button>
-            <button type="button" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }} className="vrm-b vrm-b-discret">Quitter</button>
+            <Bouton variante="primaire" data-ouvrir-equipe={m.vendeur} onClick={() => { if (uid) choisirVueEquipe(uid, m.vendeur); }}>Ouvrir ses colis</Bouton>
+            <Bouton variante="discret" data-quitter={m.id} disabled={!!occupe} onClick={async () => { if (await askConfirm({ title: "Quitter l'équipe ?", desc: `Tu ne verras plus les colis de ${m.de || 'ce vendeur'}.`, ok: 'Quitter', cancel: 'Annuler', danger: true })) agir(m.id, 'quitter', { id: m.id }); }}>Quitter</Bouton>
           </div>
         ))}
       </div>}
@@ -5782,11 +5782,11 @@ function EmailsSetting({onComptes}) {
           </span>
           <button type="button" className="vrm-email-configurer" aria-label={`Configurer le transfert de ${adr}`} onClick={()=>configurerAdresse(adr)}>Configurer</button>
           {geste && (
-            <button type="button" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
-              className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>{preuveBusy === adr ? '…' : geste}</button>
+            <Bouton variante="secondaire" taille="petit" data-confirmer-adresse={normAdresse(adr)} disabled={preuveBusy === adr} onClick={()=>confirmerAdresse(adr, false)} aria-label={`${geste} ${adr}`}
+               style={{flexShrink:0}}>{preuveBusy === adr ? '…' : geste}</Bouton>
           )}
-          <button type="button" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
-            className="vrm-b vrm-b-discret" style={{flexShrink:0}}>Retirer</button>
+          <Bouton variante="discret" onClick={()=>retirer(adr)} aria-label={`Retirer ${adr}`}
+             style={{flexShrink:0}}>Retirer</Bouton>
         </div>
       ); })}
       </>)}
@@ -5824,21 +5824,21 @@ function EmailsSetting({onComptes}) {
                   {v.n} email{v.n>1?'s':''}{v.dernier ? ` · dernier le ${new Date(v.dernier).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}` : ''}
                 </span>
               </span>
-              <button type="button" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
-                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>Ajouter</button>
+              <Bouton variante="secondaire" taille="petit" onClick={()=>ajouterAdresses([v.adresse])} aria-label={`Ajouter ${v.adresse}`}
+                 style={{flexShrink:0}}>Ajouter</Bouton>
             </div>
           ))}
           {sugg.length > 1 && (
-            <button type="button" onClick={toutesSugg} className="vrm-b vrm-b-discret" style={{marginTop:6}}>
+            <Bouton variante="discret" onClick={toutesSugg}  style={{marginTop:6}}>
               Les ajouter toutes ({sugg.length})
-            </button>
+            </Bouton>
           )}
         </div>
       )}
-      <button type="button" onClick={ajouter} disabled={reg === null || reg === undefined}
-        className="vrm-b vrm-b-secondaire" style={{marginTop:10}} title={reg ? undefined : 'Tes adresses ne sont pas encore lues'}>
+      <Bouton variante="secondaire" onClick={ajouter} disabled={reg === null || reg === undefined}
+         style={{marginTop:10}} title={reg ? undefined : 'Tes adresses ne sont pas encore lues'}>
         + Ajouter une adresse
-      </button>
+      </Bouton>
       <details className="vrm-email-aide-adresses"><summary>Comprendre les adresses et le transfert</summary>
       <div data-adresses-explication="" style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',margin:'6px 0 12px'}}>
         <div style={{display:'grid',gridTemplateColumns:'auto 1fr',columnGap:9,rowGap:6,fontSize:13,lineHeight:1.45,color:C.text}}>
@@ -5853,7 +5853,7 @@ function EmailsSetting({onComptes}) {
               ? "Adresse absente ? E-mails gardés, proposés dès que tu l'ajoutes."
               : "Adresse absente ? E-mails gardés, rien n'est perdu."}</span>
         </div>
-        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}} className="vrm-b vrm-b-secondaire vrm-b-petit">Copier l’adresse</button></div>
+        <div data-adresse-transfert-vrm="" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,marginTop:10,fontSize:12}}><span>Adresse de transfert : <b style={{overflowWrap:'anywhere'}}>{ADRESSE_COLLECTRICE}</b></span><Bouton variante="secondaire" taille="petit" onClick={async()=>{try{await navigator.clipboard.writeText(ADRESSE_COLLECTRICE);toast('Adresse de transfert copiée.');}catch(_){toast('Sélectionne l’adresse affichée pour la copier.');}}}>Copier l’adresse</Bouton></div>
         <details style={{marginTop:8}}>
           <summary style={{cursor:'pointer',fontSize:13,fontWeight:600,color:C.accentTexte,padding:'13px 0',minHeight:44,boxSizing:'border-box'}}>Comment faire suivre mes e-mails Vinted vers VRM&nbsp;?</summary>
           <ol style={{margin:'8px 0 0',paddingLeft:18,fontSize:12,color:C.text,lineHeight:1.5,display:'grid',gap:5}}>
@@ -5902,18 +5902,18 @@ function EmailsSetting({onComptes}) {
               phrase="Chaque e-mail repasse dans le traitement normal. Rien n'est supprimé avant la fin."
               compte={compteAvancement({ faites: lot.ok, ratees: lot.fait - lot.ok, restent: lot.total - lot.fait, motFait: 'traité' })}
               data={{ 'data-rejeu-lot': `${lot.fait}/${lot.total}` }}/>
-            : <button type="button" onClick={toutRejouer} className="vrm-b vrm-b-primaire vrm-b-plein" style={{marginBottom:10}}>
+            : <Bouton variante="primaire" plein onClick={toutRejouer}  style={{marginBottom:10}}>
               {enAttente.length>1?`Réessayer les ${enAttente.length} e-mails`:'Réessayer cet e-mail'}
-            </button>}
+            </Bouton>}
           {rattachementsVisibles.slice(0,limiteRattachement).map(q => (
             <div key={q.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderTop:`1px solid ${C.border}`}}>
               <span style={{flex:'1 1 130px',minWidth:0,fontSize:12,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                 {q.sujet || '(sans sujet)'} <span style={{color:C.muted}}>· {q.raison || ''}</span>
               </span>
-              <button type="button" disabled={busy===q.id || !!lot} onClick={()=>rattacher(q.id)}
-                className="vrm-b vrm-b-secondaire vrm-b-petit" style={{flexShrink:0}}>
+              <Bouton variante="secondaire" taille="petit" disabled={busy===q.id || !!lot} onClick={()=>rattacher(q.id)}
+                 style={{flexShrink:0}}>
                 {busy===q.id ? '…' : "C'est à moi"}
-              </button>
+              </Bouton>
             </div>
           ))}
           {rattachementsVisibles.length===0&&<div className="vrm-email-vide">Aucun e-mail ne correspond à cette recherche.</div>}

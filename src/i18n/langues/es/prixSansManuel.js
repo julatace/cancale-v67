@@ -9,6 +9,7 @@ export default {
   "prixPartout.mini": "Precio mínimo de ofertas: {prix}",
   "prixPartout.ouvrir": "Abrir",
   "prixPartout.annulerSite": "Cancelar la bajada pendiente en {site}",
+  "prixPartout.envoiEnCours": "Se está enviando un cambio: espera a que termine para cancelar.",
   "prixPartout.raisonPrix": "Escribe el nuevo precio.",
   "prixPartout.raisonSite": "Marca al menos un sitio.",
   "prixPartout.passu": "no leído",

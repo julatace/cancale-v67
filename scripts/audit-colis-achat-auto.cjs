@@ -247,7 +247,8 @@ const colis = (suivi, plus = {}) => ({ suivi, carrier: 'mondialrelay', status: '
     dit(poses === 4 && /contenu: contenuCarte\(\{ t, o: cmdN, autre: aa, site: aa \? aa\.site : 'vinted' \}\)/.test(APP) && /const cmdN = commandeRetrait\(t\);/.test(APP), 'G7 chaque carte « à retirer » porte SON contenu (e-mails comptés par `commandeRetrait`, achats Vinted, à vérifier, à confirmer)', String(poses));
     dit(/const p = o \? montantCommandeLu\(o\) : null;/.test(selecteur) && /prix: p != null && p > 0 \? montant\(p\) : ''/.test(selecteur), 'G8 le prix payé est celui LU de la commande (`montantCommandeLu` : pas su ou autre devise ⇒ rien)');
     dit(/compteColis: t \? \(compteDuColisEmail\(t\) \|\| ''\) : ''/.test(selecteur), 'G9 le compte du geste est celui du colis, par identité (`compteDuColisEmail` : l’adresse de réception)');
-    const aidesPasse = (/<PassesRetraitV2[\s\S]{0,900}?\}\}\/>/.exec(APP) || [''])[0];
+    // (20 nov., intégration) retraits-visuel a remplacé PassesRetraitV2 par RetraitsPoints (une carte par point) : la règle juge celui qui est rendu.
+    const aidesPasse = (/<(?:PassesRetraitV2|RetraitsPoints)\b[\s\S]{0,4000}?\}\}\/>/.exec(APP) || [''])[0];
     dit(!!aidesPasse && !/relier/.test(aidesPasse) && !/relierRetrait|relierDe\b/.test(APP), 'G10 plus de `relierRetrait`, de `relierDe` ni de `relier:` passé aux colis à retirer');
     const ouvertures = (APP.match(/setRelierColis\(\{/g) || []).length, parScan = (APP.match(/setRelierColis\(\{[^}]*depuis: 'scan' \}\)/g) || []).length;
     dit(ouvertures > 0 && ouvertures === parScan, 'G11 la feuille de choix ne s’ouvre plus que depuis le scanner (un colis qu’il tient en main)', `${parScan}/${ouvertures}`);

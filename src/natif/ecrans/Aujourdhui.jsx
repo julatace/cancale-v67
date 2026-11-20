@@ -163,7 +163,8 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
     )),
     retirer: () => (
       <Carte titre={tr('v2.retirer.titre')} n={nombre(nRet)} tonSous={retraits.premier && retraits.premier.ambre ? 'ambre' : 'neutre'}
-        sousTitre={[pts.length ? tr('v2.retirer.resume', { n: nRet, p: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}
+        // (20 nov., chasse-bugs-2) Chaque nombre a SON pluriel : « 2 colis · 1 points » (l'ancienne clé accordait les points au nombre de colis).
+        sousTitre={[pts.length ? tr('v2.retirer.resumeN', { n: nRet }) + ' · ' + tr('v2.retirer.points', { n: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}
         attrs={{ 'data-v2-bloc': 'retirer', 'data-v2-groupe': 'retirer', 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined }}>
         {ptsMontres.length ? ptsMontres.map((pt, k) => (
           <Rangee key={(pt.lieu || '?') + k} icone={<Icon name="pin" size={22}/>} titre={pt.lieu || tr('v2.retirer.pointInconnu')}
@@ -238,10 +239,16 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       const S2 = stats2 && stats2.stock;
       const detailA = !S2 ? '' : S2.achat == null ? tr('v2.st.raison.' + (S2.raisonAchat || 'achats')) : S2.achatPartiel ? tr('v2.st.auMoinsSur', { k: nombre(S2.achatNPrix || 0), n: nombre(S2.achatN || 0) }) : tr('v2.st.surN', { n: nombre(S2.achatN || 0) });
       const ouvrir = onNav ? () => onNav('cat_annonces') : null;
+      // (20 nov., « ce qui manque ») AU PRIX AFFICHÉ : la publication d'Annonces (src/stockValeurAffiche.js) — une paire comptée
+      // une fois même sur plusieurs sites, prix Vinted sinon le plus bas (dit), « au moins … sur N » quand un prix manque.
+      const VA = S2 && S2.affiche;
+      const detailP = !VA ? tr('v2.st.raison.annonces') : [VA.auMoins ? tr('v2.st.auMoinsSur', { k: nombre(VA.nPrix || 0), n: nombre(VA.n || 0) }) : tr('v2.st.surN', { n: nombre(VA.n || 0) }), tr('cqm.stock.source')].join(' · ');
       return (
-        <Carte titre={tr('v2.st.stock.titre')} attrs={{ 'data-v2-bloc': 'stock', 'data-v2-stock': S2 ? [S2.enLigne == null ? '' : S2.enLigne, cents(S2.achat)].join(',') : '' }}>
-          <Faits colonnes={2}>
+        <Carte titre={tr('v2.st.stock.titre')} attrs={{ 'data-v2-bloc': 'stock', 'data-v2-stock': S2 ? [S2.enLigne == null ? '' : S2.enLigne, cents(S2.achat)].join(',') : '',
+          'data-v2-stock-affiche': VA && VA.centimes != null ? [VA.centimes, VA.n, VA.nPrix].join(',') : '' }}>
+          <Faits colonnes={3}>
             <Fait libelle={tr('v2.st.stock.enLigne')} valeur={S2 && S2.enLigne != null ? nombre(S2.enLigne) : null} detail={S2 && S2.enLigne == null ? (S2.raisonEnLigne || tr('v2.jour.pasSu')) : ''} onModifier={ouvrir}/>
+            <Fait libelle={tr('cqm.stock.affiche')} valeur={VA && VA.centimes != null ? (VA.auMoins ? tr('journee.moins') + ' ' : '') + montant(VA.centimes / 100) : null} detail={detailP} onModifier={ouvrir} attrs={{ 'data-v2-stock-prix': VA && VA.centimes != null ? String(VA.centimes) : '' }}/>
             <Fait libelle={tr('v2.st.stock.achat')} valeur={S2 && S2.achat != null ? montant(S2.achat) : null} detail={detailA} onModifier={ouvrir}/>
           </Faits>
         </Carte>
@@ -321,15 +328,28 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
         </Carte>
       );
     },
-    // VUES ET FAVORIS du jour : l'extension ne les capte pas encore ⇒ « — · pas capté » (jamais un zéro inventé).
-    vues: () => (
-      <Carte titre={tr('v2.st.vues.titre')} attrs={{ 'data-v2-bloc': 'vues' }}>
-        <Faits colonnes={2}>
-          <Fait libelle={tr('v2.st.vues.vues')} valeur={null} detail={tr('v2.capte.pasCapte')}/>
-          <Fait libelle={tr('v2.st.vues.favoris')} valeur={null} detail={tr('v2.capte.pasCapte')}/>
-        </Faits>
-      </Carte>
-    ),
+    // VUES ET FAVORIS (20 nov., « ce qui manque ») : la publication d'Annonces (src/vuesFavoris.js) — les totaux des annonces
+    // EN LIGNE lus dans le dressing (aucune requête de plus), « + N aujourd'hui » (le dernier point d'avant aujourd'hui), « sur N
+    // annonces » ; jamais publiée ⇒ « — · ouvre Annonces » ; aucun chiffre lu ⇒ « — · pas fourni par le site ». Jamais un 0 inventé.
+    vues: () => {
+      const W = stats2 && stats2.vues;
+      const ouvrir = onNav ? () => onNav('cat_annonces') : null;
+      const signe = (x) => (x > 0 ? '+' : x < 0 ? '−' : '±') + nombre(Math.abs(x));
+      const fait = (cle, X) => {
+        const val = X && X.total != null ? (W.manque ? tr('journee.moins') + ' ' : '') + nombre(X.total) : null;
+        const detail = !W ? tr('v2.st.raison.annonces') : !X || X.total == null ? tr('cqm.pasFourni')
+          : [X.gagnes != null ? tr('cqm.vues.aujourdhui', { s: signe(X.gagnes) }) : '', tr('cqm.vues.sur', { n: X.n })].filter(Boolean).join(' · ');
+        return <Fait libelle={tr('v2.st.vues.' + cle)} valeur={val} detail={detail} onModifier={ouvrir} attrs={{ 'data-v2-vues-fait': cle, 'data-v2-vues-total': X && X.total != null ? String(X.total) : '', 'data-v2-vues-gagnes': X && X.gagnes != null ? String(X.gagnes) : '' }}/>;
+      };
+      return (
+        <Carte titre={tr('v2.st.vues.titre')} attrs={{ 'data-v2-bloc': 'vues', 'data-v2-vues': W ? 'lu' : 'passu' }}>
+          <Faits colonnes={2}>
+            {fait('vues', W && W.vues)}
+            {fait('favoris', W && W.favoris)}
+          </Faits>
+        </Carte>
+      );
+    },
     // Un retour à déposer aujourd'hui ou demain n'a pas de carte à lui : UNE rangée, en fin de page.
     retour: () => (
       <Carte attrs={{ 'data-v2-bloc': 'retour' }}>

@@ -714,7 +714,6 @@
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta .vrm-acct-tag > span { display: inline !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-price { align-self: first baseline !important; justify-self: end !important; font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; white-space: nowrap !important; }
 .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act { align-self: center !important; justify-self: end !important; }
-.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act .vrm-buy-more { width: 44px !important; height: 44px !important; min-width: 44px !important; color: var(--p-gris-2) !important; }
 /* 10.8 MESSAGES — la rangée de Mail : [avatar 44 rond] [nom · heure à droite /
    paire et compte (méta, 1 ligne) / extrait (1 ligne)] ; un rôle = une taille. */
 .vrm-main[data-ecran="messages"] .vrm-inbox-row { column-gap: var(--p-g-gout) !important; padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }

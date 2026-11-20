@@ -162,7 +162,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
         </Groupe>
       )}
       {aAnnuler.map(({ s, e }) => (
-        <Bouton key={'a' + e.idCmd} variante="texte" large indisponible={annule === e.idCmd || enCours} onClick={() => annuler(s, e)} attrs={{ 'data-prix-annuler': e.idCmd, 'data-prix-annuler-cle': s.cle }}>
+        <Bouton key={'a' + e.idCmd} variante="texte" large chargement={annule === e.idCmd} indisponible={enCours && annule !== e.idCmd} raison={tr('prixPartout.envoiEnCours')} onClick={() => annuler(s, e)} attrs={{ 'data-prix-annuler': e.idCmd, 'data-prix-annuler-cle': s.cle }}>
           {tr('prixPartout.annulerSite', { site: NOM_SITE[s.site] })}
         </Bouton>
       ))}

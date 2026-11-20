@@ -247,6 +247,15 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
       else { setQuestion({ sorte: 'refus', c, paire: c.paire, r: r || { refus: 'pas-su' }, accepte }); haut(); }
     } catch (_) { setQuestion({ sorte: 'refus', c, paire: c.paire, r: { refus: 'pas-su' }, accepte }); } finally { setEnCours(false); }
   };
+  // (20 nov.) Ouvert depuis le « Relier » d'une RANGÉE qui avait besoin d'une question : la même candidate est touchée UNE
+  // fois à l'ouverture — la question (une seule) apparaît ici, rien n'est relié sans sa réponse.
+  const relierDemande = React.useRef(cible.relier ? String(cible.relier) : '');
+  React.useEffect(() => {
+    if (!relierDemande.current || !dansFile || !entree || entree.cle !== `${cible.site}:${cible.id}`) return;
+    const c = candidates.find((x) => String(x.paire.id) === relierDemande.current) || null;
+    relierDemande.current = '';
+    if (c) relier(c);
+  }, [dansFile, entree && entree.cle, candidates.length]);   // eslint-disable-line react-hooks/exhaustive-deps
   const sortir = async (quoi) => {
     if (enCours || !entree) return;
     setEnCours(true);
@@ -260,8 +269,12 @@ export default function LiaisonSites({ cible, actions, Photo, Icon = null, onFer
   const delier = async (annonces) => { if (enCours) return; setEnCours(true); try { for (const a of annonces) await actions.delier({ annonce: a }); } finally { setEnCours(false); } };
 
   // ── Le lot « Relier les N sûres » ──
-  const surs = lu ? sursDuLot(res).filter((e) => duSite(e) && !traitees.has(e.cle)) : [];
+  // (20 nov.) « Relier les N sûres » d'une SÉLECTION (Annonces) : la relecture limitée aux annonces choisies.
+  const surs = lu ? sursDuLot(res).filter((e) => duSite(e) && !traitees.has(e.cle) && (!Array.isArray(cible.cles) || cible.cles.includes(e.cle))) : [];
   const ouvrirLot = () => { setLotCoches(new Set(surs.map((e) => e.cle))); setLotVu(false); setVue('lot'); };
+  // Ouvert pour le lot (« Relier les N sûres » d'Annonces) : la relecture dès que le calcul est là.
+  const lotDemande = React.useRef(cible.vue === 'lot');
+  React.useEffect(() => { if (lotDemande.current && lu) { lotDemande.current = false; if (surs.length) ouvrirLot(); } }, [lu]);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (vue !== 'lot') return undefined;
     if (!refFinLot.current || typeof IntersectionObserver === 'undefined') { setLotVu(true); return undefined; }

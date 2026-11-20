@@ -153,6 +153,7 @@ export default {
   "auto.ciblage": "Destinatari",
   "auto.delais": "Tempi",
   "auto.reinitialiser": "Ripristina",
+  "auto.reinit.rien": "Niente da ripristinare: sono le impostazioni originali.",
   "auto.demarrer": "Avvia",
   "auto.arreter": "Ferma",
   "auto.enregistrer": "Salva",

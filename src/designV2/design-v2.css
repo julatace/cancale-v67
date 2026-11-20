@@ -60,60 +60,20 @@
   --v2-socle: #1E3149;
   --v2-ambre: #F2B65E;
   --v2-ambre-point: #F2A33A;
-}
-
-/* ══ 2. LES BOUTONS (src/designV2/BoutonV2.jsx) ═══════════════════════════════ */
-html body .v2b-hote { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: max-content; max-width: 100%; min-width: 0; flex: none; }
-html body .v2b-hote-plein { display: flex; width: 100%; }
-html body button.v2b {
-  appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: var(--v2-cible); padding: 0 16px; border-radius: var(--v2-bouton-r);
-  font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); font-size: 15px; font-weight: 600; line-height: 1.2;
-  font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums;
-  white-space: nowrap; cursor: pointer; text-decoration: none;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
-  transition: transform var(--v2-e-retour), background-color 160ms ease, filter 160ms ease;
-}
-html body button.v2b:active:not([aria-disabled="true"]) { transform: scale(.97); filter: brightness(.94); transition: transform var(--v2-e-appui), background-color 100ms ease, filter 100ms ease; }
-html body button.v2b:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
-html body .v2b-ic { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
-html body .v2b-ic svg { stroke-width: var(--v2-trait); }
-html body .v2b-lib { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-html body .v2b-n { min-width: 2ch; padding: 1px 7px; border-radius: 999px; font-size: 13px; background: rgb(255 255 255 / .18); text-align: center; }
+}/* ══ 2. LES BOUTONS (src/designV2/BoutonV2.jsx) ═══════════════════════════════ */
 /* principal — plein, 50 px, 17/600 */
-html body button.v2b-principal { min-height: var(--v2-bouton-h); padding: 0 20px; font-size: 17px; background: var(--v2-plein-fond); color: var(--v2-plein-texte); box-shadow: 0 1px 2px rgb(0 0 0 / .18), 0 10px 22px -12px rgb(12 29 48 / .6); }
-html body button.v2b-principal:active:not([aria-disabled="true"]) { background: var(--v2-plein-fond-appui); }
-html body button.v2b-plein-largeur { width: 100%; }
 /* secondaire — teinté */
-html body button.v2b-secondaire { background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
-html body button.v2b-secondaire:active:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
 /* texte — un lien, la cible garde 44 px */
-html body button.v2b-texte { background: transparent; color: var(--v2-lien); padding: 0 8px; }
 /* destructif — ambre (§7), derrière une confirmation (le composant la refuse sinon) */
-html body button.v2b-destructif { background: transparent; color: var(--v2-danger); padding: 0 8px; }
 /* icône — 44 × 44, glyphe 24 */
-html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
-html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
-html body button.v2b-icone:active, html body button.v2b-icone[data-v2b-force="appui"] { background: color-mix(in srgb, currentColor 16%, transparent); }
+
 @media (hover: hover) and (pointer: fine) {
-  html body button.v2b-secondaire:hover:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
-  html body button.v2b-texte:hover:not([aria-disabled="true"]), html body button.v2b-destructif:hover:not([aria-disabled="true"]) { text-decoration: underline; text-underline-offset: 3px; }
-  html body button.v2b-icone:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
-}
-/* indisponible — la raison est DITE dessous ; le bouton s'éteint sans disparaître */
-html body button.v2b[aria-disabled="true"][data-v2b-etat="indisponible"] { cursor: not-allowed; opacity: .5; }
-html body .v2b-raison { font-size: 13px; line-height: 1.35; color: var(--v2-muet); white-space: normal; }
+}/* indisponible — la raison est DITE dessous ; le bouton s'éteint sans disparaître */
 /* Le plein vit sur la coque bleue : sa raison s'écrit à l'encre de la coque. */
-html body .v2b-hote-plein .v2b-raison { color: var(--v2-page-muet); }
 /* chargement — la roue remplace l'icône, la largeur ne saute pas */
-html body button.v2b[data-v2b-etat="chargement"] { cursor: progress; }
-html body .v2b-roue { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
-html body .v2b-roue > span { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: v2b-tour 700ms linear infinite; }
+
 @keyframes v2b-tour { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  html body button.v2b, html body button.v2b:active { transition: background-color 100ms ease; transform: none !important; }
-  html body .v2b-roue > span { animation-duration: 1600ms; }
 }
 
 /* La rangée touchable (liste iOS) : elle se touche entière, mêmes états qu'un bouton. */
@@ -204,8 +164,6 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
   .v2-ecran[data-v2-plein="1"] { padding-bottom: 32px; }
   /* L'ordinateur : le plein EN HAUT À DROITE, sur la ligne du titre. */
   .v2-pouce { position: absolute; left: auto; right: 32px; bottom: auto; top: 14px; z-index: 2; }
-  .v2-pouce .v2b-hote-plein { width: auto; }
-  .v2-pouce button.v2b-principal { width: auto; }
   .v2-bande { margin: 0 0 24px; padding: 2px 0 6px; grid-auto-columns: 132px; }
   .v2-bande-photo { width: 132px; height: 132px; }
   .v2-aujourdhui .v2-afaire, .v2-aujourdhui .v2-groupe { max-width: 720px; }
@@ -271,12 +229,8 @@ html[data-design="v2"] body .vrm-barre-haut-droite:empty { display: none; }
 html[data-design="v2"] body .vrm-main > :last-child { scroll-margin-bottom: calc(var(--vrm-barre-bas, 84px) + 16px); }
 /* Une ligne qui ne s'ouvre pas (achat en route : rien à toucher) : la même forme, sans chevron. */
 div.v2-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 10px 12px; color: var(--sv-encre, #0C1D30); }
-.v2-liste-reste { margin: 8px 4px 0; font-size: 13px; color: var(--v2-page-muet); }
-/* La planche des boutons (banc design-v2) force « enfoncé » et « focus » pour les capturer : les MÊMES déclarations. */
-html body button.v2b[data-v2b-force="appui"] { transform: scale(.97); filter: brightness(.94); }
-html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-plein-fond-appui); }
-html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
-html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
+.v2-liste-reste { margin: 8px 4px 0; font-size: 13px; color: var(--v2-page-muet); }/* La planche des boutons (banc design-v2) force « enfoncé » et « focus » pour les capturer : les MÊMES déclarations. */
+
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
 html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body[data-vrm-d19] .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
@@ -380,11 +334,9 @@ html body button.v2-rangee.v2-menu { white-space: nowrap; flex: 0 1 auto; min-wi
 .v2-ann-groupe-n { font-weight: 400; }
 .v2-liste-annonces[data-v2-ligne="B"] .v2-ann-groupe { grid-column: 1 / -1; padding: 8px 4px 0; color: var(--v2-page-muet); }
 .v2-ann-groupe + .v2l-a::before, .v2-ann-groupe + .v2l-c::before { display: none; }
-@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
-
-/* ══ 10. Retouches après la planche A·B·C (17 nov.) ═══════════════════════════════════════════════════════ */
+@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }/* ══ 10. Retouches après la planche A·B·C (17 nov.) ═══════════════════════════════════════════════════════ */
 /* Le plein COMPACT (en haut à droite d'Annonces) : 44 px, 15/600 — le même rôle, la même couleur. */
-html body button.v2b-principal.v2b-compact { min-height: 44px; padding: 0 16px; font-size: 15px; }
+
 .v2-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; flex-basis: 100%; grid-column: 1 / -1; }
 .v2-titre-ligne h1 { margin: 0; min-width: 0; }
 /* « N annonces sans achat relié · Voir » : UNE ligne au-dessus de la liste (plus d'ambre sur chaque rangée). */
@@ -400,6 +352,10 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2-tete-tache h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 40px; letter-spacing: -.02em; color: var(--v2-page-texte); }
 .v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
 .v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
+/* (20 nov., intégration) Achats porte DEUX ronds dans cet hôte (Retrouver, Arrivée) : côte à côte, le titre leur laisse la place. */
+.vrm-tache-retrouver { display: inline-flex; align-items: center; gap: 8px; }
+.v2-tete-tache:has(.vrm-tache-retrouver [data-arv-bouton]) h1 { padding-right: 108px; }
+.v2-tete-tache:has(> .vrm-tache-retrouver [data-arv-bouton]) > .v2-titre-ligne { padding-right: 112px; }
 .v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
 /* (19 nov., intégration) Le rond « retrouver » ne se pose plus sur « Ajouter » : la ligne du titre lui garde sa place. */
 .v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne { padding-right: 60px; box-sizing: border-box; }
@@ -434,16 +390,8 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 /* C : la ligne des faits porte la plaque entière (24 px) ; 40 + 24 + 24 = 88, la hauteur de la photo. */
 .v2l-c-txt { gap: 0; }
 .v2l-c-faits { height: 24px; margin-top: 0; }
-@media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
-/* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
-.v2-seg { display: flex; gap: 2px; padding: 2px; border-radius: 14px; background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
-html body button.v2-seg-btn { appearance: none; flex: 1 1 auto; min-width: max-content; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 12px;
-  background: transparent; color: var(--v2-page-texte, #FFFFFF); font: 600 15px/1.2 var(--sb-police-texte, system-ui); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease, color 160ms ease; }
-html body button.v2-seg-btn.is-on { background: #F4F8FC; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
-html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
-.v2-seg-n { font-weight: 400; opacity: .8; }
-.v2-seg-l { white-space: nowrap; }   /* jamais coupé : la piste se partage selon les mots */
+@media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }/* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
+   /* jamais coupé : la piste se partage selon les mots */
 /* ══ 12. Plus d'informations par rangée (Julien : « il doit y avoir plusieurs infos ») — gris, jamais ambre ══ */
 .v2l-fait { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
 .v2l-marge { font-weight: 600; margin-left: 4px; color: inherit; }
@@ -561,17 +509,10 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
    · la ligne du titre passe à la ligne s'il le faut (le plein sous le titre, entier) ;
    · le segmenté prend la largeur de ses mots (jamais rogné) et défile au doigt s'ils ne tiennent pas. */
 .v2v-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
-html body .v2v-segment .v2-seg { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
-html body .v2v-segment .v2-seg::-webkit-scrollbar { display: none; }
-html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
-html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
 /* Le champ de Ventes sur la grille de 4 (le champ partagé posait 10 px à gauche). */
-:root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }
-/* Très grand texte : les trois segments tiennent toujours dans la largeur (un mot peut passer à la ligne, jamais coupé, jamais
+:root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }/* Très grand texte : les trois segments tiennent toujours dans la largeur (un mot peut passer à la ligne, jamais coupé, jamais
    caché derrière un défilement) ; le texte d'aide du champ finit par « … ». */
-html body .v2v-segment .v2-seg { overflow-x: visible; }
-html body .v2v-segment button.v2-seg-btn { flex: 1 1 0; min-width: 0; padding: 4px 8px; }
-html body .v2v-segment .v2-seg-l { white-space: normal; text-align: center; line-height: 1.15; overflow-wrap: normal; }
+
 :root:root:root body .v2v-recherche .v2v-champ input { text-overflow: ellipsis; }
 
 /* ══ 14. LA BARRE DE SÉLECTION (nouveau design — Julien : « même le imprimer, le je dépose, etc c'est bizarre ») ════════
@@ -637,7 +578,6 @@ html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(
 @media (max-width: 1023px) {
   .v2-serie { flex-wrap: nowrap; }
   .v2-serie-d [data-serie-principal] { min-width: 0; }
-  .v2-serie-d .v2b-lib { white-space: nowrap; }
 }
 /* La tête de la coque sur Ventes / Annonces (la cloche seule) : au défilement, une barre de verre PLEINE LARGEUR avec le
    petit titre (iOS), jamais une demi-boîte posée sur la liste. */
@@ -657,11 +597,8 @@ html body .vrm-app-header.v2-entete-cloche :is(button, a, input, select, [role="
 .v2-titre-ligne h1, .v2-tete-tache h1, .v2-tete h1 { overflow-wrap: normal; word-break: normal; hyphens: manual; min-width: min-content; }
 .v2-tete-tache h1 { font-size: clamp(28px, 8.6vw, 34px); }
 html[data-grand-texte] .v2-titre-ligne { padding-right: 0; }
-html[data-grand-texte] .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 64px; }
-/* A2. Le libellé d'un bouton passe à la ligne en très grand texte ; le nombre (`.v2b-n`) n'est jamais coupé. */
-html body .v2b-n { flex: none; white-space: nowrap; }
-html[data-grand-texte] body .v2b-lib { white-space: normal; overflow: visible; text-overflow: clip; text-align: center; }
-html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var(--v2-bouton-h); padding-block: 8px; }
+html[data-grand-texte] .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 64px; }/* A2. Le libellé d'un bouton passe à la ligne en très grand texte ; le nombre (`.v2b-n`) n'est jamais coupé. */
+
 /* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
 :root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
 @media (max-width: 1023px) {

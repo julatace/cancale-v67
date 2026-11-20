@@ -153,6 +153,7 @@ export default {
   "auto.ciblage": "Segmentación",
   "auto.delais": "Plazos",
   "auto.reinitialiser": "Restablecer",
+  "auto.reinit.rien": "Nada que restablecer: son los ajustes de origen.",
   "auto.demarrer": "Iniciar",
   "auto.arreter": "Detener",
   "auto.enregistrer": "Guardar",

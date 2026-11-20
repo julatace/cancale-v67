@@ -66,11 +66,12 @@ function juger(regleSrc, sources) {
   // ── Les écrans : les MÊMES fonctions que les boutons ──────────────────────
   const A = sansCommentaires(sources.app), R = sansCommentaires(sources.relais), Q = sansCommentaires(sources.dorment);
   const memeQue = (src, action, bouton) => src.includes(action) && src.includes(bouton);
-  dit(memeQue(A, "faire: ()=>demanderDepose(txL, o, libDepose)", "onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton>"), 'Ventes : « Déposé » au glisser = le bouton « Déposé » (sa barre « Annuler » 5 s)');
+  // (20 nov., chasse-bugs-2) Décision « 4 oui » : plus de « Déposé » au glisser (ni de bouton) — scripts/audit-depose-retire.cjs.
+  dit(!A.includes("faire: ()=>demanderDepose(txL, o, libDepose)"), 'Ventes : plus de « Déposé » au glisser (décision « 4 oui »)');
   // (17 nov., lot tampons-parametres) le bouton garde sa taille pendant la préparation : `occuperPendant(ev.currentTarget, …)` enveloppe le MÊME geste.
   dit(memeQue(A, "faire: ()=>imprimerBordereauVente(o)", "onClick={()=>imprimerBordereauVente(o)}") || memeQue(A, "faire: ()=>imprimerBordereauVente(o)", "onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}"), 'Ventes : « Imprimer » au glisser = le bouton « Imprimer le bordereau »');
   dit(/fuPdf \? \{ cle: 'imprimer'/.test(A), 'Ventes : « Imprimer » seulement quand le PDF est là (comme le bouton)');
-  dit(/<LigneGlissable actif=\{peutDeposer && !deposeIci\}/.test(A), 'Ventes : seule une vente à expédier, pas déjà en attente, se glisse');
+  dit(/<LigneGlissable actif=\{aDeposerVente && !deposeIci\}/.test(A), 'Ventes : seule une vente à expédier, pas déjà en attente, se glisse (« Imprimer »)');
   dit(memeQue(R, "faire: () => retirer(x)", "onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button>"), 'À retirer : « Retiré » au glisser = « J’ai retiré » (le geste annulable)');
   dit(/faire: \(\) => \(desaccord \? setOuvert\(true\) : voirCode\(\)\)/.test(R), 'À retirer : « Le code » = le bouton « Code » ; deux codes en désaccord ⇒ la ligne s’ouvre, rien n’est choisi');
   dit(memeQue(A, "faire: ()=>markCollected(t)", "onClick={()=>markCollected(t)}") && memeQue(A, "faire: ()=>markPickupDone(o)", "onClick={()=>markPickupDone(o)}"), 'Achats (cartes) : « Retiré » = « J’ai retiré » de la carte');

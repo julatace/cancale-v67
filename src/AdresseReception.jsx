@@ -14,6 +14,7 @@ import { GroupeIos, RangeeIos } from './composants/Ios.jsx';
 import RelierMaBoite from './RelierMaBoite.jsx';
 import { tr } from './i18n/index.js';
 import './adresse-reception.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const Svg = ({ children, t = 18 }) => <svg viewBox="0 0 24 24" width={t} height={t} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
 const ARROBASE = <Svg><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></Svg>;
@@ -27,7 +28,7 @@ export function FeuilleAdresseReception({ headers, onFermer, FermeAuRetour, prop
       <ObservateurEtat onEtat={setEtat}>
         <RelierMaBoite headers={headers} proprio={proprio} onBoite={onBoite ? () => { onFermer && onFermer(); onBoite(); } : undefined}/>
       </ObservateurEtat>
-      <div className="vrm-pv-feuille-pied"><button type="button" className="vrm-b vrm-b-secondaire vrm-ar-termine" onClick={onFermer} data-termine="">{tr('relier.feuille.termine')}</button></div>
+      <div className="vrm-pv-feuille-pied"><BoutonBase variante="secondaire" className="vrm-ar-termine" onClick={onFermer} data-termine="">{tr('relier.feuille.termine')}</BoutonBase></div>
     </SheetShell>
   );
 }

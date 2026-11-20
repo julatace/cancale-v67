@@ -183,7 +183,7 @@ export default function BranchementAutomatisations({ accounts = [] }) {
         <ReglageAuto libelle={tr('auto.nego.paliers')} phrase={tr('auto.nego.paliersPhrase')}/>
         <div className="n-au-paliers" data-au-paliers={String(nego.paliers.length)}>
           {nego.paliers.map((p, i) => <div key={i} className="n-au-palier" data-au-palier={i}>
-            <ChampNombre valeur={String(p)} libelle={tr('auto.nego.palier', { n: i + 1 })} unite="%" min={1} max={100} onChange={(v) => setNego((n) => ({ ...n, paliers: n.paliers.map((q, j) => (j === i ? (Number(v) || 1) : q)) }))}/>
+            <ChampNombre valeur={String(p)} libelle={tr('auto.nego.palier', { n: i + 1 })} unite="%" min={1} max={100} videPermis={false} onChange={(v) => setNego((n) => ({ ...n, paliers: n.paliers.map((q, j) => (j === i ? (Number(v) || 1) : q)) }))}/>
             <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.nego.retirer', { n: i + 1 })} onClick={() => setNego((n) => ({ ...n, paliers: n.paliers.filter((_, j) => j !== i) }))}>✕</button>
           </div>)}
           {nego.paliers.length < 6 ? <span><button type="button" className="n-tt-bouton" data-au-ajouter-palier="" onClick={() => setNego((n) => ({ ...n, paliers: [...n.paliers, 100] }))}>＋ {tr('auto.nego.ajouterPalier')}</button></span> : null}

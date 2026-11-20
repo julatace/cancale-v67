@@ -15,6 +15,8 @@ import { nomPlateforme } from './plateformes.js';
 import './styles-annonces-outils.css';
 import './styles-publier-ailleurs.css';
 import { EncartPhotosAutresComptes } from './PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const MAX_TITRE = { leboncoin: TITRE_MAX.lbc, ebay: TITRE_MAX.ebay, vestiaire: null };
@@ -100,7 +102,7 @@ export default function PublierAilleurs({ paire = null, paires, lecture = false,
         <header className="vrm-ao-tete">
           <h2>Publier ailleurs</h2>
           {paire ? <span className="vrm-ao-num">N°{paire.num}</span> : null}
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-pa-fermer="" onClick={onFermer}>×</button>
+          <BoutonIconeNatif libelle="Fermer" icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} attrs={{ 'data-pa-fermer': "" }}/>
         </header>
         {!paire ? (
           <div className="vrm-pa-choix" data-pa-choix-liste={Array.isArray(paires) ? liste.length : ''}>

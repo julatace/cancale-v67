@@ -147,7 +147,7 @@ function juger(depot) {
   dit(/chercher:\s*\(\)\s*=>\s*ouvrirRecherche\(\)/.test(app), 'S7 Chercher = la loupe (ouvrirRecherche)');
   // (15 nov., Julien : « tu scannes le code-barres d'un colis… VRM ouvre directement la bonne vente ou le bon achat »)
   // Le disque ouvre le scanner POUR RETROUVER (src/ScannerRetrouver.jsx) ; le scanner de dépôt reste le rond d'À expédier.
-  dit(/scanner:\s*\(\)\s*=>\s*ouvrirRetrouver\('disque'\)/.test(app) && /window\.addEventListener\(EV_RETROUVER, o\)/.test(app) && /<ScannerRetrouver Photo=\{PhotoVinted\}/.test(app) && /<HoteRetrouver /.test(app), 'S7 Scanner = le scanner pour retrouver (vrm:retrouver ⇒ HoteRetrouver)');
+  dit(/scanner:\s*\(\)\s*=>\s*ouvrirRetrouver\('disque'\)/.test(app) && /window\.addEventListener\(EV_RETROUVER, o\)/.test(app) && /<ScannerRetrouver\b[^>\n]*\bPhoto=\{PhotoVinted\}/.test(app) && /<HoteRetrouver /.test(app), 'S7 Scanner = le scanner pour retrouver (vrm:retrouver ⇒ HoteRetrouver)');
   dit(/publier:[^\n]*vrm:publier-ailleurs/.test(app) && /addEventListener\('vrm:publier-ailleurs'/.test(app), 'S7 Publier = « Publier ailleurs »');
   dit(/imprimer:\s*\(\)\s*=>\s*lancerActionRecherche\(\{ id: 'imprimer-jour' \}\)/.test(app), 'S7 Imprimer = « Imprimer les bordereaux du jour » (la feuille Tout imprimer)');
   dit(/v\.lot = r\.partent/.test(app) && /colisPrets\.lot\)\?colisPrets\.lot:undefined/.test(app), 'S7 Imprimer N lit `vrm_colis_prets.lot` (le nombre de « Tout imprimer (N) »), undefined sinon');
@@ -155,7 +155,8 @@ function juger(depot) {
   dit(/connu && nImprimer > 0 \? tr\('studio\.imprimerN'/.test(de) && /: tr\('studio\.imprimer'\)/.test(de), 'S7 pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné)');
   // (17 nov., Julien : « Le + dégueulasse ») Le disque a quitté la barre ; ses gestes ont chacun leur place, à un toucher.
   dit(!/<DisqueEventail\b/.test(app), 'S7 plus de disque dans la barre du bas');
-  dit(/data-recherche-scanner=""[^\n]*ouvrirRetrouver\('loupe'\)/.test(app) && /<BoutonScanRecherche\/>/.test(app), 'S7 Scanner = une icône DANS le champ de recherche (le même scanner pour retrouver)');
+  // (20 nov., intégration) boutons-natifs : le bouton est un BoutonIcone natif, l'attribut passe par `attrs` (sur la ligne suivante).
+  dit(/function BoutonScanRecherche\(\) \{[\s\S]{0,400}?ouvrirRetrouver\('loupe'\)[\s\S]{0,200}?(?:data-recherche-scanner=""|'data-recherche-scanner': '')/.test(app) && /<BoutonScanRecherche\/>/.test(app), 'S7 Scanner = une icône DANS le champ de recherche (le même scanner pour retrouver)');
   dit(/data-geste-disque="publier"/.test(app) && /data-v2-principal': 'publier'/.test(app), 'S7 Publier = la ligne du titre d’Annonces (éteint et allumé)');
   return rouges;
 }

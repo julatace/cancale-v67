@@ -73,7 +73,8 @@ export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x, a
     const j = joursEnLigne(etat);
     const n = enL.length;
     const base = prix != null ? 'fd.etat.enVente' : 'fd.etat.enVenteSansPrix';
-    if (n > 1 && j) return { cle: base + 'SitesDepuis', vars: { prix, n, j: j.n }, ambre: false };
+    // (20 nov., chasse-bugs-2) Les jours ont LEUR pluriel (`n` = les jours, `s` = les sites) : « depuis 1 jours » se lisait.
+    if (n > 1 && j) return { cle: base + 'SitesDepuis', vars: { prix, s: n, n: j.n, j: j.n }, ambre: false };
     if (n > 1) return { cle: base + 'Sites', vars: { prix, n }, ambre: false };
     if (j) return { cle: base + 'Depuis', vars: { prix, j: j.n, n: j.n }, ambre: false };
     return { cle: base, vars: { prix }, ambre: false };

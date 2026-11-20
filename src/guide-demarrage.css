@@ -211,6 +211,29 @@
    icônes : la languette pend du bord haut, à gauche, où il est vide. */
 @media (min-width: 561px) { .vrm-exemple-cadre-mot { top: auto; bottom: 0; border-radius: 8px 8px 0 0; } }
 @media (max-width: 560px) { .vrm-exemple-cadre-mot { left: 12px; transform: none; } }
+/* (20 nov., « Bien démarrer », écrans natifs) Le bandeau en barre natif : une ligne, la phrase à gauche, le geste
+   pour sortir en TEXTE bleu à droite (l'écran garde son seul plein, NATIF.md §1 bis). Au téléphone, le bandeau dit
+   déjà « Exemple » : la languette du cadre se tait (elle couvrait la phrase), le filet hachuré reste. */
+.vrm-exemple-bandeau {
+  flex-wrap: nowrap; justify-content: space-between; gap: 12px; min-height: 48px;
+  padding: 4px 8px 8px 16px; padding-top: calc(4px + env(safe-area-inset-top, 0px));
+  background: var(--n-carte, var(--d-carte, #fff)); color: var(--n-encre, var(--d-encre, #1D1D1F));
+}
+.vrm-exemple-phrases b { font-size: 15px; }
+.vrm-exemple-sortir {
+  flex: 0 0 auto; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; cursor: pointer;
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--n-accent, #0068D6); white-space: nowrap;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.vrm-exemple-sortir:active { background: var(--n-appui, rgba(0,0,0,.06)); }
+.vrm-exemple-sortir:focus-visible { outline: 2px solid var(--n-accent, #0068D6); outline-offset: 2px; }
+@media (max-width: 560px) {
+  .vrm-exemple-bandeau { display: flex; grid-template-areas: none; gap: 8px; padding: 4px 4px 8px 16px; padding-top: calc(4px + env(safe-area-inset-top, 0px)); }
+  .vrm-exemple-gestes { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
+  .vrm-exemple-connexion { margin: 0 8px 0 0; min-height: 44px; }
+  .vrm-exemple-sortir { font-size: 16px; }
+  .vrm-exemple-cadre-mot { display: none; }
+}
 @media print { .vrm-exemple-cadre { display: none; } }
 
 /* ── (14 nov.) « exemple » sur chaque code et chaque adresse inventés : les éléments que

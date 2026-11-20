@@ -15,6 +15,8 @@ import { modePaiementLu } from './modePaiement.js';
 import './styles-annonces-outils.css';
 import './styles-achats-outils.css';
 import { jourParis } from './dateParis.js';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eurC = (c) => {
   if (c == null || !Number.isFinite(c)) return '—';
@@ -42,7 +44,7 @@ function Feuille({ titre, data, onFermer, Retour, children, droite }) {
         <header className="vrm-ao-tete">
           <h2>{titre}</h2>
           {droite || null}
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-aso-fermer="" onClick={onFermer}>×</button>
+          <BoutonIconeNatif libelle="Fermer" icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} attrs={{ 'data-aso-fermer': "" }}/>
         </header>
         {children}
       </div>
@@ -183,7 +185,7 @@ function FicheAchatGros({ a, fichesLibres, actions, Photo }) {
                     <b>€</b>
                   </span>
                 ) : <b className="vrm-aso-montant">{eurosC(x.part)}</b>}
-                <button type="button" className="vrm-ao-x vrm-fo-delier" aria-label={`Délier le N°${x.numero}`} data-fo-delier={x.numero} onClick={() => actions.delier(a.id, x.cle)}>×</button>
+                <BoutonIconeNatif libelle={`Délier le N°${x.numero}`} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x vrm-fo-delier" taille="compact" onClick={() => actions.delier(a.id, x.cle)} attrs={{ 'data-fo-delier': x.numero }}/>
               </span>
             </li>
           ))}
