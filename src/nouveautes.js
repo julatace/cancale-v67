@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov. soir, capture de Julien 22:29) docs/passation/2026-11-20-captcha-visible.md — ext. 5.410.5
+  { id: 'verification-visible', date: '2026-11-20', titre: 'Envois comme Bleam, vérification jamais cachée', phrase: 'Un onglet de travail VRM ; le panneau s’écarte devant une vérification.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., « tout comme Bleam », la suite) docs/passation/2026-11-20-bleam-suite.md — ext. 5.410.4
   { id: 'bleam-apres-vente', date: '2026-11-20', titre: 'Après-vente, cycle de vie et stock auto', phrase: 'Dans l’extension, onglet Automatisations ; tout est éteint au départ.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'compte-personnel', date: '2026-11-20', titre: 'Un compte Vinted personnel, hors URSSAF', phrase: 'Comptes liés › Gérer : vente, achats ou personnel.', tab: 'settings', pour: 'tous', mode: 'tous' },
