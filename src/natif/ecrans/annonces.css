@@ -41,4 +41,16 @@
   .n-eg-entree { flex: 1; min-width: 0; border: 0; background: none; outline: none; text-align: right; font: var(--n-t-corps-fort); color: var(--n-encre); min-height: var(--n-cible); font-variant-numeric: tabular-nums; }
   .n-eg-entree::placeholder { color: var(--n-encre-2); }
   .n-eg-refus { margin: 12px 0 0; font: var(--n-t-second); color: var(--n-ambre); }
+
+  /* (20 nov.) RELIER DEPUIS LA LISTE : la proposition d'une annonce « à relier », à côté de sa rangée (src/natif/ecrans/PropositionLiaison.jsx). */
+  .n-eg-prop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .n-eg-prop[data-eg-prop-forme="bande"] { padding: 6px var(--n-marge) 10px calc(var(--n-marge) + 66px); border-bottom: .5px solid var(--n-trait); }
+  .n-eg-prop[data-eg-prop-forme="fiche"] { padding: 10px var(--n-marge); }
+  .n-eg-prop-texte { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+  .n-eg-prop-num { font: var(--n-t-second-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-eg-prop-etat { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-eg-prop-etat[data-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-legende-fort); }
+  .n-eg-prop-gestes { display: flex; align-items: center; gap: 4px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+  .n-eg-prop[data-eg-prop-forme="cellule"] .n-eg-prop-gestes { flex-wrap: nowrap; }
+  .n-eg-prop .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }
 }

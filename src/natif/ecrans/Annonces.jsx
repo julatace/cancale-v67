@@ -24,6 +24,7 @@
 // Ordinateur : un TABLEAU (Article · N° · Sites · Prix · Prix mini · Acheté · Bénéfice · En ligne depuis) ; une cellule
 // « — » se touche et ouvre SA saisie sur place. AUCUN bouton par rangée ; « à relier » est un état discret.
 import React from 'react';
+import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { tr } from '../../i18n/index.js';
 import { Page, PagePoussee, ChampRecherche } from '../Page.jsx';
 import { Groupe } from '../Groupe.jsx';
@@ -92,7 +93,8 @@ function FeuilleFait({ cible, onFermer, onFait, euros }) {
 }
 
 // La fiche courte de l'article (les MÊMES faits pour tous les sites) — la fiche complète est celle de l'app (`onFiche`).
-function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSaisir, onNumero, onPlace, onPrix, onRelier, onFiche, Icon, cote = false }) {
+function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSaisir, onNumero, onPlace, onPrix, onRelier, onFiche, Icon, cote = false, liaison = null }) {
+  const l = liaison && a ? liaison.de(a) : null;   // (20 nov.) la ligne du site non relié porte sa proposition, en place
   return (
     <PagePoussee ouverte={ouverte} titre={a ? (a.numero ? tr('egalite.numeroCourt', { n: a.numero }) : a.titre) : ''} libelleRetour={tr('egalite.titre')} onRetour={onRetour} className={cote ? 'n-tt-fiche' : ''} attrs={{ 'data-eg-fiche': a ? a.cle : undefined }}>
       {a ? <>
@@ -115,7 +117,8 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
         <Groupe titre={tr('egalite.col.sites')}>
           {a.annonces.map((x) => <Rangee key={x.site + x.id} titre={nomSite(x.site) + (x.pseudo ? ' · ' + x.pseudo : '')} sousTitre={[etatMot(x.etat), x.depuis != null ? depuisTexte(x.depuis) : '', x.favoris != null ? tr('egalite.favoris', { n: x.favoris }) : ''].filter(Boolean).join(' · ')}
             valeur={x.prix != null ? euros(x.prix) : null} fin={x.url ? 'chevron' : null} href={x.url || ''} attrs={{ 'data-eg-annonce': x.site + ':' + x.id }}/>)}
-          {a.aRelier && onRelier ? <Rangee ton="ambre" titre={tr('egalite.relier.titre')} sousTitre={tr('egalite.relier.sous')} fin="chevron" onClick={() => onRelier(a)} attrs={{ 'data-eg-relier': a.cle }}/> : null}
+          {l && l.etat === 'aRelier' ? <PropositionLiaison l={l} forme="fiche" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/>
+            : a.aRelier && onRelier ? <Rangee ton="ambre" titre={tr('egalite.relier.titre')} sousTitre={tr('egalite.relier.sous')} fin="chevron" onClick={() => onRelier(a)} attrs={{ 'data-eg-relier': a.cle }}/> : null}
         </Groupe>
         {onFiche && a.numero ? <Groupe><Rangee icone={Icon ? <Icon name="list" size={22}/> : null} titre={tr('egalite.touteLaFiche')} fin="chevron" onClick={() => onFiche(a)} attrs={{ 'data-eg-toute-fiche': '' }}/></Groupe> : null}
       </> : null}
@@ -124,9 +127,17 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 }
 
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
-  aRegler = [], actions = [], onAction, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '',
+  aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '', liaison = null,
   euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null }) {
   const ordinateur = useOrdinateur();
+  // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
+  // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
+  const lienDe = (a) => (liaison && a ? liaison.de(a) : null);
+  const actionLot = liaison ? { cle: 'relierSurs', libelle: tr('liaL.lot'), icone: 'link', phrase: tr('liaL.lotPhrase'),
+    pour: (a) => { const l = lienDe(a); return !!(l && l.etat === 'aRelier' && l.prop && l.prop.niveau === 'sur'); },
+    juger: (sel) => (sel.length ? { ok: true } : { ok: false, raison: tr('liaL.lotAucune') }) } : null;
+  const actions = actionLot && (Array.isArray(actionsEcran) ? actionsEcran : []).every((x) => x.cle !== 'relierSurs') ? [...(actionsEcran || []), actionLot] : (actionsEcran || []);
+  const onAction = (cle, sel) => { if (cle === 'relierSurs' && liaison) { liaison.lot(sel.map((a) => lienDe(a)).filter(Boolean)); return; } if (onActionEcran) onActionEcran(cle, sel); };
   const [reglerOuvert, setReglerOuvert] = React.useState(false);
   const [menuSites, setMenuSites] = React.useState(false);
   const [menuActions, setMenuActions] = React.useState(false);
@@ -178,14 +189,21 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
 
   const rangee = (a) => {
     const grise = A && !cochable(a);
-    return <Rangee key={a.cle} vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
+    const l = A ? null : lienDe(a);
+    const aRelierL = !!(l && l.etat === 'aRelier');
+    // Balayage d'une annonce « à relier » : ⇠ Autre… (le parcours) · Relier N° (la proposition, geste principal, `franc`).
+    const gestesLiaison = !aRelierL ? null : l.prop
+      ? [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), ton: l.prop.niveau === 'sur' ? 'ambre' : 'accent', onClick: () => liaison.relier(l), franc: true }]
+      : [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'propre', libelle: tr('liaL.propreCourt'), onClick: () => liaison.propre(l) }];
+    return <React.Fragment key={a.cle}><Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
       plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton={a.aRelier ? 'ambre' : 'neutre'}
       valeur={a.prix != null ? euros(a.prix) : null} valeurForte
       detailValeur={tr('egalite.mini', { p: a.prixMini != null ? euros(a.prixMini) : '—' })}
       fin={A ? (sel.has(a.cle) ? 'coche' : <span className="n-eg-case" aria-hidden="true"/>) : 'chevron'} selectionnee={A ? sel.has(a.cle) : ouvert === a.cle}
       indisponible={!!grise} raison={grise ? tr('egalite.selection.pasPour', { site: nomSite(a.annonces[0].site) }) : ''} onClick={() => ouvrir(a)}
-      actions={A ? null : [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }]}
-      attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined }}/>;
+      actions={A ? null : (gestesLiaison || [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }])}
+      attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined }}/>
+      {aRelierL ? <PropositionLiaison l={l} forme="bande" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/> : null}</React.Fragment>;
   };
 
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.
@@ -238,12 +256,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   if (ordinateur && travail) {
     return (
       <>
-        <AnnoncesTableau articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
+        <AnnoncesTableau liaison={liaison} articles={listeTableau} filtres={travail.filtres || []} compte={travail.compte || ''} majLe={travail.majLe} onRafraichir={travail.onRafraichir} rafraichit={!!travail.rafraichit}
           actions={actionsTableau} onAction={onAction} onOuvrir={(a) => { if (onFiche && a.numero) onFiche(a); else setOuvert(a.cle); }} saisir={saisir} onNumero={onNumero} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche}
           plein={onPublier ? <Bouton variante="plein" onClick={onPublier} attrs={{ 'data-eg-publier': '' }}>{tr('egalite.publier')}</Bouton> : null}
           haut={aReglerHaut} pied={[manque, ...limites].filter(Boolean).join(' ')} onAutomatisations={travail.onAutomatisations || null} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} sites={sites}/>
         <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>
-        <FicheArticle a={articleOuvertT} ouverte={!!articleOuvertT} cote onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
+        <FicheArticle liaison={liaison} a={articleOuvertT} ouverte={!!articleOuvertT} cote onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
           onNumero={onNumero} onPlace={onPlace} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche} Icon={Icon}/>
         {dit ? <Toast key={dit.id} message={dit.message} onFin={() => setDit(null)}/> : null}
       </>
@@ -281,7 +299,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
 
       <FeuilleFait cible={saisie} euros={euros} onFait={onFait} onFermer={(ok) => { const s = saisie; setSaisie(null); if (ok && s) setDit({ id: Date.now(), message: tr('egalite.enregistre', { quoi: tr('egalite.col.' + (s.champ === 'min' ? 'prixMini' : 'achat')) }) }); }}/>
 
-      <FicheArticle a={articleOuvert} ouverte={!!articleOuvert} onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
+      <FicheArticle liaison={liaison} a={articleOuvert} ouverte={!!articleOuvert} onRetour={() => setOuvert('')} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} onSaisir={saisir}
         onNumero={onNumero} onPlace={onPlace} onPrix={onPrix} onRelier={onRelier} onFiche={onFiche} Icon={Icon}/>
 
       {dit ? <Toast key={dit.id} message={dit.message} onFin={() => setDit(null)}/> : null}

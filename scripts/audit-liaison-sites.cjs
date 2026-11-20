@@ -91,6 +91,12 @@ const MUTATIONS = {
   refPasProposee: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });", ''],
   refPlusieurs: [R, "        if (ps.length !== 1) continue;", "        if (!ps.length) continue;"],
   refAvant: [R, "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement });", "        candidats.push({ paire, niveau: 'verifier', raison: 'reference', photoAutre: '', photoVinted: '', jugement }); if (!avant) avant = String(paire.id);"],
+  // Relier depuis la liste (20 nov.).
+  propEgalite: [R, "      if (p2 && p2.rang === p1.rang && p2.proche === p1.proche) continue;          // à égalité : aucune présélection\n", ''],
+  propAppui: [R, "      const appui = p1.rang <= 3 || p1.proche >= PROCHE_PROPOSITION;", "      const appui = true;"],
+  propJuge: [R, "      if (j.refus) continue;\n      choix = { ...p1,", "      choix = { ...p1,"],
+  propPerimee: [A, "    if (!entree || entree.etat !== 'aRelier' || !prop || String(prop.paireId) !== String(paireId || '')) return { refus: 'proposition-perimee' };", "    if (!entree || !prop) return { refus: 'proposition-perimee' };"],
+  propAutreGeste: [A, "    return relier({ annonce: entree.annonce, paire, preuve: prop.niveau === 'sur' ? 'photo-sure' : prop.raison === 'photo' ? 'photo' : 'recherche' });", "    return relier({ annonce: entree.annonce, paire, preuve: 'recherche', accepte: { doutes: true, plusieurs: true } });"],
   // Le N° donné seul par l'écran Annonces (vrm_articles_sites).
   faitsIgnores: [R, "  return nf && nf.auto && cle(nf.valeur || '') ? String(nf.valeur).trim() : '';", "  return '';"],
   faitsPasSu: [R, "  return C.lbc && C.ebay && C.vc && C.journal && C.faits ? C : null;", "  if (!C.faits) C.faits = {};\n  return C.lbc && C.ebay && C.vc && C.journal ? C : null;"],
@@ -473,12 +479,82 @@ function pixels(nom, w = 64, h = w) {
           memePhoto: async () => { const autres = lireAutres(); return { ...MP.propositionsMemePhoto({ vinted: m.vinted, autres, empreintes: { vinted: m.ev, ...m.es }, refus: {}, cle, verifs: m.verifs }), autres, illisibles: [] }; },
           annoncesAutres: async () => ({ autres: lireAutres(), illisibles: [] }),
           pairesVinted: async () => (o.vintedKO ? { paires: null } : { paires: m.paires, toutesLues: true }),
-          pistes: async () => null, douteux: () => new Set(), numerosConnus: () => null, numeroVcDe: () => '',
+          pistes: async () => null, douteux: () => o.douteux || new Set(), numerosConnus: () => null, numeroVcDe: () => '',
           donnerNumero: async () => o.numero || { refus: 'sans-numero' }, refuserPhoto: () => {},
           cleNum: cle, marqueDe, tr: (k, p) => k + (p ? JSON.stringify(p) : ''), publier: (x) => { etat = x; }, lire: () => etat,
         };
         return { act: ACT.creerLiaison(deps), stock, gestes: journalGestes, lire: () => etat, m };
       };
+      // ── R · RELIER DEPUIS LA LISTE (20 nov.) : la proposition sur la rangée, et SON toucher dessus ──
+      {
+        // R1 · la « sûre » unique est LA proposition « sûr » ; le toucher depuis la liste pose EXACTEMENT les écritures du parcours.
+        const f = fabrique(); const e0 = await f.act.charger(true);
+        const prop = e0.propositions && e0.propositions['Leboncoin:5001'];
+        dit(prop && prop.niveau === 'sur' && prop.paireId === '1001' && prop.numero === '124' && f.gestes.length === 0 && egal(f.stock.vrm_lbc_liens, {}),
+          'R1 · la même photo sûre, unique ⇒ proposée « sûr » sur la rangée — et RIEN n’est relié par le calcul', prop);
+        const g = fabrique(); const eg = await g.act.charger(true);
+        const viaParcours = g.act.relier({ annonce: eg.file[0].annonce, paire: eg.file[0].candidats[0].paire, preuve: 'photo-sure' }); await tic();
+        const r = f.act.relierProposition({ cle: 'Leboncoin:5001', paireId: '1001' }); await tic();
+        const sansDate = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k === 'at' ? '·' : v)));
+        dit(r.ok && viaParcours.ok && f.gestes.length === 1 && f.gestes[0].options.duree === 10000 && egal(sansDate(f.gestes[0].ops), sansDate(g.gestes[0].ops)) && f.stock.vrm_lbc_liens['5001'] === '124',
+          'R2 · « Relier » de la rangée = le geste du parcours : les MÊMES écritures (lien + preuve), UN geste annulable 10 s', { liste: f.gestes[0] && f.gestes[0].ops, parcours: g.gestes[0] && g.gestes[0].ops });
+        // Annuler (le moteur, sens « avant ») rend l'état d'avant.
+        await GA.ecrireOps({ ops: f.gestes[0].ops, sens: 'avant', lire: (k) => f.stock[k], ecrire: (k, v) => { f.stock[k] = v; return { ok: true }; } }); await tic();
+        dit(egal(f.stock.vrm_lbc_liens, {}) && !f.stock.vrm_liaison_sites['lien:Leboncoin:5001'], 'R3 · « Annuler » rend exactement l’état d’avant', { l: f.stock.vrm_lbc_liens, j: f.stock.vrm_liaison_sites });
+      }
+      {
+        // R4 · une proposition PÉRIMÉE (la liste montrait une autre paire) ⇒ refus, rien écrit.
+        const f = fabrique(); await f.act.charger(true);
+        const r = f.act.relierProposition({ cle: 'Leboncoin:5001', paireId: '9999' });
+        dit(r.refus === 'proposition-perimee' && f.gestes.length === 0, 'R4 · proposition périmée (autre paire que celle relue) ⇒ refus, aucun geste', r);
+        const r2 = f.act.relierProposition({ cle: 'Leboncoin:7777', paireId: '1001' });
+        dit(r2.refus === 'proposition-perimee' && f.gestes.length === 0, 'R4 · annonce inconnue ⇒ refus, aucun geste', r2);
+      }
+      {
+        // R5 · 50 paires identiques (même titre, même taille, photo proche non sûre) ⇒ AUCUNE proposition, rien relié.
+        const m = monde();
+        for (let i = 0; i < 50; i++) addV(m, 3000 + i, 300 + i, 'jumelle-' + i, { titre: 'Nike Air Max 90 blanche taille 42' });
+        addA(m, 'Leboncoin', 5100, 'autre-photo', { titre: 'Nike Air Max 90 blanche taille 42' });
+        const f = fabrique({ monde: m }); const e = await f.act.charger(true);
+        dit(e.lu && e.parCle.get('Leboncoin:5100').etat === 'aRelier' && !e.propositions['Leboncoin:5100'] && f.gestes.length === 0,
+          'R5 · 50 paires identiques ⇒ AUCUNE proposition sur la rangée (jamais une présélection), rien relié', e.propositions['Leboncoin:5100']);
+        const r = f.act.relierProposition({ cle: 'Leboncoin:5100', paireId: '3000' });
+        dit(r.refus === 'proposition-perimee' && f.gestes.length === 0, 'R5 · et un toucher « Relier » sans proposition ne relie rien', r);
+      }
+      {
+        // R6 · un titre identique, même taille LUE, seul ⇒ proposé « à vérifier » ; taille différente ⇒ rien.
+        const m = monde();
+        addV(m, 3100, 234, 'p234', { titre: 'Adidas Spezial vert taille 39,5', taille: '39,5', marque: 'Adidas' });
+        addV(m, 3102, 236, 'p236', { titre: 'Asics Gel Lyte grise taille 41', taille: '41', marque: 'Nike' });
+        addA(m, 'Leboncoin', 5202, 'x5202', { titre: 'Asics Gel Lyte grise taille 41', taille: '41' });
+        addV(m, 3101, 235, 'p235', { titre: 'Nike Dunk Low noire taille 44', taille: '44' });
+        addA(m, 'Leboncoin', 5200, 'x5200', { titre: 'Adidas Spezial vert taille 39,5', taille: '39,5' });
+        addA(m, 'Leboncoin', 5201, 'x5201', { titre: 'Nike Dunk Low noire taille 42', taille: '42' });
+        const f = fabrique({ monde: m }); const e = await f.act.charger(true);
+        const p1 = e.propositions['Leboncoin:5200'], p2 = e.propositions['Leboncoin:5201'];
+        dit(p1 && p1.niveau === 'verifier' && p1.numero === '234' && !p2, 'R6 · même titre et même taille lue ⇒ « N°234 ? » à vérifier ; taille lue différente ⇒ aucune proposition', { p1, p2 });
+        const r = f.act.relierProposition({ cle: 'Leboncoin:5200', paireId: '3100' }); await tic();
+        const n0 = f.gestes.length, q = f.act.relierProposition({ cle: 'Leboncoin:5202', paireId: '3102' });
+        dit(e.propositions['Leboncoin:5202'] && q.confirmer && f.gestes.length === n0 && !f.stock.vrm_lbc_liens['5202'], 'R6 · un VRAI doute (marque différente) ⇒ la question revient, rien écrit (l’écran ouvre le parcours sur cette annonce)', q);
+        dit(r.ok && f.stock.vrm_lbc_liens['5200'] === '234' && f.stock.vrm_liaison_sites['lien:Leboncoin:5200'].par === 'recherche', 'R6 · son toucher relie (preuve « choisie par toi »)', { r, l: f.stock.vrm_lbc_liens, j: f.stock.vrm_liaison_sites, p1 });
+      }
+      {
+        // R8 · une seule candidate, mais SANS appui (taille pas lue, un mot commun) ⇒ aucune proposition (jamais « au cas où »).
+        const m = monde(); addV(m, 3200, 240, 'q240', { titre: 'Nike Air Force blanche', taille: '' }); addA(m, 'Leboncoin', 5300, 'y5300', { titre: 'Basket Nike' });
+        const f = fabrique({ monde: m }); const e = await f.act.charger(true);
+        dit(e.parCle.get('Leboncoin:5300').etat === 'aRelier' && !e.propositions['Leboncoin:5300'], 'R8 · une candidate seule mais sans appui (taille pas lue, 1 mot) ⇒ aucune proposition', e.propositions['Leboncoin:5300']);
+        // R9 · la seule candidate appuyée, mais son N° est porté par deux articles (N° douteux) ⇒ aucune proposition.
+        const m2 = monde(); addV(m2, 3300, 250, 'r250', { titre: 'Adidas Samba noire taille 41', taille: '41', marque: 'Adidas' }); addA(m2, 'Leboncoin', 5400, 'z5400', { titre: 'Adidas Samba noire taille 41', taille: '41' });
+        const g = fabrique({ monde: m2, douteux: new Set(['250']) }); const e2 = await g.act.charger(true);
+        const h = fabrique({ monde: m2 }); const e3 = await h.act.charger(true);
+        dit(!e2.propositions['Leboncoin:5400'] && e3.propositions['Leboncoin:5400'] && e3.propositions['Leboncoin:5400'].numero === '250', 'R9 · le jugement du parcours refuse (N° porté par deux articles) ⇒ aucune proposition ; sans ce refus, « N°250 ? »', { avec: e2.propositions['Leboncoin:5400'], sans: e3.propositions['Leboncoin:5400'] });
+      }
+      {
+        // R7 · « Elle n'est que sur ce site » depuis la rangée = le geste du parcours.
+        const f = fabrique({ monde: (() => { const x = monde(); addA(x, 'eBay', 186000000077, 'seule'); return x; })() }); await f.act.charger(true);
+        const r = await f.act.propreDepuisListe({ cle: 'eBay:186000000077' });
+        dit(r && r.ok && f.stock.vrm_liaison_sites['propre:eBay:186000000077'] && f.gestes.length === 1, 'R7 · « Elle n’est que sur eBay » depuis la rangée : le geste du parcours, rien d’autre', r);
+      }
       {
         const f = fabrique(); const e0 = await f.act.charger(true);
         dit(e0 && e0.lu && e0.file.length === 1 && e0.file[0].avant === '1001' && f.gestes.length === 0 && egal(f.stock.vrm_lbc_liens, {}) && e0.compteurEntree.n === 1,
@@ -666,8 +742,13 @@ function pixels(nom, w = 64, h = w) {
       const appS = sansC(app);
       const nRelier = (appS.match(/\.relier\(|\.relierLot\(|\.remplacer\(/g) || []).length;
       const actions = (appS.match(/const ACTIONS_LIAISON = \{[\s\S]*?\n\};/) || [''])[0];
-      dit(/relier: \(x\) => liaisonVrm\(\)\.then\(\(L\) => L\.relier\(x\)\)/.test(actions) && nRelier === 3 && (appS.match(/ACTIONS_LIAISON/g) || []).length === 2 && /actions=\{ACTIONS_LIAISON\}/.test(appS),
-        'I4 · dans l’app, relier n’est appelé que par les actions passées au parcours (`actions={ACTIONS_LIAISON}`) : SON toucher', { nRelier, refs: (appS.match(/ACTIONS_LIAISON/g) || []).length });
+      // (20 nov.) Les deux autres usages de ACTIONS_LIAISON : l'écoute de `relierDepuisListe` / `queSurCeSite` (SON toucher sur la
+      // proposition d'une rangée), qui n'appelle QUE `relierProposition` / `propreDepuisListe`.
+      const ecoute = (appS.match(/const parListe = async \(e\) => \{[\s\S]*?\n    \};/) || [''])[0];
+      const usages = (appS.match(/ACTIONS_LIAISON\.[a-zA-Z]+\(/g) || []);
+      dit(/relier: \(x\) => liaisonVrm\(\)\.then\(\(L\) => L\.relier\(x\)\)/.test(actions) && nRelier === 3 && (appS.match(/ACTIONS_LIAISON/g) || []).length === 4 && /actions=\{ACTIONS_LIAISON\}/.test(appS)
+        && usages.length === 2 && usages.every((u) => /^ACTIONS_LIAISON\.(relierProposition|propreDepuisListe)\($/.test(u)) && ecoute.includes('ACTIONS_LIAISON.relierProposition(') && /window\.addEventListener\(EVT_RELIER_LISTE, parListe\)/.test(appS),
+        'I4 · dans l’app, relier n’est appelé que par les actions passées au parcours (`actions={ACTIONS_LIAISON}`) et par SON toucher sur une rangée (`relierProposition`)', { nRelier, refs: (appS.match(/ACTIONS_LIAISON/g) || []).length, usages });
       const chargeMP = appS.slice(appS.indexOf('async function chargerMemePhoto('), appS.indexOf('async function chargerMemePhoto(') + 4000).split('\nif (typeof window')[0];
       dit(chargeMP.length > 500 && !/liaisonVrm|relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY/.test(chargeMP), 'I5 · le calcul « même photo » ne relie toujours rien', '');
       dit(/duree: (?:duree \|\| )?\(deux && deux\.duree\) \|\| /.test(appS) && /\(g\.duree \|\| dureePilule\)/.test(sansC(fs.readFileSync(path.join(RACINE, 'src', 'gesteAnnulable.js'), 'utf8'))), 'I6 · la pilule « Annuler » d’un lien tient la durée demandée (10 s)', '');
