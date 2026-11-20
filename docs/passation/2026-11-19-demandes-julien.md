@@ -212,3 +212,9 @@ l'extension sur le site. L'app montre l'état, les chiffres et le journal, et ch
 l'extension » qui ouvre le site avec le panneau sur la bonne page et la bonne sélection (lien `?vrm=panneau&page=…&ids=…`).
 Restent dans l'app : ce qui n'agit pas sur une plateforme (saisir un prix d'achat / prix mini / N°, ranger, imprimer des bordereaux
 déjà reçus, relier, compta, réglages) et eBay (pas de panneau : API serveur).
+
+## DÉCISION DE JULIEN (20 nov.) : la cadence devient son réglage
+« Les autres (Vtools, Vintex, Bleam) envoient des messages autant qu'ils veulent » ⇒ « vas-y fais » : par compte, dans le panneau,
+favoris/h (15 par défaut, ≤ 60), actions/h (50 par défaut, ≤ 100), plafond/jour, pause entre messages (40–90 s par défaut, 20 s–4 min,
+aléatoire). Non réglable : arrêt captcha/refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
+l'onglet. Refusé (Claude) : déguisement du navigateur, faux clics, contournement de captcha, rotation d'IP.
