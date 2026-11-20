@@ -195,7 +195,11 @@ function sourceAppCode(racine) {
   const deja = importesDe(out);
   const restes = [];
   for (const rel of Object.keys(morceaux)) for (const k of Object.keys(morceaux[rel])) restes.push(cheminsVusDeSrc(morceaux[rel][k]));
-  for (const t of sansBalises) restes.push(recoller(t, deja));
+  // (20 nov., chasse-bugs) Un écran écrit à la main porte souvent `export default function X` : recollé à la fin
+  // d'App.jsx (qui a déjà le sien), le texte n'était plus UN module (« Only one default export », audit-benefice).
+  // Seul le mot `export default` part ; la fonction reste telle quelle. Et la ligne paresseuse d'un écran vers un
+  // autre écran recollé (`const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'))`) part, comme celles d'App.jsx.
+  for (const t of sansBalises) restes.push(recoller(t.replace(/^export default (?=(?:async\s+)?function\b|class\b)/gm, '').replace(/^const \w+ = (?:React\.lazy|aLaDemande)\(\(\) => import\('\.\/[^'\n]+\.jsx'\)\);?\n/gm, ''), deja));
   const tout = restes.length ? out + '\n' + restes.join('\n') : out;
   return sansDoublonsImport(tout);
 }
