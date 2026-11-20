@@ -990,7 +990,7 @@ import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétab
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 // (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
 import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
-import { publierLiaison, lireLiaison, ouvrirLiaison, EVT_OUVRIR_LIAISON, EVT_CHARGER_LIAISON, CLE_LIAISON } from "./liaisonEtat.js";   // (19 nov.) « Relier mes annonces » : les règles et les gestes arrivent à la demande
+import { publierLiaison, lireLiaison, ouvrirLiaison, EVT_OUVRIR_LIAISON, EVT_CHARGER_LIAISON, EVT_RELIER_LISTE, CLE_LIAISON } from "./liaisonEtat.js";   // (19 nov.) « Relier mes annonces » : les règles et les gestes arrivent à la demande
 import { LigneLiaison, texteLiaison, useLiaison } from "./LiaisonEntree.jsx";
 import { VERSION_FINE } from "./photoFine.js";
 import { publierMemePhoto, lireMemePhoto, EVT_OUVRIR_MEME_PHOTO } from "./memePhotoEtat.js";
@@ -27719,6 +27719,9 @@ const ACTIONS_LIAISON = {
   pasCellesCi: (x) => liaisonVrm().then((L) => L.pasCellesCi(x)),
   verifier: (x) => liaisonVrm().then((L) => L.verifier(x)),
   charger: (force) => { chargerLiaison(force === true); },
+  // (20 nov.) Depuis la LISTE (la proposition montrée sur la rangée) : la proposition relue, puis le geste du parcours.
+  relierProposition: (x) => liaisonVrm().then((L) => L.relierProposition(x)),
+  propreDepuisListe: (x) => liaisonVrm().then((L) => L.propreDepuisListe(x)),
   // (19 nov.) Après SON lien eBay, sur SON clic CONFIRMÉ : « VRM-{n°} » écrit comme SKU chez eBay (route existante `sku`,
   // qui refuse un N° ambigu de la remise à zéro). Le lien tient alors tout seul. Aucun appel sans ce clic.
   ecrireSku: async ({ itemId, numero, compte }) => { try { const { j } = await appelEbay({ action: 'sku', itemId: String(itemId), numero: String(numero), ...corpsCompteEbay(compte || 'principal') }); _fichesEbayMemo.at = 0; return j && j.ok ? { ok: true, sku: j.sku || '' } : { ok: false, raison: (j && j.error) || '' }; } catch (_) { return { ok: false, raison: '' }; } },
@@ -27729,10 +27732,20 @@ const LiaisonSitesParesseux = aLaDemandeFeuille(() => import('./LiaisonSites.jsx
 function LiaisonCoque() {
   const [cible, setCible] = React.useState(null);
   React.useEffect(() => {
-    const ouvrir = (e) => { const d = (e && e.detail) || {}; const art = d.article && d.article.id != null ? { id: String(d.article.id), numero: String(d.article.numero || '') } : null; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, article: art, n: Date.now() }); chargerLiaison(true); };
+    const ouvrir = (e) => { const d = (e && e.detail) || {}; const art = d.article && d.article.id != null ? { id: String(d.article.id), numero: String(d.article.numero || '') } : null; setCible({ site: d.site || null, id: d.id != null ? String(d.id) : null, vue: d.vue || null, article: art, relier: d.relier || null, cles: Array.isArray(d.cles) ? d.cles : null, n: Date.now() }); chargerLiaison(true); };
     const parVc = (e) => { const d = e && e.detail; if (d && d.sens === 'vc' && d.id != null) ouvrir({ detail: { site: 'Vestiaire', id: String(d.id) } }); };
-    window.addEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.addEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.addEventListener('vrm:lien-vc', parVc);
-    return () => { window.removeEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.removeEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.removeEventListener('vrm:lien-vc', parVc); };
+    // (20 nov.) SON toucher sur la proposition d'une rangée (`relierDepuisListe`, `queSurCeSite`) : le geste du parcours,
+    // la proposition relue. Tout va bien ⇒ c'est fait (la pilule « Annuler » 10 s) ; une question, un refus, une liste qui a
+    // changé ⇒ le parcours s'ouvre sur CETTE annonce (la question y est posée, une seule).
+    const parListe = async (e) => {
+      const d = (e && e.detail) || {};
+      if (!d.cle || !d.site || d.id == null) return;
+      const r = d.quoi === 'propre' ? await ACTIONS_LIAISON.propreDepuisListe({ cle: d.cle }).catch(() => null) : await ACTIONS_LIAISON.relierProposition({ cle: d.cle, paireId: d.paireId }).catch(() => null);
+      if (r && r.ok) return;
+      ouvrir({ detail: { site: d.site, id: String(d.id), relier: d.quoi === 'relier' && r && r.refus !== 'proposition-perimee' && r.refus !== 'pas-su' ? d.paireId : null } });
+    };
+    window.addEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.addEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.addEventListener('vrm:lien-vc', parVc); window.addEventListener(EVT_RELIER_LISTE, parListe);
+    return () => { window.removeEventListener(EVT_OUVRIR_LIAISON, ouvrir); window.removeEventListener(EVT_OUVRIR_MEME_PHOTO, ouvrir); window.removeEventListener('vrm:lien-vc', parVc); window.removeEventListener(EVT_RELIER_LISTE, parListe); };
   }, []);
   if (!cible) return null;
   const fermer = () => setCible(null);

@@ -18,6 +18,7 @@
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
 import { useComptesBloques } from '../compteBloqueEtat.js';
+import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
@@ -27,7 +28,8 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -230,9 +232,28 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
         options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }] },
     ],
   };
+  // (20 nov.) RELIER DEPUIS LA LISTE — Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus,
+  // regarder la fiche ». L'état du lien et LA proposition de chaque annonce d'un autre site sont LUS (src/liaisonEtat.js, calculés
+  // par les règles du parcours) ; SON toucher passe par `relierDepuisListe` (la proposition relue, le geste du parcours).
+  const [, majLiaison] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { const fin = abonnerLiaison(majLiaison); demanderLiaison(false); return fin; }, []);
+  const liaison = {
+    de: (a) => {
+      const x = a && Array.isArray(a.annonces) ? a.annonces.find((y) => y.site !== 'vinted') : null;
+      if (!x) return null;
+      const site = NOM_SITE[x.site] || x.site, st = etatLienLu(site, x.id);
+      if (st.etat === 'passu') return null;
+      return { site, id: String(x.id), etat: st.etat, numero: st.numero, prop: st.etat === 'aRelier' ? propositionLu(site, x.id) : null };
+    },
+    relier: (l) => { if (l && l.prop) relierDepuisListe({ site: l.site, id: l.id, paireId: l.prop.paireId }); },
+    autre: (l) => { if (l) ouvrirLiaison({ site: l.site, id: l.id }); },
+    propre: (l) => { if (l) queSurCeSite({ site: l.site, id: l.id }); },
+    lot: (ls) => { const cles = ls.filter((l) => l && l.prop && l.prop.niveau === 'sur').map((l) => `${l.site}:${l.id}`); if (cles.length) ouvrirLiaison({ vue: 'lot', cles }); },
+    Photo: (src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>,
+  };
   return (
     <>
-    <VueAnnonces travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

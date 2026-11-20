@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov., Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus ») src/natif/ecrans/PropositionLiaison.jsx
+  { id: 'relier-depuis-liste', date: '2026-11-20', titre: 'Relie une annonce depuis la liste', phrase: 'Sa paire proposée sur la rangée : un toucher, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « des boutons pas très beaux, pas fiables, améliore ça ») docs/passation/2026-11-20-boutons-natifs.md
   { id: 'boutons-natifs', date: '2026-11-20', titre: 'Des boutons nets et fiables partout', phrase: 'Un double toucher ne fait qu’un geste ; un bouton grisé dit pourquoi.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md

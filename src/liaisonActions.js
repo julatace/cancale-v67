@@ -24,7 +24,7 @@
 //   refuserPhoto({ annonce, numero })   « Ce n'est pas la même » (src/memePhoto.js)
 //   cleNum, marqueDe, tr, publier(etat), lire()
 // ══════════════════════════════════════════════════════════════════════════
-import { construireLiaison, compteurLiaison, opsRelier, opsRelierLot, opsDelier, opsPlusTard, opsPropre, opsGarder, appliquerSurCartes, verifierLien, cleAnnonce, CLE_LIAISON, CLES_LIENS } from './liaisonSites.js';
+import { construireLiaison, compteurLiaison, propositionsDe, opsRelier, opsRelierLot, opsDelier, opsPlusTard, opsPropre, opsGarder, appliquerSurCartes, verifierLien, cleAnnonce, CLE_LIAISON, CLES_LIENS } from './liaisonSites.js';
 
 export const DUREE_ANNULER_LIEN = 10000;   // ms : « Annuler » reste 10 s après un lien (puis « Délier », depuis l'annonce ou la fiche)
 
@@ -54,7 +54,9 @@ export function creerLiaison(deps) {
       if (proprio() !== qui) return null;
       const journal = lireCarte(CLE_LIAISON), faits = lireCarte(CLE_FAITS);
       const res = construireLiaison({ autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, memePhoto: mp, journal: journal || {}, faits: faits || {}, numerosDouteux: sur(douteux, new Set()), numerosConnus: sur(numerosConnus, null), cle: cleNum, marqueDe, pistes: pi });
-      const etat = { ...res, compteurEntree: journal === undefined ? null : compteurLiaison(res), autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, illisibles: ext ? ext.illisibles || [] : ['Leboncoin', 'eBay', 'Vestiaire'],
+      // (20 nov.) LA proposition de chaque annonce « à relier », montrée sur sa rangée (src/liaisonSites.js `propositionsDe`).
+      const propositions = Object.fromEntries(propositionsDe(res, { cle: cleNum, marqueDe, numerosDouteux: sur(douteux, new Set()) }));
+      const etat = { ...res, propositions, compteurEntree: journal === undefined ? null : compteurLiaison(res), autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, illisibles: ext ? ext.illisibles || [] : ['Leboncoin', 'eBay', 'Vestiaire'],
         vintedPartiel: !!(vin && vin.paires && vin.toutesLues === false), pairesSansNumero: (vin && vin.sansNumero) || 0, photosLues: !!(mp && mp.lu), at: Date.now(), gen: depart };
       at = Date.now();
       publier(etat);
@@ -148,5 +150,25 @@ export function creerLiaison(deps) {
     }
     return 'pas-su';
   }
-  return { charger, relier, relierLot, delier, remplacer, plusTard, propre, garder, pasCellesCi, verifier };
+  // (20 nov.) RELIER DEPUIS LA LISTE — SON toucher sur la proposition montrée sur la rangée. La proposition est RELUE ici
+  // (l'état courant) : elle doit être la même que celle qu'il a vue (`paireId`), sinon rien (« la liste a changé »). Puis
+  // EXACTEMENT le geste du parcours (`relier` : `opsRelier`, toutes les gardes, annulable 10 s) — une question ou un refus
+  // revient tel quel (l'écran ouvre alors le parcours sur cette annonce, où la question se pose).
+  function relierProposition({ cle, paireId } = {}) {
+    const e = lire();
+    if (!e || !e.lu || !e.parCle || !e.propositions) return { refus: 'pas-su' };
+    const entree = e.parCle.get(String(cle || '')) || null, prop = e.propositions[String(cle || '')] || null;
+    if (!entree || entree.etat !== 'aRelier' || !prop || String(prop.paireId) !== String(paireId || '')) return { refus: 'proposition-perimee' };
+    const paire = (e.articles || []).find((x) => String(x.id) === String(prop.paireId)) || null;
+    if (!paire) return { refus: 'proposition-perimee' };
+    return relier({ annonce: entree.annonce, paire, preuve: prop.niveau === 'sur' ? 'photo-sure' : prop.raison === 'photo' ? 'photo' : 'recherche' });
+  }
+  // « Elle n'est que sur ce site », depuis la rangée : le même geste que le parcours.
+  function propreDepuisListe({ cle } = {}) {
+    const e = lire();
+    const entree = e && e.lu && e.parCle ? e.parCle.get(String(cle || '')) : null;
+    if (!entree || entree.etat !== 'aRelier') return Promise.resolve({ refus: 'proposition-perimee' });
+    return propre({ annonce: entree.annonce });
+  }
+  return { charger, relier, relierLot, delier, remplacer, plusTard, propre, garder, pasCellesCi, verifier, relierProposition, propreDepuisListe };
 }
