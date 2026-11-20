@@ -74,13 +74,17 @@
 
   /* Carte-tableau (19 nov., « entre Vintex et celui-là ») : un filet de 1 px, rayon 12, aucune ombre ; l'en-tête DANS la
      carte, en petites capitales grises ; les rangées sont celles du natif (vignette 44 : rangée de 56). */
-  .n-carte { box-sizing: border-box; margin: 0 var(--n-marge) 16px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); overflow: hidden; }
-  .n-carte-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--n-trait); }
+  /* (20 nov., NATIF §1 bis « comme Paramètres ») La carte est un GROUPE : l'en-tête au-dessus, en petites capitales
+     grises sur le fond de la page ; le corps blanc arrondi, sans filet ni ombre. */
+  .n-carte { box-sizing: border-box; margin: 0 var(--n-marge) 24px; color: var(--n-encre); }
+  .n-carte-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 18px; padding: 0 0 6px 16px; }
+  .n-carte-corps { border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-carte-corps:empty { display: none; }
   .n-carte-titres { display: flex; flex-direction: column; min-width: 0; }
   .n-carte-titre { margin: 0; font: var(--n-t-legende-fort); letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-carte-n { margin-inline-start: 6px; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .n-carte-sous { margin: 2px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
-  .n-tuiles-pied { margin-top: 8px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-tuiles-pied { margin-top: 8px; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
   .n-tuiles-pied > .n-bouton-bloc { display: flex; padding: 0 4px; }
   .n-carte-sous[data-n-ton="ambre"] { color: var(--n-ambre); }
   .n-carte-action { flex: 0 0 auto; display: flex; align-items: center; }
@@ -91,7 +95,7 @@
   .n-carte-corps > .n-code { margin-top: 12px; }
   .n-carte .n-rangee { background: var(--n-carte); }
 
-  /* Tuiles de chiffres : 2 colonnes au téléphone, 4 dès 600 px ; chaque tuile une carte à filet. */
+  /* Tuiles de chiffres : 2 colonnes au téléphone, 4 dès 600 px ; chaque tuile un pavé blanc uni (ni filet ni ombre, §1 bis). */
   .n-tuiles { margin: 0 var(--n-marge) 16px; }
   .n-tuiles-tete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 12px; }
   .n-tuiles-titre { margin: 0; font: var(--n-t-legende-fort); letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); }
@@ -100,7 +104,7 @@
   .n-tuile-case { min-width: 0; display: flex; }
   .n-tuile {
     appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 92px; margin: 0;
-    padding: 12px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps);
+    padding: 12px; border: 0; border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps);
   }
   .n-tuile-touche { position: relative; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
   .n-tuile-touche:active { background: var(--n-appui); }
@@ -191,7 +195,7 @@
   /* Champ : libellé 13 gris, saisie 17 (l'iPhone ne zoome pas), 44 de haut, sur la carte-2. */
   .n-champ { display: flex; flex-direction: column; gap: 6px; margin: 0 var(--n-marge) 16px; }
   .n-champ-libelle { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
-  .n-champ-ligne { display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0 12px; border: 1px solid var(--n-trait); border-radius: var(--n-r-bouton); background: var(--n-carte-2); }
+  .n-champ-ligne { display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0 12px; border: 0; border-radius: var(--n-r-bouton); background: var(--n-carte-2); }
   .n-champ-saisie { flex: 1 1 auto; min-width: 0; height: var(--n-cible); margin: 0; padding: 0; border: 0; background: transparent; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; outline: none; }
   .n-champ-suffixe { font: var(--n-t-corps); color: var(--n-encre-2); }
   .n-champ-ligne:focus-within { border-color: var(--n-accent); }
@@ -200,7 +204,7 @@
   .n-carte-corps > .n-bouton-bloc { display: flex; padding: 4px 8px 8px; }
 
   /* ListeOrdonnee (19 nov., « Personnaliser » bien fait) : rond −/+ 44, icône, nom + phrase, aperçu, poignée ≡ 44. */
-  .n-ordre { position: relative; display: flex; flex-direction: column; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; margin: 0 var(--n-marge) 8px; }
+  .n-ordre { position: relative; display: flex; flex-direction: column; border: 0; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; margin: 0 var(--n-marge) 8px; }
   .n-ordre-element { position: relative; display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 4px 4px 4px 8px; background: var(--n-carte);
     transform: translate3d(0, var(--n-ordre-d, 0px), 0); transition: transform var(--n-duree) var(--n-courbe); }
   .n-ordre-element + .n-ordre-element { border-top: 1px solid var(--n-trait); }
