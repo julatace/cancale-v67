@@ -288,8 +288,10 @@ async function controles(racine, silencieux) {
   });
   // (19 nov.) La capacité lue est celle du chemin de BAISSE de chaque site (`baisseprix`, `lbcprix`, `vcprix`) : sans elle
   // sur cet appareil, rien n'est tenté d'ici et la baisse est rangée (`deposer`).
-  await essai('A2 · la capacité lue est celle de la baisse de chaque site (extSait), jamais supposée ; sans elle la baisse est rangée', () =>
-    (/const CAP_PRIX_SITE = \{ vinted: 'baisseprix', leboncoin: 'lbcprix', vestiaire: 'vcprix' \}/.test(sansCom) && /ici: \(site\) => extSait\(CAP_PRIX_SITE\[site\]\) === 'ok'/.test(sansCom) && /deposerPrixAttente\(depPrixAttente\(\), cmd\)/.test(sansCom)) || 'absente');
+  // (20 nov., décision de Julien) Vinted, Leboncoin, Vestiaire : le prix se change dans le PANNEAU de l'extension — l'app
+  // ne range plus de baisse (`deposer` rend null) ; eBay seul part de la feuille (audit-actions-app Y1).
+  await essai('A2 · (20 nov.) l’app ne range plus de baisse : sur les sites à extension, la feuille ouvre le panneau', () =>
+    (/deposer: async \(\) => null/.test(sansCom) && !/deposerPrixAttente\(depPrixAttente\(\), cmd\)/.test(sansCom)) || 'absente');
   await essai('A3 · dupliquer : réservations lues (rien sur « pas su »), pool écrit AVANT la fiche', () => {
     const f = (/async function dupliquerNumero[\s\S]*?\n\}\n/.exec(sansCom) || [''])[0];
     const iPool = f.indexOf("save('vinted_used_numeros'"), iFiche = f.indexOf("save('vrm_fiches_neuves'");
@@ -301,7 +303,8 @@ async function controles(racine, silencieux) {
     return (f && (delegue || enLigne) && iPool > 0 && iFiche > iPool) || { iPool, iFiche, delegue, enLigne };
   });
   await essai('A4 · fiches neuves, journal des prix et modèles synchronisés (SYNC_KEYS)', () => ['vrm_fiches_neuves', 'vrm_prix_journal', 'vrm_modeles_desc'].every((k) => new RegExp(`'${k}'`).test((/const SYNC_KEYS = \[[\s\S]*?\];/.exec(APP) || [''])[0])) || 'manquant');
-  await essai('A5 · les modèles sont insérables dans 4 descriptions (Leboncoin, eBay publier, eBay modifier, brouillon)', () => { const n = (sansCom.match(/<ChipsModeles /g) || []).length; return n >= 4 || n; });
+  // (20 nov.) La fiche « Publier sur Leboncoin » est retirée (la publication se fait dans l'extension) : restent eBay ×2 et le brouillon.
+  await essai('A5 · les modèles sont insérables dans 3 descriptions (eBay publier, eBay modifier, brouillon)', () => { const n = (sansCom.match(/<ChipsModeles /g) || []).length; return n >= 3 || n; });
   return { ok, ko, rouges };
 }
 
