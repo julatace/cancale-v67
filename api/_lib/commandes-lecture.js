@@ -38,6 +38,7 @@ import { fetchAvecDelai } from './fetch-delai.js';
 import { vendeurExige } from './session.js';
 import { sbCle } from './cle.js';
 import { repondreSansCleService } from './cle-service.js';
+import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // La liste blanche : `commandeMaigre` (vinted-sync-extension/background.js) + `photo_url`.
@@ -95,8 +96,9 @@ async function lireToutService(chemin, cle) {
   const out = [];
   for (let debut = 0; debut < 100000; debut += PAGE) {
     let r;
-    try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { ...sbCle(cle), Range: `${debut}-${debut + PAGE - 1}`, 'Range-Unit': 'items', Prefer: 'count=exact' } }); }
+    try { r = await fetchAvecDelai(ordreStable(`${SUPABASE_URL}/rest/v1/${chemin}`), { headers: { ...sbCle(cle), Range: `${debut}-${debut + PAGE - 1}`, 'Range-Unit': 'items', Prefer: 'count=exact' } }); }
     catch (_) { return null; }
+    if (finALaFrontiere(r, debut)) return out;   // 416 à une frontière exacte (1 000, 2 000…) = fin de liste
     if (!r || !(r.status === 200 || r.status === 206)) return null;
     let j; try { j = await r.json(); } catch (_) { return null; }
     if (!Array.isArray(j)) return null;
