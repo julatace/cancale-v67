@@ -58,5 +58,8 @@ export default {
   "v2.pm.texte.desc": "Amplía solo el texto.",
   "arn.vendu": "Vendido",
   "arn.aVenir": "Dinero por llegar",
-  "arn.coutsSaisis": "{v} costes introducidos"
+  "arn.coutsSaisis": "{v} costes introducidos",
+  "arn.voirTous": "Ver los {n}",
+  "arn.rien": "Nada",
+  "arn.comment": "Cómo se calcula"
 };

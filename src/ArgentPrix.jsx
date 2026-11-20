@@ -157,7 +157,8 @@ export function RevisionMoisCarte({ R, mois = [], ym, setYm, portes = {} }) {
   if (!R || R.etat === 'encours') return null;
   const nomMois = (x) => dateLoc(x + '-15T12:00:00', { month: 'long', year: 'numeric' });
   const couv = R.etat === 'lu' ? (R.fini ? tr('ap.rev.fini', { n: R.n }) : tr('ap.rev.couv', { n: R.total, v: R.n })) : tr('ap.rev.ouvreVentes');
-  const MAX = 30;
+  // (20 nov., lot argent-natif) Cinq lignes, puis « Voir les N » : Julien ne veut plus de murs de lignes sur Déclarer.
+  const MAX = 5;
   const lignes = R.etat === 'lu' ? (tout ? R.lignes.slice(0, 200) : R.lignes.slice(0, MAX)) : [];
   return (
     <Section titre={tr('ap.rev.titre')} couv={couv} data-revision={R.etat} data-rev-n={R.etat === 'lu' ? R.total : ''} data-rev-achat={R.compte.achat || 0} data-rev-versement={R.compte.versement || 0} data-rev-relier={R.compte.relier || 0}>

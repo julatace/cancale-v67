@@ -59,7 +59,8 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
-import { useOrdinateur } from '../natif/index.js';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
+import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
+import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
 import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
@@ -3961,37 +3962,41 @@ function PrevisionUrssafCarte({ onNav }) {
   const parL = Object.entries(parP).filter(([, n]) => n > 0);
   const parTxt = parL.length > 1 ? parL.map(([k, n]) => `${n} ${k}`).join(', ') : '';   // une seule plateforme : rien à détailler
   const tauxTxt = String(tauxUrssaf()).replace('.', ',');
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis — Julien : « gros bouton Copier pleine largeur », trop chargé. UNE carte :
+  // l'en-tête (« Déclarer octobre 2026 », la date limite), (1) le montant à recopier EN GRAND avec un petit « Copier » à côté,
+  // les cotisations en ligne secondaire ; (2) ce qui manque en UNE ligne (ambre s'il manque quelque chose, avec son geste) ;
+  // (3) LE plein « J'ai déclaré » et « Ouvrir l'URSSAF ↗ » en bouton texte. Les mêmes chiffres, les mêmes « ? », les mêmes data-*.
+  const manque = P.ca == null || P.partiel || P.aDater > 0;
   return (
-    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={tr('compta.declarationUrssaf', { label: String(P.label) })}>
-      <div className="vrm-urssaf-geste-tete">
-        <h3>{trj('compta.declarer', { label: P.label })}</h3>
-        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{tr('compta.avant2')} {date}{jour ? ` · ${jour}` : ''}</span>
-      </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="1"><span className="vrm-urssaf-num" aria-hidden="true">1</span><b>{tr('compta.texte9')}</b><small>{tr('compta.recopierUrssaf')}</small></div>
-      <div className="vrm-urssaf-ligne" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
-        <span className="vrm-urssaf-lib"><b>{tr('compta.chiffreAffaires2')} <SourceChiffre id="ca">{P.ca == null ? <>{tr('compta.calculeDansEcran')}</> : <>{tr('compta.somme')} {nP === 1 ? tr('compta.venteFinalisee') : tr('compta.ventesFinalisees', { nP: String(nP) })}{parTxt ? ` (${parTxt})` : ''} {tr('compta.dontArgentT')} {P.label} {tr('compta.vintedJourTransaction')}</>}</SourceChiffre></b><small>{tr('compta.ventesMarchandisesRecu')}</small></span>
-        <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.ca)}</>}</span>
-        {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={tr('compta.copier', { caTxt: String(caTxt) })} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
-      </div>
-      <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
-        <span className="vrm-urssaf-lib"><b>{tr('compta.cotisations3')} <SourceChiffre id="cotis">{P.apayer == null ? <>{tr('compta.ellesCalculentChiffre')}</> : <>{fmt(P.ca)} × {tauxTxt}{tr('compta.tauxMicroEntreprise')} {fmt(P.apayer)}{tr('compta.estimationVerifierSite')}</>}</SourceChiffre></b><small>{trj('compta.estimationVrmComparer', { tauxTxt: tauxTxt })}</small></span>
-        <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.apayer)}</>}</span>
-        <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
-      </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="2"><span className="vrm-urssaf-num" aria-hidden="true">2</span><b>{tr('compta.manque')}</b></div>
-      {(P.ca == null || P.partiel || P.aDater > 0) ? (
-        <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
-          {P.ca == null ? <><span>{tr('stats.encoreCalculeOuvre')}</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton> : null}</>
-            : P.aDater > 0 ? <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>
-            : <>{tr('compta.manqueVentesEncore')}</>}
+    <NCarte className={'vrm-urssaf-geste n-arg-declarer' + (urgent ? ' is-urgent' : '')} titre={trj('compta.declarer', { label: P.label })}
+      sousTitre={<span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{tr('compta.avant2')} {date}{jour ? ` · ${jour}` : ''}</span>} tonSous={urgent ? 'ambre' : 'neutre'}
+      attrs={{ ...attrs, 'data-urssaf-parcours': '3', 'aria-label': tr('compta.declarationUrssaf', { label: String(P.label) }) }}>
+      <div className="n-arg-montant" data-urssaf-etape="1" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
+        <div className="n-arg-montant-texte">
+          <span className="n-arg-montant-lib">{tr('compta.chiffreAffaires2')} <SourceChiffre id="ca">{P.ca == null ? <>{tr('compta.calculeDansEcran')}</> : <>{tr('compta.somme')} {nP === 1 ? tr('compta.venteFinalisee') : tr('compta.ventesFinalisees', { nP: String(nP) })}{parTxt ? ` (${parTxt})` : ''} {tr('compta.dontArgentT')} {P.label} {tr('compta.vintedJourTransaction')}</>}</SourceChiffre></span>
+          <span className="n-arg-montant-val">{P.ca == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.ca)}</>}</span>
         </div>
-      ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">{tr('compta.rienToutesVentes')}</div>}
-      <div className="vrm-urssaf-etape" data-urssaf-etape="3"><span className="vrm-urssaf-num" aria-hidden="true">3</span><b>{tr('compta.declarer2')}</b><small>{aNoter.length ? tr('compta.recopieMontantSite') : tr('compta.dejaNoteIci')}</small></div>
-      <div className="vrm-urssaf-gestes">
-        <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</Bouton>
-        {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
+        {P.ca != null ? <NBouton variante="teinte" onClick={() => copier('ca', caTxt)} attrs={{ 'data-urssaf-copier': 'ca', 'data-urssaf-texte': caTxt, 'aria-label': tr('compta.copier', { caTxt: String(caTxt) }) }}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</NBouton> : null}
       </div>
-    </section>
+      <NRangee titre={<>{tr('compta.cotisations3')} <SourceChiffre id="cotis">{P.apayer == null ? <>{tr('compta.ellesCalculentChiffre')}</> : <>{fmt(P.ca)} × {tauxTxt}{tr('compta.tauxMicroEntreprise')} {fmt(P.apayer)}{tr('compta.estimationVerifierSite')}</>}</SourceChiffre></>}
+        sousTitre={trj('compta.estimationVrmComparer', { tauxTxt: tauxTxt })}
+        valeur={P.apayer == null ? '—' : (P.partiel ? tr('journee.moins') + ' ' : '') + fmt(P.apayer)}
+        attrs={{ 'data-urssaf-ligne': 'cotis', 'data-eur': P.apayer == null ? '' : String(P.apayer) }}/>
+      <div data-urssaf-etape="2">
+        {manque ? (
+          P.aDater > 0 && P.ca != null && !P.partiel
+            ? <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={<LigneDatesVersement as="span" avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>} sousLignes={2} attrs={{ 'data-urssaf-manque': String(P.aDater) }}/>
+            : P.ca == null
+              ? <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={tr('stats.encoreCalculeOuvre')} fin={onNav ? 'chevron' : null} onClick={onNav ? () => onNav('cat_ventes') : null} attrs={{ 'data-urssaf-manque': 'passu', 'data-urssaf-ventes': '' }}/>
+              : <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={P.aDater > 0 ? <LigneDatesVersement as="span" avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/> : tr('compta.manqueVentesEncore')} sousLignes={2} attrs={{ 'data-urssaf-manque': P.aDater > 0 ? String(P.aDater) : 'partiel' }}/>
+        ) : <NRangee titre={tr('compta.manque')} valeur={tr('arn.rien')} attrs={{ 'data-urssaf-rien-manque': '' }}/>}
+      </div>
+      <div className="n-arg-gestes" data-urssaf-etape="3">
+        {aNoter.length ? <NBouton variante="plein" onClick={() => demanderDeclaration(aNoter[0], onNav)} attrs={{ 'data-fu-geste': '', 'data-urssaf-cest-declare': aNoter[0] }}>{tr('compta.aiDeclare')}</NBouton>
+          : <p className="n-arg-note">{tr('compta.dejaNoteIci')}</p>}
+        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
+      </div>
+    </NCarte>
   );
 }
 // (6 nov.) « D'OÙ VIENT CE CHIFFRE ? » — un « ? » à côté d'un chiffre, qui déplie UNE

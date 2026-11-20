@@ -24,6 +24,8 @@ const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ?
 
 export default function ArgentMois({ poster, phrase, moisLong, barres, faits, geste, versements, montant, vendu = null }) {
   const [choisi, setChoisi] = React.useState(barres.length - 1);
+  const [tout, setTout] = React.useState(false);
+  const MONTRES = 8;   // le tableau reste court ; « Voir les 25 » déplie le reste (rien n'est caché sans le dire)
   const b = barres[choisi] || null;
   const { valeur, partiel } = poster;
   const [n, u] = valeur == null ? [null, ''] : coupe(montant(valeur));
@@ -71,13 +73,14 @@ export default function ArgentMois({ poster, phrase, moisLong, barres, faits, ge
           {versements.etat === 'encours' ? <Attente forme="rangees" n={3}/>
             : versements.etat === 'passu' ? <Rangee titre={tr('v2.ar.versementsPasSu')}/>
             : !versements.lignes.length ? <Rangee titre={tr('v2.ar.aucunVersement', { mois: moisLong })}/>
-            : versements.lignes.map((l) => (
+            : (tout ? versements.lignes : versements.lignes.slice(0, MONTRES)).map((l) => (
               <Rangee key={l.id} titre={l.titre || tr('v2.ar.venteSans', { plateforme: l.plateforme || '' })} plaque={l.num ? <Plaque numero={l.num}/> : null}
                 sousTitre={[l.date, l.plateforme, l.achat != null ? tr('v2.ar.achete', { p: montant(l.achat) }) + (l.marge != null ? ' → ' + (l.marge > 0 ? '+' : l.marge < 0 ? '−' : '') + montant(Math.abs(l.marge)) : '') : ''].filter(Boolean).join(' · ')}
                 valeur={l.montant == null ? '—' : montant(l.montant)} valeurForte onClick={l.num ? l.onClick : null}
                 attrs={{ 'data-v2-argent-versement': l.id, 'data-eur': cents(l.montant), 'data-v2-argent-achat': l.achat != null ? cents(l.achat) : undefined, 'data-v2-argent-marge': l.achat != null ? cents(l.marge) : undefined }}/>
             ))}
-          {versements.etat === 'lu' && versements.reste > 0 ? <Rangee titre={tr('v2.ar.autres', { n: versements.reste })}/> : null}
+          {versements.etat === 'lu' && !tout && versements.lignes.length > MONTRES ? <Rangee titre={tr('arn.voirTous', { n: versements.lignes.length })} fin="chevron" onClick={() => setTout(true)} attrs={{ 'data-arg-voir-tous': String(versements.lignes.length) }}/> : null}
+          {versements.etat === 'lu' && tout && versements.reste > 0 ? <Rangee titre={tr('v2.ar.autres', { n: versements.reste })}/> : null}
         </Carte>
       </div>
     </section>

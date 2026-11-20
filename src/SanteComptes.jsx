@@ -21,6 +21,8 @@ import { carnetDuCompte } from './discretion.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
+import { Carte, Rangee, Pastille, Bouton } from './natif/index.js';
+import './natif/ecrans/argent.css';
 
 // ── LES LECTURES (une fois pour les trois places, relues quand l'extension écrit) ──
 // La même projection que « Notes reçues » de Statistiques (petites lignes, jamais `select=data`).
@@ -183,19 +185,17 @@ const Fleche = ({ sens }) => {
 
 const aller = (q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} };
 
+// (20 nov., lot argent-natif) AU STYLE NATIF §2 bis — Julien : « liens “Pourquoi ?” soulignés répétés sur chaque compte ».
+// UNE rangée par compte : le pseudo, l'étiquette (En forme / À surveiller), la raison en une ligne grise ; « Pourquoi ? »
+// est le TOUCHER DE LA RANGÉE (chevron), qui déplie les indicateurs juste dessous (rangées sobres : le nom à gauche, la
+// valeur à droite, le seuil en une ligne grise) et le geste « Voir » en bouton texte. Les mêmes règles, les mêmes data-sc-*.
 function Indicateur({ i }) {
   const t = texteTendance(i);
   return (
-    <li className="vrm-sc-ind" data-sc-ind={i.k} data-sc-lu={i.lu ? '1' : '0'} data-sc-alerte={i.alerte ? '1' : '0'} data-sc-valeur={i.lu && i.valeur != null ? String(i.valeur) : ''}
-      data-sc-tendance={t ? t.sens : ''} data-sc-raison={i.lu ? '' : i.raison}>
-      <div className="vrm-sc-ind-tete">
-        <span className="vrm-sc-ind-nom">{tr('sante.i.' + i.k)}</span>
-        <span className="vrm-sc-ind-val">{valeur(i)}</span>
-      </div>
-      {t ? <span className="vrm-sc-ind-tend"><Fleche sens={t.sens}/>{t.texte}</span> : null}
-      {!i.lu ? <span className="vrm-sc-ind-ps">{raisonPasSu(i)}</span> : null}
-      <span className="vrm-sc-ind-src">{seuil(i.k)} {tr('sante.src.' + i.k)}</span>
-    </li>
+    <Rangee titre={tr('sante.i.' + i.k)} valeur={valeur(i)} sousTitre={!i.lu ? raisonPasSu(i) : t ? t.texte : `${seuil(i.k)} ${tr('sante.src.' + i.k)}`} sousLignes={2}
+      ton={i.alerte ? 'ambre' : 'neutre'}
+      attrs={{ 'data-sc-ind': i.k, 'data-sc-lu': i.lu ? '1' : '0', 'data-sc-alerte': i.alerte ? '1' : '0', 'data-sc-valeur': i.lu && i.valeur != null ? String(i.valeur) : '',
+        'data-sc-tendance': t ? t.sens : '', 'data-sc-raison': i.lu ? '' : i.raison }}/>
   );
 }
 
@@ -203,23 +203,20 @@ function Compte({ c }) {
   const [ouvert, setOuvert] = React.useState(false);
   const lignes = ['note', 'avisBas', 'delai', 'retards', 'annulees', 'moderation', 'freins', 'fraicheur'].map((k) => c.indicateurs[k]).filter(Boolean);
   const autres = c.alertes.length - 1;
+  const sous = c.raison ? <span data-sc-raison-texte="">{texteRaison(c.raison)}{autres > 0 ? ' · ' + tr('sante.autres', { n: autres }) : ''}</span>
+    : <span data-sc-sous="">{tr('sante.lus', { n: c.lus, sur: c.sur })}</span>;
   return (
-    <section className="vrm-sc-compte" data-sc-compte={c.uid} data-sc-etat={c.etat} data-sc-raison-k={c.raison ? c.raison.k : ''} data-sc-lus={c.lus} data-sc-alertes={c.alertes.join(' ')}>
-      <div className="vrm-sc-tete">
-        <span className="vrm-sc-nom">{c.nom}</span>
-        <span className="vrm-sc-etat" data-ton={c.etat}>{tr('sante.etat.' + c.etat)}</span>
-      </div>
-      {c.raison ? (
-        <div className="vrm-sc-raison">
-          <span data-sc-raison-texte="">{texteRaison(c.raison)}{autres > 0 ? ' · ' + tr('sante.autres', { n: autres }) : ''}</span>
-          <button type="button" className="vrm-lien-action vrm-sc-geste" data-sc-geste={c.raison.geste} onClick={() => aller(c.raison.geste)}>{tr('sante.voir')}</button>
+    <div className="vrm-sc-compte n-arg-sc" data-sc-compte={c.uid} data-sc-etat={c.etat} data-sc-raison-k={c.raison ? c.raison.k : ''} data-sc-lus={c.lus} data-sc-alertes={c.alertes.join(' ')}>
+      <Rangee titre={c.nom} sousTitre={sous} ton={c.raison ? 'ambre' : 'neutre'} pastille={<Pastille ton={c.etat === 'surveiller' ? 'ambre' : 'neutre'}>{tr('sante.etat.' + c.etat)}</Pastille>}
+        fin="chevron" onClick={() => setOuvert((o) => !o)} className="n-arg-sc-rangee"
+        attrs={{ 'data-sc-pourquoi': '', 'data-arg-sante-rangee': '', 'aria-expanded': ouvert ? 'true' : 'false' }}/>
+      {ouvert ? (
+        <div className="vrm-sc-inds n-arg-sc-inds" data-sc-inds="">
+          {lignes.map((i) => <Indicateur key={i.k} i={i}/>)}
+          {c.raison ? <div className="n-arg-sc-geste"><Bouton variante="texte" onClick={() => aller(c.raison.geste)} attrs={{ 'data-sc-geste': c.raison.geste }}>{tr('sante.voir')}</Bouton></div> : null}
         </div>
-      ) : (
-        <p className="vrm-sc-sous" data-sc-sous="">{tr('sante.lus', { n: c.lus, sur: c.sur })}</p>
-      )}
-      <button type="button" className="vrm-sc-pourquoi" aria-expanded={ouvert} data-sc-pourquoi="" onClick={() => setOuvert((o) => !o)}>{tr('sante.pourquoi')}</button>
-      {ouvert ? <ul className="vrm-sc-inds" data-sc-inds="">{lignes.map((i) => <Indicateur key={i.k} i={i}/>)}</ul> : null}
-    </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -235,12 +232,9 @@ export default function SanteComptes({ variante = 'stats', comptes = null }) {
     return <div className="vrm-sc vrm-sc-reglages" data-sante-comptes="reglages" data-sc-n-surveiller={n}>{corps}</div>;
   }
   return (
-    <section className="vrm-sv-carte vrm-sc vrm-sc-carte" data-stats-carte="sante-comptes" data-sante-comptes="stats" data-sc-n-surveiller={n}>
-      <div className="vrm-sv-carte-tete">
-        <h2 className="vrm-display vrm-sv-carte-titre">{tr('sante.titre')}</h2>
-        {S.comptes.length ? <span className="vrm-sv-note" data-sc-entete="">{n ? tr('sante.nSurveiller', { n }) : tr('sante.toutVa')}</span> : null}
-      </div>
+    <Carte titre={tr('sante.titre')} className="vrm-sc n-arg-sante" sousTitre={S.comptes.length ? <span data-sc-entete="">{n ? tr('sante.nSurveiller', { n }) : tr('sante.toutVa')}</span> : ''}
+      tonSous={n ? 'ambre' : 'neutre'} attrs={{ 'data-stats-carte': 'sante-comptes', 'data-sante-comptes': 'stats', 'data-sc-n-surveiller': n }}>
       {corps}
-    </section>
+    </Carte>
   );
 }

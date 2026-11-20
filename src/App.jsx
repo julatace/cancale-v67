@@ -20095,7 +20095,7 @@ function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = 
   // l'écran ne garde que ce qu'il porte dessous (la ligne comptes, le segmenté) — jamais deux titres « Argent ».
   const ordiTete = Natif.useOrdinateur();
   if (titreCoque && !ordiTete) return sous || right ? (
-    <div className="vrm-screen-head vrm-screen-head-sous-seul" data-tete-coque="">
+    <div className="n-arg-tete" data-tete-coque="">
       {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
       {right ? <div className="vrm-screen-actions">{right}</div> : null}
     </div>
