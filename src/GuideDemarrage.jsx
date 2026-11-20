@@ -212,7 +212,8 @@ export function BandeauExemple({ onBrancher, onConnexion = null, style, sansComp
         </span>
       </div>
       <div className="vrm-exemple-gestes">
-        <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? tr('exemple.bandeau.creer') : tr('exemple.bandeau.vraies')}</button>
+        {/* (20 nov.) Natif (NATIF.md §1 bis) : un geste en texte bleu, jamais un second plein par-dessus celui de l'écran. */}
+        <button type="button" className="vrm-exemple-sortir" data-exemple-brancher="" data-exemple-sortir="" onClick={onBrancher}>{sansCompte ? tr('exemple.bandeau.creer') : tr('exemple.bandeau.vraies')}</button>
         {sansCompte && onConnexion ? <button type="button" className="vrm-exemple-connexion" data-exemple-connexion="" onClick={onConnexion}>{tr('exemple.bandeau.connexion')}</button> : null}
       </div>
     </div>

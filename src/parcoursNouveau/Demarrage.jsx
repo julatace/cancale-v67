@@ -32,6 +32,8 @@ const fait = (x) => !!x && (x.etat === 'fait' || x.etat === 'inutile');
 // L'état court d'une étape, à droite de sa rangée (une pastille douce ; ambre = un geste à faire).
 function EtatEtape({ x }) {
   const e = x ? x.etat : 'afaire';
+  // L'import qui avance dit où il en est (lu), jamais « On regarde… ».
+  if (e === 'encours' && x && x.n != null) return <Pastille ton="neutre">{x.N != null ? tr('dm.hist.surN', { n: x.n, N: x.N }) : tr('dm.hist.n', { n: x.n })}</Pastille>;
   const cle = e === 'fait' ? 'dm.etat.fait' : e === 'inutile' ? 'dm.etat.inutile' : e === 'encours' ? 'dm.etat.encours' : e === 'passu' ? 'dm.etat.passu' : 'dm.etat.afaire';
   return <Pastille ton={e === 'afaire' ? 'ambre' : 'neutre'}>{tr(cle)}</Pastille>;
 }

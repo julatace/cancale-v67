@@ -53,7 +53,7 @@ const EMAIL = 'nouvelle.vendeuse@exemple.invalid';
 const VINTED_UID = '987654321';
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 const jeton = (uid) => `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ sub: uid, role: 'authenticated', aud: 'authenticated' })}.banc`;
-const session = () => ({ access_token: jeton(UID), refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: UID, email: EMAIL, totp: [], created_at: new Date(Date.now() - 60000).toISOString() } });
+const session = (ancien = false) => ({ access_token: jeton(UID), refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: UID, email: EMAIL, totp: [], created_at: new Date(Date.now() - (ancien ? 30 * 864e5 : 60000)).toISOString() } });
 
 // ── Le serveur des fichiers construits ──
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain', '.zip': 'application/zip', '.xpi': 'application/x-xpinstall' };
@@ -106,7 +106,7 @@ async function brancherBase(pg, base) {
     if (/vinted_accounts/.test(u.pathname)) return json(m === 'GET' ? base.comptes : []);
     if (!/app_data/.test(u.pathname)) return json([]);
     if (m === 'POST' || m === 'PATCH' || m === 'PUT' || m === 'DELETE') {
-      base.ecritures.push(m + ' ' + decodeURIComponent(u.search).slice(0, 160));
+      base.ecritures.push(m + ' ' + decodeURIComponent(u.search).slice(0, 160) + ' ' + (() => { try { const b = JSON.parse(req.postData() || 'null'); return (Array.isArray(b) ? b : [b]).map((x) => (x && x.id) || '').join(','); } catch (_) { return ''; } })());
       try {
         const b = JSON.parse(req.postData() || 'null');
         const rows = Array.isArray(b) ? b : b && b.id ? [b] : [];
@@ -149,7 +149,7 @@ const PONT = ([email, uid, version]) => {
   });
 };
 
-async function ouvrir(nav, { W, ua, kagi = false, base, sombre = false }) {
+async function ouvrir(nav, { W, ua, kagi = false, base, sombre = false, ancien = false }) {
   const tel = W < 600;
   const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 945 } }), userAgent: ua || (tel ? UA_IPHONE : UA_CHROME), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
@@ -163,7 +163,7 @@ async function ouvrir(nav, { W, ua, kagi = false, base, sombre = false }) {
       if (window.top !== window) return;
       if (!sessionStorage.getItem('banc_init')) { localStorage.clear(); localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); sessionStorage.setItem('banc_init', '1'); }
     } catch (_) {}
-  }, [session(), sombre, kagi]);
+  }, [session(ancien), sombre, kagi]);
   await pg.addInitScript(PONT, [EMAIL, UID, VERSION_EXT]);
   await brancherBase(pg, base);
   return { ctx, pg, journal, tel };
@@ -215,6 +215,7 @@ async function partieParcours(nav, W) {
   await shot(pg, `p-${W}-02-plateformes`);
   await pg.click('[data-pn-plein]');
   dit(await attendre(pg, async () => (await etape(pg)) === 'extension', 6000), `${etq} « Continuer » pousse l'extension`);
+  await attendre(pg, async () => !!main(base).vrm_plateformes_affichees, 8000);
   const pf = main(base).vrm_plateformes_affichees;
   dit(pf && pf.sites && pf.sites.join() === 'vinted,leboncoin', `${etq} « Tu vends où ? » ÉCRIT dans SA base (vinted, leboncoin)`, JSON.stringify(pf));
 
@@ -283,8 +284,10 @@ async function partieParcours(nav, W) {
   await juger(pg, etq, 'pret', tel); await shot(pg, `p-${W}-10-pret`);
 
   // « Plus tard » depuis une étape, puis Paramètres → « Bien démarrer » rouvre le sommaire.
-  await pg.click('[data-dm-reste]').catch(() => {});
-  await pg.waitForTimeout(500);
+  await pg.click('[data-dm-retour]');
+  await pg.waitForSelector('[data-parcours-nouveau][data-pn-etape="sommaire"]', { timeout: 5000 }).catch(() => {});
+  await pg.click('[data-dm-etape="comptes"]');
+  await pg.waitForSelector('[data-parcours-nouveau][data-pn-etape="comptes"]', { timeout: 5000 }).catch(() => {});
   await pg.click('[data-pn-plus-tard]').catch(() => {});
   dit(await pg.waitForSelector('[data-parcours-nouveau]', { state: 'detached', timeout: 8000 }).then(() => true).catch(() => false), `${etq} « Plus tard » ferme le parcours`);
   dit(await pg.evaluate(() => { try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: 'sommaire' })); return true; } catch (_) { return false; } })
@@ -334,12 +337,12 @@ async function partieDemo(nav, W) {
   dit(ok, `${etq} le sommaire propose l'exemple`);
   if (!ok) { await ctx.close(); return; }
   await pg.waitForTimeout(800);
-  const avant = { req: base.requetes, ecr: base.ecritures.length };
   await pg.click('[data-dm-exemple]');
   await pg.waitForLoadState('domcontentloaded');
-  const entre = await pg.waitForSelector('[data-vrm-exemple], .vrm-bandeau-exemple, [data-bandeau-exemple]', { timeout: 30000 }).then(() => true).catch(() => false);
+  const entre = await pg.waitForSelector('[data-exemple-bandeau]', { timeout: 30000 }).then(() => true).catch(() => false);
   dit(entre, `${etq} « Essayer avec des exemples » ⇒ l'app en exemple, marquée « Exemple »`);
   const apres = base.requetes;
+  const avant = { ecr: base.ecritures.length };
   await pg.waitForTimeout(2500);
   const vu = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-vrm-exemple'), texte: /Exemple/i.test(document.body.innerText), pn: document.querySelectorAll('[data-parcours-nouveau]').length }));
   dit(vu.texte && vu.pn === 0, `${etq} l'exemple : « Exemple » écrit à l'écran, le parcours ne s'empile pas devant`, JSON.stringify(vu));
@@ -350,15 +353,17 @@ async function partieDemo(nav, W) {
     await shot(pg, `d-${W}-02-exemple-${tab}`);
   }
   dit(base.requetes === apres, `${etq} AUCUNE requête vers la base ni /api pendant l'exemple (lecture comprise)`, `${base.requetes - apres} requêtes`);
-  dit(base.ecritures.length === avant.ecr || base.ecritures.slice(avant.ecr).every((e) => /vrm_parcours_nouveau|main/.test(e)), `${etq} rien de l'exemple écrit dans SA base`, base.ecritures.slice(avant.ecr).join(' | '));
+  dit(base.ecritures.length === avant.ecr, `${etq} rien de l'exemple écrit dans SA base`, base.ecritures.slice(avant.ecr).join(' | '));
+  const bandeau = await pg.evaluate(() => { const b = document.querySelector('[data-exemple-bandeau]'); const r = b.getBoundingClientRect(); return { h: Math.round(r.height), pleins: b.querySelectorAll('.vrm-b-primaire, [data-n-variante="plein"]').length, sortir: !!b.querySelector('[data-exemple-sortir]') }; });
+  dit(bandeau.pleins === 0 && bandeau.sortir && bandeau.h <= 110, `${etq} le bandeau natif : une barre, « sortir » en texte, aucun second plein`, JSON.stringify(bandeau));
   // Sortir en un toucher.
-  const sortie = pg.locator('[data-exemple-sortir], [data-bandeau-exemple] button, .vrm-bandeau-exemple button').first();
+  const sortie = pg.locator('[data-exemple-sortir]').first();
   const nS = await sortie.count();
   dit(nS > 0, `${etq} un geste « sortir de l'exemple » visible`);
   if (nS) {
     await sortie.click();
     await pg.waitForLoadState('domcontentloaded');
-    const sorti = await attendre(pg, async () => pg.evaluate(() => !document.documentElement.hasAttribute('data-vrm-exemple')), 20000);
+    const sorti = await attendre(pg, async () => pg.evaluate(() => !document.querySelector('[data-exemple-bandeau]') && !!document.querySelector('#root *')), 20000);
     dit(sorti, `${etq} sortie en un toucher : la vraie session revient`);
     await pg.waitForTimeout(1500);
     const mm = JSON.stringify(main(base));
@@ -375,7 +380,9 @@ async function partieToutVaBien(nav, W) {
   const base = nouvelleBase();
   base.lignes.push({ id: 'main', data: { vrm_parcours_nouveau: { etape: 'pret', fini: true, vues: ['plateformes'] }, vrm_bienvenue_vue: { at: '2026-11-01T00:00:00Z' }, vrm_visite_vue: { at: '2026-11-01T00:00:00Z' } } });
   base.comptes.push({ vinted_user_id: VINTED_UID, login: 'boutique_exemple', owner: UID, created_at: '2026-10-01T00:00:00Z' });
-  const { ctx, pg, journal } = await ouvrir(nav, { W, base, ua: UA_CHROME });
+  // Le compte est déjà accueilli (la feuille « … est relié à VRM » ne se rouvre pas : src/compteRelie.js).
+  base.lignes.push({ id: 'vrm_comptes_relies', data: { connus: { ['vinted:' + VINTED_UID]: { accueilli: '2026-10-01T00:00:00Z', notifie: '2026-10-01T00:00:00Z', vu: '2026-10-01T00:00:00Z' } }, base: '2026-10-01T00:00:00Z' } });
+  const { ctx, pg, journal } = await ouvrir(nav, { W, base, ua: UA_CHROME, ancien: true });
   await pg.goto(ORIGINE + '/?tab=settings&reglage=toutvabien', { waitUntil: 'domcontentloaded' });
   const vu = await pg.waitForSelector('[data-tout-va-bien]:not([data-tout-va-bien="lecture"])', { timeout: 40000 }).then(() => true).catch(() => false);
   if (!vu) {
@@ -387,16 +394,18 @@ async function partieToutVaBien(nav, W) {
   if (!pret) { await shot(pg, `t-${W}-00-RATE`); await ctx.close(); return; }
   await attendre(pg, async () => (await pg.locator('[data-tvb-point="extension:ici"]').count()) > 0, 15000);
   const pts = await pg.$$eval('[data-tvb-point]', (l) => l.map((x) => [x.getAttribute('data-tvb-point'), x.getAttribute('data-tvb-geste-code')]));
-  dit(pts.length && pts[0][0] === 'extension:ici' && pts[0][1] && pts[0][1] !== '', `${etq} extension absente ⇒ le PREMIER point est l'extension, avec son geste`, JSON.stringify(pts));
+  if (W >= 600) dit(pts.length && pts[0][0] === 'extension:ici' && pts[0][1] && pts[0][1] !== '', `${etq} extension absente ⇒ le PREMIER point est l'extension, avec son geste`, JSON.stringify(pts));
+  else dit(pts.length && !pts.some(([c]) => c === 'extension:ici') && pts[0][1], `${etq} au téléphone, l'extension vit sur l'ordinateur : pas de point « extension » ici ; le premier point a son geste`, JSON.stringify(pts));
   dit(pts.every(([, g]) => g !== null), `${etq} chaque point porte un geste (ou dit qu'il n'y a rien à faire)`);
   const det = await pg.getAttribute('[data-tvb-details]', 'data-tvb-details').catch(() => null);
   dit(det === 'ferme' && await pg.locator('[data-tvb-details-contenu]').count() === 0, `${etq} le technique est derrière « Détails », replié`);
   await shot(pg, `t-${W}-01-points`);
-  await pg.click('[data-tvb-details]');
+  await pg.click('[data-tvb-details] .n-rangee-corps');
   dit(await pg.locator('[data-tvb-details-contenu]').count() === 1, `${etq} « Détails » déplie le technique (comptes, appareils, rapports)`);
   await shot(pg, `t-${W}-02-details`);
+  if (W < 600) { dit(journal.erreurs.length === 0, `${etq} aucune erreur JS`, journal.erreurs.join(' | ')); await ctx.close(); return; }
   await pg.evaluate(() => window.__bancExt('connectee'));
-  await pg.click('[data-tvb-relire]').catch(() => {});
+  await pg.click('[data-tvb-relire] .n-rangee-corps').catch(() => {});
   const plus = await attendre(pg, async () => (await pg.locator('[data-tvb-point="extension:ici"]').count()) === 0, 45000, 500);
   dit(plus, `${etq} extension branchée ⇒ le point extension s'en va`);
   await shot(pg, `t-${W}-03-extension-ok`);
@@ -407,7 +416,7 @@ async function partieToutVaBien(nav, W) {
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('KO  dist/ absent : npm run build'); process.exit(1); }
   await new Promise((r) => srv.listen(PORT, r));
-  const nav = await lancer(PW);
+  const nav = await lancer(PW, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
     for (const W of LARGEURS) {
       if (PARTIES.includes('P')) await partieParcours(nav, W);
