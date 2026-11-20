@@ -49802,7 +49802,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (montés à part, `retraitsOutils`) n'ajoutent plus que ce qu'ils montrent.
     // (19 nov., « VRM natif ») Ventes (À envoyer, En route) : l'écran natif pose ses propres marges — ni le cadre de
     // 14–16 px d'avant, ni `data-colis-dans` (que des règles d'avant élargissaient en !important) : la liste reprend sa place.
-    <div style={{padding: natifVentes ? 0 : colisDans ? '16px 14px 12px' : retraitsOutils ? '0 14px' : '16px 14px 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
+    // (20 nov., « même bord partout ») la marge de la page : 16 px, comme chaque écran natif (elle était de 14).
+    <div style={{padding: natifVentes ? 0 : colisDans ? '16px 16px 12px' : retraitsOutils ? '0 16px' : '16px 16px 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {emballage && (()=>{
         // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).
@@ -66691,7 +66692,9 @@ function AppCoeur() {
   // était centrée et prenait la largeur de son contenu : une ligne longue (« N°215 · adidas handball spezial
   // marron taille 38 ») l'élargissait au-delà de l'écran, des deux côtés (« Mettre en vente » coupé à gauche,
   // la page glissait de côté sur l'iPhone de Julien). Les cartes prennent la largeur de l'écran, pas plus.
-  const rendreVestiaire=(t)=>(
+  // (20 nov., « même squelette ») Achats · Vestiaire : la liste native seule, à la marge de la page (comme Vinted) ; la carte
+  // de l'extension Vestiaire vit dans « Plus › Vestiaire ».
+  const rendreVestiaire=(t)=>(t==='achats' && !baseKO ? <AchatsVestiaire/> :
     <section className="vrm-market-space" aria-label="Vestiaire" data-tache-vestiaire={t} style={{padding:'12px 16px 16px',display:'flex',flexDirection:'column',alignItems:'stretch',gap:t==='annonces'?12:18}}>
       <ExtVestiaireCompte/>
       {baseKO ? <LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>
@@ -66968,7 +66971,7 @@ function AppCoeur() {
               ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
-          {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsSiteLazy site="leboncoin" lbcVentes={lbcVentes}/>}</div>}
+          {sec==='achats'&&<div data-achats-site-hote="">{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsSiteLazy site="leboncoin" lbcVentes={lbcVentes}/>}</div>}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
