@@ -21909,11 +21909,12 @@ function panneauEtatNormalise(e) {
   if (!e || typeof e !== 'object' || e.ouvert !== true) return null;
   const page = PANNEAU_PAGES.includes(e.page) ? e.page : 'accueil';
   const sel = (Array.isArray(e.sel) ? e.sel : []).map(String).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 200);
+  const selV = (Array.isArray(e.selV) ? e.selV : []).map(String).filter((x) => /^\d{1,20}$/.test(x)).slice(0, 200);
   const fiche = typeof e.fiche === 'string' && /^[av]:[\w-]{1,40}$/.test(e.fiche) ? e.fiche : '';
   const conv = typeof e.conv === 'string' && /^[\w@:.-]{1,80}$/.test(e.conv) ? e.conv : '';
   const defil = {};
   if (e.defil && typeof e.defil === 'object') for (const k of Object.keys(e.defil).slice(0, 12)) { const v = Number(e.defil[k]); if (/^[\w-]{1,30}$/.test(k) && Number.isFinite(v) && v > 0 && v < 1e6) defil[k] = Math.round(v); }
-  return { ouvert: true, page, sel, fiche, conv, defil };
+  return { ouvert: true, page, sel, selV, fiche, conv, defil };
 }
 async function panneauEtatCarte(msg, sender) {
   const tab = sender && sender.tab;

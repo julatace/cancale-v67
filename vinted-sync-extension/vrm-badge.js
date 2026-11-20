@@ -3725,7 +3725,7 @@
   let panneauDernier = '', panneauMinut = null, defilARendre = null, defilJusque = 0;
   function etatPanneauVu() {
     const defil = {}; try { contenu.querySelectorAll('[data-defil]').forEach((el) => { if (el.scrollTop > 0) defil[el.getAttribute('data-defil')] = Math.round(el.scrollTop); }); } catch (_) {}
-    return { ouvert: true, page: ongletListe, sel: [...annSel].slice(0, 200), fiche: ficheOuverte || '', conv: convChoisie || '', defil };
+    return { ouvert: true, page: ongletListe, sel: [...annSel].slice(0, 200), selV: [...venSel].slice(0, 200), fiche: ficheOuverte || '', conv: convChoisie || '', defil };
   }
   function garderPanneau() {
     if (CADRE || LISTES || !carte.hasAttribute('data-grand') || !carte.classList.contains('on')) return;
@@ -3753,6 +3753,7 @@
     if (!et || et.ouvert !== true || CADRE || LISTES || lienPanneau) return;
     if (ONGLETS5.includes(et.page)) ongletListe = et.page;
     annSel = new Set((Array.isArray(et.sel) ? et.sel : []).map(String).filter((x) => /^[\w-]{1,40}$/.test(x)));
+    venSel.clear(); for (const t of Array.isArray(et.selV) ? et.selV : []) if (/^\d{1,20}$/.test(String(t))) venSel.add(String(t));
     if (typeof et.fiche === 'string' && /^[av]:[\w-]{1,40}$/.test(et.fiche)) ficheOuverte = et.fiche;
     if (typeof et.conv === 'string' && /^[\w@:.-]{0,80}$/.test(et.conv)) convChoisie = et.conv;
     defilARendre = et.defil && typeof et.defil === 'object' ? Object.assign({}, et.defil) : null; defilJusque = Date.now() + 15000;
