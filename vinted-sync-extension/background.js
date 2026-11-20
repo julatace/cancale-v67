@@ -14314,6 +14314,8 @@ function appliquerBrouillonLu(d, rl, id) {
     if (Array.isArray(c.color_ids) && c.color_ids.length) d.color_ids = c.color_ids;
     if (Array.isArray(c.item_attributes) && c.item_attributes.length) d.item_attributes = c.item_attributes;
     if (f.description && f.description.length >= DESCRIPTION_MIN) d.description = f.description;
+    // 5.410 (`repubfidele`) Le brouillon tel que Vinted l'a rangé : chacun de ses champs du formulaire gagne (photos à part).
+    poserRecetteFidele(d, recetteFidele(it), true);
   }
   const ph = photosDuBrouillonLu(it);
   if (ph && ph.length) { d.assigned_photos = ph; noterDiag('brouillon_lu_photos'); }
@@ -15188,7 +15190,7 @@ function formeCorpsRepub(b) {
     attrs: d && Array.isArray(d.item_attributes) ? d.item_attributes.map((a) => a && a.code).filter(Boolean).sort() : null,
     taille: !!(d && Array.isArray(d.item_attributes) && d.item_attributes.some((a) => a && a.code === 'size' && Array.isArray(a.ids) && a.ids.length)),
     couleurs: d && Array.isArray(d.color_ids) ? d.color_ids.length : null, catalogue: !!(d && Number(d.catalog_id) > 0), colis: !!(d && Number(d.package_size_id) > 0),
-    photosDe: PHOTOS_DE.get(b) || undefined };
+    photosDe: PHOTOS_DE.get(b) || undefined, fidele: FIDELE_DE.get(b) || undefined };
 }
 function formeReponseRepub(o) {
   const j = o && o.json && typeof o.json === 'object' ? o.json : null;
@@ -15340,11 +15342,65 @@ function uuidRecreer() {
   const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
+// ══ 5.410 (`repubfidele`, 20 nov.) — LA COPIE FIDÈLE ═══════════════════════════════════════════
+// Julien : « normalement, vu que c'est déjà en ligne, c'est juste du copier-coller sauf les photos ».
+// Mesuré (vraie base, lecture seule, 20 nov.) : 9 brouillons créés par VRM ; 8 bâtis SANS le corps du
+// formulaire de l'annonce d'origine (la recette « codes » : 7 champs repris, isbn, mesures, fabricant
+// forcés à null), 1 seul depuis ce corps — et celui-là était égal à l'origine champ par champ. Les 63
+// corps du formulaire « Modifier » de Vinted rangés chez lui portent toujours les mêmes clés (`imei`
+// sur 14) ; 13 sur 63 ont une matière (`material`), 34 sur 63 deux couleurs.
+// ⇒ Le brouillon recopie TEL QUEL chaque champ du formulaire que Vinted sert pour l'annonce EN LIGNE
+//   (`GET item_upload/items/{id}`, depuis l'onglet du compte : sa page « Modifier ») ; SEULES les
+//   photos sont renvoyées (depuis le coffre). Titre et prix : ceux de l'atelier (SON choix, sinon
+//   ceux de Vinted). Un champ que Vinted sert et que VRM ne connaît pas n'est jamais inventé dans le
+//   corps : son NOM est gardé (`ecartes`) dans la trace (`repub_trace_*`), pour la passe suivante.
+// <repub-fidele-regle>
+const CHAMPS_FORMULAIRE_VINTED = Object.freeze(['title', 'description', 'price', 'currency', 'catalog_id', 'brand_id', 'brand', 'color_ids', 'item_attributes', 'package_size_id', 'is_unisex', 'isbn', 'imei', 'measurement_length', 'measurement_width', 'manufacturer', 'manufacturer_labelling', 'shipment_prices', 'video_game_rating_id']);
+const CHAMPS_JAMAIS_RECOPIES = Object.freeze(['id', 'photos', 'assigned_photos', 'temp_uuid', 'upload_session_id', 'is_draft', 'push_up', 'feedback_id', 'ai_photo']);
+const CHAMPS_DE_L_ATELIER = Object.freeze(['title', 'price', 'description']);   // SON choix (titre, prix, lettre) : posés par l'atelier
+function recetteFidele(itLu) {
+  if (!itLu || typeof itLu !== 'object' || Array.isArray(itLu)) return null;
+  const scal = (v) => v === null || typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && isFinite(v));
+  const recette = {}, copies = [], ecartes = [];
+  for (const k of Object.keys(itLu)) {
+    if (!/^[a-z0-9_]{1,40}$/.test(k) || CHAMPS_JAMAIS_RECOPIES.includes(k)) continue;
+    if (!CHAMPS_FORMULAIRE_VINTED.includes(k)) { if (ecartes.length < 40) ecartes.push(k); continue; }
+    let v = itLu[k];
+    if (k === 'price' && v && typeof v === 'object') { if (v.currency_code && itLu.currency == null) { recette.currency = String(v.currency_code).slice(0, 3); copies.push('currency'); } v = v.amount != null ? String(v.amount) : null; }
+    if (k === 'item_attributes') { if (!Array.isArray(v)) continue; v = v.filter((a) => a && typeof a.code === 'string' && /^[a-z0-9_]{1,40}$/.test(a.code)).map((a) => ({ code: a.code, ids: Array.isArray(a.ids) ? a.ids.map(Number).filter((x) => Number.isSafeInteger(x) && x > 0).slice(0, 10) : [] })).slice(0, 20); }
+    else if (k === 'color_ids') v = idsCouleurVinted(itLu);
+    else if (k === 'shipment_prices') { if (!v || typeof v !== 'object' || Array.isArray(v)) continue; const o = {}; for (const kk of Object.keys(v)) if (/^[a-z_]{1,30}$/.test(kk) && scal(v[kk])) o[kk] = v[kk]; v = o; }
+    else if (!scal(v)) { if (ecartes.length < 40) ecartes.push(k); continue; }
+    recette[k] = v; if (!copies.includes(k)) copies.push(k);
+  }
+  // Forme d'avant (couleur1/couleur2, marque en objet) : rangée sous les clés du formulaire, jamais devinée.
+  if (!('color_ids' in recette)) { const c = idsCouleurVinted(itLu); if (c.length) { recette.color_ids = c; copies.push('color_ids'); } }
+  if (!(Number(recette.brand_id) > 0) && itLu.brand_dto && typeof itLu.brand_dto === 'object' && Number(itLu.brand_dto.id) > 0) { recette.brand_id = Number(itLu.brand_dto.id); if (typeof itLu.brand_dto.title === 'string') recette.brand = itLu.brand_dto.title.slice(0, 80); copies.push('brand_id'); }
+  return { recette, copies: copies.sort(), ecartes: ecartes.sort() };
+}
+// Pose la recette lue sur un corps : chaque champ du formulaire que Vinted a servi gagne, sauf ceux de l'atelier.
+// Une liste VIDE lue (couleurs, attributs) n'efface jamais une liste pleine : « rien lu » ne vaut pas « rien » (§5) ;
+// `pleinsSeuls` (relecture d'un brouillon) : un champ lu à null n'efface pas non plus un champ rempli.
+function poserRecetteFidele(item, rf, pleinsSeuls) {
+  if (!item || !rf || !rf.recette) return item;
+  const vide = (v) => v == null || (Array.isArray(v) && !v.length);
+  for (const k of Object.keys(rf.recette)) if (!CHAMPS_DE_L_ATELIER.includes(k) && !(Array.isArray(rf.recette[k]) && !rf.recette[k].length && !vide(item[k])) && !(pleinsSeuls && rf.recette[k] == null && !vide(item[k]))) item[k] = Array.isArray(rf.recette[k]) ? rf.recette[k].map((x) => (x && typeof x === 'object' ? { ...x, ids: Array.isArray(x.ids) ? x.ids.slice() : x.ids } : x)) : (rf.recette[k] && typeof rf.recette[k] === 'object' ? { ...rf.recette[k] } : rf.recette[k]);
+  return item;
+}
+// Les champs du formulaire qui DIFFÈRENT entre l'origine lue et le corps envoyé (noms seulement, pour la trace).
+function ecartsRecette(rf, item) {
+  if (!rf || !rf.recette || !item) return null;
+  return Object.keys(rf.recette).filter((k) => !CHAMPS_DE_L_ATELIER.includes(k) && !(Array.isArray(rf.recette[k]) && !rf.recette[k].length) && JSON.stringify(rf.recette[k]) !== JSON.stringify(item[k])).sort();
+}
+// </repub-fidele-regle>
+const FIDELE_DE = new WeakMap();   // corps envoyé → { copies, ecartes, differents } (noms seulement, pour la trace)
 // Le corps de création : la recette de CETTE annonce, jamais un champ deviné.
 // Rend { item } ou { manque: [...] }.
 // (2 nov., 5.310) `partiel` : rend aussi le corps INCOMPLET ({ item, manque }) —
 // `reglerAvant` le complète depuis une identité ou pose la question ; jamais envoyé tel quel.
-function itemPourRecreer({ modeleCorps, codes, vivant, titre, prix, description, brand, photoIds, temp, partiel }) {
+function itemPourRecreer({ modeleCorps, codes: codes0, vivant, recette, titre, prix, description, brand, photoIds, temp, partiel }) {
+  // 5.410 (`repubfidele`) La recette LUE sur l'annonce en ligne complète d'abord les codes (catégorie, taille, colis…).
+  const codes = recette && recette.recette ? { ...(codes0 || {}), ...Object.fromEntries(['catalog_id', 'brand_id', 'brand', 'color_ids', 'item_attributes', 'package_size_id', 'is_unisex'].filter((k) => recette.recette[k] != null && !(Array.isArray(recette.recette[k]) && !recette.recette[k].length)).map((k) => [k, recette.recette[k]])) } : codes0;
   // (29 oct.) Tout passe par un brouillon : la forme COURTE {id, orientation} — celle des brouillons du site et de Vintex (mesurée).
   const assigned = photoIds.map((id) => ({ id, orientation: 0 }));
   let base = null;
@@ -15373,8 +15429,10 @@ function itemPourRecreer({ modeleCorps, codes, vivant, titre, prix, description,
       manufacturer: null, measurement_width: null, measurement_length: null, manufacturer_labelling: null };
     if (typeof c.is_unisex === 'boolean') base.is_unisex = c.is_unisex;
   }
+  // 5.410 (`repubfidele`) Chaque champ du formulaire servi par Vinted pour l'annonce en ligne, TEL QUEL.
+  if (recette && recette.recette) poserRecetteFidele(base, recette);
   const item = { ...base, id: null, currency: base.currency || 'EUR', temp_uuid: temp, title: titre, price: String(prix), description: description || base.description || '',
-    ai_photo: false, assigned_photos: assigned, shipment_prices: { domestic: null, international: null } };
+    ai_photo: false, assigned_photos: assigned, shipment_prices: (recette && recette.recette && recette.recette.shipment_prices && typeof recette.recette.shipment_prices === 'object') ? { ...recette.recette.shipment_prices } : { domestic: null, international: null } };
   // La couleur : sans elle Vinted range le brouillon mais REFUSE la mise en ligne.
   // On ne supprime donc rien tant qu'on ne la connaît pas (le modèle, sinon les codes).
   if (!idsCouleurVinted(item).length) {
@@ -16110,7 +16168,11 @@ async function apprendreRecetteVinted(acc, uid, id) {
   }
   noterDiag('recette_lue');
   try { await enfilerFiches([{ id: String(id), src: 'modif', at: new Date().toISOString(), f }]); await viderFiches({ force: true }); } catch (_) {}
-  return f;
+  // 5.410 (`repubfidele`) Le formulaire ENTIER de l'annonce en ligne (jamais rangé en base : il ne sert qu'à CE corps).
+  const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+  const rf = recetteFidele(it);
+  if (rf && rf.ecartes.length) noterDiag('recette_champs_inconnus');
+  return rf ? { ...f, recette: rf } : f;
 }
 // (28 oct., sa demande : « une barre de progression ») Chaque étape d'une
 // recréation est annoncée à l'app (`maj · repub`) : elle dessine la barre. Une
@@ -16227,14 +16289,18 @@ async function recreerVinted(msg) {
   if (appris && (appris.status === 404 || appris.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
   const vivant = appris && appris.codes ? appris.codes : null;
   if (vivant) details.codes = { ...(details.codes || {}), ...vivant }; else noterDiag('recreer_sans_lecture_vivante');
-  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  // 5.410 (`repubfidele`) Le formulaire de l'annonce EN LIGNE, recopié tel quel (seules les photos sont renvoyées) ;
+  // sa description vivante gagne sur une copie rangée plus ancienne (la lettre de l'atelier reste posée en bas).
+  const recette = appris && appris.recette && appris.recette.recette ? appris.recette : null;
+  { const dV = sansLettre(appris && appris.description); if (dV.length >= DESCRIPTION_MIN && dV !== descBase) { descBase = dV; description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase; noterDiag('recreer_description_vivante'); } }
+  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
   // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
   // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
   if (essai.manque) {
     if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
     if (appris && appris.codes) {
       details.codes = { ...(details.codes || {}), ...appris.codes };
-      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
     } else if (appris && appris.raison) {
       return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
     }
@@ -16244,7 +16310,7 @@ async function recreerVinted(msg) {
   // la question posée dans l'app). Il manque encore quelque chose ⇒ on s'arrête ICI,
   // avant toute requête, et la question part avec la réponse.
   const manqueRecette = essai.manque || null;
-  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
+  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
   const reglages = reglagesPhotoSurs(msg.reglages);
   // (29 oct., « il ne doit pas y avoir d'erreur possible ») La TAILLE est vérifiée
   // AVANT de toucher à l'annonce : sinon Vinted la refuse APRÈS la suppression.
@@ -16336,11 +16402,13 @@ async function recreerVinted(msg) {
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
-    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
+    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
     if (built.item && corrige) for (const k of Object.keys(corrige)) if (corrige[k] != null) built.item[k] = corrige[k];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
     const corpsBV = { draft: brouillonV, feedback_id: null, parcel: null, upload_session_id: temp };
+    if (recette) FIDELE_DE.set(corpsBV, { copies: recette.copies, ecartes: recette.ecartes, differents: ecartsRecette(recette, brouillonV) });
+    else noterDiag('recreer_sans_recette_fidele');
     // L'annonce ENREGISTRÉE dans VRM avant tout geste (écriture vérifiée).
     etapeRepub(id, 'enregistrement');
     const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid, num: msg.num ? String(msg.num).slice(0, 12) : undefined, etapes: { coffre: new Date().toISOString() } } } }], 'id'));
