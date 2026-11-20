@@ -23,6 +23,7 @@ import React from 'react';
 
 // Un seul jeu d'icônes au trait, 1,5 px à l'écran quelle que soit la taille.
 const TRAITS = {
+  plus: <><path d="M12 5v14M5 12h14"/></>,   // (20 nov.) « Ajouter » d'Achats, « Publier » d'Annonces : le rond dessinait un cercle vide
   printer: <><path d="M7 9V4.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10V20H7z"/></>,
   scan: <><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9v6M11 9v6M14 9v6M16.5 9v6"/></>,
   // (15 nov., scanner pour retrouver) Un code-barres sous une loupe : retrouver un colis par son code.

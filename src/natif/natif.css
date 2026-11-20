@@ -386,6 +386,14 @@
     position: sticky; z-index: 20; bottom: var(--n-bas, var(--n-bas-sur)); margin-top: auto;
     padding: 8px var(--n-marge) 8px; background: var(--n-fond);
   }
+  /* (20 nov., « un seul plein, détaché de la barre d'onglets, ≥ 12 px ») Au téléphone, dans la coque qui défile à l'écran, le
+     plein d'une page est TOUJOURS en bas (même liste courte : il ne remonte plus sous trois rangées), 12 px au-dessus des
+     onglets ; la page garde la place qu'il couvre. */
+  @media (max-width: 1023px) {
+    .n-coque[data-n-defile="ecran"] .n-page-contenu > .n-page-plein {
+      position: fixed; left: 0; right: 0; bottom: calc(var(--n-h-onglets) + var(--n-bas-sur)); padding: 8px var(--n-marge) 12px; }
+    .n-coque[data-n-defile="ecran"] .n-page-contenu[data-n-avec-plein] { padding-bottom: 88px; }
+  }
 
   /* ── PagePoussee ────────────────────────────────────────────────────────── */
   .n-poussee {

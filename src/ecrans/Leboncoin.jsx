@@ -29,7 +29,7 @@ import { BoutonIcone } from '../ui/index.js';
 import { limiteRepub, noterRepub, joursRepub, JOURS_REPUB_DEFAUT, CHOIX_JOURS_REPUB, espacementPropre, ESP_DEFAUT, delaiEspacement, attenteTotale, deplacer } from '../lbcPlus.js';
 import { useLangue } from '../i18n/react.js';   // (11 nov., lot lbc-plus) baisser le prix en série, sur son clic
 import { tr } from '../i18n/index.js';
-import { Groupe as GroupeN, Rangee as RangeeN, Vignette as VignetteN, Plaque as PlaqueN, Pastille as PastilleN, Segmente as SegmenteN, Bouton as BoutonN } from '../natif/index.js';   // (20 nov.) Ventes · Leboncoin comme Ventes · Vinted
+import { Groupe as GroupeN, Rangee as RangeeN, Vignette as VignetteN, Plaque as PlaqueN, Pastille as PastilleN, Segmente as SegmenteN, Bouton as BoutonN, ChampRecherche as ChampRechercheN } from '../natif/index.js';   // (20 nov.) Ventes · Leboncoin comme Ventes · Vinted
 import { ouvrirLiaison } from '../liaisonEtat.js';   // (19 nov.) « Relier » ouvre LE parcours « Relier mes annonces »
 
 // ⟦← App.jsx #2⟧
@@ -492,7 +492,9 @@ function RaisonPublication({ n, place }) {
 // disparaît quand tu expédies ». Le colis « à envoyer » montre bordereau + QR ;
 // une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
 // avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
-function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet = null, onOnglet = null }) {
+function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet = null, onOnglet = null, avant = null }) {
+  // (20 nov., « même squelette ») En section de Ventes : la recherche, puis le segment, puis « À régler » (`avant`), comme Vinted.
+  const [cherche, setCherche] = React.useState('');
   // « Colis fait » comme sur Vinted (`vinted_ship_done`) : un colis coché quitte
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
@@ -639,21 +641,25 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet 
         attrs={{ 'data-lbc-vente': o.txId, 'data-cible': attrCible(['lbcvente', o.txId]), 'data-bord-card': '', 'data-lbc-principal': principal, 'data-transporteur': cleStatTransporteur(t), ...(imprimerOk ? { 'data-imprime': '1', 'data-imprime-lbc': o.txId } : {}) }}/>;
     };
     const nEnv = aExpedier.length, nRoute = postes.length;
+    const mots = cherche.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const garde = (o) => !mots.length || mots.every((m) => [o.title || '', numDe(o), 'n' + numDe(o), o.label && o.label.reference || ''].join(' ').toLowerCase().includes(m));
     return (
       <div data-lbc-colis-natif="" data-lbc-onglet={ongletLbc}>
+        <div className="n-page-recherche"><ChampRechercheN valeur={cherche} onChange={setCherche} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')}/></div>
         <SegmenteN valeur={ongletLbc} onChange={setOngletLbc} libelle={tr('vv.seg.label')}
           options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: nEnv || null, attrs: { 'data-lbc-seg': 'envoyer' } }, { cle: 'route', libelle: tr('vv.seg.route'), n: nRoute || null, attrs: { 'data-lbc-seg': 'route' } },
             ...(onOnglet ? [{ cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-lbc-seg': 'toutes' } }] : [])]}/>
+        {ongletLbc === 'toutes' ? null : avant}
         {ongletLbc === 'toutes' ? null : colis.length === 0
           ? <GroupeN attrs={{ 'data-lbc-colis-vide': lbcVentes.maj ? 'lu' : 'jamais' }}><RangeeN titre={lbcVentes.maj ? tr('vn.lbc.rien') : tr('vn.lbc.pasLu')} sousTitre={lbcVentes.maj ? ilYaCourt(lbcVentes.maj) : ''}/></GroupeN>
           : ongletLbc === 'envoyer' ? (<>
             {aGenerer.length > 0 ? <GroupeN titre={`${tr('vn.lbc.aGenerer')} · ${aGenerer.length}`} pied={tr('vn.lbc.limite')}
               action={aGenerer.length > 1 ? <BoutonN variante="texte" taille="compact" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`${tr('vn.lbc.genererTous')} · ${aGenerer.length} ?`)) return; aGenerer.forEach(ouvrirLbc); }} attrs={{ 'data-lbc-generer-tous': '' }}>{tr('vn.lbc.genererTous')}</BoutonN> : null}
-              attrs={{ 'data-lbc-groupe': 'generer' }}>{aGenerer.map((o) => rangee(o, 'generer'))}</GroupeN> : null}
-            {prets.length > 0 ? <GroupeN titre={`${tr('vn.lbc.prets')} · ${prets.length}`} attrs={{ 'data-lbc-groupe': 'prets' }}>{prets.map((o) => rangee(o, 'imprimer'))}</GroupeN> : null}
+              attrs={{ 'data-lbc-groupe': 'generer' }}>{aGenerer.filter(garde).map((o) => rangee(o, 'generer'))}</GroupeN> : null}
+            {prets.length > 0 ? <GroupeN titre={`${tr('vn.lbc.prets')} · ${prets.length}`} attrs={{ 'data-lbc-groupe': 'prets' }}>{prets.filter(garde).map((o) => rangee(o, 'imprimer'))}</GroupeN> : null}
             {!aGenerer.length && !prets.length ? <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN> : null}
           </>) : (
-            postes.length ? <GroupeN titre={`${tr('vv.seg.route')} · ${postes.length}`} attrs={{ 'data-lbc-groupe': 'route' }}>{postes.map((o) => rangee(o, 'route'))}</GroupeN>
+            postes.length ? <GroupeN titre={`${tr('vv.seg.route')} · ${postes.length}`} attrs={{ 'data-lbc-groupe': 'route' }}>{postes.filter(garde).map((o) => rangee(o, 'route'))}</GroupeN>
               : <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN>)}
         {modaleBord}
       </div>

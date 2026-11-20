@@ -66822,7 +66822,7 @@ function AppCoeur() {
         {/* (20 nov.) Le segment « À envoyer · En route » de la liste (comme Ventes · Vinted) dit où on est : plus d'intertitre.
             L'ancre de la section reste (les liens « À envoyer » y descendent). */}
         <div className="vrm-colis-section-tete" data-colis-section="ventes" id={ID_SECTION_COLIS.ventes}/>
-        <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes} enSection onglet={ongletColis} onOnglet={choisirOngletColis}/></div>
+        <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes} enSection onglet={ongletColis} onOnglet={choisirOngletColis} avant={<ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>}/></div>
       </section>);
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
     if(t==='ventes') return (
@@ -66868,7 +66868,7 @@ function AppCoeur() {
       <section className="vrm-tache" data-tache={t} data-natif={natifV ? '1' : undefined} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]} data-espace={t==='annonces' ? 'paires' : (t === 'ventes' || t === 'achats' ? 'ventes' : undefined)}>
         {/* (17 nov., nouveau design) Allumé : une tête À SOI (`v2-tete-tache`) — les règles d'hier réservaient 150 px à droite
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
-        {natifV ? null : <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
+        {natifV || lbcNatif ? null : <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
           {/* (20 nov., « les mêmes dispositions sur toutes les plateformes ») Au téléphone, un écran natif (Ventes, Annonces) a déjà
               son grand titre dans la coque : Ventes · Leboncoin / eBay ne le répète plus (ni la date), comme Ventes · Vinted. */}
           {t === 'ventes' && !titreDansCoque && !(designV2App && v2VentesColis && !baseKO) ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
@@ -66918,7 +66918,7 @@ function AppCoeur() {
         {baseKO ? null : selecteurSite}
         {/* (19 nov., décision de Julien) « À régler · N » : ce qui était dans « À faire » d'Aujourd'hui, en tête de SON onglet (replié s'il ne presse pas).
             Ventes natif le pose lui-même sous ses segments (`avant`). */}
-        {designV2App && !baseKO && !natifV && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}
+        {designV2App && !baseKO && !natifV && !lbcNatif && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}
         <CacheSiV2 si={natifV || (designV2App && !sous)}>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           {/* (20 nov.) Plus de filtre de site local : le sélecteur de plateforme global, en tête de l'écran. */}

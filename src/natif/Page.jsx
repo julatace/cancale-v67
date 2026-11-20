@@ -159,7 +159,7 @@ export function Page({ titre = '', actions = null, recherche = null, plein = nul
   useTitreReduit(refBarre, refTitre);
   if (interieure) {
     return (
-      <div className={cx('n-page-contenu', className)} onKeyDown={fleches} {...(attrs || {})}>
+      <div className={cx('n-page-contenu', className)} onKeyDown={fleches} data-n-avec-plein={plein ? '' : undefined} {...(attrs || {})}>
         {recherche ? <div className="n-page-recherche">{recherche}</div> : null}
         {children}
         {plein ? <div className="n-page-plein" data-n-plein="">{plein}</div> : null}
