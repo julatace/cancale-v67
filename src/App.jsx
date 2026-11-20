@@ -20890,14 +20890,24 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
   React.useLayoutEffect(() => {
     if (!ordi) { setHote(null); return undefined; }
     const vis = (e) => e && e.getClientRects().length;
-    let titre = null;
-    for (let p = refAncre.current && refAncre.current.parentElement; p && !titre; p = p.parentElement) titre = [...p.querySelectorAll('h1')].find(vis) || null;
-    if (!titre || !titre.parentElement) { setHote(null); return undefined; }
+    const trouver = () => { let t = null; for (let p = refAncre.current && refAncre.current.parentElement; p && !t; p = p.parentElement) t = [...p.querySelectorAll('h1')].find(vis) || null; return t; };
     const h = document.createElement('span'); h.className = 'n-site-hote'; h.setAttribute('data-site-hote', '');
-    titre.insertAdjacentElement('afterend', h);
-    if (getComputedStyle(titre.parentElement).display.indexOf('flex') < 0) titre.setAttribute('data-avec-pastilles', '');
+    let titre = null;
+    // Le titre de la coque peut être re-rendu (et l'hôte, posé à côté, retiré avec lui) : on le repose à chaque changement.
+    const placer = () => {
+      const t = trouver(); if (!t || !t.parentElement) return;
+      if (titre && titre !== t) titre.removeAttribute('data-avec-pastilles');
+      titre = t;
+      if (h.previousElementSibling !== t || !h.isConnected) t.insertAdjacentElement('afterend', h);
+      if (getComputedStyle(t.parentElement).display.indexOf('flex') < 0) t.setAttribute('data-avec-pastilles', '');
+    };
+    placer();
+    if (!h.isConnected) { setHote(null); return undefined; }
     setHote(h);
-    return () => { h.remove(); titre.removeAttribute('data-avec-pastilles'); };
+    const racine = document.querySelector('.n-coque') || document.body;
+    const mo = new MutationObserver(() => { if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) placer(); });
+    mo.observe(racine, { childList: true, subtree: true });
+    return () => { mo.disconnect(); h.remove(); if (titre) titre.removeAttribute('data-avec-pastilles'); };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
     nombres={nombres} tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
