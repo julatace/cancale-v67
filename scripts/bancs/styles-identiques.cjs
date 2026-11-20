@@ -61,7 +61,7 @@ const detailDe = (cles) => Object.fromEntries(cles.map((k) => [k, (window.__vrmR
 async function ouvrir(nav, DIST, port, W, sombre, ecran) {
   const ctx = await nav.newContext({ viewport: { width: W, height: W < 600 ? 844 : 900 }, ...(W < 600 ? { isMobile: true, hasTouch: true } : {}), colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', serviceWorkers: 'block' });
   await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? '1' : '0'); } catch (_) {} }, sombre);
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /vinted\.net\//i.test(r.request().url()) ? r.abort() : r.fallback()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => { const rq = route.request(); if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }); const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base); return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body: JSON.stringify(rep.body) }); });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
   const pg = await ctx.newPage();

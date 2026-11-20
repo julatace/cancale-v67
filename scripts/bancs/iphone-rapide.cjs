@@ -77,7 +77,7 @@ async function preparer(ctx) {
   await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await ctx.addInitScript(jalons);
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
-  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /vinted\.net\//i.test(r.request().url()) ? r.abort() : r.fallback()));
+  await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
