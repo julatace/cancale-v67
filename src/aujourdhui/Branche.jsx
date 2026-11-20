@@ -15,6 +15,8 @@ import { localeCourante } from '../i18n/index.js';
 import { delaisPar, margesPar } from '../statsVentes.js';
 import { previsionMois } from '../previsionMois.js';
 import { lireValeurStock } from '../coutVente.js';
+import { lireStockValeur, EVT_STOCK_VALEUR } from '../stockValeurAffiche.js';
+import { lireVuesFavoris, EVT_VUES_FAVORIS } from '../vuesFavoris.js';
 import { eclaterReleveLots, modeleSur } from '../ceQuiRapporte.js';
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
@@ -70,6 +72,12 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
   const stock = { enLigne: EL.valeur == null ? null : EL.valeur, raisonEnLigne: EL.valeur == null ? raisonCourte(EL) : '',
     achat: VS && VS.centimes != null ? VS.centimes / 100 : null, achatPartiel: !!VS && (VS.partiel || Number(VS.nSans) > 0), achatN: VS ? VS.n : null, achatNPrix: VS ? VS.nPrix : null,
     raisonAchat: !VS ? 'annonces' : VS.centimes == null ? 'achats' : '' };
+  // (20 nov., « ce qui manque ») AU PRIX AFFICHÉ : la publication de l'écran Annonces (src/stockValeurAffiche.js) — une
+  // paire comptée une fois, prix Vinted sinon le plus bas ; null = jamais publiée (« — · ouvre Annonces »).
+  const VA = outils && outils.uid ? lireStockValeur(outils.uid()) : null;
+  stock.affiche = VA ? { centimes: VA.centimes, n: VA.n, nPrix: VA.nPrix, auMoins: !!VA.partiel || VA.nPrix < VA.n } : null;
+  // VUES ET FAVORIS : la publication de l'écran Annonces (src/vuesFavoris.js) ; null = jamais publiée.
+  const vues = outils && outils.uid ? lireVuesFavoris(outils.uid()) : null;
   // LES CHIFFRES DU RELEVÉ par période (vitesse, marge, marques) — relevé pas lu ⇒ null.
   const bornes = (p) => { try { return bornesPeriode(p, regles, maintenant); } catch (_) { return null; } };
   const lignesR = releve === undefined ? undefined : lignesReleve(releve, extras, outils && outils.enLigne);
@@ -81,7 +89,7 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
   const prevision = previsionMois({ vendu: lignesV, manque: live && live.venduManque, nonComptees: live && live.venduNonComptees, releve: Array.isArray(releve) ? releve : null, maintenant });
   const dorment = v('dorment');
   const avenir = v('attente');
-  return { chiffresPlus: { stats, moisAvant, ouvrirPeriode }, courbe, comptes, objectif, stats2: { stock, parPeriode, ecoulement, prevision,
+  return { chiffresPlus: { stats, moisAvant, ouvrirPeriode }, courbe, comptes, objectif, stats2: { stock, vues, parPeriode, ecoulement, prevision,
     dorment: { valeur: dorment.valeur == null ? null : dorment.valeur, partiel: !!dorment.partiel, raison: dorment.valeur == null ? raisonCourte(dorment) : '' },
     avenir: { valeur: avenir.valeur == null ? null : avenir.valeur, partiel: !!avenir.partiel, raison: avenir.valeur == null ? raisonCourte(avenir) : '' } } };
 }
@@ -114,6 +122,10 @@ const Mo = Object.freeze({ chiffresAujourdhui, statsPeriodes, dernieresVentes, a
 export default function AujourdhuiBranche({ calculer = null, alerte = null, ventes = null, outils = null, ...reste }) {
   if (reste.Icon && !iconePosee()) poserIcone(reste.Icon);
   const cartes = useCartes(outils);
+  // Une publication neuve d'Annonces (valeur au prix affiché, vues et favoris) redessine la carte, sans relire.
+  const [, publie] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie);
+    return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); }; }, []);
   const L = useLectures(outils);
   let plus = {};
   try { plus = typeof calculer === 'function' ? (calculer(Mo) || {}) : {}; } catch (_) { plus = {}; /* pas su ⇒ l'écran dit « — » */ }

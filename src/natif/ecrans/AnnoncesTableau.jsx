@@ -31,6 +31,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
         aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
+  const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
   const colonnes = [
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.a.numero || null,
       rendu: (l) => (l.a.numero ? <Plaque numero={l.a.numero} doublon={l.a.doublon}/> : modifiable(l, 'numero', null, onNumero ? () => onNumero(l.a) : null)) },
@@ -40,8 +41,11 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     { cle: 'benefice', libelle: tr('egalite.col.benefice'), num: true, defaut: false, tri: (l) => l.a.benefice, rendu: (l) => (l.a.benefice != null ? euros(l.a.benefice) : null) },
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.a.depuis,
       rendu: (l) => (l.a.depuis != null ? <span><span>{dateCourte(l.a.depuis)}</span><span className="n-tt-cellule-sous">{depuisTexte(l.a.depuis)}</span></span> : null) },
-    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, defaut: false, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : null) },
-    { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : null) },
+    // (20 nov., « ce qui manque ») Vues et favoris : lus dans le dressing de chaque site (aucune requête de plus) ; ce qu'aucun
+    // de ses sites ne donne s'écrit « — », dit au survol et à la lecture d'écran « pas fourni par le site » (une fois par
+    // cellule, jamais une phrase répétée à l'écran).
+    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
+    { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
     { cle: 'sites', libelle: tr('tableau.col.siteCompte'), defaut: sites.length > 1, tri: (l) => l.a.sites.join(','),
       rendu: (l) => <span><span>{l.a.sites.map((s) => nomSite(s)).join(' · ')}</span>
         {l.a.aRelier ? <span className="n-eg-arelier" data-eg-arelier="">{tr('egalite.aRelier')}</span>

@@ -116,7 +116,8 @@ const MESURE = (sel) => {
     if (!vis(l)) continue; const r = l.getBoundingClientRect(); const carte = l.parentElement.getBoundingClientRect();
     if (r.height < 63.5) out.air.push({ k: 'rangee', h: Math.round(r.height) });
     const txt = l.querySelector('.v2m-txt, .v2e-q-txt'); if (txt) { const t = txt.getBoundingClientRect(); if (carte.right - t.right < 19.5) out.air.push({ k: 'bord-droit', d: Math.round(carte.right - t.right) }); }
-    const av = l.querySelector('.v2m-av'); if (av) { const a = av.getBoundingClientRect(); if (a.left - carte.left < 19.5) out.air.push({ k: 'bord-gauche', d: Math.round(a.left - carte.left) }); }
+    const av = l.querySelector('.v2m-av'); if (av && vis(av)) {   /* (20 nov.) en très grand texte l'avatar décoratif s'efface : pas de bord à juger */
+      const a = av.getBoundingClientRect(); if (a.left - carte.left < 19.5) out.air.push({ k: 'bord-gauche', d: Math.round(a.left - carte.left) }); }
   }
   const gs = [...document.querySelectorAll('.v2m-groupe')].filter(vis);
   for (let i = 1; i < gs.length; i++) { const d = gs[i].getBoundingClientRect().top - gs[i - 1].getBoundingClientRect().bottom; if (d < 31.5) out.air.push({ k: 'entre-groupes', d: Math.round(d) }); }

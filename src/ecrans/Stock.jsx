@@ -5,6 +5,7 @@ import { useEssentiel } from '../AttenteEcran.jsx';
 import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js';
 // (15 nov., étagères) Meubles libres (forme, taille, couleurs, ordre) et LA RÈGLE DES PILES : une règle pure, partagée
 // avec la sortie automatique, « Enlever du stock », « Vendu ailleurs » et « Où ranger » (src/stockEtageres.js).
+import { reglagesDe, avecReglages } from '../etageres/reglages.js';   // (20 nov.) « Personnaliser » : le style (affichage) du meuble
 import { placerMeuble, tasserApres, opsSortieCases, ordonner, deplacerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
 import { phraseDescentes, listeNumeros, descentesDesOps } from '../etageresTextes.js';
 import { annuaireLbc, nomPlateforme } from '../plateformes.js';
@@ -883,29 +884,36 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     } else ficheVue.current = true;
     /* eslint-disable-next-line */
   }, [cleFicheStock, ficheIci]);
-  const Modale = () => {
-    if (!modal) return null;
-    let corps = null;
-    if (modal.type === 'meuble') {
-      corps = <EditeurMeuble modal={modal} onSave={async (nom, cols, rows, extra = {}) => {
+  // (20 nov., « ce qui manque ») L'ENREGISTREMENT D'UN MEUBLE, d'un seul endroit : l'éditeur complet (« Modifier le meuble »)
+  // et la page native « Personnaliser » (src/stockV2/StockV2.jsx) passent ici — même écriture `vrm_meubles` / `vrm_slots`,
+  // même question quand un meuble rétréci fait sortir des paires (« Annuler » ne change rien). Rend false si rien n'est écrit.
+  const enregistrerMeuble = async (id, nom, cols, rows, extra = {}) => {
         const planches = planchesRangees(planchesCases(extra.planches, cols, rows), cols, rows), gravite = !!extra.gravite;
         // (15 nov., étagères) Forme, couleur du meuble, couleurs de cases (par rangée:colonne), colonnes en pile. Le
         // meuble d'ORIGINE est réécrit augmenté de ce qu'il change (`{ ...x, … }`) : rien d'autre n'est touché.
         const plus = { type: TYPES[extra.type] ? extra.type : 'etagere', couleur: COULEURS.includes(extra.couleur) ? extra.couleur : null,
           couleurs: couleursDans(extra.couleurs, cols, rows), piles: (Array.isArray(extra.piles) ? extra.piles : []).map(Number).filter((c) => c >= 1 && c <= cols) };
-        if (modal.id) { const ancien = meubles.find((x) => x.id === modal.id) || {};
-          const u = meubles.map((x) => x.id === modal.id ? { ...x, name: nom, cols, rows, planches, gravite, ...plus } : x);
+        if (id) { const ancien = meubles.find((x) => x.id === id) || {};
+          const u = meubles.map((x) => x.id === id ? { ...x, name: nom, cols, rows, planches, gravite, ...plus, ...(extra.reglages ? { reglages: extra.reglages } : {}) } : x);
           // Les paires gardent leur rangée et leur colonne quand le nombre de
           // colonnes change ; celles hors des nouvelles cases repartent « à ranger ».
           // (15 nov.) … et c'est DEMANDÉ d'abord, avec leurs N° : un meuble rétréci ne fait plus sortir une paire en silence.
           const oc = Math.max(1, +ancien.cols || cols), us = { ...slots }; const dehors = [];
-          Object.keys(us).forEach((c) => { const v = us[c]; if (!v || v.m !== modal.id) return; const r = Math.floor(v.i / oc), co = v.i % oc; if (r >= rows || co >= cols) { delete us[c]; dehors.push(c); } else us[c] = { ...v, m: modal.id, i: r * cols + co }; });
-          if (dehors.length && !(await askConfirm({ title: tr('etag.retrecir', { n: dehors.length }), desc: tr('etag.retrecirDesc', { liste: listeNumeros(dehors.sort(triNum)) }), ok: tr('etag.retrecirOk') }))) return;
-          ecrireMeubles(u); ecrireSlots(us, u, [modal.id]);
+          Object.keys(us).forEach((c) => { const v = us[c]; if (!v || v.m !== id) return; const r = Math.floor(v.i / oc), co = v.i % oc; if (r >= rows || co >= cols) { delete us[c]; dehors.push(c); } else us[c] = { ...v, m: id, i: r * cols + co }; });
+          if (dehors.length && !(await askConfirm({ title: tr('etag.retrecir', { n: dehors.length }), desc: tr('etag.retrecirDesc', { liste: listeNumeros(dehors.sort(triNum)) }), ok: tr('etag.retrecirOk') }))) return false;
+          ecrireMeubles(u); ecrireSlots(us, u, [id]);
         } else {
           const ordre = meubles.reduce((mx, x) => Math.max(mx, Number.isFinite(Number(x && x.ordre)) && x.ordre !== null ? Number(x.ordre) : -1), meubles.length - 1) + 1;
           ecrireMeubles([...meubles, { id: 'm' + Date.now().toString(36), name: nom, cols, rows, planches, gravite, ...plus, ordre }]);
         }
+    return true;
+  };
+  const Modale = () => {
+    if (!modal) return null;
+    let corps = null;
+    if (modal.type === 'meuble') {
+      corps = <EditeurMeuble modal={modal} onSave={async (nom, cols, rows, extra = {}) => {
+        if (!(await enregistrerMeuble(modal.id, nom, cols, rows, extra))) return;
         fermerModal();
       }} onDelete={modal.id ? async () => {
         if (!(await askConfirm({ titre: tr('stock.supprimerMeuble'), desc: tr('stock.articlesContientRepartent'), danger: true, ok: 'Supprimer' }))) return;
@@ -1549,6 +1557,18 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     compteMeuble, rendreMeuble: cadreMeuble, creerMeuble: () => setModal({ type: 'meuble' }),
     modifierMeuble: (m) => { const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined; setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] }); },
     deplacerMeuble: (id, sens) => deplacer(id, sens),
+    // (20 nov., « ce qui manque ») « Personnaliser » (page native) : nom, style (Cartons · Rayonnage · Plan), couleur, colonnes ×
+    // rangées — par `enregistrerMeuble`, le meuble d'ORIGINE augmenté (forme, couleurs de cases, piles, planches gardées).
+    personnaliserMeuble: async (id, { name, cols, rows, couleur, affichage }) => {
+      const m = meubles.find((x) => x.id === id); if (!m) return false;
+      const c = Math.max(1, Math.min(COLS_MAX, Math.floor(Number(cols)) || 1)), r = Math.max(1, Math.min(RANGEES_MAX, Math.floor(Number(rows)) || 1));
+      return enregistrerMeuble(id, String(name || '').trim() || m.name || tr('etag.type.' + typeDe(m)), c, r, { planches: planchesDe(m), gravite: !!m.gravite, type: typeDe(m),
+        couleur: COULEURS.includes(couleur) ? couleur : (COULEURS.includes(m.couleur) ? m.couleur : null), couleurs: couleursDans(m.couleurs, c, r),
+        piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })], reglages: avecReglages(m, { ...reglagesDe(m), affichage }).reglages });
+    },
+    // « La pièce » : l'ordre des meubles (la même écriture `ordre` que Monter / Descendre).
+    placerMeubleA: (id, vers) => { const u = placerMeuble(meubles, id, vers); if (u) ecrireMeubles(u); },
+    limitesMeuble: { cols: COLS_MAX, rows: RANGEES_MAX },
     ouvrirPhoto: ouvrirRecherchePhoto, ouvrirInventaire: () => setInventaire(true),
     blocs: { inventaire: elInventaire, annuel: elAnnuel, horsLigne: blocHorsLigne, explication: <StockExplication sneakers={motsStock.nom === 'paire'} />,
       aFaire: sectionAFaire, liste: blocListe, importees: blocImportees, aPart: blocAPart, plus: sectionPlus, modale: Modale(),

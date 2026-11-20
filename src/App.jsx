@@ -3561,6 +3561,9 @@ const SYNC_KEYS = [
   // prix CHANGÉ, datée par SA lecture ; écrits au chargement des annonces, lus par la fiche.
   // (10 nov., lot L) LE STOCK D'EMBALLAGES (src/emballages.js) : écrit sur SON clic seulement.
   'vrm_prix_lus','vrm_emballages',
+  // (20 nov., « ce qui manque ») Les VUES ET FAVORIS lus (src/vuesFavoris.js) : un point daté par lecture qui change quelque
+  // chose, écrit par l'écran Annonces ; « gagné aujourd'hui » se lit d'un appareil à l'autre.
+  'vrm_vues_lues',
   // Factures PRO — plusieurs micro-entreprises. `vinted_entreprises` = liste des
   // entités [{id, companyName, companyType, companyAddress, siret, footer}] ;
   // `vinted_entreprise_active` = id de l'entité utilisée pour les nouvelles
@@ -18152,6 +18155,8 @@ const ICON_PATHS = {
   // (17 nov., nouveau design) Une paire SANS photo : un cintre au trait sur un fond uni (jamais une photo inventée).
   // (17 nov., nouveau design) « Publier » : une croix au trait.
   plus: <><path d="M12 5v14M5 12h14"/></>,
+  minus: <><path d="M5 12h14"/></>,   // (20 nov., « ce qui manque ») Stock → Personnaliser : moins de colonnes / rangées
+  chevronHaut: <><path d="m6 14.5 6-6 6 6"/></>, chevronBas: <><path d="m6 9.5 6 6 6-6"/></>,   // (20 nov.) Stock → La pièce : monter / descendre
   cintre: <><path d="M12 7.2a2.1 2.1 0 1 1 2.1-2.1"/><path d="M12 7.2v1.6L3.6 15a1.2 1.2 0 0 0 .8 2.1h15.2a1.2 1.2 0 0 0 .8-2.1L12 8.8"/></>,
   nav:  <><path d="M3 11 21 3l-8 18-2-7-8-3Z"/></>,
   // ── Icônes ajoutées pour remplacer les emojis utilisés COMME icônes ───────

@@ -23,11 +23,13 @@ import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
+import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris } from '../vuesFavoris.js';
+import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -55,7 +57,7 @@ export async function lireAnnoncesEgalite(accounts) {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, ok: false };
-      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
+      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
     })),
     lbcListingsSession().catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
@@ -141,6 +143,23 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lu, tic]);
   const sites = React.useMemo(() => (modele ? [...new Set(modele.articles.flatMap((a) => a.sites))] : []), [modele]);
+  // (20 nov., « ce qui manque ») CET écran est le propriétaire (§11) de deux chiffres qu'Aujourd'hui lit :
+  //   · les VUES ET FAVORIS de ses annonces en ligne (src/vuesFavoris.js) : un point daté par lecture qui change quelque
+  //     chose (`vrm_vues_lues`, synchronisé), puis les totaux et le gagné du jour, publiés (`vrm_vues_favoris`) ;
+  //   · la VALEUR DU STOCK AU PRIX AFFICHÉ (src/stockValeurAffiche.js) : une paire comptée une fois, prix Vinted sinon le
+  //     plus bas (`vrm_stock_valeur`).
+  // Lecture ratée (`lu` null) ⇒ rien n'est écrit ni publié : les derniers chiffres restent. Un site pas lu ⇒ « au moins ».
+  React.useEffect(() => {
+    if (!modele || !lu || !AUTH.user?.id) return;
+    const owner = AUTH.user.id, manque = !!(lu.manque && lu.manque.length);
+    let journal = load(CLE_VUES_LUES, null);
+    try {
+      const r = noterVuesLues(journal, modele.articles.flatMap((a) => a.annonces.filter((x) => x.etat === 'enligne')));
+      if (r.ajoutes) { save(CLE_VUES_LUES, r.journal); journal = r.journal; }
+    } catch (_) { /* journal illisible : la publication part sans le gagné du jour */ }
+    publierVuesFavoris(vuesFavorisEnLigne(modele.articles, journal, { manque }), { owner });
+    publierStockValeur(valeurStockAffiche(modele.articles, { partiel: manque }), { owner });
+  }, [modele, lu]);
   const opts = { seuil, maintenant: Date.now(), cle: cleNum };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;

@@ -24,6 +24,14 @@ export function GroupeConversations({ titre, sous = '', attrs = {}, children }) 
   );
 }
 
+// (20 nov., « ce qui manque ») Un pseudo se replie à ses séparateurs (« lea_ | sneakers », « adam. | martin92 »), jamais
+// au milieu d'un mot : une occasion de coupure (<wbr>) après chaque « _ », « . », « - ». Le texte lu reste le même.
+export function nomSecable(nom) {
+  const t = String(nom == null ? '' : nom);
+  if (!/[_.\-]/.test(t)) return t;
+  return t.split(/(?<=[_.\-])/).map((x, k) => (k ? <React.Fragment key={k}><wbr/>{x}</React.Fragment> : x));
+}
+
 export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait, toi = '', num = '', offre = '', etat = '', nonLu = false, lectureSeule = false, actif = false, label, onClick, attrs = {}, apres = null }) {
   return (
     <RangeeTouchable className={'v2m-ligne' + (nonLu ? ' is-nonlu' : '') + (lectureSeule ? ' is-ro' : '') + (actif ? ' is-actif' : '')} label={label} onClick={onClick}
@@ -36,7 +44,7 @@ export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait,
       </span>
       <span className="v2m-txt">
         <span className="v2m-l1">
-          <span className="v2m-nom vrm-sensible" data-stream-type="acheteur">{nom}</span>
+          <span className="v2m-nom vrm-sensible" data-stream-type="acheteur">{nomSecable(nom)}</span>
           <time className="v2m-heure" dateTime={quandIso || undefined}>{heure}</time>
         </span>
         <span className="v2m-extrait" data-v2-conv-extrait="">{toi ? <span className="v2m-toi">{toi} </span> : null}{extrait}</span>

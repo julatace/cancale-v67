@@ -21,7 +21,9 @@ export function annoncesVinted(comptes) {
     if (!c || !c.ok) continue;
     const pousse = (it, etat) => { if (!it || it.id == null) return; out.push({ site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
       prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
-      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url) }); };
+      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
+      // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
+      lu: Number.isFinite(c.lu) ? c.lu : null }); };
     arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
     arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
     arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
@@ -45,7 +47,7 @@ export function annoncesLeboncoin(items, { etatDe, numeroDe, vintedDe = null, ps
     out.push({ site: 'leboncoin', id: String(ad.id), compte: str(compteDe ? compteDe(ad) : (ad.account || ad.lbcUser)).replace(/^lbc-account:/i, ''), pseudo: str(pseudoDe ? pseudoDe(ad) : ad.accountName),
       titre: str(ad.subject || ad.title), photo: photoDe(arr(ad.images)[0]), prix: ad.price, taille: str(ad.taille || ad.size), condition: str(ad.condition),
       depuis: ad.publieeLe || ad.first_publication_date || ad.indexeeLe || ad.index_date || null,
-      favoris: nb(s.favoris), vues: nb(s.vues), messages: nb(s.messages), etat: ETAT_LBC[e] || 'retiree',
+      favoris: nb(s.favoris), vues: nb(s.vues), messages: nb(s.messages), etat: ETAT_LBC[e] || 'retiree', lu: Number.isFinite(Date.parse(s.at || '')) ? Date.parse(s.at) : null,
       numero: str(typeof numeroDe === 'function' ? numeroDe(ad) : ''), vintedId: str(vintedDe ? vintedDe(ad) : ''), url: str(ad.url), propre: !!(propreDe && propreDe(ad)) });
   }
   return out;
