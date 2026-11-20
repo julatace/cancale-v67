@@ -8,8 +8,5 @@
   font: 600 13px/18px -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif !important;
   letter-spacing: .04em !important; text-transform: uppercase !important; color: var(--n-encre-2) !important;
 }
-/* Les segmentés d'avant d'Argent (« 30 j · 90 j · Année », « Oui · Non », « Modèle … Site ») : 44 de large au doigt.
-   `:not(#…)` : une règle d'avant pose 0 avec un identifiant (styles-coque.css). */
-:root:root:root body .vrm-app-shell .vrm-main [data-espace="argent"] .vrm-seg-btn:not(#vrm-seg-argent) { min-width: 44px !important; }
 /* Les rangs et les « — » de « Ce qui rapporte le plus » étaient à 2,9:1 : le gris lisible (≥ 4,5:1) du natif. */
 :root:root:root body .vrm-app-shell .vrm-main [data-espace="argent"] :is(.vrm-cr-rang, .vrm-cr-brut[data-vide]) { color: var(--n-encre-2) !important; }
