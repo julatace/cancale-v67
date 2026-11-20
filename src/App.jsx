@@ -64393,7 +64393,13 @@ function AppCoeur() {
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
   // sinon la page dépasse ou laisse une bande vide.
   React.useEffect(()=>{
-    const onResize=()=>applyZoom(readZoom());
+    // (20 nov., iphone-rapide) Sur l'iPhone, Safari envoie `resize` quand sa barre d'adresse se replie ou revient (à
+    // chaque changement de sens du défilement) : seule la HAUTEUR change. `applyZoom` ne dépend que de la LARGEUR (zoom,
+    // largeur rendue), du réglage de densité et du texte en grand ; le refaire forçait un recalcul de style de tout le
+    // document en plein défilement. Même largeur, même réglage ⇒ rien à refaire. Une rotation (`orientationchange`) refait
+    // toujours tout, comme avant.
+    let derniere=null;
+    const onResize=(e)=>{ const cle=(window.innerWidth||0)+'|'+readZoom()+'|'+lireTailleTexte()+'|'+(window.devicePixelRatio||1); if(e && e.type==='resize' && cle===derniere) return; derniere=cle; applyZoom(readZoom()); };
     onResize();
     window.addEventListener('resize',onResize);
     window.addEventListener('orientationchange',onResize);
