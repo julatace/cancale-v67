@@ -31,6 +31,7 @@ import { BoutonIcone } from '../ui/index.js';
 import { limiteRepub, noterRepub, joursRepub, JOURS_REPUB_DEFAUT, CHOIX_JOURS_REPUB, espacementPropre, ESP_DEFAUT, delaiEspacement, attenteTotale, deplacer } from '../lbcPlus.js';
 import { useLangue } from '../i18n/react.js';   // (11 nov., lot lbc-plus) baisser le prix en série, sur son clic
 import { tr } from '../i18n/index.js';
+import { Groupe as GroupeN, Rangee as RangeeN, Vignette as VignetteN, Plaque as PlaqueN, Pastille as PastilleN, Segmente as SegmenteN, Bouton as BoutonN, ChampRecherche as ChampRechercheN } from '../natif/index.js';   // (20 nov.) Ventes · Leboncoin comme Ventes · Vinted
 import { ouvrirLiaison } from '../liaisonEtat.js';   // (19 nov.) « Relier » ouvre LE parcours « Relier mes annonces »
 
 // ⟦← App.jsx #2⟧
@@ -221,7 +222,9 @@ function RaisonPublication({ n, place }) {
 // disparaît quand tu expédies ». Le colis « à envoyer » montre bordereau + QR ;
 // une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
 // avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
-function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
+function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet = null, onOnglet = null, avant = null }) {
+  // (20 nov., « même squelette ») En section de Ventes : la recherche, puis le segment, puis « À régler » (`avant`), comme Vinted.
+  const [cherche, setCherche] = React.useState('');
   // « Colis fait » comme sur Vinted (`vinted_ship_done`) : un colis coché quitte
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
@@ -236,6 +239,11 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
   // (`vinted_bordereau_formats`) : un emplacement appris sur Vinted sert aussi
   // sur Leboncoin et inversement (§11, un seul propriétaire de la donnée).
   const [bordResult, setBordResult] = React.useState(null);
+  // (20 nov.) Ventes · Leboncoin : À envoyer · En route · Terminées — l'onglet de Ventes (`ongletColis`, le même que Vinted)
+  // quand l'app le passe, sinon le sien.
+  const [ongletLocal, setOngletLocal] = React.useState('envoyer');
+  const ongletLbc = onglet === 'envoyes' ? 'route' : onglet === 'toutes' ? 'toutes' : onglet ? 'envoyer' : ongletLocal;
+  const setOngletLbc = (v) => { if (onOnglet) onOnglet(v === 'route' ? 'envoyes' : v); else setOngletLocal(v); };
   const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
   const posForFormat = () => null; // la place vient de la forme (`positionTampon`) ou de l'aperçu
   // « Déplacer le tampon » : l'aperçu s'ouvre toujours, la place choisie s'imprime.
@@ -324,6 +332,69 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       </div>
     );
   };
+  // ── (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») EN SECTION DE VENTES, LA
+  // DISPOSITION DE VENTES · VINTED (src/natif/ecrans/Ventes.jsx) : le segment À envoyer · En route, des groupes de rangées
+  // natives (vignette, N°, titre sur 2 lignes, transporteur, prix à droite), le toucher fait LE geste (imprimer, ou ouvrir
+  // la vente sur leboncoin.fr pour générer le bordereau), le balayage « Colis fait ». Mêmes listes, mêmes règles
+  // (`lbcColisAPoster`, `lbcExpediee`, `vrm_lbc_colis_done`) : seule la mise en page change. La limite du site (le bordereau
+  // se génère SUR leboncoin.fr) est dite UNE fois, en pied du groupe (plus bas, `if (enSection)`).
+  // ── BORDEREAU PRÊT : ouvre l'onglet d'impression + propose de DÉPLACER le N° — exactement comme l'écran Colis Vinted
+  // (même modale, même store). Posée par les deux dispositions (section de Ventes et écran Leboncoin).
+  const modaleBord = bordResult ? (
+        <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 12, maxWidth: 420, width: '100%', padding: 16 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : imprime-le. Sinon, le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
+            <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
+            <TamponPose r={bordResult}/>
+            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
+            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
+            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
+          </div>
+        </div>
+  ) : null;
+  if (enSection) {
+    const ouvrirLbc = (o) => { try { window.open(lbcUrl(o), '_blank', 'noopener'); } catch (_) {} };
+    const rangee = (o, principal) => {
+      const n = numDe(o); const t = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); const posted = estFait(o);
+      const imprimerOk = principal === 'imprimer' && extSait('lbcpdf') === 'ok';
+      const pdf = principal === 'imprimer' && !imprimerOk && /^https:\/\//i.test(String(o.label && o.label.voucherUrl)) ? o.label.voucherUrl : '';
+      const toucher = principal === 'generer' ? () => ouvrirLbc(o) : imprimerOk ? () => imprimerLbc(o, n) : pdf ? () => { try { window.open(pdf, '_blank', 'noopener'); } catch (_) {} } : null;
+      return <RangeeN key={o.txId} vignette={<VignetteN src={photoArticle(o) || ''} alt=""/>} titre={o.title || '—'} lignes={2}
+        plaque={n ? <PlaqueN numero={n}/> : null}
+        sousTitre={[t && t.nom ? t.nom : '', o.label && o.label.reference ? o.label.reference : '', principal === 'route' ? (estFait(o) ? tr('vn.lbc.poste') : (o.stepLabel || tr('vn.lbc.poste'))) : ''].filter(Boolean).join(' · ')}
+        pastilleSous={principal === 'generer' ? <PastilleN ton="ambre">{tr('vn.lbc.generer')}</PastilleN> : principal === 'imprimer' ? <PastilleN>{tr('vn.lbc.pret')}</PastilleN> : null}
+        valeur={euro(o.price) || null} valeurForte onClick={toucher}
+        fin={o.label && o.label.qrUrl && principal !== 'route' ? <QrColis url={o.label.qrUrl} size={44}/> : toucher ? 'chevron' : null}
+        actions={principal === 'route' ? (estFait(o) && !lbcExpediee(o) ? [{ cle: 'pasEncore', libelle: tr('vn.lbc.pasEncore'), ton: 'neutre', onClick: () => toggleFait(o), franc: true }] : (o.label && o.label.trackingUrl ? [{ cle: 'suivre', libelle: tr('vn.lbc.suivre'), ton: 'neutre', onClick: () => { try { window.open(o.label.trackingUrl, '_blank', 'noopener'); } catch (_) {} } }] : null))
+          : [{ cle: 'fait', libelle: posted ? tr('vn.lbc.pasEncore') : tr('vn.lbc.fait'), ton: 'neutre', onClick: () => toggleFait(o), franc: true }]}
+        attrs={{ 'data-lbc-vente': o.txId, 'data-cible': attrCible(['lbcvente', o.txId]), 'data-bord-card': '', 'data-lbc-principal': principal, 'data-transporteur': cleStatTransporteur(t), ...(imprimerOk ? { 'data-imprime': '1', 'data-imprime-lbc': o.txId } : {}) }}/>;
+    };
+    const nEnv = aExpedier.length, nRoute = postes.length;
+    const mots = cherche.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const garde = (o) => !mots.length || mots.every((m) => [o.title || '', numDe(o), 'n' + numDe(o), o.label && o.label.reference || ''].join(' ').toLowerCase().includes(m));
+    return (
+      <div data-lbc-colis-natif="" data-lbc-onglet={ongletLbc}>
+        <div className="n-page-recherche"><ChampRechercheN valeur={cherche} onChange={setCherche} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')}/></div>
+        <SegmenteN valeur={ongletLbc} onChange={setOngletLbc} libelle={tr('vv.seg.label')}
+          options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: nEnv || null, attrs: { 'data-lbc-seg': 'envoyer' } }, { cle: 'route', libelle: tr('vv.seg.route'), n: nRoute || null, attrs: { 'data-lbc-seg': 'route' } },
+            ...(onOnglet ? [{ cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-lbc-seg': 'toutes' } }] : [])]}/>
+        {ongletLbc === 'toutes' ? null : avant}
+        {ongletLbc === 'toutes' ? null : colis.length === 0
+          ? <GroupeN attrs={{ 'data-lbc-colis-vide': lbcVentes.maj ? 'lu' : 'jamais' }}><RangeeN titre={lbcVentes.maj ? tr('vn.lbc.rien') : tr('vn.lbc.pasLu')} sousTitre={lbcVentes.maj ? ilYaCourt(lbcVentes.maj) : ''}/></GroupeN>
+          : ongletLbc === 'envoyer' ? (<>
+            {aGenerer.length > 0 ? <GroupeN titre={`${tr('vn.lbc.aGenerer')} · ${aGenerer.length}`} pied={tr('vn.lbc.limite')}
+              action={aGenerer.length > 1 ? <BoutonN variante="texte" taille="compact" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`${tr('vn.lbc.genererTous')} · ${aGenerer.length} ?`)) return; aGenerer.forEach(ouvrirLbc); }} attrs={{ 'data-lbc-generer-tous': '' }}>{tr('vn.lbc.genererTous')}</BoutonN> : null}
+              attrs={{ 'data-lbc-groupe': 'generer' }}>{aGenerer.filter(garde).map((o) => rangee(o, 'generer'))}</GroupeN> : null}
+            {prets.length > 0 ? <GroupeN titre={`${tr('vn.lbc.prets')} · ${prets.length}`} attrs={{ 'data-lbc-groupe': 'prets' }}>{prets.filter(garde).map((o) => rangee(o, 'imprimer'))}</GroupeN> : null}
+            {!aGenerer.length && !prets.length ? <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN> : null}
+          </>) : (
+            postes.length ? <GroupeN titre={`${tr('vv.seg.route')} · ${postes.length}`} attrs={{ 'data-lbc-groupe': 'route' }}>{postes.filter(garde).map((o) => rangee(o, 'route'))}</GroupeN>
+              : <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN>)}
+        {modaleBord}
+      </div>
+    );
+  }
   return (
     <div style={{ padding: enSection ? '0 16px 16px' : 16 }}>
       {/* (12 nov., finitions) En section de Ventes, l'intertitre « À expédier » suffit : « Colis Leboncoin »
@@ -377,19 +448,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       </>)}
       {/* ── BORDEREAU PRÊT : ouvre l'onglet d'impression + propose de DÉPLACER le
           N° — exactement comme l'écran Colis Vinted (même modale, même store). */}
-      {bordResult && (
-        <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 12, maxWidth: 420, width: '100%', padding: 16 }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : imprime-le. Sinon, le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
-            <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
-            <TamponPose r={bordResult}/>
-            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
-            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
-          </div>
-        </div>
-      )}
+      {modaleBord}
     </div>
   );
 }

@@ -246,6 +246,9 @@ async function scenario(nav, nom, W, theme) {
       if (t === 'journee' || t === 'annonces') await capture(o.pg, `${pref}-${t}`);
       if (t === 'garage') {
         // Le test n'est pas vide : l'explication est bien là, avec l'étiquette et « Article ».
+        // (20 nov., NATIF §1 bis) Elle n'est plus posée d'office : « Comment ça marche ? » l'ouvre.
+        await o.pg.click('[data-stock-explication-ouvrir]', { timeout: 4000 }).catch(() => {});
+        await o.pg.waitForTimeout(300);
         const sx = await o.pg.$('[data-stock-explication]');
         const etq = sx ? await o.pg.$eval('[data-stock-explication]', (e) => ({ d: (e.querySelector('[data-sx-dessin]') || {}).getAttribute?.('data-sx-dessin') || null, t: e.textContent })) : null;
         dit(!!etq && etq.d === 'etiquette' && /Article/.test(etq.t) && /Vendu(?!e)/.test(etq.t), `${T} « Comment marche le Stock » : une étiquette, « Article », « Vendu »`, etq);

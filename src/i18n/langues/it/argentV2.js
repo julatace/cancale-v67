@@ -55,5 +55,14 @@ export default {
   "v2.pm.zoom": "Zoom dell’app",
   "v2.pm.zoom.desc": "Ingrandisce tutto lo schermo: testi, pulsanti, immagini.",
   "v2.pm.texte": "Dimensione del testo",
-  "v2.pm.texte.desc": "Ingrandisce solo il testo."
+  "v2.pm.texte.desc": "Ingrandisce solo il testo.",
+  "arn.vendu": "Venduto",
+  "arn.aVenir": "Soldi in arrivo",
+  "arn.coutsSaisis": "{v} costi inseriti",
+  "arn.voirTous": "Vedi tutti i {n}",
+  "arn.rien": "Niente",
+  "arn.comment": "Come è calcolato",
+  "arn.comptes": "Account",
+  "site.tous": "Tutti",
+  "site.choisir": "Scegli una piattaforma"
 };

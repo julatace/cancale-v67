@@ -23,6 +23,7 @@ import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
+import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
 import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
@@ -114,7 +115,10 @@ export async function lireAnnoncesEgalite(accounts) {
   return { annonces: out, manque };
 }
 
-export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
+// `site` (20 nov., sélecteur de plateforme global — src/siteCourant.js) : le site choisi pour toute l'app ('toutes' | un site).
+// Donné, il REMPLACE le filtre de site de l'écran (liste et tableau) : plus de menu des sites ici. Absent (bancs d'hier) :
+// le filtre local d'avant.
+export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null, site: siteGlobal = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   const { pause: pauseCB } = useComptesBloques();
@@ -126,6 +130,12 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [relit, setRelit] = React.useState(false);
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
+  const siteG = siteGlobal == null ? null : (siteGlobal === 'toutes' ? 'tous' : siteGlobal);
+  React.useEffect(() => {
+    if (siteG == null) return;
+    setFiltre((f) => (f.site === siteG ? f : { ...f, site: siteG }));
+    setFiltreT((f) => (f.site === siteG ? f : { ...f, site: siteG, compte: '' }));
+  }, [siteG]);
   const [q, setQ] = React.useState('');
   const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
@@ -234,11 +244,12 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   }, [modele, siteT, compteT, filtreT.dort, seuil]);
   const nomCompte = (c) => (c.pseudo || ('#' + c.compte)) + (filtreT.site === 'tous' && sites.length > 1 ? ' · ' + nomSite(c.site) : '');
   const tableau = {
+    site: siteT,   // (20 nov.) le site du tableau : les intertitres par compte s'y rangent
     articles: lignesT, majLe, rafraichit: relit, onRafraichir: () => { setRelit(true); setTic((t) => t + 1); },
     compte: cptChoisi ? nomCompte(cptChoisi) : '',
     // (20 nov., précision de Julien) Plus d'entrée « Automatisations » dans Annonces : elles vivent dans l'extension.
     filtres: [
-      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+      ...(sites.length > 1 && siteG == null ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
         options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
@@ -267,7 +278,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces filtreSite={siteG == null} Logo={(s) => <LogoSite site={s}/>}
+      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

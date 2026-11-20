@@ -10,8 +10,7 @@
   --sr-encre: var(--sv-encre, #0C1D30);
   --sr-muet: var(--v2-muet, #4A5B6D);
   --sr-filet: var(--v2-filet, rgb(18 52 96 / .12));
-  --sr-socle: var(--v2-socle, #EEF3F8);
-  --sr-ombre: var(--v2-carte-ombre, 0 .5px 0 rgb(18 52 96 / .06), 0 1px 2px rgb(18 52 96 / .07), 0 10px 24px -14px rgb(18 52 96 / .28));
+  --sr-socle: var(--v2-socle, #EEF3F8); 
   --sr-teinte: var(--v2-teinte-fond, rgb(0 96 204 / .10));
   --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(0 96 204 / .18));
   --sr-teinte-texte: var(--v2-teinte-texte, #0050A8);
@@ -33,8 +32,7 @@
 :root[data-theme="dark"] .sr-ecran, :root[data-theme="dark"] .sr-feuille {
   --sr-page: var(--v2-page-texte, #F2F7FD); --sr-page-muet: var(--v2-page-muet, #B9C8D8);
   --sr-carte: var(--v2-carte, #16273C); --sr-encre: #EAF2FB; --sr-muet: var(--v2-muet, #A7B8CB);
-  --sr-filet: var(--v2-filet, rgb(255 255 255 / .10)); --sr-socle: var(--v2-socle, #1E3149);
-  --sr-ombre: var(--v2-carte-ombre, 0 0 0 .5px rgb(255 255 255 / .06), 0 12px 26px -14px rgb(0 0 0 / .8));
+  --sr-filet: var(--v2-filet, rgb(255 255 255 / .10)); --sr-socle: var(--v2-socle, #1E3149); 
   --sr-teinte: var(--v2-teinte-fond, rgb(74 163 255 / .16)); --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(74 163 255 / .26));
   --sr-teinte-texte: var(--v2-teinte-texte, #8CC4FF); --sr-plein: var(--v2-plein-fond, #EAF2FB); --sr-plein-appui: var(--v2-plein-fond-appui, #C9D9EA);
   --sr-plein-texte: var(--v2-plein-texte, #06111F); --sr-accent: #0A84FF; --sr-ambre: var(--v2-ambre, #F2B65E); --sr-page-ambre: var(--v2-page-ambre, #F2B65E);
@@ -55,21 +53,21 @@
 /* « Où est… » : un vrai champ (photo et voix dedans) et « ⋯ », collés en haut. */
 .sr-cherche-ligne { position: sticky; top: 6px; z-index: 25; display: flex; align-items: center; gap: 4px; margin: 8px 0 12px; color: var(--sr-page); }
 .sr-cherche { flex: 1; min-width: 0; display: flex; align-items: center; background: var(--sr-carte); color: var(--sr-encre);
-  border-radius: 14px; box-shadow: var(--sr-ombre); min-height: 50px; }
+  border-radius: 14px; box-shadow: none; min-height: 50px; }
 .sr-cherche-ic { display: grid; place-items: center; width: 40px; flex: none; color: var(--sr-muet); }
 .sr-champ { flex: 1; min-width: 0; height: 50px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; padding: 0; -webkit-appearance: none; appearance: none; }
 :root:root:root:root:root:root:root body .sr-cherche input.sr-champ { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; min-height: 50px !important; color: var(--sr-encre) !important; outline: none !important; }
 .sr-champ::placeholder { color: var(--sr-muet); opacity: 1; }
 .sr-champ::-webkit-search-cancel-button { display: none; }
 .sr-cherche-mic { display: flex; align-items: center; padding-right: 3px; color: var(--sr-muet); }
-.sr-cherche:focus-within { box-shadow: var(--sr-ombre), var(--sr-anneau); }
+.sr-cherche:focus-within { box-shadow: none, var(--sr-anneau); }
 .sr-cherche .sr-rond { color: var(--sr-muet); }
 /* Le micro commun (MicDictee) posé DANS le champ : un rond discret de 44, pas un disque blanc. */
 :root:root:root:root:root:root:root body .sr-cherche-mic button { width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sr-muet) !important; }
 
 /* La réponse « Où est » et la séance partagent la carte « ici ». */
 .sr-resultats { margin: 0 0 22px; }
-.sr-reponse { background: var(--sr-carte); color: var(--sr-encre); border-radius: 20px; box-shadow: var(--sr-ombre); padding: 14px; display: flex; flex-direction: column; gap: 12px;
+.sr-reponse { background: var(--sr-carte); color: var(--sr-encre); border-radius: 20px; box-shadow: none; padding: 14px; display: flex; flex-direction: column; gap: 12px;
   animation: sr-monte 260ms cubic-bezier(.32, .72, 0, 1) both; }
 .sr-reponse-tete, .sr-paire { display: flex; gap: 14px; align-items: center; }
 .sr-paire-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; flex: 1; }
@@ -132,7 +130,7 @@
 /* Les groupes et les listes iOS. */
 .sr-groupe { margin: 0 0 24px; }
 .sr-h2 { margin: 0 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--sr-page); }
-.sr-liste { background: var(--sr-carte); color: var(--sr-encre); border-radius: 16px; box-shadow: var(--sr-ombre); overflow: hidden; }
+.sr-liste { background: var(--sr-carte); color: var(--sr-encre); border-radius: 16px; box-shadow: none; overflow: hidden; }
 .sr-rangee { appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box; width: 100%; position: relative;
   display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; text-align: left; background: transparent; color: inherit; font: inherit;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease; }

@@ -85,7 +85,7 @@
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu):focus-visible { outline: 2px solid var(--fu-bleu) !important; outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-app-shell .vrm-filtre-site > button:not(#fu) { transition: none !important; } }
@@ -104,7 +104,7 @@
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-messages-sections > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
 :root:root body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 
 /* ── 6. LES FILTRES D'ÉTAT : pilules 13/600, actif en encre pleine (blanc en sombre) ── */

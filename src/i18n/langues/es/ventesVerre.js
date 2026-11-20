@@ -124,5 +124,17 @@ export default {
   "vn.e.coches": {"one": "{n} marcado", "other": "{n} marcados"},
   "vn.e.deposer": {"one": "{n} por entregar", "other": "{n} por entregar"},
   "vn.auMoins": "al menos {n} por enviar",
-  "vn.detailVide": "Toca una venta para verla aquí."
+  "vn.detailVide": "Toca una venta para verla aquí.",
+  "vn.lbc.aGenerer": "Etiqueta por generar",
+  "vn.lbc.prets": "Listos para imprimir",
+  "vn.lbc.genererTous": "Generar todas",
+  "vn.lbc.generer": "por generar",
+  "vn.lbc.pret": "listo",
+  "vn.lbc.fait": "Paquete hecho",
+  "vn.lbc.pasEncore": "Todavía no",
+  "vn.lbc.poste": "Enviado",
+  "vn.lbc.suivre": "Seguir",
+  "vn.lbc.rien": "Ningún paquete de Leboncoin por enviar.",
+  "vn.lbc.pasLu": "Paquetes de Leboncoin: aún no leídos.",
+  "vn.lbc.limite": "La etiqueta se genera en leboncoin.fr: tocar la venta la abre allí."
 };

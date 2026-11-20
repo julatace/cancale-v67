@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov., phase 2)
+import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { BoutonV2 } from '../designV2/BoutonV2.jsx';
 import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
@@ -675,7 +676,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
         <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
           <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <Icon name="chevron" size={14}/></label>

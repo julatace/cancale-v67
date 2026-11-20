@@ -5,7 +5,7 @@
 .vrm-aso-outils { display: flex; gap: 8px; margin: 0 0 14px; }
 .vrm-aso-outil {
   flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
-  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
+  background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: none;
   font: inherit; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
 }
 .vrm-aso-outil span { overflow: hidden; text-overflow: ellipsis; }
@@ -24,7 +24,7 @@
 
 .vrm-aso-couv { margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; line-height: 1.45; }
 .vrm-aso-bloc { white-space: nowrap; }
-.vrm-aso-liste { list-style: none; margin: 0 0 12px; padding: 0 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); }
+.vrm-aso-liste { list-style: none; margin: 0 0 12px; padding: 0 12px; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; }
 .vrm-aso-ligne { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; min-height: 60px; box-sizing: border-box; }
 .vrm-aso-ligne + .vrm-aso-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-aso-ligne.is-achat { grid-template-columns: 48px minmax(0, 1fr) auto; }
@@ -45,7 +45,7 @@
 .vrm-aso-sous .vrm-aso-num { min-height: 0; }
 .vrm-aso-sous-feuille { grid-column: 1 / -1; }
 
-.vrm-aso-carte { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 16px; margin: 0 0 16px; }
+.vrm-aso-carte { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 16px; margin: 0 0 16px; }
 .vrm-aso-grand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .vrm-aso-grand b { font-size: 38px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .vrm-aso-grand span { font-size: 15px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }

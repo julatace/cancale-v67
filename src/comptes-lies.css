@@ -6,7 +6,7 @@
 .vrm-cl-groupe { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
 .vrm-cl-groupe .vrm-fu-titre-section { margin: 20px 2px 2px; }
 .vrm-cl-carte {
-  background: var(--fu-carte); color: var(--fu-encre); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre);
+  background: var(--fu-carte); color: var(--fu-encre); border-radius: var(--fu-r-carte); box-shadow: none;
   padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; box-sizing: border-box;
 }
 .vrm-cl-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }

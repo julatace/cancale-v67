@@ -108,7 +108,7 @@ html:root {
   --sb-verre-bord: none !important;
   --sb-touche-fond: var(--ap-carte) !important; --sb-touche-ombre: none !important;
   --sb-enfonce: none !important; --sb-grave: none !important; --sb-grave-texte: none !important;
-  --sb-plein-fond: var(--ap-plein) !important; --sb-plein-encre: var(--ap-sur-plein) !important; --sb-plein-ombre: none !important;
+  --sb-plein-fond: var(--ap-plein) !important; --sb-plein-encre: var(--ap-sur-plein) !important; 
   --sb-r-tuile: 12px !important; --sb-r-plan: 12px !important; --sb-r-plateau: 10px !important;
   --sb-r-champ: 10px !important; --sb-r-touche: 10px !important; --sb-r-vignette: 10px !important;
   --sb-police-affiche: var(--ap-police) !important; --sb-police-texte: var(--ap-police) !important;
@@ -214,7 +214,7 @@ html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { background: var
 /* ══ 7. LE CONTRÔLE SEGMENTÉ d'iOS : piste grise, pouce blanc et son ombre ════ */
 html body .vrm-seg { background: var(--ap-remplir) !important; box-shadow: none !important; border-radius: 9px !important; padding: 2px !important; }
 html body .vrm-seg .vrm-seg-btn { color: var(--ap-encre) !important; border-radius: 7px !important; font-weight: 400 !important; background: transparent !important; }
-html body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: none !important; }   /* (20 nov., NATIF §1 bis) sans ombre */
 html[data-theme="dark"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #636366 !important; color: #FFFFFF !important; }
 
 /* ══ 8. LES INTERRUPTEURS d'iOS (51 × 31) — le bleu, le seul accent ═══════════ */
@@ -310,7 +310,7 @@ html body :is(.vv-seg-b, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg
 html body :is(.vv-seg, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein, .vg-ms-vues) { border-radius: 9px !important; padding: 2px !important; }
 html body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) {
   background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; border-color: transparent !important;
-  box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+  box-shadow: none !important; }   /* (20 nov., NATIF §1 bis) sans ombre */
 html[data-theme="dark"] body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) { background: #636366 !important; color: #FFFFFF !important; }
 html body .vv-seg-n:not(.is-ambre) { background: var(--ap-remplir) !important; color: inherit !important; }
 html body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(118 118 128 / .12) !important; }
@@ -325,7 +325,7 @@ html[data-theme="dark"] body { --vv-seg-on: #636366 !important; }
 html body .vrm-tache > .vrm-tache-tete h1 { color: var(--ap-encre) !important; font-family: var(--ap-police) !important; font-weight: 700 !important; letter-spacing: .011em !important; }
 
 /* ══ 18. Ma journée (verre-journee.css) : le plein bleu, les touches grises, la semaine en barres grises (le jour choisi en bleu) ══ */
-html body { --vj-plein: var(--ap-plein) !important; --vj-plein-t: var(--ap-sur-plein) !important; --vj-plein-ombre: none !important;
+html body { --vj-plein: var(--ap-plein) !important; --vj-plein-t: var(--ap-sur-plein) !important; 
   --vj-touche: var(--ap-remplir) !important; --vj-touche-bord: transparent !important; --vj-libre: transparent !important; --vj-libre-bord: var(--ap-filet) !important;
   --vj-ac: var(--ap-bleu-vif) !important; --vj-pastille: var(--ap-remplir) !important; --vj-site: var(--ap-carte) !important; }
 html body .sj-journee .vrm-jv2-barre { background: #D1D1D6 !important; }

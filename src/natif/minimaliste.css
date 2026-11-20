@@ -1,0 +1,48 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « TOUT LE SITE SIMPLE ET MINIMALISTE COMME PARAMÈTRES » (20 nov., docs/design/NATIF.md §1 bis).
+   Julien : « en gros tout le site doit être comme la fiche Paramètres, simple et minimaliste ».
+
+   Les écrans pas encore réécrits en natif gardent des décorations d'hier : des ombres de carte (une dizaine de
+   jetons `--*-ombre*` posés sur ~400 règles), des plaques gravées, des filets autour d'un tableau, des cartes posées
+   l'une sous l'autre au lieu d'UN groupe. Cette feuille les retire, dans la couche `n-anciens` (la première nommée
+   dans index.html : ses `!important` passent devant les feuilles d'hier, comme anciens-ecrans.css).
+
+   Ce qui reste exprès (exceptions NOMMÉES du banc `scripts/bancs/minimaliste.cjs`) : l'ombre de la feuille et du volet
+   (NATIF §1), les menus flottants (`--d-ombre-flottant`, `--sb-ombre-avant`), l'ambre d'un geste à faire, le rouge
+   d'un doublon de N°, la plaque du N°, les photos.
+   Contrôle : scripts/bancs/minimaliste.cjs (relevé par écran, avant / après).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer n-anciens {
+
+/* ══ 1. Les OMBRES DE CARTE d'hier : leurs jetons (`--fu-ombre`, `--w-ombre`, `--vrm-ombre-carte`, `--p-ombre`,
+   `--d-ombre-douce`, `--cm-ombre`, `--bx-ombre`…) valent `none` À LEUR SOURCE (chaque feuille qui les définit) : plus
+   de remise à zéro ici (un sélecteur universel restylait 2 300 éléments — banc natif-coque K8b — et pesait au démarrage). ══ */
+
+/* ══ 2. Ombres posées en dur, nommées par le banc (390 / 1512, avant) ══ */
+/* Messages : la plaque gravée du N° et son chiffre ; le segment choisi. */
+html body :is(.sb-plaque small, .vg-ms-vue.is-on) { box-shadow: none !important; text-shadow: none !important; }
+html body .sb-plaque { box-shadow: inset 0 0 0 .5px var(--ap-filet) !important; }
+/* Paramètres : « Mis à jour à 08:42 » (une pastille flottante) et la catégorie choisie du sommaire. */
+html body .vrm-neuf { box-shadow: none !important; background: transparent !important; }
+/* (20 nov., « téléphone bâclé ») Au téléphone, plus de « Mis à jour à 10:40 » flottant sur le contenu. */
+@media (max-width: 1023px) { html body .vrm-neuf { display: none !important; } }
+html body .vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { box-shadow: none !important; }
+/* Paramètres : la carte du profil (filet) ⇒ un groupe blanc uni. */
+html body .vrm-set-profil { border: 0 !important; box-shadow: none !important; background: var(--ap-carte) !important; }
+
+/* Le texte d'un bouton teinté d'hier : le bleu foncé de la teinte (≥ 4,5:1 sur la teinte posée sur blanc ; le banc
+   minimaliste mesurait 4,47:1 pour « Ajouter une photo » une fois la carte du profil remise en blanc). */
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { color: var(--ap-bleu-teinte) !important; }
+
+/* ══ 3. Aucun LIEN SOULIGNÉ : un « Voir plus » repliable (summary) ou un lien d'action est en texte bleu ══ */
+html body :is(#vrm-contenu, .vrm-fs, [role="dialog"]) :is(summary, .vrm-lien-action, .vrm-lien, a.vrm-lien-action) { text-decoration: none !important; }
+
+/* ══ 4. Cibles au doigt (44) : le « ⋯ » d'un achat, le « Voir » d'un bandeau ══ */
+html body .vrm-buy-more { min-width: 44px !important; min-height: 44px !important; }
+html body .vrm-bandeau-abo-geste { min-width: 44px !important; justify-content: center; }
+
+/* ══ 5. Publier ailleurs : écrit dans sa feuille (src/styles-publier-ailleurs-feuille.css). ══ */
+/* ══ 6. Ventes · Leboncoin en rangées natives : le segment prend la marge de la page, comme celui de Ventes · Vinted. ══ */
+html body [data-lbc-colis-natif] { padding-top: 4px; }   /* comme `.n-page-contenu` de Ventes · Vinted */
+html body [data-lbc-colis-natif] > .n-segmente { margin: 0 var(--n-marge, 16px) 16px; }
+}

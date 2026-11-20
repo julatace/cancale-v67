@@ -9,7 +9,7 @@
    ════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Ce qui rapporte le plus ───────────────────────────────────────────────── */
-.vrm-cr { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px 18px 10px; min-width: 0; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); }
+.vrm-cr { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: none; padding: 18px 18px 10px; min-width: 0; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); }
 .vrm-cr-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-cr-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; color: var(--fu-encre); }
 .vrm-cr-note { font-size: 13px; color: var(--fu-gris); font-variant-numeric: var(--fu-chiffres); white-space: nowrap; }
@@ -47,7 +47,7 @@
 }
 
 /* ── Articles qui dorment ──────────────────────────────────────────────────── */
-.vrm-qd { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px 18px 8px; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); min-width: 0; }
+.vrm-qd { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: none; padding: 18px 18px 8px; display: flex; flex-direction: column; gap: 12px; color: var(--fu-encre); min-width: 0; }
 .vrm-qd-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-qd-titre { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; }
 .vrm-qd-titre .vrm-qd-n { color: var(--fu-gris); font-weight: 700; margin-left: 6px; font-variant-numeric: var(--fu-chiffres); }
