@@ -57,6 +57,8 @@ async function ouvrir(nav, cond, W, base) {
   const sombre = cond === 'grand';
   const ctx = await nav.newContext({ viewport: { width: W, height: tactile ? 844 : 950 }, isMobile: tactile, hasTouch: tactile, locale: 'fr-FR', colorScheme: sombre ? 'dark' : 'light', serviceWorkers: 'block' });
   const pg = await ctx.newPage();
+  ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
+  pg.on('dialog', (d) => d.dismiss().catch(() => {}));
   const J = { erreurs: [], lectures: [] };
   // Une erreur levée par un script INJECTÉ par les bancs (pile `<anonymous>`, cadre d'origine opaque) n'est pas de l'app.
   pg.on('pageerror', (e) => { if (/^\s*at <anonymous>/m.test(String(e.stack || '').split('\n')[1] || '')) return; J.erreurs.push('pageerror ' + String(e.message || e).slice(0, 200)); });
@@ -176,6 +178,27 @@ async function main() {
           // Une fuite : le MÊME onglet, revu, n'a pas plus de minuteries qu'à sa première visite (les singletons démarrés une fois sont permis).
           if (premiere[tab] == null) premiere[tab] = s.minuteries;
           minut.push(`${tab}:${s.minuteries}`);
+          // CLICS=1 : chaque bouton visible de l'onglet (25 au plus), un par un — une erreur, un garde-fou, une page quittée.
+          if (process.env.CLICS) {
+            const n = await pg.evaluate(() => { const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.top < window.innerHeight * 2 && !e.closest('nav, [inert], [aria-hidden="true"]'); };
+              const l = [...document.querySelectorAll('.vrm-main button, .vrm-main [role="button"], .vrm-main a[href^="?"], .vrm-main a[href^="/?"]')].filter(vis).slice(0, 25); l.forEach((e, i) => e.setAttribute('data-chasse-clic', String(i))); return l.length; });
+            for (let i = 0; i < n; i++) {
+              const avant = J.erreurs.length;
+              const b = pg.locator(`[data-chasse-clic="${i}"]`);
+              const nom = await b.evaluate((e) => (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30)).catch(() => null);
+              if (nom == null || /déconnecter|supprimer|effacer|vider|fermer mon compte|retirer/i.test(nom)) continue;
+              await b.click({ timeout: 2000 }).catch(() => {});
+              await pg.waitForTimeout(700);
+              const x = await sonde(pg, false).catch(() => null);
+              dit(J.erreurs.length === avant, `${T} clic « ${nom} » : aucune erreur`, J.erreurs.slice(avant).join(' ¦ '));
+              if (x) dit(!x.souci && !x.garde.length && !x.faux.length, `${T} clic « ${nom} » : ni garde-fou ni « undefined »`, x.garde.join(',') + ' ' + x.faux.join(' | '));
+              await pg.keyboard.press('Escape').catch(() => {});
+              if (!pg.url().startsWith(`http://localhost:${PORT}`)) await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+              await pg.evaluate((t) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + t })); } catch (_) {} }, tab);
+              await pg.waitForTimeout(500);
+              await pg.evaluate((k) => { const l = [...document.querySelectorAll('.vrm-main button, .vrm-main [role="button"], .vrm-main a[href^="?"], .vrm-main a[href^="/?"]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.top < window.innerHeight * 2 && !e.closest('nav, [inert], [aria-hidden="true"]'); }).slice(0, 25); l.forEach((e, j) => e.setAttribute('data-chasse-clic', String(j))); }, i).catch(() => {});
+            }
+          }
         }
         // Une fuite de minuteries : après le tour, les minuteries uniques (démarrées une fois par l'app) sont toutes là ; un second
         // passage sur Ma journée, Ventes et Achats ne doit rien ajouter à ce qu'il y avait au DERNIER onglet du tour.
