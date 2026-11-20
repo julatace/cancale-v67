@@ -28,6 +28,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
+  // (20 nov.) Colis à retirer : contenu d'abord, trajet, QR à droite, code gardé jusqu'à la fin prouvée — docs/passation/2026-11-20-retraits-visuel.md.
+  { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'stock-meubles', date: '2026-11-19', titre: 'Tes meubles dessinés, sur toute la largeur', phrase: '« Ranger » sur chaque article : il vole dans sa case.', tab: 'garage', pour: 'tous', mode: 'complet' },
   { id: 'methode-etiquetage', date: '2026-11-19', titre: 'Choisis ta méthode d’étiquetage', phrase: 'Qui numérote, lettre ou chiffres, étiquette écrite ou imprimée.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., fiche directe) Un toucher ouvre la fiche, qui montre tout : faits, sites, gestes — docs/passation/2026-11-19-fiche-directe.md.
@@ -59,8 +61,6 @@ export const NOUVEAUTES = Object.freeze([
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») docs/passation/2026-11-19-colis-achat-auto.md
   // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
   { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
-  // (20 nov.) Colis à retirer : contenu d'abord, trajet, QR à droite, code gardé jusqu'à la fin prouvée — docs/passation/2026-11-20-retraits-visuel.md.
-  { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite du code.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « 2 oui ») src/prixAchatRecu.js — le montant du reçu d'un achat relié, jamais un lot, jamais sur une saisie.
   { id: 'prix-achat-recu', date: '2026-11-19', titre: 'Prix d’achat repris du reçu', phrase: 'Achat relié, reçu lu : le prix se pose seul (pas les lots).', tab: 'achats', pour: 'tous', mode: 'tous' },
