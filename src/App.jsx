@@ -42616,7 +42616,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // les ventes ont été relues (une capture a pu arriver), si sa lecture a
     // échoué, ou si sa photo a été déclarée morte. Une réponse arrivée après
     // un nouveau passage est gardée : une photo par clé, rien ne se contredit.
-    if(photosVentesLuesPour.current!==sales.items){photosVentesLuesPour.current=sales.items;photosVentesLues.current=new Set();}
+    // (20 nov., bugs-terrain) Une NOUVELLE référence des ventes ne fait plus tout relire : seules les lignes jamais lues
+    // (ou dont la lecture a échoué, ou forcées) partent. Avant, chaque relecture des commandes relançait toutes les lectures
+    // de photos (journal de sa session iPhone : 101 lectures `txn` en 2 min 30, les mêmes identifiants relus).
+    if(photosVentesLuesPour.current!==sales.items){photosVentesLuesPour.current=sales.items;}
     const aLire=(m)=>[...m.entries()].filter(([id,key])=>forces.has(key)||!photosVentesLues.current.has(id)).map(([id])=>id);
     const lues=photosVentesLues.current;
     (async()=>{
@@ -45619,6 +45622,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // gardée par adresse de photo dans src/indexCouleurs.js) : la couleur d'un côté qui n'en écrit aucune. Map url → [{ c, part }].
   const [couleursLiaison, setCouleursLiaison] = useState(null);
   const photosLiaisonTentees = useRef(new Set());
+  const gesteLiaisonRef = useRef({ refus: null, liens: null });
   useEffect(() => {
     if (!vueLiaison) return undefined;
     if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
@@ -45632,7 +45636,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         publierAffectation(r, cibles.map((c) => c.key));
         setLiaison(r);
       } catch (_) { publierAffectation(null); setLiaison(null); }
-    }, 30);
+      // (20 nov., bugs-terrain) Recalculée quand les données se sont POSÉES (0,9 s sans changement), pas à chaque arrivée :
+      // à l'ouverture, ventes, achats, annonces, suivis et couleurs arrivent l'un après l'autre et l'affectation (2 500
+      // articles × 2 700 achats) se refaisait à chacun (2,4 s de calcul au profil d'Achats, processeur ×4). La première, et
+      // celle qui suit un geste (« Ce n'est pas lui », un lien posé), partent tout de suite comme avant.
+    }, (() => { const geste = gesteLiaisonRef.current.refus !== liaisonRefus || gesteLiaisonRef.current.liens !== liensAchats; gesteLiaisonRef.current = { refus: liaisonRefus, liens: liensAchats }; return liaison === undefined || geste ? 30 : 900; })());
     return () => clearTimeout(id);
   }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison, achatsHorsRelierRes]);
   // Les photos à lire : celles des articles qui ont des candidats et de leurs achats candidats (au plus 240 par passe,
@@ -47372,7 +47380,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
-  const cartesColis = () => {
+  // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
+  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
+  let _cartesColisMemo = null;
+  const cartesColis = () => { if (_cartesColisMemo) return _cartesColisMemo; const r = cartesColisCalc(); _cartesColisMemo = r; queueMicrotask(() => { _cartesColisMemo = null; }); return r; };
+  const cartesColisCalc = () => {
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
     const lectureFinie = labelsPrets && emailBords !== null;
@@ -48714,7 +48726,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
-  const listeEnvoyes = () => {
+  // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
+  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
+  let _listeEnvoyesMemo = null;
+  const listeEnvoyes = () => { if (_listeEnvoyesMemo) return _listeEnvoyesMemo; const r = listeEnvoyesCalc(); _listeEnvoyesMemo = r; queueMicrotask(() => { _listeEnvoyesMemo = null; }); return r; };
+  const listeEnvoyesCalc = () => {
     const out = [];
     try {
       if (voitSite('vinted') && Array.isArray(sales.items)) {
