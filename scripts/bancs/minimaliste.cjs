@@ -442,13 +442,16 @@ async function sitesPlanches() {
             const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .vrm-attente-cache');
             const logos = [...document.querySelectorAll('.n-logo-site[data-site]')].filter(vis).map((e) => e.getAttribute('data-site'));
             return { selecteur: [...document.querySelectorAll('[data-selecteur-site], [data-site-raison], .n-selecteur-site')].filter(vis).length,
-              sitesLogos: [...new Set(logos)], nLogos: logos.length, autres: [...document.querySelectorAll('[data-achats-autre]')].filter(vis).map((e) => e.getAttribute('data-achats-autre')),
+              sitesLogos: [...new Set(logos)], nLogos: logos.length, filtreSite: [...document.querySelectorAll('[data-tt-filtre="site"]')].filter(vis).map((e) => e.getAttribute('data-tt-filtre-valeur')), autres: [...document.querySelectorAll('[data-achats-autre]')].filter(vis).map((e) => e.getAttribute('data-achats-autre')),
               debord: document.documentElement.scrollWidth > innerWidth + 1 };
           });
           await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `site-${cle}-${fen}-${th}.png`) }).catch(() => {});
           const ou = `${fen} ${th} ${cle}`;
           dit(m.selecteur === 0, `N1 ${ou} : aucun sélecteur de plateforme (vrm_site_courant = leboncoin rangé, ignoré)`, m);
-          if (cle === 'annonces' || cle === 'ventes') dit(m.sitesLogos.length >= 2, `N2 ${ou} : plusieurs sites mêlés, chaque rangée avec le logo de son site (${m.sitesLogos.join(', ')} · ${m.nLogos} logos)`, m);
+          // À l'ordinateur, le tableau d'Annonces montre ses 50 premières lignes (le premier compte, Vinted) : le mélange s'y prouve
+          // par son filtre « Site » (dans ses filtres, sur « Tous »), les logos par la colonne « Site ».
+          if (cle === 'annonces' && Number(fen) >= 1024) dit(m.filtreSite.length === 1 && m.nLogos > 0, `N2 ${ou} : tableau de tous les sites, filtre « Site » dans ses filtres, logo du site sur chaque ligne`, m);
+          else if (cle === 'annonces' || cle === 'ventes') dit(m.sitesLogos.length >= 2, `N2 ${ou} : plusieurs sites mêlés, chaque rangée avec le logo de son site (${m.sitesLogos.join(', ')} · ${m.nLogos} logos)`, m);
           if (cle === 'achats') dit(m.autres.length >= 1, `N2 ${ou} : les achats Vinted et ceux des autres sites (${m.autres.join(', ')})`, m);
           dit(!m.debord, `N3 ${ou} : rien ne déborde`, m);
         } catch (e) { rouges++; console.log(`  ❌ ${fen} ${th} ${cle} : ${String(e.message || e).slice(0, 160)}`); }
