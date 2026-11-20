@@ -113,6 +113,10 @@
   .n-tt-avatar { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: var(--n-r-rond);
     background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-corps-fort); }
   .n-tt-article-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  /* (20 nov., intégration 20nov) Le titre ne fixe plus la largeur MINIMALE de la colonne (son texte entier la fixait : avec Vues,
+     Favoris et Liaison, le tableau d'Annonces passait sous le bord droit à 1512, Statut et « Autre… » hors de vue — banc
+     liaison-sites R1). Il prend la place qui reste (`width: 100%` de l'en-tête, 180 px au moins) et s'abrège en « … ». */
+  .n-tt-article-texte { flex: 1 1 0; contain: inline-size; }
   .n-tt-article-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-tt-article-sous { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-tt-vide-cellule { color: var(--n-encre-2); }
