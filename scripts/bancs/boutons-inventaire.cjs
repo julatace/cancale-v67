@@ -242,17 +242,21 @@ function resumer(r) {
   const parOrigine = {}; const parDefaut = {};
   for (const b of r.boutons) { parOrigine[b.o] = (parOrigine[b.o] || 0) + 1; for (const d of b.d) parDefaut[d] = (parDefaut[d] || 0) + 1; }
   if (r.pleins > 1) parDefaut.D11 = r.pleins;
-  const anciens = r.boutons.filter((b) => !/^natif/.test(b.o)).length;
-  return { ecran: r.ecran, W: r.W, theme: r.theme, total: r.boutons.length, natifs: r.boutons.length - anciens, anciens, parOrigine, parDefaut, pleins: r.pleins, erreurs: r.erreurs.length, manque: r.manque };
+  // Une RANGÉE d'avant (toute la largeur de sa liste : une conversation, un réglage, un achat) est comptée à part : ce n'est
+  // pas un bouton dessiné, c'est une ligne qui se touche (NATIF.md : « une rangée ENTIÈRE se touche »).
+  const anciensTous = r.boutons.filter((b) => !/^natif/.test(b.o));
+  const rangees = anciensTous.filter((b) => b.rangee).length;
+  const anciens = anciensTous.length - rangees;
+  return { ecran: r.ecran, W: r.W, theme: r.theme, total: r.boutons.length, natifs: r.boutons.length - anciensTous.length, anciens, rangees, parOrigine, parDefaut, pleins: r.pleins, erreurs: r.erreurs.length, manque: r.manque };
 }
 
 const NOMS_D = { D1: 'cible petite', D2: 'rayon', D3: 'graisse', D4: 'contraste', D5: 'texte coupé', D6: 'icône désalignée', D7: 'gris global', D8: 'focus invisible', D9: 'indisponible muet', D10: 'lien souligné', D11: 'deux pleins', D12: 'taille de texte', D13: 'style en ligne' };
 function tableau(resumes) {
-  const lignes = ['| écran | W | thème | boutons | natifs | anciens | origines | défauts |', '|---|---|---|---|---|---|---|---|'];
-  for (const s of resumes) lignes.push(`| ${s.ecran} | ${s.W} | ${s.theme} | ${s.total} | ${s.natifs} | ${s.anciens} | ${Object.entries(s.parOrigine).map(([k, v]) => k + ' ' + v).join(', ')} | ${Object.entries(s.parDefaut).map(([k, v]) => `${k} ${NOMS_D[k]} ${v}`).join(', ') || '—'}${s.manque ? ' · ⚠️ ' + s.manque : ''} |`);
-  const tot = { total: 0, natifs: 0, anciens: 0, d: {} };
-  for (const s of resumes) { tot.total += s.total; tot.natifs += s.natifs; tot.anciens += s.anciens; for (const [k, v] of Object.entries(s.parDefaut)) tot.d[k] = (tot.d[k] || 0) + v; }
-  lignes.push(`| **TOTAL** | | | **${tot.total}** | **${tot.natifs}** | **${tot.anciens}** | | ${Object.entries(tot.d).sort().map(([k, v]) => `${k} ${v}`).join(', ')} |`);
+  const lignes = ['| écran | W | thème | touchables | natifs | boutons d\'avant | rangées d\'avant | origines | défauts |', '|---|---|---|---|---|---|---|---|---|'];
+  for (const s of resumes) lignes.push(`| ${s.ecran} | ${s.W} | ${s.theme} | ${s.total} | ${s.natifs} | ${s.anciens} | ${s.rangees} | ${Object.entries(s.parOrigine).map(([k, v]) => k + ' ' + v).join(', ')} | ${Object.entries(s.parDefaut).map(([k, v]) => `${k} ${NOMS_D[k]} ${v}`).join(', ') || '—'}${s.manque ? ' · ⚠️ ' + s.manque : ''} |`);
+  const tot = { total: 0, natifs: 0, anciens: 0, rangees: 0, d: {} };
+  for (const s of resumes) { tot.total += s.total; tot.natifs += s.natifs; tot.anciens += s.anciens; tot.rangees += s.rangees; for (const [k, v] of Object.entries(s.parDefaut)) tot.d[k] = (tot.d[k] || 0) + v; }
+  lignes.push(`| **TOTAL** | | | **${tot.total}** | **${tot.natifs}** | **${tot.anciens}** | **${tot.rangees}** | | ${Object.entries(tot.d).sort().map(([k, v]) => `${k} ${v}`).join(', ')} |`);
   return { md: lignes.join('\n'), tot };
 }
 
@@ -285,10 +289,38 @@ async function fusion(dossiers) {
   const { md, tot } = ecrire(resultats);
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try { await planche(nav, resultats); } finally { await nav.close(); }
-  console.log(md + `\n\nTOTAL : ${tot.total} boutons · ${tot.natifs} natifs · ${tot.anciens} anciens · défauts ${JSON.stringify(tot.d)}\nSorties : ${SORTIE}`);
+  console.log(md + `\n\nTOTAL : ${tot.total} touchables · ${tot.natifs} natifs · ${tot.anciens} boutons d'avant · ${tot.rangees} rangées d'avant · défauts ${JSON.stringify(tot.d)}\nSorties : ${SORTIE}`);
+}
+
+// `node boutons-inventaire.cjs --avant-apres <dossiers avant…> -- <dossiers après…>` : la planche avant / après des 10 écrans
+// principaux, 390 et 1512 (clair), une capture par écran et par largeur, côte à côte ; écrite dans SORTIE.
+async function avantApres(args) {
+  const k = args.indexOf('--'); const avant = args.slice(0, k), apres = args.slice(k + 1);
+  const trouver = (ds, nom) => { for (const d of ds) { const f = path.join(d, 'ecrans', nom); if (fs.existsSync(f)) return f; } return null; };
+  const principaux = TOUS.filter((e) => e.principal).map((e) => e.cle);
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  try {
+    for (const W of [390, 1512]) {
+      const cases = principaux.map((e) => {
+        const a = trouver(avant, `${e}-${W}-clair.png`), b = trouver(apres, `${e}-${W}-clair.png`);
+        const img = (f) => (f ? `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}">` : '<i>—</i>');
+        return `<div class="e"><h2>${e}</h2><div class="p"><figure>${img(a)}<figcaption>avant</figcaption></figure><figure>${img(b)}<figcaption>après</figcaption></figure></div></div>`;
+      }).join('');
+      const html = `<!doctype html><meta charset="utf-8"><style>body{margin:16px;font:14px -apple-system,system-ui,sans-serif;background:#ddd}
+        .g{display:grid;grid-template-columns:repeat(${W < 600 ? 5 : 2},1fr);gap:16px}.e{background:#fff;border-radius:10px;padding:8px}h2{margin:0 0 6px;font-size:16px}
+        .p{display:grid;grid-template-columns:1fr 1fr;gap:6px}figure{margin:0}img{width:100%;display:block;border:1px solid #ccc}figcaption{text-align:center;color:#444}</style>
+        <h1>Boutons natifs — avant / après · ${W}</h1><div class="g">${cases}</div>`;
+      const f = path.join(SORTIE, `planche-avant-apres-${W}.html`); fs.writeFileSync(f, html);
+      const ctx = await nav.newContext({ viewport: { width: W < 600 ? 2400 : 2000, height: 1200 } }); const pg = await ctx.newPage();
+      await pg.goto('file://' + f); await pg.screenshot({ path: path.join(SORTIE, `planche-avant-apres-${W}.png`), fullPage: true }); await ctx.close();
+      fs.unlinkSync(f);
+      console.log('planche : ' + path.join(SORTIE, `planche-avant-apres-${W}.png`));
+    }
+  } finally { await nav.close(); }
 }
 
 if (require.main === module && process.argv[2] === '--fusion') fusion(process.argv.slice(3));
+else if (require.main === module && process.argv[2] === '--avant-apres') avantApres(process.argv.slice(3));
 else if (require.main === module) (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
@@ -323,7 +355,7 @@ else if (require.main === module) (async () => {
     const { md, tot } = ecrire(resultats);
     await planche(nav, resultats);
     console.log('\n' + md);
-    console.log(`\nTOTAL : ${tot.total} boutons · ${tot.natifs} natifs · ${tot.anciens} anciens · défauts ${JSON.stringify(tot.d)}`);
+    console.log(`\nTOTAL : ${tot.total} touchables · ${tot.natifs} natifs · ${tot.anciens} boutons d'avant · ${tot.rangees} rangées d'avant · défauts ${JSON.stringify(tot.d)}`);
     console.log('Sorties : ' + SORTIE);
     const seuil = process.env.SEUIL_ANCIENS; const rouge = (seuil != null && tot.anciens > Number(seuil)) || resultats.some((r) => r.erreurs.length);
     if (rouge) { console.log('❌ ' + (resultats.some((r) => r.erreurs.length) ? 'erreurs JS' : `plus de ${seuil} boutons d'avant`)); process.exitCode = 1; }

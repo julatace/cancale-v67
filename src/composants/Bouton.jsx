@@ -18,6 +18,7 @@
 import React from 'react';
 import { IconeComposant } from './icones.jsx';
 import { Bouton, BoutonIcone } from '../natif/Bouton.jsx';
+import { Segmente } from '../natif/Segmente.jsx';
 
 const iconeParDefaut = (nom, taille) => <IconeComposant nom={nom} taille={taille}/>;
 
@@ -81,18 +82,23 @@ export function BoutonBase({ variante = 'secondaire', taille, icone, plein = fal
 //   · `n` : un compte posé après le libellé (« À envoyer 3 ») ;
 //   · `data` : les data-* que lisent les bancs.
 // Un CHOIX d'écran pose aria-pressed ; les sous-onglets gardent aria-current (PlatSubNav).
+// (20 nov., chantier « boutons natifs ») SegmenteBase DESSINE LE SEGMENTÉ NATIF (src/natif/Segmente.jsx : une piste, le
+// curseur qui glisse, ← → au clavier) — plus de puces faites main. aria-pressed reste posé (les bancs d'hier désignent le
+// choix par lui) ; un segment indisponible ne part pas (aria-disabled) ; un 0 ne s'écrit pas (un compte discret).
 export function SegmenteBase({ label, options, value, onChange, plein = false, disabled = false, className = '', style, rendreIcone = iconeParDefaut }) {
+  const choisir = (cle) => { if (disabled) return; const o = options.find((x) => x.v === cle); if (!o || o.disabled) return; onChange(cle); };
   return (
-    <div role="group" aria-label={label} className={`vrm-seg${plein ? ' vrm-seg-plein' : ''}${className ? ' ' + className : ''}`} style={style}>
-      {options.map(o => (
-        <button key={o.v} type="button" className="vrm-seg-btn" aria-pressed={value === o.v}
-          disabled={disabled || !!o.disabled} onClick={() => onChange(o.v)}
-          {...(o.titre ? { title: o.titre, ...(o.l ? {} : { 'aria-label': o.titre }) } : (!o.l && o.icone ? { 'aria-label': NOMS_ICONES[o.icone] || String(o.v) } : {}))} {...(o.data || {})}>
-          {o.icone ? rendreIcone(o.icone, 15) : null}
-          {o.l}
-          {o.n===0||o.n ? <span className="vrm-seg-n"> {o.n}</span> : null}
-        </button>
-      ))}
-    </div>
+    <Segmente libelle={label} valeur={value} onChange={choisir} className={'vrm-seg-natif' + (plein ? ' vrm-seg-natif-plein' : '') + (className ? ' ' + className : '')}
+      options={options.map((o) => ({
+        cle: o.v,
+        libelle: o.icone ? <>{rendreIcone(o.icone, 15)}{o.l}</> : o.l,
+        n: o.n === 0 || o.n ? o.n : null,
+        attrs: {
+          'aria-pressed': value === o.v ? 'true' : 'false',
+          ...(o.titre ? { title: o.titre, ...(o.l ? {} : { 'aria-label': o.titre }) } : (!o.l && o.icone ? { 'aria-label': NOMS_ICONES[o.icone] || String(o.v) } : {})),
+          ...(disabled || o.disabled ? { 'aria-disabled': 'true' } : {}),
+          ...(o.data || {}),
+        },
+      }))}/>
   );
 }

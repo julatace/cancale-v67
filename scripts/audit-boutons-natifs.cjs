@@ -42,7 +42,6 @@ const EXCEPTIONS = [
   ['src/natif/ecrans/Fiche.jsx', /className="nf-(prix|pastille|val-touche)"/, 'un FAIT de la fiche (prix, pastille, valeur) : il se change en le touchant (NATIF.md §3, `Faits`)'],
   ['src/natif/ecrans/Fiche.jsx', /className="nf-(photo|point|miniature)"/, 'la PHOTO de la fiche, ses points et miniatures : on touche l\'image'],
   ['src/natif/ecrans/Fiche.jsx', /className="nf-choisir"/, '« Choisir une action ▾ » : un MENU (il ouvre la feuille des gestes), dessiné comme le champ d\'un choix'],
-  ['src/composants/Bouton.jsx', /className="vrm-seg-btn"/, 'SegmenteBase : un SEGMENT (aria-pressed), pas un bouton — la conversion vers le Segmente natif est un autre lot'],
   ['src/designV2/BoutonV2.jsx', /className=\{'v2-rangee /, 'RangeeTouchable : une RANGÉE entière qui se touche'],
   ['src/designV2/BoutonV2.jsx', /v2-seg|SegmentV2|role="radio"/, 'SegmentV2 : un SEGMENT'],
   ['src/designV2/BoutonV2.jsx', /'principal', 'secondaire', 'texte', 'destructif'|VERS_NATIF|data-v2b/, 'les noms de rôle et les data-v2b que les bancs lisent (pas une classe de dessin)'],
