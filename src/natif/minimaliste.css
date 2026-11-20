@@ -54,3 +54,9 @@ html body :is(.vrm-pa-article, .vrm-pa-site) { border-radius: 12px !important; b
 html body .vrm-pa-cherche { box-shadow: none !important; background: var(--ap-remplir) !important; }
 
 }
+
+/* ══ 6. Ventes · Leboncoin en rangées natives (20 nov., « les mêmes dispositions sur toutes les plateformes ») : le segment
+   prend la marge de la page, comme celui de Ventes · Vinted. ══ */
+@layer n-anciens {
+html body [data-lbc-colis-natif] > .n-segmente { margin: 0 var(--n-marge, 16px) 16px; }
+}
