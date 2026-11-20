@@ -93,4 +93,7 @@ export default {
   "egalite.numerosDonnes": { one: "{n} neue Nr. für ihren Karton", other: "{n} neue Nrn. für ihre Kartons" },
   "annonces.refaireDisparus": { one: "{n} Entwurf ist nicht mehr auf Vinted: er verlässt die Liste (VRM behält seine Kopie).", other: "{n} Entwürfe sind nicht mehr auf Vinted: sie verlassen die Liste (VRM behält ihre Kopie)." },
   "annonces.refairePasSu": { one: "{n} Entwurf: VRM weiß nicht, ob er noch auf Vinted ist (sein Kleiderschrank wurde nicht ganz neu gelesen). Öffne vinted.fr auf diesem Konto.", other: "{n} Entwürfe: VRM weiß nicht, ob sie noch auf Vinted sind (ihre Kleiderschränke wurden nicht ganz neu gelesen). Öffne vinted.fr auf diesen Konten." },
+  "egalite.groupe.sansCompte": "Ohne Konto",
+  "egalite.groupe.n": {"one": "{n} Anzeige", "other": "{n} Anzeigen"},
+  "egalite.groupe.achats": {"one": "{n} Einkaufspreis zu ergänzen", "other": "{n} Einkaufspreise zu ergänzen"}
 };

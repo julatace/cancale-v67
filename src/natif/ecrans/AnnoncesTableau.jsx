@@ -12,25 +12,38 @@ import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE } from '../../articles/modele.js';
+import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
 
 const TON = { enligne: 'accent', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', brouillon: 'neutre', vendue: 'encre', retiree: 'neutre' };
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null }) {
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null, site = 'tous', Logo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
   const [filtreLien, setFiltreLien] = React.useState('tous');
   const lienDe = (a) => (liaison && a ? liaison.de(a) : null);
   const classeLien = (a) => { const l = lienDe(a); if (!l) return ''; return l.etat === 'aRelier' ? 'arelier' : l.etat === 'propre' ? 'propre' : l.etat === 'relie' || l.etat === 'aVerifier' ? 'reliee' : ''; };
-  const lignes = React.useMemo(() => (Array.isArray(articles) ? articles.filter(({ a }) => filtreLien === 'tous' || classeLien(a) === filtreLien).map(({ a, statut }) => ({
-    cle: a.cle, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
+  // (20 nov., Julien : « divise par comptes ») Les lignes rangées PAR COMPTE (src/natif/ecrans/annoncesComptes.js) : une paire en
+  // ligne sur deux comptes a une ligne sous chacun (`cle` = article | compte) ; une action reçoit chaque ARTICLE une fois.
+  const lignes = React.useMemo(() => {
+    if (!Array.isArray(articles)) return articles;
+    const statutDe = new Map(articles.map(({ a, statut }) => [a.cle, statut]));
+    const garde = articles.filter(({ a }) => filtreLien === 'tous' || classeLien(a) === filtreLien).map(({ a }) => a);
+    const out = [];
+    for (const g of groupesParCompte(garde, site)) {
+      const titre = <span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n">{tr('egalite.groupe.n', { n: g.articles.length })}</span></span>;
+      for (const a of g.articles) out.push({ a, statut: statutDe.get(a.cle), groupe: { cle: g.cle, titre } });
+    }
+    return out.map(({ a, statut, groupe }) => ({
+    cle: a.cle + '|' + groupe.cle, groupe, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
     sous: [a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition].filter(Boolean).join(' · '),
     texte: [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + a.numero : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + nomSite(x.site))].join(' '),
     prixGrille: a.prix != null ? euros(a.prix) : '',
-    attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(',') },
-  })) : articles), [articles, euros, nomSite, filtreLien, liaison]);   // eslint-disable-line react-hooks/exhaustive-deps
+    attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(','), 'data-eg-compte': groupe.cle },
+  })); }, [articles, euros, nomSite, filtreLien, liaison, site, Logo]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const unParArticle = (ls) => { const vu = new Set(); return ls.filter((l) => (vu.has(l.a.cle) ? false : (vu.add(l.a.cle), true))).map((l) => l.a); };
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
   const modifiable = (l, cle, valeur, onModifier) => (onModifier
@@ -67,7 +80,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     options: [{ cle: 'tous', libelle: tr('liaL.filtre.tous') }, { cle: 'arelier', libelle: tr('liaL.filtre.arelier') }, { cle: 'reliee', libelle: tr('liaL.filtre.reliee') }, { cle: 'propre', libelle: tr('liaL.filtre.propre') }] }] : filtres;
   const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s] }));
   const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, aucune: tr('tableau.actionAucuneIci'),
-    pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(ls.map((l) => l.a)) : null }));
+    pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(unParArticle(ls)) : null }));
   const menuLigne = (l) => [
     { cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) },
     { cle: 'mini', libelle: tr('egalite.saisie.min'), onClick: () => saisir(l.a, 'min') },
@@ -78,7 +91,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   return (
     <TableauTravail id="annonces" titre={tr('egalite.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} rafraichit={rafraichit}
       lignes={lignes} statuts={statuts} statutsDefaut={STATUTS_EN_LIGNE} filtres={filtresL} colonnes={colonnes}
-      actions={acts} onAction={(cle, ls) => onAction(cle, ls.map((l) => l.a))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)}
+      actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
       unite={(n) => tr('tableau.articles', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
       outilsPlus={onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}
       vide={tr('tableau.videAnnonces')} pasSu={tr('egalite.pasSu')} Icon={Icon} attrs={{ 'data-eg-ecran': '', 'data-eg-vue': 'tableau' }}/>

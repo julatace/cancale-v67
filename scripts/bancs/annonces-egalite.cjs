@@ -10,7 +10,7 @@
 //  1512 × 900 et 1280 × 800, clair et sombre :
 //   P. parité : les MÊMES colonnes du tableau pour chaque vendeur ; chaque cellule
 //      porte une valeur ou « — » (rien de vide) ; au téléphone chaque rangée dit
-//      « mini … · acheté … » ;
+//      son prix, jamais « mini — » / « acheté — » répétés (20 nov. : le manque est dit UNE fois, en tête du groupe du compte) ;
 //   B. aucun bouton plein dans une rangée ni dans le tableau ; un plein au plus par écran ;
 //      aucun « Relier à Vinted » ;
 //   C. contrastes ≥ 4,5:1 de chaque texte sur son fond rendu ;
@@ -74,7 +74,7 @@ const MESURE = () => {
   r.relier = [...document.querySelectorAll('[data-eg-article]')].filter((e) => /Relier à Vinted/.test(e.textContent)).length;
   r.th = [...document.querySelectorAll('[data-eg-th]')].map((e) => e.getAttribute('data-eg-th'));
   r.lignes = [...document.querySelectorAll('tr[data-eg-article]')].slice(0, 40).map((tr) => [...tr.querySelectorAll('[data-eg-col]')].map((td) => ({ c: td.getAttribute('data-eg-col'), v: td.textContent.trim().length > 0 })));
-  r.rangees = [...document.querySelectorAll('.n-rangee[data-eg-article], [data-eg-article].n-rangee, [data-eg-liste] [data-eg-article]')].slice(0, 40).map((e) => ({ faits: /mini \S/.test(e.textContent) && /acheté \S/.test(e.textContent), prix: /€|—/.test(e.textContent) }));
+  r.rangees = [...document.querySelectorAll('.n-rangee[data-eg-article], [data-eg-article].n-rangee, [data-eg-liste] [data-eg-article]')].slice(0, 40).map((e) => ({ faits: !/mini —|acheté —/.test(e.textContent), prix: /€|—/.test(e.textContent) }));
   r.nRangees = document.querySelectorAll('[data-eg-article]').length;
   return r;
 };
@@ -107,7 +107,7 @@ async function juger(nav, mutant = '') {
           dit(r.lignes.length > 0 && r.lignes.every((l) => l.length === 8 && l.every((c) => c.v)), `P ${ou} : chaque cellule porte une valeur ou « — »`, r.lignes.find((l) => l.length !== 8 || l.some((c) => !c.v)));
           parSite[v] = parSite[v] || r.th.join(',');
         } else {
-          dit(r.rangees.length > 0 && r.rangees.every((x) => x.faits && x.prix), `P ${ou} : chaque rangée dit son prix, « mini … · acheté … »`, r.rangees.find((x) => !x.faits || !x.prix));
+          dit(r.rangees.length > 0 && r.rangees.every((x) => x.faits && x.prix), `P ${ou} : chaque rangée dit son prix, et jamais « mini — » / « acheté — » (un manque est dit une fois, en tête du compte — 20 nov.)`, r.rangees.find((x) => !x.faits || !x.prix));
           dit(r.cibles.length === 0, `T ${ou} : cibles ≥ 44 × 44`, r.cibles.slice(0, 6));
         }
         if (v === 'volume') dit(r.nRangees === 60 && r.plus, `V ${ou} : 60 rangées puis « Voir N de plus »`, r.nRangees);

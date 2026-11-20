@@ -93,4 +93,7 @@ export default {
   "egalite.numerosDonnes": { one: "{n} nuovo N° da scrivere sulla sua scatola", other: "{n} nuovi N° da scrivere sulle loro scatole" },
   "annonces.refaireDisparus": { one: "{n} bozza non è più su Vinted: esce dalla lista (VRM ne tiene la copia).", other: "{n} bozze non sono più su Vinted: escono dalla lista (VRM ne tiene la copia)." },
   "annonces.refairePasSu": { one: "{n} bozza: VRM non sa se è ancora su Vinted (il suo guardaroba non è stato riletto per intero). Apri vinted.fr su questo account.", other: "{n} bozze: VRM non sa se sono ancora su Vinted (i loro guardaroba non sono stati riletti per intero). Apri vinted.fr su questi account." },
+  "egalite.groupe.sansCompte": "Senza account",
+  "egalite.groupe.n": {"one": "{n} annuncio", "other": "{n} annunci"},
+  "egalite.groupe.achats": {"one": "{n} prezzo d’acquisto da completare", "other": "{n} prezzi d’acquisto da completare"}
 };

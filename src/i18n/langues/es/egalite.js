@@ -93,4 +93,7 @@ export default {
   "egalite.numerosDonnes": { one: "{n} N.º nuevo para escribir en su caja", other: "{n} N.º nuevos para escribir en sus cajas" },
   "annonces.refaireDisparus": { one: "{n} borrador ya no está en Vinted: sale de la lista (VRM guarda su copia).", other: "{n} borradores ya no están en Vinted: salen de la lista (VRM guarda su copia)." },
   "annonces.refairePasSu": { one: "{n} borrador: VRM no sabe si sigue en Vinted (su armario no se ha releído entero). Abre vinted.fr en esta cuenta.", other: "{n} borradores: VRM no sabe si siguen en Vinted (sus armarios no se han releído enteros). Abre vinted.fr en estas cuentas." },
+  "egalite.groupe.sansCompte": "Sin cuenta",
+  "egalite.groupe.n": {"one": "{n} anuncio", "other": "{n} anuncios"},
+  "egalite.groupe.achats": {"one": "{n} precio de compra por completar", "other": "{n} precios de compra por completar"}
 };

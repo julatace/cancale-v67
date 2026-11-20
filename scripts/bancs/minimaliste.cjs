@@ -412,7 +412,66 @@ async function selecteur() {
   console.log(rouges ? `\n❌ sélecteur : ${rouges} rouge(s)` : '\n✅ sélecteur : tout est vert'); if (rouges) process.exitCode = 1;
 }
 
-if (require.main === module && process.argv[2] === '--selecteur') selecteur();
+// `--annonces` (20 nov., Julien : « améliore le visuel » + « divise par comptes ») : 3 comptes Vinted + 1 Leboncoin.
+//   A1 un groupe par compte (Vinted d'abord, Leboncoin ensuite), chacun « N annonces » ; A2 aucune rangée ne dit « mini — » ni
+//   « acheté — » ; un manque est une rangée en tête du groupe ; A3 pas de pastille teintée sous le titre (« Actions » = rond ⋯) ;
+//   A4 le plein est détaché des onglets (≥ 12 px) ; A5 replier un compte tient après rechargement ; A6 une recherche ne montre
+//   que les groupes qui ont un résultat ; A7 à 1512 : un intertitre par compte dans le tableau. Captures dans SORTIE/ecrans.
+async function annoncesComptes() {
+  await new Promise((r) => P.srv.listen(P.PORT, r));
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 400))); };
+  const base = () => { const b = E.baseFiches(); const l = baseSite('leboncoin'); b.rows.push(...l.rows.filter((x) => /^lbc_/.test(x.id))); return b; };
+  const lire = (pg) => pg.evaluate(() => {
+    const gs = [...document.querySelectorAll('[data-eg-liste] [data-eg-groupe]')].map((g) => ({ cle: g.getAttribute('data-eg-groupe'), n: Number(g.getAttribute('data-eg-groupe-n')), tete: (g.querySelector('.n-groupe-tete') || g).innerText.replace(/\s+/g, ' ').trim(), rangees: g.querySelectorAll('[data-eg-article]').length, manque: !!g.querySelector('[data-eg-manque]'), ouvert: !!g.querySelector('.n-groupe-carte') }));
+    const rangees = [...document.querySelectorAll('[data-eg-liste] [data-eg-article]')].map((e) => e.textContent);
+    const teintes = document.querySelectorAll('[data-eg-tete] .n-bouton[data-n-variante="teinte"]').length;
+    const plein = document.querySelector('[data-eg-publier]'); const onglets = document.querySelector('.n-onglets');
+    const ecart = plein && onglets ? Math.round(onglets.getBoundingClientRect().top - plein.getBoundingClientRect().bottom) : null;
+    const inter = [...document.querySelectorAll('.n-tt-intertitre')].map((x) => x.getAttribute('data-tt-groupe'));
+    return { gs, rangees, teintes, ecart, actions: !!document.querySelector('[data-eg-actions].n-bouton-icone-seule, [data-eg-actions]'), inter };
+  });
+  try {
+    for (const [W, th] of [[390, 'clair'], [390, 'sombre'], [1512, 'clair']]) {
+      console.log(`\n── Annonces par compte · ${W} · ${th}`);
+      const o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: base(), url: '/?tab=annonces', api: B.apiVolume });
+      await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_annonces_replis'); } catch (_) {} }); await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE + 1500);
+      const r = await lire(o.pg);
+      await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `annonces-comptes-${W}-${th}.png`) }).catch(() => {});
+      if (W < 1024) {
+        const cles = r.gs.map((g) => g.cle);
+        const iL = cles.findIndex((c) => c.startsWith('leboncoin:')), iV = cles.map((c, i) => (c.startsWith('vinted:') ? i : -1)).filter((i) => i >= 0);
+        dit(r.gs.length >= 4 && iV.length >= 3 && iL > Math.max(...iV), `A1 ${W} ${th} : un groupe par compte, Vinted puis Leboncoin (${cles.join(', ')})`, r.gs);
+        dit(r.gs.every((g) => /\d+ annonces?/.test(g.tete) && g.n >= 1), `A1 ${W} ${th} : chaque en-tête dit « N annonces »`, r.gs.map((g) => g.tete));
+        dit(r.rangees.length > 0 && r.rangees.every((t) => !/mini —|acheté —/.test(t)), `A2 ${W} ${th} : aucune rangée ne répète « mini — » / « acheté — »`, r.rangees.find((t) => /mini —|acheté —/.test(t)));
+        dit(r.teintes === 0 && r.actions, `A3 ${W} ${th} : aucune pastille teintée sous le titre ; « Actions » est un rond ⋯`, r);
+        dit(r.ecart == null || r.ecart >= 12, `A4 ${W} ${th} : le plein est détaché des onglets (${r.ecart} px)`, r.ecart);
+        if (th === 'clair') {
+          const premier = r.gs[0] && r.gs[0].cle;
+          await o.pg.locator(`[data-eg-groupe="${premier}"] .n-groupe-repli`).first().click({ timeout: 4000 }).catch(() => {});
+          await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE + 1500);
+          const r2 = await lire(o.pg);
+          const g2 = r2.gs.find((g) => g.cle === premier);
+          dit(!!g2 && !g2.ouvert && r2.gs.filter((g) => g.cle !== premier).every((g) => g.ouvert), `A5 ${W} : « ${premier} » replié, gardé après rechargement`, r2.gs);
+          await o.pg.locator(`[data-eg-groupe="${premier}"] .n-groupe-repli`).first().click({ timeout: 4000 }).catch(() => {});
+          await o.pg.locator('[data-eg-ecran] input[type="search"], [data-eg-ecran] .n-champ input, .n-page-recherche input').first().fill('Vans Old Skool taille 41').catch(() => {});
+          await o.pg.waitForTimeout(1200);
+          const r3 = await lire(o.pg);
+          dit(r3.gs.length >= 1 && r3.gs.every((g) => g.rangees > 0) && r3.gs.length < r.gs.length + 1, `A6 ${W} : la recherche ne montre que les groupes qui ont un résultat (${r3.gs.map((g) => g.cle + ':' + g.rangees).join(', ')})`, r3.gs);
+          await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `annonces-comptes-${W}-recherche.png`) }).catch(() => {});
+        }
+      } else {
+        dit(r.inter.length >= 4 && r.inter.some((c) => c.startsWith('leboncoin:')), `A7 ${W} : un intertitre par compte dans le tableau (${r.inter.join(', ')})`, r.inter);
+      }
+      dit(!o.erreurs.length, `${W} ${th} : aucune erreur de page`, o.erreurs.slice(0, 3));
+      await o.ctx.close();
+    }
+  } finally { await nav.close(); P.srv.close(); }
+  console.log(rouges ? `\n❌ annonces par compte : ${rouges} rouge(s)` : '\n✅ annonces par compte : tout est vert'); if (rouges) process.exitCode = 1;
+}
+
+if (require.main === module && process.argv[2] === '--annonces') annoncesComptes();
+else if (require.main === module && process.argv[2] === '--selecteur') selecteur();
 else if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }
 else if (require.main === module && process.argv[2] === '--compare') compare(process.argv.slice(3));
