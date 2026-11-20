@@ -45684,6 +45684,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Les articles des AUTRES sites sans achat (porteur = son annonce, `vrm_articles_sites`) : undefined en lecture, [] sinon.
   const [articlesSitesGlisser, setArticlesSitesGlisser] = useState(undefined);
   const [faitsSitesTic, setFaitsSitesTic] = useState(0);
+  // Les annonces reliées dans CET écran (la vue du geste, avant que l'écriture ne soit relue) : `apres` la pose, « Annuler » la retire.
+  const [reliesSitesIci, setReliesSitesIci] = useState(() => new Map());   // cle de l'annonce → n° de l'achat
   useEffect(() => {
     if (!glisserOuvert) return undefined;
     let vivant = true;
@@ -45702,10 +45704,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const liensGlisser = useMemo(() => {
     if (!glisserOuvert) return liensAchats;
     const m = new Map(liensAchats);
-    for (const e of Object.values(load('vrm_articles_sites', {}) || {})) { if (!e || e.buyFromId == null || String(e.buyFromId) === '') continue; const k = String(e.buyFromId); m.set(k, (m.get(k) || 0) + 1); }
+    const faits = load('vrm_articles_sites', {}) || {};
+    for (const e of Object.values(faits)) { if (!e || e.buyFromId == null || String(e.buyFromId) === '') continue; const k = String(e.buyFromId); m.set(k, (m.get(k) || 0) + 1); }
+    for (const [c, tx] of reliesSitesIci) { if (faits[c] && faits[c].buyFromId != null && String(faits[c].buyFromId) !== '') continue; m.set(tx, (m.get(tx) || 0) + 1); }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [glisserOuvert, liensAchats, faitsSitesTic]);
+  }, [glisserOuvert, liensAchats, faitsSitesTic, reliesSitesIci]);
   const ciblesGlisser = useMemo(() => {
     if (!glisserOuvert) return [];
     const jour = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
@@ -45729,6 +45733,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         sous: [prixTxt(x.o.price), x.o.date ? tr('liaison.venduLe', { date: jour(x.o.date) }) : ''].filter(Boolean).join(' · ') }); }
     // Les autres sites : l'ARTICLE (son annonce porte le lien, `vrm_articles_sites`), par l'identifiant de son annonce.
     for (const a of (articlesSitesGlisser || [])) {
+      if (reliesSitesIci.has(a.porteur.cle)) continue;
       const an = a.annonces.find((x) => x.site === a.porteur.site && String(x.id) === String(a.porteur.id)) || a.annonces[0] || {};
       const vendue = a.etat === 'vendue';
       out.push({ key: 's:' + a.porteur.cle, genre: vendue ? 'vente' : 'annonce', site: a.porteur.site, article: a, titre: a.titre || '', photo: a.photo || '', num: a.numero || '',
@@ -45737,7 +45742,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [glisserOuvert, fileAchat, fileVendus, fileVendusTous, fileAchatHorsLigne, articlesSitesGlisser, numeros]);
+  }, [glisserOuvert, fileAchat, fileVendus, fileVendusTous, fileAchatHorsLigne, articlesSitesGlisser, reliesSitesIci, numeros]);
   const relierGlisse = async (a, cible) => {
     if (!a || !cible) return false;
     if (cible.article) return relierGlisseSite(a, cible);
@@ -45756,10 +45761,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const lire = (k) => { try { const v = load(k, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
       const r = M.opsFait({ article: cible.article, champs: { buyPrice: w.buyPrice, buyFromId: w.buyFromId, buyFrom: w.buyFrom }, cartes: { fiches: lire('vinted_annonce_numeros'), faits: lire(M.CLE_ARTICLES) || {}, parNum: lire('vinted_buyprice_by_num') || {} } });
       if (!r || r.refus || !Array.isArray(r.ops) || !r.ops.length) { toast(tr('glisser.pasEcrit'), 'error'); return false; }
-      gesteVrm(tr('glisser.fait', { qui: cible.num ? `N°${cible.num}` : `« ${String(cible.titre || '').slice(0, 40)} »` }), r.ops, {}, () => setFaitsSitesTic((t) => t + 1));
-      // Elle sort de la liste tout de suite (la relecture qui suit la confirme ; « Annuler » la fait revenir par la même relecture).
-      setArticlesSitesGlisser((l) => (Array.isArray(l) ? l.filter((x) => !(x.porteur && x.porteur.cle === cible.article.porteur.cle)) : l));
-      setFaitsSitesTic((t) => t + 1);
+      const cleA = cible.article.porteur.cle;
+      // Elle sort de la liste tout de suite ; « Annuler » la fait revenir (la vue du geste, puis la relecture).
+      gesteVrm(tr('glisser.fait', { qui: cible.num ? `N°${cible.num}` : `« ${String(cible.titre || '').slice(0, 40)} »` }), r.ops, {}, (sens) => {
+        setReliesSitesIci((m) => { const n = new Map(m); if (sens === 'avant') n.delete(cleA); else n.set(cleA, String(w.buyFromId)); return n; });
+        setFaitsSitesTic((t) => t + 1);
+      });
       return true;
     }
     return false;

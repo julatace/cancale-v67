@@ -213,6 +213,7 @@ async function passe(b, nom) {
   await pg.waitForTimeout(600);
   const encore = await pg.locator(`[data-glisser-cible="${cle}"]`).count();
   dit(encore === 0, `${nom} · l'annonce reliée sort de la liste`);
+  dit(Number(await lireAttr(pg, '[data-glisser-achats]', 'data-glisser-achats')) === ATTENDU_ACHATS - 1, `${nom} · l'achat relié n'est plus libre`);
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2));
   await ctx.close();
 }
