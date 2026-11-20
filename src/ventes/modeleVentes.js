@@ -86,6 +86,7 @@ export function rangeeEnvoyer(f = {}) {
     num: str(f.num), numDouble: !!f.numDouble, numAttendu: !str(f.num) && !autreSite,
     titre: str(f.titre), taille: str(f.taille), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
     prix: str(f.prix), transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t),
+    achat: f.achat || null,   // (20 nov.) { relie, prix, ouvrir } : la colonne « Achat » (Relier), lue par l'écran ; null hors Vinted
     bordereau: etatBordereau({ pdf: !!f.pdf, imprime: !!f.imprime, autreSite }),
     coche: caseDeRangee(f.ligneLot || null, f.coches || null),
     echeance: echeanceRangee(f.echeance || null, { estimee: !!f.limiteEstimee, presse: !!f.presse }),
@@ -107,7 +108,7 @@ export function rangeeRoute(f = {}) {
     prix: str(f.prix), pourToi: !!f.pourToi && !!str(f.prix),
     etapes: etapesRoute(f.lues || {}),
     etat: { texte: str(f.etat), ambre: !!f.etatAmbre },
-    transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t), suivi: str(f.suivi), lienSuivi: str(f.lienSuivi),
+    transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t), achat: f.achat || null, suivi: str(f.suivi), lienSuivi: str(f.lienSuivi),
     fiche: f.fiche || null, detail: f.detail || null, gestes: f.gestes || {},
   };
 }

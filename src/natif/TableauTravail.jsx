@@ -400,9 +400,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   return (
     <div className={cx('n-tt', ordinateur ? 'n-tt-ordi' : 'n-tt-tel')} ref={refRacine} data-tt={id} data-tt-vue={ordinateur ? vue : 'tel'} data-tt-etat={lignes === undefined ? 'lecture' : lignes === null ? 'passu' : 'lu'} {...(attrs || {})}>
       <Page titre={titre} plein={barreSel || plein}>
-        {tete}
-        {avantOutils}
-        {outils}
+        {/* (20 nov., capture de Julien : « Tous les comptes » coupé, le segmenté caché sous l'en-tête, des rangées qui passent
+            au-dessus) La tête du tableau est UN bloc collant, opaque, sous la barre de titre : rien ne la recouvre, rien ne passe dessus. */}
+        <div className="n-tt-colle" data-tt-colle="">
+          {tete}
+          {avantOutils}
+          {outils}
+        </div>
         {haut}
         {Array.isArray(lignes) ? nombre : null}
         {corps}

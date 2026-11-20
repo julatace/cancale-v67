@@ -17,6 +17,7 @@ import { useOrdinateur } from '../Coque.jsx';
 import { Pastille } from '../Pastille.jsx';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) tout est mélangé : le logo du site de chaque vente
+import { celluleAchat } from './celluleAchat.jsx';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -135,6 +136,8 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
           attrs={{ 'data-etape': e.cle, 'data-fait': e.fait ? '1' : '0' }}/>)}
       </Groupe> : null}
       <Groupe attrs={{ 'data-vn-gestes': r.cle }}>
+        {r.achat ? <Rangee icone={<Icon name="relier" size={22}/>} titre={r.achat.relie ? tr('vt.achatRelie', { prix: r.achat.prix || '—' }) : tr('vt.relier')} fin="chevron"
+          onClick={r.achat.ouvrir} attrs={{ 'data-vn-geste': 'relier-achat', 'data-vt-relier': r.achat.relie ? 'relie' : 'libre' }}/> : null}
         {G.imprimer ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr(G.facture ? 'vn.g.imprimerFacture' : 'vn.g.imprimer')} onClick={(ev) => G.imprimer(ev)} attrs={{ 'data-vn-geste': 'imprimer' }}/> : null}
         {G.lien ? <Rangee icone={<Icon name="printer" size={22}/>} titre={tr('vn.g.lien.' + G.lien.sorte)} href={G.lien.url} fin="chevron" attrs={{ 'data-vn-geste': 'lien' }}/> : null}
         {G.depose ? <Rangee icone={<Icon name="check" size={22}/>} titre={tr(r.depose ? 'vv.volet.pasDepose' : 'vn.g.depose')} onClick={G.depose} attrs={{ 'data-vn-geste': 'depose' }}/> : null}
@@ -198,15 +201,20 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
       sous, statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
       texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sous].filter(Boolean).join(' '),
       attrs: surEnvoyer
-        ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
-        : { 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length), 'data-vt-statut': st, 'data-vt-transporteur': r.transporteurCle || '' } };
+        ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-site': r.site, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
+        : { 'data-vt-site': r.site, 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length), 'data-vt-statut': st, 'data-vt-transporteur': r.transporteurCle || '' } };
   });
   const presses = surEnvoyer ? rangs.filter((r) => r.echeance && r.echeance.ambre).length : 0;
   const colonnes = [
     // (20 nov. soir) Tout est mélangé : une colonne « Site » ÉTROITE, le logo seul (le nom au survol).
     { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, tri: (l) => l.r.site || null, rendu: (l) => (l.r.site ? <LogoSite site={l.r.site} taille={18} nom={Logo && Logo.nom ? Logo.nom(l.r.site) : l.r.site}/> : null) },
+    // (20 nov., Julien : « il y a la place pour mettre le bouton relier ») L'ACHAT : le bouton-icône « Relier » (les deux maillons) ouvre
+    // l'atelier sur CETTE vente ; reliée : les maillons en gris et le prix d'achat. Hors Vinted : « — ». Jamais relié tout seul (§5).
+    { cle: 'achat', libelle: tr('vt.col.achat'), tri: (l) => (l.r.achat ? (l.r.achat.relie ? 1 : 0) : null), rendu: (l) => celluleAchat(l.r.achat, Icon) },
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num} doublon={l.r.numDouble}/> : null) },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => { const n = parseFloat(String(l.prix || '').replace(/[^\d,.-]/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; }, rendu: (l) => l.prix || null },
+    // (20 nov.) Tableau étroit (1280 px, Site + Achat en plus) : la date de vente se replie (src/natif/tableau.css, requête de conteneur)
+    // pour que le titre garde ≥ 200 px ; la date LIMITE reste.
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => dateCourte(l.t) },
     { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => l.r.transporteur || null,
       rendu: (l) => (l.r.transporteur ? <span className="n-tt-transporteur" data-transporteur={l.r.transporteurCle || ''}>{logoTr(l.r)}<span>{l.r.transporteur}</span></span> : null) },
@@ -322,8 +330,8 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
     <>
       <Page titre={tr('vn.titre')} plein={plein} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet }}
         recherche={m.onglet !== 'toutes' ? <ChampRecherche valeur={q} onChange={setQ} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')} onScanner={g.retrouver} attrs={{ 'data-vn-champ': '' }}/> : null}>
-        <Segmente libelle={tr('vv.seg.label')} valeur={m.onglet} onChange={g.onglet}
-          options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: m.nEnv || undefined }, { cle: 'envoyes', libelle: tr('vv.seg.route'), n: m.nRoute || undefined }, { cle: 'toutes', libelle: tr('vn.terminees') }]}/>
+        {/* (20 nov.) Le segmenté reste collé sous la barre de titre, sur un fond opaque : jamais caché, rien ne passe dessus. */}
+        <div className="n-vn-colle" data-vn-colle="">{segment}</div>
         {avant}
         {surEnvoyer ? <>
           {!E.lu && !E.rangs.length ? <Attente forme="rangees" n={5} vignette={56} titre/>
