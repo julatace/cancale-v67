@@ -32,7 +32,8 @@ const MUTATIONS = {
   favoris_regle: ["try { return GARDES_APP.validerReglagesFavoris(voulu); }", "try { return voulu; }"],
   prix_plancher: ["if (pl && vouluC < pl.c) { refus.push({ id, code: 'plancher'", "if (false) { refus.push({ id, code: 'plancher'"],
   prix_confirme: ["if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Confirmer ».' };", ''],
-  atelier_photo: ["reglages: a.photo, ...(a.lettre", "...(a.lettre"],
+  atelier_photo: ["reglages: a.photo, ...(a.reponses", "...(a.reponses"],
+  atelier_verif: ["if (!perm.ok) return { ok: false, code: perm.raison", "if (false) return { ok: false, code: perm.raison"],
   atelier_arret: ["if (!fait) { a2.etat = 'arretee';", "if (false) { a2.etat = 'arretee';"],
   offre_liste: ["if (!off) return { ok: false, code: 'offre'", "if (false) return { ok: false, code: 'offre'"],
   contre_plancher: ["if (pl && pc < pl.c) return { ok: false, code: 'plancher'", "if (false) return { ok: false, code: 'plancher'"],
@@ -214,6 +215,14 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     rep = { accepte: true, etape: 'fait' };
     const rp = await g.envoyer({ from: 'vrm-badge', action: 'atelierReprendre', id: '5001' }, T2);
     dit(rp && rp.ok && ex[2] && ex[2].cmd === 'reprendreRepub' && ex[2].id === '5001' && g.store.vrmAtelierRepub.etat === 'finie', '« Reprendre » relit chez Vinted et finit la paire interrompue (`reprendreRepub`)', JSON.stringify({ rp, c: ex[2] }));
+    // Contrôle avant de lancer (`verifierRepub`, règle de l'app) : à corriger ⇒ Lancer fermé ; absente ⇒ ne part pas ; SA réponse voyage avec SA paire.
+    const gv = faireFond({ src: SRC, connecte: UID, lignes: { main: {} }, store: { vrmAtelierVerif: { v: 1, uid: UID, at: Date.now(), paires: { 5001: { id: '5001', etat: 'a-corriger', corrections: [], manque: ['la taille'], question: { champ: 'size_id', options: [['206', '42']] } }, 5002: { id: '5002', etat: 'absente', corrections: [], manque: [] }, 5003: { id: '5003', etat: 'ok', corrections: [], manque: [], rep: { size_id: '206' } } } } } });
+    const exv = []; gv.ctx.executerCommande = async (m) => { exv.push(m); return { accepte: true, etape: 'fait' }; };
+    const v1 = await gv.envoyer({ from: 'vrm-badge', action: 'atelierLancer', confirme: true, ids: ['5001', '5002', '5003'], espacement: { mode: 'fixe', min: 2 } }, T2);
+    dit(v1 && v1.ok === false && v1.code === 'a-corriger' && exv.length === 0, 'atelier : une annonce « à corriger » ⇒ « Lancer » refusé, rien ne part', JSON.stringify(v1));
+    const v2 = await gv.envoyer({ from: 'vrm-badge', action: 'atelierLancer', confirme: true, ids: ['5002', '5003'], espacement: { mode: 'fixe', min: 2 } }, T2);
+    await new Promise((r) => setTimeout(r, 30));
+    dit(v2 && v2.ok && exv.length === 1 && exv[0].id === '5003' && exv[0].reponses && exv[0].reponses.size_id === '206' && gv.store.vrmAtelierRepub.ids.join(',') === '5003', 'atelier : l’absente ne part jamais ; SA réponse (taille) part avec SA paire', JSON.stringify({ v2: v2 && v2.ok, exv }));
     // Offres
     const o = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12', min: '45' } } } } });
     o.ctx.offresEnAttente = async () => [{ conv: '1', prix: 40, tx: '900', oid: '901', item: '5001' }];

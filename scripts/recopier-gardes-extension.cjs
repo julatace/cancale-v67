@@ -8,6 +8,8 @@
 //   · confirmationSupprimerLbc (src/actionsExtensionGardes.js) — la confirmation « sans retour » de Leboncoin ;
 //   · la règle des REPUBLICATIONS PROGRAMMÉES (src/repubProgramme.js : decision, conditionsDepart, prendreDepart…)
 //     et l'aperçu titre / prix d'une republication (src/republierReglages.js : apercuRepub) — la veille vit dans le fond ;
+//   · le contrôle avant de lancer une republication (src/repubVerif.js) et la phrase du bilan des favoris
+//     (src/favorisProgression.js : phraseBilanFavoris) ;
 //   · l'agent de publication (src/publier/agent.js : ficheArticle, planSite, envoiPour, retenirReponses) ;
 //   · validerReglagesFavoris (src/reglagesFavoris.js) et validerAutoFavoris (src/favorisAuto.js) — les réglages des
 //     messages aux favoris écrits depuis le panneau passent par la règle de l'app (le serveur la reprend à l'envoi) ;
@@ -25,7 +27,9 @@ export { programmesDe, decision, conditionsDepart, prendreDepart, marquerPasPart
 export { apercuRepub, photoNeutre, tirerLettre } from './src/republierReglages.js';
 export { validerReglagesFavoris } from './src/reglagesFavoris.js';
 export { validerAutoFavoris } from './src/favorisAuto.js';
-export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publier/agent.js';`;
+export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publier/agent.js';
+export { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from './src/repubVerif.js';
+export { phraseBilanFavoris } from './src/favorisProgression.js';`;
 const out = esbuild.buildSync({ stdin: { contents: entree, resolveDir: R, loader: 'js' }, bundle: true, format: 'iife', globalName: '__gardesApp', write: false, platform: 'neutral', target: 'es2020', legalComments: 'none', charset: 'utf8' });
 const code = out.outputFiles[0].text.trim();
 const bloc = `// <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).\n${code}\nconst GARDES_APP = __gardesApp;\n// </gardes-app>`;

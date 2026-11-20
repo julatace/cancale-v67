@@ -95,6 +95,8 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
           else if (msg.action === 'reglagesFavoris') rep = { ok: true };
           else if (msg.action === 'prixCarte') rep = msg.confirme === true ? { ok: true, ranges: msg.items.map((x) => x.id), refus: [] } : { ok: false };
+          else if (msg.action === 'atelierVerifier') { const okR = !!(msg.reponses && msg.reponses['7001']); const paires = Object.fromEntries((msg.tous || msg.ids).map((id) => [id, id === '7001' && !okR ? { id, etat: 'a-corriger', corrections: [], manque: ['la taille'], question: { champ: 'size_id', nom: 'la taille', options: [['206', '42'], ['207', '43']] } } : { id, etat: id === '7007' ? 'corrige' : 'ok', corrections: id === '7007' ? [{ champ: 'size_id', nom: 'Taille', raison: 'même libellé dans la grille du jour' }] : [], manque: [] }]));
+            const aC = Object.values(paires).filter((x) => x.etat === 'a-corriger').length; rep = { ok: true, paires, resume: { total: msg.tous.length, verifiees: msg.tous.length, ok: 1, corrige: 1, aCorriger: aC, absente: 0, pasVerifie: 0 }, lancer: aC ? { ok: false, raison: 'a-corriger', n: aC } : { ok: true } }; }
           else if (msg.action === 'atelierLancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'offreCarte') rep = msg.quoi === 'accept' && msg.avisVu !== true ? { ok: false, code: 'avis', avis: 'VRM n’a pas pu vérifier tes autres sites : vérifie qu’elle n’y est pas vendue.' } : { ok: true };
           else if (msg.action === 'publierCarte') rep = !msg.reponses ? { ok: false, code: 'questions', questions: [{ champ: 'categorie', choix: ['Baskets', 'Bottes'], saisie: '' }] } : msg.verifVu !== true ? { accepte: false, code: 'verification', problemes: [{ code: 'photos', texte: '1 photo seulement' }] } : { accepte: true };
@@ -264,6 +266,15 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-geste-fermer]');
         await coche(['7001', '7004', '7007']); await t.pg.waitForTimeout(150);
         await action('republier');
+        await t.pg.waitForTimeout(250);
+        const av1 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-atelier-lancer]'); return { off: b && b.disabled, recap: (r.querySelector('[data-atelier-recap]') || {}).innerText || '', q: !!r.querySelector('[data-atelier-question="7001"]'), retirer: !!r.querySelector('[data-atelier-retirer="7001"]'), ferme: !!r.querySelector('[data-atelier-ferme]') }; });
+        await cap(t.pg, N('geste-atelier-verif'));
+        dit(av1.off && /1 à corriger/.test(av1.recap) && av1.q && av1.retirer && av1.ferme, `${T} : atelier : le contrôle avant de lancer (verifierRepub) — récapitulatif, « Choisir : la taille », « Retirer de la file », Lancer fermé`, JSON.stringify(av1));
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-question="7001"]'); c.value = '206'; c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(250);
+        const vv = await env('atelierVerifier');
+        const av2 = await t.pg.evaluate(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-lancer]'); return b && b.disabled; });
+        dit(vv.length === 2 && vv[1].ids.join(',') === '7001' && vv[1].reponses['7001'].size_id === '206' && av2 === false, `${T} : atelier : SA taille choisie revérifiée pour SA paire ⇒ « Lancer » s’ouvre`, JSON.stringify({ vv, av2 }));
         await clic(t.pg, '[data-atelier-bas="0"]');
         await clic(t.pg, '[data-atelier-mode="fixe"]');
         await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-photo="bright"]'); c.value = '1.2'; c.dispatchEvent(new Event('input')); });

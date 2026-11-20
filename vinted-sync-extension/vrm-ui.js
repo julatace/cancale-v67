@@ -28,6 +28,20 @@
   // </logos-transporteurs>
   const MOTS = {
     // 5.410 — panneau comme Vintex
+    g6_verif_cours: { fr: "Vérification de chaque annonce chez Vinted…", en: "Checking each listing on Vinted…", es: "Comprobando cada anuncio en Vinted…", it: "Verifica di ogni annuncio su Vinted…", de: "Jede Anzeige wird bei Vinted geprüft…" },
+    g6_verif_recap: { fr: "{v} vérifiée(s) · {c} corrigée(s) seule(s) · {a} à corriger avant de lancer", en: "{v} checked · {c} fixed automatically · {a} to fix before starting", es: "{v} comprobado(s) · {c} corregido(s) solo(s) · {a} por corregir antes de lanzar", it: "{v} verificato/i · {c} corretto/i da solo · {a} da correggere prima di avviare", de: "{v} geprüft · {c} selbst korrigiert · {a} vor dem Start zu korrigieren" },
+    g6_verif_absentes: { fr: "{n} absente(s) chez Vinted (ne partiront pas)", en: "{n} missing on Vinted (won’t go)", es: "{n} ausente(s) en Vinted (no saldrán)", it: "{n} assente/i su Vinted (non partiranno)", de: "{n} bei Vinted nicht mehr da (gehen nicht raus)" },
+    g6_verif_pas: { fr: "{n} pas vérifiée(s) maintenant (vérifiées au départ)", en: "{n} not checked now (checked at start)", es: "{n} sin comprobar ahora (se comprobarán al salir)", it: "{n} non verificato/i ora (verificati alla partenza)", de: "{n} jetzt nicht geprüft (beim Start geprüft)" },
+    g6_v_ok: { fr: "Prête", en: "Ready", es: "Lista", it: "Pronta", de: "Bereit" },
+    g6_v_corrige: { fr: "Corrigée seule", en: "Fixed automatically", es: "Corregida sola", it: "Corretta da sola", de: "Selbst korrigiert" },
+    g6_v_a_corriger: { fr: "À corriger", en: "To fix", es: "Por corregir", it: "Da correggere", de: "Zu korrigieren" },
+    g6_v_absente: { fr: "Absente chez Vinted", en: "Missing on Vinted", es: "Ausente en Vinted", it: "Assente su Vinted", de: "Bei Vinted nicht da" },
+    g6_v_pas_verifie: { fr: "Vérifiée au départ", en: "Checked at start", es: "Se comprobará al salir", it: "Verificata alla partenza", de: "Beim Start geprüft" },
+    g6_manque: { fr: "Manque : {m}", en: "Missing: {m}", es: "Falta: {m}", it: "Manca: {m}", de: "Fehlt: {m}" },
+    g6_choisir: { fr: "Choisir : {nom}", en: "Choose: {nom}", es: "Elegir: {nom}", it: "Scegli: {nom}", de: "Wählen: {nom}" },
+    g6_retirer: { fr: "Retirer de la file", en: "Remove from the queue", es: "Quitar de la cola", it: "Togli dalla coda", de: "Aus der Liste nehmen" },
+    g6_lancer_ferme: { fr: "« Lancer » reste fermé : {n} annonce(s) à corriger.", en: "“Start” stays closed: {n} listing(s) to fix.", es: "«Lanzar» sigue cerrado: {n} anuncio(s) por corregir.", it: "«Avvia» resta chiuso: {n} annuncio/i da correggere.", de: "„Starten“ bleibt gesperrt: {n} Anzeige(n) zu korrigieren." },
+    g6_toutes_absentes: { fr: "Toutes ces annonces sont absentes chez Vinted.", en: "All these listings are missing on Vinted.", es: "Todos estos anuncios faltan en Vinted.", it: "Tutti questi annunci mancano su Vinted.", de: "Alle diese Anzeigen fehlen bei Vinted." },
     g6_ecrire_message: { fr: "Écris d’abord ton message (Automatisations)", en: "Write your message first (Automations)", es: "Escribe primero tu mensaje (Automatizaciones)", it: "Scrivi prima il tuo messaggio (Automazioni)", de: "Schreib zuerst deine Nachricht (Automatisierungen)" },
     ac_publier: { fr: "Publier sur…", en: "Publish on…", es: "Publicar en…", it: "Pubblica su…", de: "Veröffentlichen auf…" },
     g6_prix_titre: { fr: "Changer le prix · {n} annonce(s)", en: "Change price · {n} listing(s)", es: "Cambiar precio · {n} anuncio(s)", it: "Cambia prezzo · {n} annuncio/i", de: "Preis ändern · {n} Anzeige(n)" },

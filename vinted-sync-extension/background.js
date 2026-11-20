@@ -4016,6 +4016,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // 5.409 : répondre depuis le volet Messages du panneau — SEULEMENT depuis la carte de l'onglet vinted.fr.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixCarte') { changerPrixCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifier') { atelierVerifier(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierLancer') { atelierLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierArreter') { atelierArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -19600,6 +19601,31 @@ async function changerPrixCarte(msg, sender) {
 //    interrompue = `reprendreRepub` (relit chez Vinted, jamais deux en ligne).
 const ATELIER_CLE = 'vrmAtelierRepub';
 const ATELIER_ESPACE_MIN = [1, 120];       // minutes
+// 5.410 (`repubverif`, chantier repub-messages-malins) : le CONTRÔLE AVANT DE LANCER, dans l'atelier du panneau — la
+//    commande `verifierRepub` (lecture, compte de l'onglet) ; la règle de l'app recopiée (`resumeVerif`, `lancerPermis`,
+//    `partiraPas`, `reponsesDe` — src/repubVerif.js) : « Lancer » fermé tant qu'il reste une annonce à corriger ; une
+//    absente ne part jamais ; SA réponse (« Choisir la taille ») voyage avec SA paire. Gardé dans `vrmAtelierVerif`.
+const ATELIER_VERIF = 'vrmAtelierVerif';
+async function atelierVerifLue() { try { const v = (await chrome.storage.local.get(ATELIER_VERIF))[ATELIER_VERIF]; return v && v.v === 1 ? v : null; } catch (_) { return null; } }
+async function atelierVerifier(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu.' };
+  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  const tous = [...new Set((Array.isArray(msg.tous) ? msg.tous : ids).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  if (!ids.length) return { ok: false, code: 'vide', raison: 'Rien à vérifier.' };
+  const prec = await atelierVerifLue();
+  const verif = prec && prec.uid === String(uid) ? Object.assign({}, prec.paires) : {};
+  const reps = msg.reponses && typeof msg.reponses === 'object' ? msg.reponses : {};
+  const r = await verifierRepub({ uid: String(uid), ids, reponses: reps, total: tous.length });
+  if (!r || r.accepte === false || !Array.isArray(r.paires)) {
+    for (const id of ids) verif[id] = { id, etat: 'pas-verifie', corrections: [], manque: [], question: null, raison: String((r && r.raison) || 'pas vérifiée'), rep: verif[id] && verif[id].rep };
+  } else for (const x of r.paires) { const q = GARDES_APP.paireVerif(x); if (q) verif[q.id] = Object.assign({}, q, { rep: reps[q.id] || (verif[q.id] && verif[q.id].rep) }); }
+  const v = { v: 1, uid: String(uid), at: Date.now(), paires: verif };
+  try { await chrome.storage.local.set({ [ATELIER_VERIF]: v }); } catch (_) {}
+  return { ok: true, paires: verif, resume: GARDES_APP.resumeVerif(tous, verif), lancer: GARDES_APP.lancerPermis(tous, verif, false) };
+}
 async function atelierEtat() { try { const a = (await chrome.storage.local.get(ATELIER_CLE))[ATELIER_CLE]; return a && a.v === 1 ? a : null; } catch (_) { return null; } }
 async function atelierLancer(msg, sender) {
   const o = ongletCarte(sender);
@@ -19609,13 +19635,20 @@ async function atelierLancer(msg, sender) {
   if (cur && cur.etat === 'cours') return { ok: false, code: 'en-cours', raison: 'Un atelier tourne déjà : attends la fin ou arrête-le.' };
   const uid = await compteConnecte('www.vinted.fr');
   if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
-  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  let ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
   if (!ids.length) return { ok: false, code: 'vide', raison: 'Aucune annonce choisie.' };
+  // Le contrôle avant de lancer (la règle de l'app) : rien ne part tant qu'il reste une annonce à corriger.
+  const vl = await atelierVerifLue();
+  const verif = vl && vl.uid === String(uid) ? vl.paires : {};
+  const perm = GARDES_APP.lancerPermis(ids, verif, false);
+  if (!perm.ok) return { ok: false, code: perm.raison, raison: perm.raison === 'a-corriger' ? `${perm.n} annonce(s) à corriger avant de lancer : rien n’est parti.` : 'Toutes ces annonces sont absentes chez Vinted : rien ne part.' };
+  ids = ids.filter((id) => !GARDES_APP.partiraPas(verif, id));
+  const reponses = Object.fromEntries(ids.map((id) => [id, GARDES_APP.reponsesDe(verif, id)]).filter(([, r]) => r));
   const e = msg.espacement && typeof msg.espacement === 'object' ? msg.espacement : {};
   const mn = Math.round(Number(e.min)), mx = Math.round(Number(e.max != null ? e.max : e.min));
   if (!(mn >= ATELIER_ESPACE_MIN[0] && mn <= ATELIER_ESPACE_MIN[1] && mx >= mn && mx <= ATELIER_ESPACE_MIN[1])) return { ok: false, code: 'espacement', raison: 'Espacement : de 1 à 120 min.' };
   const espacement = e.mode === 'aleatoire' && mx > mn ? { mode: 'aleatoire', min: mn, max: mx } : { mode: 'fixe', min: mn, max: mn };
-  const a = { v: 1, uid: String(uid), ids, i: 0, espacement, photo: reglagesPhotoSurs(msg.photo), lettre: msg.lettre === true, etat: 'cours', prochain: Date.now(), lanceLe: Date.now(), paires: {} };
+  const a = { v: 1, uid: String(uid), ids, i: 0, espacement, photo: reglagesPhotoSurs(msg.photo), lettre: msg.lettre === true, reponses, etat: 'cours', prochain: Date.now(), lanceLe: Date.now(), paires: {} };
   try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   try { Promise.resolve(atelierRepubTick()).catch(() => {}); } catch (_) {}
   return { ok: true, atelier: a };
@@ -19637,7 +19670,7 @@ async function atelierRepubTick(maintenant = Date.now()) {
     a.paires[id] = { etape: 'cours', at: maintenant };
     await chrome.storage.local.set({ [ATELIER_CLE]: a });
     let r = null;
-    try { r = await executerCommande({ cmd: 'recreerVinted', uid: a.uid, id, confirme: true, total: a.ids.length, ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(pl ? { plancher: pl.c / 100 } : {}), reglages: a.photo, ...(a.lettre ? { lettre: 'abcdefghijklmnopqrstuvwxyz'[tirerEntre(0, 25)] } : {}) }); } catch (_) { r = null; }
+    try { r = await executerCommande({ cmd: 'recreerVinted', uid: a.uid, id, confirme: true, total: a.ids.length, ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(pl ? { plancher: pl.c / 100 } : {}), reglages: a.photo, ...(a.reponses && a.reponses[id] ? { reponses: a.reponses[id] } : {}), ...(a.lettre ? { lettre: 'abcdefghijklmnopqrstuvwxyz'[tirerEntre(0, 25)] } : {}) }); } catch (_) { r = null; }
     const a2 = (await atelierEtat()) || a;
     const fait = !!(r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape));
     a2.paires[id] = { etape: fait ? (r.etape === 'attente' ? 'planifiee' : 'fait') : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || (fait ? '' : 'sans réponse')).slice(0, 200), nouvelId: r && r.nouvelId ? String(r.nouvelId) : '' };
@@ -19923,7 +19956,7 @@ async function tickFavorisCarte() {
       if (g.json.carte) st.file = g.json.carte;
       if (!g.json.vue.active) {
         st.actif = false; st.attente = null; st.prochain = null;
-        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240) };
+        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240), bilan: g.json.vue.bilan ? String(GARDES_APP.phraseBilanFavoris(g.json.vue.bilan) || '').slice(0, 300) : '' };
         await poserEtatFavorisCarte(st);
         logActivity(`💬 Messages aux favoris (carte) : ${st.file ? st.file.envoyes : 0} envoyé(s)`);
         return;
@@ -26568,15 +26601,21 @@ var __gardesApp = (() => {
     envoiPour: () => envoiPour,
     ficheArticle: () => ficheArticle,
     indexAttentes: () => indexAttentes,
+    lancerPermis: () => lancerPermis,
     marquerFinie: () => marquerFinie,
     marquerPasPartie: () => marquerPasPartie,
+    paireVerif: () => paireVerif,
     pairesAuDepart: () => pairesAuDepart,
+    partiraPas: () => partiraPas,
     photoNeutre: () => photoNeutre,
     photosExigeesVc: () => photosExigeesVc,
+    phraseBilanFavoris: () => phraseBilanFavoris,
     planSite: () => planSite,
     prendreDepart: () => prendreDepart,
     problemesAnnonce: () => problemesAnnonce,
     programmesDe: () => programmesDe,
+    reponsesDe: () => reponsesDe,
+    resumeVerif: () => resumeVerif,
     retenirReponses: () => retenirReponses,
     tirerLettre: () => tirerLettre,
     validerAutoFavoris: () => validerAutoFavoris,
@@ -28722,6 +28761,80 @@ ${lettre[1]}`;
       out.refus = { code: "lbc-champ-obligatoire", champ: autres[0] };
       out.etat = "refus";
     }
+  }
+
+  // src/repubVerif.js
+  var ETATS_VERIF = Object.freeze(["ok", "corrige", "a-corriger", "absente", "pas-verifie"]);
+  var str6 = (v2) => String(v2 == null ? "" : v2);
+  var champOk = (c) => /^[a-z_]{1,40}$/.test(str6(c));
+  function paireVerif(p) {
+    if (!p || typeof p !== "object" || !/^\d{4,15}$/.test(str6(p.id)) || !ETATS_VERIF.includes(p.etat)) return null;
+    const corrections = Array.isArray(p.corrections) ? p.corrections.filter((c) => c && champOk(c.champ)).slice(0, 10).map((c) => ({ champ: c.champ, nom: str6(c.nom).slice(0, 60), raison: str6(c.raison).slice(0, 300) })) : [];
+    const manque = Array.isArray(p.manque) ? p.manque.map((x) => str6(x).slice(0, 200)).filter(Boolean).slice(0, 10) : [];
+    const q = p.question && typeof p.question === "object" && champOk(p.question.champ) ? p.question : null;
+    return { id: str6(p.id), etat: p.etat, corrections, manque, question: q, raison: str6(p.raison).slice(0, 400) };
+  }
+  function resumeVerif(ids, verif) {
+    const v2 = verif && typeof verif === "object" ? verif : {};
+    const r = { total: 0, ok: 0, corrige: 0, aCorriger: 0, absente: 0, pasVerifie: 0, aCorrigerIds: [], absentes: [] };
+    for (const id0 of Array.isArray(ids) ? ids : []) {
+      const id = str6(id0);
+      r.total++;
+      const p = v2[id];
+      if (!p || p.etat === "pas-verifie") {
+        r.pasVerifie++;
+        continue;
+      }
+      if (p.etat === "ok") r.ok++;
+      else if (p.etat === "corrige") r.corrige++;
+      else if (p.etat === "a-corriger") {
+        r.aCorriger++;
+        r.aCorrigerIds.push(id);
+      } else if (p.etat === "absente") {
+        r.absente++;
+        r.absentes.push(id);
+      }
+    }
+    r.verifiees = r.ok + r.corrige + r.aCorriger + r.absente;
+    r.bloque = r.aCorriger > 0;
+    return r;
+  }
+  function lancerPermis(ids, verif, enCours) {
+    if (enCours) return { ok: false, raison: "verification" };
+    const r = resumeVerif(ids, verif);
+    if (r.bloque) return { ok: false, raison: "a-corriger", n: r.aCorriger };
+    if (r.total && r.absente === r.total) return { ok: false, raison: "toutes-absentes" };
+    return { ok: true };
+  }
+  function partiraPas(verif, id) {
+    const p = verif && verif[str6(id)];
+    return !!(p && p.etat === "absente");
+  }
+  function reponsesDe(verif, id) {
+    const p = verif && verif[str6(id)];
+    const r = p && p.rep && typeof p.rep === "object" && !Array.isArray(p.rep) ? p.rep : null;
+    if (!r) return void 0;
+    const o = {};
+    for (const k of Object.keys(r)) if (champOk(k) && /^\d{1,12}$/.test(str6(r[k]))) o[k] = str6(r[k]);
+    return Object.keys(o).length ? o : void 0;
+  }
+
+  // src/favorisProgression.js
+  var RAISONS_SAUT = Object.freeze(["annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
+  var MOTS_SAUT = Object.freeze({ annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
+  var MOTS_REFUS = Object.freeze({ texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
+  function phraseBilanFavoris(b, mot) {
+    if (!b) return "";
+    const m = (c, f) => typeof mot === "function" && mot(c, f) || (f === "saut" ? MOTS_SAUT : MOTS_REFUS)[c] || c;
+    const liste = (o, f) => {
+      const e = Object.entries(o);
+      return e.map(([c, n]) => e.length > 1 ? `${n} ${m(c, f)}` : m(c, f)).join(", ");
+    };
+    const p = [`${b.envoyes} envoyé${b.envoyes > 1 ? "s" : ""}`];
+    if (b.sautes) p.push(`${b.sautes} sauté${b.sautes > 1 ? "s" : ""} (${liste(b.parSaut, "saut")})`);
+    if (b.refuses) p.push(`${b.refuses} refusé${b.refuses > 1 ? "s" : ""} : ${liste(b.parRefus, "refus")}`);
+    if (b.incertains) p.push(`${b.incertains} à vérifier sur Vinted`);
+    return p.join(" · ");
   }
   return __toCommonJS(stdin_exports);
 })();

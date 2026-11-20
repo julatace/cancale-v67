@@ -1335,6 +1335,7 @@
       return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
         <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans">· ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
         <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}">${esc(quoi)}</div>
+        ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
         ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
         ${inc ? `<div class="p-pour ambre" data-fav-verifier="${inc}">${esc(TU('f_verifier', { n: inc }))}</div>` : ''}
         <button class="vu-btn vu-sec" data-fav-ok>OK</button>
@@ -1771,14 +1772,18 @@
     }
     if (geste6.k === 'atelier') {
       const g = geste6, ph = g.photo;
-      const liste = g.ids.map((id, i) => { const x = de(id); return `<li class="rg6" data-atelier-paire="${esc(id)}"><span><b>${i + 1}. ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b></span><span class="outils"><button type="button" class="rond6" data-atelier-haut="${i}" aria-label="${esc(TU('g6_monter'))}"${i ? '' : ' disabled'}>↑</button><button type="button" class="rond6" data-atelier-bas="${i}" aria-label="${esc(TU('g6_descendre'))}"${i < g.ids.length - 1 ? '' : ' disabled'}>↓</button></span></li>`; }).join('');
+      const liste = g.ids.map((id, i) => { const x = de(id); const v = g.verif && g.verif.paires ? g.verif.paires[id] : null;
+        const detail = v ? `${etiquette5(v.etat, TU('g6_v_' + (['ok', 'corrige', 'a-corriger', 'absente'].includes(v.etat) ? v.etat.replace('-', '_') : 'pas_verifie')), v.etat === 'a-corriger' ? 'ambre' : '')}${(v.corrections || []).map((c) => `<small>${esc((c.nom || c.champ) + ' : ' + (c.raison || ''))}</small>`).join('')}${(v.manque || []).map((m) => `<small>${esc(TU('g6_manque', { m }))}</small>`).join('')}${v.raison && v.etat !== 'ok' ? `<small>${esc(v.raison)}</small>` : ''}${v.etat === 'a-corriger' && v.question && Array.isArray(v.question.options) ? `<label class="champ6"><b>${esc(TU('g6_choisir', { nom: v.question.nom || v.question.champ }))}</b><select data-atelier-question="${esc(id)}" data-champ="${esc(v.question.champ)}"><option value=""></option>${v.question.options.map((o) => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></label>` : v.etat === 'a-corriger' && v.question && v.question.geste ? `<small>${esc(v.question.geste)}</small>` : ''}${v.etat === 'a-corriger' || v.etat === 'absente' ? `<button type="button" class="vu-btn" data-atelier-retirer="${esc(id)}">${esc(TU('g6_retirer'))}</button>` : ''}` : '';
+        return `<li class="rg6" data-atelier-paire="${esc(id)}" data-verif="${esc(v ? v.etat : '')}"><span><b>${i + 1}. ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${detail}</span><span class="outils"><button type="button" class="rond6" data-atelier-haut="${i}" aria-label="${esc(TU('g6_monter'))}"${i ? '' : ' disabled'}>↑</button><button type="button" class="rond6" data-atelier-bas="${i}" aria-label="${esc(TU('g6_descendre'))}"${i < g.ids.length - 1 ? '' : ' disabled'}>↓</button></span></li>`; }).join('');
       const curseur = (k, min, max, pas, lib) => `<label class="champ6 cd6"><b>${esc(TU(lib))}</b><span class="cd6-l"><input type="range" min="${min}" max="${max}" step="${pas}" value="${ph[k]}" data-atelier-photo="${k}"><output>${esc(String(ph[k]))}</output></span></label>`;
-      return `<section class="geste6" data-geste="atelier"><h3>${esc(TU('g6_atelier_titre', { n: g.ids.length }))}</h3><p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${etat}<ol class="au6-l">${liste}</ol>
+      const rs = g.verif && g.verif.resume, lp = g.verif && g.verif.lancer;
+      const recap = g.verifEnCours ? `<p class="note5" data-atelier-recap="cours">${esc(TU('g6_verif_cours'))}</p>` : rs ? `<p class="note5" data-atelier-recap="${rs.aCorriger ? 'bloque' : 'ok'}"><b>${esc(TU('g6_verif_recap', { v: rs.verifiees, c: rs.corrige, a: rs.aCorriger }))}</b>${rs.absente ? ' · ' + esc(TU('g6_verif_absentes', { n: rs.absente })) : ''}${rs.pasVerifie ? ' · ' + esc(TU('g6_verif_pas', { n: rs.pasVerifie })) : ''}</p>` : '';
+      return `<section class="geste6" data-geste="atelier"><h3>${esc(TU('g6_atelier_titre', { n: g.ids.length }))}</h3><p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${etat}${recap}<ol class="au6-l">${liste}</ol>
         <div class="rg6"><span><b>${esc(TU('g6_espacement'))}</b></span><div class="vu-seg vue5" role="group">${['fixe', 'aleatoire'].map((k) => `<button type="button" data-atelier-mode="${k}" aria-pressed="${g.mode === k}">${esc(TU('g6_' + k))}</button>`).join('')}</div></div>
         <div class="rg6"><span><b>${esc(TU(g.mode === 'aleatoire' ? 'g6_entre' : 'g6_toutes'))}</b></span><span class="outils"><input type="number" min="1" max="120" class="prix6" data-atelier-min value="${g.min}" aria-label="min">${g.mode === 'aleatoire' ? `<input type="number" min="1" max="120" class="prix6" data-atelier-max value="${g.max}" aria-label="max">` : ''}<span>min</span></span></div>
         ${curseur('bright', 0.5, 1.5, 0.05, 'g6_luminosite')}${curseur('contrast', 0.5, 1.5, 0.05, 'g6_contraste')}${curseur('sat', 0, 2, 0.05, 'g6_saturation')}${curseur('zoom', 1, 2, 0.05, 'g6_zoom')}${curseur('rot', -15, 15, 1, 'g6_rotation')}
         <label class="rg6"><span><b>${esc(TU('g6_lettre'))}</b></span><input type="checkbox" data-atelier-lettre${g.lettre ? ' checked' : ''}></label>
-        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_lancer'))}</button></div></section>`;
+        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('g6_lancer'))}</button></div>${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
     }
     if (geste6.k === 'publier') {
       const g = geste6, x = de(g.id);
@@ -1812,6 +1817,14 @@
           : `<button type="button" class="vu-btn" data-offre-quoi="accept">${esc(TU('g6_accepter'))}</button><input type="text" inputmode="decimal" class="prix6" data-offre-contre-prix="${esc(k)}" value="${esc(offreContre[k] || '')}" placeholder="${esc(TU('g6_contre_prix'))}" aria-label="${esc(TU('g6_contre_prix'))}"><button type="button" class="vu-btn" data-offre-quoi="contre">${esc(TU('g6_contre'))}</button><button type="button" class="vu-btn" data-offre-quoi="reject">${esc(TU('g6_refuser'))}</button>`)
         + `</span></div>`; }).join('')}</section>`;
   }
+  // Le contrôle avant de lancer (fond : `verifierRepub`) ; `ids` vides ⇒ seulement recalculer pour la file actuelle.
+  function atelierVerifier6(ids, reponses) {
+    const g = geste6; if (!g || g.k !== 'atelier') return;
+    const cibles = ids && ids.length ? ids : g.ids;
+    if (!cibles.length) { g.verif = null; rendre(); return; }
+    g.verifEnCours = true; rendre();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'atelierVerifier', ids: cibles, tous: g.ids.slice(), ...(reponses ? { reponses } : {}) }, (r) => { void chrome.runtime.lastError; if (geste6 !== g) return; g.verifEnCours = false; if (r && r.ok) g.verif = { paires: r.paires, resume: r.resume, lancer: r.lancer }; else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; rendre(); }); } catch (_) { g.verifEnCours = false; rendre(); }
+  }
   function brancherGestes6(racine) {
     const R = racine;
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
@@ -1834,6 +1847,8 @@
     const ax = R.querySelector('[data-atelier-max]'); if (ax) ax.addEventListener('change', () => { geste6.max = Math.max(1, Math.min(120, Math.round(Number(ax.value)) || 1)); rendre(); });
     R.querySelectorAll('[data-atelier-photo]').forEach((c) => c.addEventListener('input', () => { geste6.photo[c.getAttribute('data-atelier-photo')] = Number(c.value); const o = c.parentNode.querySelector('output'); if (o) o.textContent = c.value; }));
     const al = R.querySelector('[data-atelier-lettre]'); if (al) al.addEventListener('change', () => { geste6.lettre = al.checked; });
+    R.querySelectorAll('[data-atelier-question]').forEach((c) => c.addEventListener('change', () => { if (!c.value) return; const id = c.getAttribute('data-atelier-question'); atelierVerifier6([id], { [id]: { [c.getAttribute('data-champ')]: c.value } }); }));
+    R.querySelectorAll('[data-atelier-retirer]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-atelier-retirer'); geste6.ids = geste6.ids.filter((x) => x !== id); atelierVerifier6([], null); }));
     const la = R.querySelector('[data-atelier-lancer]'); if (la) la.addEventListener('click', () => {
       const g = geste6;
       envoyer6({ action: 'atelierLancer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, confirme: true }, (r) => {
@@ -2006,7 +2021,7 @@
       if (!k || !ids.length) return;
       // Les gestes en série passent par leurs chemins GARDÉS : l'atelier Republier et la baisse de VRM (sur SON
       // clic là-bas), le parcours des favoris de la carte. Jamais de suppression en série.
-      if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false }; geste6Etat = null; rendre(); return; }
+      if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false }; geste6Etat = null; rendre(); atelierVerifier6(null, null); return; }
       if (k === 'baisser') { geste6 = { k: 'prix', ids: ids.slice(0, 20), prix: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'publier' && ids.length === 1) { geste6 = { k: 'publier', id: ids[0], site: 'leboncoin', questions: [], problemes: [], reponses: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
