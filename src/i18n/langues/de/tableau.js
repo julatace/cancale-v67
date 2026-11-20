@@ -267,4 +267,5 @@ export default {
   "vt.bordsPasSu": "Per E-Mail erhaltene Etiketten: noch nicht gelesen, der Bildschirm versucht es selbst erneut.",
   "vt.chercher": "Nr., Modell, Käufer, Versanddienst…",
   "vt.sansBordMeta": "ohne Etikett",
+  "tableau.site.tous": "Alle Plattformen"
 };

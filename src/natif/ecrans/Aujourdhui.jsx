@@ -17,6 +17,7 @@
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
@@ -127,7 +128,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
   // fois les lectures arrivées ; des groupes absents (null) = la base ne répond pas : la publication d'avant reste.
   React.useEffect(() => { if (pret && pretLu && Array.isArray(groupes)) publierARegler(groupes); });
   const n = affiche && !affiche.pasSu ? affiche.n : null;
-  const nRet = retraits && retraits.masque ? 0 : retraits && !retraits.pasSu ? retraits.n : null;   // `masque` : un autre site choisi (20 nov.)
+  const nRet = retraits && !retraits.pasSu ? retraits.n : null;
   const rien = pret && n === 0 && nRet === 0;
   const point = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   const lignesV = ventes && ventes.etat === 'lu' && Array.isArray(ventes.lignes) ? ventes.lignes.slice(0, 5) : [];
@@ -154,14 +155,14 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
         attrs={{ 'data-v2-bloc': 'envoyer', 'data-v2-groupe': 'envoyer', 'data-v2-envoyer': String(n), 'data-v2-ecart': affiche.sous || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined, 'data-v2-bande': String(montres.length) }}>
         {montres.map((c) => (
           // (19 nov.) Le titre a SA ligne (2 au plus) et le prix à droite ; dessous « N° · échéance · transporteur ».
-          <Rangee key={c.cle} vignette={image(c.photo, 44)} titre={c.titre || (c.num ? 'N° ' + c.num : tr('v2.dv.vente', { site: c.site || '' }))} lignes={2} plaque={c.num ? <Plaque numero={c.num}/> : null}
+          <Rangee key={c.cle} vignette={image(c.photo, 44)} titre={c.titre || (c.num ? 'N° ' + c.num : tr('v2.dv.vente', { site: c.site || '' }))} lignes={2} plaque={<>{c.site ? <LogoSite site={c.site} taille={16}/> : null}{c.num ? <Plaque numero={c.num}/> : null}</>}
             sousTitre={[c.tr, c.compte].filter(Boolean).join(' · ')} pastilleSous={c.e && c.e.txt ? <Pastille ton={c.e.ambre ? 'ambre' : 'neutre'}>{c.e.txt}</Pastille> : null}
             valeur={c.prix || ''} valeurForte onClick={() => onColis && onColis(c)} attrs={{ 'data-v2-colis': c.cle, 'data-v2-colis-presse': c.e && c.e.ambre ? '1' : undefined }}/>
         ))}
         {resteEnv > 0 ? <Rangee titre={tr('v2.bande.plus', { n: resteEnv })} fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-n-plus': String(resteEnv) }}/> : null}
       </Carte>
     )),
-    retirer: () => (retraits && retraits.masque ? null : 
+    retirer: () => (
       <Carte titre={tr('v2.retirer.titre')} n={nombre(nRet)} tonSous={retraits.premier && retraits.premier.ambre ? 'ambre' : 'neutre'}
         // (20 nov., chasse-bugs-2) Chaque nombre a SON pluriel : « 2 colis · 1 points » (l'ancienne clé accordait les points au nombre de colis).
         sousTitre={[pts.length ? tr('v2.retirer.resumeN', { n: nRet }) + ' · ' + tr('v2.retirer.points', { n: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet }), retraits.premier ? retraits.premier.txt : ''].filter(Boolean).join(' · ')}

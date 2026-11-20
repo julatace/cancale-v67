@@ -16,6 +16,7 @@ import { TableauTravail } from '../TableauTravail.jsx';
 import { useOrdinateur } from '../Coque.jsx';
 import { Pastille } from '../Pastille.jsx';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
+import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) tout est mélangé : le logo du site de chaque vente
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -54,6 +55,8 @@ const echeanceCourte = (e) => (!e ? '' : e.code !== 'date' ? e.texte : e.sorte =
 // Au téléphone : le prix puis l'étiquette, l'un sous l'autre à droite du titre (deux lignes) — la ligne du N° et de la date limite
 // garde toute la largeur (jamais coupée).
 const valeurTel = (r) => <span className="n-vt-valeur">{r.prix ? <span>{r.prix}</span> : null}{etiquetteTel(r)}</span>;
+// (20 nov. soir, plus de sélecteur de plateforme) Le logo du SITE de la vente, devant le N° (au téléphone comme dans le volet).
+const avecSite = (r, plaque) => (r && r.site ? <>{<LogoSite site={r.site} taille={16}/>}{plaque}</> : plaque);
 const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 18)}</span> : null);
 
 function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
@@ -66,7 +69,7 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
     <Rangee
       vignette={vignette(r, Photo)}
       titre={r.titre} lignes={2}
-      plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
+      plaque={avecSite(r, r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null)}
       // (19 nov., intégration — capture 390 du coordinateur) Sur la rangée : le N° et la date limite SEULEMENT (jamais coupés) ;
       // la place et la taille vont dans la fiche (« Où », plus bas). Le titre tient sur deux lignes (contrat NATIF).
       sousTitre={sansBordereau(r) ? morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', tr('vt.sansBordMeta'), ech) : joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)} sousLignes={sansBordereau(r) ? 2 : 1}
@@ -89,7 +92,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
     <Rangee
       vignette={vignette(r, Photo)}
       titre={r.titre} lignes={2}
-      plaque={r.num ? <Plaque numero={r.num}/> : null}
+      plaque={avecSite(r, r.num ? <Plaque numero={r.num}/> : null)}
       sousTitre={joint(texteEtape(r.etapes), r.taille ? tr('vv.taille', { t: r.taille }) : '')}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       pastilleSous={logoTel(r)}
@@ -167,6 +170,8 @@ const rangLimite = (e) => (!e ? null : e.ambre ? 0 : e.sorte === 'lue' ? 1 : 2);
 function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantRoute, apresListe, filtre, onOutils }) {
   const [choisie, setChoisie] = React.useState(null);
   const [majLe, setMajLe] = React.useState(undefined);
+  // (20 nov. soir) Un filtre « Site » DISCRET, dans le menu de filtres du tableau (pas de barre) ; « Tous » par défaut.
+  const [siteF, setSiteF] = React.useState('toutes');
   const E = m.envoyer, R = m.route;
   const surEnvoyer = m.onglet === 'envoyer';
   React.useEffect(() => { setChoisie(null); }, [m.onglet]);
@@ -182,7 +187,11 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
   }, [ouverte]);
   // UNE vérité : une lecture ratée sans rien de lu ⇒ « pas su » (jamais « Mis à jour à l'instant » + « Rien à envoyer »).
-  const lignes = erreur ? null : !lu ? undefined : rangs.map((r) => {
+  const sitesVus = [...new Set(rangs.map((r) => r.site).filter(Boolean))];
+  const rangsVus = siteF === 'toutes' ? rangs : rangs.filter((r) => r.site === siteF);
+  const filtresSite = sitesVus.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: siteF, onChange: setSiteF,
+    options: [{ cle: 'toutes', libelle: tr('tableau.site.tous') }, ...sitesVus.map((x) => ({ cle: x, libelle: Logo && Logo.nom ? Logo.nom(x) : x, n: rangs.filter((r) => r.site === x).length }))] }] : [];
+  const lignes = erreur ? null : !lu ? undefined : rangsVus.map((r) => {
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
     const sous = surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || '';
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
@@ -194,6 +203,8 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   });
   const presses = surEnvoyer ? rangs.filter((r) => r.echeance && r.echeance.ambre).length : 0;
   const colonnes = [
+    // (20 nov. soir) Tout est mélangé : une colonne « Site » ÉTROITE, le logo seul (le nom au survol).
+    { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, tri: (l) => l.r.site || null, rendu: (l) => (l.r.site ? <LogoSite site={l.r.site} taille={18} nom={Logo && Logo.nom ? Logo.nom(l.r.site) : l.r.site}/> : null) },
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num} doublon={l.r.numDouble}/> : null) },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => { const n = parseFloat(String(l.prix || '').replace(/[^\d,.-]/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; }, rendu: (l) => l.prix || null },
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => dateCourte(l.t) },
@@ -225,7 +236,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   </Groupe> : null;
   return (
     <div className="n-vt" data-vt={m.onglet} data-vt-detail={ouverte ? '1' : '0'}>
-      <TableauTravail key={m.onglet} id={'ventes-' + m.onglet} titre={tr('vn.titre')} cases={surEnvoyer} coches={surEnvoyer ? coches : null} onCocher={surEnvoyer ? cocher : null} majLe={majLe} onRafraichir={() => { setMajLe(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} lignes={lignes} statuts={statuts} colonnes={colonnes}
+      <TableauTravail key={m.onglet} id={'ventes-' + m.onglet} titre={tr('vn.titre')} cases={surEnvoyer} coches={surEnvoyer ? coches : null} onCocher={surEnvoyer ? cocher : null} majLe={majLe} onRafraichir={() => { setMajLe(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} lignes={lignes} filtres={filtresSite} statuts={statuts} colonnes={colonnes}
         onOuvrir={(l) => setChoisie((c) => (c === l.cle ? null : l.cle))} ligneChoisie={ouverte ? ouverte.cle : ''}
         menuLigne={(l) => [{ cle: 'ouvrir', libelle: tr('tableau.ouvrirVente'), onClick: () => setChoisie(l.cle) },
           ...(l.r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vv.volet.suivre'), onClick: () => { try { window.open(l.r.lienSuivi, '_blank', 'noopener'); } catch (_) {} } }] : [])]}

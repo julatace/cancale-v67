@@ -267,4 +267,5 @@ export default {
   "vt.bordsPasSu": "Etichette ricevute via e-mail: non ancora lette, lo schermo riprova da solo.",
   "vt.chercher": "N°, modello, acquirente, corriere…",
   "vt.sansBordMeta": "senza etichetta",
+  "tableau.site.tous": "Tutti i siti"
 };
