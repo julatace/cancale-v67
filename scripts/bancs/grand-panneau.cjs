@@ -102,6 +102,8 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'publierCarte') rep = !msg.reponses ? { ok: false, code: 'questions', questions: [{ champ: 'categorie', choix: ['Baskets', 'Bottes'], saisie: '' }] } : msg.verifVu !== true ? { accepte: false, code: 'verification', problemes: [{ code: 'photos', texte: '1 photo seulement' }] } : { accepte: true };
           else if (msg.action === 'favorisAuto') rep = msg.actif && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, actif: msg.actif };
           else if (msg.action === 'reglageAuto') rep = msg.cle === 'vinted_cadence' && msg.valeur.actionsHeure > 50 && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, relu: true };
+          else if (msg.action === 'commeBleamLire') rep = { ok: true, reglages: window.__cb || (window.__cb = { methode: 'formulaire', favoris: true, messageLot: 'Bonjour {username}, je peux vous faire un prix sur un lot !', offreMin: 8, offreMax: 15 }), onglet: { tabId: 9, chemin: '/items/…/edit', etape: 'champ', travaille: true, maj: Date.now() } };
+          else if (msg.action === 'commeBleamPoser') { window.__cb = Object.assign({}, window.__cb, msg.valeur); rep = { ok: true, reglages: window.__cb }; }
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
         } },
@@ -418,6 +420,20 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         await cap(t.pg, N('parametres'));
         dit(a.parametres && a.remettre && a.details, `${T} : Paramètres en bas de la barre : le logo, Détails`, JSON.stringify({ p: a.parametres }));
+        // 5.410.3 (`repubformulaire`) : la méthode de republication (le formulaire par défaut), l'onglet qui travaille nommé,
+        // la séquence des favoris, le message « lot » et le délai de l'offre — chacun envoyé sur SON toucher.
+        await t.pg.waitForTimeout(300);
+        const cb0 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const m = r.querySelector('[data-cb-methode="formulaire"]'); return { section: !!r.querySelector('[data-comme-bleam="formulaire"]'), formulaire: !!(m && m.checked), onglet: r.querySelector('[data-onglet-travail]') ? r.querySelector('[data-onglet-travail]').getAttribute('data-onglet-travail') : null, voir: !!r.querySelector('[data-voir-onglet]'), lot: (r.querySelector('[data-cb-lot]') || {}).value || '', offre: (r.querySelector('[data-cb-offre-lib]') || {}).textContent || '' }; });
+        if (cb0.section) { await t.pg.evaluate(() => { const s = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-comme-bleam]'); if (s) s.scrollIntoView({ block: 'start' }); }); await cap(t.pg, N('methode-republication')); }
+        dit(cb0.section && cb0.formulaire && cb0.onglet === 'actif' && cb0.voir && /lot/.test(cb0.lot) && /8.*15/.test(cb0.offre), `${T} : Paramètres · Méthode de republication : « Par le formulaire de Vinted » coché, l’onglet qui travaille nommé (Voir l’onglet), le message « lot », l’offre 8–15 s`, JSON.stringify(cb0));
+        await clic(t.pg, '[data-voir-onglet]');
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-cb-methode="directe"]'); if (c) { c.checked = true; c.dispatchEvent(new Event('change')); } });
+        await t.pg.waitForTimeout(200);
+        await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const l = r.querySelector('[data-cb-lot]'); if (l) { l.value = 'Bonjour {username}, un lot ?'; l.dispatchEvent(new Event('input')); } const a = r.querySelector('[data-cb-offre="offreMin"]'), b = r.querySelector('[data-cb-offre="offreMax"]'); if (a && b) { a.value = '10'; a.dispatchEvent(new Event('input')); b.value = '20'; b.dispatchEvent(new Event('input')); } });
+        await clic(t.pg, '[data-cb-enregistrer]');
+        a = await lire(t.pg);
+        const cbE = a.envoyes.filter((m) => m.action === 'commeBleamPoser'), voirE = a.envoyes.filter((m) => m.action === 'voirOngletTravail');
+        dit(voirE.length === 1 && cbE.length === 2 && cbE[0].valeur.methode === 'directe' && cbE[1].valeur.messageLot === 'Bonjour {username}, un lot ?' && cbE[1].valeur.offreMin === 10 && cbE[1].valeur.offreMax === 20 && cbE[1].valeur.favoris === true, `${T} : « Voir l’onglet », « Directe » choisie, le message « lot » et l’offre 10–20 s enregistrés sur SON toucher`, JSON.stringify({ voirE: voirE.length, cbE }));
         // 5.410 : la cadence, SON réglage par compte (curseurs), plus vite ⇒ « Oui, aller plus vite ».
         const cad0 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('[data-cad]').length, risque: !!r.querySelector('[data-cad-risque]'), vals: Array.from(r.querySelectorAll('[data-cad]')).map((c) => c.getAttribute('data-cad') + ':' + c.value) }; });
         dit(cad0.n === 5 && cad0.risque && cad0.vals.join('|') === 'favorisHeure:15|actionsHeure:50|parJour:200|pauseMin:40|pauseMax:90', `${T} : Paramètres · Cadence : 5 curseurs aux valeurs par défaut, la phrase du risque`, JSON.stringify(cad0));

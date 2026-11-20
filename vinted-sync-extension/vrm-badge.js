@@ -979,6 +979,14 @@
   .champ6 b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
+  /* 5.410.3 : un choix (rond ou case) À GAUCHE de son libellé, la ligne entière se touche (44 px). */
+  .champ6.cb6 { flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; }
+  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0068D6); }
+  .champ6.cb6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .champ6.cb6 .note5 { margin: 0; }
+  .champ6.ot6 { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  .champ6.ot6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; }
   .au6-d .conf5 { margin: 12px 24px 0; }
   .conf5[data-irreversible] { display: block !important; }
   .conf5[data-irreversible] p { margin: 0 0 8px; }
@@ -2415,7 +2423,7 @@
   //    à la fois, une requête à la fois, compte de l'onglet, temps d'écriture, réserve de 5) n'est pas réglable.
   // ══ 5.410.3 (`repubformulaire`, `favorisbleam`) — « tout comme Bleam » : la méthode de republication, le message
   //    « lot » et le délai de l'offre, réglés ici sur SON toucher ; l'onglet qui travaille est NOMMÉ (rien de caché).
-  let cbEtat = null, cbLu = 0, cbLot = null, cbMsg = null, cbEnVol = false;
+  let cbEtat = null, cbLu = 0, cbLot = null, cbOffre = null, cbMsg = null, cbEnVol = false;
   function lireCommeBleam(force) {
     if (!force && Date.now() - cbLu < 4000) return;
     cbLu = Date.now();
@@ -2424,21 +2432,22 @@
   function ongletTravailHtml() {
     const o = cbEtat && cbEtat.onglet;
     if (!o) return '';
-    return `<div class="ligne" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}"><div class="val">${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre'))} · <span class="gris">${esc(o.chemin || '/')}</span></div><div class="outils"><button type="button" class="lien" data-voir-onglet>${esc(TU('cb_voir'))}</button></div></div>`;
+    return `<div class="champ6 ot6" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}"><span><b>${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre'))}</b><span class="note5">${esc(o.chemin || '/')}</span></span><button type="button" class="vu-btn" data-voir-onglet>${esc(TU('cb_voir'))}</button></div>`;
   }
   function commeBleamHtml() {
     if (!cbEtat) { lireCommeBleam(false); return `<section class="grp5" data-comme-bleam="pas-su"><h3>${esc(TU('cb_titre'))}</h3><p class="note5">—</p></section>`; }
     const g = cbEtat.reglages || {};
     const choix = (v, lib, note) => `<label class="champ6 cb6"><input type="radio" name="vrm-cb-methode" value="${v}" data-cb-methode="${v}"${g.methode === v ? ' checked' : ''}><span><b>${esc(TU(lib))}</b><span class="note5">${esc(TU(note))}</span></span></label>`;
     const lot = cbLot != null ? cbLot : (g.messageLot || '');
+    const oA = cbOffre ? cbOffre.offreMin : (Number(g.offreMin) || 8), oB = cbOffre ? cbOffre.offreMax : (Number(g.offreMax) || 15);
     return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
       ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}${choix('directe', 'cb_directe', 'cb_directe_note')}
       ${ongletTravailHtml()}
     </section>
     <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
-      <label class="champ6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><b>${esc(TU('cb_sequence'))}</b></label>
+      <label class="champ6 cb6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><span><b>${esc(TU('cb_sequence'))}</b></span></label>
       <label class="champ6"><b>${esc(TU('cb_lot'))}</b><textarea rows="3" maxlength="2000" data-cb-lot aria-label="${esc(TU('cb_lot'))}">${esc(lot)}</textarea><span class="note5">${esc(TU('cb_lot_note'))}</span></label>
-      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: g.offreMin, b: g.offreMax }))}</b><span class="cd6-l"><input type="range" min="3" max="60" step="1" value="${Number(g.offreMin) || 8}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="4" max="120" step="1" value="${Number(g.offreMax) || 15}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
+      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: oA, b: oB }))}</b><span class="cd6-l"><input type="range" min="3" max="60" step="1" value="${oA}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="4" max="120" step="1" value="${oB}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
       ${cbMsg ? `<p class="note5" role="status" data-cb-etat="${cbMsg.ok ? 'ok' : 'ko'}">${esc(cbMsg.texte)}</p>` : ''}
       <div class="outils"><button type="button" class="vu-btn vu-plein" data-cb-enregistrer${cbEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
     </section>`;
@@ -2449,7 +2458,7 @@
       chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'commeBleamPoser', valeur }, (r) => {
         void chrome.runtime.lastError; cbEnVol = false;
         cbMsg = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
-        if (r && r.ok && r.reglages) { cbEtat = Object.assign({}, cbEtat, { reglages: r.reglages }); cbLot = null; }
+        if (r && r.ok && r.reglages) { cbEtat = Object.assign({}, cbEtat, { reglages: r.reglages }); if (valeur.messageLot != null) cbLot = null; if (valeur.offreMin != null) cbOffre = null; }
         rendre();
       });
     } catch (_) { cbEnVol = false; cbMsg = { ok: false, texte: TU('ra_ko') }; rendre(); }
@@ -2641,6 +2650,7 @@
     { const l = racine.querySelector('[data-cb-lot]'); if (l) l.addEventListener('input', () => { cbLot = l.value; cbMsg = null; }); }
     racine.querySelectorAll('[data-cb-offre]').forEach((c) => c.addEventListener('input', () => {
       const a = racine.querySelector('[data-cb-offre="offreMin"]'), b = racine.querySelector('[data-cb-offre="offreMax"]');
+      if (a && b) cbOffre = { offreMin: Number(a.value), offreMax: Number(b.value) }; cbMsg = null;
       const lib = racine.querySelector('[data-cb-offre-lib]'); if (lib && a && b) lib.textContent = TU('cb_offre', { a: a.value, b: b.value });
     }));
     { const e = racine.querySelector('[data-cb-enregistrer]'); if (e) e.addEventListener('click', () => {

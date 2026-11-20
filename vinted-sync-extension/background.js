@@ -16767,6 +16767,8 @@ async function constaterFormulaire(acc, rep) {
 async function etapeFormulaire(acc, tabId, etape, d) {
   const injecter = async () => { try { await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['vrm-formulaire.js'] }); return true; } catch (_) { return false; } };
   const lancer = async (e, x) => { try { const res = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args: [e, x || {}], func: (e2, x2) => (globalThis.__vrmFormulaire ? globalThis.__vrmFormulaire(e2, x2) : { ok: false, code: 'script' }) }); return res && res[0] && res[0].result; } catch (_) { return null; } };
+  // L'écran plein de vinted.fr (`avecActionPlein`) sait que VRM remplit le formulaire : plus de « Réduire » jusqu'à la fin.
+  try { const a = await lireActionEnCours(); if (a && a.actif && a.sorte === 'republier' && !a.formulaire) await poserAction({ ...a, formulaire: true }); } catch (_) {}
   if (!(await injecter())) return { ok: false, code: 'onglet' };
   let o = await lancer(etape, d);
   if ((!o || o.code === 'sans-reponse') && d && d.cle) { await attendreOnglet(tabId, null, 20000); if (await injecter()) { const o2 = await lancer('reponse', { cle: d.cle }); if (o2 && o2.ok) o = o2; } }
