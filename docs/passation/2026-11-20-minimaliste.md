@@ -112,9 +112,23 @@ synchronisé). `useSiteCourant` est ré-exporté par SelecteurSite.jsx ; « tous
 passent `siteCourantCoque(site)` à `valeurChiffre` (« Tous » = les chiffres de toujours). Statistiques, Déclarer et
 Factures n'ont pas de règle par site (la déclaration URSSAF porte sur toutes les ventes) : elles restent sur tous les sites.
 
-## 3. Les preuves
+## 3. Les preuves (build final, avant = origin/main dd3336382)
 
-Voir le rapport de fin de lot (tableau avant / après, planches, bancs et audits). Fichiers de sortie hors dépôt.
+- **Relevé minimaliste** (390 et 1512 clair, base de volume, 18 écrans) : cartes décorées 20 → 0, ombres 226 → 31 (les 31
+  restantes : la plaque N° des fils de Messages à 1512, exception nommée « plaque »), liens soulignés 2 → 0, gris > 2 lignes
+  0 → 0, boutons gris pleine largeur 1 → 0, contrastes < 4,5 0 → 0, cibles < 44 60 → 0, coupé 42 → 2 (le nom d'un site
+  masqué exprès quand le sélecteur n'a que des logos ; un titre d'achat). Un seul plein par écran partout.
+- **Parité des sites** (`--sites`, Tous + 4 sites × 5 onglets) : 1512 clair — même squelette partout ; 390 clair et sombre —
+  même squelette sauf Achats (bord 14 au lieu de 16 dans les blocs propres à Leboncoin / eBay / Vestiaire d'avant).
+- `--annonces` (3 comptes Vinted + 1 Leboncoin) vert ; `--selecteur` vert ; `annonces-egalite` vert (V et P à la règle du
+  20 nov.) ; `argent-natif` vert (436 + 176 : le premier passage a buté sur son délai au dernier variant, refait seul) ;
+  `aujourdhui-natif`, `natif-ventes`, `fiche-directe`, `app-tableaux`, `liaison-sites` verts ; `natif-coque` : 4 rouges K8b
+  (restyle au retour sur un écran) — LES MÊMES sur origin/main (mesuré : 2 290 éléments avant, 2 294 après), pas de ce lot.
+- `chiffres-volume` (avant et après le même jour) : montants, comptes et tout ce qui est publié identiques ; écarts
+  seulement d'attributs d'affichage (`data-n-taille`… des composants natifs) et, sur Déclarer, des montants répétés en moins
+  (refonte d'Argent fusionnée : aucun montant nouveau ni changé).
+- Audits verts : traduction, tdz, variables, coherence, boutons-natifs, plateformes-logo, quoi-de-neuf, poids-demarrage
+  (2 005 Ko, budget tenu à 81 octets).
 
 ## 4. Ce qui reste (honnête)
 
@@ -125,3 +139,9 @@ Voir le rapport de fin de lot (tableau avant / après, planches, bancs et audits
   au chantier `claude/retraits-visuel` : pas touché ici.
 - Les textes gris d'une ou deux lignes (pieds de groupe) restent là où ils disent une limite ou un geste ; le relevé ne
   compte que ceux de plus de deux lignes.
+- Achats · Leboncoin / eBay / Vestiaire : leurs blocs d'avant (« Ouvre Mes transactions… » à filet, recherche eBay) et le
+  « ? » seul sur sa ligne ; les états vides de Messages par site diffèrent encore.
+- Aujourd'hui : les CHIFFRES suivent le site choisi ; la liste « À envoyer » et son nombre restent tous sites (le nombre est
+  publié pour tous ; le filtrer demanderait une règle par site).
+- Le logo eBay du sélecteur est pâle en sombre ; Messages met ~8 s à se lire au banc (était plus rapide) — à surveiller.
+- Statistiques, Déclarer, Factures : pas de règle par site (restent tous sites).
