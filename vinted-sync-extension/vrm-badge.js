@@ -939,6 +939,8 @@
   .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
   .au6-d .conf5 { margin: 12px 24px 0; }
+  .conf5[data-irreversible] { display: block !important; }
+  .conf5[data-irreversible] p { margin: 0 0 8px; }
   .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
   .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -1778,15 +1780,19 @@
     const nSel = [...annSel].length;
     const cols = COLS6.filter((c) => annCols.has(c));
     const site = (e && e.plateforme) || 'vinted';
-    const gestes = site === 'leboncoin' || site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'masquer', 'afficher', 'favoris', 'ouvrir'];
+    const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'masquer', 'afficher', 'favoris', 'ouvrir'];
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
-      + gestes.map((k) => `<option value="${k}"${(k === 'ouvrir' && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
+      + gestes.map((k) => `<option value="${k}"${((k === 'ouvrir' || k === 'supprimer') && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
     const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU('s_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
     const outils = `<div class="barre5 barre6">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">${statutMenu}</div>`
       + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`);
     const ligneN = `<div class="n6"><span data-ann-n="${vus.length}">${esc(TU('a_n_articles', { n: vus.length }))}</span><span class="n6-d"><span class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}" aria-label="${esc(TU('a_liste'))}">☰</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}" aria-label="${esc(TU('a_grille'))}">▦</button></span>`
       + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS6.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></span></div>`;
-    const conf = annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
+    // 5.410 : supprimer sur Leboncoin — LA confirmation de l'app (recopiée dans le fond : titre, l'annonce, ce qui reste,
+    //    « sans retour »), rendue par le fond lui-même ; « Oui, supprimer de Leboncoin » renvoie avec `sansRetour`.
+    const cs = annConfirme && annConfirme.k === 'supprimer' && annConfirme.conf ? annConfirme.conf : null;
+    const conf = cs ? `<div class="conf5" role="alertdialog" data-ann-confirme="supprimer" data-irreversible><p><b>${esc(cs.titre)}</b></p>${(cs.lignes || []).map((l) => `<p>${esc(l)}</p>`).join('')}<p class="note5">${esc(cs.reste || '')}</p><p><b>${esc(cs.sansRetour || '')}</b></p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(cs.ok)}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div></div>`
+      : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
     const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
     const haut = outils + conf + res + ligneN;
@@ -1846,6 +1852,19 @@
     const cok = racine.querySelector('[data-ann-confirme-ok]');
     if (cok) cok.addEventListener('click', () => {
       const c = annConfirme; if (!c || annEnVol) return;
+      if (c.k === 'supprimer') {
+        annEnVol = true; rendre();
+        const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === c.ids[0]) || {};
+        try {
+          chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'supprimerLbcCarte', id: c.ids[0], numero: x.num || '', titre: x.titre || '', confirme: true, sansRetour: true }, (r) => {
+            void chrome.runtime.lastError; annEnVol = false; annConfirme = null;
+            annResultat = r && r.accepte ? { ok: true, texte: TU('a_supprime_ok') } : { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+            if (r && r.accepte) { annSel.clear(); chargerListes(true); }
+            rendre();
+          });
+        } catch (_) { annEnVol = false; annConfirme = null; annResultat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+        return;
+      }
       annEnVol = true; rendre();
       try {
         chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'masquerCarte', ids: c.ids, voulu: c.k === 'masquer', confirme: true }, (r) => {
@@ -1869,6 +1888,12 @@
       if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
       // 5.409 : masquer / afficher sur Vinted, sur SON clic CONFIRMÉ (le geste appris de la règle « vendue ailleurs »).
       if ((k === 'masquer' || k === 'afficher') && ids.length <= 10) { annConfirme = { k, ids }; annResultat = null; rendre(); return; }
+      // 5.410 : supprimer sur Leboncoin, UNE annonce : le fond rend d'abord SA confirmation « sans retour » (rien ne part).
+      if (k === 'supprimer' && ids.length === 1) {
+        const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]) || {};
+        try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'supprimerLbcCarte', id: ids[0], numero: x.num || '', titre: x.titre || '', confirme: true }, (r) => { void chrome.runtime.lastError; if (r && r.code === 'sans-retour' && r.confirmation) { annConfirme = { k: 'supprimer', ids, conf: r.confirmation }; annResultat = null; } else annResultat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; rendre(); }); } catch (_) {}
+        return;
+      }
       if (k === 'favoris') { ongletListe = 'favoris'; if (ids.length === 1) filtreAnnonce = ids[0]; ranger({ vrmCarteOnglet: ongletListe }); rendre(); }
     });
   }
@@ -2015,11 +2040,22 @@
     const ch = items.find((x) => x.id === autoChoisie);
     const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
     if (autoChoisie === 'favoris') {
+      // 5.410 : les messages aux favoris se RÈGLENT ici (textes, rythme, mode auto) — leur ligne dédiée
+      //    `vrm_favoris_reglages_{uid}` (règle de l'app) et le mode auto chez VRM (`auto_regler`) ; allumer ⇒ « Oui, allumer ».
       const textes = f && Array.isArray(f.textes) ? f.textes : [];
-      droite = tete + section('au6_messages', `<p class="note5">${esc(TU('au6_messages_note'))}</p>` + (textes.length ? textes.map((t, i) => `<div class="msg6" data-auto-message="${i + 1}"><span>${esc(t)}</span></div>`).join('') : `<div class="msg6"><span>${esc(f ? (f.regle ? TU('au_versions', { n: f.versions }) : TU('au_pas_de_message')) : '—')}</span></div>`))
-        + section('au6_ciblage', ligne('f5_rythme', f ? TU(f.rythme === 'prudent' ? 'fr_rythme_prudent' : f.rythme === 'perso' ? 'au_rythme_perso' : 'fr_rythme_normal') : null, 'au6_rythme_note') + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
+      const b0 = raBrouillon.favoris || {};
+      const tx = Array.isArray(b0.textes) ? b0.textes : textes.slice();
+      while (tx.length < Math.min(5, Math.max(2, tx.length + (tx[tx.length - 1] ? 1 : 0)))) tx.push('');
+      const ry = b0.rythme || (f && f.rythme) || 'normal';
+      const autoOn = fa ? fa.actif === true : null;
+      const conf = raConfirme && raConfirme.auto === 'favoris' ? `<div class="conf5" role="alertdialog" data-ra-confirme="favoris-auto"><p>${esc(TU('ra_confirme_q', { nom: TU('au_favoris') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      const etat = raEtat && raEtat.auto === 'favoris' ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
+      droite = tete + conf + etat
+        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`}</section>`
+        + section('au6_messages', `<p class="note5">${esc(TU('au6_messages_note'))}</p>` + tx.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-rf-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join(''))
+        + section('au6_ciblage', `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('au6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>` + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
         + section('au6_delais', ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null, 'au6_attente_note') + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null))
-        + pied('?tab=messages&site=vinted&vue=favoris', `<button type="button" class="vu-btn vu-plein" data-auto-guide>${esc(TU('au6_demarrer'))}</button>`);
+        + `<div class="pied6"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><span class="outils"><button type="button" class="vu-btn" data-auto-guide>${esc(TU('au6_demarrer'))}</button><button type="button" class="vu-btn vu-plein" data-rf-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></span></div>`;
     } else {
       // 5.410 (Julien, 20 nov. : les automatisations vivent dans l'extension) : offres auto, paliers et baisse par
       // règle se RÈGLENT ici, sur SON toucher ; allumer demande « Oui, allumer » ; écrit dans `vrm_reglages_auto`.
@@ -2282,10 +2318,33 @@
       const auto = b.getAttribute('data-ra-bascule'), allumer = !raActif(auto), v = raValeur(auto, allumer);
       if (allumer) { raConfirme = { auto, cle: v.cle, valeur: v.valeur }; raEtat = null; rendre(); } else raEnvoyer(auto, v.cle, v.valeur, false);
     }));
-    const raOui = racine.querySelector('[data-ra-oui]'); if (raOui) raOui.addEventListener('click', () => { const c = raConfirme; if (c) raEnvoyer(c.auto, c.cle, c.valeur, true); });
+    const raOui = racine.querySelector('[data-ra-oui]'); if (raOui) raOui.addEventListener('click', () => { const c = raConfirme; if (c && c.cle !== 'favoris-auto') raEnvoyer(c.auto, c.cle, c.valeur, true); });
     const raNon = racine.querySelector('[data-ra-non]'); if (raNon) raNon.addEventListener('click', () => { raConfirme = null; rendre(); });
     racine.querySelectorAll('[data-ra-champ]').forEach((c) => c.addEventListener('input', () => { const k = c.getAttribute('data-ra-champ'); (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = c.value; }));
     racine.querySelectorAll('[data-ra-pct],[data-ra-jours]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-ra-pct') ? 'pct' : 'jours'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = Number(b.getAttribute('data-ra-' + k)); rendre(); }));
+    // 5.410 : messages aux favoris — textes, rythme, mode auto.
+    const rfEnvoyer = (action, donnees) => {
+      if (raEnVol) return; raEnVol = true; raEtat = null; rendre();
+      try {
+        chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge', action }, donnees), (r) => {
+          void chrome.runtime.lastError; raEnVol = false;
+          if (r && r.code === 'confirmation' && action === 'favorisAuto') { raConfirme = { auto: 'favoris', cle: 'favoris-auto', valeur: donnees }; }
+          else { raConfirme = null; raEtat = { auto: 'favoris', ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { delete raBrouillon.favoris; chargerListes(true); } }
+          rendre();
+        });
+      } catch (_) { raEnVol = false; raEtat = { auto: 'favoris', ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    const rfBr = () => { const au = (listes && listes.automatisations && listes.automatisations.favoris) || {}; return (raBrouillon.favoris = raBrouillon.favoris || { textes: Array.isArray(au.textes) ? au.textes.slice() : [] }); };
+    racine.querySelectorAll('[data-rf-texte]').forEach((c) => c.addEventListener('input', () => { const b = rfBr(); b.textes = Array.isArray(b.textes) ? b.textes : []; b.textes[Number(c.getAttribute('data-rf-texte'))] = c.value; }));
+    racine.querySelectorAll('[data-rf-texte]').forEach((c) => c.addEventListener('change', () => rendre()));
+    racine.querySelectorAll('[data-rf-rythme]').forEach((b) => b.addEventListener('click', () => { rfBr().rythme = b.getAttribute('data-rf-rythme'); rendre(); }));
+    const rfEn = racine.querySelector('[data-rf-enregistrer]'); if (rfEn) rfEn.addEventListener('click', () => {
+      const b = raBrouillon.favoris; if (!b) { raEtat = { auto: 'favoris', ok: true, texte: TU('ra_rien') }; rendre(); return; }
+      const t = (Array.isArray(b.textes) ? b.textes : []).map((x) => String(x || '').trim()).filter(Boolean);
+      rfEnvoyer('reglagesFavoris', { message: t[0] || '', variantes: t.slice(1, 5), ...(b.rythme ? { rythme: b.rythme } : {}) });
+    });
+    const rfA = racine.querySelector('[data-rf-auto]'); if (rfA) rfA.addEventListener('click', () => { const on = rfA.getAttribute('aria-pressed') === 'true'; rfEnvoyer('favorisAuto', { actif: !on }); });
+    const raOuiF = racine.querySelector('[data-ra-confirme="favoris-auto"] [data-ra-oui]'); if (raOuiF) raOuiF.addEventListener('click', (ev) => { ev.stopImmediatePropagation(); const c = raConfirme; raConfirme = null; if (c) rfEnvoyer('favorisAuto', Object.assign({}, c.valeur, { confirme: true })); }, true);
     const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};

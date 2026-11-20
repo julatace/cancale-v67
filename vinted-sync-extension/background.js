@@ -21298,7 +21298,7 @@ async function automatisationsCarte(u, owner) {
   return {
     offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
     paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false } : null,
-    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 200), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 200)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
     // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
     cadence: await cadenceCompte(u).catch(() => null),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).

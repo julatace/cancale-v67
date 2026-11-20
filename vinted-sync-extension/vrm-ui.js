@@ -28,6 +28,11 @@
   // </logos-transporteurs>
   const MOTS = {
     // 5.410 — panneau comme Vintex
+    ac_supprimer: { fr: "Supprimer de Leboncoin", en: "Delete from Leboncoin", es: "Eliminar de Leboncoin", it: "Elimina da Leboncoin", de: "Von Leboncoin löschen" },
+    a_supprime_ok: { fr: "Supprimée de Leboncoin.", en: "Deleted from Leboncoin.", es: "Eliminado de Leboncoin.", it: "Eliminato da Leboncoin.", de: "Von Leboncoin gelöscht." },
+    rf_mode_auto: { fr: "Mode automatique", en: "Automatic mode", es: "Modo automático", it: "Modalità automatica", de: "Automatikmodus" },
+    rf_mode_auto_note: { fr: "VRM écrit seul à qui met en favori, dans tes horaires et tes plafonds.", en: "VRM writes on its own to whoever favourites, within your hours and limits.", es: "VRM escribe solo a quien marca como favorito, en tus horarios y límites.", it: "VRM scrive da solo a chi mette nei preferiti, nei tuoi orari e limiti.", de: "VRM schreibt selbst an alle, die favorisieren – in deinen Zeiten und Grenzen." },
+    rf_version: { fr: "Version {n}", en: "Version {n}", es: "Versión {n}", it: "Versione {n}", de: "Version {n}" },
     cd_titre: { fr: "Cadence de ce compte", en: "Pace for this account", es: "Ritmo de esta cuenta", it: "Ritmo di questo account", de: "Tempo dieses Kontos" },
     cd_fav_h: { fr: "Messages aux favoris par heure", en: "Messages to favourites per hour", es: "Mensajes a favoritos por hora", it: "Messaggi ai preferiti all’ora", de: "Nachrichten an Favoriten pro Stunde" },
     cd_act_h: { fr: "Actions par heure", en: "Actions per hour", es: "Acciones por hora", it: "Azioni all’ora", de: "Aktionen pro Stunde" },

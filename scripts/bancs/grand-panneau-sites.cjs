@@ -167,7 +167,7 @@ async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
     const orig = Element.prototype.attachShadow;
     Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
     window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
-      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; setTimeout(() => cb && cb(rep), 0); } },
+      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; else if (msg.action === 'supprimerLbcCarte') rep = msg.sansRetour === true ? { accepte: true, etape: 'fait' } : { accepte: false, code: 'sans-retour', confirmation: { titre: 'Supprimer le N°7 de Leboncoin ?', lignes: ['N°7 · Paire A'], reste: 'L’article reste dans ton stock, avec son N°.', sansRetour: 'C’est sans retour : Leboncoin ne rend pas une annonce supprimée.', ok: 'Oui, supprimer de Leboncoin', irreversible: true } }; setTimeout(() => cb && cb(rep), 0); } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -216,7 +216,22 @@ const lireS = (pg) => pg.evaluate(() => {
         await t.pg.screenshot({ path: path.join(SORTIE, `${site}-annonces-${largeur}-${scheme}.png`) });
         dit(a.on && a.grand && (mobile ? a.w >= largeur - 1 : a.w >= largeur * 0.7) && !a.debord, `${T} : le grand panneau s’ouvre aussi ici`, JSON.stringify(a));
         dit(a.onglets.join(',') === 'accueil,annonces,ventes,messages,favoris,notifications,automatisations,parametres' && a.vx === 'annonces' && a.grpSite.includes(site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'), `${T} : la même barre latérale « comme Vintex », le site nommé`, JSON.stringify({ o: a.onglets, g: a.grpSite }));
-        dit(a.lignes === (site === 'leboncoin' ? 2 : 1) && JSON.stringify(a.options) === JSON.stringify(['baisser', 'ouvrir']), `${T} : toutes les annonces du compte de l’onglet (tous statuts, comme Vintex) ; « Choisir une action » sans Republier ni Offre aux favoris`, JSON.stringify(a));
+        dit(a.lignes === (site === 'leboncoin' ? 2 : 1) && JSON.stringify(a.options) === JSON.stringify(site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : ['baisser', 'ouvrir']), `${T} : toutes les annonces du compte de l’onglet (tous statuts, comme Vintex) ; « Choisir une action » sans Republier ni Offre aux favoris`, JSON.stringify(a));
+        if (site === 'leboncoin') {
+          // 5.410 : « Supprimer » d'UNE annonce : la confirmation « sans retour » du fond, puis SON « Oui ».
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-ann-sel="a1"]'); c.checked = true; c.dispatchEvent(new Event('change')); });
+          await t.pg.waitForTimeout(150);
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const s2 = r.querySelector('[data-ann-action]'); s2.value = 'supprimer'; s2.dispatchEvent(new Event('change')); });
+          await t.pg.waitForTimeout(250);
+          const c1 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-ann-confirme="supprimer"]'); return b ? b.innerText : ''; });
+          await t.pg.screenshot({ path: path.join(SORTIE, `${site}-supprimer-${largeur}-${scheme}.png`) });
+          const env1 = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'supprimerLbcCarte'));
+          dit(/sans retour/.test(c1) && /Oui, supprimer de Leboncoin/.test(c1) && env1.length === 1 && env1[0].sansRetour !== true, `${T} : « Supprimer » : la confirmation « sans retour » d'abord, rien ne part`, JSON.stringify({ c1, env1 }));
+          await clic(t.pg, '[data-ann-confirme-ok]');
+          await t.pg.waitForTimeout(200);
+          const env2 = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'supprimerLbcCarte'));
+          dit(env2.length === 2 && env2[1].sansRetour === true && env2[1].confirme === true && env2[1].id === 'a1', `${T} : « Oui, supprimer de Leboncoin » ⇒ la demande part avec « sans retour »`, JSON.stringify(env2));
+        }
         if (site === 'leboncoin') dit(a.sansCompte === '124', `${T} : les 124 annonces lues sans compte sont DITES, jamais montrées`, a.sansCompte);
         await clic(t.pg, '[data-onglet-b="ventes"]');
         await clic(t.pg, '[data-fiche-b]');

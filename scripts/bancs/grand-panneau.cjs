@@ -92,6 +92,8 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
+          else if (msg.action === 'reglagesFavoris') rep = { ok: true };
+          else if (msg.action === 'favorisAuto') rep = msg.actif && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, actif: msg.actif };
           else if (msg.action === 'reglageAuto') rep = msg.cle === 'vinted_cadence' && msg.valeur.actionsHeure > 50 && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, relu: true };
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
@@ -127,7 +129,7 @@ const lire = (pg) => pg.evaluate(() => {
     logos: r.querySelectorAll('.table6 .vu-transp').length, sousTitres: Array.from(r.querySelectorAll('.table6 .st6')).map((x) => x.innerText).filter(Boolean).length,
     avatars: r.querySelectorAll('img.av6').length, initiales: r.querySelectorAll('span.av6').length, vignettesMsg: r.querySelectorAll('.vig6').length,
     autoListe: Array.from(r.querySelectorAll('[data-auto-choix]')).map((x) => x.getAttribute('data-auto-choix') + ':' + x.querySelector('[data-etat]').getAttribute('data-etat') + (x.getAttribute('aria-selected') === 'true' ? '*' : '')),
-    autoSections: Array.from(r.querySelectorAll('.au6-d .sec6 h3')).filter(vis).map((x) => x.textContent.trim()), autoMessages: r.querySelectorAll('[data-auto-message]').length, autoDemarrer: !!q('[data-auto-guide]'), apercu: q('[data-paliers-apercu]') ? q('[data-paliers-apercu]').getAttribute('data-paliers-apercu') : null,
+    autoSections: Array.from(r.querySelectorAll('.au6-d .sec6 h3')).filter(vis).map((x) => x.textContent.trim()), autoMessages: Array.from(r.querySelectorAll('[data-rf-texte]')).filter((t) => t.value).length, autoDemarrer: !!q('[data-auto-guide]'), apercu: q('[data-paliers-apercu]') ? q('[data-paliers-apercu]').getAttribute('data-paliers-apercu') : null,
     lienPanneau: document.getElementById('vrm-badge').getAttribute('data-lien-panneau'), adresse: location.href,
     couleursVives: (() => { const out = []; for (const el of r.querySelectorAll('.vx6 *')) { if (!vis(el)) continue; const cs = getComputedStyle(el); for (const v of [cs.color, cs.backgroundColor]) { const m = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?/.exec(v); if (!m || (m[4] !== undefined && Number(m[4]) < 0.2)) continue; const [R, G, B] = [+m[1], +m[2], +m[3]]; if ((R > 180 && G < 90 && B < 90) || (G > 160 && R < 90 && B < 110) || (R > 120 && B > 160 && G < 90)) out.push(el.className + ':' + v); } } return out.slice(0, 5); })(),
     msgs: r.querySelectorAll('[data-conv]').length, volet: q('[data-volet-conv]') ? q('[data-volet-conv]').getAttribute('data-volet-conv') : null,
@@ -274,7 +276,24 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         await cap(t.pg, N('automatisations'));
         dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
-        dit(a.autoSections.join('|') === 'Messages|Ciblage|Délais' && a.autoMessages === 3 && a.autoDemarrer, `${T} : détail MESSAGES · CIBLAGE · DÉLAIS, ses 3 textes, « Démarrer »`, JSON.stringify({ s: a.autoSections, m: a.autoMessages }));
+        dit(a.autoSections.join('|') === 'Messages|Ciblage|Délais' && a.autoMessages === 3 && a.autoDemarrer, `${T} : détail MESSAGES · CIBLAGE · DÉLAIS, ses 3 textes modifiables, « Démarrer »`, JSON.stringify({ s: a.autoSections, m: a.autoMessages }));
+        // 5.410 : les messages aux favoris se règlent ici : un texte changé, le rythme, « Enregistrer » ; le mode auto ⇒ « Oui, allumer ».
+        await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-rf-texte="1"]'); ta.value = 'Coucou {pseudo}, prix doux !'; ta.dispatchEvent(new Event('input')); ta.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(150);
+        await clic(t.pg, '[data-rf-rythme="prudent"]');
+        await clic(t.pg, '[data-rf-enregistrer]');
+        a = await lire(t.pg);
+        const rf = a.envoyes.filter((m) => m.action === 'reglagesFavoris');
+        dit(rf.length === 1 && rf[0].message === 'Bonjour {pseudo}, une offre rien que pour toi.' && rf[0].variantes[0] === 'Coucou {pseudo}, prix doux !' && rf[0].rythme === 'prudent', `${T} : messages aux favoris : SES textes et SON rythme partent à « Enregistrer »`, JSON.stringify(rf));
+        await clic(t.pg, '[data-rf-auto]');
+        a = await lire(t.pg);
+        await cap(t.pg, N('favoris-auto'));
+        const fa1 = a.envoyes.filter((m) => m.action === 'favorisAuto');
+        const faConf = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ra-confirme="favoris-auto"]'));
+        await clic(t.pg, '[data-ra-oui]');
+        a = await lire(t.pg);
+        const fa2 = a.envoyes.filter((m) => m.action === 'favorisAuto');
+        dit(fa1.length === 1 && fa1[0].actif === true && fa1[0].confirme !== true && faConf && fa2.length === 2 && fa2[1].confirme === true && fa2[1].actif === true, `${T} : mode auto : « Allumer » ⇒ « Oui, allumer » ⇒ envoyé confirmé`, JSON.stringify({ fa1, faConf, fa2 }));
         await clic(t.pg, '[data-auto-choix="paliers"]');
         a = await lire(t.pg);
         await cap(t.pg, N('paliers'));
