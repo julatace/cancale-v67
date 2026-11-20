@@ -55,6 +55,10 @@ const MUTS = {
   'menu-sans-relier': ['src/App.jsx', "onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}", "onClick={()=>{ close(); }}"],
   'pilule-sans-action': ['src/PiluleAnnuler.jsx', "{v && v.action ? <button", "{false && v.action ? <button"],
   'ecran-defile-pendant': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'void e;'],
+  'tri-ancien-dabord': ['src/relierGlisser.js', "|| (q.d || 0) - (p.d || 0) ||", "|| (p.d || 0) - (q.d || 0) ||"],
+  'recus-tous': ['src/relierGlisser.js', "return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) === true; } catch (_) { return false; } });", "return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) !== false; } catch (_) { return true; } });"],
+  'facette-contient': ['src/relierGlisser.js', "return normFacette(k, v) === normFacette(k, choix[k]); }));", "return normFacette(k, v).includes(normFacette(k, choix[k])); }));"],
+  'ventes-bornees': ['src/App.jsx', "glisserOuvert ? vendusSansAchat(-Infinity)", "glisserOuvert ? vendusSansAchat(Date.now() - 365 * 86400e3)"],
   'ecran-bloque-toujours': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'if (e.cancelable) e.preventDefault();'],
 };
 if (process.argv.includes('--prouve')) {
@@ -244,6 +248,24 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(/addEventListener\('touchmove', bloque, \{ passive: false \}\)/.test(ecran) && /appui\.current\.phase === 'leve' && e\.cancelable\) e\.preventDefault\(\)/.test(ecran), 'S4 le doigt ne défile plus SEULEMENT une fois l’achat levé');
   dit(/data-glisser-ici=/.test(ecran) && /aria-pressed=\{choisi === x\.tx\}/.test(ecran), 'S5 l’alternative clavier / lecteur d’écran : choisir l’achat, puis « Relier ici »');
   dit(/if \(x && c\) setConfirme\(\{ a: x\.a, cible: c \}\);[^\n]*\n\s*return;\s*\/\/|if \(x && c\) setConfirme\(\{ a: x\.a, cible: c \}\);/.test(ecran) && !/onRelier\(x\.a/.test(ecran), 'S6 lâcher ne relie jamais : il POSE la question (« Oui » relie)');
+  // ── F · (20 nov., Julien) le plus récent d'abord, seuls les achats reçus, plateforme · marque · taille, toutes les paires ──
+  {
+    const l = [{ k: 'a', d: '2026-10-01' }, { k: 'b', d: null }, { k: 'c', d: '2026-11-15' }, { k: 'd', d: 1760000000 }];
+    dit((G.plusRecentDabord(l, (x) => x.d) || []).map((x) => x.k).join('') === 'cadb', 'F1 du plus récent au plus ancien (secondes ou ISO), une ligne sans date À LA FIN', JSON.stringify((G.plusRecentDabord(l, (x) => x.d) || []).map((x) => x.k)));
+    const xs = [{ a: { t: 'recu' } }, { a: { t: 'route' } }, { a: { t: 'relais' } }, { a: { t: '?' } }];
+    const recus = G.seulementRecus(xs, (a) => (a.t === 'recu' ? true : a.t === '?' ? null : false)) || [];
+    dit(recus.length === 1 && recus[0].a.t === 'recu', 'F2 seuls les achats REÇUS : en route, au point relais et « pas su » écartés');
+    const C = [{ site: 'vinted', marque: 'Nike', taille: '42' }, { site: 'leboncoin', marque: 'Nike SB', taille: '42,5' }, { site: 'vinted', marque: 'Adidas', taille: '42' }];
+    const lire = { site: (c) => c.site, marque: (c) => c.marque, taille: (c) => c.taille };
+    const f = G.filtrerFacettes(C, { marque: 'nike' }, lire) || [];
+    dit(f.length === 1 && f[0].marque === 'Nike', 'F3 une marque choisie : exactement elle (« Nike » ne prend pas « Nike SB »)');
+    dit((G.filtrerFacettes(C, { taille: '42' }, lire) || []).length === 2 && (G.filtrerFacettes(C, { site: 'leboncoin' }, lire) || []).length === 1, 'F4 taille « 42 » ne prend pas « 42,5 » ; plateforme exacte');
+    const fac = G.facettesDe(C, lire);
+    dit(fac.site.map((x) => x.cle).join(',') === 'vinted,leboncoin' && fac.site[0].n === 2 && JSON.stringify(G.choixValides({ marque: 'puma', site: 'vinted' }, fac)) === '{"site":"vinted"}', 'F5 les choix présents avec leur nombre ; un choix gardé qui n’existe plus tombe');
+    const ecr = (() => { try { return sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) { return ''; } })();
+    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && /recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app)');
+    dit(/const fileVendusTous = useMemo\(\(\) => \(glisserOuvert \? vendusSansAchat\(-Infinity\)/.test(app) && /fileAchatHorsLigne/.test(app) && /articlesSitesGlisser/.test(app), 'F7 toutes les paires : ventes sans borne, masquées / à confirmer, autres sites');
+  }
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();
