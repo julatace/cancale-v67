@@ -20902,10 +20902,10 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
       if (getComputedStyle(t.parentElement).display.indexOf('flex') < 0) t.setAttribute('data-avec-pastilles', '');
     };
     placer();
-    if (!h.isConnected) { setHote(null); return undefined; }
-    setHote(h);
+    setHote(h.isConnected ? h : null);
+    // Le titre peut arriver après (écran encore en lecture) : on attend qu'il soit là, puis on reste à côté de lui.
     const racine = document.querySelector('.n-coque') || document.body;
-    const mo = new MutationObserver(() => { if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) placer(); });
+    const mo = new MutationObserver(() => { if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); } });
     mo.observe(racine, { childList: true, subtree: true });
     return () => { mo.disconnect(); h.remove(); if (titre) titre.removeAttribute('data-avec-pastilles'); };
   }, [ordi]);

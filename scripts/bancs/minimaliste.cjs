@@ -390,6 +390,8 @@ async function selecteur() {
       dit(v1.sel === 'leboncoin' && v1.tache === 'leboncoin', `S2 ${W} Ventes suit le choix (Leboncoin)`, v1);
       for (const [url, cle] of [['?tab=journee', 'journee'], ['?tab=annonces', 'annonces'], ['?tab=achats', 'achats'], ['?tab=messages', 'messages']]) {
         await aller(o, url);
+        // Annonces se lit après la coque (la liste de tous les sites) : attendre ses rangées, 20 s au plus.
+        if (cle === 'annonces') await o.pg.waitForSelector('[data-eg-article]', { timeout: 20000 }).catch(() => {});
         const x = await lire(o.pg);
         const egOk = x.eg === 'leboncoin' || (W >= 1024 && x.egSites.length > 0 && x.egSites.every((v) => v.split(',').includes('leboncoin')));
         const ok = x.sel === 'leboncoin' && (cle === 'journee' || (cle === 'annonces' ? egOk : x.tache === 'leboncoin'));
