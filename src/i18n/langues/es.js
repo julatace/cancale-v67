@@ -77,6 +77,7 @@ import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_liaisonSites from './es/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
 import ecran_compteBloque from './es/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
@@ -2332,6 +2333,7 @@ export default {
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
+  ...ecran_ceQuiManque,
   ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,

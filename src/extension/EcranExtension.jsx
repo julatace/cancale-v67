@@ -21,8 +21,10 @@ import { jaugeDuCompte, toutArreteDe } from '../jaugeActions.js';
 import { useReglageDiscretion } from '../Discretion.jsx';
 import { avecReprise, avecToutArrete, CLE_DISCRETION } from '../discretion.js';
 import { installerExtensionIci, pageExtensionsIci } from '../navigateurExtension.js';
-import { Icon, SUPABASE_URL, sbAuth, load, vmrCmd, lireCapturesDetail, useComptesAutresSites, faitsExtensionApp, useExtVivante, useSansSouris, brancherExtensionApp } from '../App.jsx';
+import { Icon, SUPABASE_URL, sbAuth, load, save, vmrCmd, lireCapturesDetail, useComptesAutresSites, faitsExtensionApp, useExtVivante, useSansSouris, brancherExtensionApp } from '../App.jsx';
 import { nomCompteLie } from '../comptesLies.js';
+import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
+import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -100,7 +102,25 @@ function texteJauge(j, maintenant) {
   return j.n && j.repartA && j.repartA > maintenant ? `${base} · ${tr('ext.jauge.repart', { heure: heureLoc(j.repartA) })}` : base;
 }
 
-function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre }) {
+// (20 nov., « ce qui manque ») COMPTE BLOQUÉ : CHANGER D'AVIS À TOUT MOMENT. Pendant que Vinted bloque CE compte (« banni »
+// lu, src/compteBloque.js), sa rangée dit son choix et offre « Mettre en pause » / « Garder » — la MÊME clé
+// (`vrm_comptes_bloques`, `choixPose`) que la question de la coque, écrite sur SON toucher seulement. Débloqué : rien ici.
+function BloqueRangees({ uid, etat, choix, maintenant, onChoisir }) {
+  const phase = cbPhase(choix, etat, maintenant);
+  if (!['question', 'pause', 'garder', 'plus_tard'].includes(phase)) return null;
+  const cle = phase === 'pause' ? 'pause' : phase === 'garder' ? 'garder' : 'question';
+  return (
+    <>
+      <Rangee titre={tr('cqm.bloque.titre')} sousTitre={tr('cqm.bloque.etat.' + cle)} ton="ambre" attrs={{ 'data-ext-bloque': uid, 'data-ext-bloque-choix': phase }}/>
+      <Rangee titre={tr('cqm.bloque.pause')} fin={phase === 'pause' ? 'coche' : null} onClick={phase === 'pause' ? null : () => onChoisir(uid, 'pause')}
+        attrs={{ 'data-ext-bloque-geste': 'pause', 'aria-pressed': phase === 'pause' ? 'true' : 'false' }}/>
+      <Rangee titre={tr('cqm.bloque.garder')} fin={phase === 'garder' ? 'coche' : null} onClick={phase === 'garder' ? null : () => onChoisir(uid, 'garder')}
+        attrs={{ 'data-ext-bloque-geste': 'garder', 'aria-pressed': phase === 'garder' ? 'true' : 'false' }}/>
+    </>
+  );
+}
+
+function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre, bloque = null }) {
   const phrase = dire(c.etat.cle, c.etat.vars);
   const lu = c.lu ? tr('ext.lu', { age: ilYa(c.lu.at, maintenant) }) : (c.etat.cle === 'ext.compte.jamaisLu' ? '' : tr('ext.jamais'));
   const total = c.gestes.length;
@@ -109,6 +129,7 @@ function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre }) {
       <Rangee titre={phrase} sousTitre={lu} lignes={2} ton={c.etat.ton === 'geste' ? 'ambre' : 'neutre'} valeur={tr('ext.peut.n', { n: c.peut, total })}
         href={c.etat.geste === 'ouvrir-vinted' ? 'https://www.vinted.fr' : ''} fin={c.etat.geste === 'ouvrir-vinted' ? 'chevron' : null}
         attrs={{ 'data-ext-compte-etat': c.etat.code }}/>
+      {bloque && c.site === 'vinted' ? <BloqueRangees uid={c.id} etat={bloque.etats && bloque.etats[c.id]} choix={bloque.choix[c.id]} maintenant={maintenant} onChoisir={bloque.choisir}/> : null}
       {c.etat.geste === 'reprendre' ? <Rangee titre={tr('ext.geste.reprendre')} fin="chevron" onClick={() => onReprendre(c.id)} attrs={{ 'data-ext-reprendre': c.id }}/> : null}
       {c.site === 'vinted' ? <Rangee titre={texteJauge(c.jauge, maintenant)} lignes={2} attrs={{ 'data-ext-jauge': c.jauge ? `${c.jauge.n}/${c.jauge.max}` : (c.jauge === null ? 'pas-su' : 'lecture') }}/> : null}
       {c.gestes.map((g) => <RangeeGeste key={g.cle} g={g}/>)}
@@ -135,6 +156,18 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
   const [autresSites] = useComptesAutresSites(true);
   const [reg, ecrire] = useReglageDiscretion();
   const [ouverts, setOuverts] = React.useState({});
+  const cb = useComptesBloques();
+  // SON toucher : la même écriture que la question de la coque (src/CompteBloque.jsx `ecrire`), relue juste avant.
+  const choisirBloque = (uid, quoi) => {
+    const cur = { ...(load(CLE_COMPTES_BLOQUES, {}) || {}) };
+    const avant = cur[uid];
+    const e = choixPose(quoi, cb.etats && cb.etats[uid], avant && avant.n != null ? avant.n : null, Date.now());
+    if (!e) return;
+    cur[uid] = e;
+    save(CLE_COMPTES_BLOQUES, cur);
+    choixComptesBloquesChange();
+  };
+  const bloque = cb.etats && typeof cb.etats === 'object' ? { etats: cb.etats, choix: cb.choix || {}, choisir: choisirBloque } : null;
 
   const liste = Array.isArray(comptesVinted) ? comptesVinted.filter((a) => a && a.vinted_user_id != null && !ecarte(String(a.vinted_user_id))) : [];
   const vinted = liste.map((a) => ({ id: String(a.vinted_user_id), nom: String(a.login || '') }));
@@ -201,7 +234,7 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
       ) : null}
 
       {chargement ? <Attente forme="rangees" n={4}/> : vm.sites.map((s) => s.comptes.map((c) => (
-        <CompteGroupe key={`${s.site}:${c.id}`} c={c} maintenant={maintenant} ouvert={deplie(c)} onReprendre={reprendre}
+        <CompteGroupe key={`${s.site}:${c.id}`} c={c} maintenant={maintenant} ouvert={deplie(c) || !!(bloque && c.site === 'vinted' && cb.bloques.has(String(c.id)))} onReprendre={reprendre} bloque={bloque}
           onBascule={() => setOuverts((o) => ({ ...o, [`${c.site}:${c.id}`]: !deplie(c) }))}/>
       )))}
 
