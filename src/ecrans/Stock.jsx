@@ -893,8 +893,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         // meuble d'ORIGINE est réécrit augmenté de ce qu'il change (`{ ...x, … }`) : rien d'autre n'est touché.
         const plus = { type: TYPES[extra.type] ? extra.type : 'etagere', couleur: COULEURS.includes(extra.couleur) ? extra.couleur : null,
           couleurs: couleursDans(extra.couleurs, cols, rows), piles: (Array.isArray(extra.piles) ? extra.piles : []).map(Number).filter((c) => c >= 1 && c <= cols) };
+        if (extra.reglages) plus.reglages = extra.reglages;   // (20 nov.) le style choisi par « Personnaliser »
         if (id) { const ancien = meubles.find((x) => x.id === id) || {};
-          const u = meubles.map((x) => x.id === id ? { ...x, name: nom, cols, rows, planches, gravite, ...plus, ...(extra.reglages ? { reglages: extra.reglages } : {}) } : x);
+          const u = meubles.map((x) => x.id === id ? { ...x, name: nom, cols, rows, planches, gravite, ...plus } : x);
           // Les paires gardent leur rangée et leur colonne quand le nombre de
           // colonnes change ; celles hors des nouvelles cases repartent « à ranger ».
           // (15 nov.) … et c'est DEMANDÉ d'abord, avec leurs N° : un meuble rétréci ne fait plus sortir une paire en silence.
