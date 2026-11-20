@@ -66909,15 +66909,6 @@ function AppCoeur() {
             : titreDansCoque ? null : <h1>{TITRES_TACHE[t]}</h1>}
           {/* (17 nov., nouveau design) PLATEFORME + COMPTE = UN MENU sous le grand titre : les mêmes contrôles qu'avant
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
-          {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
-            const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
-            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return <div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={t}/></span></div>;
-            return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
-              libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
-              sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>
-              {/* (20 nov.) Le choix du SITE est le sélecteur global (au-dessus) : ce menu ne porte plus que le compte Vinted. */}
-              {site==='vinted' && !baseKO && nCpt > 1 ? <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={t==='messages'}/> : null}
-            </MenuPlateformeV2><span className="v2-aide"><PhraseEcran cle={t}/></span></div>; })() : null}
           {designV2App ? null : <PhraseEcran cle={t}/>}
           {/* (15 nov., refonte-journee — la maquette « Annonces ») Annonces | Stock | Achats SOUS le titre d'Annonces (le même
               sélecteur que la coque, qui ne le pose plus au-dessus pour cet écran). */}
@@ -66934,6 +66925,19 @@ function AppCoeur() {
         </header>}
         {/* (20 nov., décision) LE sélecteur de plateforme, sous le titre de chaque écran principal (src/natif/SelecteurSite.jsx). */}
         {baseKO ? null : selecteurSite}
+        {/* (20 nov., « même squelette ») Le compte Vinted et l'aide SOUS le sélecteur : le sélecteur est à la même hauteur sur
+            chaque site (Vinted ajoutait sa ligne de compte au-dessus). */}
+        {natifV || lbcNatif ? null : <div className="v2-tete-tache v2-tete-suite">
+          {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
+            const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
+            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return <div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={t}/></span></div>;
+            return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
+              libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
+              sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>
+              {/* (20 nov.) Le choix du SITE est le sélecteur global (au-dessus) : ce menu ne porte plus que le compte Vinted. */}
+              {site==='vinted' && !baseKO && nCpt > 1 ? <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={t==='messages'}/> : null}
+            </MenuPlateformeV2><span className="v2-aide"><PhraseEcran cle={t}/></span></div>; })() : null}
+        </div>}
         {/* (19 nov., décision de Julien) « À régler · N » : ce qui était dans « À faire » d'Aujourd'hui, en tête de SON onglet (replié s'il ne presse pas).
             Ventes natif le pose lui-même sous ses segments (`avant`). */}
         {designV2App && !baseKO && !natifV && !lbcNatif && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}

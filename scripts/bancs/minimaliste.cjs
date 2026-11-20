@@ -494,7 +494,8 @@ function squelette() {
   const sel = document.querySelector('[data-selecteur-site]');
   const seg = [...racine.querySelectorAll('.n-segmente')].filter((x) => vis(x) && !x.closest('[data-selecteur-site]'))[0] || null;
   const minL = (q) => { const l = [...racine.querySelectorAll(q)].filter(vis).map((e) => Math.round(e.getBoundingClientRect().left)); return l.length ? Math.min(...l) : null; };
-  const plein = [...document.querySelectorAll('[data-n-variante="plein"]')].find(vis);
+  // La PLACE du plein : sa bande (`.n-page-plein`) — le bouton lui-même peut porter sa raison dessous (« Coche un colis… »).
+  const plein = [...document.querySelectorAll('.n-page-plein, [data-n-plein]')].find(vis) || [...document.querySelectorAll('[data-n-variante="plein"]')].find(vis);
   const onglets = document.querySelector('.n-onglets');
   return {
     titre: titre ? { txt: titre.innerText.trim().slice(0, 30), ...R(titre) } : null,
@@ -542,8 +543,8 @@ async function sitesPlanches() {
       for (const r of l.slice(1)) {
         const q = r.sq, n = r.site;
         if (!!q.titre !== !!ref.titre || (q.titre && !t1(q.titre.t, ref.titre.t))) ecarts.push(n + ' : titre');
-        if (!q.sel || !ref.sel || !t1(q.sel.t, ref.sel.t) || !t1(q.sel.l, ref.sel.l) || !t1(q.sel.h, ref.sel.h)) ecarts.push(n + ' : sélecteur');
-        if (!!q.seg !== !!ref.seg || (q.seg && (q.seg.libelles.join('/') !== ref.seg.libelles.join('/') || !t1(q.seg.t, ref.seg.t)))) ecarts.push(n + ' : segments ' + (q.seg ? q.seg.libelles.join('/') : '—') + ' ≠ ' + (ref.seg ? ref.seg.libelles.join('/') : '—'));
+        if (!!q.sel !== !!ref.sel || (q.sel && (!t1(q.sel.t, ref.sel.t) || !t1(q.sel.l, ref.sel.l) || !t1(q.sel.h, ref.sel.h)))) ecarts.push(n + ` : sélecteur ${q.sel ? q.sel.t : '—'} ≠ ${ref.sel ? ref.sel.t : '—'}`);
+        if (!!q.seg !== !!ref.seg || (q.seg && (q.seg.libelles.join('/') !== ref.seg.libelles.join('/') || !t1(q.seg.t, ref.seg.t)))) ecarts.push(n + ' : segments ' + (q.seg ? q.seg.libelles.join('/') + '@' + q.seg.t : '—') + ' ≠ ' + (ref.seg ? ref.seg.libelles.join('/') + '@' + ref.seg.t : '—'));
         if (q.bordGroupes != null && ref.bordGroupes != null && !t1(q.bordGroupes, ref.bordGroupes)) ecarts.push(n + ` : bord des groupes ${q.bordGroupes} ≠ ${ref.bordGroupes}`);
         if (q.bordRangees != null && ref.bordRangees != null && !t1(q.bordRangees, ref.bordRangees)) ecarts.push(n + ` : bord des rangées ${q.bordRangees} ≠ ${ref.bordRangees}`);
         if (q.plein && ref.plein && (!t1(q.plein.l, ref.plein.l) || !t1(q.plein.w, ref.plein.w) || !t1(q.plein.ecartOnglets, ref.plein.ecartOnglets))) ecarts.push(n + ' : place du plein');
