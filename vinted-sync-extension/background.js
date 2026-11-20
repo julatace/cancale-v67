@@ -21825,7 +21825,7 @@ async function automatisationsCarte(u, owner) {
   try {
     const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(u))))].map((b) => b.toString(16).padStart(2, '0')).join('');
     if (/^[0-9a-f-]{36}$/.test(String(owner || ''))) {
-      const f = await sbGet(`app_data?id=eq.favoris_file_${h}&select=a:data->groupes->${owner}->auto->reglages`);
+      const f = await sbGet(`app_data?id=eq.favoris_file_${h}&select=a:data->groupes->"${owner}"->auto->reglages`);
       if (Array.isArray(f)) { const a = f[0] && f[0].a; auto = a && typeof a === 'object' ? { actif: a.actif === true, attenteMin: Number(a.attenteMin) || null, attenteMax: Number(a.attenteMax) || null, parJour: Number(a.parJour) || null, parHeure: Number(a.parHeure) || null, heureDebut: Number.isFinite(Number(a.heureDebut)) ? Number(a.heureDebut) : null, heureFin: Number.isFinite(Number(a.heureFin)) ? Number(a.heureFin) : null } : { actif: false }; }
     }
   } catch (_) { auto = null; }
