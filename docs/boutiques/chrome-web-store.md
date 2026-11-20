@@ -55,8 +55,8 @@ s'affiche que dans le tableau de bord : prendre celle qui parle d'outils de trav
   dessin + 16 px de marge transparente ; l'icône actuelle remplit tout le carré. Ce n'est pas un motif de
   refus, mais la redessiner change le paquet : à faire avec une version de l'extension, pas ici.
 - Captures 1280 × 800 (1 au moins, 5 au plus) : `capture-1-journee.png`, `capture-2-ventes.png`,
-  `capture-3-compta.png`, `capture-4-annonces.png`, `capture-5-extension.png` (refaites le 20 nov.
-  pour la 5.409.0, style « VRM natif » ; l'écran Argent remplace Achats : plus aucun logo de
+  `capture-3-garage.png`, `capture-4-annonces.png`, `capture-5-extension.png` (refaites le 20 nov.
+  pour la 5.409.0, style « VRM natif » ; l'écran Stock remplace Achats : plus aucun logo de
   transporteur). Données INVENTÉES (mode exemple de l'app, bandeau « Exemple — données
   inventées » visible ; la carte du logo sur une page de dressing inventée, sans marque de site).
   Pas à pas complet pour Julien : `docs/chrome-web-store/README.md`.

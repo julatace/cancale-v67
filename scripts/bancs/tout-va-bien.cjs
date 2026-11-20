@@ -19,7 +19,7 @@ require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : l
 const path = require('path'), fs = require('fs'), http = require('http');
 const { metaVersData } = require('./_meta.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = 4391;
 const CAPT = process.env.BANC_CAPTURES || path.join(__dirname, 'captures');
 fs.mkdirSync(CAPT, { recursive: true });
@@ -159,7 +159,7 @@ async function scenario(b, scen, largeur, sombre) {
   await page.scrollIntoViewIfNeeded().catch(() => {});
   // (20 nov.) Les comptes un par un et les appareils sont derrière « Détails » (src/ToutVaBien.jsx, points d'abord) : on les déplie.
   const det = page.locator('[data-tvb-details="ferme"] .n-rangee-corps');
-  if (await det.count()) { await det.first().click(); await pg.waitForTimeout(300); }
+  if (await det.count()) { await det.first().click({ timeout: 10000 }).catch(async (e) => { await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-RATE-details-${nom}.png`) }); throw e; }); await pg.waitForTimeout(300); }
   const resume = (await page.locator('[data-tvb-resume]').first().innerText().catch(() => '')).split('\n')[0].trim();
   if (scen === 'panne') {
     const r222 = page.locator('[data-tvb-compte="vinted:222"]');

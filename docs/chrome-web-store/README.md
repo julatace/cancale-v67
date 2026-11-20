@@ -45,7 +45,7 @@ Copie chaque texte depuis `docs/boutiques/chrome-web-store.md` :
 | Catégorie | **Outils** (sinon « Productivité ») — jamais « Shopping » | même section |
 | Langue | **Français** | même section |
 | Icône 128 × 128 | rien : elle vient du paquet | — |
-| Captures d'écran | `capture-1-journee.png`, `capture-2-ventes.png`, `capture-3-compta.png`, `capture-4-annonces.png`, `capture-5-extension.png` (dans cet ordre) | dossier `chrome-store/` ou `docs/boutiques/visuels/` |
+| Captures d'écran | `capture-1-journee.png`, `capture-2-ventes.png`, `capture-3-garage.png`, `capture-4-annonces.png`, `capture-5-extension.png` (dans cet ordre) | dossier `chrome-store/` ou `docs/boutiques/visuels/` |
 | Petite tuile promotionnelle 440 × 280 | `tuile-440x280.png` | idem |
 | Tuile « marquee » 1400 × 560 (facultative) | `tuile-1400x560.png` | idem |
 | Site Web officiel | `https://vrm.center` | — |
@@ -118,7 +118,7 @@ exact, je prépare la réponse ou la nouvelle version.
   Les deux sont justifiés dans la fiche et la politique (mise à jour le 20 nov. : publier une fiche, masquer,
   baisse par règle, négociation par paliers, vendue ailleurs ⇒ masquée, écran plein « Tout arrêter »,
   compte bloqué ⇒ pause).
-- Captures refaites au style « VRM natif » (FR + EN), l'écran Argent à la place d'Achats.
+- Captures refaites au style « VRM natif » (FR + EN), l'écran Stock à la place d'Achats (Argent, en données d'exemple, montre surtout des « — »).
 
 ## Fabriquer ce qu'on envoie
 
