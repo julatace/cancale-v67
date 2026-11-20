@@ -9353,6 +9353,23 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // les quelques transactions écrites depuis. Les champs de version s'ajoutent aux cinq
 // (revue colis, intégration) — `cap` (l'heure de la lecture, que le suivi des commandes exige) y est déjà, par `VERSION_META`.
 // (personne ne lit `id`, `cap`… ici). Partagée 60 s, comme `memo` ; un échec n'est pas gardé.
+const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
+// (20 nov., lectures-legeres) + `ti` (l'intitulé de l'état) : les preuves de vente (`lirePreuvesVenteVinted`)
+// relisaient la MÊME famille sous une autre projection (~144 Ko à CHAQUE ouverture, la plus grosse lecture au
+// chaud) ; elles la prennent désormais ici (gardée sur l'appareil, revalidée par version). La copie change de
+// forme ⇒ elle change de nom (`txn2`) : une copie d'avant, sans `ti`, n'est jamais servie.
+const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title,ti:meta->>status_title`;
+const TXN_FAMILLE = 'txn2';
+let _txnMeta = null;
+const lireTxnMeta = () => {
+  const qui = AUTH.user?.id || '';
+  if (_txnMeta && _txnMeta.qui === qui && Date.now() - _txnMeta.at < ROW_TTL_MS) return _txnMeta.p;
+  const p = lireFamilleCopiee(TXN_FAMILLE, TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
+  const e = { qui, at: Date.now(), p };
+  _txnMeta = e;
+  p.then((rows) => { if (!Array.isArray(rows) && _txnMeta === e) _txnMeta = null; });
+  return p;
+};
 // (20 nov., lectures-legeres) Deux lectures lourdes servies 20 s à leurs voisines (src/memoCourt.js) : les dates
 // de capture (`lireCapturesDetail`) et les transactions des preuves de vente (`lirePreuvesVenteVinted`). Oubliées à
 // toute écriture qui peut toucher leurs lignes et à tout signal de l'extension (`lecturesPartagees.abonner`), au
@@ -9365,23 +9382,12 @@ try {
   const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
   if (lp && typeof lp.abonner === 'function') {
     lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
-    lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => _memoPreuvesTxn.oublier());
+    // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
+    lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
   }
   if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
 } catch (_) {}
 onCloudReady(oublierMemosLectures);
-const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
-const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title`;
-let _txnMeta = null;
-const lireTxnMeta = () => {
-  const qui = AUTH.user?.id || '';
-  if (_txnMeta && _txnMeta.qui === qui && Date.now() - _txnMeta.at < ROW_TTL_MS) return _txnMeta.p;
-  const p = lireFamilleCopiee('txn', TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
-  const e = { qui, at: Date.now(), p };
-  _txnMeta = e;
-  p.then((rows) => { if (!Array.isArray(rows) && _txnMeta === e) _txnMeta = null; });
-  return p;
-};
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
 // LITIGE et elle réapparaît dans les colis à faire ». Mesuré (lecture seule) :
@@ -32319,8 +32325,15 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    // (20 nov., lectures-legeres) Servie 20 s aux voisines (`_memoPreuvesTxn`) : ~144 Ko lus deux fois en 3 s au banc.
-    const rows = await _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', () => lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true }), { force: !!opts.force });
+    // (20 nov., lectures-legeres) La MÊME famille que `lireTxnMeta` (gardée sur l'appareil, revalidée par version),
+    // rendue sous les noms d'ici — mêmes lignes, mêmes valeurs que l'ancienne lecture
+    // (`id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt`) ;
+    // servie 20 s aux voisines (`_memoPreuvesTxn`), oubliée à toute écriture qui peut la toucher ; `force` relit.
+    if (opts.force) _txnMeta = null;
+    const rows = await _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', async () => {
+      const l = await lireTxnMeta();
+      return Array.isArray(l) ? l.map((r) => ({ id: r.id, tx: r.tx, it: r.item, ti: r.ti, at: r.su, cap: r.cap })) : null;
+    }, { force: !!opts.force });
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).

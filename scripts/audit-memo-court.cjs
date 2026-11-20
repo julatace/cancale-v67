@@ -81,8 +81,10 @@ async function passe(memoPath, lpPath, appTexte, silencieux) {
   // 7.
   const app = appTexte;
   dit(/function lireCapturesDetail\(opts\) \{\s*return _memoCaptures\.lire\(\(AUTH\.user && AUTH\.user\.id\) \|\| '', lireCapturesDetailUne, \{ force: !!\(opts && opts\.force\) \}\);/.test(app), '7. lireCapturesDetail passe par le memo, par vendeur');
-  dit(/_memoPreuvesTxn\.lire\(\(AUTH\.user && AUTH\.user\.id\) \|\| '', \(\) => lireTout\('id=like\.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title/.test(app), '7. les transactions des preuves passent par le memo, par vendeur');
-  dit(/lp\.abonner\('app_data\?id=like\.harvest_\*', \(\) => _memoCaptures\.oublier\(\)\)/.test(app) && /lp\.abonner\('app_data\?id=like\.harvest_%25_txn_%25', \(\) => _memoPreuvesTxn\.oublier\(\)\)/.test(app), '7. les deux memos abonnés aux vidages');
+  dit(/_memoPreuvesTxn\.lire\(\(AUTH\.user && AUTH\.user\.id\) \|\| '', async \(\) => \{\s*const l = await lireTxnMeta\(\);\s*return Array\.isArray\(l\) \? l\.map\(\(r\) => \(\{ id: r\.id, tx: r\.tx, it: r\.item, ti: r\.ti, at: r\.su, cap: r\.cap \}\)\) : null;/.test(app), '7. les transactions des preuves : la famille gardée (lireTxnMeta) sous les noms d\'avant, par le memo, par vendeur');
+  dit(/ti:meta->>status_title`;\s*const TXN_FAMILLE = 'txn2';/.test(app), '7. la copie des transactions porte `ti` et a changé de nom (aucune copie d\'avant servie)');
+  dit(/lp\.abonner\('app_data\?id=like\.harvest_%25_txn_%25', \(\) => \{ _memoPreuvesTxn\.oublier\(\); _txnMeta = null; \}\)/.test(app), '7. une écriture de transaction fait oublier la mémoire de 60 s aussi');
+  dit(/lp\.abonner\('app_data\?id=like\.harvest_\*', \(\) => _memoCaptures\.oublier\(\)\)/.test(app), '7. le memo des captures abonné aux vidages');
   dit(/onCloudReady\(oublierMemosLectures\)/.test(app) && /addEventListener\('vrm:ext', oublierMemosLectures\)/.test(app), '7. oubliés à onCloudReady et au signal de l\'extension');
   dit(/lireCapturesDetail\(\{ force: !aLaCoque \}\)/.test(app) && /lireCapturesDetail\(\{ force: true \}\)/.test(app), '7. « Réessayer » et le retour du réseau forcent la relecture');
   return { ok, ko, rouges };
