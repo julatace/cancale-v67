@@ -96,7 +96,9 @@ function DetailVente({ r, g, Icon, Logo, Photo, Generer }) {
   const route = Array.isArray(r.etapes);
   const G = r.gestes || {};
   const etapes = route ? r.etapes.map((e) => ({ cle: e.cle, fait: e.fait, ici: e.ici, libelle: tr('vv.route.' + e.cle), valeur: '' }))
-    : (d.etapes || []).map((e) => ({ cle: e.cle, fait: e.fait, ici: e.ici, geste: e.geste, libelle: tr('vv.fiche.' + e.cle),
+    // (20 nov., décision « 4 oui ») L'étape du dépôt se dit « Déposé » (un FAIT, coché quand le suivi le constate), jamais
+    // « À déposer · à faire » : aucun geste de dépôt n'est demandé.
+    : (d.etapes || []).map((e) => ({ cle: e.cle, fait: e.fait, ici: e.ici, geste: false, libelle: tr(e.cle === 'adeposer' ? 'vv.route.depose' : 'vv.fiche.' + e.cle),
       valeur: e.cle === 'vendue' ? d.quand : e.cle === 'bordereau' ? d.bordereau : e.cle === 'adeposer' ? texteEcheance(r.echeance) : e.cle === 'versement' && d.versement === 'vinted' ? tr('vv.fiche.versementVinted') : '' }));
   return (
     <>
@@ -171,7 +173,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
     const sous = surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || '';
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
-      sous, statut: st, statutLibelle: motStatut(r), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
+      sous, statut: st, statutLibelle: motStatut(r), nonCochable: !(r.coche && r.coche.possible), num: r.num, prix: r.prix, t: r.t, prixGrille: r.prix,
       texte: [r.titre, r.num ? 'n' + r.num + ' n°' + r.num + ' ' + r.num : '', r.taille, r.acheteur, r.compte, r.transporteur, r.suivi, sous].filter(Boolean).join(' '),
       attrs: surEnvoyer
         ? { 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '', 'data-vn-num': r.num, 'data-vn-prix': r.prix, 'data-vt-statut': 'envoyer', 'data-vt-transporteur': r.transporteurCle || '' }
@@ -185,16 +187,19 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => l.r.transporteur || null,
       rendu: (l) => (l.r.transporteur ? <span className="n-tt-transporteur" data-transporteur={l.r.transporteurCle || ''}>{logoTr(l.r)}<span>{l.r.transporteur}</span></span> : null) },
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => l.statut },
-    ...(surEnvoyer ? [{ cle: 'limite', libelle: tr('vt.col.limite'), titreCourt: presses > 0 ? tr('vt.col.limiteN', { n: presses }) : '', tri: (l) => rangLimite(l.r.echeance),
+    ...(surEnvoyer ? [{ cle: 'limite', apresStatut: true, libelle: tr('vt.col.limite'), titreCourt: presses > 0 ? tr('vt.col.limiteN', { n: presses }) : '', tri: (l) => rangLimite(l.r.echeance),
       rendu: (l) => { const t = texteEcheance(l.r.echeance); return t ? <span className="n-vt-limite" data-vt-ambre={l.r.echeance.ambre ? '1' : undefined}>{t}</span> : null; } }] : []),
   ];
   const statuts = surEnvoyer
     ? STATUTS_ENVOYER.map((c) => ({ cle: c, libelle: tr('vt.st.' + c), ton: 'ambre' }))
     : ['route', 'livree', 'terminee'].map((c) => ({ cle: c, libelle: tr(MOT_STATUT[c]), ton: 'neutre' }));
   const P = E.plein;
-  const actions = surEnvoyer && g.imprimerChoix ? [{ cle: 'imprimer', libelle: tr('tableau.action.imprimer'), aucune: tr('tableau.action.imprimerAucune'), pour: (l) => !!(l.r.coche && l.r.coche.possible) }] : [];
+  // LES CASES = LE LOT D'IMPRESSION (la règle d'avant : `cochesEffectives`, cochées d'office là où le bordereau est prêt, jamais
+  // sans bordereau) ; « Imprimer N bordereaux » de la barre d'outils imprime CES cases (N = le plein d'avant, `pleinImprimer`).
+  const coches = React.useMemo(() => new Set(rangs.filter((r) => r.coche && r.coche.on).map((r) => r.cle)), [rangs]);
+  const cocher = (cles, on) => { const k = new Set(cles); for (const r of rangs) if (k.has(r.cle) && r.coche && r.coche.possible && !!r.coche.on !== !!on) g.basculer(r.coche.cle); };
   const outilsPlus = surEnvoyer ? <>
-    {P.n > 0 || P.occupe ? <Bouton variante="teinte" icone={<Icon name="printer" size={18}/>} chargement={P.occupe} onClick={g.imprimer}
+    {P.n > 0 || P.occupe ? <Bouton variante="plein" ajuste icone={<Icon name="printer" size={18}/>} chargement={P.occupe} onClick={g.imprimer}
       attrs={{ 'data-vn-plein': String(P.n), 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': P.nVentes, 'data-impr-lot': P.nVentes, 'data-impr-retours-coches': P.nRetours }}>{tr('vt.imprimerN', { n: P.n })}</Bouton> : null}
     {filtre}
     <BoutonIcone libelle={tr('vt.outils')} icone={<Icon name="more" size={20}/>} onClick={onOutils} attrs={{ 'data-vn-plus': '' }}/>
@@ -207,8 +212,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   </Groupe> : null;
   return (
     <div className="n-vt" data-vt={m.onglet} data-vt-detail={ouverte ? '1' : '0'}>
-      <TableauTravail key={m.onglet} id={'ventes-' + m.onglet} titre={tr('vn.titre')} majLe={majLe} onRafraichir={() => { setMajLe(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} lignes={lignes} statuts={statuts} colonnes={colonnes} actions={actions}
-        onAction={(cle, ls) => { if (cle === 'imprimer' && g.imprimerChoix) g.imprimerChoix(ls.map((l) => l.r.coche.cle).filter(Boolean)); }}
+      <TableauTravail key={m.onglet} id={'ventes-' + m.onglet} titre={tr('vn.titre')} cases={surEnvoyer} coches={surEnvoyer ? coches : null} onCocher={surEnvoyer ? cocher : null} majLe={majLe} onRafraichir={() => { setMajLe(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} lignes={lignes} statuts={statuts} colonnes={colonnes}
         onOuvrir={(l) => setChoisie((c) => (c === l.cle ? null : l.cle))} ligneChoisie={ouverte ? ouverte.cle : ''}
         menuLigne={(l) => [{ cle: 'ouvrir', libelle: tr('tableau.ouvrirVente'), onClick: () => setChoisie(l.cle) },
           ...(l.r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vv.volet.suivre'), onClick: () => { try { window.open(l.r.lienSuivi, '_blank', 'noopener'); } catch (_) {} } }] : [])]}
