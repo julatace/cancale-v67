@@ -126,15 +126,18 @@ const sain = async (pg, ecran) => {
       LIGNES = lignes();
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A. Vestiaire', async () => {
+        // (20 nov.) Annonces est la liste UNIQUE (« à égalité ») : l'article Vestiaire y est, et la limite « Vestiaire ne
+        // donne pas la date de mise en ligne » n'est plus dite (la date est lue, 5.410). Les rangées de l'ancien écran
+        // Vestiaire (`data-vc-depuis`) ne sont plus montées sur cette route ; la phrase « au moins » est jugée par
+        // audit-lbc-vc-interesses (A1), sur le module de l'écran.
         await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vestiaire`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-vc-annonce="71000002"]', { timeout: 25000 });
+        await pg.waitForFunction(() => /Sac cabas/.test(document.body.innerText), null, { timeout: 25000 });
         await pg.waitForTimeout(800);
-        const v = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-annonce]')].map((e) => ({ id: e.getAttribute('data-vc-annonce'), d: e.getAttribute('data-vc-depuis'), t: e.innerText })));
-        const a = v.find((x) => x.id === '71000001'), c = v.find((x) => x.id === '71000002');
-        dit(a && a.d === 'exacte' && /en ligne depuis le 30 oct/.test(a.t) && !/au moins/.test(a.t), 'A · date LUE chez Vestiaire : « en ligne depuis le 30 oct. 2026 »', a && a.t.replace(/\n/g, ' · '));
-        dit(c && c.d === 'au-moins' && /vue en ligne depuis au moins le 2 nov/.test(c.t), 'A · sans date lue : « vue en ligne depuis au moins le 2 nov. 2026 » (borne basse, dite)', c && c.t.replace(/\n/g, ' · '));
-        await sain(pg, 'Vestiaire · Annonces');
-        await capture(pg, 'vestiaire-' + nomVp);
+        const t = await pg.evaluate(() => document.body.innerText);
+        dit(/Salomon XT-6/.test(t) && /Sac cabas/.test(t), 'A · les deux articles Vestiaire sont dans Annonces');
+        dit(!/Vestiaire : le site ne donne pas la date de mise en ligne/.test(t), 'A · la limite « Vestiaire ne donne pas la date de mise en ligne » n’est plus dite (la date est lue)', (/Vestiaire :[^.]*\./.exec(t) || [''])[0]);
+        await sain(pg, 'Annonces');
+        await capture(pg, 'annonces-' + nomVp);
       });
       await essaie('B. Leboncoin', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });

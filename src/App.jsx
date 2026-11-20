@@ -19469,7 +19469,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = f
   const comptesRegle = [...new Set(sitesVus.filter((x) => x.site === 'vinted' && /^\d{1,20}$/.test(String(x.compte || ''))).map((x) => String(x.compte)))]
     .map((uid) => ({ uid, nom: compteDe(uid), ...regleDuCompte(regles, uid) }))
     // (19 nov., ext. 5.409) …et par compte LEBONCOIN de ce N° (`lbc:{compte}`, la même règle ; l'extension la lit dans
-    // `regleBaisseLbcTick` et passe par `baisserPrixLbc`). Vestiaire : pas de date de mise en ligne lue ⇒ pas de règle.
+    // `regleBaisseLbcTick` et passe par `baisserPrixLbc`). Vestiaire (20 nov., 5.410) : la règle se règle dans Automatisations.
     .concat([...new Set(sitesVus.filter((x) => x.site === 'leboncoin' && x.compte).map((x) => 'lbc:' + String(x.compte).replace(/^lbc-account:/i, '')))]
       .filter((k) => /^lbc:[\w:.-]{1,80}$/.test(k)).map((uid) => ({ uid, nom: 'Leboncoin', ...regleDuCompte(regles, uid) })));
   const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
