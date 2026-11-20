@@ -501,7 +501,7 @@ function squelette() {
     titre: titre ? { txt: titre.innerText.trim().slice(0, 30), ...R(titre) } : null,
     sel: sel ? { site: sel.getAttribute('data-site-courant'), ...R(sel) } : null,
     seg: seg ? { libelles: [...seg.querySelectorAll('.n-segmente-libelle')].map((x) => x.textContent.trim()), ...R(seg) } : null,
-    bordGroupes: minL('.n-groupe-carte, .n-carte-corps, .n-tt-cadre'), bordRangees: minL('.n-rangee, .n-tt-tr'),
+    bordGroupes: minL('.n-groupe-carte, .n-carte-corps, .n-tt-cadre, .vrm-buy-list, [data-achats-site] .n-groupe-carte'), bordRangees: minL('.n-rangee, .n-tt-tr, .vrm-buy-row, .vrm-buy-list > *'),   // (les achats Vinted d'avant comptent : même bord)
     plein: plein ? { ecartOnglets: onglets && vis(onglets) ? Math.round(onglets.getBoundingClientRect().top - plein.getBoundingClientRect().bottom) : null, l: Math.round(plein.getBoundingClientRect().left), w: Math.round(plein.getBoundingClientRect().width) } : null,
     debord: document.documentElement.scrollWidth > innerWidth + 1,
   };
