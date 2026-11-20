@@ -931,6 +931,7 @@
   .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
+  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .geste6 { margin: 12px 16px; padding: 12px 16px; border: .5px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
   .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -965,7 +966,7 @@
   @media (max-width: 760px) {
     .carte[data-grand] { top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; border-radius: 0; }
     .vx6, .vx6[data-reduit] { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
-    .side6 { flex-direction: row; overflow-x: auto; padding: 6px 84px max(6px, env(safe-area-inset-bottom)) 8px; border-right: 0; border-bottom: .5px solid var(--n-trait); gap: 4px; scrollbar-width: none; order: 2; }
+    .side6 { flex-direction: row; overflow-x: auto; padding: 6px 8px max(6px, env(safe-area-inset-bottom)) 8px; border-right: 0; border-bottom: .5px solid var(--n-trait); gap: 4px; scrollbar-width: none; order: 2; }
     .main6 { order: 1; min-height: 0; }
     .side6 .marque6, .side6 .grp6 { display: none; }
     .side6 .bas6 { margin: 0; padding: 0; border: 0; }
@@ -990,6 +991,12 @@
     .tuiles6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .au6 .volet5, .au6 .au6-d { display: flex !important; }
     .au6 { display: block !important; }
+    /* 5.410.1 : au téléphone, le grand panneau occupe l'écran — le rond VRM s'écarte (le × ferme), il ne couvre plus
+       la barre du bas ; Automatisations : la LISTE seule, puis le détail en page poussée avec « ‹ Retour ». */
+    .carte.on[data-grand] ~ .btn { display: none !important; }
+    .au6[data-auto-vue="liste"] .au6-d { display: none !important; }
+    .au6[data-auto-vue="detail"] .gauche5 { display: none !important; }
+    .au6-retour { display: inline-flex !important; }
     .sec6, .au6-t, .pied6 { padding-left: 16px; padding-right: 16px; }
   }
 </style>
@@ -2212,7 +2219,7 @@
   //    (négociation : l'aperçu « 100 → 93 → 88 → 85 »), en bas « Modifier dans VRM » et un plein « Démarrer ». Les
   //    réglages se changent dans VRM (l'extension n'écrit jamais la ligne `main`) ; « Démarrer » des favoris ouvre le
   //    parcours pas à pas de la carte (rien ne part sans SA confirmation).
-  let autoChoisie = 'favoris';
+  let autoChoisie = 'favoris', autoDetail = false;   // 5.410.1 : au téléphone, le détail est une page poussée
   let raBrouillon = {}, raConfirme = null, raEtat = null, raEnVol = false;   // 5.410 : réglages écrits depuis le panneau
   const apercuPaliers6 = (pcts) => { const p = 100, f = 85, out = [p]; for (const pct of (pcts || []).slice().sort((a, b) => a - b)) { let v = Math.round(p - (p - f) * pct / 100); if (v < f) v = f; if (v < p && v < out[out.length - 1]) out.push(v); } return out; };
   function automatisationsHtml() {
@@ -2284,7 +2291,9 @@
       droite = tete + conf + etat + `<section class="sec6">${bascule}</section>` + corpsR
         + `<div class="pied6" data-ra-pied="${esc(cleDe)}"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-ra-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
     }
-    return `<div class="deux5 au6" data-automatisations data-auto-choisie="${autoChoisie}"><div class="gauche5">${gauche}</div><div class="volet5 au6-d">${droite}</div></div>`;
+    const vueAuto = items.length <= 1 || autoDetail ? 'detail' : 'liste';
+    droite = (items.length > 1 ? `<button type="button" class="au6-retour" data-auto-retour>‹ ${esc(TU('au6_retour'))}</button>` : '') + droite;
+    return `<div class="deux5 au6" data-automatisations data-auto-choisie="${autoChoisie}" data-auto-vue="${vueAuto}"><div class="gauche5">${gauche}</div><div class="volet5 au6-d">${droite}</div></div>`;
   }
   // ══ 5.410 — LA CADENCE (Julien, 20 nov. « vas-y fais ») : SON réglage par compte, ici dans Paramètres. Défauts
   //    inchangés ; plus vite que le défaut ⇒ « Oui, aller plus vite ». Le reste (captcha, prudence, 403/429, un compte
@@ -2465,7 +2474,8 @@
     const mj = racine.querySelector('[data-vx-maj]'); if (mj) mj.addEventListener('click', () => { chargerListes(true); });
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
-    racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); rendre(); }));
+    racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; rendre(); }));
+    const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
     // 5.410 : la cadence (Paramètres). Un curseur change le brouillon ; « Enregistrer » écrit (plus vite ⇒ confirmation).
     racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('input', () => {
       const k = c.getAttribute('data-cad'); const v = Number(c.value);

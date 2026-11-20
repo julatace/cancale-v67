@@ -28,6 +28,7 @@
   // </logos-transporteurs>
   const MOTS = {
     // 5.410 — panneau comme Vintex
+    au6_retour: { fr: 'Automatisations', en: 'Automations', es: 'Automatizaciones', it: 'Automazioni', de: 'Automatisierungen' },
     li_titre: { fr: "Intéressés sur Leboncoin · {n}", en: "Interested on Leboncoin · {n}", es: "Interesados en Leboncoin · {n}", it: "Interessati su Leboncoin · {n}", de: "Interessenten auf Leboncoin · {n}" },
     li_n: { fr: "{n} intéressé(s) · {a} attendent ta réponse", en: "{n} interested · {a} waiting for your reply", es: "{n} interesado(s) · {a} esperan tu respuesta", it: "{n} interessato/i · {a} aspettano la tua risposta", de: "{n} Interessent(en) · {a} warten auf deine Antwort" },
     li_voir: { fr: "Voir", en: "View", es: "Ver", it: "Vedi", de: "Ansehen" },

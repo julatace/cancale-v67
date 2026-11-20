@@ -200,6 +200,10 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         dit(a.accueil && a.accueil.tuiles.join('|') === 'v6_ventes_jour:1|v6_a_expedier:2|v6_non_lus:2|v6_en_vente:5' && a.accueil.jauge, `${T} : Accueil : ventes du jour 1, à expédier 2, non lus 2, en vente 5, jauge — lus, jamais inventés`, JSON.stringify(a.accueil));
         dit(a.accueil && a.accueil.capte.join(',') === 'ventes,codes', `${T} : Accueil : seulement ce qui a été capté depuis la dernière visite`, JSON.stringify(a.accueil && a.accueil.capte));
         dit(!a.secu && !a.toutArreter, `${T} : plus de « Sécurité du compte » ni de « Tout arrêter »`);
+        if (mobile) {
+          const rond = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('.btn'); const f = r.querySelector('.side6 [data-onglet-b="favoris"]'); const fr = f.getBoundingClientRect(); const el = r.elementFromPoint(fr.left + fr.width / 2, fr.top + fr.height / 2); return { rondVisible: !!(b && b.getClientRects().length && getComputedStyle(b).display !== 'none'), favorisLibre: !!(el && (el === f || f.contains(el))), dansEcran: fr.right <= innerWidth + 1 }; });
+          dit(!rond.rondVisible && rond.favorisLibre, `${T} : panneau ouvert au téléphone : le rond VRM s'écarte, rien ne couvre l'onglet « Favoris » de la barre du bas`, JSON.stringify(rond));
+        }
         dit(a.couleursVives.length === 0, `${T} : ni rouge vif, ni vert vif, ni violet`, JSON.stringify(a.couleursVives));
         // Articles : le tableau.
         await clic(t.pg, '[data-onglet-b="annonces"]');
@@ -348,6 +352,19 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         await cap(t.pg, N('automatisations'));
         dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
+        if (mobile) {
+          // 5.410.1 : au téléphone, la LISTE seule (aucun titre en double), puis le détail en page poussée avec « ‹ Retour ».
+          const lv = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).display !== 'none'); const txt = r.querySelector('.carte').innerText; return { vue: r.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'), detail: vis(r.querySelector('.au6-d')), fois: (txt.match(/Messages aux favoris/g) || []).length }; });
+          dit(lv.vue === 'liste' && !lv.detail && lv.fois === 1, `${T} : au téléphone, Automatisations montre la liste seule (« Messages aux favoris » une fois)`, JSON.stringify(lv));
+          await clic(t.pg, '[data-auto-choix="favoris"]');
+          const dv = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).display !== 'none'); return { vue: r.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'), liste: vis(r.querySelector('.au6 .gauche5')), retour: vis(r.querySelector('[data-auto-retour]')) }; });
+          await cap(t.pg, N('automatisations-detail'));
+          await clic(t.pg, '[data-auto-retour]');
+          const rv = await t.pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'));
+          dit(dv.vue === 'detail' && !dv.liste && dv.retour && rv === 'liste', `${T} : toucher une automatisation pousse son détail ; « ‹ Retour » revient à la liste`, JSON.stringify({ dv, rv }));
+          await clic(t.pg, '[data-auto-choix="favoris"]');
+          a = await lire(t.pg);
+        }
         dit(a.autoSections.join('|') === 'Messages|Ciblage|Délais' && a.autoMessages === 3 && a.autoDemarrer, `${T} : détail MESSAGES · CIBLAGE · DÉLAIS, ses 3 textes modifiables, « Démarrer »`, JSON.stringify({ s: a.autoSections, m: a.autoMessages }));
         // 5.410 : les messages aux favoris se règlent ici : un texte changé, le rythme, « Enregistrer » ; le mode auto ⇒ « Oui, allumer ».
         await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-rf-texte="1"]'); ta.value = 'Coucou {pseudo}, prix doux !'; ta.dispatchEvent(new Event('input')); ta.dispatchEvent(new Event('change')); });
