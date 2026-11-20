@@ -173,7 +173,19 @@ function mesurer({ tel, mut }) {
   }
   if (document.documentElement.scrollWidth > innerWidth + 1) out.coupes.push('page plus large que la fenêtre : ' + document.documentElement.scrollWidth);
   const titre = (() => { const h = [...document.querySelectorAll('.n-grand-titre, .n-page-titre, h1')].find((x) => visible(x)); return h ? h.innerText.trim().slice(0, 40) : ''; })();
-  return { ...out, titre, dialogues: dialogues.length };
+  // LA FORME de l'écran (« les mêmes dispositions sur toutes les plateformes », Julien, 20 nov.) : ce qui se compare d'un
+  // site à l'autre — composants natifs ou d'hier, segments, en-têtes de groupe, colonnes du tableau, pleins.
+  const dansEcran = (sel) => tous.filter((e) => e.matches(sel));
+  const forme = {
+    natif: dansEcran('.n-rangee, .n-tt-tr, .n-groupe, .n-carte, .n-segmente').length > 0,
+    rangeesNatives: dansEcran('.n-rangee, .n-tt-tr').length,
+    rangeesAnciennes: dansEcran('[class*="vrm-"][class*="-ligne"], [class*="vrm-"][class*="-rangee"], .v2l, .v2-ligne, [class*="-carte"]:not([class*="n-"])').filter((e) => !e.closest('.n-rangee, .n-tt-tr')).length,
+    segments: dansEcran('.n-segmente [role="tab"], .n-segmente button, .vrm-seg .vrm-seg-btn').map((e) => (e.innerText || '').replace(/\s+\d[\d\s]*$/, '').trim()).filter(Boolean).slice(0, 8),
+    groupes: dansEcran('.n-groupe-titre, .n-carte-titre, .n-tuiles-titre').map((e) => (e.innerText || '').replace(/[\s·]+\d[\d\s]*$/, '').trim().toUpperCase()).slice(0, 12),
+    colonnes: dansEcran('.n-tt-th').map((e) => (e.innerText || '').replace(/[↑↓↕]/g, '').trim()).filter(Boolean),
+    pleins: out.pleins.length,
+  };
+  return { ...out, titre, forme, dialogues: dialogues.length };
 }
 
 const FEN = {
@@ -192,9 +204,43 @@ function baseVide() {
   return b;
 }
 
+// Les bases « un seul site » (Julien, 20 nov. : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») :
+// un vendeur SANS compte Vinted, 24 annonces et 5 ventes sur Leboncoin, eBay ou Vestiaire. Données INVENTÉES, aux formes
+// lues par l'app (lbc_listings / lbc_ventes, ebay_listings / ebay_orders, vc_listings / vc_ventes).
+const MODELES = ['Nike Air Max 1', 'Adidas Samba OG', 'New Balance 550', 'Asics Gel-1130', 'Salomon XT-6', 'Vans Old Skool'];
+function baseSite(site) {
+  const b = baseVide(); const m = b.main[0].data;
+  const J = 86400000, now = Date.now(), iso = (j) => new Date(now - j * J).toISOString();
+  b.accounts = [];
+  m.vrm_plateformes_affichees = { sites: [site], at: iso(20) };
+  const N = 24, titre = (i) => `${MODELES[i % MODELES.length]} taille ${36 + (i % 8)}`, prix = (i) => 30 + (i * 7) % 90;
+  if (site === 'leboncoin') {
+    const items = {}; for (let i = 0; i < N; i++) { const id = String(3200000000 + i); items[id] = { id, ref: String(101 + i), customRef: 'VRM-' + (101 + i), subject: titre(i), status: 'active', account: 'lbcA', seenAt: iso(0.02), price: prix(i), firstSeenAt: iso(3 + i) }; }
+    b.rows.push({ id: 'lbc_accounts', data: { accounts: { lbcA: { id: 'lbcA', name: 'Moi', sessionAt: iso(0.05) } } } });
+    b.rows.push({ id: 'lbc_listings', data: { capturedAt: iso(0.02), items, lectures: { lbcA: { at: iso(0.02), total: N, n: N } } } });
+    const ventes = {}; for (let i = 0; i < 5; i++) ventes['L' + i] = { txId: 'L' + i, itemId: String(3200000000 + i), isSeller: true, price: prix(i) * 100, stepStatus: i < 2 ? 'to_ship' : 'done', dateVente: iso(i + 1), title: titre(i) };
+    b.rows.push({ id: 'lbc_ventes', data: { ventes } });
+  } else if (site === 'ebay') {
+    const items = []; for (let i = 0; i < N; i++) items.push({ itemId: String(256100000000 + i), sku: 'VRM-' + (101 + i), title: titre(i), listingStatus: 'Active', depuis: iso(3 + i), price: String(prix(i)) + '.00', photo: null });
+    b.rows.push({ id: 'ebay_listings', data: { capturedAt: now - 0.02 * J, complet: true, items } });
+    const orders = []; for (let i = 0; i < 5; i++) orders.push({ orderId: '12-0000' + i, orderPaymentStatus: 'PAID', orderFulfillmentStatus: i < 2 ? 'NOT_STARTED' : 'FULFILLED', creationDate: iso(i + 1), pricingSummary: { total: { value: prix(i) + '.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: (prix(i) - 5) + '.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '6.00', currency: 'EUR' }, lineItems: [{ sku: 'VRM-' + (101 + i), legacyItemId: String(256100000000 + i), title: titre(i) }] });
+    b.rows.push({ id: 'ebay_orders', data: { capturedAt: now - 0.02 * J, complet: true, orders } });
+  } else if (site === 'vestiaire') {
+    const items = {}, liens = {}; for (let i = 0; i < N; i++) { const id = 'P' + (101 + i); items[id] = { statut: 'on_sale', vuAt: iso(0.02), titre: titre(i), compte: 'vcA', prix: prix(i) }; liens[id] = String(101 + i); }
+    b.rows.push({ id: 'vc_listings', data: { capturedAt: iso(0.02), complet: true, liens, items } });
+    const ventes = {}; for (let i = 0; i < 5; i++) ventes[String(72900100 + i)] = { productId: String(72900100 + i), ref: String(101 + i), titre: titre(i), etat: i < 2 ? 'ACTION_NEEDED' : 'Expédiée', aExpedier: i < 2, date: iso(i + 1), montant: { cle: 'price', devise: 'EUR', valeur: prix(i) } };
+    b.rows.push({ id: 'vc_ventes', data: { ventes, lectures: {} } });
+  }
+  return b;
+}
+const SITE_DE_BASE = { lbc: 'leboncoin', ebay: 'ebay', vc: 'vestiaire' };
+const baseDe = (base) => (base === 'vide' ? baseVide() : SITE_DE_BASE[base] ? baseSite(SITE_DE_BASE[base]) : E.baseFiches());
+
 async function ouvrirEcran(nav, fen, sombre, ec, base) {
   const f = FEN[fen];
-  const o = await P.ouvrir(nav, { W: f.tel ? 390 : 1512, sombre, b: base === 'vide' ? baseVide() : E.baseFiches(), url: '/' + ec.url, api: B.apiVolume });
+  // Une base « un seul site » ouvre chaque tâche filtrée sur ce site (`&site=`).
+  const url = SITE_DE_BASE[base] && /tab=(annonces|ventes|achats|messages)/.test(ec.url) ? ec.url + '&site=' + SITE_DE_BASE[base] : ec.url;
+  const o = await P.ouvrir(nav, { W: f.tel ? 390 : 1512, sombre, b: baseDe(base), url: '/' + url, api: B.apiVolume });
   if (f.W !== (f.tel ? 390 : 1512) || f.H !== (f.tel ? 844 : 950)) await o.pg.setViewportSize({ width: f.W, height: f.H });
   await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
@@ -277,7 +323,34 @@ async function planches(args) {
   } finally { await nav.close(); }
 }
 
-if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }
+// `--formes d1 d2 …` : par écran et par fenêtre, la FORME de chaque base « un seul site » contre celle de Vinted (base de
+// volume) : composants natifs, segments, en-têtes de groupe, colonnes du tableau, pleins. « même » = tout égal.
+function formes(dossiers) {
+  const res = lireDossiers(dossiers).filter((r) => r.forme);
+  const cle = (r) => r.ecran + '|' + r.fen + '|' + r.theme;
+  const ref = {}; for (const r of res) if (r.base === 'volume') ref[cle(r)] = r.forme;
+  const l = ['| écran | fenêtre | base | natif | rangées natives / d\'hier | segments | groupes | colonnes | pleins | comme Vinted |', '|---|---|---|---|---|---|---|---|---|---|'];
+  let ecarts = 0;
+  for (const r of res.sort((a, b) => (a.ecran + a.fen + a.base).localeCompare(b.ecran + b.fen + b.base))) {
+    const f = r.forme, v = ref[cle(r)];
+    let meme = '—';
+    if (v && r.base !== 'volume' && r.base !== 'vide') {
+      const diff = [];
+      if (f.natif !== v.natif) diff.push('natif');
+      if (f.segments.join('|') !== v.segments.join('|')) diff.push('segments');
+      if (f.colonnes.join('|') !== v.colonnes.join('|')) diff.push('colonnes');
+      if (f.pleins > 1) diff.push('pleins');
+      if (f.rangeesAnciennes > 0 && v.rangeesAnciennes === 0) diff.push('rangées d\'hier');
+      meme = diff.length ? '❌ ' + diff.join(', ') : '✅ même';
+      if (diff.length) ecarts++;
+    }
+    l.push(`| ${r.ecran} | ${r.fen} | ${r.base} | ${f.natif ? 'oui' : 'non'} | ${f.rangeesNatives} / ${f.rangeesAnciennes} | ${f.segments.join(' · ')} | ${f.groupes.join(' · ')} | ${f.colonnes.join(' · ')} | ${f.pleins} | ${meme} |`);
+  }
+  const md = l.join('\n'); fs.writeFileSync(path.join(SORTIE, 'formes.md'), md + `\n\nÉcarts : ${ecarts}\n`); console.log(md + `\n\nÉcarts : ${ecarts}`);
+}
+
+if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
+else if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }
 else if (require.main === module && process.argv[2] === '--compare') compare(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--planches') planches(process.argv.slice(3));
 else if (require.main === module) (async () => {
@@ -308,4 +381,4 @@ else if (require.main === module) (async () => {
   } finally { await nav.close(); P.srv.close(); }
 })();
 
-module.exports = { mesurer, TOUS, baseVide };
+module.exports = { mesurer, TOUS, baseVide, baseSite };
