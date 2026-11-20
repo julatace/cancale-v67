@@ -26560,7 +26560,7 @@ var __gardesApp = (() => {
     const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id);
     if (!l.length) return null;
     const titre = l.length > 1 ? `Supprimer ${l.length} annonces de Leboncoin ?` : `Supprimer ${l[0].numero ? `le N°${l[0].numero}` : "cette annonce"} de Leboncoin ?`;
-    const lignes = l.map((r) => `${r.numero ? `N°${r.numero} · ` : ""}${String(r.titre || "").slice(0, 50)}${r.ou ? ` — vendu sur ${r.ou}` : ""}`);
+    const lignes = l.map((r) => `${r.numero ? `N°${r.numero} · ` : ""}${String(r.titre || "").slice(0, 50)}${r.ou ? ` — vendu sur ${r.ou}` : ""}`.replace(/ · $/, "")).filter(Boolean);
     return { titre, lignes, reste: "L’article reste dans ton stock, avec son N°.", sansRetour: "C’est sans retour : Leboncoin ne rend pas une annonce supprimée.", ok: "Oui, supprimer de Leboncoin", irreversible: true };
   }
 

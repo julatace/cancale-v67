@@ -92,6 +92,49 @@ l'extension, on ne doit plus pouvoir faire d'action dans l'app ».
 
 | **Plafond d'actions** | ⚠️⚠️ **50 actions/heure/compte PAR DÉFAUT (sa décision du 29 oct.), et depuis le 20 nov. (« vas-y fais ») SA CADENCE PAR COMPTE** dans Paramètres du panneau (5.410, `vinted_cadence` de `vrm_reglages_auto`) : actions/h 10–100, favoris/h 1–60 (déf. 15), plafond du jour (déf. Discrétion), pause entre messages 20 s–4 min toujours au hasard (déf. 40–90 s) ; plus vite ⇒ confirmation. `RESERVE_GESTES` = 5 reste ⇒ l'automatique s'arrête 5 avant ; une republication réserve ses 3 gestes. **Ne PAS changer les défauts sans qu'il le demande.** NON réglables : captcha/refus + prudence 24 h (20/h), pause 403/429, un compte à la fois, une requête à la fois, compte de l'onglet, temps d'écriture. Budget de LECTURE séparé (20/h). `audit-cadence`. |
 
+
+## Ce que l'app ne fait plus, l'extension le porte (suite, après fusion de `claude/actions-extension`)
+
+`origin/claude/actions-extension` est fusionné dans `claude/panneau-vintex` (vrai merge ; CLAUDE.md §9 et Quoi de neuf :
+les deux lignes gardées). L'app ne fait plus aucun geste ; dans la 5.410.0 l'extension porte :
+
+- **Le pilote du mode auto des favoris** (`piloteFavorisTick`, alarme `vrm-relais`) : le tour de l'app d'avant
+  (`tourPiloteFavoris`), dans le fond : intervalle tiré au hasard 2–5 min, compte de l'ONGLET seulement
+  (`compteOngletPourAuto`), mode auto relu chez VRM toutes les 30 min, gardes d'abord (`attenteAvantFavori` : discrétion,
+  SA cadence, plafonds, réserve, captcha ⇒ arrêt, Tout arrêter), puis `auto` → `suivant` → `/vrm/favoris` → `terminer`.
+  Une file de la carte en cours ⇒ il attend. État : `chrome.storage.local` `vrmPiloteFavoris`.
+- **La veille des republications programmées** (`veilleRepubTick`, même alarme) : l'index léger d'abord
+  (`attentes`, jamais `select=data` pour rien), puis la RÈGLE DE L'APP recopiée (`decision`, `conditionsDepart`,
+  `prendreDepart`, `marquerPasPartie`, `marquerFinie`, `pairesAuDepart`, `apercuRepub`) : à SON heure (fenêtre 10 min),
+  conditions mesurées ici (onglet, compte, frein de Vinted, place dans l'heure, 50 republications du jour, autre
+  travail) ; une seule manque ⇒ « pas partie » avec la raison ; sinon départ PRIS (comparer-et-échanger) et les paires
+  partent dans SON ordre par `executerCommande` (coffre → brouillon → suppression → mise en ligne, gardes comprises), avec
+  SES réglages (titre, prix jamais sous l'achat, lettre). ⚠️ Réglages PHOTO non neutres : le fond ne retouche pas une
+  photo ⇒ « pas partie (photo) », dit — à lancer depuis le panneau.
+- **Les 3 gardes d'avant SON clic**, recopiées par `scripts/recopier-gardes-extension.cjs` (esbuild, bloc
+  `<gardes-app>` de background.js, `--verifie`), jamais réécrites à la main, posées AU POINT D'EXÉCUTION (aucun appelant
+  ne peut les sauter) :
+  1. accepter une offre (`executerPourAppCoeur`, `…/offer_requests/{id}/accept`) : `avisAcceptationManuelle` — vendue
+     ailleurs ⇒ refusé toujours ; « pas su » ⇒ `code: 'avis'`, seul son second toucher (`avisVu`) fait partir ;
+  2. publier (`publierFicheSite`) : `problemesAnnonce` (+ `photosExigeesVc` pour Vestiaire) ⇒ `code: 'verification'`,
+     seul `verifVu` publie quand même ;
+  3. supprimer sur Leboncoin (`supprimeLbcDepuisApp`) : sans `sansRetour` ⇒ `code: 'sans-retour'` + la confirmation de
+     l'app (`confirmationSupprimerLbc`, src/actionsExtensionGardes.js, le texte de `supprimerLbcJournee`).
+  Le panneau : Articles sur leboncoin.fr → « Supprimer de Leboncoin » (une annonce) montre cette confirmation, puis
+  « Oui, supprimer de Leboncoin ».
+- **Les réglages des messages aux favoris écrits depuis le panneau** : textes (message + 4 versions) et rythme dans
+  LEUR ligne dédiée `vrm_favoris_reglages_{uid}` (celle que le serveur relit à chaque envoi et au mode auto — la mettre
+  aussi dans `vrm_reglages_auto` aurait créé deux vérités), validés par la règle de l'app recopiée
+  (`validerReglagesFavoris`) ; le MODE AUTO (allumé, horaires, quotas) par `auto_regler` du serveur (validé par
+  `validerAutoFavoris` des deux côtés), allumer ⇒ « Oui, allumer ».
+- Audit : `scripts/audit-extension-porte-app.cjs` (vrai background.js, 26 contrôles ; `--prouve` 11 mutations).
+
+### Ce qui reste (dit honnêtement)
+- Panneau : pas encore d'écran pour ACCEPTER une offre ni pour PUBLIER une fiche (les gardes sont au point d'exécution,
+  prêtes) ; « Baisser » et « Republier » du menu Articles ouvrent encore vrm.center — or l'app renvoie maintenant au
+  panneau : il faut une saisie de prix et l'atelier Republier DANS le panneau (prochain lot, avant l'intégration).
+- Republication programmée avec réglages photo : « pas partie » (le fond ne retouche pas d'image).
+
 ## Preuves
 
 - Bancs : `scripts/bancs/grand-panneau.cjs` (251 contrôles : 1512 clair/sombre, 1280, 390 clair/sombre, Orion émulé,
