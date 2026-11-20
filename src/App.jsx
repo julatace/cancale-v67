@@ -9388,6 +9388,18 @@ try {
   if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
 } catch (_) {}
 onCloudReady(oublierMemosLectures);
+// Les transactions des preuves de vente (`lirePreuvesVenteVinted`) : la MÊME famille que `lireTxnMeta` (gardée sur
+// l'appareil, revalidée par version), rendue sous les noms de l'ancienne lecture — mêmes lignes, mêmes valeurs que
+// `id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt` ;
+// servie 20 s aux voisines (`_memoPreuvesTxn`), oubliée à toute écriture qui peut la toucher ; `force` relit.
+// Rend le tableau, ou `null` (pas su).
+const lireTxnPreuves = (opts = {}) => {
+  if (opts.force) _txnMeta = null;
+  return _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', async () => {
+    const l = await lireTxnMeta();
+    return Array.isArray(l) ? l.map((r) => ({ id: r.id, tx: r.tx, it: r.item, ti: r.ti, at: r.su, cap: r.cap })) : null;
+  }, { force: !!opts.force });
+};
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
 // LITIGE et elle réapparaît dans les colis à faire ». Mesuré (lecture seule) :
@@ -32325,15 +32337,8 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    // (20 nov., lectures-legeres) La MÊME famille que `lireTxnMeta` (gardée sur l'appareil, revalidée par version),
-    // rendue sous les noms d'ici — mêmes lignes, mêmes valeurs que l'ancienne lecture
-    // (`id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt`) ;
-    // servie 20 s aux voisines (`_memoPreuvesTxn`), oubliée à toute écriture qui peut la toucher ; `force` relit.
-    if (opts.force) _txnMeta = null;
-    const rows = await _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', async () => {
-      const l = await lireTxnMeta();
-      return Array.isArray(l) ? l.map((r) => ({ id: r.id, tx: r.tx, it: r.item, ti: r.ti, at: r.su, cap: r.cap })) : null;
-    }, { force: !!opts.force });
+    // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
+    const rows = await lireTxnPreuves(opts);
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
