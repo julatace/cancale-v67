@@ -22,7 +22,9 @@ import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
 // (11 nov., lot quoi-republier) « Quelles annonces republier ? » dans « Republier sur Leboncoin » : la MÊME règle et la même carte que Vinted.
 import QuoiRepublier from '../design/QuoiRepublier.jsx';
 import { quoiRepublier, ageDepuis, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR } from '../quoiRepublier.js';
-import LbcBaissePrix from '../LbcBaissePrix.jsx';
+import { BoutonExtension, FeuilleExtension } from '../BoutonExtension.jsx';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov., décision de Julien) « … dans l'extension »
+import { Groupe as NGroupe, Rangee as NRangee, Plaque as NPlaque } from '../natif/index.js';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { IconePlus } from '../plateformes/IconePlus.jsx';
 import { BoutonIcone } from '../ui/index.js';
@@ -130,6 +132,10 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
   const nTot = Number.isFinite(Number(total)) && total != null && Number(total) >= (nPh || 0) ? Number(total) : null;
   const textePhotos = nPh == null ? '' : nTot != null && nTot > nPh ? `${nPh} photo${nPh > 1 ? 's' : ''} sur ${nTot}` : `${nPh} photo${nPh > 1 ? 's' : ''}`;
   const etat = glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : abandonne ? 'abandonne' : 'pret';
+  // (20 nov., décision de Julien) Leboncoin : la publication se fait dans le panneau de l'extension, sur leboncoin.fr,
+  // depuis CETTE annonce Vinted (son identifiant). L'app ne remplit plus le dépôt. eBay reste ici.
+  if (lbc) return <span data-bouton-publier={fait ? 'fait' : 'panneau'} data-id={id}>{fait ? <span style={{ fontSize: 13, color: C.muted }}>{tr('actionsExt.dejaPubliee')}</span>
+    : <BoutonExtension className="vrm-ao-second" action="publier" site="leboncoin" ids={[String(id)]}/>}</span>;
   return (
     <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
@@ -1858,22 +1864,8 @@ function LeboncoinScreen() {
   };
   const [pauseEnVol, setPauseEnVol] = useState(null);
   const [pauseRes, setPauseRes] = useState([]);
-  const mettreEnPause = async (r) => {
-    if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
-    const ok = await askConfirm({
-      title: `Mettre en pause « ${r.title || 'cette annonce'} » sur Leboncoin ?`,
-      desc: `N°${r.numero}${prix} — vendue sur Vinted.\n\nElle ne sera plus visible sur Leboncoin. Ce n'est pas une suppression : tu pourras la remettre en ligne depuis « Mes annonces » sur Leboncoin.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
-      ok: 'Mettre en pause', cancel: 'Annuler',
-    });
-    if (!ok) return;
-    setPauseEnVol(r.id);
-    let rep = null;
-    try { rep = await vmrCmd({ cmd: 'lbcPause', id: String(r.id) }, 70000); } catch (_) { rep = null; }
-    setPauseEnVol(null);
-    setPauseRes((l) => [{ id: r.id, numero: r.numero, titre: r.title || '', rep, at: Date.now() }, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
-    if (rep && rep.accepte && rep.etape === 'fait') reload();
-  };
+  // (20 nov., décision de Julien) La pause se fait dans le panneau de l'extension : l'app ouvre leboncoin.fr sur CETTE annonce.
+  const mettreEnPause = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'pause' }); };
   // ── SUPPRIMER DE LEBONCOIN, SUR SON CLIC CONFIRMÉ (29 octobre) ──────────
   // Julien : « je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
   // Même chemin que la pause : l'app n'envoie qu'UN identifiant et la
@@ -1889,27 +1881,8 @@ function LeboncoinScreen() {
     return __vmrEtat.lbcSupprime === true ? 'ok' : 'retard';
   };
   const [supprRes, setSupprRes] = useState([]);
-  const supprimerSurLbc = async (r) => {
-    if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null && isFinite(Number(r.prix)) && Number(r.prix) > 0 ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
-    const ok = await askConfirm({
-      title: `Supprimer « ${r.title || 'cette annonce'} » de Leboncoin ?`,
-      desc: `${r.numero ? `N°${r.numero}` : 'Annonce Leboncoin'}${prix}${r.pourquoi ? ` — ${r.pourquoi}` : ''}.\n\nC'est sans retour : l'annonce disparaît de Leboncoin, avec ses favoris et ses statistiques. Pour la remettre, il faudra la republier.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
-      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true, irreversible: true,
-    });
-    if (!ok) return;
-    setPauseEnVol(r.id);
-    // (14 nov., lot accompagnement) PENDANT, puis APRÈS (et sa suite) ou ÉCHEC (la raison en mots, le geste).
-    const acc = accompagner('lbc.supprimer', { total: 1, arretable: false }).pendant(0);
-    let rep = null;
-    try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
-    setPauseEnVol(null);
-    const res = { id: r.id, numero: r.numero || '', titre: r.title || '', rep, at: Date.now() };
-    setSupprRes((l) => [res, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
-    // Le résultat se dit AUSSI là où il a cliqué (la carte de résultat est plus bas).
-    try { const ph = phraseSuppr(res); if (ph.etape === 'fait') acc.fini({ n: 1 }); else acc.echec(!rep ? { sansReponse: true, raison: ph.t } : rep.accepte === false ? (rep.raison || rep) : { status: rep.statut, raison: ph.t }); } catch (_) {}
-    if (rep && rep.accepte && rep.etape === 'fait') reload();
-  };
+  // (20 nov., décision de Julien) Supprimer : dans le panneau de l'extension (sa confirmation y est demandée).
+  const supprimerSurLbc = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'supprimer' }); };
   const phraseSuppr = (x) => {
     const rp = x.rep;
     const cite = rp && rp.reponse ? ` « ${String(rp.reponse).slice(0, 160)} »` : '';
@@ -2022,7 +1995,7 @@ function LeboncoinScreen() {
   const porteRepubLbc = !!(data && (data.repub === null || (data.repub && (data.repub.length || Object.keys(data.repubKO || {}).length))));
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '12px 16px 40px', maxWidth: 920, margin: '0 auto' }}>
-      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
+      {/* (20 nov.) La fiche « Publier sur Leboncoin » est retirée : la publication se fait dans l'extension. */}
       {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
           au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
       <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
@@ -2056,7 +2029,8 @@ function LeboncoinScreen() {
           {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" data-afaire-ferme="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
         </div>
       ) : null}
-      {data && Array.isArray(data.baisse) && data.baisse.length ? <LbcBaissePrix annonces={data.baisse} onFini={reload}/> : null}
+      {/* (20 nov., décision de Julien) Baisser les prix Leboncoin : dans le panneau de l'extension. */}
+      {data && Array.isArray(data.baisse) && data.baisse.length ? <div data-lbc-baisse-panneau={data.baisse.length} style={{ margin: '8px 0' }}><BoutonExtension action="baisser" site="leboncoin" ids={data.baisse.map((x) => String(x.id))}/></div> : null}
       </AFaireSite>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
@@ -2112,7 +2086,10 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
+      {/* (20 nov., décision de Julien) Republier sur Leboncoin : dans le panneau de l'extension (l'ancien atelier est retiré). */}
+      {repubOuvert && data && Array.isArray(data.repub) && <FeuilleExtension action="republier" site="leboncoin" ids={data.repub.map((x) => String(x.id))} onFermer={() => setRepubOuvert(false)}>
+        <NGroupe>{data.repub.slice(0, 40).map((x) => <NRangee key={x.id} titre={x.titre || x.subject || x.title || '—'} plaque={x.numero ? <NPlaque numero={x.numero}/> : null}/>)}</NGroupe>
+      </FeuilleExtension>}
       {data && <AnnoncesLeboncoin outils={<>
           {/* (14 nov.) « Actualiser » et « Publier sur Leboncoin » : deux icônes de la barre de la liste
               (l'entrée « Publier » garde son attribut et son événement, src/App.jsx `EntreePublierAilleurs`). */}
@@ -2126,7 +2103,7 @@ function LeboncoinScreen() {
             : pe === 'retard'
               ? <>Mets l’extension à jour, puis ouvre « Mes annonces », chaque compte.</>
               : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="">Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes : l’extension relit la liste en entier.</>}</>;
-      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}
+      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprimerSurLbc} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}
         lienVintedDe={(ad) => !!data.liensMain?.[String(ad.id)]}
         retraitDe={(ad) => retraitParAnnonce.get(String(ad.id))}
         onRelierVinted={(ad) => ouvrirLiaison({ site: 'Leboncoin', id: ad.id })}/>}
@@ -2264,18 +2241,10 @@ function LeboncoinScreen() {
               {/* (29 oct., revue) La pause et la suppression ne sont proposées que sur
                   une annonce désignée par IDENTITÉ (lien posé, référence VRM) :
                   jamais sur une annonce reliée par son seul titre. */}
-              {pausable && pe === 'ok' && r.ident && r.lbc && r.id ? (
-                <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
-                  style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
-                  {pauseEnVol === r.id ? 'Mise en pause…' : '⏸ Mettre en pause sur Leboncoin'}
-                </button>
-              ) : null}
-              {pausable && se === 'ok' && r.ident && r.lbc && r.id ? (
-                <button type="button" data-lbc-supprimer={r.id} disabled={!!pauseEnVol} onClick={() => supprimerSurLbc({ ...r, pourquoi: r.ou === 'eBay' ? 'vendue sur eBay' : r.ou === 'Vestiaire' ? 'vendue sur Vestiaire' : 'vendue sur Vinted' })}
-                  style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
-                  {pauseEnVol === r.id ? 'Suppression…' : 'Supprimer de Leboncoin'}
-                </button>
-              ) : null}
+              {/* (20 nov., décision de Julien) Mettre en pause, supprimer : dans le panneau de l'extension sur leboncoin.fr,
+                  toujours sur une annonce désignée par IDENTITÉ (lien posé, référence VRM). */}
+              {pausable && r.ident && r.lbc && r.id ? <> <BoutonExtension className="vrm-ao-second" action="pause" site="leboncoin" ids={[String(r.id)]} attrs={{ 'data-lbc-pause': r.id }}/>
+                {' '}<BoutonExtension className="vrm-ao-second" action="supprimer" site="leboncoin" ids={[String(r.id)]} attrs={{ 'data-lbc-supprimer': r.id }}/></> : null}
             </div>
           );
           const pausables = vendues.some((r) => r.ident && r.lbc && r.id);

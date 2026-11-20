@@ -10,6 +10,7 @@
 // échéance LUE) : son temps restant en AMBRE, une seule fois dans Messages — la
 // pastille « offre 180 € » de la liste reste neutre. Les offres VINTED n'expirent pas :
 // rien de tel pour elles. Vignette vide = `PhotoVide`, N° = `Numero`, liens au style du pied.
+import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov.) « Répondre à l'offre dans l'extension »
 import React from 'react';
 import { GESTES_OFFRE, etatGeste, prixContre, euros, resteAvant, etiquetteOffre, expireBientot } from './offresVestiaire.js';
 import { PhotoVide } from './composants/PhotoVide.jsx';
@@ -54,26 +55,8 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
         </span>
         <span className="vrm-of-prix" data-vc-offre-cents={o.offre == null ? '' : String(o.offre)}>{euros(o.offre)}</span>
       </div>
-      {prets.length > 0 && (
-        <div className="vrm-of-gestes" role="group" aria-label={tr('vcOffres.repondreOffre')} data-acc-pendant={enCours ? 'offre.vestiaire' : undefined}>
-          {prets.filter((g) => g !== 'contre').map((g) => (
-            <button key={g} type="button" className={'vrm-of-btn' + (confirme === g ? ' is-confirme' : '')} data-vc-offre-geste={g} data-vc-offre-confirme={confirme === g ? '1' : undefined}
-              disabled={!!enCours} onClick={() => (confirme === g ? faire(g) : setConfirme(g))}>{enCours === g ? '…' : (confirme === g ? CONFIRME[g]() : NOM[g]())}</button>
-          ))}
-          {prets.includes('contre') && contre == null && <button type="button" className="vrm-of-btn" data-vc-offre-geste="contre" disabled={!!enCours} onClick={() => { setConfirme(''); setContre(''); }}>{NOM.contre()}</button>}
-        </div>
-      )}
-      {contre != null && (
-        <div className="vrm-of-contre" data-vc-offre-contre="">
-          <input className="vrm-of-champ" inputMode="decimal" aria-label={tr('vcOffres.contreOffreEuros')} placeholder="€" value={contre} onChange={(e) => setContre(e.target.value.slice(0, 12))}/>
-          <button type="button" className="vrm-of-btn is-plein" data-vc-offre-envoyer="" disabled={!!enCours || !pc || pc.cents == null} onClick={() => pc && pc.cents != null && faire('contre', pc.cents)}>{enCours === 'contre' ? '…' : tr('vcOffres.envoyer')}</button>
-          <button type="button" className="vrm-of-btn" aria-label={tr('vcOffres.annulerContreOffre')} onClick={() => setContre(null)}>✕</button>
-          {pc && pc.erreur ? <span className="vrm-of-erreur" role="status">{pc.erreur}</span> : null}
-        </div>
-      )}
-      {prets.length < GESTES_OFFRE.length && (
-        <a className="vrm-of-lien vrm-pied-lien" data-pied-lien="repondre-vc" data-vc-offre-ailleurs={GESTES_OFFRE.filter((g) => !prets.includes(g)).map((g) => g + ':' + etats[g].etat).join(',')} href={lien} target="_blank" rel="noreferrer">{tr('vcOffres.repondreVestiaire')}</a>
-      )}
+      {/* (20 nov., décision de Julien) Accepter, refuser, contre-offre : dans le panneau de l'extension, sur CETTE négociation. */}
+      <div className="vrm-of-gestes" data-vc-offre-panneau={o.id}><BoutonExtension className="vrm-of-btn" action="offres" site="vestiaire" ids={[String(o.id)]}/></div>
       {res ? <div className="vrm-of-resultat" data-vc-offre-resultat={res.ton}>{res.ton === 'ok' ? <AccApres geste="offre.vestiaire" texte={res.texte} ensuite={null}/> : <AccEchec geste="offre.vestiaire" erreur={res.ton === 'muet' ? { sansReponse: true, raison: res.texte } : res.texte}/>}</div> : null}
     </li>
   );

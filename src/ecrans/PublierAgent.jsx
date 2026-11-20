@@ -27,6 +27,7 @@ import { useOrdinateur } from '../natif/Coque.jsx';
 import { ficheArticle, planSite, questionsArticle, retenirReponses, envoiPour, noterEnvoi, noterRelu, relireEnvoi, couverture, lireMemoireAgent, CLE_AGENT, SITES_AGENT } from '../publier/agent.js';
 import { CATEGORIES_VRM, CLES_VRM } from '../publier/tables.js';
 import { CLE_CORRESPONDANCES } from '../correspondances.js';
+import { BoutonExtension } from '../BoutonExtension.jsx';   // (20 nov.) « Publier sur … dans l'extension »
 import { lireFichesPage, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, vmrCmd, extSait, relaisVivant, load, save, isCloudReady, appelEbay, vintedDeChrome, __vmrJobs, __vmrNotifier } from '../App.jsx';
 import '../natif/jetons.css';
 import '../natif/natif.css';
@@ -190,7 +191,9 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
   const publier = async () => {
     if (enCours || !prets.length) return;
     setEnCours(true); arret.current = false;
-    const file = prets.slice();
+    // (20 nov., décision de Julien) Vinted, Leboncoin, Vestiaire : le dépôt se fait dans le panneau de l'extension
+    // (« Publier dans l'extension », plus bas). Seul eBay (API serveur) part d'ici.
+    const file = prets.filter(({ p }) => p.site === 'ebay');
     file.forEach(({ l, p }) => marquer(l, p.site, 'attente'));
     for (const { l, p } of file) {
       if (arret.current) break;
@@ -258,10 +261,14 @@ export default function PublierAgent({ ouverte = true, articles = [], onRetour }
       </div>
     </div>
   );
-  const nPret = prets.length;
+  const nPret = prets.filter(({ p }) => p.site === 'ebay').length;
+  const sitesExt = ['vinted', 'leboncoin', 'vestiaire'].map((site) => ({ site, ids: [...new Set(prets.filter(({ p }) => p.site === site).map(({ l }) => String(l.f.numero || l.f.cle)))] })).filter((x) => x.ids.length);
   const plein = vue === 'articles' && Array.isArray(lignes) && lignes.length
     ? (enCours ? <Bouton variante="plein" onClick={() => { arret.current = true; }} attrs={{ 'data-pa-arreter': '' }}>{tr('egalite.selection.annuler')}</Bouton>
-      : <Bouton variante="plein" indisponible={!nPret} raison={!nPret ? tr('agent.rienAPublier') : ''} onClick={publier} attrs={{ 'data-pa-publier': String(nPret) }}>{tr('agent.publier', { n: nPret })}</Bouton>)
+      : <>
+        {sitesExt.map((x) => <BoutonExtension key={x.site} action="publier" site={x.site} ids={x.ids} libelle={tr('actionsExt.publierSur', { site: NOM[x.site] })}/>)}
+        {nPret || !sitesExt.length ? <Bouton variante="plein" indisponible={!nPret} raison={!nPret ? tr('agent.rienAPublier') : ''} onClick={publier} attrs={{ 'data-pa-publier': String(nPret) }}>{tr('agent.publier', { n: nPret })}</Bouton> : null}
+      </>)
     : null;
 
   const tableau = () => (

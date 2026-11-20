@@ -90,6 +90,7 @@ import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, 
 import ecran_stock_rangement from './fr/stockRangement.js';
 import ecran_stock_etiquetage from './fr/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_natif from './fr/natif.js';
+import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
   ...ecran_accessibilite,
@@ -2365,4 +2366,5 @@ export default {
   ...ecran_stock_etiquetage,
   ...ecran_natif,
   ...ecran_extension,
+  ...ecran_actions_ext,
 };

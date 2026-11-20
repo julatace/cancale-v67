@@ -17,6 +17,7 @@
 // ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov.) « Régler dans l'extension »
 import Automatisations, { SectionAuto, MessagesAuto, ReglageAuto, ChoixAuto, ChampNombre, PhraseAuto } from '../natif/ecrans/Automatisations.jsx';
 import { Interrupteur } from '../natif/Rangee.jsx';
 import { lireReglagesFavoris, sauverReglagesFavoris } from '../reglagesFavoris.js';
@@ -264,5 +265,11 @@ export default function BranchementAutomatisations({ accounts = [] }) {
     detail: () => <>{sites(['vinted'])}<SectionAuto titre={tr('auto.delais')}><PhraseAuto>{tr('auto.repub.phrase')}</PhraseAuto></SectionAuto></>,
   };
 
-  return <Automatisations items={[itemFavoris, itemOffres, itemBaisse, itemMasquer, itemRepub]} choisi={choisi} onChoisir={setChoisi} Icon={Icon} compte={comptes.length > 1 ? nomCompte : (comptes[0] ? comptes[0].nom : '')}/>;
+  // ⚠️⚠️ (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») L'écran MONTRE l'état et les
+  //    réglages lus (en lecture : `fieldset disabled`) ; allumer, éteindre, régler se fait dans le panneau de l'extension
+  //    (« Régler dans l'extension », la page de CET automatisme). Rien n'est écrit d'ici.
+  const versPanneau = (it) => ({ ...it, modifie: false, reinitialiser: undefined, onglets: it.onglets,
+    plein: { libelle: tr('actionsExt.automatisations'), onClick: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations', ids: [it.cle], action: 'regler' }) },
+    detail: it.detail ? (o) => <fieldset disabled data-au-lecture="" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>{it.detail(o)}</fieldset> : it.detail });
+  return <Automatisations items={[itemFavoris, itemOffres, itemBaisse, itemMasquer, itemRepub].map(versPanneau)} choisi={choisi} onChoisir={setChoisi} Icon={Icon} compte={comptes.length > 1 ? nomCompte : (comptes[0] ? comptes[0].nom : '')}/>;
 }

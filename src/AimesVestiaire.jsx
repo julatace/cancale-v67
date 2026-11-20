@@ -6,6 +6,7 @@
 // montant), « Envoyer l'offre de 237 € à 3 personnes », une fois par personne, relue par
 // Vestiaire. Sans recette apprise de SON propre geste : rien ne part, et on dit comment.
 // Règle : src/aimesVestiaire.js ; envoi : `offrirAuxAimesVc` (background.js).
+import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov.) l'offre aux personnes qui aiment : dans l'extension
 import React from 'react';
 import { tr, monnaie, heure } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
@@ -91,14 +92,13 @@ export default function AimesVestiaire({ etat, recette, cap, versionExt = '', en
                 <small>{tr('aimesVc.personnes', { n: x.n })}{x.prevenues ? ` · ${tr('aimesVc.dejaPrevenues', { n: x.prevenues })}` : ''}</small>
               </span>
               {x.aPrevenir > 0 && Number.isInteger(x.prixCents)
-                ? <button type="button" className="sb-touche avc-geste" aria-haspopup="dialog" data-aimes-vc-ouvrir={x.produit} onClick={() => setOuvert(x.produit)}>{tr('aimesVc.faireOffre')}</button>
+                ? <BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" ids={[String(x.produit)]} attrs={{ 'data-aimes-vc-ouvrir': x.produit }}/>
                 : <span className="avc-fait">{x.aPrevenir > 0 ? tr('aimesVc.prixPasLu') : tr('aimesVc.toutes')}</span>}
             </li>
           ))}
         </ul>
       )}
       <p className="avc-aide">{tr('aimesVc.aide')}</p>
-      {choisie && Feuille ? <FeuilleOffre l={choisie} recette={recette} cap={cap} versionExt={versionExt} envoyer={envoyer} Photo={Photo} Feuille={Feuille} envoi={etat.envoi} onClose={() => setOuvert('')}/> : null}
     </section>
   );
 }

@@ -27,7 +27,8 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm } from '../App.jsx';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -170,26 +171,18 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // `baisserPrixLbc`, Vestiaire `baisserPrixVestiaire`, chacun avec ses garde-fous) — un article à la fois ; la PAUSE Leboncoin
   // sur son geste CONFIRMÉ (`lbcPause`, une à la fois, la réponse de Leboncoin dite), jamais une suppression.
   const lbcEnLigne = (a) => a.annonces.filter((x) => x.site === 'leboncoin' && x.etat === 'enligne');
-  const pauseLbcSue = () => (vmrExtPresent() && __vmrEtat && __vmrEtat.lbcPause === true);
   actions.push(
     { cle: 'prixSites', libelle: tr('egalite.action.prixSites'), icone: 'tag', phrase: tr('egalite.action.prixSites.phrase'),
       pour: (a) => !!a.numero && a.annonces.some((x) => x.etat === 'enligne'),
       juger: (sel) => (sel.length === 1 ? { ok: true } : { ok: false, raison: sel.length ? tr('egalite.action.unALaFois') : tr('egalite.selection.aucune') }) },
-    { cle: 'pauseLbc', libelle: tr('egalite.action.pauseLbc'), icone: 'archive', phrase: tr('egalite.action.pauseLbc.phrase'),
+    // (20 nov., décision de Julien) La pause Leboncoin se fait dans le panneau de l'extension, sur leboncoin.fr.
+    { cle: 'pauseLbc', libelle: tr('actionsExt.pause'), icone: 'archive', phrase: tr('actionsExt.phrase', { site: 'Leboncoin' }),
       pour: (a) => lbcEnLigne(a).length > 0,
-      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : !pauseLbcSue() ? { ok: false, raison: tr('egalite.action.pauseLbc.ext') } : { ok: true }) });
-  const pauserLbc = async (choisis) => {
-    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), numero: a.numero || '', titre: a.titre || '' })));
+      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : { ok: true }) });
+  const pauserLbc = (choisis) => {
+    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => String(x.id)));
     if (!ids.length) return;
-    const ok = await askConfirm({ title: tr('egalite.pauseLbc.titre', { n: ids.length }), desc: tr('egalite.pauseLbc.desc'), ok: tr('egalite.action.pauseLbc'), cancel: tr('egalite.pauseLbc.annuler') });
-    if (!ok) return;
-    let faits = 0, refus = 0;
-    for (const x of ids) {   // une à la fois : l'extension relit l'annonce, vérifie le compte de l'onglet, garde, sécurité
-      let rep = null; try { rep = await vmrCmd({ cmd: 'lbcPause', id: x.id }, 70000); } catch (_) { rep = null; }
-      if (rep && rep.accepte && rep.etape === 'fait') faits++; else refus++;
-    }
-    toast(tr('egalite.pauseLbc.bilan', { faits, refus }));
-    setTic((t) => t + 1);
+    ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'pause' });
   };
   const onAction = (k, choisis) => {
     if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }
