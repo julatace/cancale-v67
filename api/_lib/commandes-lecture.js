@@ -42,6 +42,7 @@ import { repondreSansCleService } from './cle-service.js';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 // La liste blanche : `commandeMaigre` (vinted-sync-extension/background.js) + `photo_url`.
 export const CHAMPS_COMMANDE = ['date', 'price', 'title', 'status', 'transaction_id', 'conversation_id', 'transaction_user_status', 'item_id', 'photo', 'photo_url'];
+const GARDES = new Set(CHAMPS_COMMANDE);
 // Forme de la réponse : un changement de règle change l'ETag (jamais un 304 sur une autre forme).
 export const FORME = 'c1';
 const RE_ID = /^harvest_\d{1,20}_orders_(sold|purchased)$/;
@@ -53,8 +54,9 @@ const SEL_LIGNE = `${SEL_VERSION},supprime:data->supprime,payload:data->payload`
 
 export function reduireCommande(o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return o;
+  // L'ORDRE des clés de la commande est gardé (une empreinte qui la sérialiserait ne change pas).
   const out = {};
-  for (const c of CHAMPS_COMMANDE) if (o[c] !== undefined) out[c] = o[c];
+  for (const c of Object.keys(o)) if (GARDES.has(c) && o[c] !== undefined) out[c] = o[c];
   return out;
 }
 export function reduirePayload(p) {
