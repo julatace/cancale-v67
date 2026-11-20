@@ -26,7 +26,7 @@ import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } fr
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
-import { fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
+import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
   annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
 
 const JOUR = 24 * 3600 * 1000;
@@ -72,7 +72,10 @@ export async function lireAnnoncesEgalite(accounts) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
     const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
     const noms = Array.isArray(annu) ? annuaireLbc((annu[0] && annu[0].a) || {}) : null;
+    // (20 nov.) Seules SES annonces : compte prouvé par une vente ou une session vue, ou référence VRM (`annonceLbcALui`).
+    const prouves = new Set([...comptesLbcProuves((vr[0] && vr[0].ventes) || {}, ls.items), ...(Array.isArray(annu) ? comptesLbcSession((annu[0] && annu[0].a) || {}) : [])]);
     out.push(...annoncesLeboncoin(ls.items, {
+      aLui: (ad) => annonceLbcALui(ad, prouves),
       etatDe: (ad) => { if (!annonceLbcEnVente(ad, vendues)) return vendues.has(String(ad.id)) ? 'vendue' : 'retiree';
         const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() });
         return e.etat === 'enligne' ? 'active' : e.etat === 'aconfirmer' ? 'aconfirmer' : 'retiree'; },

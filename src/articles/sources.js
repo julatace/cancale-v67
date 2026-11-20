@@ -36,10 +36,20 @@ export function annoncesVinted(comptes) {
 // Leboncoin) ; `numeroDe(ad)` : le N° par identité ('' = aucun) ; `vintedDe(ad)` : l'annonce Vinted reliée ('' sinon) ;
 // `pseudoDe(ad)` : le nom du compte ; `propreDe(ad)` : déclarée « pas sur Vinted » (journal de liaison).
 const ETAT_LBC = { active: 'enligne', aconfirmer: 'aconfirmer', pause: 'pause', vendue: 'vendue' };
-export function annoncesLeboncoin(items, { etatDe, numeroDe, vintedDe = null, pseudoDe = null, propreDe = null, compteDe = null } = {}) {
+// `aLui(ad)` : la règle de l'app `annonceLbcALui` (référence VRM, ou compte prouvé par une vente / une session vue).
+export function annoncesLeboncoin(items, { etatDe, numeroDe, vintedDe = null, pseudoDe = null, propreDe = null, compteDe = null, aLui = null } = {}) {
   const out = [];
   for (const ad of Object.values(items && typeof items === 'object' ? items : {})) {
     if (!ad || ad.id == null) continue;
+    // (20 nov., capture de Julien : appartements, box, cartes… dans SES annonces) Une annonce Leboncoin n'est la sienne que
+    // si elle est PROUVÉE à l'un de ses comptes (lue sous « Mes annonces » : `account`/`lbcUser`) ou reliée par identité
+    // (N°, annonce Vinted). Les annonces d'autres vendeurs relevées en naviguant (126 sur 194 mesurées) ne sont pas les siennes ;
+    // un compte présent ne suffit pas (15 nov. : 49 sur 60 avec un compte étaient d'autres) — `aLui` juge le compte.
+    const compteLu = str(compteDe ? compteDe(ad) : (ad.account || ad.lbcUser)).replace(/^lbc-account:/i, '');
+    const numLu = str(typeof numeroDe === 'function' ? numeroDe(ad) : '');
+    const vintedLu = str(vintedDe ? vintedDe(ad) : '');
+    const sien = typeof aLui === 'function' ? !!aLui(ad) : !!compteLu;
+    if (!sien && !numLu && !vintedLu) continue;
     const e = typeof etatDe === 'function' ? str(etatDe(ad)) : '';
     const s = ad.stats && typeof ad.stats === 'object' ? ad.stats : {};
     out.push({ site: 'leboncoin', id: String(ad.id), compte: str(compteDe ? compteDe(ad) : (ad.account || ad.lbcUser)).replace(/^lbc-account:/i, ''), pseudo: str(pseudoDe ? pseudoDe(ad) : ad.accountName),
