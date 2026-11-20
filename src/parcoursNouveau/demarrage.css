@@ -32,7 +32,7 @@
   }
   .dm-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 24px; }
   .dm-titre { font: var(--n-t-grand); letter-spacing: -0.02em; margin: 4px var(--n-marge) 6px; outline: none; overflow-wrap: anywhere; }
-  .dm-titre:focus, .dm-titre:focus-visible { outline: none; box-shadow: none; }
+  .dm .dm-titre.dm-titre:focus, .dm .dm-titre.dm-titre:focus-visible { outline: none; box-shadow: none; }   /* le titre reçoit le focus à chaque page (lecteur d’écran), sans anneau */
   .dm-phrase { font: var(--n-t-corps); color: var(--n-encre-2); margin: 0 var(--n-marge) 22px; }
   .dm-erreur { font: var(--n-t-second); color: var(--n-ambre); margin: -14px calc(var(--n-marge) + 16px) 16px; }
   .dm-num {
