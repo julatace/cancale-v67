@@ -127,6 +127,9 @@ async function scenarioV(nav, largeur, sombre) {
       `${nom} : Annonces publie ${ATTENDU.vues} vues sur ${ATTENDU.nVues}, ${ATTENDU.favoris} favoris sur ${ATTENDU.nFav} (le 0 de Vinted = pas su)`, pub);
     dit(!!pub && pub.vues.gagnes === ATTENDU.gagnesVues && pub.favoris.gagnes === ATTENDU.gagnesFav, `${nom} : +${ATTENDU.gagnesVues} vues, +${ATTENDU.gagnesFav} favori aujourd’hui (le point d’hier)`, pub && { v: pub.vues, f: pub.favoris });
     dit(!!sv && sv.centimes === ATTENDU.stockC && sv.n === ATTENDU.stockN && sv.nVinted === 4, `${nom} : stock au prix affiché 355 € sur 4 (le brouillon ne compte pas), prix Vinted`, sv);
+    // (20 nov., intégration) Le point s'écrit APRÈS la publication de `vrm_vues_favoris` (machine chargée : lu trop tôt, le banc
+    // voyait encore le seul point d'hier) : on attend l'état (deux points), jamais un délai fixe ; rien de plus n'est exigé.
+    await A.pg.waitForFunction(() => { try { const x = JSON.parse(localStorage.getItem('vrm_vues_lues') || 'null'); return !!(x && x.a && (x.a['vinted#1001'] || []).length >= 2); } catch (_) { return false; } }, null, { timeout: 10000 }).catch(() => {});
     const j = await ls(A.pg, 'vrm_vues_lues');
     dit(!!j && Array.isArray(j.a['vinted#1001']) && j.a['vinted#1001'].length === 2 && j.a['vinted#1001'][1][1] === 120 && Math.abs(j.a['vinted#1001'][1][0] - (Date.now() - 10 * 60e3)) < 5 * 60e3,
       `${nom} : un point daté par la LECTURE du dressing (il y a 10 min), pas l’heure de l’écran`, j && j.a['vinted#1001']);

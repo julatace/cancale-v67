@@ -372,7 +372,8 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
             const h = (x) => { if (!x) return 0; const pb = getComputedStyle(x, '::before'); const ext = pb && pb.content && pb.content !== 'none' && pb.position === 'absolute' ? Math.max(0, -parseFloat(pb.top || '0')) + Math.max(0, -parseFloat(pb.bottom || '0')) : 0; return Math.round(x.getBoundingClientRect().height + ext); };
             const tx = e.querySelector('.n-eg-prop-texte'), cont = e.closest('.n-groupe-carte, .n-tt-table, table, [data-eg-liste]') || document.body, rc = cont.getBoundingClientRect();
             return { a: e.getAttribute('data-eg-prop-annonce'), niveau: e.getAttribute('data-eg-prop'), numero: e.getAttribute('data-eg-prop-numero'), forme: e.getAttribute('data-eg-prop-forme'), hRelier: h(btn), hAutre: h(autre), hPropre: h(propre), hBloc: Math.round(e.getBoundingClientRect().height),
-              wTexte: tx ? Math.round(tx.getBoundingClientRect().width) : null, deborde: [...e.querySelectorAll('*')].some((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.right > Math.min(innerWidth, rc.right) + 1); }) };
+              wTexte: tx ? Math.round(tx.getBoundingClientRect().width) : null, deborde: [...e.querySelectorAll('*')].some((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.right > Math.min(innerWidth, rc.right) + 1); }),
+              qui: [...e.querySelectorAll('*')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.right > Math.min(innerWidth, rc.right) + 1); }).slice(0, 2).map((x) => String(x.className || x.tagName).slice(0, 40) + '@' + Math.round(x.getBoundingClientRect().right) + '>' + Math.round(Math.min(innerWidth, rc.right))) };
           }));
           let props = await lireProp();
           const p1 = props.find((x) => x.a === 'Leboncoin:5001'), p2 = props.find((x) => x.a === 'Leboncoin:5002'), p4 = props.find((x) => x.a === 'Leboncoin:5004');
