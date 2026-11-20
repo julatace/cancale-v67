@@ -33,7 +33,6 @@ export default function ArriveeAchat({ entree, coque, onFermer, onSuivant = null
   const [articles, setArticles] = React.useState(undefined);
   const [nChoisi, setNChoisi] = React.useState(null);
   const [tapes, setTapes] = React.useState([]);            // « je numérote moi-même » : SES N°
-  const [cases, setCases] = React.useState(null);           // une case par paire (null = pas de case)
   const [sel, setSel] = React.useState(0);                  // la paire dont la case est montrée
   const [vueMeuble, setVueMeuble] = React.useState(null);   // le meuble montré (son id)
   const [fait, setFait] = React.useState(null);             // après « Ranger ici » : { numeros, lignes, horsLigne? }
@@ -42,7 +41,16 @@ export default function ArriveeAchat({ entree, coque, onFermer, onSuivant = null
   const [enReseau, setEnReseau] = React.useState(enLigne);
   const [jeton, setJeton] = React.useState(0);              // relire (réseau revenu, N° pris entre-temps)
 
-  const etat = React.useMemo(() => { try { return coque.lireEtat(); } catch (_) { return null; } }, [coque, jeton, fait]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Les meubles, les cases et les fiches : relus quand le nuage ou un autre écran les change (pas pendant SON geste).
+  const [relu, setRelu] = React.useState(0);
+  React.useEffect(() => {
+    const CLES = ['vrm_slots', 'vrm_meubles', 'vrm_fiches_neuves', 'vinted_annonce_numeros'];
+    const f = (ev) => { const k = ev && ev.detail && ev.detail.k; if (!k || CLES.includes(k)) setRelu((x) => x + 1); };
+    const g = (ev) => { const l = (ev && ev.detail && ev.detail.cles) || []; if (l.some((k) => CLES.includes(k))) setRelu((x) => x + 1); };
+    window.addEventListener('vrm:save', f); window.addEventListener('vrm:nuage-relu', g);
+    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:nuage-relu', g); };
+  }, []);
+  const etat = React.useMemo(() => { try { return coque.lireEtat(); } catch (_) { return null; } }, [coque, jeton, fait, relu]);   // eslint-disable-line react-hooks/exhaustive-deps
   const deja = React.useMemo(() => numeroArrivee({ tx: e.tx, fiches: etat && etat.fiches, numsAchat: (() => { try { return coque.numsAchat(e.tx) || []; } catch (_) { return []; } })() }), [etat, e.tx, coque]);
   const methode = React.useMemo(() => { try { return coque.methode(); } catch (_) { return null; } }, [coque]);
   const n = pairesDansLeColis(e, { articles: articles || null, choisi: nChoisi });
@@ -73,21 +81,24 @@ export default function ArriveeAchat({ entree, coque, onFermer, onSuivant = null
     : null;
   const numerosPrets = numeros.length > 0 && numeros.every(Boolean) && (!verifTapes || verifTapes.every((v) => v.ok));
   const sigNums = numeros.join('|');
-  // Les cases : la règle du Stock, recalculée quand les N° ou les cases changent ; SON choix gardé.
-  React.useEffect(() => {
-    if (!etat || !numerosPrets) { setCases(null); return; }
+  // Les cases : la règle du Stock (`casesArrivee`), calculée AU RENDU (jamais un écran sans case le temps d'un effet) ;
+  // SON choix (`choix`, paire → case touchée) passe par-dessus, remis à zéro quand les N° changent. Un N° déjà dans une
+  // case (une paire qui avait déjà son N°) n'en reçoit pas d'autre.
+  const [choix, setChoix] = React.useState({});
+  React.useEffect(() => { setChoix({}); setSel(0); setVueMeuble(null); }, [sigNums]);
+  const cases = React.useMemo(() => {
+    if (!etat || !numerosPrets) return null;
     const cleNum = coque.cleNum;
-    const nums = deja.etat === 'attribue' ? numeros.filter((x) => !(etat.slots || {})[cleNum(x)]) : numeros;
-    const r = casesArrivee({ meubles: etat.meubles, slots: etat.slots, numeros: nums.length ? nums : numeros, cleNum });
-    setCases(r.su ? { ...r, pour: nums } : { su: false });
-    setSel(0);
-    const c0 = r.su && r.cases && r.cases.find(Boolean); setVueMeuble(c0 ? String(c0.meubleId) : (etat.meubles && etat.meubles[0] ? String(etat.meubles[0].id) : null));
+    const r = casesArrivee({ meubles: etat.meubles, slots: etat.slots, numeros, cleNum });
+    if (!r.su) return { su: false };
+    return { ...r, cases: r.cases.map((c, k) => ((etat.slots || {})[cleNum(numeros[k])] ? null : c)) };
   }, [sigNums, numerosPrets, etat]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const prix = prixPayeArrivee(e);
   const meubles = (etat && Array.isArray(etat.meubles) ? etat.meubles : []).filter((m) => m && m.id != null);
-  const meubleVu = meubles.find((m) => String(m.id) === String(vueMeuble)) || meubles[0] || null;
-  const listeCases = cases && cases.su ? cases.cases : [];
+  const c0 = cases && cases.su ? cases.cases.find(Boolean) : null;
+  const meubleVu = meubles.find((m) => String(m.id) === String(vueMeuble)) || (c0 && meubles.find((m) => String(m.id) === String(c0.meubleId))) || meubles[0] || null;
+  const listeCases = cases && cases.su ? cases.cases.map((c, k) => (Object.prototype.hasOwnProperty.call(choix, k) ? choix[k] : c)) : [];
   const caseSel = listeCases[sel] || null;
   const infoCase = React.useMemo(() => {
     const parI = new Map();
@@ -98,7 +109,7 @@ export default function ArriveeAchat({ entree, coque, onFermer, onSuivant = null
     if (!meubleVu || !cases || !cases.su) return;
     const c = autreCase({ meubles, slots: etat.slots, cases: listeCases, k: sel, m: meubleVu.id, i });
     if (!c) { setMsg(tr('arv.case.prise')); return; }
-    setMsg(''); const l = listeCases.slice(); l[sel] = c; setCases({ ...cases, cases: l });
+    setMsg(''); setChoix((x) => ({ ...x, [sel]: c }));
   };
 
   const ranger = async () => {

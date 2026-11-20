@@ -24,7 +24,7 @@ import { tr, monnaie, date as dateLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireCodeColis, retrouverParSuivi, normaliserN } from './scanColis.js';
 import { useLectureCamera, raisonCamera, vibrer, creerBip, zoomDe, poserZoom } from './ScannerColis.jsx';
-import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources } from './retrouverColis.js';
+import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources, sourcePrincipalePresente } from './retrouverColis.js';
 import { codeCherchable, normaliserCode } from './etiquettesScan.js';
 import { achatDuScan } from './arriveeAchat.js';
 import { cleLigne, ouvrirLigne } from './ficheLigne.js';
@@ -48,6 +48,7 @@ const phraseCamera = () => {
   const r = raisonCamera();
   return r === 'refus' ? tr('scan.r.camRefus') : r === 'occupee' ? tr('scan.r.camOccupee') : r === 'lecteur' ? tr('scan.r.camLecteur') : tr('scan.r.sansCamera');
 };
+const achatsLus = (S) => sourcePrincipalePresente() && !(S.manques || []).includes(tr('scan.r.manque.achats'));
 const court = (s) => { const n = normaliserN(s); return n.length > 18 ? `${n.slice(0, 8)}…${n.slice(-6)}` : n; };
 
 function Icone({ d, taille = 22 }) {
@@ -274,6 +275,9 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       enCours.current = null;
       const S = lireSourcesColis();
       if (S.pret) { finir(false); return; }
+      // (20 nov., lot arrivee-scan) L'arrivée ne cherche que des ACHATS : leur liste lue (même en cache, hors ligne) suffit,
+      // les ventes et bordereaux pas lus ne peuvent pas porter un achat. Achats pas lus ⇒ on attend, comme avant.
+      if (arrivee && achatsLus(S)) { finir(false); return; }
       // Une source pas lue n'est jamais « rien » (ni « un seul » : l'autre source pourrait porter le même n°) :
       // on attend qu'elles soient lues ; au-delà de 10 s, on dit ce qui manque.
       if (Date.now() - t0 >= ATTENTE_SOURCES_MS) { finir(true); return; }
