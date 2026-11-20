@@ -2280,6 +2280,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'carte-merci', type:'panneau', nu:true, ic:'cadeau', lib:tr('confort.merci.lib'), desc:tr('confort.merci.desc'), data:{ 'data-reglage-carte-merci':'' }, el:<ReglageCarteMerci lire={()=>load(CLE_CARTE_MERCI, {})} ecrire={(v)=>save(CLE_CARTE_MERCI, v)} telecharger={telechargerFichier}/> },
     ]},
     {id:'aide',titre:tr('reglages.groupe.aide'),items:[
+      // (20 nov.) « Bien démarrer » : le parcours de 5 minutes (src/parcoursNouveau/Demarrage.jsx), rouvert à son sommaire.
+      { id:'bien-demarrer', type:'action', ic:'play', lib:tr('dm.reglage.lib'), desc:tr('dm.reglage.desc'), onClick:()=>{ try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: 'sommaire' })); } catch (_) {} }, data:{ 'data-reglage-bien-demarrer':'' } },
       // (8 nov.) Un geste : extension (présente, version, connectée à CE compte), comptes, boîte e-mail, dernière relecture — et ce qui manque.
       { id:'verifier', type:'panneau', nu:true, ic:'scan', lib:tr('reglages.verifier.lib'), desc:tr('reglages.verifier.desc'), data:{ 'data-reglage-verifier':'' }, el:<VerifierInstallationApp comptes={comptes} onNav={setTab} seule/> },
       // (2 nov.) La visite en bulles, rejouée sur son clic (src/VisiteBulles.jsx).
