@@ -26,16 +26,23 @@ l'extension, on ne doit plus pouvoir faire d'action dans l'app ».
 - **Lien profond** (`lireLienPanneau`) : `https://www.vinted.fr/?vrm=panneau&page=<…>&ids=<…>&action=<…>` (pareil sur
   leboncoin.fr / vestiairecollective.com) ouvre le panneau à la page, sélection cochée, action PRÉ-choisie ;
   masquer/afficher arrivent sur la barre de confirmation ; RIEN ne part sans son toucher ; paramètres retirés de l'adresse.
-  Contrat côté app : `src/ouvrirPanneau.js` (`lienPanneau({site, page, ids, action})`), tenu par
-  `scripts/audit-lien-panneau.cjs` (exécute les deux côtés, 9 mutations rouges).
+  Contrat côté app : `src/ouvrirPanneau.js` — **le MÊME fichier, octet pour octet, que celui du chantier
+  `claude/actions-extension`** (pas de conflit à la fusion) ; le lecteur comprend SON vocabulaire
+  (`src/actionsExtension.js` : prix/changer|baisser|remettre, republier/republier|mettre-en-ligne|brouillon,
+  publier/creer|publier, annonces/pause|supprimer, messages|offres/repondre, favoris/envoyer, automatisations/regler,
+  vacances) et celui du panneau (articles, commandes, messagerie…). Une action n'est jamais FAITE : elle est
+  pré-choisie dans « Choisir une action » quand ce geste y existe (« supprimer » ne l'est jamais). Tenu par
+  `scripts/audit-lien-panneau.cjs` (lit `src/actionsExtension.js` s'il est là, sinon sa copie ; 9 mutations rouges).
 - Capacités : `panneauvintex` (`vxHtml`), `lienpanneau` (`lireLienPanneau`) à 5.410.0 ; Quoi de neuf `panneau-vintex`.
 - Garde-fous inchangés (`audit-actions-gardees` vert) : aucune nouvelle écriture dans `background.js`.
 
 ## Ce qui n'est PAS encore fait (dit honnêtement)
 
-- L'app n'utilise pas encore `lienPanneau` : ses boutons d'action (baisser, masquer, republier, favoris, publier…)
-  agissent toujours comme avant. Prochain lot : remplacer chaque geste de l'app sur un site par
-  `window.open(lienPanneau(...))`, écran par écran, avec un audit qui interdit un geste direct.
+- Les boutons de l'app → `lienPanneau` : fait par le chantier `claude/actions-extension` (pas ici). Côté panneau, les
+  pages `prix`, `republier`, `publier`, `offres`, `vacances` ouvrent l'onglet le plus proche (Articles, Messagerie,
+  Paramètres) avec la sélection cochée ; une page dédiée par geste (saisie du prix, atelier Republier, publier) reste
+  à construire dans le panneau. Le pilote du mode auto des favoris et la veille des republications programmées ne
+  partent plus de l'app (actions-extension) : à porter par l'extension — pas fait dans ce lot.
 - « Changer le prix » dans le panneau ouvre encore VRM pour la saisie du montant (le dépôt `cmd_prix_*` existe côté
   extension, l'interface de saisie dans le panneau reste à faire).
 

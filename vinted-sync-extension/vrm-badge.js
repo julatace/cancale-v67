@@ -3303,15 +3303,19 @@
   //    s'ouvre sur la page, la sélection PRÉ-COCHÉE, l'action PRÉ-CHOISIE. Rien ne part : un geste qui écrit attend SA
   //    confirmation dans le panneau (la barre « Masquer N annonces ? », le récapitulatif des favoris…). Les paramètres
   //    `vrm*` sont retirés de l'adresse (un rechargement ne rouvre rien) ; ids : chiffres et tirets seulement, 50 au plus.
-  const PAGES_LIEN = { articles: 'annonces', commandes: 'ventes', messagerie: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', accueil: 'accueil', parametres: 'parametres' };
-  const ACTIONS_LIEN = ['baisser', 'masquer', 'afficher', 'republier', 'favoris', 'ouvrir', 'offre', 'repondre', 'publier'];
+  // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
+  // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
+  const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
+  // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
+  const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
   function lireLienPanneau() {
     try {
       if (CADRE || LISTES || !/(^|\.)(vinted\.[a-z.]+|leboncoin\.fr|vestiairecollective\.com)$/i.test(String(location.hostname || ''))) return null;
       const p = new URLSearchParams(String(location.search || ''));
       if (p.get('vrm') !== 'panneau') return null;
       const page = PAGES_LIEN[String(p.get('page') || '').toLowerCase()] || 'accueil';
-      const ids = String(p.get('ids') || '').split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 50);
+      const ids = String(p.get('ids') || '').split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 200);
       let action = String(p.get('action') || '').toLowerCase();
       if (!ACTIONS_LIEN.includes(action)) action = p.get('page') === 'republier' ? 'republier' : p.get('page') === 'prix' ? 'baisser' : '';
       try { for (const k of ['vrm', 'page', 'ids', 'action']) p.delete(k); const q = p.toString(); history.replaceState(history.state, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (_) {}
@@ -3323,7 +3327,7 @@
     ongletListe = lienPanneau.page;
     for (const id of lienPanneau.ids) annSel.add(id);
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
-    else if (lienPanneau.action && lienPanneau.action !== 'ouvrir') annActionPre = lienPanneau.action;
+    else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
     hote.setAttribute('data-lien-panneau', lienPanneau.page);
     setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
