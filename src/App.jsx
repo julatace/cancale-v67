@@ -66429,10 +66429,12 @@ function AppCoeur() {
   const snapJourneeArret = instantaneAuMoinsPermis && tab === 'journee' && snapJournee && (horsLigne || baseKO)
     ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
   // (20 nov., affichage instantané) La COPIE de l'écran (src/copieEcran.js), lue d'IndexedDB au montage de la coque
-  // (`copiesPretes`) : montrée d'abord, inerte et datée. Base injoignable ou hors ligne : elle RESTE, « Pas à jour ·
-  // Réessayer » (jamais présentée comme fraîche). Sans abonnement : jamais (`instantaneAuMoinsPermis`).
+  // (`copiesPretes`) : montrée d'abord, inerte et datée. Base injoignable : elle RESTE, « Pas à jour · Réessayer »
+  // (jamais présentée comme fraîche). Sans abonnement : jamais (`instantaneAuMoinsPermis`).
   const copieIci = instantaneAuMoinsPermis && copiesPretes >= 0 && ECRANS_COPIE.includes(tab) ? copieEnMemoire(uidInstantane, tab) : null;
-  const copieEnPanne = !!copieIci && (baseKO || horsLigne);
+  // Hors ligne, l'écran VRAI se lit depuis les lignes gardées sur l'appareil (lot K) et ses gestes hors ligne restent
+  // possibles : la copie ne le bloque pas. Seule une base injoignable EN LIGNE (rien de relisible) garde la copie.
+  const copieEnPanne = !!copieIci && baseKO && !horsLigne;
   const instantaneEcranIci = copieIci ? <VueCopie copie={copieIci} etat={copieEnPanne ? 'pas-a-jour' : 'maj'} onReessayer={() => { try { window.location.reload(); } catch (_) {} }}/>
     : !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
