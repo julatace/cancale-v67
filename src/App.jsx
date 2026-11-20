@@ -34979,7 +34979,11 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
-const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+const CLE_ACCT_OUBLIS = 'vrm_acct_cache_oublis';
+const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; });
+  // (20 nov., bugs-terrain) Les listes OUBLIÉES depuis la dernière écriture complète (voir `oublierAcct`) ne reviennent pas.
+  try { const ob = JSON.parse(sessionStorage.getItem(CLE_ACCT_OUBLIS) || 'null'); const t = ob && Array.isArray(ob.types) ? ob.types : []; if (t.includes('*')) Object.keys(o).forEach((k) => delete o[k]); else t.forEach((k) => delete o[k]); } catch (_) {}
+  return o; } }catch(_){} return {}; })();
 // (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
 // `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
 // « pas encore lu ». Rien n'est lu ni écrit ici.
@@ -35026,7 +35030,18 @@ const etatOrdersDuCache = (type, accounts) => {
 // onglet, l'iPhone qui la met de côté), ou au plus tard 20 s après, quand le navigateur est
 // libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
-const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); sessionStorage.removeItem(CLE_ACCT_OUBLIS); }catch(_){} };
+// (20 nov., bugs-terrain) OUBLIER une liste du cache de session SANS réécrire tout le cache (~1,5 Mo de JSON à son volume) :
+// chaque signal de l'extension (« ventes », « achats », « annonces », « messages ») en écrivait une copie entière, une fois
+// par moteur monté — 1,4 s de calcul à l'ouverture d'Achats (profil, 12 comptes, processeur ×4). La liste oubliée est NOTÉE
+// tout de suite (une petite clé, `CLE_ACCT_OUBLIS`) : un rechargement juste après ne la relit jamais ; le cache entier est
+// réécrit plus tard (`_persistAcctCacheBientot`), comme après un rangement. `types` vide ⇒ tout.
+const oublierAcct = (...types) => {
+  const tous = !types.length;
+  if (tous) Object.keys(_acctCache).forEach((k) => delete _acctCache[k]); else types.forEach((k) => delete _acctCache[k]);
+  try { const ob = JSON.parse(sessionStorage.getItem(CLE_ACCT_OUBLIS) || 'null'); const t = new Set(ob && Array.isArray(ob.types) ? ob.types : []); (tous ? ['*'] : types).forEach((k) => t.add(k)); sessionStorage.setItem(CLE_ACCT_OUBLIS, JSON.stringify({ types: [...t] })); } catch (_) { _persistAcctCache(); return; }
+  _persistAcctCacheBientot();
+};
 // (11 nov., états vides) RETOUR DU RÉSEAU avec des listes gardées « pas relues » (src/copieLignes.js) :
 // les caches de lecture de la session sont vidés AVANT que les écrans se remontent (cet écouteur est posé
 // au chargement du module, avant ceux des écrans) ⇒ ils relisent la base, pas la mémoire de la coupure.
@@ -42122,7 +42137,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // dates de versement illisibles sont relues aussi. Rend la promesse : le
   // bouton reste « Lecture… » jusqu'au bout.
   const relireVentes = async () => {
-    try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+    try { oublierAcct('sold'); } catch (_) {}
     for (const u of (Array.isArray(sales.failedUids) ? sales.failedUids : [])) _rowCache.delete(`o:${u}`);
     await Promise.all([
       loadOrders('sold', setSales, false, { silencieux: true }),
@@ -42795,7 +42810,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
       hiddenAt = 0;
       oublierLignesUneFois();                                        // vide le cache de lignes (relit la moisson fraîche)
-      try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
+      try { oublierAcct(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
       if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
@@ -42838,7 +42853,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (12 nov.) Ventes monte DEUX moteurs (la liste et « À expédier ») : le second ne réoublie pas la ligne
       // que le premier vient de relire (`oublierCommandesCompte`, 4 s) — une seule relecture du compte.
       if (uid) oublierCommandesCompte(uid); else oublierLignesUneFois();
-      try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+      try { oublierAcct('sold'); } catch (_) {}
       // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
       //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
       //    un écran qui en dépend relit (plus bas).
@@ -42856,7 +42871,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // déjà affichés quelque part — sans squelette, sans perdre l'écran.
       else if (ev.quoi === 'achats') {
         if (ev.uid) _rowCache.delete(`o:${ev.uid}`); else oublierLignesUneFois();
-        try { delete _acctCache.purchased; _persistAcctCache(); } catch (_) {}
+        try { oublierAcct('purchased'); } catch (_) {}
         if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
@@ -42874,7 +42889,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       //    jamais le relais serveur sur un signal.
       else if (ev.quoi === 'annonces') {
         oublierDressing(ev.uid);
-        try { delete _acctCache.listings; _persistAcctCache(); } catch (_) {}
+        try { oublierAcct('listings'); } catch (_) {}
         if (['annonces', 'journee', 'bordereaux', 'messages'].includes(curSub)) signalAnnonces(ev.uid);
       }
     };
@@ -42899,7 +42914,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // autres boîtes restent servies par leur mémoire ; aucune requête Vinted (moisson seulement).
         if (q.quoi === 'messages') {
           if (q.uid) _rowCache.delete(`h:${q.uid}:inbox`);
-          try { delete _acctCache.convs; _persistAcctCache(); } catch (_) {}
+          try { oublierAcct('convs'); } catch (_) {}
           if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
           continue;
         }
@@ -45591,7 +45606,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [sales.items, numeros, saleOv]);
   // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
   // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
-  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer';
+  // (20 nov., bugs-terrain) Pas dans le moteur des outils de retrait d'Achats (`retraitsOutils`) : il ne montre aucune proposition,
+  // et refaisait la même affectation que la liste (3,3 s de calcul au profil d'Achats, 12 comptes, processeur ×4).
+  const vueLiaison = !retraitsOutils && ((curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer');
   // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
   useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // Les articles par clé (Achats : « article proposé » sous un achat).
