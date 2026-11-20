@@ -20657,6 +20657,9 @@ const VENTES_NATIF = true;
 // (20 nov., chasse-bugs-2) Décision « 4 oui » du 19 nov. : plus aucun geste « Je dépose / Déposé » pour une VENTE (le dépôt est
 // constaté par le suivi du transporteur). Les marques notées AVANT (`vinted_ship_done`, `vinted_bords_shipped`) restent lues.
 const TOURNEE_DEPOT_RETIREE = true;
+// (20 nov., chasse-bugs-2 — décision « 4 oui ») « Colis fait » sur Leboncoin et Vestiaire aussi : le départ est constaté par l'état lu du site / le suivi ;
+// les coches notées avant (`vrm_lbc_colis_done`, `vrm_vc_colis_done`) restent lues.
+const LBC_VC_COLIS_FAIT_RETIRE = true;
 // « Générer le bordereau » : le bouton d'avant (il commande l'extension, dit ce qui l'empêche) dans le détail d'une vente.
 function BoutonGenererNatif(p) { return <BoutonBordereau grand aGenerer pdf={false} {...p}/>; }
 function CacheSiV2({ si, children }) {
@@ -28424,8 +28427,8 @@ function CarteColisVc({ v, imprime, fait }) {
         </div>
         {v.bordereau ? <button type="button" data-geste="imprime" data-vc-imprime={v.id} onClick={() => marquerVc('vrm_vc_imprimes', v.id, !imprime)} title={imprime ? 'Remettre en « à imprimer »' : 'Marquer comme imprimé'}
           className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: imprime ? C.bg : 'transparent', color: imprime ? C.text : C.muted }}>{imprime ? '✓ Imprimé' : 'Marquer imprimé'}</button> : null}
-        <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Le colis est encore chez toi : il revient dans « À envoyer »' : 'Marquer déposé : il passe dans « Envoyés »'}
-          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? 'Pas encore déposé' : 'Déposé'}</button>
+        {LBC_VC_COLIS_FAIT_RETIRE ? null : <button type="button" data-geste="fait" data-vc-fait={v.id} onClick={() => marquerVc('vrm_vc_colis_done', v.id, !fait)} title={fait ? 'Le colis est encore chez toi : il revient dans « À envoyer »' : 'Marquer déposé : il passe dans « Envoyés »'}
+          className="vrm-colis-sec vrm-colis-ter" style={{ ...sec, border: `1px solid ${C.border}`, background: fait ? C.bg : 'transparent', color: fait ? C.text : C.muted }}>{fait ? 'Pas encore déposé' : 'Déposé'}</button>}
       </div>
       </DansFiche>
     </div>
@@ -42059,11 +42062,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (20 nov., chasse-bugs-2) LA FICHE ET LA LISTE JUGENT PAR LA MÊME RÈGLE. Mesuré sur sa base : une vente « Bordereau envoyé
     // au vendeur » gardée dans « À envoyer » (le départ n'est PROUVÉ que par une prise en charge lue, `ventesPartiesParPreuve`),
     // dont la ligne du transporteur disait « en route » sans prise en charge — la fiche cochait « En route ✓ · Livrée ✓ ».
-    // Une vente que la liste garde à envoyer (`aExpedier` et pas `estParti`) : aucune étape après « Bordereau prêt » ; une
-    // preuve du transporteur ne compte que si la règle du départ l'a acceptée (`partisVinted`).
+    // Une vente que la liste garde à envoyer (`aExpedier` et pas `estParti`) : aucune étape après « Bordereau prêt », aucune
+    // preuve du transporteur que la règle du départ n'a pas acceptée.
     const enAttenteEnvoi = !horsParcours && aExpedier(o) && !estParti(o);
     const prT0 = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
-    const prT = partisVinted.has(txL) ? prT0 : { bouge: false, livre: false, livreAt: null, source: null };
+    // Une vente que Vinted dit déjà partie (pas « à envoyer ») garde la preuve du transporteur telle quelle (« Livré » au relais).
+    const prT = enAttenteEnvoi ? { bouge: false, livre: false, livreAt: null, source: null } : prT0;
     // (18 nov.) Vinted parle à DEUX endroits : l'état de la commande (`o.status`) et le détail de la transaction lu ensuite
     // (`etatTxn(tx).ss`) — c'est CE détail que dit la phrase sous la frise (`vintedDeTx` → `dernierStatut`). La piste lit les
     // deux, pour ne jamais dire « Livré » à côté d'une piste restée à « En route ».
@@ -47861,16 +47865,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (only !== 'bordereaux') return undefined;
     return enregistrerSourceColis('comptabilite:' + (colisDans || 'colis'), () => sourceRetrouver.current());
   }, [only, colisDans]);
-  const [emballage, setEmballage] = useState(() => {
-    if (curSub !== 'bordereaux' || !DEMANDE_EMBALLAGE.at || Date.now() - DEMANDE_EMBALLAGE.at > 60000) return false;
-    DEMANDE_EMBALLAGE.at = 0; return true;
-  });
-  useEffect(() => {
-    if (curSub !== 'bordereaux') return undefined;
-    const f = () => { if (cache()) return; DEMANDE_EMBALLAGE.at = 0; setEmballage(true); };
-    window.addEventListener('vrm:emballer', f);
-    return () => window.removeEventListener('vrm:emballer', f);
-  }, [curSub]);
+  // (20 nov., chasse-bugs-2 — décision « 4 oui ») « Emballer » est retiré : le mode ne s'ouvre plus (ni bouton, ni demande d'un autre écran).
+  const [emballage, setEmballage] = useState(false);
   const colisEmballage = () => {
     const vue = colonnesColis(cartesColis(), 'toutes');
     const prets = ((vue.colonnes.find(c => c.cle === 'prets') || {}).cartes) || [];
@@ -49952,9 +49948,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           tuiles.envoyer = { n: toShip.length, sub, alerte: late>0 };
           // (1er nov.) LE MODE EMBALLAGE, d'ici : il s'ouvre sur Colis, sur les
           // colis de la colonne « Prêts à imprimer », dans son ordre.
-          if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
-            title:tr('journee.emballerColisPrets'), sub:`${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}`,
-            action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
+          // (20 nov., chasse-bugs-2 — décision « 4 oui ») plus de tâche « Emballer ».
           // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
           // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
           if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, nRetours: (() => { try { return retoursChoisis().length; } catch (_) { return 0; } })(), exact, phrase: `${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}` };
@@ -50668,8 +50662,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             try { const ev = new CustomEvent('vrm:ouvrir-emballage', { detail: { pris: false, depuis: 'tournee' } }); window.dispatchEvent(ev); pris = !!ev.detail.pris; } catch (_) {}
             if (pris) return;
             // Le mode emballage de Colis (DEMANDE_EMBALLAGE, comme « Emballer les colis prêts ») : il s'ouvre en arrivant.
-            DEMANDE_EMBALLAGE.at = Date.now();
-            if (onNav) onNav('cat_bord'); try { setTimeout(() => window.dispatchEvent(new Event('vrm:emballer')), 0); } catch (_) {} return;
+            if (onNav) onNav('cat_bord'); return;   // (20 nov., chasse-bugs-2 — décision « 4 oui ») le mode emballage n'existe plus
           }
           if (id === 'deposer') { if (onNav) onNav('cat_bord'); allerDansColis('[data-colis-detail]'); return; }
           if (id === 'retirer') { if (onNav) onNav('retraits'); try { window.dispatchEvent(new CustomEvent('vrm:ancre-retraits')); } catch (_) {} }
@@ -50825,7 +50818,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         };
         const titreCase = (x) => x.pasSu ? (x.titrePasSu || 'Pas encore lu') : [x.t && x.t.sub, x.t && x.t.presses && !x.t.presses.urgent ? x.t.presses.phrase : ''].filter(Boolean).join(' · ');
         const gesteCase = (x) => {
-          const e = x.id === 'envoyer' && !x.pasSu && x.t && x.t.emballer;
+          const e = null;   // (20 nov., chasse-bugs-2 — décision « 4 oui ») plus de « Emballer » sur la case
           if (!e) return null;
           return (
             <Bouton variante="secondaire" icone="box" className="vrm-b-petit vrm-day-case-geste" data-job="emballer" data-n={e.n} title={e.phrase}
@@ -51903,7 +51896,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <div className="sj-pied">
                       {colis.length > montres.length ? <LienJ onClick={() => { if (onNav) onNav(xE.tab); }} attrs={{ 'data-sj-autres': String(colis.length - montres.length) }}>{tr('sj.autres', { n: colis.length - montres.length })}</LienJ>
                         : <LienJ onClick={() => { if (onNav) onNav(xE.tab); }}>{tr('sj.ouvrirColis')}</LienJ>}
-                      {em ? <button type="button" className="sb-touche" data-job="emballer" data-n={em.n} title={em.phrase} onClick={() => { DEMANDE_EMBALLAGE.at = Date.now(); if (onNav) onNav('cat_bord'); }}><Icon name="box" size={16}/>{tr('journee.emballer')}</button> : null}
                     </div>
                   </>) };
               }
@@ -56777,8 +56769,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
                       // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
-                      format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot, preparer: () => setPreparerOuvert(true),
-                      emballer: () => setEmballage(true), scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
+                      format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot,
+                      scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
                   // rendues pour Ventes (leurs blocs rendent `null`) ; les feuilles (papier, impression, scanner, préparer…) restent.
                   if (VENTES_NATIF) {
@@ -56817,9 +56809,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                             {[
                               resLot.total > 0 ? { k: 'choisir', icon: 'check', lab: resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('v2v.outils.choisir'), on: ouvrirLot, attrs: { 'data-lot-ouvrir': '1' } } : null,
                               resLot.total > 0 || Lret.length > 0 ? { k: 'papier', icon: 'printer', lab: tr('vv.format'), val: tr(`impr.format.${formatLot}`), on: () => setChoixPapier({ puis: null }), attrs: { 'data-impr-format': formatLot } } : null,
-                              (nEnv || 0) > 0 ? { k: 'preparer', icon: 'box', lab: tr('v2v.outils.preparer'), on: () => setPreparerOuvert(true) } : null,
                               // (20 nov., chasse-bugs-2 — décision « 4 oui ») « Je dépose » et la tournée retirés : le dépôt est constaté par le suivi.
-                              nPrets > 0 ? { k: 'emballer', icon: 'box', lab: tr('v2v.outils.emballer'), on: () => setEmballage(true) } : null,
                               { k: 'scanner', icon: 'scan', lab: tr('sv.scanner.envoi'), on: () => setScanOuvert('envoi') },
                               tuilesTete ? { k: 'tous', icon: 'filter', lab: outilsColis ? tr('vv.outils.filtresMasquer') : tr('vv.outils.filtres'), on: () => setOutilsColis((v) => !v) } : null,
                             ].filter(Boolean).map((t) => (
@@ -56971,17 +56961,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {onglet === 'envoyer' && (notes.prets || notes.attente) ? <p className="vrm-colis-note" data-cc-note="envoyer">{[notes.prets, notes.attente].filter(Boolean).join(' ')}</p> : null}
             {/* (9 nov.) Ce que Vestiaire (À envoyer) et Pickup (À retirer) ont dit par SMS, sans identité : dit, jamais relié seul. */}
             {(onglet === 'envoyer' || onglet === 'retirer') ? <InfosSms key={onglet} onglet={onglet} lire={lireInfosSms} ecrireLiens={ecrireLiensSms} publier={publierATrancher} /> : null}
-            {/* (9 nov., lot AD) « Préparer mes colis » : un colis à la fois, plein écran, dans l'ordre de cette liste. */}
-            {/* Une rangée À ELLE (pas `.vrm-colis-outils`, rangée derrière « … ») : le geste du moment. */}
-            {onglet === 'envoyer' && (nEnv || 0) > 0 ? (<VersAFaire>
-              <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
-                <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
-              </div></VersAFaire>) : null}
-            {onglet === 'envoyer' && nPretsVue > 0 && (
-              <div className="vrm-colis-outils" data-cc-colonne="prets">
-                <Bouton variante="secondaire" icone="box" data-emballer-ouvrir={nPretsVue} onClick={() => setEmballage(true)} style={{ minHeight: 44 }}>Emballer</Bouton>
-              </div>
-            )}
+            {/* (20 nov., chasse-bugs-2 — décision « 4 oui ») « Préparer mes colis » et « Emballer » retirés : le départ est constaté par le suivi. */}
             {onglet === 'retirer' && (
               <section className="vrm-colis-retirer" data-cible="colonne:retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
@@ -57743,7 +57723,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     primaire={o.label && o.label.voucherUrl
                       ? <button type="button" data-imprime="1" data-imprime-lbc={x.txId} className="vrm-colis-primaire" onClick={() => onColisLeboncoin && onColisLeboncoin()} title="Bordereau Leboncoin tamponné (titre + N°)" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
                       : <a data-generer-lbc={x.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}`} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="Le bordereau se génère sur Leboncoin" style={{...primaireBleu,background:C.card2||C.bg,color:C.text}}><Icon name="printer" size={16}/><span className="vrm-lib-long">Générer sur Leboncoin</span><span className="vrm-lib-court">Générer</span></a>}
-                    gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { modifierCle('vrm_lbc_colis_done', {}, (u) => { if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); return u; }); majLbcFait(); }}
+                    gestes={LBC_VC_COLIS_FAIT_RETIRE ? null : <button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { modifierCle('vrm_lbc_colis_done', {}, (u) => { if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); return u; }); majLbcFait(); }}
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
@@ -58324,7 +58304,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       </>)}
 
       {(curSub==='bordereaux' || curSub==='achats') && scanOuvert === 'retrait' ? <ScannerColis Photo={PhotoVinted} mode="retrait" trouver={trouverRetrait} onConfirmer={retirerScan} onFermer={() => setScanOuvert(false)} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => setScanOuvert(false)}/></ScannerColis> : null}
-      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis Photo={PhotoVinted} mode="envoi" note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc"/> : null)} trouver={trouverScan} attendu={scanAttendu} onConfirmer={(x) => deposeScan.demander(x.cle, x, x.num ? `N°${x.num}` : x.titre)} onFermer={() => { setScanOuvert(false); setScanAttendu(''); }} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => { setScanOuvert(false); setScanAttendu(''); }}/></ScannerColis> : null}
+      {curSub==='bordereaux' && scanOuvert && scanOuvert !== 'retrait' ? <ScannerColis Photo={PhotoVinted} mode="envoi" note={(c) => (c && c.num ? <NotePaireCoque numero={c.num} variante="bloc"/> : null)} trouver={trouverScan} attendu={scanAttendu} onFermer={() => { setScanOuvert(false); setScanAttendu(''); }} attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={() => { setScanOuvert(false); setScanAttendu(''); }}/></ScannerColis> : null}
       {/* (9 nov., lot AD) « Préparer mes colis » (Colis → À envoyer) et le mode relais (À retirer, Achats). */}
       {curSub==='bordereaux' && preparerOuvert ? <PreparerColis colis={colisPreparer()} uid={AUTH.user?.id || ''} attente={deposeScan.attente ? deposeScan.attente.cle : ''}
           onFait={(c) => { if (c && c.geste) deposeScan.demander(c.cle, c.geste, c.num ? `N°${c.num}` : c.titre); }} onAnnuler={deposeScan.annuler}
@@ -67727,7 +67707,6 @@ function AppCoeur() {
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
             onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
-            onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
             onSource={(src)=>{ fermer(); setGsOpen(false);
