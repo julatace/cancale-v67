@@ -25,6 +25,7 @@ import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resu
 import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
 // (17 nov., extension 5.408) Republier étape par étape : la chaîne de chaque paire, le plan, le bilan.
 import { chaineRepub, planRepub, resumeRepub, dureeCourte, gesteProbleme } from '../repubEtapes.js';
+import { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from '../repubVerif.js';
 import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
 import '../republier-guide.css';
@@ -1591,7 +1592,7 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
   );
 }
 // ⟦← App.jsx #8⟧
-function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null, programme = null, programmeMode = null, progsRepub = null, onProgrammeFait = null }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null, programme = null, programmeMode = null, progsRepub = null, onProgrammeFait = null, controler = null }) {
   // (11 nov., lot republier-programme) Une programmation : SES réglages figés (src/repubProgramme.js).
   const PR = programme && programme.reglages ? programme.reglages : null;
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
@@ -1676,6 +1677,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
   // (30 oct.) Vinted a dit « réessaie dans N min » : « Reprendre » attend jusque-là
   // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
   const [arretJusqua, setArretJusqua] = useState(0);
+  // (20 nov., ext. 5.410 `repubverif`) LE CONTRÔLE AVANT DE LANCER : chaque annonce choisie est LUE chez Vinted
+  // (son formulaire, la grille de sa catégorie) ; « à corriger » ferme le bouton Lancer tant qu'il en reste.
+  const [verif, setVerif] = useState({});              // id → { etat, corrections, manque, question, rep }
+  const [verifEnCours, setVerifEnCours] = useState(false);
+  const [verifPanne, setVerifPanne] = useState('');
+  const verifPour = React.useRef('');
   // (12 nov., 5.370) La discrétion de l'extension a dit « attends » (autre compte, même série,
   // ouverture de Vinted) : la MÊME paire repart à cette heure-là, rien n'est compté en échec.
   const reportRef = React.useRef(null);   // { id, at }
@@ -1833,6 +1840,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
     // brouillon disparu) : sautée, jamais envoyée, et dit sur sa ligne.
     // Une liste vivante VIDE (relecture en cours, lecture ratée) ne dit rien : « rien lu » ne vaut pas « rien » (§5).
     const partie = toutes.length > 0 && aFaire.find((a) => !st[a.id] && !aFaireCalc.some((x) => x.id === a.id));
+    // (20 nov., 5.410) Une annonce que le contrôle a prouvée ABSENTE chez Vinted ne part jamais.
+    { const abs = aFaire.find((a) => !st[a.id] && partiraPas(verif, a.id)); if (abs) { setSt((p) => ({ ...p, [abs.id]: { etat: 'echec', code: 'absente', raison: tr('rep.verif.absente') } })); return; } }
     if (partie) { setSt((p) => ({ ...p, [partie.id]: { etat: 'echec', code: 'plus-dans-la-liste', raison: action === 'enLigne' ? 'pas envoyé : ce brouillon n’est plus proposable (plus sur Vinted, ou sur un autre compte)' : 'pas envoyée : elle n’est plus en ligne sur ce compte (vendue ou retirée)' } })); return; }
     const suiv = aFaire.find((a) => !st[a.id]);
     // Des mises en ligne encore planifiées (« à la suite ») : la file n'est finie qu'après elles.
@@ -1849,7 +1858,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, total: aFaire.length, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, total: aFaire.length, ...(reponsesDe(verif, suiv.id) ? { reponses: reponsesDe(verif, suiv.id) } : {}), ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       if (r && r.code === 'discretion' && Number(r.attendreMs) > 0) {
         reportRef.current = { id: suiv.id, at: Date.now() + Number(r.attendreMs) + 5000 };
@@ -1951,6 +1960,38 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
     const q2 = questionRepubOk(r && r.question) && !(r.question.champ in reponses) ? r.question : null;
     setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses, draftId: (r && r.draftId) || '' } }));
   };
+  // (20 nov., 5.410 `repubverif`) Le contrôle, compte par compte (celui de l'onglet seulement : l'extension le garde).
+  const verifActif = !!controler && recree && etape === 'envoi' && mode === 'idle' && !(programme && programmeMode === 'depart');
+  const lancerVerif = async (ids, repParId) => {
+    if (!controler || !ids.length) return;
+    setVerifEnCours(true); setVerifPanne('');
+    const parUid = {}; for (const id of ids) { const a = aFaire.find((x) => String(x.id) === String(id)); const u = String((a && a.uid) || compteUid || ''); (parUid[u] = parUid[u] || []).push(String(id)); }
+    try {
+      for (const u of Object.keys(parUid)) {
+        const idsU = parUid[u];
+        let r = null; try { r = await controler(u, idsU, repParId || {}, aFaire.length); } catch (_) { r = null; }
+        if (!r || r.accepte === false || !Array.isArray(r.paires)) {
+          const raison = (r && r.raison) || tr('rep.verif.panne');
+          setVerifPanne(raison);
+          setVerif((p) => { const n = { ...p }; for (const id of idsU) n[id] = { id, etat: 'pas-verifie', corrections: [], manque: [], question: null, raison, rep: p[id] && p[id].rep }; return n; });
+          continue;
+        }
+        setVerif((p) => { const n = { ...p }; for (const x of r.paires) { const q = paireVerif(x); if (q) n[q.id] = { ...q, rep: (repParId && repParId[q.id]) || (p[q.id] && p[q.id].rep) }; } return n; });
+      }
+    } finally { setVerifEnCours(false); }
+  };
+  const verifCle = aFaire.map((a) => a.id).join(',');
+  React.useEffect(() => { if (verifActif && aFaire.length && verifPour.current !== verifCle) { verifPour.current = verifCle; lancerVerif(aFaire.map((a) => String(a.id)).filter((id) => !verif[id] || verif[id].etat === 'pas-verifie')); } }, [verifActif, verifCle]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // SA réponse à la question d'UNE annonce : revérifiée (une lecture), gardée pour SON départ seulement.
+  const repondreVerif = async (a) => {
+    const v0 = verif[String(a.id)] || {};
+    if (!v0.question) return;
+    const v = await demanderQuestionRepub(v0.question, a.titre || '');
+    if (v == null) return;
+    const rep = { ...(v0.rep || {}), [v0.question.champ]: String(v) };
+    await lancerVerif([String(a.id)], { [String(a.id)]: rep });
+  };
+  const retirerDeLaFile = (id) => setSel((p) => { const n = new Set(p); n.delete(String(id)); return n; });
   const cssReg = cssApercuPhoto(reg);   // (6 nov.) la même chaîne que « à la main » et l'extension
   const curseur = (lab, cle, min, max, pas) => (
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
@@ -2200,6 +2241,18 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
             {action !== 'enLigne' && !!aFaire.length && mode === 'idle' && <EncartPhotosAutresComptes sources={aFaire.map((a) => ({ id: a.id, compte: String(a.uid || compteUid) }))} compteCible={compteUid ? `vinted:${compteUid}` : null} PhotoVinted={PhotoVinted}/>}
             {/* (17 nov., 5.408) LE PLAN, avant de lancer : « 12 paires · environ 40 min · fin vers 15:10 ». */}
             {recree && !!aFaire.length && mode === 'idle' && (() => { const pl = planRepub({ n: aFaire.length, attentes: aFaire.slice(1).map((a) => plan[a.id]), action }); return pl ? <div className="vrm-repub-plan" data-repub-plan={pl.sec} data-repub-plan-n={pl.n} data-repub-plan-fin={pl.fin}><span>{tr('rep.plan', { n: pl.n, duree: texteDuree(pl.sec), heure: heureLoc(pl.fin) })}</span> <Pourquoi label={tr('rep.plan.comment')}>{tr('rep.plan.pourquoi')}</Pourquoi></div> : null; })()}
+            {/* (20 nov., 5.410 `repubverif`) LE CONTRÔLE, avant de lancer : « 12 vérifiées · 2 corrigées seules · 1 à corriger avant de lancer ». */}
+            {verifActif && !!aFaire.length && (() => { const rv = resumeVerif(aFaire.map((a) => String(a.id)), verif); return (
+              <div className="vrm-repub-verif" data-repub-verif={verifEnCours ? 'encours' : rv.bloque ? 'bloque' : 'pret'} data-repub-verif-ok={rv.ok} data-repub-verif-corrige={rv.corrige} data-repub-verif-a-corriger={rv.aCorriger} data-repub-verif-absente={rv.absente} data-repub-verif-pas={rv.pasVerifie}>
+                <span className="vrm-repub-verif-t">{verifEnCours ? tr('rep.verif.encours', { n: aFaire.length }) : tr('rep.verif.vues', { n: rv.verifiees })}</span>
+                {!verifEnCours && rv.corrige > 0 && <span>{tr('rep.verif.corrigees', { n: rv.corrige })}</span>}
+                {!verifEnCours && rv.aCorriger > 0 && <span className="vrm-repub-afinir">{tr('rep.verif.aCorriger', { n: rv.aCorriger })}</span>}
+                {!verifEnCours && rv.absente > 0 && <span className="vrm-repub-afinir">{tr('rep.verif.absentes', { n: rv.absente })}</span>}
+                {!verifEnCours && rv.pasVerifie > 0 && <span>{tr('rep.verif.pas', { n: rv.pasVerifie })}</span>}
+                {!verifEnCours && verifPanne && <span className="vrm-repub-verif-panne">{verifPanne}</span>}
+                {!verifEnCours && <Bouton variante="discret" data-repub-verif-relire onClick={() => lancerVerif(aFaire.map((a) => String(a.id)), Object.fromEntries(aFaire.map((a) => [String(a.id), reponsesDe(verif, a.id)]).filter((x) => x[1])))}>{tr('rep.verif.relire')}</Bouton>}
+                <Pourquoi label={tr('rep.verif.comment')}>{tr('rep.verif.pourquoi')}</Pourquoi>
+              </div>); })()}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
             {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
@@ -2272,6 +2325,17 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
                   </div>
                   {recree && s.etat && <div style={{ padding: '0 0 4px 26px' }}><ChaineRepub s={s} p={prog[String(a.id)]} action={action} /></div>}
                   {raison && <div style={{ fontSize: 13, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
+                  {mode === 'idle' && verifActif && (() => { const v = verif[String(a.id)]; if (!v || v.etat === 'ok') return null; return (
+                    <div className="vrm-repub-verif-ligne" data-repub-verif-ligne={a.id} data-repub-verif-etat={v.etat} style={{ padding: '0 0 4px 26px' }}>
+                      {v.etat === 'corrige' && v.corrections.map((c) => <div key={c.champ} data-repub-verif-correction={c.champ}>{tr('rep.verif.ligne.corrige', { nom: c.nom || c.champ })} — {c.raison}</div>)}
+                      {v.etat === 'a-corriger' && <div data-repub-verif-manque>{tr('rep.verif.ligne.manque', { quoi: v.manque.join(', ') })}</div>}
+                      {v.etat === 'absente' && <div>{v.raison || tr('rep.verif.absente')}</div>}
+                      {v.etat === 'pas-verifie' && v.raison && <div className="vrm-repub-verif-discret">{v.raison}</div>}
+                      {v.etat === 'a-corriger' && <div className="vrm-b-rangee">
+                        {v.question && v.question.options ? <Bouton data-repub-verif-choisir={v.question.champ} disabled={verifEnCours} onClick={() => repondreVerif(a)}>{`${tr('rep.geste.choisir')} ${v.question.nom || ''}`.trim()}</Bouton> : v.question && v.question.geste ? <span>{v.question.geste}</span> : null}
+                        <Bouton variante="discret" data-repub-verif-retirer={a.id} onClick={() => retirerDeLaFile(a.id)}>{tr('rep.verif.retirer')}</Bouton>
+                      </div>}
+                    </div>); })()}
                   {s.question && (s.etat === 'echec' || s.etat === 'a-refaire') && mode !== 'run' && !(recree && mode === 'fini') && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-question={s.question.champ} onClick={() => repondreLigne(a)}>{`${tr('rep.geste.choisir')} ${s.question.nom || ''}`.trim()}</Bouton></div>}
                   {(() => { const g = !s.question && reprendre && mode !== 'run' && !(recree && mode === 'fini') ? gesteProbleme(s, prog[String(a.id)], peutGestes) : null; return g && (g.geste === 'reprendre' || g.geste === 'refaire') ? <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-reprendre-ligne={a.id} data-repub-geste={g.geste} onClick={() => gesteLigne(a, g.geste)}>{tr('rep.geste.' + g.geste)}</Bouton></div> : null; })()}
                   {s.etat === 'a-refaire' && refaire && !reprendre && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
@@ -2319,7 +2383,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
             <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
-            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucun article à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>
+            {(() => { const lp = verifActif ? lancerPermis(aFaire.map((x) => String(x.id)), verif, verifEnCours) : { ok: true };
+              return <Bouton variante="primaire" data-republier-lancer data-repub-lancer-verif={lp.ok ? 'ok' : lp.raison} disabled={!ok || !aFaire.length || !lp.ok} title={!aFaire.length ? 'Aucun article à envoyer' : !lp.ok ? (lp.raison === 'a-corriger' ? tr('rep.verif.bloque', { n: lp.n }) : lp.raison === 'verification' ? tr('rep.verif.encours', { n: aFaire.length }) : tr('rep.verif.toutesAbsentes')) : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>; })()}
           </>}
           {mode === 'run' && <>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted }}>Garde cette fenêtre ouverte.</span>

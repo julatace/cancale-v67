@@ -13913,7 +13913,14 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedPage(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
-  if (!r || !r.ok) { noterDiag('tailles_lecture_ratee_' + ((r && r.status) || 0)); return { raison: "Vinted n'a pas rendu la liste des tailles" }; }
+  if (!r || !r.ok) {
+    noterDiag('tailles_lecture_ratee_' + ((r && r.status) || 0));
+    // 5.410 (`repubverif`) Vinted REFUSE la catégorie elle-même (champ nommé dans son refus) : elle n'existe plus ou n'est pas
+    // une catégorie finale — dit, jamais devinée. Tout autre refus reste « liste pas lue ».
+    const errs = r && r.json && Array.isArray(r.json.errors) ? r.json.errors : [];
+    const surCat = r && (r.status === 400 || r.status === 422) && errs.some((e) => /^(category|catalog_id|catalog)$/.test(String((e && (e.field || e.name)) || '')));
+    return { raison: "Vinted n'a pas rendu la liste des tailles", status: (r && r.status) || 0, ...(surCat ? { categorieRefusee: true } : {}) };
+  }
   try { echantillonRate('tailles_reponse_forme', cat, JSON.stringify(formeJson(r.json)).slice(0, 1500)); } catch (_) {}
   const options = optionsTailleDe(r.json);
   const requis = codesRequis(r.json);
@@ -16173,6 +16180,75 @@ async function apprendreRecetteVinted(acc, uid, id) {
   const rf = recetteFidele(it);
   if (rf && rf.ecartes.length) noterDiag('recette_champs_inconnus');
   return rf ? { ...f, recette: rf } : f;
+}
+// ══ 5.410 (`repubverif`, 20 nov.) — LE CONTRÔLE AVANT DE LANCER ══════════════════════════════════
+// Julien : « plus d'intelligence, même dans la republication, car les catégories sont parfois mal
+// remplies et ça bloque côté Vinted ». Mesuré (compteurs de l'extension chez lui, 20 nov.) : refus de
+// Vinted nommant la taille ×10 (+ photos et taille ×1), les photos ×7, la description ×2.
+// SUR SON CLIC (l'atelier, étape « Envoi »), AVANT qu'il lance : pour chaque annonce choisie, VRM LIT
+// chez Vinted (onglet du compte, budget de LECTURE, une à la fois) le formulaire de l'annonce en ligne —
+// celui que le brouillon recopiera tel quel (`repubfidele`) — puis le juge contre ce que Vinted sert
+// (grille de la catégorie : tailles, champs obligatoires ; catégorie refusée par Vinted) :
+//   · ok          — rien à faire ;
+//   · corrige     — corrigé depuis une donnée SÛRE (taille au même libellé dans la grille de Vinted,
+//                   champ repris de CETTE annonce) : montré dans le récapitulatif, appliqué au départ ;
+//   · a-corriger  — il manque quelque chose que VRM ne peut pas déduire : UNE question (valeurs de Vinted),
+//                   sa réponse revient ici (`reponses`) ; l'atelier ne lance pas tant qu'il en reste ;
+//   · absente     — Vinted dit qu'elle n'existe plus : elle ne part pas ;
+//   · pas-verifie — lecture impossible (budget, onglet, réponse inconnue) : dite, vérifiée au départ comme avant.
+// AUCUN geste chez Vinted, aucune écriture, aucun « secours » : c'est une lecture. Le budget de lecture est
+// GARDÉ pour la republication elle-même (une lecture par annonce au départ) : au-delà, « pas vérifiée ».
+const VERIF_REPUB_MAX = 30;
+async function lecturesFaitesHeure(uid) {
+  try { const t = Date.now(); return ((((await chrome.storage.local.get('vrmLectures')).vrmLectures) || {})[String(uid)] || []).filter((x) => t - x < 3600000).length; } catch (_) { return LECTURES_MAX_HEURE; }
+}
+async function verifierRepub(msg) {
+  const uid = String((msg && msg.uid) || '');
+  const ids = Array.isArray(msg && msg.ids) ? [...new Set(msg.ids.map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, VERIF_REPUB_MAX) : [];
+  if (!/^\d+$/.test(uid) || !ids.length) return { accepte: false, code: 'invalide', raison: 'rien à vérifier' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const stop0 = await gardeStricte(uid, acc, { lecture: true });
+  if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  const reponses = msg.reponses && typeof msg.reponses === 'object' && !Array.isArray(msg.reponses) ? msg.reponses : {};
+  const total = Number.isInteger(msg.total) && msg.total > 0 ? Math.min(msg.total, 60) : ids.length;
+  // Une lecture par annonce GARDÉE pour le départ de chacune (au plus 10 dans l'heure).
+  let permis = Math.max(0, LECTURES_MAX_HEURE - (await lecturesFaitesHeure(uid)) - Math.min(total, 10));
+  const paires = []; let arret = '';
+  for (const id of ids) {
+    if (!arret && permis <= 0) arret = 'budget';
+    if (arret) { paires.push({ id, etat: 'pas-verifie', raison: arret === 'budget' ? 'pas vérifiée maintenant : VRM garde ses lectures de Vinted pour la republication elle-même — elle sera vérifiée à son départ (rien ne part si elle est incomplète)' : arret }); continue; }
+    let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=p:data->photos`); } catch (_) { coffre = null; }
+    const nPh = Array.isArray(coffre) ? (coffre[0] && Array.isArray(coffre[0].p) ? coffre[0].p.filter((u) => /^https:\/\/images\d*\.vinted\.net\//i.test(String(u))).length : 0) : null;
+    permis--;
+    const appris = await avecVinted(() => apprendreRecetteVinted(acc, uid, id));
+    if (appris && appris.sansPage) return { accepte: false, code: 'onglet-vinted', raison: appris.raison };
+    if (appris && (appris.status === 404 || appris.status === 410)) { paires.push({ id, etat: 'absente', raison: "Vinted dit que cette annonce n'existe plus (vendue ou supprimée) : elle ne sera pas republiée" }); continue; }
+    if (!appris || !appris.recette) {
+      const r0 = (appris && appris.raison) || "Vinted n'a pas répondu";
+      paires.push({ id, etat: 'pas-verifie', raison: `pas vérifiée : ${r0}` });
+      if (!(appris && (appris.status || appris.vu))) arret = `pas vérifiée : ${r0}`;   // garde ou budget : les suivantes non plus
+      continue;
+    }
+    const it = (itemPourRecreer({ codes: appris.codes, vivant: appris.codes, recette: appris.recette, titre: 'x', prix: 1, description: String(appris.description || ''), photoIds: [1], temp: 'x', partiel: true }) || {}).item;
+    if (!it) { paires.push({ id, etat: 'pas-verifie', raison: 'pas vérifiée : forme inconnue' }); continue; }
+    const tailleDe = (x) => JSON.stringify((Array.isArray(x.item_attributes) ? x.item_attributes : []).find((a) => a && a.code === 'size') || null);
+    const t0 = tailleDe(it);
+    const rep = reponses[id] && typeof reponses[id] === 'object' ? reponses[id] : null;
+    const rg = await reglerAvant(uid, acc, it, [id], rep, { id });
+    const g = Number(it.catalog_id) > 0 ? await grilleTailles(uid, acc, it.catalog_id, { cacheSeul: true }) : null;
+    const corrections = [];
+    if (tailleDe(it) !== t0 && !(rep && rep.size)) corrections.push({ champ: 'size', nom: 'la taille', raison: "sa taille n'est plus dans la grille de Vinted pour cette catégorie : la même taille (même libellé) de la grille d'aujourd'hui est posée" });
+    for (const c of rg.completes) corrections.push({ champ: c, nom: NOM_QUESTION[c] || c, raison: 'repris de cette même annonce' });
+    const manque = rg.manque.slice(); let question = rg.question;
+    if (g && g.categorieRefusee && !(rep && rep.catalog_id)) { manque.unshift('la catégorie (Vinted ne la propose plus)'); question = await questionRepub(uid, it, ['catalog_id'], { id }); }
+    if (nPh === 0) manque.push("les photos (aucune n'est sauvegardée : passe sur l'annonce dans Vinted une fois)");
+    const etat = manque.length ? 'a-corriger' : corrections.length ? 'corrige' : 'ok';
+    noterDiag('repub_verif_' + etat.replace('-', '_'));
+    paires.push({ id, etat, corrections, manque, question: manque.length && question ? question : null, ...(rep ? { reponses: rg.reponses } : {}), ...(appris.recette.ecartes.length ? { champsInconnus: appris.recette.ecartes.length } : {}) });
+  }
+  return { accepte: true, etape: 'fait', paires, at: Date.now() };
 }
 // (28 oct., sa demande : « une barre de progression ») Chaque étape d'une
 // recréation est annoncée à l'app (`maj · repub`) : elle dessine la barre. Une
@@ -21843,6 +21919,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await avecTemoinRepub(() => refaireBrouillon(msg)); await journalCommande(msg, r); return r; }
   // 17 nov. (5.408) : « Reprendre » une republication interrompue, sur son clic (voir `reprendreRepub`).
   if (msg && msg.cmd === 'reprendreRepub') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => reprendreRepub(msg))); await journalCommande(msg, r); return r; }
+  // 20 nov. (5.410, `repubverif`) : le contrôle AVANT de lancer (lecture seule, sur son clic, voir `verifierRepub`).
+  if (msg && msg.cmd === 'verifierRepub') return await verifierRepub(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
