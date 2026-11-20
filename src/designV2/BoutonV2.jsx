@@ -18,52 +18,36 @@
 //  Libellé : un verbe + un objet + le bon nombre (« Imprimer 5 bordereaux ») — jamais « OK » seul.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { Bouton, BoutonIcone } from '../natif/Bouton.jsx';
 import './design-v2.css';
 import './argent-v2.css';   // (17 nov., phase 2) Argent, Paramètres et la tête de la coque (allumé seulement) — ici et pas dans App.jsx : audit-studio S3
 
 const ROLES = new Set(['principal', 'secondaire', 'texte', 'destructif']);
 
-function Roue() {
-  return <span className="v2b-roue" aria-hidden="true"><span/></span>;
-}
-
-// `onClick` peut rendre une promesse : tant qu'elle court, le bouton est « en cours » (et refuse un second toucher).
+// (20 nov., chantier « boutons natifs ») BoutonV2 et BoutonIconeV2 DESSINENT LE BOUTON NATIF (src/natif/Bouton.jsx) :
+// principal → plein · secondaire → teinte · texte → texte · destructif → texte AMBRE derrière SA confirmation (inchangée).
+// Les data-v2b* restent posés (les bancs du design v2 désignent leurs boutons par eux).
+const VERS_NATIF = { principal: 'plein', secondaire: 'teinte', texte: 'texte', destructif: 'texte' };
 export function BoutonV2({ role = 'secondaire', icone = null, n = null, children, onClick, raison = '', indisponible = false,
   chargement = false, confirmer = null, plein = false, compact = false, className = '', attrs = {}, type = 'button', titre = '' }) {
   const r = ROLES.has(role) ? role : 'secondaire';
-  const [enCours, setEnCours] = React.useState(false);
-  const occupe = chargement || enCours;
-  const idRaison = React.useId();
   const toucher = async (e) => {
-    if (indisponible || occupe) { e.preventDefault(); return; }
     // Le destructif ne part jamais sans SA confirmation (une fonction qui rend vrai/faux, ou une promesse).
     if (r === 'destructif') { if (typeof confirmer !== 'function') return; const ok = await confirmer(); if (!ok) return; }
     if (typeof onClick !== 'function') return;
-    const res = onClick(e);
-    if (res && typeof res.then === 'function') { setEnCours(true); try { await res; } finally { setEnCours(false); } }
+    return onClick(e);
   };
-  const cls = ['v2b', 'v2b-' + r, plein ? 'v2b-plein-largeur' : '', compact ? 'v2b-compact' : '', className].filter(Boolean).join(' ');
   return (
-    <span className={'v2b-hote' + (plein ? ' v2b-hote-plein' : '')} data-v2b-hote="">
-      <button type={type} className={cls} data-v2b={r} data-v2b-etat={indisponible ? 'indisponible' : occupe ? 'chargement' : 'repos'}
-        aria-disabled={indisponible || occupe ? 'true' : undefined} aria-busy={occupe ? 'true' : undefined}
-        aria-describedby={indisponible && raison ? idRaison : undefined} title={titre || undefined} onClick={toucher} {...attrs}>
-        {occupe ? <Roue/> : icone ? <span className="v2b-ic" aria-hidden="true">{icone}</span> : null}
-        <span className="v2b-lib">{children}</span>
-        {n != null && n !== '' ? <span className="v2b-n" aria-hidden="true">{n}</span> : null}
-      </button>
-      {indisponible && raison ? <span className="v2b-raison" id={idRaison} data-v2b-raison="">{raison}</span> : null}
-    </span>
+    <Bouton variante={VERS_NATIF[r]} ton={r === 'destructif' ? 'ambre' : ''} ajuste={!plein} large={plein} bloc="contenu" taille={compact ? 'compact' : 'normal'}
+      icone={icone} chargement={chargement} indisponible={indisponible} raison={raison} type={type} className={className} onClick={toucher}
+      attrs={{ 'data-v2b': r, 'data-v2b-etat': indisponible ? 'indisponible' : chargement ? 'chargement' : 'repos', title: titre || undefined, ...attrs }}>
+      {children}{n != null && n !== '' ? <span className="n-bouton-nombre" aria-hidden="true">{n}</span> : null}
+    </Bouton>
   );
 }
 
 export function BoutonIconeV2({ icone, label, onClick, attrs = {}, actif = false }) {
-  return (
-    <button type="button" className={'v2b v2b-icone' + (actif ? ' is-actif' : '')} data-v2b="icone" aria-label={label} title={label}
-      aria-pressed={actif ? 'true' : undefined} onClick={onClick} {...attrs}>
-      <span className="v2b-ic" aria-hidden="true">{icone}</span>
-    </button>
-  );
+  return <BoutonIcone libelle={label} icone={icone} onClick={onClick} actif={actif} attrs={{ 'data-v2b': 'icone', ...attrs }}/>;
 }
 
 // Une rangée ENTIÈRE qui se touche (liste iOS) : pas un bouton dans la rangée, la rangée elle-même.

@@ -207,9 +207,11 @@ function mesurer({ tel, mut }) {
   return { boutons: out, pleins, dialogues: dialogues.length };
 }
 
-const ATTENTE = Number(process.env.ATTENTE || 1600);
+const ATTENTE = Number(process.env.ATTENTE || 2500);
 async function ouvrirEcran(nav, W, sombre, ec) {
   const o = await P.ouvrir(nav, { W, sombre, b: E.baseFiches(), url: '/' + ec.url, api: B.apiVolume });
+  // Comme fiche-directe : le 1er chargement pose ses réglages d'arrivée, le 2e est l'app telle qu'il la voit chaque jour
+  // (sans ce rechargement, la coque montre encore l'écran d'avant — mesuré : « Ma journée » au lieu d'« Aujourd'hui »).
   await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
   await P.pret(o.pg);
@@ -268,39 +270,57 @@ async function planche(nav, resultats) {
   await pg.goto('file://' + f); await pg.screenshot({ path: path.join(SORTIE, 'planche-pires.png'), fullPage: true }); await ctx.close();
 }
 
-if (require.main === module) (async () => {
+function ecrire(resultats) {
+  const resumes = resultats.map(resumer);
+  const { md, tot } = tableau(resumes);
+  fs.writeFileSync(path.join(SORTIE, 'inventaire.md'), `# Inventaire des boutons (${new Date().toISOString().slice(0, 16)}, ${process.env.BANC_DIST || 'dist'})\n\n${md}\n\nDéfauts : ${Object.entries(NOMS_D).map(([k, v]) => k + ' ' + v).join(' · ')}\n`);
+  fs.writeFileSync(path.join(SORTIE, 'inventaire.json'), JSON.stringify(resultats, null, 1));
+  return { md, tot };
+}
+
+// `node boutons-inventaire.cjs --fusion d1 d2 …` : un seul tableau et une seule planche pour plusieurs passages
+// (une largeur et un thème par passage tiennent chacun sous 15 min).
+async function fusion(dossiers) {
+  const resultats = dossiers.flatMap((d) => { try { return JSON.parse(fs.readFileSync(path.join(d, 'inventaire.json'), 'utf8')); } catch (_) { return []; } });
+  const { md, tot } = ecrire(resultats);
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  try { await planche(nav, resultats); } finally { await nav.close(); }
+  console.log(md + `\n\nTOTAL : ${tot.total} boutons · ${tot.natifs} natifs · ${tot.anciens} anciens · défauts ${JSON.stringify(tot.d)}\nSorties : ${SORTIE}`);
+}
+
+if (require.main === module && process.argv[2] === '--fusion') fusion(process.argv.slice(3));
+else if (require.main === module) (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   const resultats = [];
+  const garder = (r) => { resultats.push(r); ecrire(resultats); return resumer(r); };
   try {
     for (const W of LARGEURS) for (const th of THEMES) for (const ec of ECRANS) {
       const tel = W < 600; const sombre = th === 'sombre';
       let o;
       try {
         o = await ouvrirEcran(nav, W, sombre, ec);
-        const r = await releve(o, ec.cle, W, th, tel); resultats.push(r);
-        const s = resumer(r);
+        const r = await releve(o, ec.cle, W, th, tel);
+        const s = garder(r);
         console.log(`· ${ec.cle} ${W} ${th} : ${s.total} boutons, ${s.anciens} anciens, défauts ${JSON.stringify(s.parDefaut)}${s.manque ? ' ⚠️ ' + s.manque : ''}${r.erreurs.length ? ' ❌ erreurs ' + r.erreurs.join(' / ') : ''}`);
         // Les sous-pages de Paramètres : chaque rangée de la liste qui pousse une page.
         if (ec.sousPages) {
-          const n = await o.pg.evaluate(() => [...document.querySelectorAll('#vrm-contenu .n-rangee[data-n-fin="chevron"], #vrm-contenu [data-reglages-entree], #vrm-contenu [data-param-section], #vrm-contenu .v2-pm-rangee, #vrm-contenu .vrm-pm-cat-ligne')].filter((x) => x.getClientRects().length).length);
-          for (let i = 0; i < Math.min(n, Number(process.env.MAX_SOUS || 14)); i++) {
+          const SEL_SOUS = '#vrm-contenu .n-rangee[data-n-fin="chevron"], #vrm-contenu [data-reglages-entree], #vrm-contenu [data-param-section], #vrm-contenu .v2-pm-rangee, #vrm-contenu .vrm-pm-cat-ligne';
+          const n = await o.pg.evaluate((sel) => [...document.querySelectorAll(sel)].filter((x) => x.getClientRects().length).length, SEL_SOUS);
+          for (let i = tel ? 0 : 1; i < Math.min(n, Number(process.env.MAX_SOUS || 6)); i++) {
             const o2 = await ouvrirEcran(nav, W, sombre, ec);
-            const cible = o2.pg.locator('#vrm-contenu .n-rangee[data-n-fin="chevron"], #vrm-contenu [data-reglages-entree], #vrm-contenu [data-param-section], #vrm-contenu .v2-pm-rangee, #vrm-contenu .vrm-pm-cat-ligne').nth(i);
+            const cible = o2.pg.locator(SEL_SOUS).nth(i);
             const nomSous = ((await cible.innerText().catch(() => '')) || String(i)).split('\n')[0].trim().toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ]+/g, '-').slice(0, 24);
             await cible.click({ timeout: 4000 }).catch(() => {}); await o2.pg.waitForTimeout(ATTENTE);
-            const r2 = await releve(o2, 'parametres.' + nomSous, W, th, tel); resultats.push(r2);
-            const s2 = resumer(r2); console.log(`  · ${r2.ecran} : ${s2.total} boutons, ${s2.anciens} anciens, défauts ${JSON.stringify(s2.parDefaut)}`);
+            const r2 = await releve(o2, 'parametres.' + nomSous, W, th, tel);
+            const s2 = garder(r2); console.log(`  · ${r2.ecran} : ${s2.total} boutons, ${s2.anciens} anciens, défauts ${JSON.stringify(s2.parDefaut)}`);
             await o2.ctx.close();
           }
         }
       } catch (e) { console.log(`❌ ${ec.cle} ${W} ${th} : ${String(e.message || e).slice(0, 200)}`); }
       if (o) await o.ctx.close();
     }
-    const resumes = resultats.map(resumer);
-    const { md, tot } = tableau(resumes);
-    fs.writeFileSync(path.join(SORTIE, 'inventaire.md'), `# Inventaire des boutons (${new Date().toISOString().slice(0, 16)}, ${process.env.BANC_DIST || 'dist'})\n\n${md}\n\nDéfauts : ${Object.entries(NOMS_D).map(([k, v]) => k + ' ' + v).join(' · ')}\n`);
-    fs.writeFileSync(path.join(SORTIE, 'inventaire.json'), JSON.stringify(resultats.map((r) => ({ ...r, boutons: r.boutons.map(({ png, ...b }) => b) })), null, 1));
+    const { md, tot } = ecrire(resultats);
     await planche(nav, resultats);
     console.log('\n' + md);
     console.log(`\nTOTAL : ${tot.total} boutons · ${tot.natifs} natifs · ${tot.anciens} anciens · défauts ${JSON.stringify(tot.d)}`);

@@ -48,6 +48,13 @@
   .n-bouton[data-n-variante="texte"][aria-disabled="true"],
   .n-bouton[data-n-variante="destructif"][aria-disabled="true"] { background: transparent; }
   .n-bouton[aria-busy="true"] { cursor: progress; }
+  /* Compact (un tableau, une barre d'outils) : 44 au doigt, 32 à la souris (ci-dessous, pointer: fine). */
+  .n-bouton[data-n-taille="compact"] { padding: 6px 12px; font: var(--n-t-second-fort); }
+  .n-bouton-raison[data-n-resultat="echec"] { color: var(--n-ambre); }
+  .n-bouton-bloc[data-n-bloc="contenu"] { display: contents; }
+  .n-bouton-nombre { font-variant-numeric: tabular-nums; }
+  .n-bouton[data-n-ton="ambre"] { color: var(--n-ambre); }
+  .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { background: var(--n-ambre-fond); }
   .n-bouton-icone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 0; }
   .n-bouton-libelle { min-width: 0; overflow-wrap: anywhere; }
   .n-bouton-raison { font: var(--n-t-legende); color: var(--n-encre-2); text-align: center; padding: 0 8px; }
@@ -581,6 +588,8 @@
 
   /* ── le survol, seulement là où il existe (souris) ──────────────────────── */
   @media (hover: hover) and (pointer: fine) {
+    .n-bouton[data-n-taille="compact"] { min-height: 32px; min-width: 32px; }
+    .n-bouton-icone-seule[data-n-taille="compact"] { width: 32px; height: 32px; }
     .n-rangee[data-n-touche] .n-rangee-corps:hover::after { opacity: .5; }
     .n-rangee[data-n-selection] .n-rangee-corps:hover::after { opacity: 1; }
     .n-laterale-entree:hover, .n-laterale-compte:hover { background: var(--n-appui); }

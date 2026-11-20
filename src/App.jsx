@@ -16464,9 +16464,12 @@ function Btn({children,onClick,color,small,danger,outline,disabled,primaire:prim
   const primaire = !!primaireDemande && !outline && !danger;
   // (10 nov., lot P — VoiceOver) Un `Btn` sans texte (une icône seule) prend son `title` pour nom lu.
   const nomLu = !rest['aria-label'] && !rest['aria-labelledby'] && typeof rest.title === 'string' && rest.title.trim() && !aDuTexte(children) ? { 'aria-label': rest.title.trim() } : null;
+  // (20 nov., chantier « boutons natifs ») Le dessin natif, par `Bouton` (BoutonBase → src/natif/Bouton.jsx) : un
+  // `danger` est un texte ambre (sa confirmation reste celle de l'écran), `small` le compact (32 souris / 44 doigt).
+  const st = style && Object.keys(style).length ? { style } : null;
   return (
-    <button data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} type="button" onClick={onClick} disabled={!!disabled} {...rest} {...nomLu}
-      className={`vrm-b vrm-b-${primaire ? 'primaire' : 'secondaire'}${small ? ' vrm-b-petit' : ''}${className ? ' ' + className : ''}`} style={style}>{children}</button>
+    <Bouton variante={primaire ? 'primaire' : danger ? 'danger' : 'secondaire'} taille={small ? 'petit' : undefined} onClick={onClick} disabled={!!disabled}
+      data-vrm-tone={danger ? 'danger' : color ? 'custom' : 'brand'} {...rest} {...nomLu} {...st} className={className}>{children}</Bouton>
   );
 }
 // ⟦→ ecrans/Compta.jsx #15⟧
