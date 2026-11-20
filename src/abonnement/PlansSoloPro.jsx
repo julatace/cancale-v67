@@ -27,6 +27,7 @@ import { abonnementPublie, publierAbonnement, suivreAbonnement } from './etatAbo
 import { reglePlanCourante, suivrePlan } from './planVentes.js';
 import { APERCU_LIGNES, bloquerGestes } from './apercu.js';
 import './plans.css';
+import { Bouton as BoutonNatif } from '../natif/Bouton.jsx';
 
 const dateLongue = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
 const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) || '');
@@ -253,7 +254,7 @@ export function BandeauCompteVendeur({ comptes, ventes, autres, enTete }) {
         <span className="vrm-bandeau-abo-texte">{p === 'vinted'
           ? <>Ton offre Solo : choisis le compte qui vend. Tant que tu n'as pas choisi, tous tes comptes comptent.</>
           : <>Ton offre Solo : choisis le compte qui vend sur {nomP}. Tant que tu n'as pas choisi, tous tes comptes {nomP} comptent.</>}</span>
-        <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => setOuvert(p)}>Choisir</button>
+        <BoutonNatif variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={() => setOuvert(p)}>Choisir</BoutonNatif>
       </div>
     )}
     {ouvert === 'vinted' && <QuelCompteVend comptes={comptes} ventes={ventes} enTete={enTete} onFerme={() => setOuvert('')}/>}

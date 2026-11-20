@@ -2,6 +2,7 @@
 export default {
   "natif.bouton.confirmer": "Zum Bestätigen erneut tippen",
   "natif.bouton.echec": "Das hat nicht geklappt. Versuch es noch einmal.",
+  "natif.bouton.enCours": "Warte, bis die laufende Aktion fertig ist.",
   "natif.plaque.prefixe": "Nr.",
   "natif.plaque.numero": "Nummer {numero}",
   "natif.plaque.doublon": "Nummer {numero}, zweimal vergeben",

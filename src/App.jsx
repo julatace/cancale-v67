@@ -21838,7 +21838,7 @@ function BandeauSuppressionPrevue({ tab }) {
   return (
     <div data-bandeau-suppression={p.effaceLe} role="status" className="vrm-bandeau-abo">
       <span className="vrm-bandeau-abo-texte">Ton compte sera supprimé le {quand}. Rien n’est effacé d’ici là.</span>
-      <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={annuler} disabled={occupe} data-bandeau-suppression-annuler="">{occupe ? 'Annulation…' : 'Annuler la suppression'}</button>
+      <Natif.Bouton variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={annuler} chargement={occupe} attrs={{'data-bandeau-suppression-annuler':''}}>{occupe ? 'Annulation…' : 'Annuler la suppression'}</Natif.Bouton>
     </div>
   );
 }
@@ -21932,7 +21932,7 @@ function BandeauAbonnement({ setTab }) {
   return (
     <div data-bandeau-abonnement="essai" data-essai-jours={r.jours} data-seuil={r.seuil} role="status" className="vrm-bandeau-abo">
       <span className="vrm-bandeau-abo-texte">{r.texte}</span>
-      <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>Gérer</button>
+      <Natif.Bouton variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={() => voirAbonnement(setTab)}>Gérer</Natif.Bouton>
       <button type="button" className="vrm-bandeau-abo-fermer" aria-label="Masquer pour aujourd'hui" onClick={() => { try { localStorage.setItem(cleRappelEssai(uid, r.seuil), jourParis()); } catch (_) {} setFerme(1); }}>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m2.5 2.5 7 7m0-7-7 7"/></svg>
       </button>
@@ -53176,8 +53176,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
-        {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <button type="button" className="vrm-icon-control vrm-achats-selection" data-serie-ouvrir={serieAchats.nom} aria-label={tr('achats.selectionner')} title={tr('achats.selectionner')} onClick={()=>serieAchats.ouvrir()}><Icon name="check" size={20}/></button> : null}
-        {!baseKO && <button type="button" className="vrm-icon-control vrm-achats-plus" data-achats-plus={achatsOutilsOuverts?'ouvert':'ferme'} aria-expanded={achatsOutilsOuverts} aria-controls="vrm-achats-outils" aria-label={tr('achats.plusFournisseursDelai')} title={tr('achats.fournisseursDelaiLots')} onClick={()=>setAchatsOutilsOuverts(v=>!v)}><Icon name="more" size={20}/></button>}
+        {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <Natif.BoutonIcone libelle={tr('achats.selectionner')} icone={<Icon name="check" size={20}/>} className="vrm-achats-selection" onClick={()=>serieAchats.ouvrir()} attrs={{'data-serie-ouvrir':serieAchats.nom}}/> : null}
+        {!baseKO && <Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/>}
         </div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
@@ -54493,9 +54493,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   <a className="vrm-buy-quick" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" title={tr('achats.suivreColis', { carrierName: String(carrierName(tk.carrier)), suivi: String(suivi) })} aria-label={tr('achats.suivreColis2')} style={{color:C.muted}}><Icon name="truck" size={16}/></a>
                 )}
                 {peutCode && (
-                  <button className="vrm-icon-control vrm-buy-quick" type="button" onClick={()=>openQrView(tk)} title={tr('achats.codeRetrait')} aria-label={tr('achats.codeRetrait')} style={{color:C.warn}}><Icon name="key" size={16}/></button>
+                  <Natif.BoutonIcone libelle={tr('achats.codeRetrait')} icone={<Icon name="key" size={20}/>} className="vrm-buy-quick" onClick={()=>openQrView(tk)}/>
                 )}
-                <button className="vrm-icon-control vrm-buy-more" type="button" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} title={tr('achats.codeRetraitSuivi')} aria-label={tr('achats.plusActionsAchat')} aria-haspopup="menu" style={{color:achatMenu===tid?C.accent:C.muted,background:achatMenu===tid?`${C.accent}12`:'transparent'}}>⋯</button>
+                <Natif.BoutonIcone libelle={tr('achats.plusActionsAchat')} icone={<Icon name="more" size={20}/>} actif={achatMenu===tid} className="vrm-buy-more" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} attrs={{'aria-haspopup':'menu',title:tr('achats.codeRetraitSuivi')}}/>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>

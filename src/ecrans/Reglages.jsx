@@ -169,6 +169,8 @@ import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composants du design du 17 nov. (le SEUL depuis le 19 nov.)
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
+import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -2570,18 +2572,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
         <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerSous} data-sous-retour="" aria-label={titreRetour}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
+          <BoutonIconeNatif libelle={titreRetour} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerSous} attrs={{ 'data-sous-retour': '' }}/>
           <span className="vg-pm-nav-txt"><small aria-hidden="true">{titreRetour}</small><h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2></span>
           <StatutSauvegardeReglages/>
         </div>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
         <div className="vrm-set-nav vg-pm-nav">
-          <button type="button" className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} data-categorie-retour="" aria-label={tr('ecran.settings')}>
-            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>
-          </button>
+          <BoutonIconeNatif libelle={tr('ecran.settings')} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '' }}/>
           <span className="vg-pm-nav-txt"><small aria-hidden="true">{tr('ecran.settings')}</small><h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2></span>
           <StatutSauvegardeReglages/>
         </div>

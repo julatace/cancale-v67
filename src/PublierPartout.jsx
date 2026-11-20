@@ -18,6 +18,8 @@ import './styles-annonces-outils.css';
 import './styles-publier-partout.css';
 import CorrespondanceSite from './CorrespondancesPartout.jsx';
 import { texteFiche } from './correspondances.js';   // (15 nov.) catégorie Vinted → celle de chaque site
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')} €`);
 const ETAT_CLE = { envoi: 'partout.etat.envoi', attente: 'partout.etat.attente', publie: 'partout.etat.publie', 'publie-relu': 'partout.etat.relu', 'a-finir': 'partout.etat.aFinir', refuse: 'partout.etat.refuse', 'pas-envoye': 'partout.etat.pasEnvoye' };
@@ -288,7 +290,7 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
         <header className="vrm-ao-tete">
           <h2>{tr('partout.titre')}</h2>
           {seul && liste[0].num ? <span className="vrm-ao-num">N°{liste[0].num}</span> : liste.length > 1 ? <span className="vrm-ao-num" data-pp-n={liste.length}>{tr('partout.nAnnonces', { n: liste.length })}</span> : null}
-          <button type="button" className="vrm-ao-x" aria-label={tr('partout.fermer')} data-pp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
+          <BoutonIconeNatif libelle={tr('partout.fermer')} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} indisponible={!!(enCours)} raison={tr('natif.bouton.enCours')} attrs={{ 'data-pp-fermer': "" }}/>
         </header>
         <p className="vrm-pp-source" data-pp-source=""><LogoSite site="vinted"/>{tr('partout.source')}</p>
         {exclues > 0 ? <p className="vrm-pp-garde" data-pp-exclues={exclues}>{tr('partout.exclues', { n: exclues })}</p> : null}

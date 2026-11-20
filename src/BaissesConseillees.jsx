@@ -11,6 +11,8 @@ import { tr, monnaie } from './i18n/index.js';
 import { texteRaisons, resumeConseils } from './baisseConseillee.js';
 import './styles-annonces-outils.css';
 import './styles-vendre-plus.css';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eur = (v) => (v == null || !Number.isFinite(Number(v)) ? '—' : monnaie(Number(v), 'EUR', Number.isInteger(Number(v)) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : undefined));
 
@@ -47,7 +49,7 @@ export default function BaissesConseillees({ lignes = null, ventesLues = true, o
       <div className="vrm-ao-feuille vrm-bc" role="dialog" aria-modal="true" aria-label={tr('bc.titre')}>
         <header className="vrm-ao-tete">
           <h2>{tr('bc.titre')}</h2>
-          <button type="button" className="vrm-ao-x" aria-label={tr('bc.fermer')} data-bc-fermer="" onClick={onFermer}>×</button>
+          <BoutonIconeNatif libelle={tr('bc.fermer')} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} attrs={{ 'data-bc-fermer': "" }}/>
         </header>
         <p className="vrm-bc-resume" data-bc-resume={`${R.baisser}/${R.garder}/${R.achat}`}>
           {[R.baisser ? tr('bc.resume.baisser', { n: R.baisser }) : '', R.garder ? tr('bc.resume.garder', { n: R.garder }) : '', R.achat ? tr('bc.resume.achat', { n: R.achat }) : ''].filter(Boolean).join(' · ')}

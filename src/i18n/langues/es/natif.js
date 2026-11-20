@@ -2,6 +2,7 @@
 export default {
   "natif.bouton.confirmer": "Toca otra vez para confirmar",
   "natif.bouton.echec": "No ha funcionado. Inténtalo de nuevo.",
+  "natif.bouton.enCours": "Espera a que termine la acción en curso.",
   "natif.plaque.prefixe": "N.º",
   "natif.plaque.numero": "Número {numero}",
   "natif.plaque.doublon": "Número {numero}, usado por dos artículos",
