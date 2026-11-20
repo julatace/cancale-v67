@@ -308,27 +308,6 @@ async function passe(b, vp, sombre) {
   await essaie(`${T} QLH`, async () => {
     const { ctx, pg, errs, tactile } = await ouvrir(b, vp, sombre, base());
     try {
-      // H — hors ligne : l'achat reconnu, le N° attend le réseau.
-      // En ligne d'abord (une arrivée ouverte puis fermée : les écrans et les données sont en mémoire), puis le réseau tombe.
-      await scannerArrivee(pg, tactile);
-      await taper(pg, mr(8));
-      await attendreArrivee(pg); await fermerArrivee(pg);
-      await scannerArrivee(pg, tactile);
-      await ctx.setOffline(true);
-      await pg.evaluate(() => window.dispatchEvent(new Event('offline')));
-      await taper(pg, mr(7));
-      if (process.env.DEBUG_H) console.log('     (H : ' + await pg.evaluate(() => location.search + ' · onglets ' + [...document.querySelectorAll('[data-ecran]')].map((e) => e.getAttribute('data-ecran')).join(',') + ' · ' + ((document.querySelector('[data-scan-r]') || {}).innerText || '').slice(0, 160).replace(/\n/g, ' / ')) + ')');
-      const h = await attendre(async () => { const x = await ecran(pg); return x.ouvert && x.etat ? x : null; }, 15000);
-      dit(!!h && h.tx === '9407' && h.etat === 'horsLigne', `${T} H1 · hors ligne : l’achat reconnu (cache), « le N° attend le réseau »`, h || (await ecran(pg)));
-      await juger(pg, T, 'H1', tactile);
-      await shot(pg, `H1-hors-ligne-${suf}`);
-      const avant = await lireLocal(pg);
-      await toucher(pg, '[data-arv-noter]', tactile);
-      const h2 = await attendre(async () => { const l = await lireLocal(pg); return l.notes['9407'] ? l : null; }, 6000);
-      dit(!!h2 && h2.pool.length === avant.pool.length && !Object.values(h2.fiches).some((f) => f.achat && f.achat.tx === '9407'), `${T} H2 · « Noter l’arrivée » : notée, AUCUN N° donné hors ligne`, h2 && { notes: Object.keys(h2.notes), pool: h2.pool.length });
-      await ctx.setOffline(false);
-      await pg.evaluate(() => window.dispatchEvent(new Event('online')));
-      await fermerArrivee(pg);
       await scannerArrivee(pg, tactile);
       await taper(pg, '48889999');
       const q1 = await pg.getAttribute('[data-arv-scan]', 'data-arv-scan').catch(() => null);
@@ -353,10 +332,34 @@ async function passe(b, vp, sombre) {
       dit(cs.length === 3 && new Set(cs).size === 3 && !cs.includes('-') && !cs.includes('mA:0') && !cs.includes('mA:1'), `${T} L1 · trois cases différentes, jamais une prise`, cs);
       await juger(pg, T, 'L1', tactile);
       await pg.waitForTimeout(1300); await shot(pg, `L1-lot-${suf}`);
+      if (process.env.DEBUG_L) await pg.evaluate(() => { window.__trace = []; const t0 = Date.now(); const f = () => { window.__trace.push((Date.now() - t0) + ':' + Object.keys(JSON.parse(localStorage.getItem('vrm_slots') || '{}')).join('/')); if (Date.now() - t0 < 3000) setTimeout(f, 50); }; f();
+        const o = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k === 'vrm_slots') window.__trace.push('SET ' + (Date.now() - t0) + ' ' + String(v).slice(0, 120) + ' @ ' + (new Error().stack || '').split('\n').slice(2, 5).join(' | ').slice(0, 300)); return o.call(this, k, v); }; });
       await toucher(pg, '[data-arv-ranger]', tactile);
-      const l2 = await attendre(async () => { const l = await lireLocal(pg); const fs2 = Object.values(l.fiches).filter((f) => f.achat && f.achat.tx === String(LOT_TX)); return fs2.length === 3 ? { l, fs2 } : null; }, 10000);
+      if (process.env.DEBUG_L) { await pg.waitForTimeout(3200); const tr0 = await pg.evaluate(() => window.__trace); console.log('     TRACE ' + tr0.filter((x, i, a) => x.startsWith('SET') || i === 0 || (a[i - 1] && x.split(':')[1] !== a[i - 1].split(':')[1])).join(' || ')); }
+      const l2 = await attendre(async () => { const l = await lireLocal(pg); const fs2 = Object.values(l.fiches).filter((f) => f.achat && f.achat.tx === String(LOT_TX)); return fs2.length === 3 && ['13', '14', '15'].every((x) => l.slots[x]) ? { l, fs2 } : null; }, 10000);   // les clés s'écrivent l'une après l'autre
       { const l = await lireLocal(pg); if (!l2 || !['13', '14', '15'].every((x) => l.slots[x])) console.log('     (lot : slots ' + JSON.stringify(l.slots) + ' · fiches ' + JSON.stringify(Object.values(l.fiches).map((f) => [f.numero, f.case, f.achat && f.achat.tx])) + ')'); }
       dit(!!l2 && l2.fs2.map((f) => f.numero).sort().join(',') === '13,14,15' && ['13', '14', '15'].every((n) => l2.l.slots[n]) && l2.fs2.every((f) => f.prixAchat == null), `${T} L2 · « Ranger les 3 paires » : 3 fiches, 3 cases, aucun prix divisé`, l2 && l2.fs2.map((f) => [f.numero, f.prixAchat]));
+      await fermerArrivee(pg);
+      // H — hors ligne : l'achat reconnu, le N° attend le réseau.
+      // En ligne d'abord (une arrivée ouverte puis fermée : les écrans et les données sont en mémoire), puis le réseau tombe.
+      await scannerArrivee(pg, tactile);
+      await taper(pg, mr(8));
+      await attendreArrivee(pg); await fermerArrivee(pg);
+      await scannerArrivee(pg, tactile);
+      await ctx.setOffline(true);
+      await pg.evaluate(() => window.dispatchEvent(new Event('offline')));
+      await taper(pg, mr(7));
+      if (process.env.DEBUG_H) console.log('     (H : ' + await pg.evaluate(() => location.search + ' · onglets ' + [...document.querySelectorAll('[data-ecran]')].map((e) => e.getAttribute('data-ecran')).join(',') + ' · ' + ((document.querySelector('[data-scan-r]') || {}).innerText || '').slice(0, 160).replace(/\n/g, ' / ')) + ')');
+      const h = await attendre(async () => { const x = await ecran(pg); return x.ouvert && x.etat ? x : null; }, 15000);
+      dit(!!h && h.tx === '9407' && h.etat === 'horsLigne', `${T} H1 · hors ligne : l’achat reconnu (cache), « le N° attend le réseau »`, h || (await ecran(pg)));
+      await juger(pg, T, 'H1', tactile);
+      await shot(pg, `H1-hors-ligne-${suf}`);
+      const avant = await lireLocal(pg);
+      await toucher(pg, '[data-arv-noter]', tactile);
+      const h2 = await attendre(async () => { const l = await lireLocal(pg); return l.notes['9407'] ? l : null; }, 6000);
+      dit(!!h2 && h2.pool.length === avant.pool.length && !Object.values(h2.fiches).some((f) => f.achat && f.achat.tx === '9407'), `${T} H2 · « Noter l’arrivée » : notée, AUCUN N° donné hors ligne`, h2 && { notes: Object.keys(h2.notes), pool: h2.pool.length });
+      await ctx.setOffline(false);
+      await pg.evaluate(() => window.dispatchEvent(new Event('online')));
       await fermerArrivee(pg);
       dit(!errs.length, `${T} QLH · aucune erreur de page`, errs[0]);
     } finally { await ctx.close(); }
