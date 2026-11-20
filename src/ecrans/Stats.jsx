@@ -675,7 +675,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
         <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
           <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <Icon name="chevron" size={14}/></label>

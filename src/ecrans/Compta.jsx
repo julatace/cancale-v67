@@ -58,7 +58,8 @@ import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
-import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';
+import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
+import { useOrdinateur } from '../natif/index.js';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
 import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
@@ -893,6 +894,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,argentNav=null}) {
   const designV2 = useDesignV2();   // (17 nov., phase 2) allumé : les segments SOUS le titre, dans l'en-tête (avant les actions)
+  const ordiFac = useOrdinateur();
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -1140,10 +1142,11 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // « Nouvelle facture » sur la ligne du titre, la cloche à droite), la ligne comptes et le segmenté d'Argent, puis UNE
   // recherche (+ « ⋯ » : relire, Excel, ma facture, réglages — les mêmes gestes, la même feuille), UN segmenté
   // En attente · Comptabilisées, la liste (le même tableau) ou un état vide dessiné ; les cartes d'hier dessous.
+  // (20 nov., lot argent-natif) Au téléphone, « Argent » est le grand titre de la coque : l'écran ne le redit pas.
   if (designV2 && argentNav) return (
     <div data-espace="argent" data-argent-factures="" className="v2-fac" style={{padding:16}}>
       <header className="v2-tete-tache v2-tete-argent" data-v2-factures-tete="">
-        <div className="v2-titre-ligne"><h1>{L.argent}</h1>
+        <div className="v2-titre-ligne">{ordiFac ? <h1>{L.argent}</h1> : <span/>}
           <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div>
         {argentNav}
       </header>
@@ -3840,7 +3843,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
-  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice');
+  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice'), qV = Q.find((x) => x.id === 'vendu');
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   // La phrase de l'affiche : la note de la MÊME règle (le manque, les ventes à dater), sinon « au jour du versement ».
   const phrase = qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
@@ -3902,7 +3905,8 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}/>;
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}
+    vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
 // Le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
@@ -4756,7 +4760,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
-      {vue !== 'factures' ? <ScreenHead icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
+      {vue !== 'factures' ? <ScreenHead titreCoque icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
       {vue !== 'factures' && !ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —

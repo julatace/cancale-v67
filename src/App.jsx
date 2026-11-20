@@ -20088,9 +20088,18 @@ function PhraseEcran({ cle, className = '' }) {
   // phrase reste dans la page pour les lecteurs d'écran (`vrm-sr-seul`) : rien de supprimé, rien de deviné.
   return <><p className={'vrm-phrase-ecran vrm-phrase-ecran-aide' + (className ? ' ' + className : '')} data-phrase-ecran={cle}><span className="vrm-sr-seul">{t}</span>{aide}</p>{premiere}</>;
 }
-function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '' }) {
+function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '', titreCoque = false }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
+  // (20 nov., lot argent-natif) `titreCoque` : au téléphone, la COQUE pose le grand titre de l'écran (Argent) ; l'en-tête de
+  // l'écran ne garde que ce qu'il porte dessous (la ligne comptes, le segmenté) — jamais deux titres « Argent ».
+  const ordiTete = Natif.useOrdinateur();
+  if (titreCoque && !ordiTete) return sous || right ? (
+    <div className="vrm-screen-head vrm-screen-head-sous-seul" data-tete-coque="">
+      {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
+      {right ? <div className="vrm-screen-actions">{right}</div> : null}
+    </div>
+  ) : null;
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
   // les outils SaaS. Ici : un surtitre en capitales espacées, un titre large et
@@ -20725,6 +20734,9 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   const etat = useEtatActionsVu();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const natif = ECRANS_NATIFS.has(tab);
+  // (20 nov., lot argent-natif) Argent (ses quatre segments : `compta`, `dashboard`) a son GRAND TITRE au téléphone, comme
+  // Aujourd'hui — Julien, captures du 20 nov. : pas de grand titre « Argent » visible en haut. L'écran ne pose plus le sien.
+  const argentTab = tab === 'compta' || tab === 'dashboard';
   React.useEffect(() => { setPlus(false); }, [tab]);
   const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges, 22);
   const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
@@ -20745,7 +20757,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   );
   return (
     <>
-      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : titre} grandTitre={natif || (tab === 'journee' && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
+      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || ((tab === 'journee' || argentTab) && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
         recherche={ordi || rechercheOuverte || sansRecherche ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
       {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
     </>

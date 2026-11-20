@@ -104,29 +104,40 @@ function fleches(e) {
 // et l'attribut est posé sur la barre seule (rien d'autre ne recalcule son style).
 function useTitreReduit(refBarre, refTitre) {
   React.useEffect(() => {
-    const barre = refBarre.current, titre = refTitre.current;
-    if (!barre || !titre) return undefined;
+    if (!refBarre.current) return undefined;
     // (19 nov., intégration) Le titre JUGÉ est celui qu'on VOIT : le grand titre de la coque, ou — quand l'écran pose le sien
     // (Page natif d'Annonces, de Ventes : celui de la coque est alors caché) — le premier grand titre visible de l'écran.
     // Un titre caché ne passe jamais « dessous » : sans ce choix, la barre se croyait réduite en haut (petit + grand titre).
     // Lu au défilement (passif, une lecture par image), à la taille, et quand l'écran change.
+    // ⚠️ (20 nov., lot argent-natif) Les éléments sont relus À CHAQUE FOIS (`ref.current`), jamais gardés du montage :
+    // la tête de la coque naît sur Aujourd'hui (grand titre) puis l'écran change (le repère prend sa place) — l'ancien
+    // titre, détaché, n'était plus « vu », la barre ne se réduisait plus jamais et ses icônes flottaient SUR le contenu
+    // (captures de Julien, 20 nov., Argent).
+    // `data-n-fond` : la barre prend son fond (flou + filet) dès que du contenu passe dessous (l'écran a défilé), comme
+    // iOS ; `data-n-reduit` : le petit titre centré, une fois le grand titre passé.
     let image = 0;
-    const vu = (e) => !!e && e.getClientRects().length > 0;
+    const vu = (e) => !!e && e.isConnected && e.getClientRects().length > 0;
     const verifier = () => {
       image = 0;
+      const barre = refBarre.current, titre = refTitre.current;
+      if (!barre || !barre.isConnected) return;
       const cible = vu(titre) ? titre : [...document.querySelectorAll('.vrm-main .n-grand-titre')].find(vu) || null;
       const bas = barre.getBoundingClientRect().bottom;
       // Un écran d'avant (pas de grand titre natif : un repère) pose son propre titre dessous : le petit titre attend ~48 px de défilement.
       const marge = cible && !cible.classList.contains('n-grand-titre') ? 48 : 0;
       const reduit = !!cible && cible.getBoundingClientRect().bottom <= bas - marge;
+      const defileur = barre.closest('.n-coque-ecran, .n-poussee, .n-feuille-corps');
+      const haut = defileur && defileur.scrollHeight > defileur.clientHeight + 1 ? defileur.scrollTop : (window.scrollY || 0);
+      const fond = reduit || haut > 0 || (!!cible && cible.getBoundingClientRect().top < bas - 1);
       if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
+      if (fond) barre.setAttribute('data-n-fond', ''); else barre.removeAttribute('data-n-fond');
     };
     const demander = () => { if (!image) image = requestAnimationFrame(verifier); };
     demander();
     document.addEventListener('scroll', demander, { passive: true, capture: true });
     window.addEventListener('resize', demander, { passive: true });
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(demander) : null;
-    if (ro) ro.observe(barre);
+    if (ro) ro.observe(refBarre.current);
     const t = setInterval(demander, 1500);   // l'écran change d'onglet sans défiler : relu, sans coût (une lecture)
     return () => { if (image) cancelAnimationFrame(image); clearInterval(t); document.removeEventListener('scroll', demander, true); window.removeEventListener('resize', demander); if (ro) ro.disconnect(); };
   }, [refBarre, refTitre]);

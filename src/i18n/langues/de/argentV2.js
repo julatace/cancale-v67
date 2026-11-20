@@ -55,5 +55,8 @@ export default {
   "v2.pm.zoom": "App-Zoom",
   "v2.pm.zoom.desc": "Vergrößert den ganzen Bildschirm: Text, Tasten, Bilder.",
   "v2.pm.texte": "Textgröße",
-  "v2.pm.texte.desc": "Vergrößert nur den Text."
+  "v2.pm.texte.desc": "Vergrößert nur den Text.",
+  "arn.vendu": "Verkauft",
+  "arn.aVenir": "Kommendes Geld",
+  "arn.coutsSaisis": "{v} Kosten erfasst"
 };
