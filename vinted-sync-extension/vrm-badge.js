@@ -931,6 +931,9 @@
   .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
+  .cd6-l { display: flex; align-items: center; gap: 12px; max-width: 520px; }
+  .cd6-l input[type=range] { flex: 1; min-height: 44px; accent-color: var(--n-accent); padding: 0; border: 0; background: transparent; }
+  .cd6-l output { min-width: 88px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   .champ6 { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: .5px solid var(--n-trait); }
   .champ6 b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
@@ -2049,6 +2052,30 @@
     }
     return `<div class="deux5 au6" data-automatisations data-auto-choisie="${autoChoisie}"><div class="gauche5">${gauche}</div><div class="volet5 au6-d">${droite}</div></div>`;
   }
+  // ══ 5.410 — LA CADENCE (Julien, 20 nov. « vas-y fais ») : SON réglage par compte, ici dans Paramètres. Défauts
+  //    inchangés ; plus vite que le défaut ⇒ « Oui, aller plus vite ». Le reste (captcha, prudence, 403/429, un compte
+  //    à la fois, une requête à la fois, compte de l'onglet, temps d'écriture, réserve de 5) n'est pas réglable.
+  let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
+  function cadenceHtml() {
+    const c0 = listes && listes.automatisations && listes.automatisations.cadence;
+    if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
+    if (!c0) return `<section class="grp5" data-cadence="pas-su"><h3>${esc(TU('cd_titre'))}</h3><p class="note5">—</p></section>`;
+    const c = Object.assign({}, c0, cadBrouillon || {});
+    const jour = c.parJour || 200;
+    const LIB = { favorisHeure: TU('cd_fav_h'), actionsHeure: TU('cd_act_h'), parJour: TU('cd_jour'), pauseMin: TU('cd_pause_min'), pauseMax: TU('cd_pause_max') };
+    const curseur = (k, min, max, pas, val, txt) => `<label class="champ6 cd6"><b>${esc(LIB[k])}</b><span class="cd6-l"><input type="range" min="${min}" max="${max}" step="${pas}" value="${val}" data-cad="${k}" aria-label="${esc(LIB[k])}"><output data-cad-v="${k}">${esc(txt)}</output></span></label>`;
+    return `<section class="grp5" data-cadence="${esc(listes.compte.id)}"><h3>${esc(TU('cd_titre'))}</h3>
+      ${curseur('favorisHeure', 1, 60, 1, c.favorisHeure, TU('cd_par_heure', { n: c.favorisHeure }))}
+      ${curseur('actionsHeure', 10, 100, 1, c.actionsHeure, TU('cd_par_heure', { n: c.actionsHeure }))}
+      ${curseur('parJour', 20, 1000, 10, jour, TU('cd_par_jour', { n: jour }))}
+      ${curseur('pauseMin', 20, 240, 5, c.pauseMin, TU('cd_secondes', { n: c.pauseMin }))}
+      ${curseur('pauseMax', 20, 240, 5, c.pauseMax, TU('cd_secondes', { n: c.pauseMax }))}
+      <p class="note5" data-cad-risque>${esc(TU('cd_risque'))}</p>
+      ${cadConfirme ? `<div class="conf5" role="alertdialog" data-cad-confirme><p>${esc(TU('cd_confirme_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-cad-oui>${esc(TU('cd_oui'))}</button><button type="button" class="vu-btn" data-cad-non>${esc(TU('ra_annuler'))}</button></div></div>` : ''}
+      ${cadEtat ? `<p class="note5" role="status" data-cad-etat="${cadEtat.ok ? 'ok' : 'ko'}">${esc(cadEtat.texte)}</p>` : ''}
+      <div class="outils"><button type="button" class="vu-lien" data-cad-defaut>${esc(TU('cd_defaut'))}</button><button type="button" class="vu-btn vu-plein" data-cad-enregistrer${cadEnVol || !cadBrouillon ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
+    </section>`;
+  }
   // ══ 5.409 — NOTIFICATIONS (capture « Notifications » de Vintex) : le journal capté des 7 derniers jours, en tableau
   //    filtrable (type, statut « nouveau » / « vu » selon le marqueur de l'app), chaque ligne mène à VRM par identité.
   let notifType = 'tous', notifStatut = 'tous';
@@ -2203,6 +2230,34 @@
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
     racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); rendre(); }));
+    // 5.410 : la cadence (Paramètres). Un curseur change le brouillon ; « Enregistrer » écrit (plus vite ⇒ confirmation).
+    racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('input', () => {
+      const k = c.getAttribute('data-cad'); const v = Number(c.value);
+      cadBrouillon = Object.assign({}, cadBrouillon || {}, { [k]: v });
+      if (k === 'pauseMin' && (cadBrouillon.pauseMax || (listes.automatisations.cadence || {}).pauseMax) <= v) cadBrouillon.pauseMax = Math.min(240, v + 5);
+      if (k === 'pauseMax' && (cadBrouillon.pauseMin || (listes.automatisations.cadence || {}).pauseMin) >= v) cadBrouillon.pauseMin = Math.max(20, v - 5);
+      cadConfirme = false; cadEtat = null;
+      const o = racine.querySelector(`[data-cad-v="${k}"]`); if (o) o.textContent = TU(k === 'parJour' ? 'cd_par_jour' : /pause/.test(k) ? 'cd_secondes' : 'cd_par_heure', { n: v });
+      const e = racine.querySelector('[data-cad-enregistrer]'); if (e) e.disabled = false;
+    }));
+    racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('change', () => rendre()));
+    const cadEnvoyer = (confirme) => {
+      const c = Object.assign({}, (listes.automatisations && listes.automatisations.cadence) || {}, cadBrouillon || {});
+      const valeur = { uid: listes.compte.id, favorisHeure: c.favorisHeure, actionsHeure: c.actionsHeure, pauseMin: c.pauseMin, pauseMax: c.pauseMax, ...(cadBrouillon && cadBrouillon.parJour != null ? { parJour: cadBrouillon.parJour } : c.parJour ? { parJour: c.parJour } : {}) };
+      cadEnVol = true; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vinted_cadence', valeur, confirme: confirme === true }, (r) => {
+          void chrome.runtime.lastError; cadEnVol = false;
+          if (r && r.code === 'confirmation') { cadConfirme = true; cadEtat = null; }
+          else { cadConfirme = false; cadEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { cadBrouillon = null; chargerListes(true); } }
+          rendre();
+        });
+      } catch (_) { cadEnVol = false; cadEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
+    const cadO = racine.querySelector('[data-cad-oui]'); if (cadO) cadO.addEventListener('click', () => cadEnvoyer(true));
+    const cadN = racine.querySelector('[data-cad-non]'); if (cadN) cadN.addEventListener('click', () => { cadConfirme = false; rendre(); });
+    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 40, pauseMax: 90 }; cadConfirme = false; cadEtat = null; rendre(); });
     // 5.410 : régler une automatisation ici. Rien ne part sans SON toucher ; allumer passe par « Oui, allumer ».
     const raValeur = (auto, actif) => {
       const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};
@@ -2627,6 +2682,7 @@
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
+      ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
       <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=discretion', 'r_rythme')}${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>

@@ -52,7 +52,8 @@ const TOUTES = ANN.map((x, i) => Object.assign({}, x, { statut: STATUTS[i] }));
 VEN[0].transporteur = 'Chronopost'; VEN[0].transporteurCle = 'chronopost'; VEN[2].transporteur = 'Mondial Relay'; VEN[2].transporteurCle = 'mondialrelay';
 VEN.forEach((x, i) => { x.statutVinted = ['Envoie le colis avant le 23 nov.', 'Bordereau en préparation', 'Colis en route vers l’acheteur', 'Commande finalisée', 'Commande annulée'][i]; });
 MSG.forEach((x, i) => { if (i % 2 === 0) x.avatar = img('p' + i); });
-const AUTO = { offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', textes: ['Bonjour {pseudo}, une offre rien que pour toi.', 'Salut {pseudo} ! Je te fais un prix.', 'Hello {pseudo}, elle t’attend.'], auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
+const CADENCE = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90, poses: [] };
+const AUTO = { cadence: CADENCE, offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', textes: ['Bonjour {pseudo}, une offre rien que pour toi.', 'Salut {pseudo} ! Je te fais un prix.', 'Hello {pseudo}, elle t’attend.'], auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
 const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' },
   annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN, toutes: TOUTES, nTous: TOUTES.length, statuts: { en_vente: 5, brouillon: 2, masque: 1, reserve: 1, vendu: 1, a_confirmer: 0 } }, automatisations: AUTO, notifications: NOTIFS, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
@@ -91,7 +92,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
-          else if (msg.action === 'reglageAuto') rep = { ok: true, relu: true };
+          else if (msg.action === 'reglageAuto') rep = msg.cle === 'vinted_cadence' && msg.valeur.actionsHeure > 50 && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, relu: true };
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
         } },
@@ -305,6 +306,19 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         await cap(t.pg, N('parametres'));
         dit(a.parametres && a.remettre && a.details, `${T} : Paramètres en bas de la barre : le logo, Détails`, JSON.stringify({ p: a.parametres }));
+        // 5.410 : la cadence, SON réglage par compte (curseurs), plus vite ⇒ « Oui, aller plus vite ».
+        const cad0 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('[data-cad]').length, risque: !!r.querySelector('[data-cad-risque]'), vals: Array.from(r.querySelectorAll('[data-cad]')).map((c) => c.getAttribute('data-cad') + ':' + c.value) }; });
+        dit(cad0.n === 5 && cad0.risque && cad0.vals.join('|') === 'favorisHeure:15|actionsHeure:50|parJour:200|pauseMin:40|pauseMax:90', `${T} : Paramètres · Cadence : 5 curseurs aux valeurs par défaut, la phrase du risque`, JSON.stringify(cad0));
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-cad="actionsHeure"]'); c.value = '70'; c.dispatchEvent(new Event('input')); c.dispatchEvent(new Event('change')); });
+        await t.pg.waitForTimeout(200);
+        await clic(t.pg, '[data-cad-enregistrer]');
+        await t.pg.waitForTimeout(150);
+        const cadC = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-cad-confirme]'));
+        await cap(t.pg, N('cadence'));
+        await clic(t.pg, '[data-cad-oui]');
+        a = await lire(t.pg);
+        const cadE = a.envoyes.filter((m) => m.action === 'reglageAuto' && m.cle === 'vinted_cadence');
+        dit(cadC && cadE.length === 2 && cadE[0].confirme === false && cadE[1].confirme === true && cadE[1].valeur.actionsHeure === 70 && cadE[1].valeur.uid === '111', `${T} : 70 actions/h : « Oui, aller plus vite » demandé, puis envoyé confirmé pour CE compte`, JSON.stringify({ cadC, cadE }));
         if (!mobile) {
           await clic(t.pg, '[data-vx-reduire]');
           a = await lire(t.pg);

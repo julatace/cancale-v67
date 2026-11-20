@@ -28,6 +28,19 @@
   // </logos-transporteurs>
   const MOTS = {
     // 5.410 — panneau comme Vintex
+    cd_titre: { fr: "Cadence de ce compte", en: "Pace for this account", es: "Ritmo de esta cuenta", it: "Ritmo di questo account", de: "Tempo dieses Kontos" },
+    cd_fav_h: { fr: "Messages aux favoris par heure", en: "Messages to favourites per hour", es: "Mensajes a favoritos por hora", it: "Messaggi ai preferiti all’ora", de: "Nachrichten an Favoriten pro Stunde" },
+    cd_act_h: { fr: "Actions par heure", en: "Actions per hour", es: "Acciones por hora", it: "Azioni all’ora", de: "Aktionen pro Stunde" },
+    cd_jour: { fr: "Plafond par jour", en: "Daily limit", es: "Límite diario", it: "Limite giornaliero", de: "Tageslimit" },
+    cd_pause_min: { fr: "Pause entre deux messages : au moins", en: "Pause between two messages: at least", es: "Pausa entre dos mensajes: como mínimo", it: "Pausa tra due messaggi: almeno", de: "Pause zwischen zwei Nachrichten: mindestens" },
+    cd_pause_max: { fr: "Pause entre deux messages : au plus", en: "Pause between two messages: at most", es: "Pausa entre dos mensajes: como máximo", it: "Pausa tra due messaggi: al massimo", de: "Pause zwischen zwei Nachrichten: höchstens" },
+    cd_par_heure: { fr: "{n} / h", en: "{n} / h", es: "{n} / h", it: "{n} / h", de: "{n} / Std." },
+    cd_par_jour: { fr: "{n} / jour", en: "{n} / day", es: "{n} / día", it: "{n} / giorno", de: "{n} / Tag" },
+    cd_secondes: { fr: "{n} s", en: "{n} s", es: "{n} s", it: "{n} s", de: "{n} s" },
+    cd_risque: { fr: "Plus vite = plus de risque que Vinted restreigne le compte.", en: "Faster = more risk that Vinted restricts the account.", es: "Más rápido = más riesgo de que Vinted restrinja la cuenta.", it: "Più veloce = più rischio che Vinted limiti l’account.", de: "Schneller = mehr Risiko, dass Vinted das Konto einschränkt." },
+    cd_confirme_q: { fr: "Aller plus vite que le réglage par défaut sur ce compte ?", en: "Go faster than the default on this account?", es: "¿Ir más rápido que el ajuste predeterminado en esta cuenta?", it: "Andare più veloce dell’impostazione predefinita su questo account?", de: "Auf diesem Konto schneller als die Standardeinstellung arbeiten?" },
+    cd_oui: { fr: "Oui, aller plus vite", en: "Yes, go faster", es: "Sí, ir más rápido", it: "Sì, più veloce", de: "Ja, schneller" },
+    cd_defaut: { fr: "Revenir aux valeurs par défaut", en: "Back to defaults", es: "Volver a los valores predeterminados", it: "Torna ai valori predefiniti", de: "Standardwerte wiederherstellen" },
     ra_etat: { fr: "État", en: "Status", es: "Estado", it: "Stato", de: "Status" },
     ra_confirme_note: { fr: "Allumer demande ta confirmation ; éteindre est immédiat.", en: "Turning on asks for your confirmation; turning off is immediate.", es: "Activar pide tu confirmación; desactivar es inmediato.", it: "Attivare chiede la tua conferma; spegnere è immediato.", de: "Einschalten braucht deine Bestätigung; Ausschalten wirkt sofort." },
     ra_allumer: { fr: "Allumer", en: "Turn on", es: "Activar", it: "Attiva", de: "Einschalten" },

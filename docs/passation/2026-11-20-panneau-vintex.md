@@ -36,11 +36,54 @@ l'extension, on ne doit plus pouvoir faire d'action dans l'app ».
 - L'app n'utilise pas encore `lienPanneau` : ses boutons d'action (baisser, masquer, republier, favoris, publier…)
   agissent toujours comme avant. Prochain lot : remplacer chaque geste de l'app sur un site par
   `window.open(lienPanneau(...))`, écran par écran, avec un audit qui interdit un geste direct.
-- Écrire les réglages des automatisations DEPUIS le panneau : pas fait. Chemin sûr retenu pour la suite : une ligne
-  dédiée `cmd_reglages_{uid}` posée par l'extension (jamais `main`), lue par l'app au chargement et appliquée par elle
-  (comme `cmd_prix_*`). Aujourd'hui : « Modifier dans VRM ».
 - « Changer le prix » dans le panneau ouvre encore VRM pour la saisie du montant (le dépôt `cmd_prix_*` existe côté
   extension, l'interface de saisie dans le panneau reste à faire).
+
+
+## Les réglages des automatisations écrits DEPUIS le panneau (Julien, 20 nov. : « les automatisations vivent dans l'extension »)
+
+- **Clé retenue : la ligne dédiée `vrm_reglages_auto`** (une par compte VRM, comme `main` ; jamais `main` lui-même) :
+  `{ v: 1, rev, at, par: 'extension'|'app', cles: { vinted_offres_auto, vinted_offre_refus_msg,
+  vinted_offre_refus_variantes, vinted_offres_paliers, vinted_baisse_regle, vinted_cadence } }`.
+- **Une seule règle de lecture** (`superposerReglagesAuto`, `src/reglagesAutoLigne.js`, bloc `<reglages-auto-ligne>`
+  recopié dans background.js par `node scripts/audit-reglages-auto.cjs --recopie`) : une clé PRÉSENTE dans la ligne gagne
+  sur `main` ; absente ⇒ `main` (les réglages d'avant restent valables) ; ligne illisible ⇒ `lireMain` rend null, le
+  moteur ne fait rien.
+- **Extension** : `lireMain` superpose la ligne dès qu'on lui demande une de ces clés (tous les moteurs passent par là) ;
+  `reglageAutoCarte` (action `reglageAuto` du panneau) normalise (`reglageAutoNormalise` : bornes de l'écran de l'app,
+  ALLUMER ⇒ `confirme`, éteindre immédiat), écrit par `modifierLigneCas` (comparer-et-échanger sur `rev`), relit, note au
+  journal. Aucune requête vers Vinted.
+- **App** : `appliquerReglagesAutoLigne` au chargement (après `markCloudReady`) et au retour sur l'onglet (après
+  `relireNuage`) pose les valeurs de la ligne ; `save()` d'une de ces clés les recopie dans la ligne
+  (`ecrireReglagesAutoLigne`). Le chantier `claude/actions-extension` (qui retire l'écran app) est prévenu de la clé.
+- **Panneau · Automatisations** : offres auto (Allumer ⇒ « Oui, allumer » ; message de refus), négociation par paliers
+  (paliers %, remise maximale, aperçu, allumer/éteindre), baisse par règle de CE compte (5/10/15 % après 7/14/30 j).
+  Messages aux favoris : restent dans `vrm_favoris_reglages_{uid}` (ligne dédiée existante), « Modifier dans VRM » —
+  pas encore écrits depuis le panneau. Vendue ailleurs ⇒ masquée n'a pas d'interrupteur (décision « 3 oui ») ;
+  republication programmée : reste l'atelier — pas dans ce lot.
+- Audit : `scripts/audit-reglages-auto.cjs` (vrais `lireMain` + `reglageAutoCarte` de background.js sur base en mémoire,
+  règle de l'app ; `--mutation` 9/9 rouges).
+
+## La cadence, SON réglage par compte (Julien, 20 nov. : « vas-y fais »)
+
+- `vinted_cadence.comptes[uid]` dans la même ligne : messages aux favoris / h (défaut 15, 1–60), actions / h (défaut 50,
+  10–100 ; la réserve de 5 reste), plafond par jour (absent = celui de « Discrétion », 200 ; 20–1000), pause entre deux
+  messages (défaut 40–90 s, plage de 20 s à 4 min, toujours tirée au hasard, jamais deux fois la même). Plus vite que le
+  défaut ⇒ « Oui, aller plus vite ». Paramètres du panneau : 5 curseurs + « Plus vite = plus de risque que Vinted
+  restreigne le compte. »
+- Moteur (`compterActionUn`) : plafond de l'heure = SA cadence (`cadenceCompte`, relue au plus une fois par minute,
+  dernière lue sinon défauts), décalage de la réserve gardé, moitié quand les autres Chrome ne sont pas lus, captcha /
+  Tout arrêter / prudence (20/h) / montée d'un compte neuf / plafond du jour inchangés. Favoris : `porteDiscretion` prend
+  SA limite quand il l'a posée. Pause : envoyée avec `lancer` en plage (ms), validée par le serveur (`plageValide`,
+  `api/_lib/favoris-file.js`) et tirée par `delaiRythme`.
+- NON réglables : arrêt au captcha / refus + prudence 24 h, pause sur 403/429, un compte à la fois par ordinateur, une
+  requête à la fois, compte de l'onglet, temps d'écriture.
+- Audit : `scripts/audit-cadence.cjs` (vrai background.js : défauts 45 + 5, 60/h ⇒ 55 + 5, 61 favoris/h et 19 s refusés,
+  captcha actif à 60/h, prudence 20/h même à 100, ligne illisible ⇒ défauts ; `--prouve` 7/7 rouges).
+
+### Ligne « Plafond d'actions » de CLAUDE.md §3 proposée (à reporter par le coordinateur)
+
+| **Plafond d'actions** | ⚠️⚠️ **50 actions/heure/compte PAR DÉFAUT (sa décision du 29 oct.), et depuis le 20 nov. (« vas-y fais ») SA CADENCE PAR COMPTE** dans Paramètres du panneau (5.410, `vinted_cadence` de `vrm_reglages_auto`) : actions/h 10–100, favoris/h 1–60 (déf. 15), plafond du jour (déf. Discrétion), pause entre messages 20 s–4 min toujours au hasard (déf. 40–90 s) ; plus vite ⇒ confirmation. `RESERVE_GESTES` = 5 reste ⇒ l'automatique s'arrête 5 avant ; une republication réserve ses 3 gestes. **Ne PAS changer les défauts sans qu'il le demande.** NON réglables : captcha/refus + prudence 24 h (20/h), pause 403/429, un compte à la fois, une requête à la fois, compte de l'onglet, temps d'écriture. Budget de LECTURE séparé (20/h). `audit-cadence`. |
 
 ## Preuves
 
