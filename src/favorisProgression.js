@@ -36,13 +36,14 @@ export function traduireResultatFavori(r){
   return {resultat,raison,ecrits,...(variante?{variante}:{}),...(apresMs?{apresMs}:{})};
 }
 
-// (20 nov., ext. 5.410 `messagesmalins`) LE BILAN d'un envoi : « 12 envoyés · 2 sautés (vendus) · 1 refusé : texte
-// contenant un lien ». Une règle pour l'app, la carte de vinted.fr et le serveur (vueFile/fin). Sauté = rien envoyé à
-// ce favori, la file a continué (annonce plus disponible, déjà en conversation, offre sous le prix mini, conversation
-// refusée par Vinted) ; refusé = Vinted ou la règle a arrêté CE message (la raison nommée).
+// (20 nov., ext. 5.410 `messagesmalins`) LE BILAN d'un envoi : « 12 envoyés · 2 sautés (vendus ou indisponibles) · 1 refusé :
+// texte refusé par Vinted ». Une règle pour l'app, la carte de vinted.fr et le serveur (vueFile.bilan, fin.bilan). Sauté = rien
+// envoyé à ce favori, la file a continué (annonce plus disponible, déjà en conversation, offre sous le prix mini, conversation
+// refusée par Vinted) ; refusé = Vinted ou la règle a arrêté CE message (la raison nommée). Regroupé par CODE (traduit à l'écran).
 export const RAISONS_SAUT=Object.freeze(['annonce_indisponible','article_vendu','conversation_deja_contactee','conversation_existante','offre_sous_plancher','conversation_refusee']);
-export const MOTS_SAUT=Object.freeze({annonce_indisponible:'vendus ou indisponibles',article_vendu:'vendus ou indisponibles',conversation_deja_contactee:'déjà en conversation',conversation_existante:'déjà en conversation',offre_sous_plancher:'offre sous le prix mini',conversation_refusee:'conversation refusée par Vinted'});
-export const MOTS_REFUS=Object.freeze({texte_interdit:'texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted',texte_refuse:'texte refusé par Vinted',vinted_robot:'vérification anti-robot de Vinted',pause_vinted:'Vinted demande de ralentir',vinted_frein:'Vinted demande de ralentir',offre_refusee:'offre refusée par Vinted'});
+const CODE_SAUT={article_vendu:'annonce_indisponible',conversation_existante:'conversation_deja_contactee'};
+export const MOTS_SAUT=Object.freeze({annonce_indisponible:'vendus ou indisponibles',conversation_deja_contactee:'déjà en conversation',offre_sous_plancher:'offre sous le prix mini',conversation_refusee:'conversation refusée par Vinted',autre:'autres'});
+export const MOTS_REFUS=Object.freeze({texte_interdit:'texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted',texte_refuse:'texte refusé par Vinted',vinted_robot:'vérification anti-robot de Vinted',pause_vinted:'Vinted demande de ralentir',vinted_frein:'Vinted demande de ralentir',offre_refusee:'offre refusée par Vinted',autre:'autre refus'});
 export function bilanFavoris(jobs){
   const l=Array.isArray(jobs)?jobs:[];
   const b={envoyes:0,sautes:0,refuses:0,incertains:0,attente:0,parSaut:{},parRefus:{}};
@@ -51,17 +52,19 @@ export function bilanFavoris(jobs){
     if(j.etat==='envoye')b.envoyes++;
     else if(j.etat==='attente'||j.etat==='reserve')b.attente++;
     else if(j.etat==='incertain')b.incertains++;
-    else if(j.etat==='ignore'||(j.etat==='refuse'&&RAISONS_SAUT.includes(j.raison))){b.sautes++;const m=MOTS_SAUT[j.raison]||'autres';b.parSaut[m]=(b.parSaut[m]||0)+1;}
-    else if(j.etat==='refuse'){b.refuses++;const m=MOTS_REFUS[j.raison]||'autre refus';b.parRefus[m]=(b.parRefus[m]||0)+1;}
+    else if(j.etat==='ignore'||(j.etat==='refuse'&&RAISONS_SAUT.includes(j.raison))){b.sautes++;const c=CODE_SAUT[j.raison]||(MOTS_SAUT[j.raison]?j.raison:'autre');b.parSaut[c]=(b.parSaut[c]||0)+1;}
+    else if(j.etat==='refuse'){b.refuses++;const c=j.raison==='vinted_frein'?'pause_vinted':MOTS_REFUS[j.raison]?j.raison:'autre';b.parRefus[c]=(b.parRefus[c]||0)+1;}
   }
   return b;
 }
-// La phrase du bilan (français ; les écrans traduits passent par tr() avec les mêmes nombres).
-export function phraseBilanFavoris(b){
+// La phrase du bilan. `mot(code, famille)` traduit un code (l'écran passe tr()) ; sans lui, le français de la règle.
+export function phraseBilanFavoris(b,mot){
   if(!b)return '';
+  const m=(c,f)=>(typeof mot==='function'&&mot(c,f))||(f==='saut'?MOTS_SAUT:MOTS_REFUS)[c]||c;
+  const liste=(o,f)=>{const e=Object.entries(o);return e.map(([c,n])=>e.length>1?`${n} ${m(c,f)}`:m(c,f)).join(', ');};
   const p=[`${b.envoyes} envoyé${b.envoyes>1?'s':''}`];
-  if(b.sautes)p.push(`${b.sautes} sauté${b.sautes>1?'s':''} (${Object.entries(b.parSaut).map(([m,n])=>Object.keys(b.parSaut).length>1?`${n} ${m}`:m).join(', ')})`);
-  if(b.refuses)p.push(`${b.refuses} refusé${b.refuses>1?'s':''} : ${Object.entries(b.parRefus).map(([m,n])=>Object.keys(b.parRefus).length>1?`${n} ${m}`:m).join(', ')}`);
+  if(b.sautes)p.push(`${b.sautes} sauté${b.sautes>1?'s':''} (${liste(b.parSaut,'saut')})`);
+  if(b.refuses)p.push(`${b.refuses} refusé${b.refuses>1?'s':''} : ${liste(b.parRefus,'refus')}`);
   if(b.incertains)p.push(`${b.incertains} à vérifier sur Vinted`);
   return p.join(' · ');
 }

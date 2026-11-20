@@ -1,5 +1,7 @@
 import React from 'react';
 import {ETAPES_FAVORIS,RAISONS_FAVORIS,progressionFavoris,dureeFavoris,traduireResultatFavori} from './favorisProgression.js';
+// (20 nov., ext. 5.410 `messagesmalins`) Le bilan : « 12 envoyés · 2 sautés (vendus ou indisponibles) · 1 refusé : texte refusé par Vinted ».
+const bilanTexte=(b)=>{if(!b)return '';const l=(o,f)=>{const e=Object.entries(o||{});return e.map(([c,n])=>(e.length>1?n+' ':'')+tr(`fav.bilan.${f}.${c}`)).join(', ');};const p=[tr('fav.bilan.envoyes',{n:b.envoyes})];if(b.sautes)p.push(tr('fav.bilan.sautes',{n:b.sautes,quoi:l(b.parSaut,'s')}));if(b.refuses)p.push(tr('fav.bilan.refuses',{n:b.refuses,quoi:l(b.parRefus,'r')}));if(b.incertains)p.push(tr('fav.bilan.incertains',{n:b.incertains}));return p.join(' · ');};
 import {requeteJsonBornee} from './requeteJsonBornee.js';
 // (11 nov., lot favoris-clair) Le suivi en direct passe par la feuille commune
 // « VRM travaille » (src/suiviTravail.js) : une ligne par message, désignée par
@@ -131,7 +133,7 @@ function AutomatisationFavoris({uid,owner,ownerActuel,headers,selection,reglages
     {(!!p.total||!!phase)&&<div className="vrm-favoris-progression" aria-label="Progression des envois">
       {!!p.total&&<><div className="vrm-favoris-progress-head" role="status"><strong>{p.termines} / {p.total} traités</strong><span>{p.envoyes} envoyé(s) · {p.ignores} ignoré(s)</span></div><progress aria-label="Traitement des favoris" aria-valuetext={`${p.termines} sur ${p.total} traités${phase?' · '+phase:''}`} value={avancement} max={p.total}/></>}
       <p role="status" aria-live={phase?'polite':'off'}>{phase|| (vue?.active?(p.secondes>0?`Prochaine vérification dans ${dureeFavoris(p.secondes)}`:'En attente du prochain passage'):p.incertains||p.refuses?'File interrompue : vérifie le résultat ci-dessous.':'Sélection traitée ou file arrêtée.')}</p>
-      {!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
+      {vue?.bilan&&(vue.bilan.sautes||vue.bilan.refuses)?<small data-favoris-bilan>{bilanTexte(vue.bilan)}</small>:!!p.ignores&&<small>Ignorés : la conversation contient déjà des messages. Aucun nouveau message envoyé à ces favoris.</small>}
       {vue?.active&&vue.intervalleMinutes!=null&&<small>{vue.intervalleMinutes===0?'Temps entre les messages : rapide, 6 à 10 s, tiré au hasard.':vue.intervalleMaxMinutes?`Temps entre les messages : entre ${vue.intervalleMinutes} et ${vue.intervalleMaxMinutes} min, tiré au hasard.`:`Temps entre les messages : ${vue.intervalleMinutes} min.`} Le plafond horaire peut prolonger l’attente.</small>}
       {!!p.total&&<p>{p.attente} en attente · {p.encours} en cours{p.incertains?` · ${p.incertains} à vérifier sur Vinted`:''}{p.refuses?` · ${p.refuses} interrompu(s)`:''}{p.annules?` · ${p.annules} annulé(s)`:''}{p.verifies?` · ${p.verifies} clôturé(s) après vérification manuelle`:''}</p>}
       {vue?.active&&!phase&&(!ecranActif||typeof document!=='undefined'&&document.visibilityState==='hidden'||!disponible)&&<p role="status">Envois suspendus : {disponible?'reviens sur cet écran pour reprendre.':'vérifie la connexion de l’extension au bon compte.'}</p>}
