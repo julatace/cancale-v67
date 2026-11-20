@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.2';
+const CODE_VERSION = '5.410.4';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -21890,7 +21890,8 @@ async function automatisationsCarte(u, owner) {
   const r0 = Array.isArray(rg) ? (rg[0] || null) : undefined;
   return {
     offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
-    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false } : null,
+    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false,
+      tranches: of.paliers.tranches, bonusLot: of.paliers.bonusLot, pas: of.paliers.pas, flexible: of.paliers.flexible, msgAccepte: of.paliers.msgAccepte, msgContre: of.paliers.msgContre, msgFinale: of.paliers.msgFinale, delais: of.paliers.delais } : null,   // 5.410.4
     favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
     // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
     cadence: await cadenceCompte(u).catch(() => null),
