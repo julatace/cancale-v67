@@ -19,6 +19,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { Bouton, BoutonIcone } from '../natif/Bouton.jsx';
+import { Segmente } from '../natif/Segmente.jsx';
 import './design-v2.css';
 import './argent-v2.css';   // (17 nov., phase 2) Argent, Paramètres et la tête de la coque (allumé seulement) — ici et pas dans App.jsx : audit-studio S3
 
@@ -60,18 +61,13 @@ export function RangeeTouchable({ onClick, children, className = '', attrs = {},
 
 // Le contrôle segmenté du nouveau design : une piste translucide sur la coque, le segment choisi = une pastille de
 // porcelaine claire à l'encre (jour comme nuit) — jamais un bloc gris plein. 44 px, nombres tabulaires.
+// (20 nov., chantier « boutons natifs ») Le segmenté du design v2 = le Segmente NATIF (piste, curseur, ← →). Les attributs
+// d'hier restent posés (`data-v2-seg`, `aria-selected`) : les bancs du design v2 désignent le choix par eux.
 export function SegmentV2({ options = [], value, onChange, label, attrs = {} }) {
   return (
-    <div className="v2-seg" role="tablist" aria-label={label} {...attrs}>
-      {options.map((o) => {
-        const on = o.v === value;
-        return (
-          <button key={o.v} type="button" role="tab" aria-selected={on} className={'v2-seg-btn' + (on ? ' is-on' : '')} data-v2-seg={o.v}
-            onClick={() => onChange && onChange(o.v)} {...(o.data || {})}>
-            <span className="v2-seg-l">{o.l}</span>{o.n != null && o.n !== '' ? <span className="v2-seg-n">{o.n}</span> : null}
-          </button>
-        );
-      })}
+    <div className="v2-seg-hote" {...attrs}>
+      <Segmente libelle={label} valeur={value} onChange={(v) => onChange && onChange(v)}
+        options={options.map((o) => ({ cle: o.v, libelle: o.l, n: o.n != null && o.n !== '' ? o.n : null, attrs: { 'data-v2-seg': o.v, 'aria-selected': o.v === value ? 'true' : 'false', ...(o.data || {}) } }))}/>
     </div>
   );
 }

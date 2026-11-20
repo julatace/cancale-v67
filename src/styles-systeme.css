@@ -447,7 +447,6 @@
 :root:root body .vrm-app-shell .vrm-main .vrm-buy-title.vrm-buy-title { font-size: var(--d-t-15) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-buy-price.vrm-buy-price { font-size: var(--d-t-15) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-main .vrm-rpf-chevron.vrm-rpf-chevron { font-size: var(--d-t-17) !important; }
-:root:root body .vrm-main .vrm-buy-more.vrm-buy-more { color: var(--d-encre) !important; }
 :root:root body .vrm-main details.vrm-recus-email > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
 
 /* Le compte d'un filtre CHOISI (eBay « Toutes 4 », E-mails « Tout 6 ») : à l'encre de son libellé, la nuit

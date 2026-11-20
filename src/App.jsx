@@ -18306,18 +18306,14 @@ const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognit
 // ⇒ SA vente ou SON achat (`ouvrirRetrouver`, src/retrouverColis.js : le même scanner).
 function BoutonScanRecherche() {
   return (
-    <button className="vrm-micro" type="button" data-recherche-scanner="" data-geste-disque="scanner" onClick={(e) => { e.preventDefault(); ouvrirRetrouver('loupe'); }}
-      aria-label={tr('v2.scanner')} title={tr('v2.scanner')}>
-      <Icon name="scan" size={19}/>
-    </button>
+    <Natif.BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={20}/>} className="vrm-micro" onClick={(e) => { e.preventDefault(); ouvrirRetrouver('loupe'); }}
+      attrs={{ 'data-recherche-scanner': '', 'data-geste-disque': 'scanner' }}/>
   );
 }
 function BoutonPhotoRecherche() {
   return (
-    <button className="vrm-micro" type="button" data-recherche-photo-ouvrir="" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
-      aria-label="Chercher par photo" title={`Chercher par photo : prends ${motsArticle(vendActuel()).le}, VRM montre les annonces qui lui ressemblent`}>
-      <Icon name="camera" size={19}/>
-    </button>
+    <Natif.BoutonIcone libelle="Chercher par photo" icone={<Icon name="camera" size={20}/>} className="vrm-micro" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
+      attrs={{ 'data-recherche-photo-ouvrir': '', title: `Chercher par photo : prends ${motsArticle(vendActuel()).le}, VRM montre les annonces qui lui ressemblent` }}/>
   );
 }
 // (11 nov., parler à la loupe) Le moteur est commun (src/dicteeNavigateur.js) :
@@ -18346,12 +18342,8 @@ function MicDictee({ onText, onDirect, onErreur, titre = 'Dicter', nu = false, c
       onErreur: (code) => { if (onErreur) onErreur(code); else toast(PHRASES_VOIX[code] || PHRASES_VOIX.autre); if (code === 'refus') majRefus(); } });
   };
   return (
-    <button className={nu ? 'vrm-micro' : 'vrm-icon-control'} type="button" data-mic-dictee data-micro-ecoute={ecoute ? '1' : '0'} onClick={lancer} aria-label={ecoute ? tr('commun.arreterDictee') : titre} aria-pressed={ecoute}
-      title={ecoute ? tr('commun.ecouteParlePuis') : titre}
-      style={nu ? undefined : {flexShrink:0,display:'inline-flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:12,cursor:'pointer',fontFamily:'inherit',
-        border:`1px solid ${ecoute?C.accent:C.border}`,background:ecoute?`${C.accent}18`:C.card,color:ecoute?C.accent:C.muted,transition:'background .15s,color .15s,border-color .15s'}}>
-      <Icon name="mic" size={nu ? 19 : 17}/>
-    </button>
+    <Natif.BoutonIcone libelle={ecoute ? tr('commun.arreterDictee') : titre} icone={<Icon name="mic" size={20}/>} actif={ecoute} className={nu ? 'vrm-micro' : 'vrm-mic-dictee'} onClick={lancer}
+      attrs={{ 'data-mic-dictee': '', 'data-micro-ecoute': ecoute ? '1' : '0', title: ecoute ? tr('commun.ecouteParlePuis') : titre }}/>
   );
 }
 // ── TRADUCTION DES MESSAGES (G35) ─────────────────────────────────────────────
@@ -58164,7 +58156,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <div data-bords-faits={faits.length} style={{fontSize:12,color:C.muted,marginTop:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'9px 12px'}}>
               <span style={{color:C.text,fontWeight:600}}>{faits.length} bordereau{faits.length>1?'x':''} déjà traité{faits.length>1?'s':''}</span>
               <span style={{flex:1,minWidth:0}}>retiré{faits.length>1?'s':''} tout seul{faits.length>1?'s':''} dès que Vinted confirme.</span>
-              <button type="button" data-bords-faits-voir="" onClick={()=>setShowBordDone(v=>!v)} style={{border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',fontSize:13,padding:'0 4px',fontFamily:'inherit',minWidth:44,minHeight:44}}>{showBordDone?'Masquer':'Les voir'}</button>
+              <Natif.Bouton variante="texte" taille="compact" onClick={()=>setShowBordDone(v=>!v)} attrs={{'data-bords-faits-voir':'','aria-expanded':showBordDone?'true':'false'}}>{showBordDone?'Masquer':'Les voir'}</Natif.Bouton>
             </div>
           );
         })()}
