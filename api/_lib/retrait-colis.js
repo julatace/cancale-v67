@@ -377,7 +377,17 @@ export const LIEU_AU_FUTUR = /prochains?\s+jours|prochainement|d[èe]s\s+(?:son|
 // Vercel (UTC), une arrivée à 00 h 30 à Paris tombait la VEILLE, et le widget
 // disait « à vérifier » un jour avant l'app (§11 : un nombre, deux écrans).
 let FMT_PARIS = null;
+// (20 nov., bugs-terrain) Le jour de Paris ne change qu'aux heures pleines (décalages entiers) : gardé par HEURE,
+// `formatToParts` ne tourne qu'une fois par heure vue (0,9 s propre au profil d'Achats, volume de sa base).
+const _jourParHeure = new Map();
 const jourDe = (ms) => {
+  const h = Number.isFinite(ms) ? Math.floor(ms / 3600000) : null;
+  if (h != null && _jourParHeure.has(h)) return _jourParHeure.get(h);
+  const j = jourDeCalc(ms);
+  if (h != null) { if (_jourParHeure.size > 5000) _jourParHeure.clear(); _jourParHeure.set(h, j); }
+  return j;
+};
+const jourDeCalc = (ms) => {
   try {
     FMT_PARIS = FMT_PARIS || new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' });
     const p = FMT_PARIS.formatToParts(new Date(ms));
