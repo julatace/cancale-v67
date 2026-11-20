@@ -20893,13 +20893,18 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     const trouver = () => { let t = null; for (let p = refAncre.current && refAncre.current.parentElement; p && !t; p = p.parentElement) t = [...p.querySelectorAll('h1')].find(vis) || null; return t; };
     const h = document.createElement('span'); h.className = 'n-site-hote'; h.setAttribute('data-site-hote', '');
     let titre = null;
+    // Un titre posé dans un bloc passe EN LIGNE (style posé sur lui : aucune règle d'avant ne le bat) pour que les pastilles
+    // tiennent à côté de lui.
+    const marquer = (t) => { if (!t || !t.parentElement || getComputedStyle(t.parentElement).display.indexOf('flex') >= 0) return;
+      if (t.style.display !== 'inline-block') { t.style.display = 'inline-block'; t.style.verticalAlign = 'middle'; }
+      if (!t.hasAttribute('data-avec-pastilles')) t.setAttribute('data-avec-pastilles', ''); };
     // Le titre de la coque peut être re-rendu (et l'hôte, posé à côté, retiré avec lui) : on le repose à chaque changement.
     const placer = () => {
       const t = trouver(); if (!t || !t.parentElement) return;
       if (titre && titre !== t) titre.removeAttribute('data-avec-pastilles');
       titre = t;
       if (h.previousElementSibling !== t || !h.isConnected) t.insertAdjacentElement('afterend', h);
-      if (getComputedStyle(t.parentElement).display.indexOf('flex') < 0) t.setAttribute('data-avec-pastilles', '');
+      marquer(t);
     };
     placer();
     setHote(h.isConnected ? h : null);
@@ -20907,10 +20912,10 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     const racine = document.querySelector('.n-coque') || document.body;
     const mo = new MutationObserver(() => {
       if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); }
-      else if (titre && !titre.hasAttribute('data-avec-pastilles') && getComputedStyle(titre.parentElement).display.indexOf('flex') < 0) titre.setAttribute('data-avec-pastilles', '');
+      else if (titre && (titre.style.display !== 'inline-block' || !titre.hasAttribute('data-avec-pastilles'))) marquer(titre);
     });
-    mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'class'] });
-    return () => { mo.disconnect(); h.remove(); if (titre) titre.removeAttribute('data-avec-pastilles'); };
+    mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'style'] });
+    return () => { mo.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.display = ''; titre.style.verticalAlign = ''; } };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
     nombres={nombres} tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
