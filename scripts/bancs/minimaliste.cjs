@@ -234,6 +234,9 @@ function baseSite(site) {
   return b;
 }
 const SITE_DE_BASE = { lbc: 'leboncoin', ebay: 'ebay', vc: 'vestiaire' };
+// Ajoute à une base les lignes d'un site (en REMPLAÇANT celles du même identifiant : la base de volume porte déjà des
+// `lbc_listings` / `ebay_*` vides — deux lignes du même id, l'app lisait la première).
+function ajouterSite(b, site) { const x = baseSite(site); const ids = new Set(x.rows.filter((r) => /^(lbc_|ebay_|vc_)/.test(r.id)).map((r) => r.id)); b.rows = b.rows.filter((r) => !ids.has(r.id)); b.rows.push(...x.rows.filter((r) => ids.has(r.id))); return b; }
 const baseDe = (base) => (base === 'vide' ? baseVide() : SITE_DE_BASE[base] ? baseSite(SITE_DE_BASE[base]) : E.baseFiches());
 
 async function ouvrirEcran(nav, fen, sombre, ec, base) {
@@ -359,7 +362,7 @@ async function selecteur() {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 300))); };
-  const multi = () => { const b = E.baseFiches(); const l = baseSite('leboncoin'), e = baseSite('ebay'); b.rows.push(...l.rows.filter((x) => /^lbc_/.test(x.id)), ...e.rows.filter((x) => /^ebay_/.test(x.id))); return b; };
+  const multi = () => ajouterSite(ajouterSite(E.baseFiches(), 'leboncoin'), 'ebay');
   const lire = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-selecteur-site]'); const t = document.querySelector('.vrm-tache');
     return { sel: s ? s.getAttribute('data-site-courant') : null, choix: s ? [...s.querySelectorAll('[data-site-choix]')].map((b) => b.getAttribute('data-site-choix')) : [],
       tache: t ? t.getAttribute('data-tache-site') : null, eg: (document.querySelector('[data-eg-ecran][data-eg-site]') || { getAttribute: () => null }).getAttribute('data-eg-site'),
@@ -398,6 +401,8 @@ async function selecteur() {
       await o.pg.locator('[data-selecteur-site] [data-site-choix="toutes"]').first().click({ timeout: 5000 }).catch(() => {});
       await o.pg.waitForTimeout(1200);
       await aller(o, '?tab=journee');
+      // Les chiffres se lisent après la coque : attendre qu'ils soient LUS (plus « — » partout), 10 s au plus.
+      await o.pg.waitForFunction(() => [...document.querySelectorAll('.n-tuile-valeur')].some((x) => x.textContent.trim() !== '—'), null, { timeout: 10000 }).catch(() => {});
       const j1 = await lire(o.pg);
       dit(j1.sel === 'toutes' && JSON.stringify(j1.tuiles) === JSON.stringify(j0.tuiles), `S3 ${W} revenu à « Tous » : les mêmes chiffres qu'au départ`, { j0: j0.tuiles, j1: j1.tuiles });
       dit(!o.erreurs.length, `${W} aucune erreur de page`, o.erreurs.slice(0, 3));
@@ -421,7 +426,7 @@ async function annoncesComptes() {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 400))); };
-  const base = () => { const b = E.baseFiches(); const l = baseSite('leboncoin'); b.rows.push(...l.rows.filter((x) => /^lbc_/.test(x.id))); return b; };
+  const base = () => ajouterSite(E.baseFiches(), 'leboncoin');
   const lire = (pg) => pg.evaluate(() => {
     const gs = [...document.querySelectorAll('[data-eg-liste] [data-eg-groupe]')].map((g) => ({ cle: g.getAttribute('data-eg-groupe'), n: Number(g.getAttribute('data-eg-groupe-n')), tete: (g.querySelector('.n-groupe-tete') || g).innerText.replace(/\s+/g, ' ').trim(), rangees: g.querySelectorAll('[data-eg-article]').length, manque: !!g.querySelector('[data-eg-manque]'), ouvert: !!g.querySelector('.n-groupe-carte') }));
     const rangees = [...document.querySelectorAll('[data-eg-liste] [data-eg-article]')].map((e) => e.textContent);
@@ -442,7 +447,7 @@ async function annoncesComptes() {
         const cles = r.gs.map((g) => g.cle);
         const iL = cles.findIndex((c) => c.startsWith('leboncoin:')), iV = cles.map((c, i) => (c.startsWith('vinted:') ? i : -1)).filter((i) => i >= 0);
         dit(r.gs.length >= 4 && iV.length >= 3 && iL > Math.max(...iV), `A1 ${W} ${th} : un groupe par compte, Vinted puis Leboncoin (${cles.join(', ')})`, r.gs);
-        dit(r.gs.every((g) => /\d+ annonces?/.test(g.tete) && g.n >= 1), `A1 ${W} ${th} : chaque en-tête dit « N annonces »`, r.gs.map((g) => g.tete));
+        dit(r.gs.every((g) => /\d+ annonces?/i.test(g.tete) && g.n >= 1), `A1 ${W} ${th} : chaque en-tête dit « N annonces »`, r.gs.map((g) => g.tete));
         dit(r.rangees.length > 0 && r.rangees.every((t) => !/mini —|acheté —/.test(t)), `A2 ${W} ${th} : aucune rangée ne répète « mini — » / « acheté — »`, r.rangees.find((t) => /mini —|acheté —/.test(t)));
         dit(r.teintes === 0 && r.actions, `A3 ${W} ${th} : aucune pastille teintée sous le titre ; « Actions » est un rond ⋯`, r);
         dit(r.ecart == null || r.ecart >= 12, `A4 ${W} ${th} : le plein est détaché des onglets (${r.ecart} px)`, r.ecart);
@@ -501,7 +506,7 @@ function squelette() {
 async function sitesPlanches() {
   await new Promise((r) => P.srv.listen(P.PORT, r));
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
-  const base = () => { const b = E.baseFiches(); for (const s of ['leboncoin', 'ebay', 'vestiaire']) { const x = baseSite(s); b.rows.push(...x.rows.filter((r) => /^(lbc_|ebay_|vc_)/.test(r.id))); } return b; };
+  const base = () => ['leboncoin', 'ebay', 'vestiaire'].reduce((b, s) => ajouterSite(b, s), E.baseFiches());
   const variantes = liste('VARIANTES', '390:clair,390:sombre,1512:clair').map((v) => v.split(':'));
   const ongletsVoulus = liste('ONGLETS', ONGLETS_PLANCHE.map((o) => o[0]).join(','));
   const releve = [];
