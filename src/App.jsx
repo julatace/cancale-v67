@@ -20479,6 +20479,11 @@ function Toaster() {
   return dansFiche ? createPortal(pile, zoneFiche) : pile;
 }
 
+// (20 nov., bugs-terrain) Un <details> dont le contenu n'est monté qu'OUVERT (un détail replié ne coûte rien au rendu).
+function DetailsRepliOuvert({ className, attrs, resume, children }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  return <details className={className} {...(attrs || {})} onToggle={(e) => setOuvert(!!e.currentTarget.open)}><summary>{resume}</summary>{ouvert ? children : null}</details>;
+}
 function TopProgress() {
   const [busy, setBusy] = React.useState(false);
   const [pct, setPct] = React.useState(0);
@@ -57041,8 +57046,19 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
                   // Prêt quand les codes ET les achats sont lus ET que les passes sont là (ou qu'il n'y a rien à retirer) : une passe
                   // qui arrive après « En route » le pousserait.
-                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  // (20 nov., bugs-terrain — captures iPhone de Julien : « À retirer au moins · 18 » puis RIEN) Tant que les e-mails de
+                  // suivi ne sont pas lus, la place des colis DIT qu'on lit (jamais un vide muet) ; une lecture RATÉE le dit avec
+                  // « Réessayer » (avant : `tracking` restait `null`, aucune relecture, aucune phrase — la liste vide pour toujours).
+                  const suivisRates = !baseKO && trackingKO && tracking === null;
+                  const etatLecture = baseKO || toutLuRet ? null : suivisRates
+                    ? <div className="vrm-colis-vide" data-retraits-suivis-ko="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{ flex: '1 1 220px' }}>{tr('achats.eMailsSuivi')}</span>
+                        <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={() => { lireSuivis({ force: true }); }} style={{ flexShrink: 0, minHeight: 44 }}>{tr('ranger.reessayer')}</Bouton>
+                      </div>
+                    : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
+                  return <QuandLuV2 pret={baseKO || suivisRates || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {videSite}
+                    {avecColis ? null : etatLecture}
                     {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :
                         les mêmes points (`pointsARetirer`), les mêmes gestes ; le prix payé de l'achat relié par identité, les horaires LUS. */}
                     {avecColis ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
@@ -57063,7 +57079,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
-                    {ancienne && ancienne !== videSite ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
+                    {/* (20 nov., bugs-terrain) Le détail replié n'est RENDU qu'ouvert : fermé, ses lignes (LigneRetraitF) se recalculaient à
+                        chaque rendu d'Achats — 7,9 s de calcul sur 25 s au profil (volume de sa base, processeur ×4). */}
+                    {ancienne && ancienne !== videSite ? <DetailsRepliOuvert className="vrm-repli" attrs={{ 'data-v2-detail-retraits': '' }} resume={tr('v2.passe.detail')}>{ancienne}</DetailsRepliOuvert> : null}
                   </div></QuandLuV2>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou
