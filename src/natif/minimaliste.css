@@ -43,5 +43,6 @@ html body .vrm-bandeau-abo-geste { min-width: 44px !important; justify-content: 
 
 /* ══ 5. Publier ailleurs : écrit dans sa feuille (src/styles-publier-ailleurs-feuille.css). ══ */
 /* ══ 6. Ventes · Leboncoin en rangées natives : le segment prend la marge de la page, comme celui de Ventes · Vinted. ══ */
+html body [data-lbc-colis-natif] { padding-top: 4px; }   /* comme `.n-page-contenu` de Ventes · Vinted */
 html body [data-lbc-colis-natif] > .n-segmente { margin: 0 var(--n-marge, 16px) 16px; }
 }
