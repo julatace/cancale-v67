@@ -352,6 +352,10 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2-tete-tache h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 40px; letter-spacing: -.02em; color: var(--v2-page-texte); }
 .v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
 .v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
+/* (20 nov., intégration) Achats porte DEUX ronds dans cet hôte (Retrouver, Arrivée) : côte à côte, le titre leur laisse la place. */
+.vrm-tache-retrouver { display: inline-flex; align-items: center; gap: 8px; }
+.v2-tete-tache:has(.vrm-tache-retrouver [data-arv-bouton]) h1 { padding-right: 108px; }
+.v2-tete-tache:has(> .vrm-tache-retrouver [data-arv-bouton]) > .v2-titre-ligne { padding-right: 112px; }
 .v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
 /* (19 nov., intégration) Le rond « retrouver » ne se pose plus sur « Ajouter » : la ligne du titre lui garde sa place. */
 .v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne { padding-right: 60px; box-sizing: border-box; }

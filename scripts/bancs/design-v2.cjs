@@ -87,7 +87,9 @@ async function mesurerEcran(pg, nom, tel) {
     const horsAncien = (e) => !e.closest('[data-v2-detail-retraits], .v2-feuille-corps');
     const boutons = zones.flatMap((z) => z.matches('button') ? [z] : [...z.querySelectorAll('button')]).filter(vis).filter(horsAncien);
     const petits = boutons.filter((b) => { return b.offsetHeight < 44 || b.offsetWidth < 44; }).map((b) => (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 30) + ':' + b.offsetWidth + 'x' + b.offsetHeight);
-    const horsComposant = boutons.filter((b) => !b.hasAttribute('data-v2b') && !b.hasAttribute('data-v2-rangee')).map((b) => b.className.slice(0, 40));
+    // (20 nov., intégration) Un contrôle de « VRM natif » (classe `n-…`, le seul design depuis le 19 nov. : ex. le plan des points
+    // des colis à retirer, retraits-visuel) est de la famille du composant natif, pas un bouton d'avant hors composant.
+    const horsComposant = boutons.filter((b) => !b.hasAttribute('data-v2b') && !b.hasAttribute('data-v2-rangee') && !/(^|\s)n-/.test(b.className)).map((b) => b.className.slice(0, 40));
     const inlineFlex = [...document.querySelectorAll('.v2b, .v2b-hote, .v2-rangee')].filter((e) => getComputedStyle(e).display === 'inline-flex').length;
     const textes = zones.flatMap((z) => [...z.querySelectorAll('*')]).filter(vis).filter(horsAncien).filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
     const tronques = textes.filter((e) => { const cs = getComputedStyle(e); return e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && /hidden|clip/.test(cs.overflowX) && e.clientWidth > 0; }).map((e) => e.className + ':' + e.textContent.trim().slice(0, 30));
@@ -228,7 +230,10 @@ async function telephone(nav, sombre, b, sigs) {
     pages: [...document.querySelectorAll('.v2-passe-pages')].map((p) => p.textContent.trim()), enRoute: document.querySelectorAll('[data-v2-achat]').length }));
   dit(a.passes.length > 0 && a.passes.every((p) => p.n === p.faces), `A ${a.passes.length} passes (un point = une passe), chaque colis du point a sa face`, a.passes);
   const tousAvant = avant.achats.codes;
-  const nFaces = a.passes.reduce((t, p) => t + p.faces, 0);
+  // (20 nov., intégration, lot retraits-visuel) Un « à vérifier » qui a encore son code ou son QR RESTE dans la carte de son point
+  // (`data-rp-verif`, décision de rétention) : il n'est pas « à retirer » — comparé hors de ces faces-là.
+  const nVerif = await pg.evaluate(() => document.querySelectorAll('[data-v2-face][data-rp-verif]').length);
+  const nFaces = a.passes.reduce((t, p) => t + p.faces, 0) - nVerif;
   dit(a.codes.length > 0 && a.codes.every((c) => tousAvant.includes(c)), `A les ${a.codes.length} codes des passes sont des codes qu’Achats portait avant (${tousAvant.length}, à vérifier compris) — aucun inventé`, { v2: a.codes, avant: tousAvant });
   dit(String(nFaces) === String(avant.journee.ret), `A ${nFaces} colis en passes = « À retirer » de Ma journée d’avant (${avant.journee.ret})`, { faces: nFaces, avant: avant.journee.ret });
   dit(a.qr <= avant.achats.qr && a.qr <= nFaces, `A QR seulement s’il existe (${a.qr} ici, ${avant.achats.qr} lignes « QR » avant)`, a);

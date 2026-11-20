@@ -67123,10 +67123,10 @@ function AppCoeur() {
           {/* (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat (src/ScannerRetrouver.jsx). */}
           {(t === 'ventes' || t === 'achats') && !baseKO && !(t === 'ventes' && v2VentesColis) ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
-          </span> : null}
-          {/* (20 nov., lot arrivee-scan) « Arrivée » : un colis reçu en main ⇒ le scan ⇒ l'écran d'arrivée de SON achat (N°, case, étiquette). */}
-          {t === 'achats' && !baseKO ? <span className="vrm-tache-retrouver" data-arv-hote="achats">
-            <Rond icone="box" label={tr('arv.bouton')} titre={tr('arv.boutonTitre')} onClick={() => ouvrirRetrouver('achats', '', 'arrivee')} attrs={{ 'data-arv-bouton': 'achats' }}/>
+            {/* (20 nov., lot arrivee-scan) « Arrivée » : un colis reçu en main ⇒ le scan ⇒ l'écran d'arrivée de SON achat (N°, case, étiquette).
+                (Intégration 20nov) DANS le même hôte que « Retrouver » : deux hôtes posés au même endroit (absolu, à droite) se
+                recouvraient — « Retrouver un colis » n'était plus touchable (banc design-v2 T). */}
+            {t === 'achats' ? <span data-arv-hote="achats" style={{ display: 'contents' }}><Rond icone="box" label={tr('arv.bouton')} titre={tr('arv.boutonTitre')} onClick={() => ouvrirRetrouver('achats', '', 'arrivee')} attrs={{ 'data-arv-bouton': 'achats' }}/></span> : null}
           </span> : null}
           {t === 'ventes' && !designV2App && !baseKO ? <span className="vv-tete-place" data-vv-tete-place="ventes"/> : null}
         </header>}

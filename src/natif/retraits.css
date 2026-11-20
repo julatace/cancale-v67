@@ -84,7 +84,7 @@
 
   /* La barre du trajet : cinq étapes, la courante en accent, une étape non lue grise (aucune date). */
   .n-rp-trajet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .n-rp-etape { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; text-align: center; color: var(--n-encre-3); }
+  .n-rp-etape { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; text-align: center; color: var(--n-encre-2); }   /* (20 nov., intégration) plus d'encre-3 : « Payé », « Expédié »… lisibles (≥ 4,5:1, banc design-v2 C) ; la non-lue se dit par son point creux et l'absence de date */
   .n-rp-etape::before { content: ""; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: var(--n-trait); }
   .n-rp-etape:first-child::before { display: none; }
   .n-rp-etape.is-lien-lu::before { background: var(--n-encre-2); }
@@ -92,7 +92,7 @@
   .n-rp-etape.is-lue .n-rp-etape-point { border-color: var(--n-encre-2); background: var(--n-encre-2); }
   .n-rp-etape.is-courante .n-rp-etape-point { border-color: var(--n-accent); background: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
   .n-rp-etape-nom { max-width: 100%; font: var(--n-t-legende); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .n-rp-etape.is-lue .n-rp-etape-nom { color: var(--n-encre-2); }
+  .n-rp-etape.is-lue .n-rp-etape-nom { color: var(--n-encre); }
   .n-rp-etape.is-courante .n-rp-etape-nom { color: var(--n-accent); font-weight: 600; }
   .n-rp-etape-date { min-height: 16px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
