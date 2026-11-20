@@ -90,7 +90,8 @@ import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './fr/stockRangement.js';
-import ecran_arrivee_scan from './fr/arriveeScan.js';   // (20 nov., lot arrivee-scan)
+import ecran_arrivee_scan from './fr/arriveeScan.js';
+import ecran_roles_comptes from './fr/rolesComptes.js';   // (20 nov., lot bleam-suite)   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './fr/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_demarrage from './fr/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
 import ecran_natif from './fr/natif.js';
@@ -2371,6 +2372,7 @@ export default {
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
   ...ecran_arrivee_scan,
+  ...ecran_roles_comptes,
   ...ecran_demarrage,
   ...ecran_natif,
   ...ecran_extension,

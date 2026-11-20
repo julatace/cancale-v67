@@ -127,6 +127,7 @@ import { declarationAnnuelle } from '../declarationAnnuelle.js';
 // ⟦← App.jsx #4⟧
 import { accompagner } from '../accompagnement.js';   // (14 nov.) après / échec d'un geste
 import { AccAvant, AccEchec } from '../ui/Accompagne.jsx';
+import { CLE_ROLES_COMPTES, comptesHorsTotaux } from '../rolesComptes.js';   // (20 nov., lot bleam-suite) compte personnel hors totaux déclarés
 const FicheFacturation = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FicheFacturation })));
 const ListeFacturesPro = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.ListeFacturesPro })));
 const FacturesAEnvoyer = aLaDemande(() => import('../FacturePro.jsx').then((m) => ({ default: m.FacturesAEnvoyer })));
@@ -1629,7 +1630,7 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   const { ventes, ko } = useVentesCoque();
   // (6 nov.) VENDU compte aussi les ventes vues par e-mail pas encore relues (src/venteEmailFraiche.js) ;
   // REÇU (daté au versement) ne les voit jamais.
-  const hAccCle = [...new Set((load('vinted_accounts_hidden', []) || []).map(String))].sort().join(',');
+  const hAccCle = [...comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}))].sort().join(',');
   const ventesEmailCa = useVentesEmailFraiches(ventes, ko, accounts, (u) => compteEcarte(u, new Set(hAccCle ? hAccCle.split(',') : []), panelOff || {}), hAccCle + '|' + JSON.stringify(panelOff || {}));
   const ventesVendu = React.useMemo(() => avecVentesEmail(ventes, ventesEmailCa), [ventes, ventesEmailCa]);
   const [datesLbc] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);
@@ -1642,12 +1643,12 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
   // Les ventes et comptes masqués sont des réglages synchronisés (§5.49).
   const [tick, setTick] = React.useState(0);
   React.useEffect(() => onCloudReady(() => setTick((t) => t + 1)), []);
-  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden' || k === CLE_ROLES_COMPTES) setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
     if (!Array.isArray(ventes)) return { etat: 'passu' };
     const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const hAcc = comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}));   // (20 nov.) + les comptes PERSONNELS (src/rolesComptes.js)
     const ecarte = (uid) => compteEcarte(uid, hAcc, panelOff || {});
     const uidDe = (o) => o && o._acc && o._acc.vinted_user_id;
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
@@ -1918,12 +1919,12 @@ function useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
   const [versements, setVersements] = React.useState(undefined);
   React.useEffect(() => { let mort = false; fetchVersementsVinted().then((m) => { if (!mort) setVersements(m); }).catch(() => { if (!mort) setVersements(null); }); return () => { mort = true; }; }, []);
   const [tick, setTick] = React.useState(0);
-  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
+  React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden' || k === CLE_ROLES_COMPTES) setTick((t) => t + 1); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const calc = React.useMemo(() => {
     if (ventes === undefined) return { etat: 'encours' };
     if (!Array.isArray(ventes)) return { etat: 'passu' };
     const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
-    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const hAcc = comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}));   // (20 nov.) + les comptes PERSONNELS (src/rolesComptes.js)
     const loginDe = (uid) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === String(uid)); return (a && a.login) || String(uid); };
     const lbc = lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), datesLbc) : [];
     const ebay = Array.isArray(ebayCommandes) ? ebayCommandes : [];

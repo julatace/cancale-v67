@@ -28,12 +28,18 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov., « tout comme Bleam », la suite) docs/passation/2026-11-20-bleam-suite.md — ext. 5.410.4
+  { id: 'bleam-apres-vente', date: '2026-11-20', titre: 'Après-vente, cycle de vie et stock auto', phrase: 'Dans l’extension, onglet Automatisations ; tout est éteint au départ.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'compte-personnel', date: '2026-11-20', titre: 'Un compte Vinted personnel, hors URSSAF', phrase: 'Comptes liés › Gérer : vente, achats ou personnel.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « 4 litiges avec 2 écritures différentes » ; « fais un beau logo pour relier ») src/natif/ecrans/RetoursVentes.jsx, celluleAchat.jsx
   { id: 'ventes-retours', date: '2026-11-20', titre: 'Retours rangés, relier en un toucher', phrase: 'Un groupe « Retours et litiges » ; les maillons relient la vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme, ça ne marche pas du tout ») docs/passation/2026-11-20-sans-selecteur.md
   { id: 'sans-selecteur', date: '2026-11-20', titre: 'Tous tes sites ensemble, sans onglets', phrase: 'Chaque ligne porte le logo de son site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
   { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov. au soir, décision de Julien : « on fait absolument tout comme Bleam », ext. 5.410.3) docs/passation/2026-11-20-comme-bleam.md
+  { id: 'repub-formulaire', date: '2026-11-20', titre: 'Republier par le formulaire de Vinted', phrase: 'Champ par champ, dans un onglet nommé ; l’ancienne méthode au choix.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-bleam', date: '2026-11-20', titre: 'Favoris : le message, puis l’offre', phrase: 'Message « lot » si on aime plusieurs articles ; offre jamais sous ton plancher.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
   // (20 nov., Julien : « trie du plus récent, des filtres, jamais un achat pas encore livré, il manque des paires ») docs/passation/2026-11-20-relier-achats.md
   { id: 'relier-achats', date: '2026-11-20', titre: 'Relier : toutes tes paires, plus récentes d’abord', phrase: 'Filtres plateforme, marque, taille ; seuls les achats reçus.', tab: 'achats', pour: 'tous', mode: 'tous' },

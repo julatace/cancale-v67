@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.2';
+const CODE_VERSION = '5.410.4';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4027,6 +4027,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixCarte') { changerPrixCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifier') { atelierVerifier(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingPlus') { dressingPlus(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.410.4
+    if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingAction') { dressingAction(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'analyseFavoris') { (async () => { const o = ongletCarte(sender); const u = o ? await compteConnecte('www.vinted.fr') : null; return u ? Object.assign({ ok: true }, await analyseFavorisCarte(String(u))) : { ok: false, code: 'onglet' }; })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierLancer') { atelierLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierArreter') { atelierArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -4035,6 +4038,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisAuto') { favorisAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'supprimerLbcCarte') { supprimerLbcCarte(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
+    // 5.410.3 (`repubformulaire`) : la méthode de republication, le message « lot » et le délai de l'offre (Paramètres
+    // du panneau, SON toucher) ; l'onglet qui travaille (nommé dans le panneau, « Voir l'onglet » l'affiche).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'commeBleamLire') {
+      Promise.all([reglagesCommeBleam(), etatOngletTravail()]).then(([reglages, onglet]) => sendResponse({ ok: true, reglages, onglet }), () => sendResponse({ ok: false }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'commeBleamPoser') {
+      poserReglagesCommeBleam(msg.valeur).then(sendResponse, () => sendResponse({ ok: false, raison: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'voirOngletTravail') {
+      etatOngletTravail().then(async (o) => { if (!o) return sendResponse({ ok: false }); try { await chrome.tabs.update(o.tabId, { active: true }); const t = await chrome.tabs.get(o.tabId); if (t && t.windowId != null) await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} sendResponse({ ok: true }); }, () => sendResponse({ ok: false }));
+      return true;
+    }
     // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglageAuto') {
       reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
@@ -11951,7 +11968,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -12897,15 +12914,18 @@ function seuilOffreLu(v) {
   return isFinite(n) && n > 0 ? n : null;
 }
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde', 'vinted_offres_paliers']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde', 'vinted_offres_paliers', 'vinted_buyprice_by_num']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
   const nums = m.vinted_annonce_numeros || {};
-  const mins = {}, refuses = {};
+  const mins = {}, refuses = {}, achats = {};
   for (const k in nums) {
     // (5.342, P4) « 45,5 » (clavier français) se lit 45,5 comme à l'écran — avant : NaN, mini ignoré sans un mot.
     const n = seuilOffreLu(nums[k] && nums[k].min); if (n != null) mins[String(k)] = n;
     const rf = seuilOffreLu(nums[k] && nums[k].refuse); if (rf != null) refuses[String(k)] = rf;   // seuil de refus posé par LUI
+    // 5.410.4 : l'achat de CETTE fiche (posé sur la fiche, sinon sous SON N°) — pour le plancher absolu achat + 10 %.
+    const f0 = nums[k] || {}; const ac = seuilOffreLu(f0.buyPrice != null && String(f0.buyPrice).trim() !== '' ? f0.buyPrice : (f0.numero != null && m.vinted_buyprice_by_num ? m.vinted_buyprice_by_num[cleNum(f0.numero)] : null));
+    if (ac != null) achats[String(k)] = ac;
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
@@ -12916,7 +12936,8 @@ async function offreAutoReglages() {
   // 5.409 : la négociation par paliers (son réglage, éteint par défaut ; les messages passent la même garde de mots).
   const paliers = reglagesPaliersExt(m.vinted_offres_paliers);
   paliers.messages = paliers.messages.filter((t) => !erreurMessageAutoExt(t));
-  return { actif, mins, refuses, msgRefus, refusVersions, garde, paliers };
+  for (const k of ['msgAccepte', 'msgContre', 'msgFinale']) paliers[k] = paliers[k].filter((t) => !erreurMessageAutoExt(t));
+  return { actif, mins, refuses, achats, msgRefus, refusVersions, garde, paliers };
 }
 // ══ 5.409 (19 nov.) — LA NÉGOCIATION PAR PALIERS, sans IA (copie de src/negociationPaliers.js ; l'audit
 //    scripts/audit-negociation-paliers.cjs exige les mêmes réponses sur la même table de cas) ═══════════════════
@@ -12926,45 +12947,75 @@ async function offreAutoReglages() {
 // aléatoire 3–20 min, offre RELUE avant le geste, sécurité du compte, garde (compte de l'onglet, 15/h offres, 50/h,
 // réserve, pause 429/403, captcha), une à la fois ; journal « contre_offre ». Éteinte par défaut.
 const PALIERS_DEFAUT_EXT = { paliers: [50, 80, 100] };
+// 5.410.4 : tranches, bonus de lot, pas d'arrondi (1 € / 0,50 €), « rester flexible », étape finale, plancher ABSOLU
+// (prix mini, sinon achat + 10 %) — copie de src/negociationPaliers.js (audit-negociation-paliers : mêmes réponses).
 function reglagesPaliersExt(v) {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   const pcts = (Array.isArray(o.paliers) ? o.paliers : PALIERS_DEFAUT_EXT.paliers).map(Number).filter((x) => Number.isFinite(x) && x > 0 && x <= 100);
   const uniques = [...new Set(pcts.map((x) => Math.round(x)))].sort((a, b) => a - b).slice(0, 6);
   const rm = Number(o.remiseMax);
+  const tranches = (Array.isArray(o.tranches) ? o.tranches : []).map((x) => ({ de: Number(x && x.de), a: Number(x && x.a), baisse: Number(x && x.baisse) }))
+    .filter((x) => Number.isFinite(x.de) && Number.isFinite(x.a) && Number.isFinite(x.baisse) && x.de >= 0 && x.a > x.de && x.baisse > 0 && x.baisse < x.a).sort((a, b) => a.de - b.de).slice(0, 8);
+  const bl = Number(o.bonusLot);
+  const fx = o.flexible && typeof o.flexible === 'object' && o.flexible.actif === true ? Number(o.flexible.ecart) : NaN;
+  const vers = (k) => (Array.isArray(o[k]) ? o[k] : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5);
+  const d = o.delais && typeof o.delais === 'object' ? o.delais : null;
   return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
-    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5), arrondi: o.arrondi !== false };
+    messages: vers('messages'), arrondi: o.arrondi !== false, pas: Number(o.pas) === 0.5 ? 0.5 : 1, tranches, bonusLot: Number.isInteger(bl) && bl > 0 && bl <= 50 ? bl : 0,
+    flexible: typeof o.flexible === 'number' ? (o.flexible > 0 && o.flexible <= 10 ? o.flexible : 0) : Number.isFinite(fx) ? (fx > 0 && fx <= 10 ? fx : 2) : (o.flexible && o.flexible.actif === true ? 2 : 0),   // déjà normalisé : un nombre
+    msgAccepte: vers('msgAccepte'), msgContre: vers('msgContre'), msgFinale: vers('msgFinale'),
+    delais: d && Number.isInteger(Number(d.min)) && Number.isInteger(Number(d.max)) && Number(d.min) >= 1 && Number(d.max) > Number(d.min) && Number(d.max) <= 240 ? { min: Number(d.min), max: Number(d.max) } : null };
 }
-function plancherPalier(prix, mini, remiseMax) {
-  const p = Number(prix); if (!(p > 0)) return null;
-  const m = Number(mini); if (Number.isFinite(m) && m > 0) return m < p ? m : null;
-  const r = Number(remiseMax); if (Number.isFinite(r) && r > 0 && r < 90) return Math.ceil(Math.round(p * (1 - r / 100) * 100)) / 100;
+function plancherAbsoluPalier(mini, achat) {
+  const m = Number(mini); if (Number.isFinite(m) && m > 0) return m;
+  const a = Number(achat); if (Number.isFinite(a) && a > 0) return Math.ceil(Math.round(a * 100) * 110 / 100) / 100;
   return null;
+}
+function plancherPalier(prix, mini, remiseMax, opts = {}) {
+  const p = Number(prix); if (!(p > 0)) return null;
+  const abs = plancherAbsoluPalier(mini, opts.achat);
+  const lot = Number(opts.nArticles) > 1 && Number(opts.bonusLot) > 0 ? 1 + Number(opts.bonusLot) / 100 : 1;
+  const tr = (Array.isArray(opts.tranches) ? opts.tranches : []).find((x) => p >= x.de && p <= x.a);
+  let f;
+  if (tr) f = Math.ceil(Math.round((p - tr.baisse * lot) * 100)) / 100;
+  else {
+    const m = Number(mini); if (Number.isFinite(m) && m > 0) return m < p ? m : null;
+    const r = Number(remiseMax) > 0 ? Number(remiseMax) * lot : NaN;
+    if (Number.isFinite(r) && r > 0 && r < 90) f = Math.ceil(Math.round(p * (1 - r / 100) * 100)) / 100;
+    else f = abs;
+  }
+  if (f == null) return null;
+  if (abs != null && f < abs) f = abs;
+  return f < p ? f : null;
 }
 function prixPaliersExt(prix, plancher, R) {
   const p = Number(prix), f = Number(plancher);
   if (!(p > 0) || !(f > 0) || !(f < p)) return [];
   const out = [];
+  const pas = R.pas === 0.5 ? 0.5 : 1;
   for (const pct of R.paliers) {
     let v = p - (p - f) * pct / 100;
-    v = R.arrondi ? Math.round(v) : Math.round(v * 100) / 100;
+    v = R.arrondi ? Math.round(v / pas) * pas : Math.round(v * 100) / 100;
+    v = Math.round(v * 100) / 100;
     if (v < f) v = f;
     if (v >= p) continue;
     if (!out.length || v < out[out.length - 1]) out.push(v);
   }
   return out;
 }
-function palierContreOffre({ prix, mini, offre, joues = [], reglages }) {
+function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages }) {
   const R = reglagesPaliersExt(reglages);
   if (!R.actif) return null;
-  const f = plancherPalier(prix, mini, R.remiseMax);
+  const f = plancherPalier(prix, mini, R.remiseMax, { achat, nArticles, tranches: R.tranches, bonusLot: R.bonusLot });
   if (f == null) return null;
   const l = prixPaliersExt(prix, f, R);
   const deja = new Set((Array.isArray(joues) ? joues : []).map(Number));
   for (let i = 0; i < l.length; i++) {
     if (deja.has(i)) continue;
+    if (R.flexible > 0 && Number(offre) >= f && Number(offre) < l[i] && l[i] - Number(offre) <= R.flexible + 1e-9) return { i, accepter: true, prix: Number(offre), plancher: f };
     if (!(l[i] > Number(offre))) return null;
     if (l[i] < f) return null;
-    return { i, prix: l[i], plancher: f };
+    return { i, prix: l[i], plancher: f, finale: i === l.length - 1 };
   }
   return null;
 }
@@ -12985,14 +13036,14 @@ async function contreOffreAuto({ uid, acc, o, prix, messages }) {
       const versions = messages.map((t, i) => ({ n: i + 1, texte: t }));
       const v = choisirVariante(versions, await varianteDerniere(uid, 'contre'));
       if (v && v.texte) {
-        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${o.conv}/replies`, corpsReponseVinted(remplirVariablesOffre(v.texte, o)), { timeoutMs: 12000 });
+        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${o.conv}/replies`, corpsReponseVinted(remplirVariablesOffre(v.texte, Object.assign({}, o, { prixPropose: prix }))), { timeoutMs: 12000 });
         if (rm && rm.ok) { variante = v.n; await noterVarianteDerniere(uid, 'contre', v.n); }
       }
     }
   }
   return { ok: true, variante };
 }
-function remplirVariablesOffre(t, o) { return String(t).replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
+function remplirVariablesOffre(t, o) { return String(t).replace(/\{price\}|\{prix\}/g, o && Number(o.prixPropose) > 0 ? String(o.prixPropose).replace('.', ',') + ' €' : '').replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
 // `offreEnAttenteDe` de l'app (§11), bornée par identité d'offre.
@@ -13119,10 +13170,12 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   // (5.369) `msg` : ses versions [{n, texte}] (ou l'ancien texte seul). Une version
   // tirée au hasard, jamais celle du refus précédent ; puis le temps d'écriture.
   const versionsRefus = Array.isArray(msg) ? msg : (typeof msg === 'string' ? versionsMessage(msg, []) : []);
-  if (quoi === 'reject' && r && r.ok && conv && versionsRefus.length) {
+  // 5.410.4 : aussi après une acceptation, SON message d'acceptation (versions au hasard, {price} = le prix accepté).
+  const sorteMsg = quoi === 'accept' ? 'accepte' : 'refus';
+  if ((quoi === 'reject' || quoi === 'accept') && r && r.ok && conv && versionsRefus.length) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
-    const version = choisirVariante(versionsRefus, await varianteDerniere(uid, 'refus'));
+    const version = choisirVariante(versionsRefus, await varianteDerniere(uid, sorteMsg));
     // ⚠️ 5.361 (revue de robustesse, haute 21) : le corps est la forme RELEVÉE sur
     //    ses vraies requêtes (`docs/automatisation-vinted.md` §3, la même que
     //    `executerMessageFavori` et l'app) — `corpsReponseVinted`. Avant : `{ message }`,
@@ -13147,7 +13200,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
       });
     } catch (_) {}
     if (!parti) { if (c2.at) await rendreActions(String(uid), c2.at, 1); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
-    await noterVarianteDerniere(uid, 'refus', version.n);
+    await noterVarianteDerniere(uid, sorteMsg, version.n);
     return { ok: true, status: r.status, code: r.code, error: '', variante: version.n };
   }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
@@ -13232,8 +13285,10 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const it = d && d.parId && d.parId[String(o.item)];
         const prixAnn = it ? prixCarte(it.price) : null;
         const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
-        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
-        if (palier) quoi = 'contre';
+        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
+        // 5.410.4 « rester flexible » : l'offre est à ≤ N € du palier et au-dessus du plancher ⇒ ACCEPTÉE (mêmes gardes que l'acceptation).
+        if (palier && palier.accepter) quoi = 'accept';
+        else if (palier) quoi = 'contre';
       }
       if (!quoi) continue;
       // (5.308) Jamais une acceptation sur une paire vendue ailleurs, ni sur une
@@ -13256,7 +13311,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         }
       }
       // Délai aléatoire depuis la PREMIÈRE fois où VRM voit l'offre.
-      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs() * (await facteurPrudence(uid)), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
+      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + (palier && reg.paliers.delais ? tirerEntre(reg.paliers.delais.min * 60000, reg.paliers.delais.max * 60000) : delaiOffreMs()) * (await facteurPrudence(uid)), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs() * fPrud));   // étalement aléatoire entre deux gestes
       await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
@@ -13306,7 +13361,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         for (const k in jt) if (!jt[k] || jt[k].at < Date.now() - 30 * 86400000) delete jt[k];
         st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
         await chrome.storage.local.set({ vrmContreOffres: jt, vrmOffresFaites: st, vrmOffresPrevues: pv });
-        const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: reg.paliers.messages });
+        const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: palier.finale && reg.paliers.msgFinale.length ? reg.paliers.msgFinale : reg.paliers.msgContre.length ? reg.paliers.msgContre : reg.paliers.messages });
         if (rc && rc.ok) {
           faites += 1;
           await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante });
@@ -13319,7 +13374,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const st2 = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {}; delete st2[o.oid]; delete st[o.oid]; await chrome.storage.local.set({ vrmOffresFaites: st2 });
         break;
       }
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -13382,6 +13437,7 @@ async function visiteVintedUnPassage() {
     prixAttenteTick('visite').catch(() => {});
     regleBaisseTick('visite').catch(() => {});      // 5.409 : la baisse par règle (éteinte par défaut)
     masquerAilleursTick('visite').catch(() => {});  // 5.409 : vendue ailleurs ⇒ masquée sur Vinted
+    apresVenteTick('visite').catch(() => {});       // 5.410.4 : après-vente (éteint par défaut)
     // 5.290 : les n° que le serveur ne peut pas lire chez le transporteur
     // (Mondial Relay toujours) — un passage au plus toutes les 5 min, son
     // propre budget : rien de la visite Vinted n'est consommé ni attendu.
@@ -15999,6 +16055,8 @@ async function reprendreRepub(msg) {
   if (!vb) return { accepte: false, code: 'rien', raison: "VRM n'a rien enregistré pour cette republication — rien n'a été touché" };
   if (vb.uid && String(vb.uid) !== uid) return { accepte: false, code: 'autre-compte', raison: "cette republication n'est pas sur ce compte — rien n'a été touché" };
   if (vb.etat === 'fait') return { accepte: true, etape: 'fait', deja: true, draftId: vb.draftId || undefined, nouvelId: vb.nouvelId || undefined, raison: 'déjà fait — rien n’a été renvoyé.' };
+  // 5.410.3 : une paire faite par le formulaire se reprend par le formulaire (rien de ce qui est prouvé n'est refait).
+  if (vb.methode === 'formulaire') return reprendreParFormulaire(msg, acc, vb);
   const draftId = /^\d{4,15}$/.test(String(vb.draftId || '')) ? String(vb.draftId) : '';
   if (draftId && await brouillonPlanifie(draftId)) return { accepte: false, code: 'planifiee', raison: 'la mise en ligne de ce brouillon est déjà programmée — rien à faire.' };
   const lire = (cible) => avecVinted(() => vintedPage(acc, 'GET', `/api/v2/item_upload/items/${cible}`, null, { timeoutMs: 30000 }));
@@ -16302,7 +16360,7 @@ function etapeRepub(id, etape, extra) {
 // annoncées (aucune n'est déduite) ; seulement pendant une republication de CE compte
 // (l'état `vrmActionEnCours` posé par `avecActionPlein`, même article).
 const ORDRE_ETAPES_REPUB = ['coffre', 'brouillon', 'supprimee', 'enligne'];
-const ETAPE_VERS_CHAINE = { lecture: ['coffre', 0], photos: ['coffre', 0], enregistrement: ['coffre', 0], complete: ['coffre', 0], brouillon: ['brouillon', 0], suppression: ['supprimee', 0], attente: ['enligne', 0], 'en-ligne': ['enligne', 0], fin: ['enligne', 1] };
+const ETAPE_VERS_CHAINE = { formulaire: ['coffre', 0], lecture: ['coffre', 0], photos: ['coffre', 0], enregistrement: ['coffre', 0], complete: ['coffre', 0], brouillon: ['brouillon', 0], suppression: ['supprimee', 0], attente: ['enligne', 0], 'en-ligne': ['enligne', 0], fin: ['enligne', 1] };
 let _chaineEtapeAction = Promise.resolve();
 function poserEtapeAction(id, etape, extra) {
   const suite = _chaineEtapeAction.then(async () => {
@@ -16510,6 +16568,15 @@ async function recreerVinted(msg) {
     // (2 nov., revue) Ni la lecture vivante ni celle-ci n'ont vu l'annonce (Vinted 5xx,
     // pas de réponse) : VRM ne sait pas si elle existe encore — il ne crée rien à l'aveugle.
     if (rl && !rl.ok) { noterDiag(`recreer_lecture_ko_${Number(rl.status) || 0}`); return { accepte: true, etape: 'echec', raison: `Vinted n'a pas répondu en lisant cette annonce (${Number(rl.status) || 'pas de réponse'}) — VRM ne sait pas si elle existe encore, rien n'a été créé ni supprimé. Réessaie dans quelques minutes.` }; }
+    // 5.410.3 (`repubformulaire`, sa décision du 20 nov. : « tout comme Bleam ») — par le FORMULAIRE de Vinted,
+    // sauf s'il a choisi l'ancienne méthode (Paramètres du panneau) : la même place dans la file, les mêmes gardes.
+    if (msg.methode !== 'directe' && (msg.methode === 'formulaire' || (await reglagesCommeBleam()).methode === 'formulaire')) {
+      const essaiF = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: !!manqueRecette });
+      if (essaiF.item && corrige) for (const k of Object.keys(corrige)) if (corrige[k] != null) essaiF.item[k] = corrige[k];
+      const rf = await recreerParFormulaire({ acc, uid, id, msg, urls, second, reglages, item: essaiF.item, titre, prix, description, descBase, sauve, photosC, versB, lettreFin, recette });
+      envoyes += Number(rf.envoyes) || 0;
+      return rf.r;
+    }
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
@@ -16564,9 +16631,11 @@ async function recreerVinted(msg) {
     await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsCV), titre, prix, nPhotos: ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
     await majVersBrouillon(uid, id, { etat: 'brouillon-range', draftId, supprime: false });
     // 4. L'ancienne annonce SUPPRIMÉE, juste après (comme Vintex).
-    etapeRepub(id, 'suppression');
-    await pauseRepub('suppression', uid);
-    const rdV = await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
+    // 5.410.4 (« Stock auto ») : `dupliquer` — l'annonce VENDUE reste (elle porte la vente) : rien n'est supprimé, la
+    //    copie est mise en ligne. Seul le moteur « Stock auto » le pose (`stockAutoGeste`, par identité de N°).
+    const dupliquer = msg.dupliquer === true;
+    if (!dupliquer) { etapeRepub(id, 'suppression'); await pauseRepub('suppression', uid); }
+    const rdV = dupliquer ? { ok: true, status: 200, json: {}, dupliquee: true } : await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });
     // (29 oct., revue) Suppression PAS PARTIE (pas d'onglet, pause) : l'issue est certaine,
     // l'ancienne est toujours en ligne — jamais « peut-être », jamais de verrou de 30 min.
     if (pasParti(rdV)) {
@@ -16592,8 +16661,8 @@ async function recreerVinted(msg) {
     }
     await noterRepubJour(uid);
     if (suppIncertaine) noterDiag(`versbrouillon_suppression_incertaine_${(rdV && rdV.status) || 0}`);
-    else { try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {} }
-    await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: !suppIncertaine, supprimeLe: suppIncertaine ? null : new Date().toISOString(), ...(suppIncertaine ? { cause: 'suppression-incertaine' } : {}) });
+    else if (!dupliquer) { try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {} }
+    await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: !suppIncertaine && !dupliquer, supprimeLe: suppIncertaine ? null : new Date().toISOString(), ...(suppIncertaine ? { cause: 'suppression-incertaine' } : {}) });
     if (versB) {
       if (suppIncertaine) { await poserVerrouRecreer(id); return { accepte: true, etape: 'double', draftId, raison: "le brouillon est rangé sur Vinted. Vinted n'a pas répondu clairement à la suppression : l'annonce est PEUT-ÊTRE encore en ligne — regarde ton dressing." }; }
       noterDiag('versbrouillon_ok');
@@ -16622,6 +16691,414 @@ async function recreerVinted(msg) {
     await pauseRepub('enLigne', uid);
     return await finRepubBrouillon(acc, job);
   } finally { if (!confie && nA - envoyes > 0) await rendreActions(uid, tRes, nA - envoyes); } });
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.410.3 (`repubformulaire`, `favorisbleam`) — « ON FAIT ABSOLUMENT TOUT COMME BLEAM »
+// ══════════════════════════════════════════════════════════════════════════════
+// Décision de Julien du 20 nov. au soir, après avoir observé l'outil concurrent sur son
+// compte (export de VRM Observateur : formes et délais seulement, aucune valeur recopiée).
+// Elle remplace, pour la republication et les messages aux favoris, la ligne « Piloter
+// souris / clavier : refusé ». Il a été prévenu UNE fois du risque : un clic fabriqué
+// (`isTrusted: false`) est visible par Vinted. ⚠️ RIEN n'est fait pour que ces clics aient
+// l'air humains (ni `isTrusted` maquillé, ni débogueur, ni mouvement de souris inventé).
+//
+// LA REPUBLICATION PAR LE FORMULAIRE (méthode par défaut ; l'ancienne, « directe », reste
+// choisissable dans Paramètres du panneau) — mesuré chez l'outil observé, ≈ 3 min par paire :
+//   1. un onglet vinted.fr DU MÊME CHROME (le compte de l'onglet, mêmes cookies), ouvert en
+//      arrière-plan et NOMMÉ dans le panneau (« VRM travaille dans cet onglet · Voir ») ;
+//   2. la page « Modifier » de l'ancienne annonce (une lecture), puis « Vends tes articles » ;
+//   3. les photos du COFFRE VRM déposées dans le champ de fichiers (la page les envoie) ;
+//   4. catégorie, titre, description, marque, taille, couleurs, colis, état, prix — saisis
+//      dans le vrai formulaire, 5 à 15 s au hasard entre deux champs (jamais deux fois le même) ;
+//   5. « Sauvegarder le brouillon » (la page envoie le brouillon ; VRM relit ce qu'elle a
+//      envoyé : un champ différent de la fiche ⇒ ARRÊT, l'ancienne n'est pas touchée) ;
+//   6. la page de l'ancienne annonce : « Supprimer » + la confirmation de Vinted ;
+//   7. la page du brouillon : « Ajouter » (la mise en ligne).
+// L'ordre VRM est gardé : coffre → brouillon → suppression → mise en ligne (jamais inversé).
+// Chaque étape est datée sur sa preuve (la RÉPONSE de Vinted à la requête de la page), comme
+// `repubetapes` ; « Reprendre » finit une paire interrompue par le même formulaire ; un élément
+// introuvable ⇒ arrêt propre, la raison dite (« Vinted a changé sa page ») ; jamais deux en ligne.
+// Tous les garde-fous restent : compte de l'onglet, 50/h et la cadence du compte (la paire
+// réservée d'un coup, comme avant), une paire à la fois (`avecVinted`), arrêt + alerte au
+// premier captcha / DataDome, pause sur 403/429, « Tout arrêter » (relu entre chaque champ),
+// et l'écran plein (`avecActionPlein`) sur vinted.fr pendant TOUT le travail.
+const COMME_BLEAM = 'vrmCommeBleam';
+const LOT_DEFAUT = 'Bonjour {username}, je vois que plusieurs de mes articles vous plaisent : je peux vous faire un prix sur un lot si vous voulez !';
+const OFFRE_APRES_DEFAUT = [8, 15];   // secondes entre le message et l'offre (mesuré : ~11 s)
+async function reglagesCommeBleam() {
+  let r = null; try { r = (await chrome.storage.local.get(COMME_BLEAM))[COMME_BLEAM]; } catch (_) { r = null; }
+  const o = r && typeof r === 'object' ? r : {};
+  const min = Number(o.offreMin), max = Number(o.offreMax);
+  const okMin = Number.isInteger(min) && min >= 3 && min <= 120, okMax = Number.isInteger(max) && max >= 3 && max <= 120;
+  const lot = typeof o.messageLot === 'string' && o.messageLot.trim() && o.messageLot.length <= 2000 ? o.messageLot : LOT_DEFAUT;
+  let a = okMin ? min : OFFRE_APRES_DEFAUT[0], b = okMax ? max : OFFRE_APRES_DEFAUT[1];
+  if (b <= a) b = Math.min(120, a + 1);
+  return { methode: o.methode === 'directe' ? 'directe' : 'formulaire', favoris: o.favoris !== false, messageLot: lot, offreMin: a, offreMax: b };
+}
+async function poserReglagesCommeBleam(v) {
+  if (!v || typeof v !== 'object') return { ok: false, raison: 'réglage illisible' };
+  const cur = await reglagesCommeBleam();
+  const n = { ...cur };
+  if (v.methode != null) { if (!['formulaire', 'directe'].includes(v.methode)) return { ok: false, raison: 'méthode inconnue' }; n.methode = v.methode; }
+  if (v.favoris != null) n.favoris = v.favoris === true;
+  if (v.messageLot != null) { const t = String(v.messageLot); if (!t.trim() || t.length > 2000) return { ok: false, raison: 'message vide ou trop long' }; if (!texteSurVinted(t).ok) return { ok: false, raison: 'Vinted refuserait ce message (lien, adresse ou numéro)' }; n.messageLot = t; }
+  if (v.offreMin != null || v.offreMax != null) {
+    const a = Number(v.offreMin != null ? v.offreMin : n.offreMin), b = Number(v.offreMax != null ? v.offreMax : n.offreMax);
+    if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 3 && b <= 120 && a < b)) return { ok: false, raison: 'délai entre 3 et 120 s, le plus court avant le plus long' };
+    n.offreMin = a; n.offreMax = b;
+  }
+  try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: n.methode, favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
+  return { ok: true, reglages: await reglagesCommeBleam() };
+}
+// ── L'onglet qui travaille : un onglet vinted.fr de CE Chrome, en arrière-plan, nommé dans le panneau.
+const ONGLET_TRAVAIL = 'vrmOngletTravail';
+const PAUSES_FORMULAIRE = { champ: [5000, 15000], apresSuppression: [15000, 40000] };
+let _dernierePauseChamp = -1;
+async function pauseFormulaire(quoi, uid) {
+  const p = PAUSES_FORMULAIRE[quoi] || PAUSES_FORMULAIRE.champ;
+  const f = await facteurPrudence(uid);
+  let ms;
+  for (let i = 0; i < 8; i++) { ms = Math.round((p[0] + Math.random() * (p[1] - p[0])) * f); if (quoi !== 'champ' || Math.round(ms / 250) !== Math.round(_dernierePauseChamp / 250)) break; }
+  if (quoi === 'champ') _dernierePauseChamp = ms;
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['formulaire:' + quoi, ms]); } catch (_) {}
+  if (_repubSuivi) { try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'repub', id: _repubSuivi, pause: 'formulaire', ms, jusqua: Date.now() + ms })).catch(() => {}); } catch (_) {} }
+  // Par tranches de 10 s au plus, chacune suivie d'un appel à Chrome : le service worker (MV3, §4.9) reste éveillé.
+  for (let reste = ms; reste > 0; reste -= 10000) { await new Promise((ok) => setTimeout(ok, Math.min(10000, reste))); try { await chrome.storage.local.get(ONGLET_TRAVAIL); } catch (_) {} }
+}
+async function attendreOnglet(tabId, re, ms = 45000) {
+  const fin = Date.now() + ms;
+  for (;;) {
+    let t = null; try { t = await chrome.tabs.get(tabId); } catch (_) { return null; }
+    let chemin = ''; try { chemin = new URL(String(t.url || '')).pathname; } catch (_) {}
+    if (t && t.status === 'complete' && (!re || re.test(chemin))) return t;
+    if (Date.now() > fin) return null;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+async function ongletTravailVinted(acc, uid) {
+  const domaine = (acc && acc.domain) || 'www.vinted.fr';
+  const pg = await pageVintedPour(acc);   // SON onglet vinted.fr, connecté sur CE compte : sans lui, rien ne part
+  if (pg.refus) return { refus: pg.refus };
+  let mem = null; try { mem = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; } catch (_) { mem = null; }
+  if (mem && mem.tabId != null) {
+    let t = null; try { t = await chrome.tabs.get(mem.tabId); } catch (_) { t = null; }
+    if (t && ongletDuDomaine(t, domaine)) { await poserOngletTravail({ ...mem, uid: String(uid), maj: Date.now() }); return { tabId: t.id }; }
+  }
+  let fen; try { fen = (await chrome.tabs.get(pg.tabId)).windowId; } catch (_) { fen = undefined; }
+  let t = null;
+  try { t = await chrome.tabs.create({ url: `https://${domaine}/`, active: false, ...(fen != null ? { windowId: fen } : {}) }); } catch (_) { t = null; }
+  if (!t || t.id == null) return { refus: 'onglet' };
+  await poserOngletTravail({ tabId: t.id, uid: String(uid), depuis: Date.now(), maj: Date.now() });
+  if (!(await attendreOnglet(t.id))) return { refus: 'onglet' };
+  return { tabId: t.id, cree: true };
+}
+async function poserOngletTravail(o) { try { await chrome.storage.local.set({ [ONGLET_TRAVAIL]: o }); } catch (_) {} }
+async function naviguerTravail(tabId, url, re) {
+  try { await chrome.tabs.update(tabId, { url }); } catch (_) { return false; }
+  return !!(await attendreOnglet(tabId, re));
+}
+// Les réponses de Vinted aux requêtes de la PAGE passent par les MÊMES constats que celles de
+// `requeteVinted` : sécurité du compte, pause 403/429, prudence, arrêt net au captcha.
+async function constaterFormulaire(acc, rep) {
+  if (!rep || typeof rep !== 'object') return;
+  const r = { status: Number(rep.status) || 0, ok: !!rep.ok, json: rep.json == null ? null : rep.json, text: String(rep.texte || ''), viaPage: true };
+  try { await secuObserver('vinted', acc && acc.vinted_user_id, { status: r.status, json: r.json, texte: r.text, entetes: rep.dd ? { 'x-datadome': '1' } : {} }); } catch (_) {}
+  if (freinVinted(r.status)) await poserPauseVinted(r.status, 'formulaire', 0);
+  if (refusDeVinted(r)) await poserPrudence(acc, r.status, 'formulaire');
+  if (rep.captcha || estCaptchaVinted(r)) await poserCaptcha(acc, r.status);
+}
+// UNE étape du formulaire dans l'onglet qui travaille (le script de page est reposé à chaque fois :
+// la page a pu naviguer). La page navigue juste après un geste : la réponse est relue dans sa session.
+async function etapeFormulaire(acc, tabId, etape, d) {
+  const injecter = async () => { try { await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['vrm-formulaire.js'] }); return true; } catch (_) { return false; } };
+  const lancer = async (e, x) => { try { const res = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args: [e, x || {}], func: (e2, x2) => (globalThis.__vrmFormulaire ? globalThis.__vrmFormulaire(e2, x2) : { ok: false, code: 'script' }) }); return res && res[0] && res[0].result; } catch (_) { return null; } };
+  // L'écran plein de vinted.fr (`avecActionPlein`) sait que VRM remplit le formulaire : plus de « Réduire » jusqu'à la fin.
+  try { const a = await lireActionEnCours(); if (a && a.actif && a.sorte === 'republier' && !a.formulaire) await poserAction({ ...a, formulaire: true }); } catch (_) {}
+  if (!(await injecter())) return { ok: false, code: 'onglet' };
+  let o = await lancer(etape, d);
+  if ((!o || o.code === 'sans-reponse') && d && d.cle) { await attendreOnglet(tabId, null, 20000); if (await injecter()) { const o2 = await lancer('reponse', { cle: d.cle }); if (o2 && o2.ok) o = o2; } }
+  if (!o || typeof o !== 'object') o = { ok: false, code: 'onglet' };
+  try { await poserOngletTravail({ ...(((await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]) || {}), tabId, etape, maj: Date.now() }); } catch (_) {}
+  if (o.code === 'captcha') { noterDiag('formulaire_captcha'); await poserCaptcha(acc, 0); }
+  if (o.rep) await constaterFormulaire(acc, o.rep);
+  if (o.code === 'refus' && o.status) await constaterFormulaire(acc, { status: o.status, ok: false, json: o.json, texte: o.texte });
+  if (o.code === 'selecteur') noterDiag('formulaire_selecteur_' + String(o.manque || '').replace(/[^a-z-]/g, '').slice(0, 30));
+  return o;
+}
+// Entre deux champs : « Tout arrêter », la vérification, la pause de Vinted, le compte de l'onglet.
+async function arretFormulaire(uid, acc) {
+  try { if ((await toutArreteDepuis(null)) > 0) return { code: 'tout-arrete', raison: "« Tout arrêter » a été touché" }; } catch (_) {}
+  const rb = await robotDeLaRequete(String(uid)); if (rb) return { code: 'secu-robot', raison: rb };
+  const g = await gardeStricte(uid, acc, { lecture: true }); if (g) return { code: g.code, raison: g.error };
+  { const fr = await lireFreinRepub(uid); if (fr) return { code: 'frein-refus', raison: phraseFreinRepub(fr) }; }
+  return null;
+}
+const PHRASE_SELECTEUR = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable) : VRM s'arrête proprement`;
+// Les valeurs de la fiche, telles que le formulaire les demande (identifiants de Vinted).
+function champsFormulaire(item) {
+  const it = item && typeof item === 'object' ? item : {};
+  const attr = (c) => { const a = Array.isArray(it.item_attributes) ? it.item_attributes.find((x) => x && x.code === c && Array.isArray(x.ids) && x.ids.length) : null; return a ? Number(a.ids[0]) : null; };
+  const n = (v) => (Number.isSafeInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
+  const prix = Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
+  const marque = typeof it.brand === 'string' ? it.brand : (it.brand && typeof it.brand === 'object' ? String(it.brand.title || '') : '');
+  return { titre: String(it.title || '').replace(/\s+/g, ' ').trim(), description: String(it.description || ''), prix: isFinite(prix) && prix > 0 ? Math.round(prix * 100) / 100 : null,
+    categorie: n(it.catalog_id), marqueId: n(it.brand_id), marque: marque.trim(), taille: n(attr('size')) || n(it.size_id), etat: n(attr('condition')) || n(attr('status')) || n(it.status_id),
+    couleurs: (Array.isArray(it.color_ids) ? it.color_ids : [it.color1_id, it.color2_id]).map(n).filter(Boolean).slice(0, 2), colis: n(it.package_size_id) };
+}
+// Ce que la PAGE a envoyé dans son brouillon, comparé à la fiche : la liste des champs différents.
+function ecartsBrouillonFormulaire(attendu, corps) {
+  let o = null; try { o = typeof corps === 'string' ? JSON.parse(corps) : corps; } catch (_) { o = null; }
+  const d = o && (o.draft || o.item);
+  if (!d || typeof d !== 'object') return null;   // pas lu : l'appelant s'arrête
+  const v = champsFormulaire(d), e = [];
+  if (attendu.categorie && v.categorie !== attendu.categorie) e.push('la catégorie');
+  if (attendu.taille && v.taille !== attendu.taille) e.push('la taille');
+  if (attendu.etat && v.etat !== attendu.etat) e.push("l'état");
+  if (attendu.colis && v.colis !== attendu.colis) e.push('le colis');
+  if (attendu.marqueId && v.marqueId && v.marqueId !== attendu.marqueId) e.push('la marque');
+  if (attendu.couleurs.length && JSON.stringify([...v.couleurs].sort()) !== JSON.stringify([...attendu.couleurs].sort())) e.push('la couleur');
+  if (attendu.prix != null && v.prix !== attendu.prix) e.push('le prix');
+  if (attendu.titre && v.titre !== attendu.titre) e.push('le titre');
+  return e;
+}
+async function photosPourFormulaire(urls, second, reglages) {
+  const out = [];
+  for (let i = 0; i < Math.min(urls.length, 20); i++) {
+    let blob = null, err = null;
+    for (const u of [urls[i], (second || [])[i]].filter((u, k, t) => u && t.indexOf(u) === k)) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
+    if (!blob) return { erreur: `la photo ${i + 1} n'a pas pu être lue (${String(err && err.message || err || 'photo absente').slice(0, 40)})` };
+    try { blob = await photoReglee(blob, reglages); } catch (e) { return { erreur: String(e && e.message || e).slice(0, 80) }; }
+    let b64 = '';
+    try { const u8 = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let k = 0; k < u8.length; k += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(k, k + 0x8000)); b64 = btoa(s); } catch (_) { return { erreur: `la photo ${i + 1} n'a pas pu être préparée` }; }
+    out.push({ b64, type: blob.type || 'image/jpeg', nom: `photo-${i + 1}.jpg` });
+  }
+  return { photos: out };
+}
+async function nomCategorieVinted(catalogId) {
+  try { await chargerCataloguesPlateformes(); } catch (_) {}
+  const f = feuillesCatalogueVinted(_catVinted).find((x) => x[0] === String(catalogId));
+  if (!f) return null;
+  const parts = f[1].split(' > ');
+  return { chemin: f[1], nom: parts[parts.length - 1] };
+}
+// La recréation PAR LE FORMULAIRE, appelée par `recreerVinted` DANS sa place de la file (`avecVinted`),
+// après ses gardes (coffre, recette, taille, refus déjà vu, quota du jour, paire réservée). Rend
+// { r, envoyes } : `envoyes` = les gestes réservés partis chez Vinted (le reste est rendu par l'appelant).
+async function recreerParFormulaire(c) {
+  const { acc, uid, id, msg, urls, second, reglages, item, titre, prix, description, descBase, sauve, photosC, versB, lettreFin } = c;
+  let envoyes = 0;
+  const fin = (r) => ({ r, envoyes });
+  const num = msg && msg.num ? String(msg.num) : '';
+  const attendu = champsFormulaire({ ...(item || {}), title: titre, description, price: prix });
+  const manquent = [!attendu.categorie && 'la catégorie', !attendu.etat && "l'état", !attendu.colis && 'le colis', !attendu.couleurs.length && 'la couleur'].filter(Boolean);
+  if (manquent.length) return fin({ accepte: false, code: 'incomplet', raison: `VRM ne connaît pas ${manquent.join(', ')} de CETTE annonce : le formulaire de Vinted ne peut pas être rempli. Rien n'a été touché.` });
+  const cat = await nomCategorieVinted(attendu.categorie);
+  // 1. Les photos du coffre, préparées AVANT tout geste visible.
+  const ph = await photosPourFormulaire(urls, second, reglages);
+  if (!ph.photos) return fin({ accepte: true, etape: 'echec', raison: `${ph.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` });
+  // 2. L'onglet qui travaille (le compte de l'onglet, nommé dans le panneau).
+  const ot = await ongletTravailVinted(acc, uid);
+  if (ot.refus) return fin({ accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: ot.refus }) });
+  const tab = ot.tabId;
+  const arret = async () => arretFormulaire(uid, acc);
+  const stopAvant = (s) => fin({ accepte: false, code: s.code, raison: `${s.raison} — rien n'a été créé ni supprimé, ton annonce est intacte.` });
+  const echecAvant = (o) => fin(o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n'a été créé ni supprimé, ton annonce est intacte.` }
+    : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n'a été créé ni supprimé, ton annonce est intacte.` }
+      : o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted a refusé une photo (${o.status || 0}) — rien n'a été créé ni supprimé, ton annonce est intacte.` }
+        : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n'a été créé ni supprimé, ton annonce est intacte.` });
+  // 3. L'annonce ENREGISTRÉE dans VRM avant tout geste (même forme que la méthode directe : « Reprendre » la relit).
+  const brouillonV = { ...(item || {}), id: null, title: titre, description, assigned_photos: [] }; delete brouillonV.push_up;
+  const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify({ draft: brouillonV, feedback_id: null, parcel: null }), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid, methode: 'formulaire', num: num ? num.slice(0, 12) : undefined, etapes: { coffre: new Date().toISOString() } } } }], 'id'));
+  if (okCoffre !== true) return fin({ accepte: true, etape: 'echec', raison: "VRM n'a pas pu enregistrer l'annonce avant de la retirer — rien n'a été supprimé, elle est toujours en ligne (réessaie dans un moment)" });
+  const marquer = (etat, extra) => majVersBrouillon(uid, id, { etat, ...(extra || {}) });
+  const domaine = acc.domain || 'www.vinted.fr';
+  // 4. La page « Modifier » de l'ancienne (une lecture), puis « Vends tes articles ».
+  etapeRepub(id, 'formulaire', { champ: 'ouverture' });
+  if (!(await naviguerTravail(tab, `https://${domaine}/items/${id}/edit`, /\/items\/\d+\/edit/))) { await marquer('fait', { cause: 'formulaire-onglet' }); return fin({ accepte: false, code: 'onglet-vinted', raison: RAISON_ONGLET_VINTED }); }
+  { const s = await arret(); if (s) { await marquer('fait', { cause: 'arret' }); return stopAvant(s); } }
+  await pauseFormulaire('champ', uid);
+  let o = await etapeFormulaire(acc, tab, 'ouvrirVente');
+  if (!o.ok) { await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
+  // 5. Les photos, puis chaque champ dans l'ordre observé, 5 à 15 s entre deux.
+  etapeRepub(id, 'photos', { fait: 0, total: ph.photos.length });
+  o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos });
+  if (!o.ok) { await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
+  etapeRepub(id, 'photos', { fait: ph.photos.length, total: ph.photos.length });
+  const champs = [
+    ['categorie', { id: attendu.categorie, nom: cat && cat.nom, recherche: cat && cat.nom }],
+    ['titre', { valeur: attendu.titre }],
+    ['description', { valeur: attendu.description }],
+    ...(attendu.marque ? [['marque', { id: attendu.marqueId, nom: attendu.marque }]] : []),
+    ...(attendu.taille ? [['taille', { id: attendu.taille }]] : []),
+    ['couleurs', { ids: attendu.couleurs }],
+    ['colis', { id: attendu.colis }],
+    ['etat', { id: attendu.etat }],
+    ['prix', { valeur: attendu.prix }],
+  ];
+  for (const [quoi, d] of champs) {
+    await pauseFormulaire('champ', uid);
+    { const s = await arret(); if (s) { await marquer('fait', { cause: 'arret' }); return stopAvant(s); } }
+    etapeRepub(id, 'formulaire', { champ: quoi });
+    o = await etapeFormulaire(acc, tab, 'champ', { quoi, ...d });
+    if (!o.ok) { await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
+  }
+  // 6. Le brouillon : la page l'envoie, VRM relit ce qu'elle a envoyé.
+  await pauseFormulaire('champ', uid);
+  { const s = await arret(); if (s) { await marquer('fait', { cause: 'arret' }); return stopAvant(s); } }
+  etapeRepub(id, 'brouillon');
+  await poserVerrouRecreer('r' + id);
+  o = await etapeFormulaire(acc, tab, 'brouillon', { cle: 'b' + id });
+  if (!o.ok && o.code !== 'sans-reponse') { await leverVerrouRecreer('r' + id); await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
+  const rb = o.rep || null;
+  if (!rb || !rb.status || rb.status >= 500) {
+    await marquer('fait', { cause: 'brouillon-flou' }); envoyes++;
+    return fin({ accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement au brouillon : il est PEUT-ÊTRE dans tes brouillons Vinted. Rien n'a été supprimé — ton annonce est toujours en ligne. Regarde tes brouillons avant de réessayer." });
+  }
+  await leverVerrouRecreer('r' + id);
+  envoyes++;
+  if (!rb.ok) {
+    await poserFreinRepub(uid, { status: rb.status, json: rb.json });
+    await marquer('fait', { cause: `brouillon-refuse-${rb.status}` });
+    return fin({ accepte: true, etape: 'echec', raison: `Vinted a refusé le brouillon (${rb.status}${raisonRefusVinted({ json: rb.json }) ? ' : ' + String(raisonRefusVinted({ json: rb.json })).slice(0, 200) : ''}) — rien n'a été supprimé, ton annonce est toujours en ligne.` });
+  }
+  const draftId = idDeBrouillon(rb.json);
+  if (!draftId) { await marquer('fait', { cause: 'sans-id' }); return fin({ accepte: true, etape: 'echec', raison: "le brouillon est rangé sur Vinted, mais VRM n'a pas pu lire son identifiant — VRM s'arrête là : rien n'a été supprimé, ton annonce est toujours en ligne." }); }
+  const ecarts = ecartsBrouillonFormulaire(attendu, rb.corps);
+  await rangerBrouillon(draftId, { uid, corps: rb.corps ? String(rb.corps).slice(0, 60000) : undefined, titre, prix, nPhotos: ph.photos.length, parVRM: true, ancienId: id, etat: 'brouillon', methode: 'formulaire' });
+  if (!ecarts || ecarts.length) {
+    noterDiag('formulaire_brouillon_ecart');
+    await marquer('fait', { draftId, supprime: false, cause: 'formulaire-ecart' });
+    return fin({ accepte: true, etape: 'echec', draftId, raison: `le brouillon est rangé sur Vinted, mais ${ecarts ? `${ecarts.join(', ')} n'${ecarts.length > 1 ? 'ont' : 'a'} pas été pris comme sur ta fiche` : "VRM n'a pas pu relire ce que la page a envoyé"} : VRM s'arrête là, ton annonce est toujours en ligne. Corrige le brouillon sur Vinted (Mes brouillons → « Modifier ») ou supprime-le.` });
+  }
+  await marquer('brouillon-range', { draftId, supprime: false });
+  // 7. L'ancienne : « Supprimer » + la confirmation de Vinted, sur sa page.
+  await pauseFormulaire('champ', uid);
+  { const s = await arret(); if (s) { await marquer('fait', { draftId, supprime: false, cause: 'arret' }); return fin({ accepte: false, code: s.code, draftId, raison: `${s.raison} — le brouillon est rangé sur Vinted, l'ancienne annonce n'a PAS été supprimée : « Reprendre » finit la paire.` }); } }
+  etapeRepub(id, 'suppression');
+  if (!(await naviguerTravail(tab, `https://${domaine}/items/${id}`, new RegExp(`/items/${id}`)))) { await marquer('fait', { draftId, supprime: false, cause: 'suppression-pas-partie' }); return fin({ accepte: true, etape: 'echec', draftId, raison: "l'onglet de Vinted n'a pas ouvert l'ancienne annonce — elle n'a PAS été supprimée, le brouillon attend : « Reprendre » finit la paire." }); }
+  const rd = await supprimerParFormulaire(acc, uid, id, tab, draftId, versB);
+  if (rd.parti) envoyes++;
+  if (!rd.ok) return fin(rd.r);
+  if (versB) { noterDiag('versbrouillon_formulaire_ok'); return fin({ accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre }); }
+  // 8. Le brouillon : « Ajouter » (la mise en ligne), 15 à 40 s après la suppression.
+  etapeRepub(id, 'attente');
+  await pauseFormulaire('apresSuppression', uid);
+  const rp = await publierParFormulaire(acc, uid, id, tab, draftId, { titre, prix, nPhotos: ph.photos.length, sauve, description, lettreFin, urls, num });
+  if (rp.parti) envoyes++;
+  return fin(rp.r);
+}
+// La suppression de l'ancienne par sa page (aussi pour « Reprendre ») : { ok, parti, r }.
+async function supprimerParFormulaire(acc, uid, id, tab, draftId, versB) {
+  const o = await etapeFormulaire(acc, tab, 'supprimer', { id, cle: 's' + id });
+  const pas = (cause, raison) => majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'a-publier', draftId, supprime: false, cause }).then(() => ({ ok: false, parti: false, r: { accepte: true, etape: 'echec', draftId, raison } }));
+  if (!o.ok && o.code === 'captcha') return pas('verification', `${PHRASE_CAPTCHA} L'ancienne annonce n'a PAS été supprimée ; le brouillon attend.`);
+  if (!o.ok && o.code === 'selecteur') return pas('formulaire-selecteur', `${PHRASE_SELECTEUR(o.manque)} — l'ancienne annonce n'a PAS été supprimée ; le brouillon attend (« Reprendre »).`);
+  const rd = o.rep || null;
+  if (!rd || !rd.status || rd.status >= 500) {
+    await poserVerrouRecreer(id);
+    await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, supprime: false, cause: 'suppression-incertaine' });
+    return { ok: false, parti: !!rd, r: { refaire: true, accepte: true, etape: 'incertain', draftId, raison: `le brouillon est rangé sur Vinted, mais Vinted n'a pas répondu clairement à la suppression de l'ancienne annonce : elle est PEUT-ÊTRE encore en ligne. VRM s'arrête là (jamais deux fois ${motsExt().meme} en ligne) — « Reprendre » relit l'ancienne d'abord.` } };
+  }
+  if (!rd.ok) {
+    await poserFreinRepub(uid, { status: rd.status, json: rd.json });
+    await majVersBrouillon(uid, id, { etat: 'fait', draftId, supprime: false, cause: `suppression-refusee-${rd.status}` });
+    return { ok: false, parti: true, r: { accepte: true, etape: 'echec', draftId, raison: `Vinted a refusé de retirer l'annonce (${rd.status}) — elle est toujours en ligne. Le brouillon rangé sur Vinted est en trop : supprime-le dans tes brouillons Vinted.` } };
+  }
+  await noterRepubJour(uid);
+  try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {}
+  await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: true, supprimeLe: new Date().toISOString() });
+  return { ok: true, parti: true };
+}
+// La mise en ligne du brouillon par sa page (« Ajouter »), aussi pour « Reprendre » : { parti, r }.
+async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
+  const domaine = acc.domain || 'www.vinted.fr';
+  const stop = await arretFormulaire(uid, acc);
+  if (stop) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais il n'a pas été mis en ligne (${stop.raison}) — « Reprendre » le met en ligne, sans en créer un autre.` } }; }
+  if (await lireVerrouRecreer('b' + draftId)) { await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId }); return { parti: false, r: { accepte: true, etape: 'incertain', draftId, raison: "une autre mise en ligne de ce brouillon est partie sans réponse claire — VRM n'en renvoie pas une seconde. Regarde ton dressing." } }; }
+  etapeRepub(id, 'en-ligne');
+  if (!(await naviguerTravail(tab, `https://${domaine}/items/${draftId}/edit`, new RegExp(`/items/${draftId}/edit`)))) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: "l'onglet de Vinted n'a pas ouvert le brouillon — il n'a pas été mis en ligne : « Reprendre » le fait, sans en créer un autre." } }; }
+  { const f = await etapeFormulaire(acc, tab, 'formulairePret'); if (!f.ok) { await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: 'formulaire-' + (f.code || 'ko') }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(f.code === 'captcha' ? { code: 'verification' } : {}), raison: f.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(f.manque)} — le brouillon attend (« Reprendre »).` } }; } }
+  await pauseFormulaire('champ', uid);
+  await poserVerrouRecreer('b' + draftId);
+  const o = await etapeFormulaire(acc, tab, 'publier', { draftId, cle: 'p' + draftId });
+  if (!o.ok && (o.code === 'captcha' || o.code === 'selecteur')) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier', draftId }); return { parti: false, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, ...(o.code === 'captcha' ? { code: 'verification' } : {}), raison: o.code === 'captcha' ? `${PHRASE_CAPTCHA} Le brouillon attend.` : `${PHRASE_SELECTEUR(o.manque)} — le brouillon attend (« Reprendre »).` } }; }
+  const rc = o.rep || null;
+  if (!rc || !rc.status || rc.status >= 500) {
+    noterDiag('formulaire_mise_en_ligne_incertaine');
+    await majVersBrouillon(uid, id, { etat: 'mise-en-ligne-incertaine', draftId });
+    return { parti: !!rc, r: { accepte: true, etape: 'incertain', draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted n'a pas répondu clairement à la mise en ligne : il est PEUT-ÊTRE en ligne — « Reprendre » relit le brouillon d'abord." } };
+  }
+  await leverVerrouRecreer(id); await leverVerrouRecreer('b' + draftId);
+  if (!rc.ok) {
+    await poserFreinRepub(uid, { status: rc.status, json: rc.json });
+    await majVersBrouillon(uid, id, { etat: 'a-publier', draftId, cause: `refuse-${rc.status}` });
+    return { parti: true, r: { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId, raison: `l'ancienne annonce est supprimée et le brouillon est rangé, mais Vinted a refusé de le mettre en ligne (${rc.status}) — VRM s'arrête là. Il est dans tes brouillons Vinted.` } };
+  }
+  await noterRepubJour(uid);
+  const jV = rc.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
+  const nouvelId = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
+  try { await rangerBrouillon(draftId, { uid, titre: j.titre, prix: j.prix, nPhotos: j.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelId, methode: 'formulaire' }); } catch (_) {}
+  try { await coffreDeLaNouvelle(uid, nouvelId, id, { ...(j.sauve || {}), title: j.titre, price: j.prix, desc: j.description, lettreVRM: j.lettreFin || null, photos: j.urls }); } catch (_) {}
+  await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId });
+  try { await noterJournal(uid, 'republiee', { a: String(id), b: nouvelId, vers: j.prix }); } catch (_) {}
+  noterDiag('formulaire_republier_ok');
+  return { parti: true, r: { accepte: true, etape: 'fait', nouvelId, draftId, ancien: j.sauve && Number(j.sauve.price), nouveau: j.prix, nouveauTitre: j.titre, methode: 'formulaire' } };
+}
+// « Reprendre » une paire faite par le formulaire : ce qui est prouvé n'est jamais refait.
+//   · l'ancienne PAS prouvée supprimée : sa page est ouverte ; elle n'existe plus ⇒ prouvée ;
+//     elle est là et un brouillon est prêt ⇒ « Supprimer » (SON clic de « Reprendre ») ;
+//   · puis le brouillon : « Ajouter ». Pas de brouillon ⇒ rien n'est perdu, c'est dit.
+async function reprendreParFormulaire(msg, acc, vb) {
+  const uid = String(msg.uid), id = String(msg.id);
+  const draftId = /^\d{4,15}$/.test(String(vb.draftId || '')) ? String(vb.draftId) : '';
+  if (!draftId) { await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'fait', cause: 'intacte' }); return { accepte: true, etape: 'intacte', raison: "le brouillon n'a pas été créé : ton annonce n'a pas été supprimée. Relance Republier quand tu veux." }; }
+  if (vb.etat === 'mise-en-ligne-incertaine') {
+    const rl = await avecVinted(() => vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 }));
+    if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
+    const it = rl && rl.ok && rl.json && typeof rl.json === 'object' ? (rl.json.item || rl.json.draft || null) : null;
+    if (it && it.is_draft === false) { await leverVerrouRecreer('b' + draftId); await leverVerrouRecreer(id); await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId: draftId }); return { accepte: true, etape: 'fait', draftId, nouvelId: draftId, raison: 'elle était déjà en ligne — rien n’a été renvoyé.' }; }
+    if (!(it && it.is_draft === true)) return { accepte: false, code: 'incertaine', raison: "VRM n'a pas pu relire ce brouillon chez Vinted : il est PEUT-ÊTRE en ligne. Regarde ton dressing. Rien n'a été touché." };
+    await leverVerrouRecreer('b' + draftId);
+  }
+  const jour = await gardeJourRepub(uid); if (jour) return { accepte: false, code: jour.code, raison: jour.raison };
+  const nA = vb.supprime === true ? 1 : 2;
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: nA, recu, sorte: 'republier', secu: { sorte: 'republication', mode: 'clic' } });
+  if (stop) return { accepte: false, code: stop.code, raison: stop.error, ...(stop.attendreMs != null ? { attendreMs: stop.attendreMs, jusqua: stop.jusqua } : {}) };
+  let envoyes = 0;
+  return await avecVinted(async () => { try {
+    suiviRepub(id);
+    const ot = await ongletTravailVinted(acc, uid);
+    if (ot.refus) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage({ sansPage: ot.refus }) };
+    const domaine = acc.domain || 'www.vinted.fr';
+    if (vb.publier === true && vb.supprime !== true) {
+      const ra = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 });
+      if (ra && ra.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(ra) };
+      if (ra && (ra.status === 404 || ra.status === 410)) await majVersBrouillon(uid, id, { supprime: true, supprimeLe: new Date().toISOString(), etat: 'a-publier', draftId });
+      else if (ra && ra.ok) {
+        etapeRepub(id, 'suppression');
+        if (!(await naviguerTravail(ot.tabId, `https://${domaine}/items/${id}`, new RegExp(`/items/${id}`)))) return { accepte: true, etape: 'echec', draftId, raison: "l'onglet de Vinted n'a pas ouvert l'ancienne annonce — rien n'a été supprimé." };
+        const rd = await supprimerParFormulaire(acc, uid, id, ot.tabId, draftId, false);
+        if (rd.parti) envoyes++;
+        if (!rd.ok) return { ...rd.r, reprise: true };
+      } else return { accepte: false, code: 'ancienne-pas-sure', raison: `Vinted n'a pas répondu en relisant l'ancienne annonce (${(ra && ra.status) || 'pas de réponse'}) — VRM ne sait pas si elle est encore en ligne. Rien n'a été touché, réessaie dans un moment.` };
+      await pauseFormulaire('apresSuppression', uid);
+    }
+    await leverVerrouRecreer(id);
+    const rp = await publierParFormulaire(acc, uid, id, ot.tabId, draftId, { titre: vb.titre, prix: vb.prix, nPhotos: 0, sauve: null, description: '', lettreFin: null, urls: [], num: msg.num ? String(msg.num) : '' });
+    if (rp.parti) envoyes++;
+    return { ...rp.r, reprise: true };
+  } finally { if (recu.at && nA - envoyes > 0) await rendreActions(uid, Number(recu.at), nA - envoyes); } });
+}
+// Le panneau : l'onglet qui travaille (s'il travaille encore, à quel pas) — rien de caché à Julien.
+async function etatOngletTravail() {
+  let m = null; try { m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; } catch (_) { m = null; }
+  if (!m || m.tabId == null) return null;
+  let t = null; try { t = await chrome.tabs.get(m.tabId); } catch (_) { t = null; }
+  if (!t) return null;
+  const a = await lireActionEnCours();
+  let chemin = ''; try { chemin = new URL(String(t.url || '')).pathname; } catch (_) {}
+  return { tabId: t.id, chemin: chemin.replace(/\d{4,}/g, '…'), etape: String(m.etape || ''), travaille: !!(a && a.actif && a.sorte === 'republier' && Date.now() - Number(a.maj || 0) < ACTION_FRAIS_MS), maj: Number(m.maj) || 0 };
 }
 // ══════════════════════════════════════════════════════════════════════════════
 // CRÉER SUR VINTED DEPUIS UNE FICHE VRM (11 nov., 5.367 — demande validée par Julien)
@@ -17357,7 +17834,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee'];   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -19089,6 +19566,89 @@ async function prixMiniAnnonce(itemId) {
   let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
   return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
+// ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
+const INITIATEUR_BLEAM = 'seller_enters_notification';
+const LOT_ENVOYE = 'vrmLotEnvoye';
+async function lotDejaEnvoye(uid, recipientId) {
+  try { const m = (await chrome.storage.local.get(LOT_ENVOYE))[LOT_ENVOYE] || {}; const t = m[String(uid)] && m[String(uid)][String(recipientId)]; return Number(t) > 0 && Date.now() - Number(t) < 30 * 864e5; } catch (_) { return false; }
+}
+async function noterLotEnvoye(uid, recipientId) {
+  try { const m = (await chrome.storage.local.get(LOT_ENVOYE))[LOT_ENVOYE] || {}; const u = m[String(uid)] = m[String(uid)] || {}; u[String(recipientId)] = Date.now(); const cles = Object.keys(u); if (cles.length > 2000) delete u[cles[0]]; await chrome.storage.local.set({ [LOT_ENVOYE]: m }); } catch (_) {}
+}
+// Le plancher d'une offre aux favoris (centimes) : prix mini de l'annonce, sinon achat + 10 % (`plancherBaisse`,
+// la même règle que la baisse par règle) ; lecture ratée ou rien de posé ⇒ null ⇒ PAS D'OFFRE.
+async function plancherFavori(itemId) {
+  if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
+  let r; try { r = await sbGet(`app_data?id=eq.main&select=f:data->vinted_annonce_numeros->"${itemId}"`); } catch (_) { r = null; }
+  if (!Array.isArray(r)) return null;
+  const fiche = r[0] && r[0].f && typeof r[0].f === 'object' ? r[0].f : {};
+  const num = fiche.numero != null ? String(fiche.numero).trim() : '';
+  let achatParNum = null;
+  if (num && centimesPoses(fiche.min) == null && !(fiche.buyPrice != null && String(fiche.buyPrice).trim() !== '')) {
+    let b; try { b = await sbGet(`app_data?id=eq.main&select=b:data->vinted_buyprice_by_num->"${encodeURIComponent(num)}"`); } catch (_) { b = null; }
+    if (!Array.isArray(b)) return null;
+    if (b[0] && b[0].b != null) achatParNum = { [num]: b[0].b };
+  }
+  return plancherBaisse(fiche, achatParNum);
+}
+function delaiOffreBleam(cb) { const a = Number(cb && cb.offreMin) || 8, b = Number(cb && cb.offreMax) || 15; return Math.round((a + Math.random() * (b - a)) * 1000); }
+let _dernierDelaiOffre = -1;
+async function sequenceFavoriBleam(x) {
+  const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit } = x;
+  const id = (v) => typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v);
+  const pseudo = String((c && c.opposite_user && c.opposite_user.login) || '');
+  // Le message, tel qu'il partira (pseudo, titre, prix de l'annonce) — relu par la règle de Vinted.
+  const infos = { article: String((c && c.transaction && c.transaction.item_title) || ''), prix: prixAnnonce };
+  if (prixRequisFavori(version.texte) && !prixTexteFavori(infos.prix)) return { resultat: 'refuse', raison: 'offre_prix_inconnu' };
+  const brut = personnaliserMessageFavori(version.texte, pseudo, undefined, infos).slice(0, 2000);
+  const texte = texteJamaisRepete(brut, pseudo, await textesRecents(uid));
+  if (texte == null || !texte.trim()) return { resultat: 'refuse', raison: 'historique_non_verifie' };
+  if (!texteSurVinted(texte).ok) { noterDiag('favori_texte_final_interdit'); return { resultat: 'refuse', raison: 'texte_interdit' }; }
+  // 1. La conversation marquée lue (comme la page, avant de répondre) — une lecture, hors du plafond des gestes.
+  etape('lue');
+  const lu = await vintedPage(acc, 'PUT', `/api/v2/conversations/${convId}/mark_as_read`, null, { timeoutMs: 12000 });
+  if (lu && lu.sansPage) return { resultat: 'refuse', raison: 'onglet_vinted' };
+  if (lu && lu.pause) return { resultat: 'refuse', raison: 'pause_vinted' };
+  { const f = freinFavoriAuto(lu); if (f) return { resultat: 'refuse', status: lu.status, raison: f }; }
+  // 2. Le message : le temps d'écriture, puis l'envoi.
+  await pauseFavori('reponse', uid);
+  etape('ecriture');
+  const ec = await attendreEcriture(uid, acc, texte, 'serie');
+  if (!ec.ok) return { resultat: 'refuse', raison: ec.code === 'vinted-pause' ? 'pause_vinted' : ec.code === 'vinted-autre' ? 'compte_vinted_different' : ec.code === 'secu-robot' ? 'vinted_robot' : ec.code === 'tout-arrete' ? 'autorisation_expiree' : 'compte_vinted_absent' };
+  if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
+  etape('envoi');
+  const r = await vintedPage(acc, 'POST', `/api/v2/conversations/${convId}/replies`, corpsReponseVinted(texte), { timeoutMs: 12000 });
+  if (partie(r)) compterEcrit();
+  if (r.sansPage) return { resultat: 'refuse', raison: 'onglet_vinted' };
+  if (r.pause) return { resultat: 'refuse', raison: 'pause_vinted' };
+  if (!(r.ok && r.json && r.json.code === 0)) {
+    if (!r.ok && [400, 422].includes(r.status) && !freinFavoriAuto(r)) { if (!version.lot) await noterVersionRefusee(uid, version.texte); noterDiag('favori_message_refuse_' + r.status); return { resultat: 'refuse', status: r.status, raison: 'texte_refuse' }; }
+    return { resultat: !r.ok && r.status >= 400 && r.status < 500 ? 'refuse' : 'incertain', status: r.status };
+  }
+  if (version.lot) { await noterLotEnvoye(uid, body.recipientId); noterDiag('favori_lot_envoye'); }
+  else { await noterVarianteDerniere(uid, 'favori', version.n); }
+  await noterTexteRecent(uid, texte);
+  const fini = { resultat: 'envoye', status: r.status, variante: version.lot ? null : version.n };
+  // 3. L'offre, dans la même conversation, 8 à 15 s après (jamais deux fois le même délai), au prix de SA règle.
+  if (!offre || !id(tx)) return fini;
+  const prix = prixOffreFavori(prixAnnonce, offre);
+  if (!prix) { noterDiag('favori_offre_prix_inconnu'); return fini; }
+  const pl = await plancherFavori(body.itemId);
+  if (!pl) { noterDiag('favori_offre_sans_plancher'); return fini; }
+  if (Math.round(Number(prix) * 100) < pl.c) { noterDiag('favori_offre_sous_plancher'); return fini; }
+  let ms = delaiOffreBleam(cb); for (let i = 0; i < 6 && Math.round(ms / 250) === Math.round(_dernierDelaiOffre / 250); i++) ms = delaiOffreBleam(cb);
+  _dernierDelaiOffre = ms;
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:offreBleam', ms]); } catch (_) {}
+  etape('attente_offre');
+  await new Promise((ok) => setTimeout(ok, ms));
+  { const ar = await arretPendantEcriture(uid, 'serie'); if (ar) { noterDiag('favori_offre_pas_partie_' + ar.code); return fini; } }
+  if (await gardeStricte(uid, acc, { lecture: true })) { noterDiag('favori_offre_pas_partie_garde'); return fini; }
+  etape('offre');
+  const o = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { currency: devise, price: prix } }, { timeoutMs: 12000 });
+  if (partie(o)) compterEcrit();
+  noterDiag(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0) ? 'favori_offre_ok' : 'favori_offre_refusee_' + ((o && o.status) || 'reseau'));
+  return fini;
+}
 async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
@@ -19149,6 +19709,8 @@ async function executerMessageFavori(uid,acc,body){
   // toute écriture chez Vinted (aucune conversation ouverte). Pas de preuve ⇒ comme avant.
   {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
   const nA=offre?3:2;
+  // 5.410.4 : SES filtres des favoris (par article, même acheteur réécrit trop tôt) tenus aussi AU GESTE (mode auto compris).
+  {const RBf=await bleamCompte(uid).catch(()=>null);if(RBf&&RBf.favoris&&RBf.favoris.actif){const rf=favoriFiltre({item:body.itemId,acheteur:body.recipientId},Object.assign({},RBf.favoris,{noteMin:0,apresMin:0,periodeJours:0}),await contactsFavoris(String(uid)),Date.now());if(rf){noterDiag('favori_filtre_'+rf);return rep('ignore',0,'filtre_'+rf);}}}
   const recu={};
   const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
   if(arretPlafond){const at=attenteDeRefus(arretPlafond);if(at>0)apresMs=at;}
@@ -19159,7 +19721,9 @@ async function executerMessageFavori(uid,acc,body){
   const partie=x=>{const f=freinFavoriAuto(x);if(f&&!frein)frein=f;return !(x&&(x.sansPage||x.pause));};
   try{
   etape('conversation');
-  const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
+  // 5.410.3 (`favorisbleam`, « tout comme Bleam ») : la conversation s'ouvre comme chez l'outil observé (`seller_enters_notification`).
+  const cbF=await reglagesCommeBleam();
+  const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
   if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(creation.pause)return rep('refuse',0,'pause_vinted');
@@ -19216,6 +19780,21 @@ async function executerMessageFavori(uid,acc,body){
   // « je t'ai fait une offre » partait QUAND MÊME, compté « envoyé » : l'acheteuse
   // lisait une offre qui n'existe pas. Offre refusée / prix inconnu ⇒ AUCUN message,
   // « refusé » avec la raison ; réponse incertaine ⇒ « incertain » (jamais renvoyé).
+  // ⚠️ 5.410.3 (`favorisbleam`) — LA SÉQUENCE « COMME BLEAM » (mesurée le 20 nov. : conversation, message ~6 s après,
+  // offre ~11 s après le message, dans la même conversation) : la conversation marquée lue, le message (« lot » quand la
+  // personne a aimé au moins 2 articles de ce compte, une fois par personne), PUIS l'offre au prix de SA règle 8 à 15 s
+  // après (réglable), jamais sous le plancher (prix mini, sinon achat + 10 %) — pas de plancher connu ⇒ pas d'offre.
+  // Un message qui DIT le prix de l'offre ({prix}) garde l'ordre d'avant (offre puis message) : jamais un prix annoncé
+  // pour une offre pas faite (audit X2).
+  if(cbF.favoris){
+    const lot=Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId));
+    const versionB=lot&&texteSurVinted(cbF.messageLot).ok?{n:0,texte:cbF.messageLot,lot:true}:choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
+    if(versionB&&!(offre&&prixRequisFavori(versionB.texte))){
+      const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes});
+      if(r.variante!=null)variante=r.variante;
+      return rep(r.resultat,r.status||0,r.raison);
+    }
+  }
   let prixOffreFait=null;   // (5.370) le prix de l'offre FAITE, pour {prix}
   if(offre){
     const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
@@ -19276,7 +19855,7 @@ async function executerMessageFavori(uid,acc,body){
   // (qui arrêtait toutes les files).
   if(r.sansPage)return rep('refuse',0,'onglet_vinted');
   if(r.pause)return rep('refuse',0,'pause_vinted');
-  if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
+  if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterEnvoiFavori(uid,convId,variante,body.itemId,body.recipientId);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
   // (5.410) Vinted REFUSE le message lui-même (400/422, sans frein) : CETTE version n'est plus jamais tirée sur ce compte.
   // La forme du refus (clés, code — jamais le texte) est notée pour la passe suivante.
   if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
@@ -19340,6 +19919,7 @@ function cochablesApercu(a) {
 }
 async function noterApercuCarte(uid, a) {
   try {
+    { const RB = await bleamCompte(uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) a = filtrerApercuFavoris(a, RB.favoris, await contactsFavoris(String(uid)), Date.now()); }   // 5.410.4
     const m = (await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {};
     m[String(uid)] = { at: Date.now(), etat: String(a && a.etat || ''), total: Number(a && a.total) || 0, raison: String(a && a.raison || ''), cochables: cochablesApercu(a) };
     await chrome.storage.local.set({ [FAVORIS_CARTE_APERCU]: m });
@@ -19366,6 +19946,8 @@ async function favorisCarte(msg, sender) {
   if (quoi === 'apercu') {
     const r = await apiFavorisCarte(o.uid, 'apercu');
     if (!r.ok || !r.json || !r.json.apercu) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas répondu. Réessaie dans un instant.' };
+    // 5.410.4 : SES filtres (note, par article, période, délai, réécrire) — un favori écarté n'est plus cochable (dit).
+    { const RB = await bleamCompte(o.uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) r.json.apercu = filtrerApercuFavoris(r.json.apercu, RB.favoris, await contactsFavoris(o.uid), Date.now()); }
     await noterApercuCarte(o.uid, r.json.apercu);
     // 5.407 : l'étiquette N° de chaque article, PAR IDENTITÉ d'annonce, du compte de l'onglet
     // seulement (infosDuCompte, la règle de la ligne sous ses annonces) — lu dans VRM, aucune requête Vinted.
@@ -21841,10 +22423,14 @@ async function automatisationsCarte(u, owner) {
   const r0 = Array.isArray(rg) ? (rg[0] || null) : undefined;
   return {
     offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
-    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false } : null,
+    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false,
+      tranches: of.paliers.tranches, bonusLot: of.paliers.bonusLot, pas: of.paliers.pas, flexible: of.paliers.flexible, msgAccepte: of.paliers.msgAccepte, msgContre: of.paliers.msgContre, msgFinale: of.paliers.msgFinale, delais: of.paliers.delais } : null,   // 5.410.4
     favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
     // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
     cadence: await cadenceCompte(u).catch(() => null),
+    // 5.410.4 : les réglages « comme Bleam » de CE compte (chaque section, éteinte par défaut) + la dernière sauvegarde.
+    bleam: await bleamCompte(u).catch(() => null),
+    sauvegarde: await (async () => { try { return ((await chrome.storage.local.get(SAUVE_ETAT))[SAUVE_ETAT] || {})[String(u)] || null; } catch (_) { return null; } })(),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
   };
@@ -24244,9 +24830,12 @@ async function genererBordereau(uid, tx, opts = {}) {
   // compte ni à dépasser le plafond horaire (§48).
   const adr = await adresseVendeur(uid, acc);
   if (adr == null) return { ok: false, error: "adresse d'envoi inconnue pour ce compte — génère-en un à la main une fois, l'extension la retiendra" };
-  if (opts.automatique && !(await bordereauxAutoActifs())) return { ok: false, error: 'Génération automatique désactivée dans VRM' };
+  if (opts.automatique && !(await bordereauxAutoActifs(uid))) return { ok: false, error: 'Génération automatique désactivée dans VRM' };
+  // 5.410.4 : Colissimo « boîte aux lettres » = la valeur APPRISE de SA commande à la main ; pas apprise ⇒ rien (dit).
+  const depot = opts.automatique ? await depotBordereau(uid) : { dropOff: null };
+  if (depot.refus) { noterDiag('bordereau_boite_pas_apprise'); return { ok: false, error: depot.refus }; }
   const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`,
-    { seller_address_id: adr, drop_off_type: null, label_type: null });
+    { seller_address_id: adr, drop_off_type: depot.dropOff, label_type: null });
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
   if (r.ok) await noterJournal(uid, 'bordereau', { x: tx, auto: opts.automatique === true });
   // ⚠️ ON MESURE LES ÉCHECS AU LIEU DE LES SUPPOSER (§5.24). Sans ça, « il y a
@@ -26477,7 +27066,9 @@ async function recupererLabelInsiste(acc, uid, tx) {
 }
 
 // Pas de cache : une coupure dans VRM doit arrêter la prochaine génération.
-async function bordereauxAutoActifs() {
+// 5.410.4 : ou SON réglage « Après-vente · bordereau » de CE compte (panneau), éteint par défaut.
+async function bordereauxAutoActifs(uid) {
+  if (uid != null && await bordereauAutoCompte(String(uid)).catch(() => false)) return true;
   try {
     const session = await authToken();
     if (!session?.access_token || !session.user_id) return false;
@@ -26540,7 +27131,7 @@ async function genererBordereauxEnAttente(uid, opts = {}) {
     } catch (_) { /* sans cette lecture on retombe sur le statut Vinted, qui suffit */ }
     const memo = (await chrome.storage.local.get('vrmBordFaits')).vrmBordFaits || {};
     let faits = 0;
-    for (const o of (opts.lectureSeule || !(await bordereauxAutoActifs()) ? [] : candidates)) {
+    for (const o of (opts.lectureSeule || !(await bordereauxAutoActifs(uid)) ? [] : candidates)) {
       if (faits >= BORD_MAX_PAR_VISITE) break;
       if (await pauseVinted()) break;                            // 5.162 : Vinted a freiné
       const tx = String(o.transaction_id);
@@ -26708,7 +27299,7 @@ const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier'];
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -26743,7 +27334,84 @@ function raPaliers(v) {
   const uniques = [...new Set(pcts.map((x) => Math.round(x)))].sort((a, b) => a - b).slice(0, 6);
   const rm = Number(o.remiseMax);
   return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [50, 80, 100],
-    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= RA_TEXTE_MAX).slice(0, 5), arrondi: o.arrondi !== false };
+    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= RA_TEXTE_MAX).slice(0, 5), arrondi: o.arrondi !== false,
+    ...paliersPlus(o) };
+}
+// 5.410.4 (« comme Bleam / Vintex ») — la négociation étendue, champs NEUTRES par défaut (absents = comme avant) :
+//   tranches [{ de, a, baisse }] (euros : « de 20 € à 40 € : baisse max 6 € »), bonusLot (% de baisse en plus si
+//   l'acheteur prend plusieurs articles), pas (arrondi 1 € ou 0,50 €), flexible { actif, ecart } (accepter si l'écart
+//   au palier ≤ ecart €), messages par étape (accepte / contre / finale, versions tirées au hasard, {price}),
+//   delais { min, max } (minutes, tirées au hasard). Le plancher ABSOLU reste le prix mini / l'achat + 10 %.
+function paliersPlus(o) {
+  const out = {};
+  const tr = (Array.isArray(o.tranches) ? o.tranches : []).map((x) => ({ de: Number(x && x.de), a: Number(x && x.a), baisse: Number(x && x.baisse) }))
+    .filter((x) => Number.isFinite(x.de) && Number.isFinite(x.a) && Number.isFinite(x.baisse) && x.de >= 0 && x.a > x.de && x.a <= 100000 && x.baisse > 0 && x.baisse < x.a)
+    .map((x) => ({ de: Math.round(x.de * 100) / 100, a: Math.round(x.a * 100) / 100, baisse: Math.round(x.baisse * 100) / 100 })).sort((x, y) => x.de - y.de).slice(0, 8);
+  if (tr.length) out.tranches = tr;
+  const bl = Number(o.bonusLot); if (Number.isInteger(bl) && bl > 0 && bl <= 50) out.bonusLot = bl;
+  if (Number(o.pas) === 0.5) out.pas = 0.5;
+  const fx = o.flexible && typeof o.flexible === 'object' ? o.flexible : null;
+  if (fx && fx.actif === true) { const e = Number(fx.ecart); out.flexible = { actif: true, ecart: Number.isFinite(e) && e > 0 && e <= 10 ? Math.round(e * 100) / 100 : 2 }; }
+  for (const k of ['msgAccepte', 'msgContre', 'msgFinale']) { const l = (Array.isArray(o[k]) ? o[k] : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= RA_TEXTE_MAX).slice(0, 5); if (l.length) out[k] = l; }
+  const d = o.delais && typeof o.delais === 'object' ? o.delais : null;
+  if (d) { const mn = Number(d.min), mx = Number(d.max); if (Number.isInteger(mn) && Number.isInteger(mx) && mn >= 1 && mx > mn && mx <= 240) out.delais = { min: mn, max: mx }; }
+  return out;
+}
+// ══ 5.410.4 — « COMME BLEAM », LA SUITE : un réglage PAR COMPTE (`vinted_bleam.comptes[uid][section]`), TOUT éteint
+//    par défaut, allumer = SA confirmation. Sections : bordereau (commande auto, Colissimo relais / boîte), messages à
+//    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
+//    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
+//    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing'];
+const BLEAM_STRATEGIES = ['anti', 'destock', 'vierge'];
+const BLEAM_TRIS = ['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'];
+// Les stratégies prêtes (Bleam) : étapes en jours depuis la mise en ligne de l'annonce, `repeter` (jours après la
+// dernière étape), `plafondPct` (baisse totale au plus, depuis le prix d'origine), `ensuite` (republier tous les N j
+// une fois le plafond atteint ; 0 = rien de plus).
+const BLEAM_PRESETS = {
+  anti: { etapes: [{ apres: 7, action: 'baisse', pct: 10 }, { apres: 10, action: 'republier' }], repeter: 7, plafondPct: 20, ensuite: 0 },
+  destock: { etapes: [{ apres: 3, action: 'baisse', pct: 10 }, { apres: 6, action: 'baisse', pct: 10 }, { apres: 9, action: 'baisse', pct: 10 }, { apres: 12, action: 'baisse', pct: 10 }, { apres: 15, action: 'republier' }], repeter: 12, plafondPct: 20, ensuite: 7 },
+};
+const bleamEnt = (v, a, b, d) => { const n = Number(v); return Number.isInteger(n) && n >= a && n <= b ? n : d; };
+const bleamTextes = (l) => (Array.isArray(l) ? l : []).map(raTexte).filter((t) => t).slice(0, 5);
+function bleamEtapes(l) {
+  return (Array.isArray(l) ? l : []).map((e) => (e && typeof e === 'object' ? e : {}))
+    .map((e) => (e.action === 'republier' ? { apres: bleamEnt(e.apres, 1, 90, null), action: 'republier' } : { apres: bleamEnt(e.apres, 1, 90, null), action: 'baisse', pct: bleamEnt(e.pct, 1, 30, null) }))
+    .filter((e) => e.apres != null && (e.action === 'republier' || e.pct != null)).sort((a, b) => a.apres - b.apres).slice(0, 8);
+}
+function bleamSection(nom, v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const actif = o.actif === true;
+  if (nom === 'bordereau') return { actif, colissimo: o.colissimo === 'boite' ? 'boite' : 'relais' };
+  if (nom === 'msgVente' || nom === 'msgFinalise') return { actif, textes: bleamTextes(o.textes) };
+  if (nom === 'msgRelais' || nom === 'msgEvaluation') return { actif, textes: bleamTextes(o.textes), heures: bleamEnt(o.heures, 1, 168, 24) };
+  if (nom === 'eval5') return { actif, textes: bleamTextes(o.textes) };
+  if (nom === 'stockAuto') {
+    const st = {}; const s0 = o.stock && typeof o.stock === 'object' ? o.stock : {};
+    for (const k of Object.keys(s0).slice(0, 500)) { const n = bleamEnt(s0[k], 2, 99, null); let c = String(k).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(c)) c = String(parseInt(c, 10)); /* = cleNum (app et extension) */ if (n != null && /^[A-Z]{0,3}\d{1,6}$/.test(c)) st[c] = n; }
+    return { actif, stock: st };
+  }
+  if (nom === 'cycle') {
+    const strategie = BLEAM_STRATEGIES.includes(o.strategie) ? o.strategie : 'anti';
+    const p = BLEAM_PRESETS[strategie];
+    const base = p ? { etapes: p.etapes.map((e) => Object.assign({}, e)), repeter: p.repeter, plafondPct: p.plafondPct, ensuite: p.ensuite }
+      : { etapes: bleamEtapes(o.etapes), repeter: bleamEnt(o.repeter, 0, 90, 0), plafondPct: bleamEnt(o.plafondPct, 1, 50, 20), ensuite: bleamEnt(o.ensuite, 0, 90, 0) };
+    const r = o.rythme && typeof o.rythme === 'object' ? o.rythme : {};
+    const paire = (x, max) => { const mx = bleamEnt(x && x.max, 0, max, null); if (mx == null) return null; const mn = bleamEnt(x && x.min, 0, mx, mx); return { min: mn, max: mx }; };
+    const jours = [...new Set((Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort();
+    const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);
+    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
+  }
+  if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
+  if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
+  return { actif };   // sauvegarde
+}
+// Le réglage COMPLET d'un compte (chaque section, éteinte si rien n'est posé ou lisible).
+function bleamDe(regle, uid) {
+  const c = regle && typeof regle === 'object' && regle.comptes && typeof regle.comptes === 'object' ? regle.comptes[String(uid)] : null;
+  const out = {};
+  for (const s of BLEAM_SECTIONS) out[s] = bleamSection(s, c && typeof c === 'object' ? c[s] : null);
+  return out;
 }
 // Une demande d'écriture → { ok: true, valeur } ou { ok: false, code, raison }. `actuelle` = la valeur lue avant
 // (superposée) ; `confirme` = SON toucher sur la confirmation ; `maintenant` = l'heure.
@@ -26798,6 +27466,19 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     if (plusVite && confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme la cadence plus rapide.' };
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign(c, { at: Number(maintenant) || 0 });
+    return { ok: true, valeur: { v: 1, comptes } };
+  }
+  if (cle === 'vinted_bleam') {
+    // { uid, section, valeur } : UNE section d'UN compte ; allumer (éteint → allumé) exige `confirme`.
+    const d = demande && typeof demande === 'object' ? demande : {};
+    const uid = String(d.uid == null ? '' : d.uid);
+    if (!/^\d{1,20}$/.test(uid)) return { ok: false, code: 'forme', raison: 'Compte inconnu.' };
+    if (!BLEAM_SECTIONS.includes(d.section)) return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
+    const v = bleamSection(d.section, d.valeur);
+    const avant = bleamDe(actuelle, uid)[d.section];
+    if (allume(avant.actif, v.actif) && confirme !== true) return refus;
+    const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
+    comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };
   }
   // vinted_baisse_regle : { uid, actif, pct, jours } pour UN compte ; les autres comptes ne bougent pas.
@@ -34929,4 +35610,520 @@ function detectLbcQuota(data) {
   };
   try { walk(data, 0); } catch (_) {}
   return best;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.410.4 — « COMME BLEAM », LA SUITE (Julien, 20 nov. : « tout comme Bleam »)
+// ══════════════════════════════════════════════════════════════════════════════
+// Chaque moteur : un réglage PAR COMPTE (`vinted_bleam.comptes[uid]`, règle partagée <reglages-auto-ligne>),
+// ÉTEINT par défaut, réglé dans le panneau (Automatisations) ; il n'agit qu'au nom du COMPTE DE L'ONGLET
+// (`compteOngletPourAuto`, `gardeStricte`), dans les plafonds (50/h, réserve de 5, jour), une requête à la fois
+// (`avecVinted`), écran plein pendant le geste (`avecActionPlein`), captcha ⇒ arrêt, 403/429 ⇒ pause ; chaque geste
+// est noté AVANT de partir (jamais deux fois) et va au journal. Rien de payant, aucune IA.
+// ⛔ Refusé, à ne pas ajouter : photos modifiées « pour que Vinted ne voie pas un doublon », empreinte / adresse IP
+// différente par compte, tout ce qui camoufle l'automatisation.
+const BLEAM_CLE = 'vinted_bleam';
+const BLEAM_MEMO = 'vrmBleamMemo';          // { [uid]: { init, tx: { [tx]: { vente, finalise, relais, evaluation, eval5, stock, relaisVu, finVu } } } }
+const BLEAM_PROCHAIN = 'vrmBleamProchain';
+const BLEAM_VENTES_N = 40;
+// Ce qui veut dire « litige » sur une vente (texte de Vinted) : rien ne part, jamais (ni message ni évaluation).
+const BLEAM_LITIGE = /litige|r[ée]clamation|complaint|dispute|probl[èe]me|retour|rembours|annul|suspend|bloqu/i;
+const BLEAM_AU_POINT = /point relais|disponible|[àa] retirer|pr[êe]t [àa] [êe]tre retir|arriv[ée]e? au|livr[ée] au point|en attente de retrait/i;
+async function bleamCompte(uid) {
+  const m = await lireMain([BLEAM_CLE]).catch(() => null);
+  if (!m) return null;
+  return bleamDe(m[BLEAM_CLE], String(uid));
+}
+async function lireMemoBleam() { try { return (await chrome.storage.local.get(BLEAM_MEMO))[BLEAM_MEMO] || {}; } catch (_) { return null; } }
+async function poserMemoBleam(m) { try { await chrome.storage.local.set({ [BLEAM_MEMO]: m }); return true; } catch (_) { return false; } }
+// ── APRÈS-VENTE : ce qu'il y a à faire (règle PURE, exécutée par l'audit sur le vrai fichier) ────────────────────
+// `ventes` : [{ tx, conv, item, statut, code, expedition, date }] (statut = texte de Vinted, code = statut numérique
+// du détail de transaction, 450 = finalisée) ; `memo` : ce qui a déjà été fait / vu ; `litiges` : Set de n° de
+// transaction. Rend { actions: [{ tx, conv, item, sorte }], memo } — `memo` mis à jour des « vu » (arrivée au point,
+// fin), et des événements SAUTÉS (section éteinte au moment où ils arrivent : jamais rattrapés ensuite).
+// Au tout premier passage d'un compte (`memo.init` absent), l'état ACTUEL de chaque vente est noté sans rien envoyer :
+// allumer l'après-vente n'écrit jamais aux acheteurs du passé.
+function apresVenteAFaire({ ventes, reglage, memo, litiges, maintenant }) {
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  const R = reglage || {};
+  const m = memo && typeof memo === 'object' ? { init: memo.init, tx: Object.assign({}, memo.tx || {}) } : { tx: {} };
+  const premier = !m.init;
+  const actions = [];
+  for (const v of Array.isArray(ventes) ? ventes : []) {
+    if (!v || !/^\d{1,20}$/.test(String(v.tx || ''))) continue;
+    const tx = String(v.tx), st = String(v.statut || ''), exp = String(v.expedition || '');
+    if (!st && !v.code) continue;                                   // une conversation n'est pas une vente (§5)
+    const e = Object.assign({}, m.tx[tx] || {});
+    const litige = (litiges && litiges.has && litiges.has(tx)) || BLEAM_LITIGE.test(st) || BLEAM_LITIGE.test(exp) || PAS_UNE_VENTE.test(st);
+    const finalisee = String(v.code) === '450' || /finalis/i.test(st);
+    const auPoint = !finalisee && (BLEAM_AU_POINT.test(exp) || BLEAM_AU_POINT.test(st));
+    if (auPoint && !e.relaisVu) e.relaisVu = t;
+    if (finalisee && !e.finVu) e.finVu = t;
+    const dues = [];
+    if (!e.vente) dues.push('vente');
+    if (finalisee && !e.finalise) dues.push('finalise');
+    if (finalisee && !e.eval5) dues.push('eval5');
+    if (e.relaisVu && !finalisee && !e.relais) dues.push('relais');
+    if (e.finVu && !e.evaluation) dues.push('evaluation');
+    if (finalisee && !e.stock) dues.push('stock');
+    for (const d of dues) {
+      if (premier) { e[d] = 'avant'; continue; }                     // le passé : noté, jamais envoyé
+      const sec = d === 'vente' ? R.msgVente : d === 'finalise' ? R.msgFinalise : d === 'relais' ? R.msgRelais : d === 'evaluation' ? R.msgEvaluation : d === 'eval5' ? R.eval5 : R.stockAuto;
+      const attend = d === 'relais' ? t - e.relaisVu < (sec && sec.heures || 24) * 3600000 : d === 'evaluation' ? t - e.finVu < (sec && sec.heures || 24) * 3600000 : false;
+      if (attend) continue;                                          // pas encore l'heure : rien noté, il viendra
+      if (litige) { e[d] = 'litige'; continue; }                      // litige ⇒ RIEN, jamais
+      if (!sec || sec.actif !== true || (d !== 'stock' && d !== 'eval5' && !(sec.textes && sec.textes.length)) || (d === 'eval5' && !(sec.textes && sec.textes.length))) { e[d] = 'eteint'; continue; }
+      if ((d === 'vente' || d === 'finalise' || d === 'relais' || d === 'evaluation') && !/^[1-9]\d{0,19}$/.test(String(v.conv || ''))) { e[d] = 'sans-conversation'; continue; }
+      actions.push({ tx, conv: String(v.conv || ''), item: String(v.item || ''), sorte: d });
+    }
+    m.tx[tx] = e;
+  }
+  if (premier) m.init = t;
+  // Le mémo ne grossit pas sans fin : 90 jours.
+  for (const k of Object.keys(m.tx)) { const e = m.tx[k]; const plus = Math.max(Number(e.relaisVu) || 0, Number(e.finVu) || 0, ...['vente', 'finalise', 'relais', 'evaluation', 'eval5', 'stock'].map((x) => Number(e[x]) || 0)); if (plus && plus < t - 90 * 864e5) delete m.tx[k]; }
+  return { actions, memo: m };
+}
+// Les ventes de CE compte, projetées (§4.4 : jamais `select=data`) : la commande + son détail de transaction.
+async function ventesApresVente(uid) {
+  const n = BLEAM_VENTES_N;
+  const v = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=cap:data->>capturedAt,${idxCarte('o', 'data->payload->my_orders', n)}`);
+  if (v === null) return null;
+  const r0 = (v && v[0]) || null;
+  const cmds = r0 ? Array.from({ length: n }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
+  const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,it:meta->>item_id,st:meta->>status,ti:meta->>status_title,sst:meta->>ship_status_title`);
+  if (det === null) return null;
+  const parTx = new Map((det || []).map((r) => [(/_txn_(\d+)$/.exec(String(r.id || '')) || [])[1], r]).filter((x) => x[0]));
+  const lit = await sbGet(`app_data?id=like.harvest_${uid}_litige_*&select=id,tx:data->payload->>transaction_id,tx2:data->payload->complaint->>transaction_id`);
+  if (lit === null) return null;
+  const litiges = new Set((lit || []).flatMap((r) => [r.tx, r.tx2, (/_litige_(\d+)$/.exec(String(r.id || '')) || [])[1]]).filter((x) => /^\d{1,20}$/.test(String(x || ''))).map(String));
+  const ventes = cmds.map((o) => { const tx = String(o.transaction_id); const d = parTx.get(tx) || {};
+    return { tx, conv: o.conversation_id != null ? String(o.conversation_id) : '', item: d.it ? String(d.it) : '', statut: String(d.ti || o.status || ''), code: d.st ? String(d.st) : '', expedition: String(d.sst || ''), date: o.date || '' }; });
+  return { ventes, litiges };
+}
+// Une version tirée au hasard (jamais celle d'avant), {pseudo} retiré s'il n'est pas su, jamais deux fois le même texte.
+async function texteAcheteur(uid, sorte, textes) {
+  const versions = (Array.isArray(textes) ? textes : []).filter((x) => x && !erreurMessageAutoExt(x)).map((x, i) => ({ n: i + 1, texte: x }));
+  if (!versions.length) return null;
+  const v = choisirVariante(versions, await varianteDerniere(uid, 'av_' + sorte));
+  if (!v) return null;
+  const brut = String(v.texte).replace(/\{pseudo\}/g, '').replace(/\s{2,}/g, ' ').trim().slice(0, 2000);
+  const t = texteJamaisRepete(brut, '', await textesRecents(uid));
+  return t && t.trim() ? { texte: t, n: v.n } : null;
+}
+// L'ÉVALUATION APPRISE : SA propre évaluation laissée à la main (requête rangée `harvest_*_wreq_*feedback*`) donne
+// l'adresse et la forme. Jamais vue ⇒ rien ne part, et c'est dit (« laisse une évaluation à la main une fois »).
+// La forme n'est acceptée que si elle ne porte que des clés connues (note 1–5, texte, n° de transaction).
+const RE_EVAL_CHEMIN = /^\/api\/v2\/(?:transactions\/\d{1,20}\/feedbacks?|feedbacks|user_feedbacks)$/;
+function evaluationApprise(rows) {
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const meth = String(r && r.m || '').toUpperCase(), ch = String(r && r.p || '');
+    if (!['POST', 'PUT'].includes(meth) || !RE_EVAL_CHEMIN.test(ch)) continue;
+    let o = null; try { o = JSON.parse(String(r.b || '')); } catch (_) { o = null; }
+    const corps = o && typeof o === 'object' && !Array.isArray(o) ? (o.feedback && typeof o.feedback === 'object' ? o.feedback : o) : null;
+    if (!corps) continue;
+    const cles = Object.keys(corps);
+    const note = cles.find((k) => /^(rating|rate|stars|score)$/.test(k) && Number.isInteger(Number(corps[k])) && Number(corps[k]) >= 1 && Number(corps[k]) <= 5);
+    const texte = cles.find((k) => /^(feedback|comment|text|body|message)$/.test(k) && typeof corps[k] === 'string');
+    const tx = cles.find((k) => /^transaction_id$/.test(k));
+    if (!note || !texte || cles.some((k) => k !== note && k !== texte && k !== tx)) continue;
+    return { methode: meth, chemin: ch.replace(/\/transactions\/\d{1,20}\//, '/transactions/{tx}/'), enveloppe: corps !== o ? 'feedback' : '', note, texte, tx: tx || '' };
+  }
+  return null;
+}
+function corpsEvaluation(appris, tx, texte) {
+  const c = { [appris.note]: 5, [appris.texte]: String(texte).slice(0, 500) };
+  if (appris.tx) c[appris.tx] = Number(tx);
+  return { chemin: appris.chemin.replace('{tx}', String(tx)), corps: appris.enveloppe ? { [appris.enveloppe]: c } : c };
+}
+// LE GESTE d'après-vente (UN par passage) : message à l'acheteur, évaluation 5 étoiles, ou « stock auto ».
+let _avEnVol = null;
+function apresVenteTick(source) {
+  if (_avEnVol) return _avEnVol;
+  _avEnVol = apresVenteTickUn(source).catch(() => ({ erreur: true })).finally(() => { _avEnVol = null; });
+  return _avEnVol;
+}
+async function apresVenteTickUn() {
+  if (!(await relaisSessionOwner())) return { saute: 'session' };
+  const uid = await compteOngletPourAuto();
+  if (!uid) return { saute: 'onglet' };
+  const R = await bleamCompte(uid);
+  if (!R) return { lu: false };
+  const allume = ['msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto'].some((k) => R[k] && R[k].actif === true);
+  if (!allume) return { saute: 'eteint' };                          // ÉTEINT par défaut : rien, pas même une lecture
+  const t = Date.now();
+  const p = await prochainPasse(BLEAM_PROCHAIN, uid + ':av', t);
+  if (p === null) return { saute: 'stockage' };
+  if (p > t) return { saute: 'espace' };
+  if (await prudenceDe(uid)) return { saute: 'prudence' };
+  const lu = await ventesApresVente(uid);
+  if (!lu) return { lu: false };
+  const memoTout = await lireMemoBleam();
+  if (memoTout === null) return { saute: 'stockage' };
+  const plan = apresVenteAFaire({ ventes: lu.ventes, reglage: R, memo: memoTout[uid], litiges: lu.litiges, maintenant: t });
+  memoTout[uid] = plan.memo;
+  if (!(await poserMemoBleam(memoTout))) return { saute: 'stockage' };
+  const a = plan.actions[0];
+  if (!a) return { lu: true, rien: true };
+  if (!(await poserProchain(BLEAM_PROCHAIN, uid + ':av', t + tirerEntre(3 * 60000, 9 * 60000)))) return { saute: 'stockage' };
+  // Noté AVANT le geste : un worker tué ne le rejoue jamais.
+  const marquer = async (val) => { const m2 = (await lireMemoBleam()) || {}; const e = ((m2[uid] = m2[uid] || { init: t, tx: {} }).tx[a.tx] = Object.assign({}, (m2[uid].tx || {})[a.tx] || {})); e[a.sorte] = val; return poserMemoBleam(m2); };
+  if (!(await marquer(t))) return { saute: 'stockage' };
+  const r = a.sorte === 'stock' ? await stockAutoGeste(uid, a, R) : a.sorte === 'eval5' ? await evaluationGeste(uid, a, R) : await messageAcheteurGeste(uid, a, R);
+  if (r && r.pasParti) await marquer(undefined);                    // rien n'est parti (onglet, pause, place) : il reviendra
+  return Object.assign({ lu: true, sorte: a.sorte, tx: a.tx }, r || {});
+}
+async function compteDe(uid) {
+  const accts = await getStoredAccounts({ ouNull: true });
+  return Array.isArray(accts) ? accts.find((x) => String(x.vinted_user_id) === String(uid)) || null : null;
+}
+async function messageAcheteurGeste(uid, a, R) {
+  const acc = await compteDe(uid); if (!acc) return { pasParti: true, code: 'compte' };
+  const sec = a.sorte === 'vente' ? R.msgVente : a.sorte === 'finalise' ? R.msgFinalise : a.sorte === 'relais' ? R.msgRelais : R.msgEvaluation;
+  const tx = await texteAcheteur(uid, a.sorte, sec.textes);
+  if (!tx) return { ok: false, code: 'texte' };
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, sorte: 'message', rythme: true, secu: { sorte: 'autre', mode: 'auto' } });
+  if (stop) return { pasParti: true, code: stop.code };
+  const r = await avecActionPlein('apresvente', { uid, total: 1 }, () => avecVinted(async () => {
+    { const s2 = await gardeStricte(uid, acc, { lecture: true }); if (s2) return { pasParti: true }; }
+    const ec = await attendreEcriture(uid, acc, tx.texte, 'serie'); if (!ec.ok) return { pasParti: true, code: ec.code };
+    return vintedPage(acc, 'POST', `/api/v2/conversations/${a.conv}/replies`, corpsReponseVinted(tx.texte), { timeoutMs: 12000 });
+  }));
+  if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(uid, recu.at, 1); return { pasParti: true, code: r && r.code }; }
+  if (!r.ok) { if (!r.pause && refusRestreint(r)) await poserFreinRepub(uid, r); return { ok: false, status: r.status }; }
+  await noterVarianteDerniere(uid, 'av_' + a.sorte, tx.n); await noterTexteRecent(uid, tx.texte);
+  await noterJournal(uid, 'message_acheteur', { x: a.tx, auto: true, v: tx.n });
+  logActivity(`💬 Message à l'acheteur (${a.sorte}) — vente ${a.tx}`);
+  return { ok: true, variante: tx.n };
+}
+async function evaluationGeste(uid, a, R) {
+  const wr = await sbGet(`app_data?id=like.harvest_${uid}_wreq_*feedback*&select=id,m:data->>method,p:data->>path,b:data->>body`);
+  if (wr === null) return { pasParti: true, code: 'lecture' };
+  const appris = evaluationApprise(wr);
+  if (!appris) { noterDiag('bleam_eval_pas_appris'); return { ok: false, code: 'pas-appris' }; }
+  const acc = await compteDe(uid); if (!acc) return { pasParti: true, code: 'compte' };
+  const tx = await texteAcheteur(uid, 'eval5', R.eval5.textes);
+  if (!tx) return { ok: false, code: 'texte' };
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, sorte: 'evaluation', rythme: true, secu: { sorte: 'autre', mode: 'auto' } });
+  if (stop) return { pasParti: true, code: stop.code };
+  const c = corpsEvaluation(appris, a.tx, tx.texte);
+  const r = await avecActionPlein('apresvente', { uid, total: 1 }, () => avecVinted(async () => {
+    { const s2 = await gardeStricte(uid, acc, { lecture: true }); if (s2) return { pasParti: true }; }
+    await wait(800 + Math.floor(Math.random() * 1600));
+    return vintedPage(acc, appris.methode, c.chemin, c.corps, { timeoutMs: 15000 });
+  }));
+  if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(uid, recu.at, 1); return { pasParti: true }; }
+  if (!r.ok) { if (!r.pause && refusRestreint(r)) await poserFreinRepub(uid, r); return { ok: false, status: r.status }; }
+  await noterVarianteDerniere(uid, 'av_eval5', tx.n); await noterTexteRecent(uid, tx.texte);
+  await noterJournal(uid, 'evaluation', { x: a.tx, auto: true });
+  return { ok: true };
+}
+// STOCK AUTO : la paire vendue (identité : SON annonce ⇒ SA fiche ⇒ SON N°) a encore des exemplaires (quantité posée
+// par LUI sur le N°, ≥ 2) ⇒ remise en ligne par le moteur de republication (`executerCommande`, coffre → brouillon →
+// mise en ligne, gardes comprises, `dupliquer` : l'annonce vendue n'est jamais supprimée), puis quantité − 1.
+// Jamais par ressemblance (§5) : sans annonce, sans fiche ou sans N° ⇒ rien.
+async function stockAutoGeste(uid, a, R) {
+  if (!/^\d{4,15}$/.test(a.item)) return { ok: false, code: 'sans-annonce' };
+  const m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']);
+  if (!m) return { pasParti: true, code: 'lecture' };
+  const fiche = (m.vinted_annonce_numeros || {})[a.item];
+  if (!fiche || fiche.numero == null || (fiche.accountId != null && String(fiche.accountId) !== String(uid))) return { ok: false, code: 'sans-fiche' };
+  const num = cleNum(fiche.numero);
+  const n = Number(R.stockAuto.stock[num]);
+  if (!(n >= 2)) return { ok: false, code: 'pas-de-stock' };
+  const pl = plancherBaisse(fiche, m.vinted_buyprice_by_num);
+  const r = await executerCommande({ cmd: 'recreerVinted', uid: String(uid), id: a.item, confirme: true, dupliquer: true, methode: 'directe', total: 1, num: String(fiche.numero), ...(pl ? { plancher: pl.c / 100 } : {}) }).catch(() => null);
+  if (!r || !r.accepte || !['fait', 'double', 'attente'].includes(r.etape)) return r && (r.code === 'vinted-pause' || r.code === 'onglet-vinted' || r.code === 'plafond') ? { pasParti: true, code: r.code } : { ok: false, code: (r && (r.code || r.etape)) || 'sans-reponse' };
+  // La quantité − 1, dans SA ligne de réglages (comparer-et-échanger) ; 1 restant = la paire remise en ligne.
+  await modifierLigneCas(REGLAGES_AUTO_ID, (d) => {
+    const cles = (d && d.cles) || {}; const b = cles[BLEAM_CLE] && typeof cles[BLEAM_CLE] === 'object' ? JSON.parse(JSON.stringify(cles[BLEAM_CLE])) : { v: 1, comptes: {} };
+    const s = (((b.comptes = b.comptes || {})[uid] = b.comptes[uid] || {}).stockAuto = b.comptes[uid].stockAuto || { actif: true, stock: {} });
+    s.stock = s.stock || {}; if (n - 1 >= 2) s.stock[num] = n - 1; else delete s.stock[num];
+    return ligneAvecReglage(d, BLEAM_CLE, b, 'extension', Date.now());
+  }).catch(() => false);
+  await noterJournal(uid, 'stock_auto', { a: a.item, x: a.tx, auto: true });
+  logActivity(`📦 Stock auto : N° ${fiche.numero} remis en ligne (${n - 1} restant${n - 1 > 1 ? 's' : ''})`);
+  return { ok: true, reste: n - 1 };
+}
+// ── BORDEREAU AUTO PAR COMPTE : Colissimo « point relais » (le choix par défaut de Vinted, rien n'est forcé) ou
+//    « boîte aux lettres » (la valeur `drop_off_type` APPRISE de SA commande à la main sur ce compte ; jamais vue ⇒ la
+//    commande automatique ne part pas pour ce compte, et c'est dit). Jamais pour eBay (§2.8 : ce chemin est Vinted seul).
+async function bordereauAutoCompte(uid) { const R = await bleamCompte(uid).catch(() => null); return !!(R && R.bordereau && R.bordereau.actif === true); }
+async function depotBordereau(uid) {
+  const R = await bleamCompte(uid).catch(() => null);
+  if (!R || !R.bordereau || R.bordereau.colissimo !== 'boite') return { dropOff: null };
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_wreq_api_v2_transactions_id_shipment_order&select=b:data->>body`).catch(() => null);
+  let v = null; try { const o = JSON.parse(String(rows && rows[0] && rows[0].b || '')); v = o && o.drop_off_type != null && /^[\w-]{1,20}$/.test(String(o.drop_off_type)) ? o.drop_off_type : null; } catch (_) { v = null; }
+  return v == null ? { refus: 'boîte aux lettres pas encore apprise : commande une fois un bordereau Colissimo en boîte aux lettres à la main sur Vinted, VRM retiendra ton choix' } : { dropOff: v };
+}
+// ── CYCLE DE VIE (règle PURE) : l'étape due pour UNE annonce. `plan` = la section `cycle` ; `etat` = { item, debut,
+//    faits, origineC } (rangé par N°, il survit à une republication) ; `item` = { id, prixC, misLe } ; `plancherC` =
+//    prix mini / achat + 10 % (null ⇒ aucune baisse, §3). Rend { action: 'baisse', vouluC } | { action: 'republier' }
+//    | { rien }, et l'état à garder. Jamais une hausse, jamais sous le plancher ni sous le plafond de baisse totale.
+function cycleAction({ plan, etat, item, plancherC, maintenant }) {
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (!plan || plan.actif !== true || !item || !Number.isInteger(item.prixC) || item.prixC <= 0) return { rien: 'eteint', etat };
+  let e = etat && typeof etat === 'object' ? Object.assign({}, etat, { faits: Array.isArray(etat.faits) ? etat.faits.slice() : [] }) : null;
+  if (!e || e.item !== String(item.id)) e = { item: String(item.id), debut: Number(item.misLe) > 0 ? Number(item.misLe) : t, faits: [], origineC: e && e.origineC > 0 ? e.origineC : item.prixC };
+  if (!(e.origineC > 0)) e.origineC = item.prixC;
+  const jours = (t - e.debut) / 864e5;
+  const minC = Math.ceil(e.origineC * (100 - plan.plafondPct) / 100);
+  const auPlafond = item.prixC <= minC || (plancherC != null && item.prixC <= plancherC);
+  if (auPlafond && plan.ensuite > 0) return jours >= plan.ensuite ? { action: 'republier', i: 'ensuite', etat: e } : { rien: 'attente', etat: e };
+  const etapes = Array.isArray(plan.etapes) ? plan.etapes : [];
+  for (let i = 0; i < etapes.length; i++) {
+    if (e.faits.includes(i)) continue;
+    const et = etapes[i];
+    if (jours < et.apres) return { rien: 'attente', etat: e };
+    if (et.action === 'baisse') {
+      if (auPlafond || plancherC == null) { e.faits.push(i); continue; }
+      let v = Math.floor(item.prixC * (100 - et.pct) / 100 / 100) * 100;
+      if (v < minC) v = minC;
+      if (v < plancherC) v = plancherC;
+      if (v >= item.prixC || v < 100) { e.faits.push(i); continue; }
+      return { action: 'baisse', i, vouluC: v, etat: e };
+    }
+    if (auPlafond && plan.ensuite === 0) return { rien: 'fini', etat: e };
+    return { action: 'republier', i, etat: e };
+  }
+  if (auPlafond) return { rien: 'fini', etat: e };
+  const fin = etapes.length ? etapes[etapes.length - 1].apres : 0;
+  if (plan.repeter > 0 && jours >= fin + plan.repeter) { e.faits = []; e.debut = t; return { rien: 'recommence', etat: e }; }
+  return { rien: 'fini', etat: e };
+}
+// Le créneau (heure de Paris) : jour de la semaine coché et heure dans la plage. Hors créneau ⇒ l'action prête attend.
+function jourHeureParis(t) {
+  try { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t));
+    const j = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf((p.find((x) => x.type === 'weekday') || {}).value); const h = Number((p.find((x) => x.type === 'hour') || {}).value);
+    if (j >= 0 && Number.isFinite(h)) return { j, h: h % 24 }; } catch (_) {}
+  const d = new Date(t); return { j: d.getDay(), h: d.getHours() };
+}
+function creneauOuvert(rythme, t) {
+  const r = rythme || {}; const { j, h } = jourHeureParis(t);
+  return Array.isArray(r.jours) && r.jours.includes(j) && h >= Number(r.heureDebut) && h < Number(r.heureFin);
+}
+// Le quota du jour (tiré au hasard entre SON minimum et SON maximum, une fois par jour), jamais plus que ce qui est prêt.
+function quotaDuJour(paire, tire) { const mn = Number(paire && paire.min) || 0, mx = Number(paire && paire.max) || 0; return Number.isInteger(tire) && tire >= mn && tire <= mx ? tire : mn + Math.floor(Math.random() * (mx - mn + 1)); }
+const CYCLE_ETAT = 'vrmCycleEtat', CYCLE_JOUR = 'vrmCycleJour';
+let _cycleEnVol = null;
+function cycleVieTick(source) {
+  if (_cycleEnVol) return _cycleEnVol;
+  _cycleEnVol = cycleVieTickUn(source).catch(() => ({ erreur: true })).finally(() => { _cycleEnVol = null; });
+  return _cycleEnVol;
+}
+async function cycleVieTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  const uid = await compteOngletPourAuto();
+  if (!uid) return { saute: 'onglet' };
+  const R = await bleamCompte(uid);
+  if (!R) return { lu: false };
+  const plan = R.cycle;
+  if (!plan || plan.actif !== true) return { saute: 'eteint' };
+  const t = Date.now();
+  if (!creneauOuvert(plan.rythme, t)) return { saute: 'creneau' };
+  const p = await prochainPasse(BLEAM_PROCHAIN, uid + ':cy', t);
+  if (p === null) return { saute: 'stockage' };
+  if (p > t) return { saute: 'espace' };
+  if (await prudenceDe(uid)) return { saute: 'prudence' };
+  { const arret = await porteDiscretion(uid, 'baisse_prix', {}); if (arret && (arret.code === 'tout-arrete' || arret.code === 'verification')) return { saute: arret.code }; }
+  const dr = await dressingLu(uid);
+  if (dr === null) return { lu: false };
+  const cap = Date.parse(String(dr.capturedAt || ''));
+  if (!Array.isArray(dr.items) || !Number.isFinite(cap) || t - cap > DRESSING_AGE_MAX_MS) return { saute: 'dressing' };
+  const m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']);
+  if (m === null) return { lu: false };
+  const fiches = m.vinted_annonce_numeros || {};
+  let st; try { st = await chrome.storage.local.get([CYCLE_ETAT, CYCLE_JOUR]); } catch (_) { return { saute: 'stockage' }; }
+  const etats = st[CYCLE_ETAT] || {}, jr0 = st[CYCLE_JOUR] || {};
+  const jourCle = new Date(t).toISOString().slice(0, 10);
+  const jr = jr0[uid] && jr0[uid].j === jourCle ? jr0[uid] : { j: jourCle, prix: 0, repub: 0, qPrix: quotaDuJour(plan.rythme.prix), qRepub: quotaDuJour(plan.rythme.repub) };
+  const pretes = [];
+  for (const it of dr.items) {
+    if (!it || !ouverteSurVinted(it) || !/^\d{4,15}$/.test(String(it.id))) continue;
+    const fiche = fiches[String(it.id)];
+    if (fiche && fiche.accountId != null && String(fiche.accountId) !== uid) continue;
+    const devise = it.price && typeof it.price === 'object' ? String(it.price.currency_code || 'EUR') : 'EUR';
+    if (devise !== 'EUR') continue;
+    const prixC = centimesPoses(it.price && typeof it.price === 'object' ? it.price.amount : it.price);
+    const cle = uid + ':' + (fiche && fiche.numero != null ? 'n' + cleNum(fiche.numero) : 'i' + it.id);
+    const pl = plancherBaisse(fiche, m.vinted_buyprice_by_num);
+    const r = cycleAction({ plan, etat: etats[cle], item: { id: String(it.id), prixC, misLe: Number(it.created_at_ts) > 0 ? Number(it.created_at_ts) * 1000 : 0 }, plancherC: pl ? pl.c : null, maintenant: t });
+    etats[cle] = r.etat;
+    if (r.action === 'baisse' && jr.prix < jr.qPrix) pretes.push({ cle, it, fiche, r });
+    if (r.action === 'republier' && jr.repub < jr.qRepub) pretes.push({ cle, it, fiche, r, pl });
+  }
+  jr0[uid] = jr;
+  try { await chrome.storage.local.set({ [CYCLE_ETAT]: etats, [CYCLE_JOUR]: jr0 }); } catch (_) { return { saute: 'stockage' }; }
+  if (!pretes.length) return { lu: true, rien: true, jour: jr };
+  if (!(await poserProchain(BLEAM_PROCHAIN, uid + ':cy', t + tirerEntre(20 * 60000, 50 * 60000)))) return { saute: 'stockage' };
+  const x = pretes[tirerEntre(0, pretes.length - 1)];
+  const noterFait = async () => { const s2 = (await chrome.storage.local.get([CYCLE_ETAT, CYCLE_JOUR])) || {}; const e2 = s2[CYCLE_ETAT] || {}, j2 = s2[CYCLE_JOUR] || {};
+    const e = Object.assign({}, e2[x.cle] || x.r.etat); e.faits = [...new Set([...(e.faits || []), x.r.i].filter((y) => y !== 'ensuite'))]; if (x.r.i === 'ensuite') e.debut = Date.now(); e2[x.cle] = e;
+    const jj = j2[uid] && j2[uid].j === jr.j ? j2[uid] : jr; jj[x.r.action === 'baisse' ? 'prix' : 'repub'] = (jj[x.r.action === 'baisse' ? 'prix' : 'repub'] || 0) + 1; j2[uid] = jj;
+    await chrome.storage.local.set({ [CYCLE_ETAT]: e2, [CYCLE_JOUR]: j2 }); };
+  if (x.r.action === 'baisse') {
+    // La baisse : la MÊME commande que la baisse par règle (`cmd_prix_*`, exécutée par `prixAttenteTick` dans les plafonds).
+    const cmds = await sbGet(`app_data?id=like.cmd_prix_*&select=id,cle:meta->>cle,etat:meta->>etat&order=id.desc&limit=400`);
+    if (!Array.isArray(cmds)) return { lu: false };
+    if (cmds.some((c) => c && c.cle === 'vinted:' + x.it.id && (c.etat === 'attente' || c.etat === 'pris'))) return { lu: true, attend: 'baisse-deja' };
+    const prixC = centimesPoses(x.it.price && typeof x.it.price === 'object' ? x.it.price.amount : x.it.price);
+    const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
+    const data = { v: 1, site: 'vinted', args: { uid, id: String(x.it.id), prix: x.r.vouluC / 100, prixAvant: prixC / 100 }, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS,
+      etat: 'attente', reports: 0, cle: 'vinted:' + x.it.id, prix: x.r.vouluC / 100, prixAvant: prixC / 100, num: String((x.fiche && x.fiche.numero) || '').slice(0, 12), source: 'regle', uidRegle: uid, regle: { cycle: plan.strategie },
+      pasAvant: t + tirerEntre(2 * 60000, 20 * 60000) };
+    if (prixAttCommande(data).refus) return { lu: true, saute: 'forme' };
+    const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + t.toString(36) + alea, data }], 'id');
+    if (ok === false) return { lu: true, depose: null };
+    await noterFait();
+    return { lu: true, action: 'baisse', id: String(x.it.id), prix: x.r.vouluC / 100 };
+  }
+  const r = await executerCommande({ cmd: 'recreerVinted', uid, id: String(x.it.id), confirme: true, total: 1, ...(x.fiche && x.fiche.numero ? { num: String(x.fiche.numero) } : {}), ...(x.pl ? { plancher: x.pl.c / 100 } : {}) }).catch(() => null);
+  if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { await noterFait(); return { lu: true, action: 'republier', id: String(x.it.id) }; }
+  return { lu: true, action: 'republier', pasParti: true, code: (r && (r.code || r.etape)) || 'sans-reponse' };
+}
+// ── SAUVEGARDE AUTOMATIQUE (toutes les heures) : le coffre de CHAQUE annonce refait depuis la dernière lecture du
+//    dressing de ce compte (aucune requête vers Vinted : la base seule) ; heure et nombre retenus pour le panneau.
+const SAUVE_ETAT = 'vrmSauvegardeAuto';
+let _sauveEnVol = null;
+function sauvegardeAutoTick() {
+  if (_sauveEnVol) return _sauveEnVol;
+  _sauveEnVol = (async () => {
+    if (!(await relaisSessionOwner())) return { saute: 'session' };
+    const uid = await compteConnecte('www.vinted.fr').catch(() => null);
+    if (!/^\d{1,20}$/.test(String(uid || ''))) return { saute: 'onglet' };
+    const R = await bleamCompte(uid);
+    if (!R || !R.sauvegarde || R.sauvegarde.actif !== true) return { saute: 'eteint' };
+    const t = Date.now();
+    let s = {}; try { s = (await chrome.storage.local.get(SAUVE_ETAT))[SAUVE_ETAT] || {}; } catch (_) { return { saute: 'stockage' }; }
+    if (s[uid] && t - Number(s[uid].at || 0) < 3600000) return { saute: 'espace' };
+    const dr = await dressingLu(uid);
+    if (!dr || !Array.isArray(dr.items)) return { lu: false };
+    const ouvertes = dr.items.filter((it) => it && !it.is_closed && !it.is_hidden && !it.is_draft);
+    const ok = await archiverLot(uid, ouvertes, dr.items);
+    s[uid] = { at: t, n: ouvertes.length, lu: dr.capturedAt || '', ok: ok !== false };
+    try { await chrome.storage.local.set({ [SAUVE_ETAT]: s }); } catch (_) {}
+    return { lu: true, n: ouvertes.length };
+  })().catch(() => ({ erreur: true })).finally(() => { _sauveEnVol = null; });
+  return _sauveEnVol;
+}
+// ── ANALYSE DES RÉPONSES AUX FAVORIS (lecture seule) : par version de message, combien d'envois, combien de
+//    conversations relues, combien de réponses de l'acheteur APRÈS l'envoi. « Pas relue » n'est pas « pas de réponse ».
+const FAV_ENVOIS = 'vrmFavorisEnvois';
+async function noterEnvoiFavori(uid, conv, variante, item, acheteur) {
+  try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
+    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
+}
+function analyseFavoris(envois, convs) {
+  const parConv = new Map((Array.isArray(convs) ? convs : []).map((c) => [String(c.cid), c]));
+  const out = {};
+  for (const e of Array.isArray(envois) ? envois : []) {
+    const k = String(e.v || 0); const o = out[k] = out[k] || { version: Number(e.v) || 0, envoyes: 0, relues: 0, reponses: 0 };
+    o.envoyes++;
+    const c = parConv.get(String(e.c));
+    if (!c) continue;
+    o.relues++;
+    const opp = String(c.opp || '');
+    if ((Array.isArray(c.msgs) ? c.msgs : []).some((mm) => mm && mm.entity_type === 'message' && mm.entity && String(mm.entity.user_id) === opp && Number(mm.created_at_ts) * 1000 > Number(e.t))) o.reponses++;
+  }
+  return Object.values(out).map((o) => Object.assign(o, { taux: o.relues ? Math.round(o.reponses * 100 / o.relues) : null })).sort((a, b) => a.version - b.version);
+}
+async function analyseFavorisCarte(uid) {
+  let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[uid] || []; } catch (_) { return null; }
+  const ids = [...new Set(l.map((x) => x.c).filter((c) => /^\d{1,20}$/.test(c)))].slice(-200);
+  const convs = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const lot = ids.slice(i, i + 40).map((c) => `harvest_${uid}_conv_${c}`).join(',');
+    const rows = await sbGet(`app_data?id=in.(${lot})&select=cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,msgs:data->payload->conversation->messages`);
+    if (rows === null) return null;
+    for (const r of rows || []) convs.push(r);
+  }
+  return { versions: analyseFavoris(l, convs), envois: l.length };
+}
+// ── FILTRES DES FAVORIS (Vintex) : appliqués à l'APERÇU avant qu'il soit cochable (le moteur et sa séquence ne
+//    changent pas). Note de l'acheteur sous X (sans note : écarté aussi), limite par article, période de recherche,
+//    favori reçu il y a moins de N minutes (attend), même acheteur réécrit avant N jours. Éteint ⇒ rien ne change.
+function favoriFiltre(x, F, contacts, maintenant) {
+  if (!F || F.actif !== true || !x) return null;
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (F.noteMin > 0) { const n = Number(x.note != null ? x.note : x.feedback_reputation != null ? Number(x.feedback_reputation) * 5 : NaN); if (!Number.isFinite(n) || n < F.noteMin) return 'note'; }
+  const at = Date.parse(String(x.at || x.created_at || '')) || Number(x.t) || 0;
+  if (F.periodeJours > 0 && at && t - at > F.periodeJours * 864e5) return 'periode';
+  if (F.apresMin > 0 && (!at || t - at < F.apresMin * 60000)) return 'trop-tot';
+  const c = contacts || {};
+  if (F.parArticle > 0 && x.item != null && (Number((c.parArticle || {})[String(x.item)]) || 0) >= F.parArticle) return 'par-article';
+  const ach = x.acheteur != null ? String(x.acheteur) : x.user_id != null ? String(x.user_id) : '';
+  if (F.reecrireJours > 0 && ach && (c.parAcheteur || {})[ach] && t - Number(c.parAcheteur[ach]) < F.reecrireJours * 864e5) return 'reecrire';
+  return null;
+}
+function filtrerApercuFavoris(a, F, contacts, maintenant) {
+  if (!a || !F || F.actif !== true || !Array.isArray(a.tous)) return a;
+  return Object.assign({}, a, { tous: a.tous.map((x) => { const r = x && x.cochable === true ? favoriFiltre(x, F, contacts, maintenant) : null; return r ? Object.assign({}, x, { cochable: false, raisonFiltre: r }) : x; }) });
+}
+async function contactsFavoris(uid) {
+  let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[uid] || []; } catch (_) { l = []; }
+  const parArticle = {}, parAcheteur = {};
+  for (const e of l) { if (e.i) parArticle[e.i] = (parArticle[e.i] || 0) + 1; if (e.a) parAcheteur[e.a] = Math.max(Number(parAcheteur[e.a]) || 0, e.t); }
+  return { parArticle, parAcheteur };
+}
+// ── LE DRESSING AMÉLIORÉ (vinted.fr, page profil du COMPTE DE L'ONGLET) : ce que la barre et les plaques affichent.
+//    Lecture seule : N° par identité d'annonce, sauvegardé ou non (coffre), statistiques LUES du dressing capté.
+async function dressingPlus(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet' };
+  const uid = await compteConnecte('www.vinted.fr').catch(() => null);
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte' };
+  const page = String(msg && msg.membre || '');
+  if (page !== String(uid)) return { ok: true, actif: false, raison: 'autre-profil' };   // le dressing d'un AUTRE : rien
+  const R = await bleamCompte(uid);
+  if (!R) return { ok: false, code: 'lecture' };
+  if (!R.dressing || R.dressing.actif !== true) return { ok: true, actif: false, raison: 'eteint' };
+  const m = await lireMain(['vinted_annonce_numeros']);
+  const dr = await dressingLu(uid);
+  const cf = await sbGet(`app_data?id=like.coffre_${uid}_*&select=id`);
+  const nums = {}, stats = {};
+  for (const [id, f] of Object.entries((m && m.vinted_annonce_numeros) || {})) if (f && f.numero != null && (f.accountId == null || String(f.accountId) === String(uid))) nums[id] = String(f.numero).slice(0, 12);
+  for (const it of (dr && Array.isArray(dr.items) ? dr.items : [])) {
+    if (!it || it.id == null) continue;
+    stats[String(it.id)] = { vues: Number(it.view_count) || 0, favoris: Number(it.favourite_count) || 0, prix: prixCarte(it.price), cree: Number(it.created_at_ts) || 0, repub: Number(it.push_up_count || 0) };
+  }
+  const sauve = Array.isArray(cf) ? cf.map((r) => (/^coffre_\d+_(\d+)$/.exec(String(r.id || '')) || [])[1]).filter(Boolean) : null;
+  return { ok: true, actif: true, uid: String(uid), tri: R.dressing.tri, filtre: R.dressing.filtre, nums, stats, sauve, stock: R.stockAuto.stock };
+}
+// Les actions de la barre : CHACUNE par un chemin gardé existant. Republier ⇒ l'atelier (SON « Lancer », contrôle
+// avant départ) ; Supprimer ⇒ SA confirmation, une à la fois, gardes strictes, 10 au plus par toucher, journal.
+async function dressingAction(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Depuis l’onglet vinted.fr seulement.' };
+  const uid = await compteConnecte('www.vinted.fr').catch(() => null);
+  if (!/^\d{1,20}$/.test(String(uid || '')) || String(msg && msg.membre || '') !== String(uid)) return { ok: false, code: 'compte', raison: 'Ce dressing n’est pas celui du compte connecté : rien n’est parti.' };
+  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))];
+  if (msg.quoi === 'republier') return atelierLancer({ ids, confirme: msg.confirme === true, espacement: { mode: 'aleatoire', min: 2, max: 6 } }, sender);
+  if (msg.quoi === 'supprimer') {
+    if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme la suppression.' };
+    if (!ids.length || ids.length > 10) return { ok: false, code: 'vide', raison: 'De 1 à 10 annonces par toucher.' };
+    const acc = await compteDe(uid); if (!acc) return { ok: false, code: 'compte' };
+    const faits = [];
+    for (const id of ids) {
+      const recu = {};
+      const stop = await gardeStricte(String(uid), acc, { reserve: 0, recu, sorte: 'supprimer', secu: { sorte: 'autre', mode: 'clic' } });
+      if (stop) { faits.push({ id, ok: false, code: stop.code }); break; }
+      const r = await avecActionPlein('supprimer', { uid: String(uid), id, total: ids.length }, () => avecVinted(() => vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 30000 })));
+      if (!r || pasParti(r)) { if (recu.at) await rendreActions(String(uid), recu.at, 1); faits.push({ id, ok: false, code: 'pas-parti' }); break; }
+      faits.push({ id, ok: !!r.ok, status: r.status });
+      if (r.ok) { await noterJournal(String(uid), 'supprimee', { a: id }); try { await noterSuppressionCompte(String(uid), id, new Date().toISOString()); } catch (_) {} } else break;
+    }
+    return { ok: faits.length > 0 && faits.every((x) => x.ok), faits };
+  }
+  if (msg.quoi === 'stock') {
+    const n = Number(msg.n); if (!(Number.isInteger(n) && n >= 1 && n <= 99)) return { ok: false, code: 'forme', raison: 'Une quantité de 1 à 99.' };
+    const m = await lireMain(['vinted_annonce_numeros', BLEAM_CLE]); if (!m) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’a changé.' };
+    const R = bleamDe(m[BLEAM_CLE], String(uid));
+    const stock = Object.assign({}, R.stockAuto.stock); let sans = 0;
+    for (const id of ids) { const f = (m.vinted_annonce_numeros || {})[id]; if (!f || f.numero == null) { sans++; continue; } const k = cleNum(f.numero); if (n >= 2) stock[k] = n; else delete stock[k]; }
+    if (sans === ids.length) return { ok: false, code: 'sans-numero', raison: 'Ces annonces n’ont pas de N° VRM : la quantité se pose sur un N° (jamais par ressemblance).' };
+    return reglageAutoCarte({ cle: BLEAM_CLE, valeur: { uid: String(uid), section: 'stockAuto', valeur: { actif: R.stockAuto.actif, stock } } }, sender);
+  }
+  return { ok: false, code: 'action', raison: 'Action inconnue.' };
 }

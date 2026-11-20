@@ -979,6 +979,14 @@
   .champ6 b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
+  /* 5.410.3 : un choix (rond ou case) À GAUCHE de son libellé, la ligne entière se touche (44 px). */
+  .champ6.cb6 { flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; }
+  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0068D6); }
+  .champ6.cb6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .champ6.cb6 .note5 { margin: 0; }
+  .champ6.ot6 { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  .champ6.ot6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; }
   .au6-d .conf5 { margin: 12px 24px 0; }
   .conf5[data-irreversible] { display: block !important; }
   .conf5[data-irreversible] p { margin: 0 0 8px; }
@@ -2337,6 +2345,141 @@
   let autoChoisie = 'favoris', autoDetail = false;   // 5.410.1 : au téléphone, le détail est une page poussée
   let raBrouillon = {}, raConfirme = null, raEtat = null, raEnVol = false;   // 5.410 : réglages écrits depuis le panneau
   const apercuPaliers6 = (pcts) => { const p = 100, f = 85, out = [p]; for (const pct of (pcts || []).slice().sort((a, b) => a - b)) { let v = Math.round(p - (p - f) * pct / 100); if (v < f) v = f; if (v < p && v < out[out.length - 1]) out.push(v); } return out; };
+  // ══ 5.410.4 — « COMME BLEAM », LA SUITE : après-vente, stock auto, cycle de vie, filtres + analyse des favoris,
+  //    sauvegarde horaire, dressing amélioré — chaque section se règle ICI (vinted_bleam.comptes[uid][section]), éteinte
+  //    par défaut ; allumer passe par « Oui, allumer » ; le fond relit et normalise (règle partagée).
+  const BM_ITEMS = ['apresvente', 'stockauto', 'cycle', 'favfiltres', 'sauvegarde', 'dressing'];
+  const BM_SECTIONS_DE = { apresvente: ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5'], stockauto: ['stockAuto'], cycle: ['cycle'], favfiltres: ['favoris'], sauvegarde: ['sauvegarde'], dressing: ['dressing'] };
+  // Les clés de texte écrites EN ENTIER (audit-extension-feuille L3 : chaque clé utilisée existe).
+  const BM_TITRE = { bordereau: 'bm_s_bordereau', msgVente: 'bm_s_msgVente', msgFinalise: 'bm_s_msgFinalise', msgRelais: 'bm_s_msgRelais', msgEvaluation: 'bm_s_msgEvaluation', eval5: 'bm_s_eval5', stockAuto: 'bm_s_stockAuto', cycle: 'bm_s_cycle', favoris: 'bm_s_favoris', sauvegarde: 'bm_s_sauvegarde', dressing: 'bm_s_dressing' };
+  const BM_JOUR = ['bm_j0', 'bm_j1', 'bm_j2', 'bm_j3', 'bm_j4', 'bm_j5', 'bm_j6'];
+  const BM_TRI = { recentes: 'bm_tri_recentes', anciennes: 'bm_tri_anciennes', vues_plus: 'bm_tri_vues_plus', vues_moins: 'bm_tri_vues_moins', favoris: 'bm_tri_favoris', prix_bas: 'bm_tri_prix_bas', prix_haut: 'bm_tri_prix_haut', republiees: 'bm_tri_republiees' };
+  const BM_STRAT_NOTE = { anti: 'bm_anti_note', destock: 'bm_destock_note', vierge: 'bm_vierge_note' };
+  let bmBrouillon = {}, bmConfirme = null, bmEtat = null, bmEnVol = false, bmAnalyse = null;
+  const bmLu = (s) => { const b = listes && listes.automatisations && listes.automatisations.bleam; return b && b[s] ? b[s] : null; };
+  const bmVal = (s) => Object.assign({}, bmLu(s) || {}, bmBrouillon[s] || {});
+  const bmOnItem = (id) => { const b = listes && listes.automatisations && listes.automatisations.bleam; if (!b) return null; return BM_SECTIONS_DE[id].some((s) => b[s] && b[s].actif === true); };
+  const lignes6 = (l) => (Array.isArray(l) ? l : []).join('\n');
+  function bmSectionHtml(s, corps, titre, note) {
+    const v = bmVal(s), on = v.actif === true;
+    return `<section class="sec6" data-bm-section="${s}"><h3>${esc(TU(titre))}</h3><div class="rg6"><span><b>${esc(TU('ra_etat'))}</b>${note ? `<small>${esc(TU(note))}</small>` : ''}</span><button type="button" class="vu-btn ra6" data-bm-bascule="${s}" aria-pressed="${on}">${esc(TU(on ? 'ra_eteindre' : 'ra_allumer'))}</button></div>${corps || ''}</section>`;
+  }
+  const bmTexte = (s, k, lab, note) => `<label class="champ6"><b>${esc(TU(lab))}</b>${note ? `<small>${esc(TU(note))}</small>` : ''}<textarea data-bm-champ="${s}.${k}" data-bm-lignes maxlength="5000" rows="3">${esc(lignes6(bmVal(s)[k]))}</textarea></label>`;
+  const bmNombre = (s, k, lab, min, max) => `<label class="champ6"><b>${esc(TU(lab))}</b><input type="number" min="${min}" max="${max}" step="1" data-bm-champ="${s}.${k}" value="${esc(bmVal(s)[k] != null ? bmVal(s)[k] : '')}"></label>`;
+  const bmSeg = (s, k, choix) => `<div class="vu-seg vue5" role="group" data-bm-seg="${s}.${k}">${choix.map(([x, l]) => `<button type="button" data-bm-choix="${s}.${k}" data-bm-v="${x}" aria-pressed="${String(bmVal(s)[k]) === String(x)}">${esc(TU(l))}</button>`).join('')}</div>`;
+  function bleamDetailHtml(id) {
+    if (!listes.automatisations.bleam) return `<p class="note5">${esc(TU('au_pas_su'))}</p>`;
+    const conf = bmConfirme ? `<div class="conf5" role="alertdialog" data-bm-confirme="${esc(bmConfirme.section)}"><p>${esc(TU('ra_confirme_q', { nom: TU(BM_TITRE[bmConfirme.section] || 'bm_s_cycle') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    const etat = bmEtat ? `<p class="note5" role="status" data-bm-etat="${bmEtat.ok ? 'ok' : 'ko'}">${esc(bmEtat.texte)}</p>` : '';
+    let corps = '';
+    if (id === 'apresvente') {
+      corps = bmSectionHtml('bordereau', `<div class="rg6"><span><b>${esc(TU('bm_colissimo'))}</b><small>${esc(TU('bm_colissimo_note'))}</small></span>${bmSeg('bordereau', 'colissimo', [['relais', 'bm_relais'], ['boite', 'bm_boite']])}</div><p class="note5">${esc(TU('bm_ebay_jamais'))}</p>`, 'bm_s_bordereau', 'bm_bordereau_note')
+        + bmSectionHtml('msgVente', bmTexte('msgVente', 'textes', 'bm_versions', 'bm_versions_note'), 'bm_s_msgVente')
+        + bmSectionHtml('msgFinalise', bmTexte('msgFinalise', 'textes', 'bm_versions', 'bm_versions_note'), 'bm_s_msgFinalise')
+        + bmSectionHtml('msgRelais', bmTexte('msgRelais', 'textes', 'bm_versions', 'bm_versions_note') + bmNombre('msgRelais', 'heures', 'bm_heures', 1, 168), 'bm_s_msgRelais', 'bm_relais_note')
+        + bmSectionHtml('msgEvaluation', bmTexte('msgEvaluation', 'textes', 'bm_versions', 'bm_versions_note') + bmNombre('msgEvaluation', 'heures', 'bm_heures', 1, 168), 'bm_s_msgEvaluation', 'bm_litige_note')
+        + bmSectionHtml('eval5', bmTexte('eval5', 'textes', 'bm_versions', 'bm_versions_note') + `<p class="note5">${esc(TU('bm_eval_appris'))}</p>`, 'bm_s_eval5', 'bm_litige_note');
+    } else if (id === 'stockauto') {
+      const st = bmVal('stockAuto').stock || {};
+      const txt = bmBrouillon.stockAuto && bmBrouillon.stockAuto.stockTexte != null ? bmBrouillon.stockAuto.stockTexte : Object.entries(st).map(([k, n]) => `${k} = ${n}`).join('\n');
+      corps = bmSectionHtml('stockAuto', `<label class="champ6"><b>${esc(TU('bm_quantites'))}</b><small>${esc(TU('bm_quantites_note'))}</small><textarea data-bm-champ="stockAuto.stockTexte" rows="4">${esc(txt)}</textarea></label><p class="note5">${esc(TU('bm_stock_identite'))}</p>`, 'bm_s_stockAuto');
+    } else if (id === 'cycle') {
+      const c = bmVal('cycle'), r = c.rythme || {};
+      const etTxt = bmBrouillon.cycle && bmBrouillon.cycle.etapesTexte != null ? bmBrouillon.cycle.etapesTexte : (c.etapes || []).map((e) => e.action === 'republier' ? `${e.apres} republier` : `${e.apres} baisse ${e.pct}`).join('\n');
+      const jours = Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6];
+      corps = bmSectionHtml('cycle', `<div class="rg6"><span><b>${esc(TU('bm_strategie'))}</b></span>${bmSeg('cycle', 'strategie', [['anti', 'bm_anti'], ['destock', 'bm_destock'], ['vierge', 'bm_vierge']])}</div>`
+        + `<p class="note5" data-bm-strategie-note>${esc(TU(BM_STRAT_NOTE[c.strategie] || BM_STRAT_NOTE.anti))}</p>`
+        + ((c.strategie || 'anti') === 'vierge' ? `<label class="champ6"><b>${esc(TU('bm_etapes'))}</b><small>${esc(TU('bm_etapes_note'))}</small><textarea data-bm-champ="cycle.etapesTexte" rows="4">${esc(etTxt)}</textarea></label>${bmNombre('cycle', 'repeter', 'bm_repeter', 0, 90)}${bmNombre('cycle', 'plafondPct', 'bm_plafond', 1, 50)}` : '')
+        + `<h3>${esc(TU('bm_rythme'))}</h3>`
+        + `<label class="champ6"><b>${esc(TU('bm_repub_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.min" value="${esc((r.repub || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.max" value="${esc((r.repub || {}).max)}" aria-label="max"></span></label>`
+        + `<label class="champ6"><b>${esc(TU('bm_prix_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.min" value="${esc((r.prix || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.max" value="${esc((r.prix || {}).max)}" aria-label="max"></span></label>`
+        + `<div class="rg6"><span><b>${esc(TU('bm_jours'))}</b></span><div class="vu-seg vue5" role="group">${[1, 2, 3, 4, 5, 6, 0].map((j) => `<button type="button" data-bm-jour="${j}" aria-pressed="${jours.includes(j)}">${esc(TU(BM_JOUR[j]))}</button>`).join('')}</div></div>`
+        + `<label class="champ6"><b>${esc(TU('bm_heures_plage'))}</b><span class="cd6-l"><input type="number" min="0" max="23" data-bm-champ="cycle.r.heureDebut" value="${esc(r.heureDebut)}" aria-label="début"> – <input type="number" min="1" max="24" data-bm-champ="cycle.r.heureFin" value="${esc(r.heureFin)}" aria-label="fin"></span></label>`
+        + `<p class="note5">${esc(TU('bm_cycle_plancher'))}</p>`, 'bm_s_cycle');
+    } else if (id === 'favfiltres') {
+      const an = bmAnalyse;
+      corps = bmSectionHtml('favoris', bmNombre('favoris', 'noteMin', 'bm_note_min', 0, 5) + bmNombre('favoris', 'parArticle', 'bm_par_article', 0, 50) + bmNombre('favoris', 'periodeJours', 'bm_periode', 0, 90) + bmNombre('favoris', 'apresMin', 'bm_apres_min', 0, 1440) + bmNombre('favoris', 'reecrireJours', 'bm_reecrire', 0, 30) + `<p class="note5">${esc(TU('bm_filtres_note'))}</p>`, 'bm_s_favoris')
+        + `<section class="sec6" data-bm-analyse><h3>${esc(TU('bm_analyse'))}</h3><p class="note5">${esc(TU('bm_analyse_note'))}</p>`
+        + (an && an.versions ? (an.versions.length ? `<div class="table5"><div class="tr5 th5"><span>${esc(TU('bm_version'))}</span><span>${esc(TU('bm_envoyes'))}</span><span>${esc(TU('bm_reponses'))}</span><span>${esc(TU('bm_taux'))}</span></div><ul class="rangs">${an.versions.map((v) => `<li class="tr5" data-bm-v-taux="${v.taux == null ? '' : v.taux}"><span>${esc(TU('rf_version', { n: v.version || '—' }))}</span><span class="cel5">${v.envoyes}</span><span class="cel5">${v.reponses} / ${v.relues}</span><span class="cel5">${v.taux == null ? '—' : v.taux + ' %'}</span></li>`).join('')}</ul></div>` : `<p class="val gris">${esc(TU('bm_analyse_vide'))}</p>`) : an && an.ko ? `<p class="val gris">—</p>` : '')
+        + `<div class="outils"><button type="button" class="vu-btn" data-bm-analyser>${esc(TU('bm_analyser'))}</button></div></section>`;
+    } else if (id === 'sauvegarde') {
+      const sv = listes.automatisations.sauvegarde;
+      corps = bmSectionHtml('sauvegarde', `<p class="note5" data-bm-sauve-at="${sv && sv.at ? sv.at : ''}">${esc(sv && sv.at ? TU('bm_sauve_derniere', { quand: depuis(sv.at), n: sv.n }) : TU('bm_sauve_jamais'))}</p>`, 'bm_s_sauvegarde', 'bm_sauve_note');
+    } else if (id === 'dressing') {
+      corps = bmSectionHtml('dressing', `<label class="champ6"><b>${esc(TU('bm_tri'))}</b><select class="act5" data-bm-champ="dressing.tri">${['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'].map((k) => `<option value="${k}"${bmVal('dressing').tri === k ? ' selected' : ''}>${esc(TU(BM_TRI[k]))}</option>`).join('')}</select></label><div class="rg6"><span><b>${esc(TU('bm_filtre'))}</b></span>${bmSeg('dressing', 'filtre', [['toutes', 'bm_f_toutes'], ['sauvegardees', 'bm_f_sauve'], ['non', 'bm_f_non']])}</div><p class="note5">${esc(TU('bm_dressing_note'))}</p>`, 'bm_s_dressing');
+    }
+    return conf + etat + corps + `<div class="pied6" data-bm-pied="${id}"><button type="button" class="vu-lien" data-bm-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-bm-enregistrer${bmEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
+  }
+  // La valeur d'une section telle qu'elle part (le fond la NORMALISE : bornes, textes, jamais un plafond).
+  function bmValeurEnvoi(s, actif) {
+    const v = bmVal(s), out = Object.assign({}, v, { actif });
+    const lig = (t) => String(t == null ? '' : t).split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5);
+    if (Array.isArray(v.textes) === false && typeof v.textes === 'string') out.textes = lig(v.textes);
+    if (s === 'stockAuto' && v.stockTexte != null) { const st = {}; for (const l of String(v.stockTexte).split('\n')) { const m = /^\s*([A-Za-z]{0,3}\s*\d{1,6})\s*[=:]\s*(\d{1,2})\s*$/.exec(l); if (m) st[m[1]] = Number(m[2]); } out.stock = st; delete out.stockTexte; }
+    if (s === 'cycle') {
+      if (v.etapesTexte != null) { out.etapes = String(v.etapesTexte).split('\n').map((l) => /^\s*(\d{1,2})\s*j?\s*(republier|baisse)\s*(\d{1,2})?/i.exec(l)).filter(Boolean).map((m) => m[2].toLowerCase() === 'republier' ? { apres: Number(m[1]), action: 'republier' } : { apres: Number(m[1]), action: 'baisse', pct: Number(m[3]) }); delete out.etapesTexte; }
+      const r = Object.assign({}, (bmLu('cycle') || {}).rythme || {}, v.rythme || {});
+      out.rythme = r; delete out.r;
+    }
+    for (const k of ['heures', 'noteMin', 'parArticle', 'periodeJours', 'apresMin', 'reecrireJours', 'repeter', 'plafondPct']) if (out[k] != null && out[k] !== '') out[k] = Number(out[k]);
+    return out;
+  }
+  function bmEnvoyer(s, actif, confirme, fin) {
+    const uid = listes && listes.compte && listes.compte.id;
+    bmEnVol = true; bmEtat = null; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vinted_bleam', valeur: { uid, section: s, valeur: bmValeurEnvoi(s, actif) }, confirme: confirme === true }, (r) => {
+        void chrome.runtime.lastError; bmEnVol = false;
+        if (r && r.code === 'confirmation') { bmConfirme = { section: s }; }
+        else { bmConfirme = null; bmEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { delete bmBrouillon[s]; chargerListes(true); } }
+        rendre(); if (fin) fin(r);
+      });
+    } catch (_) { bmEnVol = false; bmEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
+  function brancherBleam(racine) {
+    const br = (s) => (bmBrouillon[s] = bmBrouillon[s] || {});
+    racine.querySelectorAll('[data-bm-champ]').forEach((c) => c.addEventListener('input', () => {
+      const [s, ...ch] = c.getAttribute('data-bm-champ').split('.'); const b = br(s);
+      const v = c.hasAttribute('data-bm-lignes') ? c.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5) : c.value;
+      if (ch[0] === 'r') { const r = (b.rythme = Object.assign({}, (bmLu(s) || {}).rythme || {}, b.rythme || {})); if (ch.length === 3) r[ch[1]] = Object.assign({}, r[ch[1]] || {}, { [ch[2]]: Number(v) }); else r[ch[1]] = Number(v); }
+      else b[ch[0]] = v;
+    }));
+    racine.querySelectorAll('select[data-bm-champ]').forEach((c) => c.addEventListener('change', () => { const [s, k] = c.getAttribute('data-bm-champ').split('.'); br(s)[k] = c.value; }));
+    racine.querySelectorAll('[data-bm-choix]').forEach((b) => b.addEventListener('click', () => { const [s, k] = b.getAttribute('data-bm-choix').split('.'); br(s)[k] = b.getAttribute('data-bm-v'); rendre(); }));
+    racine.querySelectorAll('[data-bm-jour]').forEach((b) => b.addEventListener('click', () => { const b0 = br('cycle'); const r = (b0.rythme = Object.assign({}, (bmLu('cycle') || {}).rythme || {}, b0.rythme || {})); const j = Number(b.getAttribute('data-bm-jour')); const l = Array.isArray(r.jours) ? r.jours.slice() : [0, 1, 2, 3, 4, 5, 6]; r.jours = l.includes(j) ? l.filter((x) => x !== j) : [...l, j]; rendre(); }));
+    racine.querySelectorAll('[data-bm-bascule]').forEach((b) => b.addEventListener('click', () => { const s = b.getAttribute('data-bm-bascule'); const on = bmVal(s).actif === true; if (on) bmEnvoyer(s, false, false); else { bmConfirme = { section: s }; bmEtat = null; rendre(); } }));
+    const oui = racine.querySelector('[data-bm-oui]'); if (oui) oui.addEventListener('click', () => { const c = bmConfirme; bmConfirme = null; if (c) bmEnvoyer(c.section, true, true); });
+    const non = racine.querySelector('[data-bm-non]'); if (non) non.addEventListener('click', () => { bmConfirme = null; rendre(); });
+    const re = racine.querySelector('[data-bm-reinit]'); if (re) re.addEventListener('click', () => { bmBrouillon = {}; bmConfirme = null; bmEtat = null; rendre(); });
+    const en = racine.querySelector('[data-bm-enregistrer]'); if (en) en.addEventListener('click', () => {
+      const ss = Object.keys(bmBrouillon).filter((s) => (BM_SECTIONS_DE[autoChoisie] || []).includes(s));
+      if (!ss.length) { bmEtat = { ok: true, texte: TU('ra_rien') }; rendre(); return; }
+      const suite = () => { const s = ss.shift(); if (s) bmEnvoyer(s, bmVal(s).actif === true, false, (r) => { if (r && r.ok) suite(); }); };
+      suite();
+    });
+    const an = racine.querySelector('[data-bm-analyser]'); if (an) an.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'analyseFavoris' }, (r) => { void chrome.runtime.lastError; bmAnalyse = r && r.ok ? r : { ko: true }; rendre(); }); } catch (_) { bmAnalyse = { ko: true }; rendre(); } });
+  }
+  // 5.410.4 — la négociation « comme Bleam » : tranches de prix, rester flexible, arrondi, bonus de lot, messages par
+  //    étape ({price}), délais. Le plancher absolu (prix mini / achat + 10 %) n'est PAS réglable : il est dit.
+  const tranchesTexte = (l) => (Array.isArray(l) ? l : []).map((x) => `${x.de}-${x.a}:${x.baisse}`).join('\n');
+  const tranchesLues = (t) => String(t || '').split('\n').map((l) => /^\s*(\d+(?:[.,]\d+)?)\s*[-–à]\s*(\d+(?:[.,]\d+)?)\s*[:=]\s*(\d+(?:[.,]\d+)?)\s*$/.exec(l)).filter(Boolean).map((m) => ({ de: Number(m[1].replace(',', '.')), a: Number(m[2].replace(',', '.')), baisse: Number(m[3].replace(',', '.')) }));
+  function paliersPlusHtml(pa, b0) {
+    const tr = b0.tranches != null ? tranchesLues(b0.tranches) : (pa.tranches || []);
+    const ex = tr[0] ? (() => { const p = Math.round((tr[0].de + tr[0].a) / 2); return TU('pp_exemple', { p, b: Math.ceil((p - tr[0].baisse) * 100) / 100 }); })() : TU('pp_exemple_vide');
+    const fx = b0.flexible != null ? b0.flexible === 'oui' : Number(pa.flexible) > 0;
+    const pas = b0.pas != null ? Number(b0.pas) : (pa.pas === 0.5 ? 0.5 : 1);
+    const lg = (k) => esc(b0[k] != null ? b0[k] : (Array.isArray(pa[k]) ? pa[k].join('\n') : ''));
+    const d = pa.delais || {};
+    return `<section class="sec6" data-paliers-plus><h3>${esc(TU('pp_tranches'))}</h3><label class="champ6"><b>${esc(TU('pp_tranches_l'))}</b><small>${esc(TU('pp_tranches_note'))}</small><textarea data-ra-champ="tranches" rows="3">${esc(b0.tranches != null ? b0.tranches : tranchesTexte(pa.tranches))}</textarea></label><p class="apercu6" data-pp-exemple>${esc(ex)}</p>`
+      + `<div class="rg6"><span><b>${esc(TU('pp_flexible'))}</b><small>${esc(TU('pp_flexible_note'))}</small></span><div class="vu-seg vue5" role="group">${['non', 'oui'].map((k) => `<button type="button" data-pp-flexible="${k}" aria-pressed="${(k === 'oui') === fx}">${esc(TU(k === 'oui' ? 'pp_oui' : 'pp_non'))}</button>`).join('')}</div></div>`
+      + `<label class="champ6"><b>${esc(TU('pp_ecart'))}</b><input type="number" min="0.5" max="10" step="0.5" data-ra-champ="ecart" value="${esc(b0.ecart != null ? b0.ecart : (Number(pa.flexible) > 0 ? pa.flexible : 2))}"></label>`
+      + `<div class="rg6"><span><b>${esc(TU('pp_arrondi'))}</b></span><div class="vu-seg vue5" role="group">${[1, 0.5].map((k) => `<button type="button" data-pp-pas="${k}" aria-pressed="${pas === k}">${esc(k === 1 ? '1 €' : '0,50 €')}</button>`).join('')}</div></div>`
+      + `<label class="champ6"><b>${esc(TU('pp_bonus'))}</b><small>${esc(TU('pp_bonus_note'))}</small><input type="number" min="0" max="50" step="1" data-ra-champ="bonusLot" value="${esc(b0.bonusLot != null ? b0.bonusLot : (pa.bonusLot || ''))}"></label>`
+      + `<h3>${esc(TU('pp_messages'))}</h3><p class="note5">${esc(TU('pp_messages_note'))}</p>`
+      + [['msgAccepte', 'pp_msgAccepte'], ['msgContre', 'pp_msgContre'], ['msgFinale', 'pp_msgFinale']].map(([k, l]) => `<label class="champ6"><b>${esc(TU(l))}</b><textarea data-ra-champ="${k}" rows="2">${lg(k)}</textarea></label>`).join('')
+      + `<label class="champ6"><b>${esc(TU('pp_delais'))}</b><span class="cd6-l"><input type="number" min="1" max="240" data-ra-champ="delaiMin" value="${esc(b0.delaiMin != null ? b0.delaiMin : (d.min || ''))}" aria-label="min"> – <input type="number" min="2" max="240" data-ra-champ="delaiMax" value="${esc(b0.delaiMax != null ? b0.delaiMax : (d.max || ''))}" aria-label="max"></span></label>`
+      + `<p class="note5" data-pp-plancher>${esc(TU('pp_plancher_absolu'))}</p></section>`;
+  }
   function automatisationsHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
@@ -2348,6 +2491,8 @@
       { id: 'offres', titre: 'au_offres', sous: 'au6_offres_sous', on: o ? o.actif : null },
       { id: 'paliers', titre: 'au_paliers', sous: 'au6_paliers_sous', on: pa ? pa.actif : null },
       { id: 'baisse', titre: 'au_baisse', sous: 'au6_baisse_sous', on: ba ? ba.actif : null },
+      // 5.410.4 : la suite « comme Bleam » (Vinted seulement, par compte).
+      ...BM_ITEMS.map((id) => ({ id, titre: 'bm_' + id, sous: 'bm_' + id + '_sous', on: bmOnItem(id) })),
     ];
     // 5.410 : sur Leboncoin / Vestiaire, la baisse par règle de CE compte seulement.
     if (au.site === 'leboncoin' || au.site === 'vestiaire') { items.splice(0, items.length, ...items.filter((x) => x.id === 'baisse')); autoChoisie = 'baisse'; }
@@ -2358,7 +2503,9 @@
     let droite = '';
     const ch = items.find((x) => x.id === autoChoisie);
     const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
-    if (autoChoisie === 'favoris') {
+    if (BM_ITEMS.includes(autoChoisie)) {
+      droite = tete + `<div data-bm-detail="${autoChoisie}">${bleamDetailHtml(autoChoisie)}</div>`;
+    } else if (autoChoisie === 'favoris') {
       // 5.410 : les messages aux favoris se RÈGLENT ici (textes, rythme, mode auto) — leur ligne dédiée
       //    `vrm_favoris_reglages_{uid}` (règle de l'app) et le mode auto chez VRM (`auto_regler`) ; allumer ⇒ « Oui, allumer ».
       const textes = f && Array.isArray(f.textes) ? f.textes : [];
@@ -2397,6 +2544,7 @@
         corpsR = section('au6_regle', `<label class="champ6"><b>${esc(TU('ra_paliers_pcts'))}</b><small>${esc(TU('ra_paliers_note'))}</small><input type="text" inputmode="numeric" data-ra-champ="paliers" value="${esc(pcts)}"></label>`
           + `<label class="champ6"><b>${esc(TU('ra_remise'))}</b><small>${esc(TU('ra_remise_note'))}</small><input type="number" min="1" max="89" step="1" data-ra-champ="remise" value="${esc(rem)}"></label>`)
           + section('au6_apercu', `<p class="apercu6" data-paliers-apercu="${ap.join('>')}">${esc(ap.join(' → '))} · ${esc(TU('au6_plancher', { p: 85 }))}</p>`)
+          + paliersPlusHtml(pa || {}, b0)
           + section('au6_messages', ligne('au_messages', pa ? (pa.messages ? TU('au_versions', { n: pa.messages }) : TU('au_pas_de_message')) : null));
       } else {
         const pct = Number(b0.pct || (ba && ba.pct) || 5), jours = Number(b0.jours || (ba && ba.jours) || 14);
@@ -2413,6 +2561,48 @@
   // ══ 5.410 — LA CADENCE (Julien, 20 nov. « vas-y fais ») : SON réglage par compte, ici dans Paramètres. Défauts
   //    inchangés ; plus vite que le défaut ⇒ « Oui, aller plus vite ». Le reste (captcha, prudence, 403/429, un compte
   //    à la fois, une requête à la fois, compte de l'onglet, temps d'écriture, réserve de 5) n'est pas réglable.
+  // ══ 5.410.3 (`repubformulaire`, `favorisbleam`) — « tout comme Bleam » : la méthode de republication, le message
+  //    « lot » et le délai de l'offre, réglés ici sur SON toucher ; l'onglet qui travaille est NOMMÉ (rien de caché).
+  let cbEtat = null, cbLu = 0, cbLot = null, cbOffre = null, cbMsg = null, cbEnVol = false;
+  function lireCommeBleam(force) {
+    if (!force && Date.now() - cbLu < 4000) return;
+    cbLu = Date.now();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'commeBleamLire' }, (r) => { void chrome.runtime.lastError; if (r && r.ok) { const avant = JSON.stringify(cbEtat); cbEtat = { reglages: r.reglages, onglet: r.onglet || null }; if (JSON.stringify(cbEtat) !== avant) rendre(); } }); } catch (_) {}
+  }
+  function ongletTravailHtml() {
+    const o = cbEtat && cbEtat.onglet;
+    if (!o) return '';
+    return `<div class="champ6 ot6" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}"><span><b>${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre'))}</b><span class="note5">${esc(o.chemin || '/')}</span></span><button type="button" class="vu-btn" data-voir-onglet>${esc(TU('cb_voir'))}</button></div>`;
+  }
+  function commeBleamHtml() {
+    if (!cbEtat) { lireCommeBleam(false); return `<section class="grp5" data-comme-bleam="pas-su"><h3>${esc(TU('cb_titre'))}</h3><p class="note5">—</p></section>`; }
+    const g = cbEtat.reglages || {};
+    const choix = (v, lib, note) => `<label class="champ6 cb6"><input type="radio" name="vrm-cb-methode" value="${v}" data-cb-methode="${v}"${g.methode === v ? ' checked' : ''}><span><b>${esc(TU(lib))}</b><span class="note5">${esc(TU(note))}</span></span></label>`;
+    const lot = cbLot != null ? cbLot : (g.messageLot || '');
+    const oA = cbOffre ? cbOffre.offreMin : (Number(g.offreMin) || 8), oB = cbOffre ? cbOffre.offreMax : (Number(g.offreMax) || 15);
+    return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
+      ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}${choix('directe', 'cb_directe', 'cb_directe_note')}
+      ${ongletTravailHtml()}
+    </section>
+    <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
+      <label class="champ6 cb6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><span><b>${esc(TU('cb_sequence'))}</b></span></label>
+      <label class="champ6"><b>${esc(TU('cb_lot'))}</b><textarea rows="3" maxlength="2000" data-cb-lot aria-label="${esc(TU('cb_lot'))}">${esc(lot)}</textarea><span class="note5">${esc(TU('cb_lot_note'))}</span></label>
+      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: oA, b: oB }))}</b><span class="cd6-l"><input type="range" min="3" max="60" step="1" value="${oA}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="4" max="120" step="1" value="${oB}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
+      ${cbMsg ? `<p class="note5" role="status" data-cb-etat="${cbMsg.ok ? 'ok' : 'ko'}">${esc(cbMsg.texte)}</p>` : ''}
+      <div class="outils"><button type="button" class="vu-btn vu-plein" data-cb-enregistrer${cbEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
+    </section>`;
+  }
+  function poserCommeBleam(valeur) {
+    cbEnVol = true; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'commeBleamPoser', valeur }, (r) => {
+        void chrome.runtime.lastError; cbEnVol = false;
+        cbMsg = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
+        if (r && r.ok && r.reglages) { cbEtat = Object.assign({}, cbEtat, { reglages: r.reglages }); if (valeur.messageLot != null) cbLot = null; if (valeur.offreMin != null) cbOffre = null; }
+        rendre();
+      });
+    } catch (_) { cbEnVol = false; cbMsg = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
   let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
@@ -2593,8 +2783,21 @@
     const mj = racine.querySelector('[data-vx-maj]'); if (mj) mj.addEventListener('click', () => { chargerListes(true); });
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
-    racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; rendre(); }));
+    racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; bmBrouillon = {}; bmConfirme = null; bmEtat = null; rendre(); }));
     const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
+    // 5.410.3 : la méthode de republication (un toucher l'écrit), la séquence des favoris, le message « lot », le délai de l'offre.
+    racine.querySelectorAll('[data-cb-methode]').forEach((c) => c.addEventListener('change', () => { if (c.checked) poserCommeBleam({ methode: c.getAttribute('data-cb-methode') }); }));
+    { const l = racine.querySelector('[data-cb-lot]'); if (l) l.addEventListener('input', () => { cbLot = l.value; cbMsg = null; }); }
+    racine.querySelectorAll('[data-cb-offre]').forEach((c) => c.addEventListener('input', () => {
+      const a = racine.querySelector('[data-cb-offre="offreMin"]'), b = racine.querySelector('[data-cb-offre="offreMax"]');
+      if (a && b) cbOffre = { offreMin: Number(a.value), offreMax: Number(b.value) }; cbMsg = null;
+      const lib = racine.querySelector('[data-cb-offre-lib]'); if (lib && a && b) lib.textContent = TU('cb_offre', { a: a.value, b: b.value });
+    }));
+    { const e = racine.querySelector('[data-cb-enregistrer]'); if (e) e.addEventListener('click', () => {
+      const f = racine.querySelector('[data-cb-favoris]'), a = racine.querySelector('[data-cb-offre="offreMin"]'), b = racine.querySelector('[data-cb-offre="offreMax"]'), l = racine.querySelector('[data-cb-lot]');
+      poserCommeBleam({ favoris: !!(f && f.checked), ...(l ? { messageLot: l.value } : {}), ...(a && b ? { offreMin: Number(a.value), offreMax: Number(b.value) } : {}) });
+    }); }
+    { const v = racine.querySelector('[data-voir-onglet]'); if (v) v.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'voirOngletTravail' }, () => { void chrome.runtime.lastError; }); } catch (_) {} }); }
     // 5.410 : la cadence (Paramètres). Un curseur change le brouillon ; « Enregistrer » écrit (plus vite ⇒ confirmation).
     racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('input', () => {
       const k = c.getAttribute('data-cad'); const v = Number(c.value);
@@ -2627,7 +2830,14 @@
     const raValeur = (auto, actif) => {
       const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};
       if (auto === 'offres') return { cle: 'vinted_offres_auto', valeur: actif };
-      if (auto === 'paliers') { const pa = au.paliers || {}; const pcts = String(b0.paliers != null ? b0.paliers : (pa.paliers || [50, 80, 100]).join(',')).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100); const rem = Number(b0.remise != null ? b0.remise : pa.remiseMax); return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false } }; }
+      if (auto === 'paliers') { const pa = au.paliers || {}; const pcts = String(b0.paliers != null ? b0.paliers : (pa.paliers || [50, 80, 100]).join(',')).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100); const rem = Number(b0.remise != null ? b0.remise : pa.remiseMax);
+        // 5.410.4 : les champs « comme Bleam » (absents = comme avant) ; le fond les normalise.
+        const vl = (k) => (b0[k] != null ? String(b0[k]).split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5) : (Array.isArray(pa[k]) ? pa[k] : []));
+        const fx = b0.flexible != null ? b0.flexible === 'oui' : Number(pa.flexible) > 0; const ec = Number(b0.ecart != null ? b0.ecart : pa.flexible || 2);
+        const dmn = Number(b0.delaiMin != null ? b0.delaiMin : (pa.delais || {}).min), dmx = Number(b0.delaiMax != null ? b0.delaiMax : (pa.delais || {}).max);
+        return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false,
+          tranches: b0.tranches != null ? tranchesLues(b0.tranches) : (pa.tranches || []), bonusLot: Number(b0.bonusLot != null ? b0.bonusLot : pa.bonusLot) || 0, pas: Number(b0.pas != null ? b0.pas : pa.pas) === 0.5 ? 0.5 : 1,
+          ...(fx ? { flexible: { actif: true, ecart: ec } } : {}), msgAccepte: vl('msgAccepte'), msgContre: vl('msgContre'), msgFinale: vl('msgFinale'), ...(dmn >= 1 && dmx > dmn ? { delais: { min: Math.round(dmn), max: Math.round(dmx) } } : {}) } }; }
       const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: au.cle || (listes && listes.compte && listes.compte.id), actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
     };
     const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
@@ -2674,6 +2884,8 @@
     const rfA = racine.querySelector('[data-rf-auto]'); if (rfA) rfA.addEventListener('click', () => { const on = rfA.getAttribute('aria-pressed') === 'true'; rfEnvoyer('favorisAuto', { actif: !on }); });
     const raOuiF = racine.querySelector('[data-ra-confirme="favoris-auto"] [data-ra-oui]'); if (raOuiF) raOuiF.addEventListener('click', (ev) => { ev.stopImmediatePropagation(); const c = raConfirme; raConfirme = null; if (c) rfEnvoyer('favorisAuto', Object.assign({}, c.valeur, { confirme: true })); }, true);
     const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
+    brancherBleam(racine);   // 5.410.4
+    racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
       if (auto === 'offres') { if (b0.refus == null) { raEtat = { auto, ok: true, texte: TU('ra_rien') }; rendre(); return; } raEnvoyer(auto, 'vinted_offre_refus_msg', String(b0.refus), false); return; }
@@ -3070,6 +3282,7 @@
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
+      ${commeBleamHtml()}
       ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
@@ -3082,7 +3295,8 @@
     if (grand5) {
       // 5.410 : le panneau « comme Vintex ». Ce qui se passe maintenant (envoi en cours, version, réparation, lecture de
       // l'historique, alertes du site) reste AU-DESSUS de la page ; les listes sont la page.
-      const extras = [principal, majHtml(e.maj), Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : '', repHtml(), progression, historique, lignePerime, ligneDeCote, aRetirerLbc, diagnosticLbc, bascule].filter(Boolean).map((h) => `<div class="ext6">${h}</div>`).join('');
+      if (e.plateforme === 'vinted') lireCommeBleam(false);   // 5.410.3 : l'onglet qui travaille, nommé en haut du panneau
+      const extras = [principal, e.plateforme === 'vinted' && cbEtat && cbEtat.onglet && cbEtat.onglet.travaille ? ongletTravailHtml() : '', majHtml(e.maj), Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : '', repHtml(), progression, historique, lignePerime, ligneDeCote, aRetirerLbc, diagnosticLbc, bascule].filter(Boolean).map((h) => `<div class="ext6">${h}</div>`).join('');
       const liste = listesHtml(e, parametres5);
       poserHtml(contenu, vxHtml(e, `<div class="gestes">${liste}</div>`, extras));
     } else poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}

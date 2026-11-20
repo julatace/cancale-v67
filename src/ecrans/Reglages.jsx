@@ -15,6 +15,7 @@ import { RevenirEnArriere } from '../App.jsx';   // (11 nov.) revenir en arrièr
 import { ImporterSetting } from '../App.jsx';   // (11 nov.) Importer son stock et ses ventes passées (src/importStock.js)
 import { lireLitigesVinted, changerCompteVrm } from '../App.jsx';
 import { AlerteDejaRelie } from '../AlerteDejaRelie.jsx';
+import { CLE_ROLES_COMPTES, ROLES_COMPTE, roleCompte, avecRole } from '../rolesComptes.js';   // (20 nov., lot bleam-suite)
 import { PhraseComptePro, ArgentComptePro } from '../VintedProCompte.jsx';   // (11 nov., lot vinted-pro)
 import { statutProVinted } from '../vintedPro.js';
 import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
@@ -824,6 +825,8 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
   const [loading, setLoading] = useState(false);
 
   const [labels, setLabels] = useStateCle('vinted_account_labels', () => load('vinted_account_labels', {}));
+  // (20 nov., lot bleam-suite) Le rôle de chaque compte : vente (défaut) · achats · personnel (hors totaux déclarés) — src/rolesComptes.js.
+  const [rolesComptes, setRolesComptes] = useStateCle(CLE_ROLES_COMPTES, () => load(CLE_ROLES_COMPTES, {}) || {});
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelDraft, setLabelDraft] = useState('');
   // Email associé à chaque compte (l'adresse à laquelle Vinted écrit — masquée
@@ -1276,6 +1279,12 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
               <input defaultValue={labels[acc.vinted_user_id] || ''} placeholder={acc.login || `#${uid}`} aria-label="Nom affiché"
                 onBlur={(e) => { const v = e.target.value.trim(); const u = { ...labels, [acc.vinted_user_id]: v }; if (!v) delete u[acc.vinted_user_id]; setLabels(u); save('vinted_account_labels', u); }}
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
+              <div role="radiogroup" aria-label={tr('roles.titre')} data-role-compte={roleCompte(rolesComptes, uid)} style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {ROLES_COMPTE.map((r) => <button key={r} type="button" role="radio" aria-checked={roleCompte(rolesComptes, uid) === r} data-role-choix={r} className="sb-touche"
+                  onClick={() => { const u = avecRole(rolesComptes, uid, r); setRolesComptes(u); save(CLE_ROLES_COMPTES, u); }}
+                  style={{minHeight:44,padding:'0 12px',borderRadius:12,border:`1px solid ${C.border}`,background:roleCompte(rolesComptes, uid) === r ? C.surface2 || C.surface : C.surface,color:C.text,fontWeight:roleCompte(rolesComptes, uid) === r ? 700 : 500,fontFamily:'inherit',fontSize:14}}>{tr({ vente: 'roles.vente', achats: 'roles.achats', perso: 'roles.perso' }[r])}</button>)}
+              </div>
+              {roleCompte(rolesComptes, uid) === 'perso' && <div data-role-perso-note="" style={{fontSize:13,color:C.muted}}>{tr('roles.persoNote')}</div>}
               <input value={acctEmails[uid] || ''} onChange={e=>setAcctEmail(acc.vinted_user_id, e.target.value)} placeholder="E-mail du compte" aria-label="E-mail du compte"
                 style={{width:'100%',maxWidth:320,boxSizing:'border-box',border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:15,fontFamily:'inherit',background:C.surface,color:C.text}}/>
               <input type="tel" inputMode="tel" value={acctPhones[uid] || ''} onChange={e=>setAcctPhone(acc.vinted_user_id, e.target.value)} placeholder="Téléphone du compte" aria-label="Téléphone du compte"
