@@ -19,17 +19,24 @@ import { useSiteCourant } from '../siteCourant.js';
 import './selecteur-site.css';
 export { useSiteCourant, CLE_SITE_COURANT } from '../siteCourant.js';
 
-export function SelecteurSite({ sites = [], valeur = 'toutes', onChange, nom = (s) => s, Logo = null, tous = 'Tous', libelle = '', attrs = null }) {
+// `court(site)` (20 nov.) : le nom court (« LBC », « VC ») — au téléphone, à quatre ou cinq choix, le TEXTE court seul (un
+// logo seul se lisait mal). `indisponible` + `raison` : l'écran n'a pas de règle par site (Statistiques, Déclarer…) — le
+// sélecteur est grisé sur « Tous » et la phrase est dite une fois, dessous.
+const COURTS = { vinted: 'Vinted', leboncoin: 'LBC', ebay: 'eBay', vestiaire: 'VC' };
+export function SelecteurSite({ sites = [], valeur = 'toutes', onChange, nom = (s) => s, court = (s) => COURTS[s] || s, Logo = null, tous = 'Tous', libelle = '', attrs = null, indisponible = false, raison = '' }) {
   if (!Array.isArray(sites) || sites.length < 2) return null;
   const options = [
     { cle: 'toutes', libelle: tous, attrs: { 'data-site-choix': 'toutes' } },
     ...sites.map((s) => ({ cle: s, attrs: { 'data-site-choix': s, 'aria-label': nom(s) },
-      libelle: <span className="n-site-option">{Logo ? <span className="n-site-logo" aria-hidden="true">{Logo(s)}</span> : null}<span className="n-site-nom">{nom(s)}</span></span> })),
+      libelle: <span className="n-site-option">{Logo ? <span className="n-site-logo" aria-hidden="true">{Logo(s)}</span> : null}<span className="n-site-nom">{nom(s)}</span><span className="n-site-court" aria-hidden="true">{court(s)}</span></span> })),
   ];
-  const v = sites.includes(valeur) ? valeur : 'toutes';
+  const v = indisponible ? 'toutes' : sites.includes(valeur) ? valeur : 'toutes';
   return (
-    <div className="n-selecteur-site" data-site-courant={v} data-n-choix={options.length} {...(attrs || {})}>
-      <Segmente options={options} valeur={v} onChange={onChange} libelle={libelle}/>
+    <div className="n-selecteur-site" data-site-courant={v} data-n-choix={options.length} data-site-indisponible={indisponible ? '1' : undefined} {...(attrs || {})}>
+      <div className="n-selecteur-site-seg" inert={indisponible ? '' : undefined} aria-disabled={indisponible ? 'true' : undefined}>
+        <Segmente options={options} valeur={v} onChange={onChange} libelle={libelle}/>
+      </div>
+      {indisponible && raison ? <p className="n-selecteur-site-raison" data-site-raison="">{raison}</p> : null}
     </div>
   );
 }

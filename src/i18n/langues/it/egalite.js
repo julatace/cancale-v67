@@ -95,5 +95,6 @@ export default {
   "annonces.refairePasSu": { one: "{n} bozza: VRM non sa se è ancora su Vinted (il suo guardaroba non è stato riletto per intero). Apri vinted.fr su questo account.", other: "{n} bozze: VRM non sa se sono ancora su Vinted (i loro guardaroba non sono stati riletti per intero). Apri vinted.fr su questi account." },
   "egalite.groupe.sansCompte": "Senza account",
   "egalite.groupe.n": {"one": "{n} annuncio", "other": "{n} annunci"},
-  "egalite.groupe.achats": {"one": "{n} prezzo d’acquisto da completare", "other": "{n} prezzi d’acquisto da completare"}
+  "egalite.groupe.achats": {"one": "{n} prezzo d’acquisto da completare", "other": "{n} prezzi d’acquisto da completare"},
+  "egalite.groupe.aRelier": {"one": "{n} annuncio da collegare", "other": "{n} annunci da collegare"}
 };

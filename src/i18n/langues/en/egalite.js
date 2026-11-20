@@ -95,5 +95,6 @@ export default {
   "annonces.refairePasSu": { one: "{n} draft: VRM doesn't know if it's still on Vinted (its wardrobe wasn't fully re-read). Open vinted.fr on this account.", other: "{n} drafts: VRM doesn't know if they're still on Vinted (their wardrobes weren't fully re-read). Open vinted.fr on these accounts." },
   "egalite.groupe.sansCompte": "No account",
   "egalite.groupe.n": {"one": "{n} listing", "other": "{n} listings"},
-  "egalite.groupe.achats": {"one": "{n} purchase price to fill in", "other": "{n} purchase prices to fill in"}
+  "egalite.groupe.achats": {"one": "{n} purchase price to fill in", "other": "{n} purchase prices to fill in"},
+  "egalite.groupe.aRelier": {"one": "{n} listing to link", "other": "{n} listings to link"}
 };

@@ -60,7 +60,7 @@ function sousDe(a, nomSite, filtreSite, euros = (n) => String(n)) {
   if (a.sites.length > 1 && (!filtreSite || filtreSite === 'tous')) bouts.push(tr('egalite.surSites', { n: a.sites.length }));
   if (a.etat !== 'enligne') bouts.push(etatMot(a.etat));
   if (a.achat != null) bouts.push(tr('egalite.achete', { p: euros(a.achat) }));
-  if (a.aRelier) bouts.push(tr('egalite.aRelier'));
+  // (20 nov.) « à relier » n'est plus sur la ligne : il est dit UNE fois, en tête du groupe (« N à relier › »).
   return bouts.join(' · ');
 }
 
@@ -203,14 +203,15 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       ? [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), ton: l.prop.niveau === 'sur' ? 'ambre' : 'accent', onClick: () => liaison.relier(l), franc: true }]
       : [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'propre', libelle: tr('liaL.propreCourt'), onClick: () => liaison.propre(l) }];
     return <React.Fragment key={a.cle + (cleCompte ? '|' + cleCompte : '')}><Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
-      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton={a.aRelier ? 'ambre' : 'neutre'}
+      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton="neutre"
       valeur={a.prix != null ? euros(a.prix) : null} valeurForte
       detailValeur={a.prixMini != null ? tr('egalite.mini', { p: euros(a.prixMini) }) : ''}
       fin={A ? (sel.has(a.cle) ? 'coche' : <span className="n-eg-case" aria-hidden="true"/>) : 'chevron'} selectionnee={A ? sel.has(a.cle) : ouvert === a.cle}
       indisponible={!!grise} raison={grise ? tr('egalite.selection.pasPour', { site: nomSite(a.annonces[0].site) }) : ''} onClick={() => ouvrir(a)}
       actions={A ? null : (gestesLiaison || [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }])}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, ...(cleCompte ? { 'data-eg-compte': cleCompte } : {}) }}/>
-      {aRelierL && l.prop ? <PropositionLiaison l={l} forme="ligne" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/> : null}</React.Fragment>;
+      {/* (20 nov., « même rangée sur chaque site ») La proposition n'est plus posée sous chaque rangée : le balayage la garde
+          (« Relier N° »), la tête du groupe dit « N à relier › » et ouvre le parcours. */}</React.Fragment>;
   };
 
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.
@@ -296,6 +297,10 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                 <Groupe key={g.cle} titre={<span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{titre}{g.site ? <span className="n-eg-sr"> · {nomSite(g.site)}</span> : null}</span>}
                   repli={{ ouvert: !replis.has(g.cle), onBascule: () => basculerRepli(g.cle), n: tr('egalite.groupe.n', { n }) }}
                   attrs={{ 'data-eg-groupe': g.cle, 'data-eg-groupe-n': String(n) }}>
+                  {(() => { const aRel = !A && (onRelier || liaison) ? g.articles.filter((x) => x.aRelier || (lienDe(x) && lienDe(x).etat === 'aRelier')) : [];
+                    return aRel.length ? <Rangee titre={tr('egalite.groupe.aRelier', { n: aRel.length })} ton="ambre" fin="chevron"
+                      onClick={() => { const l0 = lienDe(aRel[0]); if (l0 && liaison) liaison.autre(l0); else if (onRelier) onRelier(aRel[0]); }}
+                      attrs={{ 'data-eg-manque': 'relier', 'data-eg-manque-n': String(aRel.length) }}/> : null; })()}
                   {sansAchat && onCompleter && !A ? <Rangee titre={tr('egalite.groupe.achats', { n: sansAchat })} ton="ambre" fin="chevron" onClick={() => onCompleter('achat')} attrs={{ 'data-eg-manque': 'achat', 'data-eg-manque-n': String(sansAchat) }}/> : null}
                   {g.articles.slice(0, max).map((a) => rangee(a, g.cle))}
                 </Groupe>);

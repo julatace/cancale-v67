@@ -95,5 +95,6 @@ export default {
   "annonces.refairePasSu": { one: "{n} borrador: VRM no sabe si sigue en Vinted (su armario no se ha releído entero). Abre vinted.fr en esta cuenta.", other: "{n} borradores: VRM no sabe si siguen en Vinted (sus armarios no se han releído enteros). Abre vinted.fr en estas cuentas." },
   "egalite.groupe.sansCompte": "Sin cuenta",
   "egalite.groupe.n": {"one": "{n} anuncio", "other": "{n} anuncios"},
-  "egalite.groupe.achats": {"one": "{n} precio de compra por completar", "other": "{n} precios de compra por completar"}
+  "egalite.groupe.achats": {"one": "{n} precio de compra por completar", "other": "{n} precios de compra por completar"},
+  "egalite.groupe.aRelier": {"one": "{n} anuncio por vincular", "other": "{n} anuncios por vincular"}
 };

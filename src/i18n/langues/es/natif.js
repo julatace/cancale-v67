@@ -29,5 +29,19 @@ export default {
   "natif.plus.nouveau": "Nuevo",
   "site.tous": "Todas",
   "site.libelle": "Plataforma mostrada",
-  "site.plus.titre": "Plataformas"
+  "site.plus.titre": "Plataformas",
+  "site.tousSeulement": "Esta página abarca todos los sitios.",
+  "achats.site.enRoute": "En camino",
+  "achats.site.recus": "Recibidos",
+  "achats.site.annules": "Cancelados",
+  "achats.site.sansTitre": "Artículo",
+  "achats.site.lecture": "Leyendo tus compras de {site}…",
+  "achats.site.passu": "Compras de {site}: no se pudieron leer",
+  "achats.site.jamais": "Compras de {site}: aún no leídas",
+  "achats.site.aucun": "Ninguna compra de {site} en camino",
+  "achats.site.lu": "Leído {quand}",
+  "achats.site.gesteLbc": "Abre «Mes transactions» en leboncoin.fr, con la extensión.",
+  "achats.site.gesteVc": "Abre «Mis pedidos» en Vestiaire, con la extensión.",
+  "ebay.recherches.titre": "Búsquedas y alertas de eBay",
+  "ebay.recherches.compte": "Cuentas de eBay y ajustes"
 };

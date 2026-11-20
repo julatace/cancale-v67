@@ -95,5 +95,6 @@ export default {
   "annonces.refairePasSu": { one: "{n} brouillon : VRM ne sait pas s'il est encore sur Vinted (son dressing n'a pas été relu en entier). Ouvre vinted.fr sur ce compte.", other: "{n} brouillons : VRM ne sait pas s'ils sont encore sur Vinted (leur dressing n'a pas été relu en entier). Ouvre vinted.fr sur ces comptes." },
   "egalite.groupe.sansCompte": "Sans compte",
   "egalite.groupe.n": {"one": "{n} annonce", "other": "{n} annonces"},
-  "egalite.groupe.achats": {"one": "{n} prix d’achat à compléter", "other": "{n} prix d’achat à compléter"}
+  "egalite.groupe.achats": {"one": "{n} prix d’achat à compléter", "other": "{n} prix d’achat à compléter"},
+  "egalite.groupe.aRelier": {"one": "{n} annonce à relier", "other": "{n} annonces à relier"}
 };

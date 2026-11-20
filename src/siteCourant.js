@@ -62,3 +62,25 @@ export function useSiteCourant() {
   const s = React.useSyncExternalStore(abonner, lireSiteCourant, () => 'toutes');
   return [s, poserSiteCourant];
 }
+
+// Les sites RELIÉS (posés par la coque à chaque rendu) : le site effectif d'un écran qui n'a pas la coque sous la main
+// (« À régler », Aujourd'hui) — un site plus relié vaut « Tous ».
+let _relies = null;
+export function poserSitesRelies(l) { _relies = Array.isArray(l) ? l : null; }
+export const sitesRelies = () => (_relies || []);
+export function siteCourantEffectif(brut = lireSiteCourant()) { return _relies ? siteEffectif(brut, _relies) : brut; }
+export function useSiteEffectif() { const [s] = useSiteCourant(); return siteCourantEffectif(s); }
+// Le site d'une ligne d'« À régler » par son identifiant (la carte qui l'a faite) ; inconnu ⇒ null : une ligne de TOUS les
+// sites (URSSAF, numéros, Compléter…), montrée seulement sous « Tous » — jamais un chiffre global sous le logo d'un site.
+const SITE_DES_LIGNES = {
+  'colis-limite': 'vinted', 'colis-en-retard': 'vinted', 'poste-sans-depart': 'vinted', 'retrait-dernier-jour': 'vinted', 'supprime-vinted': 'vinted',
+  'quoi-republier': 'vinted', 'remettre-en-vente': 'vinted', 'a-confirmer': 'vinted', 'retours-vente': 'vinted', 'retours-vente-revenus': 'vinted', 'emballer': 'vinted',
+  'ebay-ne-pas-poster': 'ebay', 'messages-ebay': 'ebay',
+  'vestiaire-envoyer': 'vestiaire', 'vestiaire-messages': 'vestiaire', 'vestiaire-offre': 'vestiaire', 'vestiaire-offres-reste': 'vestiaire',
+};
+export function siteDeLigne(id, tab = '') {
+  const base = String(id || '').split(':')[0];
+  if (SITE_DES_LIGNES[base]) return SITE_DES_LIGNES[base];
+  const m = /^plat_(vinted|leboncoin|ebay|vestiaire)$/.exec(String(tab || ''));
+  return m ? m[1] : null;
+}

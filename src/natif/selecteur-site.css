@@ -13,7 +13,14 @@
   .n-site-option { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
   .n-site-logo { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; align-items: center; justify-content: center; }
   .n-site-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-site-logo { color: currentColor; }
+  .n-site-court { display: none; }
+  /* Au téléphone, à quatre ou cinq choix : le nom COURT en texte (« Tous · Vinted · LBC · eBay · VC »), lisible en clair
+     comme en sombre (l'encre du segmenté) ; le logo et le nom long sont lus par `aria-label`. */
   @media (max-width: 599px) {
-    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-logo + .n-site-nom { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) :is(.n-site-logo, .n-site-nom) { display: none; }
+    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-court { display: inline; }
   }
+  .n-selecteur-site[data-site-indisponible] .n-selecteur-site-seg { opacity: .45; }
+  .n-selecteur-site-raison { margin: 6px 0 0; font: var(--n-t-legende, 13px/18px system-ui); color: var(--n-encre-2); }
 }

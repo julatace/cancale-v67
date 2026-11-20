@@ -98,6 +98,7 @@ import { grouperParCompte, entreesGroupees } from './regroupeComptes.js'; // (11
 import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : DiagnosticLeboncoin (était importé en statique)
 const DiagnosticLeboncoin = aLaDemandeDiscret(() => import('./DiagnosticLeboncoin.jsx'));
+const AchatsSiteLazy = aLaDemande(() => import('./achats/AchatsSite.jsx'));   // (20 nov.) les achats Leboncoin / Vestiaire, disposition Vinted
 import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
 import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import './design/studio-reste.css';   // (14 nov., Studio bleu clair) Argent, Messages, Paramètres, Communauté, E-mails, connexion, feuilles
@@ -937,7 +938,7 @@ import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
 import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
-import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
+import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta, questionsArgent } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOIS } from "./cibleNotif.js";
@@ -20699,12 +20700,13 @@ const groupePlateformes = (tab, setTab) => {
   const l = SITES_RELIES_COQUE.v || [];
   if (!l.length) return null;
   return { titre: tr('site.plus.titre'), entrees: l.map((x) => ({ cle: 'site-' + x, libelle: nomPlateforme(x), icone: <span className="n-site-logo"><LogoSite site={x}/></span>,
-    onChoisir: () => { DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
+    onChoisir: () => { if (x === 'ebay') { try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} return; }
+      DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
     attrs: { 'data-plus-site': x } })) };
 };
-function SelecteurSiteCoque() {
+function SelecteurSiteCoque({ indisponible = false, raison = '' } = {}) {
   const [brut, poser] = useSiteCourant();
-  return <Natif.SelecteurSite sites={SITES_RELIES_COQUE.v} valeur={siteCourantCoque(brut)} onChange={poser} nom={nomPlateforme} Logo={(x) => <LogoSite site={x}/>}
+  return <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={SITES_RELIES_COQUE.v} valeur={siteCourantCoque(brut)} onChange={poser} nom={nomPlateforme} Logo={(x) => <LogoSite site={x}/>}
     tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
 }
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
@@ -24862,7 +24864,9 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // (même écran ⇒ seule la section change).
 // Le sélecteur de plateforme d'Argent : LE sélecteur de la coque (`SelecteurSiteCoque` : les sites reliés, `vrm_site_courant`) —
 // fusion du 20 nov. avec argent-natif : un seul composant, une seule clé, le même en tête de chaque onglet.
-function SelecteurSiteArgent() { return <SelecteurSiteCoque/>; }
+// Statistiques, Déclarer, Factures n'ont pas de règle par site (la déclaration porte sur toutes les ventes) : le sélecteur y
+// est grisé sur « Tous », la phrase dite une fois — jamais un chiffre de tous les sites sous le logo d'un site.
+function SelecteurSiteArgent({ seg = 'resume' }) { return seg === 'resume' ? <SelecteurSiteCoque/> : <SelecteurSiteCoque indisponible raison={tr('site.tousSeulement')}/>; }
 function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
   // (17 nov., nouveau design · Argent) Allumé : UNE ligne « Toutes les plateformes · N comptes › » (les comptes qui entrent
   // dans les totaux, la même règle `compteEcarte` que Compta ; le toucher mène aux comptes), puis UN contrôle segmenté
@@ -24878,7 +24882,7 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
     // réglage secondaire : une ligne discrète « Comptes · N › » qui mène aux comptes (la même destination qu'hier).
     return (
       <div className="v2-argent-nav n-arg-nav" data-v2-argent-nav={seg}>
-        <SelecteurSiteArgent/>
+        <SelecteurSiteArgent seg={seg}/>
         <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
         <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
@@ -26139,23 +26143,6 @@ function LigneAchat({ photo, titre, statut, meta, montant, actions, sous, attenu
     </div>
   );
 }
-function LigneAchatLbc({ o, floute = false }) {
-  const [qr, setQr] = React.useState(false);
-  const st = etapeAchatLbc(o);
-  const lbl = o.label || {};
-  const enCours = st.step >= 1 && st.step < 4;
-  const qrUrl = enCours && /^https?:\/\//.test(String(lbl.qrUrl || '')) ? lbl.qrUrl : '';
-  const suivi = enCours && /^https?:\/\//.test(String(lbl.trackingUrl || '')) ? lbl.trackingUrl : '';
-  const date = o.dateVente ? new Date(o.dateVente) : null;
-  return <LigneAchat data={{ 'data-lbc-achat': String(o.txId || ''), 'data-flou': floute ? '1' : '0' }} floute={floute} attenue={st.step === 0}
-    photo={photoArticle(o)} titre={o.title} statut={st} montant={lbcEuro(o.price)}
-    meta={<>{date && !isNaN(date) && <span style={{ whiteSpace: 'nowrap' }}>{date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) })}</span>}{o.deliveryLabel && <span>· {o.deliveryLabel}</span>}</>}
-    sous={qr && qrUrl ? <div style={{ marginTop: 8 }}><QrColis url={qrUrl} size={120} /></div> : null}
-    actions={<>
-      {suivi && <a className="vrm-buy-quick" href={suivi} target="_blank" rel="noreferrer" title="Suivre le colis" aria-label="Suivre le colis" style={{ color: C.muted }}><Icon name="truck" size={16} /></a>}
-      {qrUrl && <button className="vrm-icon-control vrm-buy-quick" type="button" data-lbc-achat-qr="" onClick={() => setQr(v => !v)} title="QR du colis" aria-label="QR du colis" aria-expanded={qr} style={{ color: C.warn }}><Icon name="key" size={16} /></button>}
-    </>} />;
-}
 const prixLbcSu = (o) => (o && o.price != null && o.price !== '' && Number.isFinite(Number(o.price)) ? Number(o.price) / 100 : null);
 function lbcArgent(lbcVentes) {
   const ventes = (lbcVentes && lbcVentes.ventes) || [];
@@ -26245,80 +26232,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
 // (`lbc_ventes`, chaque transaction), côté ACHETEUR : `isSeller === false`
 // (jamais déduit, §5). Même carte, même séparation « reçu / en cours » que les
 // ventes — côté achat « finalisé » = colis reçu. Photo + titre + statut + prix.
-function AchatsLeboncoin({ lbcVentes = { achats: [] } }) {
-  const achats = (lbcVentes.achats || []);
-  // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
-  const lbcOuvert = useCompteLbcOuvert();
-  const annLbc = useAnnuaireLbc(); // (11 nov.) le nom de chaque compte, pour les groupes par compte
-  // (17 oct., revue) La section « Achats » est toujours dans la navigation :
-  // rendre `null` laissait un écran BLANC sous le titre (vu au rendu). Une
-  // liste vide a une cause, et une cause se dit — jamais lu (« — ») n'est pas
-  // « aucun achat » (lu, vide).
-  if (achats.length === 0) {
-    const lu = !!lbcVentes.maj;
-    return (
-      <div data-lbc-achats-vide={lu ? 'lu' : 'jamais'} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '14px 16px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>
-        {lu
-          ? <>Aucun achat Leboncoin dans ta dernière lecture ({ilYaCourt(lbcVentes.maj)}).</>
-          : <>Ouvre « Mes transactions » sur leboncoin.fr : tes achats arrivent.</>}
-      </div>
-    );
-  }
-  const actives = achats.filter(o => !lbcAnnulee(o));
-  const recus = actives.filter(lbcFinalisee);
-  const enRoute = actives.filter(o => !lbcFinalisee(o));
-  const annules = achats.filter(lbcAnnulee);
-  const somme = (arr) => sommeConnue(arr, prixLbcSu);   // (11 nov.) prix inconnu ≠ 0 € : « au moins », ou « — »
-  const fmt2 = (r) => texteSomme(r, (n) => n.toFixed(2).replace('.', ',') + '\u00a0€');
-  // (28 oct.) Le plus récent d'abord, comme les achats Vinted ; une date
-  // illisible en dernier. L'année est dite quand ce n'est pas celle-ci.
-  // (9 nov., soir, lot AJ) La règle unique (src/ordreRecent.js) : date d'achat lue, tous comptes mélangés.
-  const tsAchat = (o) => quandLeboncoin(o);
-  // (11 nov.) Regroupée par compte quand un compte Leboncoin est ouvert (src/regroupeComptes.js, suit le flou).
-  // Appelée comme une fonction : `ListeParCompte` garde son état (comptes dépliés) d'un rendu à l'autre.
-  const Liste = ({ arr }) => <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, marginTop: 6 }}><ListeParCompte lignes={ordreRecent(arr, tsAchat)} ouvert={lbcOuvert} floute={(o) => lbcFloute(lbcOuvert, o.account)} compteDe={(o) => idCompteLbcApp(o.account)} unite="achat" libelle="Compte ouvert sur Leboncoin" nomDe={(id) => nomCompteLbcGroupe(annLbc, id)}
-    rendre={(o) => <LigneAchatLbc key={o.txId} o={o} floute={lbcFloute(lbcOuvert, o.account)} />}/></div>;
-  return (
-    <div style={{ marginBottom: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '12px 14px' }}>
-      {/* (27 oct., « pareil que Vinted ») Plus de second titre « Achats
-          Leboncoin (2) » sous l'onglet « Achats » de l'espace Leboncoin. */}
-      <h2 className="vrm-sr">Achats Leboncoin</h2>
-      {/* Côté achat : « Reçus » = colis arrivé · « En route » = en cours de
-          livraison. Deux chiffres, deux mots, jamais mélangés (comme les ventes). */}
-      {actives.length > 0 && (
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', padding: '2px 0 10px' }}>
-          <div>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{fmt2(somme(recus))}</div>
-            <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Reçus · {recus.length}</div>
-          </div>
-          <div>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.muted }}>{fmt2(somme(enRoute))}</div>
-            <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>En route · {enRoute.length}</div>
-          </div>
-        </div>
-      )}
-      {enRoute.length > 0 && (<>
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '6px 0 0' }}>En cours de livraison ({enRoute.length})</div>
-        {Liste({ arr: enRoute })}
-        {/* (17 oct.) OÙ ARRIVE LE CODE D'UN COLIS LEBONCOIN. Mesuré sur sa base :
-            une transaction Leboncoin ne porte NI point de retrait NI code (champs
-            captés : statut, transporteur, prix). Le code vient de l'e-mail du
-            transporteur — qui ne dit pas de quelle plateforme vient le colis :
-            il rejoint donc la liste « À retirer » des achats, comme ceux de
-            Vinted. On le dit une fois, plutôt qu'un « en route » muet. */}
-        {enRoute.some(o => o.deliveryLabel) && <div data-lbc-code-ou="" style={{ fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 1.45 }}><Pourquoi ecrit label="Où arrive le code de retrait ?">Par l’e-mail du transporteur, dans Achats → À retirer.</Pourquoi></div>}
-      </>)}
-      {recus.length > 0 && (<>
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Reçus ({recus.length})</div>
-        {Liste({ arr: recus })}
-      </>)}
-      {annules.length > 0 && (<>
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 0' }}>Annulés / remboursés ({annules.length})</div>
-        {Liste({ arr: annules })}
-      </>)}
-    </div>
-  );
-}
+// (20 nov.) L'ancien `AchatsLeboncoin` (cartes) est remplacé par src/achats/AchatsSite.jsx (la disposition des achats Vinted).
 // ── OÙ PART UN COLIS eBAY (26 octobre) — `destinationEbay` (§11) ──────────
 // Une ligne sur la carte, seulement pour un envoi qui n'est PAS ordinaire :
 // international par le programme d'eBay (on poste en France, eBay fait la
@@ -27303,7 +27217,7 @@ const SESSION_FIL_EBAY={
   prete:async()=>{ if(!AUTH.session) return true; if(authValid()) return true; return authRefresh(); },
   renouveler:()=>authRefresh(),
 };
-function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={}}){
+function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={},sansGagnes=false}){
   const {ventes}=useVentesCoque();
   const repere=React.useMemo(()=>{
     if(!Array.isArray(ventes))return null;
@@ -27328,10 +27242,10 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={}}){
     <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
     <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
-    <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
+    {sansGagnes?null:<details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
       <summary>Tes achats gagnés sur eBay · 60 derniers jours</summary>
       {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div>}
-    </details>
+    </details>}
   </div>;
 }
 function EbayActionCompte({vue,comptes,onCompte,children}){
@@ -28598,42 +28512,8 @@ function AchatsVestiaire() {
     const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') relire(); };
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
-  const style = { fontSize: 13, color: C.muted, lineHeight: 1.55 };
-  let corps;
-  if (d === undefined) corps = <div data-vc-achats="charge" style={style}>Lecture de tes achats Vestiaire…</div>;
-  else if (d === null) corps = <div data-vc-achats="pas-su" style={style}>Je n'ai pas pu lire tes achats Vestiaire (rien perdu). <button type="button" className="vrm-lien-action" data-vc-achats-relire="" onClick={() => { setD(undefined); relire(); }} style={{ background: 'none', border: 'none', color: C.accentTexte, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44, padding: 0 }}>Réessayer</button></div>;
-  else if (!d.achats) corps = <div data-vc-achats="jamais" style={style}>Pas encore lus : ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur Vestiaire{extSait('vcachats') === 'retard' ? <> (mise à jour en <b>{EXT_CAPACITES.vcachats}</b> d'abord)</> : ''}. Ton panier n'est jamais lu.</div>;
-  else {
-    // (9 nov., soir, lot AJ) le plus récent en haut, la règle unique (src/ordreRecent.js)
-    const liste = ordreRecent(Object.entries(d.achats).filter(([, v]) => v && typeof v === 'object').map(([id, v]) => ({ id, ...v })), quandVestiaire);
-    if (!liste.length) corps = <div data-vc-achats="vide" style={style}>Aucun achat Vestiaire lu{d.lecture && d.lecture.at ? ` (${ageCourtVc(d.lecture.at)})` : ''}. Après un achat, ouvre <b style={{ color: C.text }}>« Mes commandes »</b> sur Vestiaire.</div>;
-    else corps = (
-      <div data-vc-achats="lu" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div data-vc-achats-resume="" style={style}>
-          {liste.length} achat{liste.length > 1 ? 's' : ''} vu{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}. Hors totaux : tes prix d'achat, tu les saisis.
-        </div>
-        {/* (11 nov.) Regroupés par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
-        <ListeParCompte lignes={liste.slice(0, 30)} ouvert={vcOuvert} floute={(v) => vcFloute(vcOuvert, v.compte)} compteDe={(v) => String(v.compte == null ? '' : v.compte).trim()} unite="achat" libelle="Compte ouvert sur Vestiaire" nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})}
-          rendre={(v) => (
-          <div key={v.id} data-vc-achat={v.id} data-vc-achat-suivi={v.suivi || ''} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, ...(vcFloute(vcOuvert, v.compte) ? STYLE_FLOU : {}) }}>
-            <div style={{ fontSize: 13, color: C.text, fontWeight: 600, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
-            <div style={{ fontSize: 12, color: C.muted }}>
-              {v.etat ? `Vestiaire : « ${v.etat} »` : 'état non dit'}{dateCourteVc(v.date) ? ` · ${dateCourteVc(v.date)}` : ''}
-              {v.montant && isFinite(Number(v.montant.valeur)) ? ` · ${fmt(v.montant.valeur)}${v.montant.devise && v.montant.devise !== 'EUR' ? ' ' + v.montant.devise : ''} (« ${v.montant.cle} »)` : ''}
-              {v.suivi ? ` · suivi ${v.suivi}${v.transporteur ? ' (' + v.transporteur + ')' : ''}` : ''}
-            </div>
-            {v.suivi ? <BoutonSuivreColis transporteur={v.transporteur} suivi={v.suivi}/> : null}
-          </div>
-        )}/>
-      </div>
-    );
-  }
-  return (
-    <Card style={{ padding: 16 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Tes achats Vestiaire</div>
-      {corps}
-    </Card>
-  );
+  // (20 nov.) La disposition des achats Vinted : `src/achats/AchatsSite.jsx` (chargé avec l'écran).
+  return <AchatsSiteLazy site="vestiaire" d={d}/>;
 }
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
@@ -35195,6 +35075,9 @@ function confirmerOffresAuto() {
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
 }
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
+  // (20 nov., sélecteur de plateforme) Le site choisi pour toute l'app : Aujourd'hui ne montre que les colis, retraits et
+  // ventes de CE site (le site de chaque ligne est connu par identité : la plateforme de sa vente).
+  const [siteJourBrut] = useSiteCourant(); const siteJour = siteCourantCoque(siteJourBrut);
   const horsLigneVue = useHorsLigne();   // (11 nov.) hors ligne : pas de N° proposé à un nouvel achat (serveur seul)
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
@@ -51733,9 +51616,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const Tc = (id) => T.find((x) => x.id === id);
           const xE = Tc('envoyer'), xR = Tc('retirer'), xM = Tc('messages'), xP = Tc('prix');
           const lu = (x) => !!(x && !x.pasSu && x.t && !baseKO);
-          const nE = lu(xE) ? (Number(xE.t.n) || 0) : null;
-          const em = lu(xE) && xE.t.emballer ? xE.t.emballer : null;
-          const nPrets = em && em.n > 0 ? em.n : 0;
+          const unSite = siteJour !== 'toutes';
+          const colisVus = unSite ? colisJournee.filter((c) => c.site === siteJour) : colisJournee;
+          const nE = lu(xE) ? (unSite ? colisVus.length : (Number(xE.t.n) || 0)) : null;
+          // Les bordereaux prêts sont ceux des ventes Vinted (le lot d'impression) : sous un autre site, aucun plein.
+          const em = lu(xE) && xE.t.emballer && (!unSite || siteJour === 'vinted') ? xE.t.emballer : null;
+          const nPrets = em && em.n > 0 ? Math.min(em.n, nE || 0) : 0;
           const ecart = nE == null ? ((xE && xE.titrePasSu) || tr('v2.pasLu')) : nE === 0 ? tr('v2.rienAEnvoyer')
             : nPrets && nE > nPrets ? tr('v2.ecartCourt', { n: nE - nPrets, r: nE - nPrets })
             : nPrets ? (em.exact === false ? tr('v2.pretsAuMoins', { n: nPrets }) : tr('v2.tousPrets')) : tr('v2.aucunPret');
@@ -51768,7 +51654,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             dejaJ.add(j);
             const titreJ = String(j.court || j.title || '').trim(); if (!titreJ) continue;
             const idJ = j.id || 'job'; rangJ[idJ] = (rangJ[idJ] || 0) + 1;
-            groupesJ.push({ id: idJ + (rangJ[idJ] > 1 ? ':' + rangJ[idJ] : ''), icone: j.icon || 'check', titre: titreJ, n: j.n, detail: typeof j.detail === 'string' ? j.detail : '',
+            groupesJ.push({ id: idJ + (rangJ[idJ] > 1 ? ':' + rangJ[idJ] : ''), site: j.litige ? (j.litige.site || null) : siteDeLigne(idJ, j.tab), icone: j.icon || 'check', titre: titreJ, n: j.n, detail: typeof j.detail === 'string' ? j.detail : '',
               photo: Array.isArray(j.photos) ? (j.photos.find(Boolean) || null) : null, ambre: !!j.urgent || j.color === C.warn, geste: geste(j),
               tab: j.litige ? (j.litige.sens === 'achat' ? 'achats' : 'cat_ventes') : (j.tab || ''), sens: j.litige ? j.litige.sens : undefined });
           }
@@ -51793,7 +51679,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             if (ev !== 'lu' || baseKO) return { etat: ev === 'pasSu' || baseKO ? 'passu' : 'encours', lignes: [] };
             try {
               const parTx = new Map(); for (const o of (sales.items || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) parTx.set(String(tx), o); }
-              const lignes = (Mo.dernieresVentes(liveStats.venduLignes, 5) || []).map((x) => {
+              const duSite = (x) => siteJour === 'toutes' || String(x && x.plateforme || '').toLowerCase().slice(0, 4) === String(nomPlateforme(siteJour) || siteJour).toLowerCase().slice(0, 4);
+              const lignes = (Mo.dernieresVentes((liveStats.venduLignes || []).filter(duSite), 5) || []).map((x) => {
                 const o = x.plateforme === 'Vinted' ? parTx.get(x.tx) : null;
                 const bd = o ? bordsParTxn[x.tx] : null; const en = o ? effEntry(o) : null;
                 const num = String(o ? ((bd ? numForBord(bd) : '') || (en && en.numero) || '') : '');
@@ -51808,12 +51695,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {baseKO ? null : <SelecteurSiteCoque/>}
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
-              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
+              affiche={{ n: nE, pasSu: nE == null, sous: unSite && siteJour !== 'vinted' ? (nE === 0 ? tr('v2.rienAEnvoyer') : '') : ecart, ambre: colisVus.some((c) => c.e && c.e.ambre) }}
               // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
               // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
-              colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
-              retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
-              groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
+              colis={nE ? colisVus.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
+              // Les colis à retirer sont des ACHATS (Vinted et e-mails des transporteurs) : sous un autre site, le bloc se tait
+              // (« À retirer » de SON onglet Achats dit les siens) — jamais le nombre de tous les sites sous son logo.
+              retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ, masque: unSite && siteJour !== 'vinted' }}
+              groupes={baseKO ? null : groupesJ} alerte={unSite && siteJour !== 'vinted' ? () => null : alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
@@ -64879,7 +64768,10 @@ function AppCoeur() {
     if (s === 'toutes' || sitesRelies.includes(s)) poserSiteCourant(s);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platSub]);
-  SITES_RELIES_COQUE.v = sitesRelies;
+  SITES_RELIES_COQUE.v = sitesRelies; poserSitesRelies(sitesRelies);
+  // (20 nov.) « Plus › eBay » : ce qu'eBay a en propre — ses comptes et réglages, ses recherches et alertes (sorties d'Achats).
+  const [ebayRecherches, setEbayRecherches] = useState(false);
+  React.useEffect(() => { const f = () => setEbayRecherches(true); window.addEventListener('vrm:ebay-recherches', f); return () => window.removeEventListener('vrm:ebay-recherches', f); }, []);
   const selecteurSite = <SelecteurSiteCoque/>;
   React.useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.tache !== tab || !d.site) return; setPlatSub(d.site); retenirFiltre(d.tache, d.site, true); };
     window.addEventListener('vrm:site-tache', f); return () => window.removeEventListener('vrm:site-tache', f); }, [tab]);
@@ -66925,7 +66817,8 @@ function AppCoeur() {
         {natifV || lbcNatif ? null : <div className="v2-tete-tache v2-tete-suite">
           {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
             const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
-            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return <div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={t}/></span></div>;
+            // (20 nov., « grand titre seul ») Sans choix de compte, rien sous le titre : ni « ? » seul sur sa ligne.
+            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return null;
             return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
               libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
               sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>
@@ -67075,7 +66968,7 @@ function AppCoeur() {
               ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
-          {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsLeboncoin lbcVentes={lbcVentes}/>}</div>}
+          {sec==='achats'&&<div style={{padding:16}}>{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsSiteLazy site="leboncoin" lbcVentes={lbcVentes}/>}</div>}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}
@@ -67083,7 +66976,7 @@ function AppCoeur() {
           {sec==='annonces'&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<><LigneLiaison site="Leboncoin"/><LeboncoinScreen/></>)}
           {/* (27 oct.) Le diagnostic est une aide en cas de souci : en bas de
               l'espace, plus une ligne en tête de chaque section. */}
-          <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div>
+          {sec==='annonces'||sec==='colis' ? <div data-diag-lbc="" style={{padding:'0 16px'}}><DiagnosticLeboncoin key={AUTH.user?.id||'sans-session'} lire={q=>lireBaseRelue(`${SUPABASE_URL}/rest/v1/${q}`)} couleurs={C}/></div> : null}
         </section>); };
   const rendreEbay=(sec)=>{ const allerSec=(x)=>allerSection('plat_ebay',x); return (<section className="vrm-market-space" aria-label="eBay">
           {/* Julien : « eBay, je veux tout pareil que Vinted — les onglets achats,
@@ -67134,7 +67027,9 @@ function AppCoeur() {
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onReconnecter={allerComptesEbay}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onReconnecter={allerComptesEbay} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
-          {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
+          {/* (20 nov., « même squelette ») Achats · eBay : les achats gagnés sous « En route » (la disposition de Vinted) ; les
+              recherches et alertes eBay vivent dans « Plus › eBay » (`vrm:ebay-recherches`). */}
+          {sec==='achats'&&<Natif.Groupe titre={tr('achats.site.enRoute')} nu attrs={{ 'data-achats-site': 'ebay' }}><div className="vrm-ebay-achats-natif"><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayAchats key={'ac-'+ref} headers={enTeteSession} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div></Natif.Groupe>}
           {sec==='offres'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&!baseKO&&<LigneLiaison site="eBay"/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
@@ -68327,6 +68222,10 @@ function AppCoeur() {
             </>}</GardeEcran>}
         {tab==='messages'&&<GardeEcran nom="messages">{rendreTache('messages')}</GardeEcran>}
         {tab==='achats'&&<GardeEcran nom="achats">{rendreTache('achats')}</GardeEcran>}
+        {ebayRecherches ? <GardeEcran nom="ebay-recherches"><Natif.PagePoussee ouverte titre={tr('ebay.recherches.titre')} onRetour={() => setEbayRecherches(false)} attrs={{ 'data-ebay-recherches': '' }}>
+          <Natif.Groupe><Natif.Rangee icone={<Icon name="settings" size={22}/>} titre={tr('ebay.recherches.compte')} fin="chevron" onClick={() => { setEbayRecherches(false); DEMANDE_REGLAGE_SOUS.id = 'ebay'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); }}/></Natif.Groupe>
+          <EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette} sansGagnes/>
+        </Natif.PagePoussee></GardeEcran> : null}
         {tab==='inventory'&&<GardeEcran nom="inventory"><Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/></GardeEcran>}
         {tab==='catalog'  &&<GardeEcran nom="catalog"><Catalog   catalog={catalog} setCatalog={setCatalog} onDeleteId={(id)=>{
           const norm=v=>String(v||'').trim();

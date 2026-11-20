@@ -364,7 +364,31 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           await ctx.close();
         });
         // R · RELIER DEPUIS LA LISTE (20 nov.) : la proposition sur la rangée d'Annonces (tableau à 1512, liste à 390).
-        await essaie(`R ${T}`, async () => {
+        // (20 nov., « même rangée sur chaque site ») Au téléphone, plus de proposition SOUS chaque rangée : la tête du groupe dit
+        // « N à relier › » (ouvre le parcours) et la rangée garde le geste au balayage (« Relier N° », la proposition).
+        if (tel) await essaie(`R ${T}`, async () => {
+          const { ctx, pg, errs } = await ouvrir(b, vp, scenario(F, { fine: fineP1 }), { sombre, tab: 'leboncoin', images: F });
+          await pg.waitForSelector('[data-eg-manque="relier"]', { timeout: 20000 }).catch(() => {});
+          const m = await pg.evaluate(() => ({ tete: [...document.querySelectorAll('[data-eg-manque="relier"]')].map((e) => Number(e.getAttribute('data-eg-manque-n'))),
+            props: document.querySelectorAll('[data-eg-prop-annonce]').length, h: (() => { const e = document.querySelector('[data-eg-manque="relier"]'); return e ? Math.round(e.getBoundingClientRect().height) : 0; })() }));
+          await shot(pg, '11-liste');
+          dit(m.tete.length >= 1 && m.tete.every((n) => n >= 1) && m.props === 0 && m.h >= 44, `${T} R1 « N à relier › » UNE fois en tête du groupe, aucune proposition sous les rangées`, JSON.stringify(m));
+          dit(!((await stock(pg, 'vrm_lbc_liens')) || {})[5001], `${T} R1 montrer la liste ne relie rien`, '');
+          // Le balayage de la rangée 5001 : « Relier N°124 » (la proposition sûre, geste franc) ⇒ relié par la preuve « photo sûre ».
+          const rangee = await pg.evaluateHandle(() => [...document.querySelectorAll('[data-eg-article]')].find((x) => /5001/.test(x.getAttribute('data-eg-article') || '') || /Leboncoin:5001/.test(x.outerHTML)) || null);
+          await pg.evaluate((el) => { if (el) { el.scrollIntoView({ block: 'center' }); (el.querySelector('.n-rangee-corps') || el).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 })); } }, rangee);
+          await pg.waitForTimeout(400); await shot(pg, '13-balayage');
+          await pg.evaluate((el) => { const l = el ? [...el.querySelectorAll('.n-rangee-action')] : []; const b = l[l.length - 1]; if (b) b.click(); }, rangee);
+          await pg.waitForFunction(() => { try { return (JSON.parse(localStorage.getItem('vrm_lbc_liens') || '{}') || {})['5001'] === '124'; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
+          const l = await stock(pg, 'vrm_lbc_liens');
+          dit(l && String(l[5001]) === '124', `${T} R2 le balayage « Relier N°124 » relie 5001 à 124`, JSON.stringify(l));
+          await pg.locator('[data-eg-manque="relier"]').first().click({ timeout: 5000 }).catch(() => {});
+          const okTete = await pg.waitForSelector('[data-liaison]', { timeout: 8000 }).then(() => true).catch(() => false);
+          dit(okTete, `${T} R3 « N à relier › » ouvre le parcours « Relier mes annonces »`, String(okTete));
+          dit(errs.length === 0, `${T} R aucune erreur JS`, errs.slice(0, 2).join(' | '));
+          await ctx.close();
+        });
+        else await essaie(`R ${T}`, async () => {
           const { ctx, pg, errs } = await ouvrir(b, vp, scenario(F, { fine: fineP1 }), { sombre, tab: 'leboncoin', images: F });
           await pg.waitForSelector('[data-eg-prop-annonce="Leboncoin:5001"]', { timeout: 20000 }).catch(() => {});
           const lireProp = () => pg.evaluate(() => [...document.querySelectorAll('[data-eg-prop-annonce]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => {

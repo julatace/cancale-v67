@@ -100,7 +100,7 @@ const cle = () => CLE_A_REGLER + (branche.uid ? ':' + branche.uid : '');
 const ecouteurs = new Set();
 const dire = () => { for (const f of [...ecouteurs]) { try { f(); } catch (_) { /* un lecteur cassé ne tait pas les autres */ } } try { if (typeof window !== 'undefined') window.dispatchEvent(new Event(EVT)); } catch (_) {} };
 const resume = (g) => ({ id: String(g.id), onglet: g.onglet || ongletDe(g), icone: g.icone || '', titre: String(g.titre || ''), detail: String(g.detail || ''), n: g.n == null ? null : Number(g.n), ambre: !!g.ambre,
-  photo: typeof g.photo === 'string' ? g.photo : null, tab: g.tab || '', gesteTxt: (g.geste && g.geste.txt) || '', sens: g.sens || undefined });
+  photo: typeof g.photo === 'string' ? g.photo : null, tab: g.tab || '', gesteTxt: (g.geste && g.geste.txt) || '', sens: g.sens || undefined, site: g.site || null });
 const signature = (l) => JSON.stringify((l || []).map(resume));
 
 // La coque dit comment ouvrir un écran (les rangées gardées d'une session précédente n'ont plus leur geste) et, quand

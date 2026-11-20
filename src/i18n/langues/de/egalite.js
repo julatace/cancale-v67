@@ -95,5 +95,6 @@ export default {
   "annonces.refairePasSu": { one: "{n} Entwurf: VRM weiß nicht, ob er noch auf Vinted ist (sein Kleiderschrank wurde nicht ganz neu gelesen). Öffne vinted.fr auf diesem Konto.", other: "{n} Entwürfe: VRM weiß nicht, ob sie noch auf Vinted sind (ihre Kleiderschränke wurden nicht ganz neu gelesen). Öffne vinted.fr auf diesen Konten." },
   "egalite.groupe.sansCompte": "Ohne Konto",
   "egalite.groupe.n": {"one": "{n} Anzeige", "other": "{n} Anzeigen"},
-  "egalite.groupe.achats": {"one": "{n} Einkaufspreis zu ergänzen", "other": "{n} Einkaufspreise zu ergänzen"}
+  "egalite.groupe.achats": {"one": "{n} Einkaufspreis zu ergänzen", "other": "{n} Einkaufspreise zu ergänzen"},
+  "egalite.groupe.aRelier": {"one": "{n} Anzeige zu verknüpfen", "other": "{n} Anzeigen zu verknüpfen"}
 };
