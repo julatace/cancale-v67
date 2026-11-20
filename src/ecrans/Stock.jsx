@@ -1587,7 +1587,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     <section className="vrm-ms-section" data-stock-section="meubles" aria-label={tr('ms.stock.meubles')}>
     <h2 className="vrm-ms-h2">{tr('ms.stock.meubles')}</h2>
-    {meubles.length === 0 && <StockExplication sneakers={motsStock.nom === 'paire'} />}
+    {/* (20 nov., NATIF §1 bis) Plus d'explication permanente sans meuble : « Comment ça marche ? » l'ouvre (le pied). */}
     {/* à ranger */}
     {aRanger.length > 0 && (
       <Card style={{ padding: '12px 13px' }}>
@@ -1639,9 +1639,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         (15 nov.) UNE ligne : « + Ajouter un meuble » (l'action) et « Comment ça marche ? » (un lien discret). */}
     <div className="vrm-etag-pied" data-meubles-pied="">
       <button className={meubles.length ? 'sb-touche' : 'vrm-b vrm-b-primaire'} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}>{tr('stock.ajouterMeuble')}</button>
-      {meubles.length > 0 && !explication && <button className="sb-lien" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
+      {!explication && <button className="sb-lien" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
     </div>
-    {meubles.length > 0 && explication && <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />}
+    {explication && <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />}
 
     </section>
 
