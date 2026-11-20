@@ -327,25 +327,10 @@ async function main() {
         });
         dit(r.lien && r.tag === 'A' && r.href === 'blob:' && r.tete === '%PDF-', 'hors connexion : « Bordereau » de la 70001 est un vrai lien vers le PDF gardé ici (%PDF)', JSON.stringify({ lien: r.lien, tag: r.tag, href: r.href, tete: r.tete }));
         dit(r.absent && !r.lien2, 'la 70002 (bordereau jamais ouvert ici) : « pas gardé ici », aucun faux bouton', JSON.stringify({ absent: r.absent, lien2: r.lien2 }));
-        dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 2 && r.deposer.every((x) => x === 'Déposé'), 'la liste dit « À déposer · 2 », chaque colis a « Déposé »', JSON.stringify({ t: r.titres, d: r.deposer }));
+        // (20 nov., chasse-bugs-2 — décision « 4 oui ») Plus de « Déposé » à toucher : le dépôt est constaté par le suivi du transporteur.
+        dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 0 && !(await pg.locator('[data-depot-ouvrir]').count()), 'la liste dit « À déposer · 2 », sans « Déposé » ni « Je dépose » (décision « 4 oui »)', JSON.stringify({ t: r.titres, d: r.deposer }));
         dit(/^Hors connexion — dernier état du \d{1,2} \S+ à \d{2}:\d{2}\./.test(r.ligne.trim()), 'le bandeau dit l\'heure du dernier état', r.ligne);
         if (process.env.SHOT_HL) await pg.screenshot({ path: `${process.env.SHOT_HL}-${vp.width}-${sombre ? 'sombre' : 'clair'}-comptoir.png`, fullPage: true }).catch(() => {});
-        // « Déposé » : noté, annulé, renoté — UNE marque, qui part au retour du réseau.
-        const nAvant = (etat.ecrits || []).length;
-        const btn = '[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-fait-btn]';
-        await pg.locator(btn).click({ timeout: 5000 });
-        await pg.waitForTimeout(300);
-        await pg.locator('[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-annuler]').click({ timeout: 5000 });
-        await pg.waitForTimeout(300);
-        await pg.locator(btn).click({ timeout: 5000 });
-        await pg.waitForTimeout(600);
-        const note = await pg.evaluate(() => ({ fait: [...document.querySelectorAll('[data-hl-fait]')].map((x) => x.getAttribute('data-hl-fait')), ship: JSON.parse(localStorage.getItem('vinted_ship_done') || '{}'), attente: (document.querySelector('[data-file-envoi]') || { getAttribute: () => null }).getAttribute('data-file-envoi') }));
-        dit(note.fait.join() === 'attente' && Object.keys(note.ship).join() === '70001' && (etat.ecrits || []).length === nAvant, 'hors connexion : « Déposé » noté (en attente d\'envoi), UNE marque pour la 70001, rien parti', JSON.stringify({ ...note, envois: (etat.ecrits || []).length - nAvant }));
-        etat.hors = false; await ctx.setOffline(false);
-        let parti = null;
-        for (let i = 0; i < 40 && !parti; i++) { await pg.waitForTimeout(500); parti = (etat.ecrits || []).slice(nAvant).find((x) => /vinted_ship_done/.test(x.corps) && /70001/.test(x.corps)); }
-        let ship = null; try { const c = JSON.parse(parti ? parti.corps : 'null'); const rows = Array.isArray(c) ? c : [c]; for (const row of rows) { const d = row && (row.data || row); if (d && d.vinted_ship_done) ship = d.vinted_ship_done; } } catch (_) {}
-        dit(!!parti && ship && Object.keys(ship).join() === '70001', 'le réseau revient : la marque « Déposé » part, une fois, pour la seule 70001', parti ? JSON.stringify(ship) : 'rien envoyé');
         dit(erreurs.length === 0, 'aucune erreur d\'app (E)', erreurs.join(' | '));
         await ctx.close();
       });

@@ -933,7 +933,6 @@ import "./styles-preparer-relais.css";
 import ModeRelais from "./ModeRelais.jsx";
 // (10 nov., lots AU/AY) Le mode « dépôt » — pas paresseux : il s'ouvre sans réseau.
 import ModeDepot from "./ModeDepot.jsx";
-import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
@@ -20655,6 +20654,9 @@ function portailSiV2(si, el) {
 }
 // (19 nov., « VRM natif », docs/design/NATIF.md) Ventes est l'écran natif (src/natif/ecrans/Ventes.jsx) pour tout le monde.
 const VENTES_NATIF = true;
+// (20 nov., chasse-bugs-2) Décision « 4 oui » du 19 nov. : plus aucun geste « Je dépose / Déposé » pour une VENTE (le dépôt est
+// constaté par le suivi du transporteur). Les marques notées AVANT (`vinted_ship_done`, `vinted_bords_shipped`) restent lues.
+const TOURNEE_DEPOT_RETIREE = true;
 // « Générer le bordereau » : le bouton d'avant (il commande l'extension, dit ce qui l'empêche) dans le détail d'une vente.
 function BoutonGenererNatif(p) { return <BoutonBordereau grand aGenerer pdf={false} {...p}/>; }
 function CacheSiV2({ si, children }) {
@@ -22700,7 +22702,6 @@ function JourneeHorsLigne({ uid, tab }) {
   const [enGrand, setEnGrand] = React.useState(null);
   // (10 nov., lots AU/AY) Le mode « dépôt » et le mode relais SANS réseau : la photo gardée sur CET appareil
   // pour CE compte (datée « vue à hh:mm »), les gestes de toujours (« Déposé » ⇒ file d'envoi).
-  const [depotHL, setDepotHL] = React.useState(false);
   const [relaisHL, setRelaisHL] = React.useState(false);
   const colis = ONGLETS_COLIS_HL.includes(tab);
   const pdfs = usePdfsHorsLigne(uid, photo ? photo.envoyer : []);
@@ -22739,14 +22740,10 @@ function JourneeHorsLigne({ uid, tab }) {
     if (j === 1) return 'à poster demain au plus tard';
     return 'à poster avant le ' + new Date(e.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
   };
-  const colisDepotHL = colisDepotHorsLigne(photo);
-  const etatDepotHL = (c) => { const ef = c && c.tx ? gestes.etatFait({ tx: c.tx }) : ''; return ef === 'attente' ? 'attente' : ef === 'note' ? 'fait' : ''; };
   const blocEnvoyer = (<>
     {tete(tr('journee.deposer'), photo.nEnvoyer)}
-    {colisDepotHL.some((c) => c.peutFaire) ? <div className="vrm-pas-a-pas-rangee" data-depot-rangee="hors-ligne"><Bouton variante="secondaire" icone="scan" data-depot-ouvrir="hors-ligne" onClick={() => setDepotHL(true)} style={{ minHeight: 44 }}>{tr('journee.jeDepose')}</Bouton></div> : null}
-    {depotHL ? <ModeDepot horsLigne vueA={photo.at} colis={colisDepotHL} etatDe={etatDepotHL}
-      onDeposer={(c) => { if (c && c.tx && !etatDepotHL(c)) gestes.faire({ tx: c.tx }, true); }} onAnnuler={(c) => { if (c && c.tx) gestes.faire({ tx: c.tx }, false); }}
-      onFermer={() => setDepotHL(false)} Retour={FermeAuRetour} Icon={Icon} zIndex={Z_CONFIRMATION - 4}/> : null}
+    {/* (20 nov., chasse-bugs-2 — décision « 4 oui » du 19 nov.) Plus de « Je dépose » ni de « Déposé » : le dépôt est constaté par le
+        suivi du transporteur. Une marque « Déposé » notée AVANT reste lue (« Noté déposé »), sans geste pour la refaire. */}
     <div data-hl-envoyer={photo.nEnvoyer} style={carte}>
       {photo.envoyer.length === 0
         ? <div style={{fontSize:13,color:C.muted,padding:'10px 0'}}>{trj('journee.aucunColisEnvoyer3', { quand: quand })}</div>
@@ -22759,7 +22756,7 @@ function JourneeHorsLigne({ uid, tab }) {
             {e.tx && Array.isArray(e.pdf) && e.pdf.length ? (pdfs[e.tx]
               ? <a className="vrm-b vrm-b-secondaire vrm-b-petit" data-hl-pdf={e.tx} href={pdfs[e.tx]} target="_blank" rel="noopener" download={`bordereau${e.numero ? '-N' + e.numero : ''}.pdf`} style={{flexShrink:0}}>{tr('journee.bordereau')}</a>
               : (pdfs[e.tx] === '' ? <span data-hl-pdf-absent={e.tx} style={{fontSize:12,color:C.muted,flexShrink:0}}>{tr('journee.bordereauGardeIci')}</span> : null)) : null}
-            <GesteHorsLigne etat={ef} libelle="Déposé" fait="Noté déposé" peut={!!e.tx} onOui={() => gestes.faire(e, true)} onNon={() => gestes.faire(e, false)} attrs={{ 'data-hl-fait-btn': '' }}/>
+            {ef ? <span data-hl-fait-lu={ef} style={{fontSize:12,fontWeight:600,color:C.text}}>Noté déposé{ef === 'attente' ? ' · part au retour du réseau' : ''}</span> : null}
             {!e.tx ? <span data-hl-sans-geste="" style={{flexBasis:'100%',fontSize:12,color:C.muted}}>{e.plateforme === 'ebay' ? tr('journee.ebayDepotSuit') : tr('journee.colisGardeSans')}</span> : null}
           </div>); })}
       {photo.nEnvoyer > photo.envoyer.length && <div style={{fontSize:12,color:C.muted,padding:'6px 0 10px'}}>{trj('annonces.autres2', { x: photo.nEnvoyer - photo.envoyer.length })}</div>}
@@ -39785,7 +39782,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     let pretsMemo = null;
     const prets = () => pretsMemo || (pretsMemo = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle))));
     const peutImprimer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets().has(String(o.transaction_id)) ? true : 'pas de bordereau prêt';
-    const peutDeposer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true;
     return [
       // (17 nov., nouveau design) `plein` : le libellé du bouton plein de la barre (le nombre = cochées ET imprimables = imprimées) ;
       // `raisonZero` : ce que dit le menu « ⋯ » quand rien de la sélection ne s'y prête.
@@ -39795,18 +39791,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
         return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
       } },
-      { k: 'depose', libelle: 'Je dépose', icone: 'check', plein: (n) => tr('v2s.deposer', { n }), raisonZero: tr('v2s.zero.deposer'), portee: (cles) => portee(lignes(cles), peutDeposer), faire: (cles) => {
-        // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
-        const { ok, pasFaits } = trierSerie(lignes(cles), peutDeposer);
-        const ops = [];
-        for (const o of ok) {
-          const k = String(o.transaction_id), b = bordsParTxn[k], kb = b ? bordKey(b) : null;
-          if (!shipDone[k]) ops.push({ k: 'vinted_ship_done', type: 'cle', id: k, apres: Date.now(), avant: shipDone[k] });
-          if (kb) ops.push({ k: 'vinted_bords_shipped', type: 'cle', id: kb, apres: 1, avant: bordsShipped[kb] });
-        }
-        if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops, { vinted_ship_done: setShipDone, vinted_bords_shipped: setBordsShipped }, null, 'colis.depose');
-        return resumeSerie({ faits: ok, pasFaits }, { un: 'déposée', plusieurs: 'déposées' });
-      } },
+      // (20 nov., chasse-bugs-2 — décision « 4 oui ») « Je dépose » en série retiré : le dépôt est constaté par le suivi du transporteur.
       { k: 'exporter', libelle: 'Exporter', icone: 'doc', faire: (cles) => {
         const L = lignes(cles);
         const csv = csvDe(['Date', 'Compte', 'Article', 'N°', 'Prix (€)', 'État', 'N° de transaction'],
@@ -48839,7 +48824,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
           }) : null,
           facture: !!(pdf && inv),
-          depose: () => gesteColisFait(o, b, !posted),
+          depose: null,   // (20 nov., chasse-bugs-2 — décision « 4 oui ») plus de « Marquer déposé » : le suivi du transporteur le constate
           marquerImprime: b ? () => toggleBordPrinted(b) : null, imprimeMarque: !!(b && isBordPrinted(b)),
           jaiLePdf: !pdf ? () => startBordereau(num, titre, acc, o && o.transaction_id) : null,
           generer: !pdf && o && o.transaction_id != null ? { uid: acc && acc.vinted_user_id, tx: String(o.transaction_id), conv: o.conversation_id, login: accNameOf(acc), onFait: (u) => rechargerLabels(u) } : null,
@@ -52507,7 +52492,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             const deposeIci = !!(deposeVente.attente && deposeVente.attente.cle === txL);
             // (6 nov.) Une vente vue par e-mail, pas encore relue sur Vinted : aucun geste d'envoi
             // ici (ni « Déposé », ni bordereau) tant que Vinted n'a pas rendu son état.
-            const peutDeposer = !o._venteEmail && !hidden && st!=='cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id!=null;
+            const aDeposerVente = !o._venteEmail && !hidden && st!=='cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id!=null;
+            // (20 nov., chasse-bugs-2 — décision « 4 oui » du 19 nov.) Aucun geste « Déposé » : le dépôt est constaté par le suivi du
+            // transporteur. `aDeposerVente` dit encore l'étape (« À déposer · à faire ») ; aucun bouton, aucun balayage ne la coche.
+            const peutDeposer = false;
             // (8 nov., « restes ventes ») La note « vue par e-mail » de ce compte est dite en tête (§7).
             const emailEnTete = !!(o._venteEmail && o._acc && ventesEmailTete.has(String(o._acc.vinted_user_id || '')));
             const libDepose = num ? `N°${num}` : (o.title || '');
@@ -52532,7 +52520,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             // étapes) et la ligne (quatre segments, `friseVenteFusion`) passent par la
             // MÊME `friseVente` — une règle, deux formes.
             const preuvesFrise = preuvesFriseDe(o);
-            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer, verification: preuvesFrise.verification }) : null;
+            const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: aDeposerVente, verification: preuvesFrise.verification }) : null;
             // Le transporteur : la règle de la pastille (`transporteurVente` → `transporteurDuColis`), la même que le tiroir.
             const fuTransp = transporteurVente(preuvesFrise.bordE, txL);
             const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
@@ -52719,8 +52707,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               /* (11 nov., gestes-glisser) Glisser vers la gauche : « Déposé » (principale, le glisser long) et
                  « Imprimer » quand le PDF est là — les MÊMES fonctions que les boutons de la ligne
                  (`demanderDepose` et sa barre « Annuler » 5 s ; `imprimerBordereauVente`). */
-              <LigneGlissable actif={peutDeposer && !deposeIci} cle={txL} libelle={libDepose || 'vente'} actions={[
-                { cle: 'depose', libelle: tr('ventes.depose'), icone: <Icon name="check" size={18}/>, faire: ()=>demanderDepose(txL, o, libDepose), data: { 'data-lg-depose': txL } },
+              <LigneGlissable actif={aDeposerVente && !deposeIci} cle={txL} libelle={libDepose || 'vente'} actions={[
                 fuPdf ? { cle: 'imprimer', libelle: tr('ventes.imprimer'), icone: <Icon name="printer" size={18}/>, faire: ()=>imprimerBordereauVente(o), data: { 'data-lg-imprimer': txL } } : null,
               ]}>{(gp, tiroirG) => (
               // Ligne de vente dans la liste groupée (filet fin entre les lignes,
@@ -52737,7 +52724,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
                   </div> : null}
                   {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
-                </> : peutDeposer ? <>
+                </> : aDeposerVente ? <>
                   {/* (2 nov., 22 h 30) Une vente à expédier porte TOUJOURS la rangée de la maquette : la puce du
                       transporteur et le bouton bordereau (« Imprimer le bordereau » si le PDF est là, sinon
                       « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
@@ -52747,7 +52734,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
-                </> : gesteRemise} basSeul={!peutDeposer && !!gesteRemise} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !estParti(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
+                </> : gesteRemise} basSeul={!aDeposerVente && !!gesteRemise} gestes={gesteCout ? <div className="vrm-gestes-pile">{gesteCout}</div> : null} compte={o._acc ? (accNameOf(o._acc) || null) : null} sous={o.date?dateFr(o.date, {day:'numeric',month:'short'}):''} etat={motEtatVente(venteStage(o).label)} ton={st!=='cancelled' && aExpedier(o) && !estParti(o) ? 'action' : (st==='cancelled' ? 'annule' : '')} montant={montant(sell, { devise: o.price?.currency_code || 'EUR' })} className="vrm-sale-row" key={o.transaction_id} data-tx={String(o.transaction_id)} data-cible={attrCible(['vente',String(o.transaction_id)])} style={{borderTop:i>0?`1px solid ${C.border}`:'none',opacity:hidden?0.5:(st==='cancelled'&&!annChez?0.6:1),padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,...(estFloute(o)?STYLE_FLOU:null),...(gp.style||{})}}>
               </LigneVenteCompacte>
               )}</LigneGlissable>
             );
@@ -56783,8 +56770,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
                       // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
-                      format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot, preparer: () => setPreparerOuvert(true), deposer: () => setDepotOuvert(true),
-                      tournee: () => setTourneeDepot(true), emballer: () => setEmballage(true), scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
+                      format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot, preparer: () => setPreparerOuvert(true),
+                      emballer: () => setEmballage(true), scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
                   // rendues pour Ventes (leurs blocs rendent `null`) ; les feuilles (papier, impression, scanner, préparer…) restent.
                   if (VENTES_NATIF) {
@@ -56824,8 +56811,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                               resLot.total > 0 ? { k: 'choisir', icon: 'check', lab: resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('v2v.outils.choisir'), on: ouvrirLot, attrs: { 'data-lot-ouvrir': '1' } } : null,
                               resLot.total > 0 || Lret.length > 0 ? { k: 'papier', icon: 'printer', lab: tr('vv.format'), val: tr(`impr.format.${formatLot}`), on: () => setChoixPapier({ puis: null }), attrs: { 'data-impr-format': formatLot } } : null,
                               (nEnv || 0) > 0 ? { k: 'preparer', icon: 'box', lab: tr('v2v.outils.preparer'), on: () => setPreparerOuvert(true) } : null,
-                              (nEnv || 0) > 0 ? { k: 'deposer', icon: 'scan', lab: tr('v2v.outils.deposer'), on: () => setDepotOuvert(true) } : null,
-                              (nEnv || 0) > 0 ? { k: 'tournee', icon: 'pin', lab: tr('v2v.outils.tournee'), on: () => setTourneeDepot(true) } : null,
+                              // (20 nov., chasse-bugs-2 — décision « 4 oui ») « Je dépose » et la tournée retirés : le dépôt est constaté par le suivi.
                               nPrets > 0 ? { k: 'emballer', icon: 'box', lab: tr('v2v.outils.emballer'), on: () => setEmballage(true) } : null,
                               { k: 'scanner', icon: 'scan', lab: tr('sv.scanner.envoi'), on: () => setScanOuvert('envoi') },
                               tuilesTete ? { k: 'tous', icon: 'filter', lab: outilsColis ? tr('vv.outils.filtresMasquer') : tr('vv.outils.filtres'), on: () => setOutilsColis((v) => !v) } : null,
@@ -56983,8 +56969,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {onglet === 'envoyer' && (nEnv || 0) > 0 ? (<VersAFaire>
               <div className="vrm-pas-a-pas-rangee" data-preparer-rangee="">
                 <Bouton variante="secondaire" icone="box" data-preparer-ouvrir={nEnv} onClick={() => setPreparerOuvert(true)} style={{ minHeight: 44 }}>Préparer mes colis</Bouton>
-                {/* (10 nov., lot AU) Au point relais : les colis à déposer, scannés un à un. */}
-                <Bouton variante="secondaire" icone="scan" data-depot-ouvrir={nEnv} onClick={() => setDepotOuvert(true)} style={{ minHeight: 44 }}>Je dépose</Bouton>
               </div></VersAFaire>) : null}
             {onglet === 'envoyer' && nPretsVue > 0 && (
               <div className="vrm-colis-outils" data-cc-colonne="prets">
@@ -57619,7 +57603,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const nDeposablesT = tourneeItems.filter((t) => t.pret && t.site !== 'ebay').length;
                 const faitsT = deposesAujT + (enAttenteT && tourneeItems.some((t) => t.cle === enAttenteT) ? 1 : 0);
                 const totalT = deposesAujT + nDeposablesT;
-                const tourneeEl = (tourneeItems.length || tourneeDepot) ? (
+                // (20 nov., chasse-bugs-2 — décision « 4 oui ») La tournée de dépôt (« Marquer ce colis déposé ») n'est plus montrée.
+                const tourneeEl = TOURNEE_DEPOT_RETIREE ? null : (tourneeItems.length || tourneeDepot) ? (
                   <div key="__tournee" className="vrm-tournee-tete" >
                     {tourneeItems.length ? <VersAFaire><span style={{display:'inline-flex',alignItems:'center',gap:2}}><Bouton variante="secondaire" icone="pin" data-tournee-ouvrir={tourneeItems.length} onClick={() => setTourneeDepot(true)}>Préparer la tournée de dépôt</Bouton>
                       {/* (8 nov., clarté) Ce que fait la tournée, pour qui la découvre : deux phrases derrière « ⓘ ». */}
@@ -57864,14 +57849,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 if (identC === cleVolet) voletSel = { ident: identC, site: 'vinted', titre, num, double: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))), photo: typeof ph === 'string' ? ph : null,
                   sous: [tailleC ? tr('vv.taille', { t: tailleC }) : '', compteC].filter(Boolean).join(' · '), bloc: blocVente(),
                   gestes: [pdf ? { cle: 'imprimer', icone: 'printer', libelle: tr('vv.volet.imprimer'), onClick: () => { try { const bt = document.querySelector(`[data-vv-rang="${CSS.escape(identC)}"] button[data-imprime="1"]`); if (bt) bt.click(); } catch (_) {} } } : null,
-                    { cle: 'depose', icone: 'check', libelle: posted ? tr('vv.volet.pasDepose') : tr('ventes.depose'), onClick: () => gesteColisFait(o, b, !posted) },
                     b && b.suivi ? { cle: 'suivre', icone: 'truck', libelle: tr('vv.volet.suivre'), href: trackUrl(trV.cle || '', b.suivi) } : null].filter(Boolean) };
                 // (2 nov.) Toujours l'intertitre (« Prêts à imprimer », « En attente du
                 // bordereau ») : le résumé en colonnes qui les nommait est retiré.
                 return (
                   <React.Fragment key={e.key}>
                   {ouvreSansDate}
-                  <div data-vv-rang={enVentes ? identC : undefined} data-vv-choisie={identC === cleVolet ? '1' : undefined} data-vv-bordereau={enVentes ? etatBordC : undefined} hidden={cacheC || undefined} data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} {...flColis} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
+                  <div data-vv-rang={enVentes ? identC : undefined} data-vv-choisie={identC === cleVolet ? '1' : undefined} data-vv-bordereau={enVentes ? etatBordC : undefined} hidden={cacheC || undefined} data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: false, onFait: () => {} })} {...flColis} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
                     <div className="vv-rang-l" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
                       {caseDe(e.txn || e.key, titre)}
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -58066,13 +58050,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:isBordPrinted(b)?C.bg:'transparent',color:isBordPrinted(b)?C.text:C.muted}}>
                         {isBordPrinted(b)?'✓ Imprimé':'Marquer imprimé'}
                       </button>}
-                      {/* « Colis fait » marque LES DEUX (la vente et le bordereau) :
-                          deux marqueurs pour un même carton, c'était deux chiffres
-                          qui divergeaient. */}
-                      <button type="button" onClick={()=>gesteColisFait(o, b, !posted)} title={posted?'Le colis est encore chez toi : il revient dans « À envoyer »':'Marquer déposé : il passe dans « Envoyés »'} data-geste="fait"
-                        className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:posted?C.bg:'transparent',color:posted?C.text:C.muted}}>
-                        {posted?'Pas encore déposé':'Déposé'}
-                      </button>
+                      {/* (20 nov., chasse-bugs-2 — décision « 4 oui ») « Déposé » retiré : le dépôt est constaté par le suivi du transporteur. */}
                       {b && <button type="button" onClick={()=>hideBord(b)} title={tr('sv.masquer.titre')} data-geste="masquer"
                         className="vrm-colis-sec vrm-colis-ter vrm-colis-masquer-geste" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>{tr('sv.masquer')}</button>}
                       {b && b.suivi && <a href={trackUrl(trV.cle||'', b.suivi)} target="_blank" rel="noreferrer" title={`Suivre le colis n°${b.suivi}`} data-geste="suivre" className="vrm-colis-sec vrm-colis-ter" style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,textDecoration:'none',display:'inline-flex',alignItems:'center'}}><Icon name="truck" size={13} style={{marginRight:5}}/>Suivre</a>}
