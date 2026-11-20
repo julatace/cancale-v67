@@ -46,3 +46,13 @@ html body .vrm-bandeau-abo-geste { min-width: 44px !important; justify-content: 
 html body [data-lbc-colis-natif] { padding-top: 4px; }   /* comme `.n-page-contenu` de Ventes · Vinted */
 html body [data-lbc-colis-natif] > .n-segmente { margin: 0 var(--n-marge, 16px) 16px; }
 }
+
+/* (20 nov., intégration 5.410 — planche sélecteur × onglets) Argent au téléphone : « Statistiques » était coupé
+   (« Statistiq… ») dans le segmenté à quatre choix. Le choix actif garde le même poids que les autres et l'écart des
+   lettres se resserre à peine : les quatre mots tiennent en 390 px. */
+@layer vrm-natif {
+  @media (max-width: 430px) {
+    .n-arg-nav .n-segmente-choix { padding: 0 3px; letter-spacing: -0.01em; }
+    .n-arg-nav .n-segmente-choix[aria-checked="true"] { font: var(--n-t-second); font-weight: 600; letter-spacing: -0.015em; }
+  }
+}

@@ -21,6 +21,13 @@
     .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) :is(.n-site-logo, .n-site-nom) { display: none; }
     .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-court { display: inline; }
   }
+  /* (20 nov., intégration 5.410 — planche 1512) Dans une colonne ÉTROITE à l'ordinateur (liste de Ventes à côté du détail,
+     ~420 px), les noms longs étaient coupés (« Vint… », « Leb… ») : la règle suit la place de la colonne, pas l'écran. */
+  .n-selecteur-site { container-type: inline-size; }
+  @container (max-width: 560px) {
+    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) :is(.n-site-logo, .n-site-nom) { display: none; }
+    .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-court { display: inline; }
+  }
   .n-selecteur-site[data-site-indisponible] .n-selecteur-site-seg { opacity: .45; }
   .n-selecteur-site-raison { margin: 6px 0 0; font: var(--n-t-legende, 13px/18px system-ui); color: var(--n-encre-2); }
 }
