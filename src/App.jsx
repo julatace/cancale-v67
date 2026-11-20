@@ -31900,15 +31900,10 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
 // (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
 // parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
-// (20 nov., iphone-rapide) … et une réponse RÉUSSIE sert encore 15 s aux lecteurs suivants TANT QUE RIEN N'A ÉTÉ ÉCRIT
-// (`generationDonnees`, src/ecransGardes.jsx : une sauvegarde, un signal de l'extension, un retour au premier plan la font
-// monter ⇒ relue). Mesuré (banc iphone-rapide, 4G lente) : 3 balayages de 124 Ko l'un après l'autre en 2 s au démarrage.
-let _capturesEnVol = null, _capturesLues = null;
+let _capturesEnVol = null;
 function lireCapturesDetail() {
-  const qui = AUTH.user?.id || '', gen = generationDonnees();
-  if (_capturesLues && _capturesLues.qui === qui && _capturesLues.gen === gen && Date.now() - _capturesLues.at < 15000) return Promise.resolve(_capturesLues.v);
   if (_capturesEnVol) return _capturesEnVol;
-  _capturesEnVol = lireCapturesDetailUne().then((v) => { if (v) _capturesLues = { qui, gen, at: Date.now(), v }; return v; }).finally(() => { _capturesEnVol = null; });
+  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
   return _capturesEnVol;
 }
 async function lireCapturesDetailUne() {
@@ -32350,9 +32345,7 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    // (20 nov., iphone-rapide) Partagée par `fetchMemo` (60 s, vidée par toute écriture qui peut porter ces lignes) :
-    // 6 lecteurs l'appelaient, 2 balayages de 144 Ko au démarrage.
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true, memo: true });
+    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
@@ -35103,7 +35096,7 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
     // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
     // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
-    _txnMeta = null; _capturesLues = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
   } catch (_) {}
 });
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
