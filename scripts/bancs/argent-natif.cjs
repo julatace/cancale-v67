@@ -17,8 +17,8 @@ require('./_porte-banc.cjs');
 //    S  le style : aucun lien souligné, aucun bouton pleine largeur hors du plein, cartes à filet sans ombre ;
 //       « Les offres » : aucune colonne vide de bout en bout ; un compte sans rien de lu = une ligne grise ;
 //       santé des comptes : des rangées qui se touchent (pas de « Pourquoi ? » souligné) ;
-//    N  LES CHIFFRES NE CHANGENT PAS : la liste triée des montants rendus de chaque segment, et ce que l'écran publie,
-//       sont égaux à ceux du build de référence (`BANC_REFERENCE=f`, écrit par `BANC_JSON=f` sur le build d'avant).
+//    N  LES CHIFFRES NE CHANGENT PAS : chaque nombre porté par un data-* de chaque segment (hors mise en page) est égal
+//       à celui du build de référence (`BANC_REFERENCE=f`, écrit par `BANC_JSON=f` sur le build d'avant).
 //  `SHOTS=dossier` garde les captures (regarde-les). `SEULEMENT_CAPTURES=1` : photographier sans juger.
 //  Un banc ne meurt pas, il rapporte.
 // ════════════════════════════════════════════════════════════════════════════
@@ -83,10 +83,23 @@ const MESURE = () => {
   const deborde = document.documentElement.scrollWidth > W + 1;
   const ombres = [...main.querySelectorAll('[data-arg-carte], .n-carte, .n-groupe-corps')].filter(vu).filter((e) => getComputedStyle(e).boxShadow !== 'none').length;
   const offres = main.querySelector('[data-arg-offres]');
-  const colsVides = offres ? JSON.parse(offres.getAttribute('data-arg-colonnes-vides') || '[]') : null;
+  // Une colonne vide de bout en bout (que des « — » sur les comptes lus) : ce que Julien a vu (« Reçues, Acceptées… vides »).
+  const colsVides = (() => { const t = offres || [...main.querySelectorAll('[role="table"]')].find((x) => x.closest('[data-stats-carte="sv-offres"]')); if (!t) return null;
+    const tete = [...t.querySelectorAll('[role="columnheader"]')].map((h) => h.innerText.trim());
+    const lignes = [...t.querySelectorAll('[role="row"]')].filter((r) => !r.querySelector('[role="columnheader"]') && r.querySelectorAll('[role="cell"]').length === tete.length);
+    if (!lignes.length) return [];
+    return tete.slice(1).filter((_, k) => lignes.every((r) => r.querySelectorAll('[role="cell"]')[k + 1].innerText.trim() === '—')); })();
+  const muets = offres ? offres.querySelectorAll('[data-arg-rien-lu]').length : 0;
   const sante = main.querySelectorAll('[data-arg-sante-rangee]').length;
   const pourquoi = [...main.querySelectorAll('a, button')].filter(vu).filter((e) => /^Pourquoi/.test(e.innerText.trim())).length;
-  return { tete: !!tete, grandVu, pleins: pleins.length, soulignes, largeurs, coupes: [...new Set(coupes)].slice(0, 12), deborde, ombres, colsVides, sante, pourquoi, montants: montants.slice().sort(), haut: main.scrollHeight };
+  // LES CHIFFRES PORTÉS (les nombres des data-*, jamais un libellé) : le même relevé avant et après. Écartés : ce qui
+  // dépend de la MISE EN PAGE (combien de rangées sont montrées, la barre choisie, les attributs neufs `data-arg-*`, `data-n-*`)
+  // et les rangées de versements (8 montrées au lieu de 30 : leur NOMBRE est porté par `data-v2-argent-versements`).
+  const MISE_EN_PAGE = /^data-(arg-|n-|rev-lignes|v2-argent-faits|v2-argent-barre-v|v2-argent-versement$|v2-bande|v2-dernieres|sc-lus|qr-liste|photos-perdues|ms-rang)/;
+  const chiffres = [];
+  for (const e of main.querySelectorAll('*')) { if (e.closest('[data-v2-argent-versement]')) continue;
+    for (const a of e.attributes) if (a.name.startsWith('data-') && !MISE_EN_PAGE.test(a.name) && /^-?\d+(?:[.,]\d+)?$/.test(a.value) && !(Number(a.value) > 1.6e12 && Number(a.value) < 2.2e12)) chiffres.push(a.name + '=' + a.value); }
+  return { chiffres: [...new Set(chiffres)].sort(), tete: !!tete, grandVu, pleins: pleins.length, soulignes, largeurs, coupes: [...new Set(coupes)].slice(0, 12), deborde, ombres, colsVides, sante, pourquoi, montants: montants.slice().sort(), haut: main.scrollHeight };
 };
 // Petites cibles au doigt (les éléments touchables visibles).
 const CIBLES = () => { const main = document.querySelector('.vrm-main'); const out = [];
@@ -123,7 +136,7 @@ async function unSegment(nav, nomBase, b, taille, sombre, seg) {
       await pg.screenshot({ path: path.join(SHOTS, `${nomBase}-${taille}-${sombre ? 'sombre' : 'clair'}-${seg}-${k}.png`) }); if (y < k * (hv - 160) - 10) break; }
     await defile(pg, 0); await pg.waitForTimeout(300);
     if (!m) { dit(false, `${ou} : l'écran est rendu`); return; }
-    (releve[nomBase] = releve[nomBase] || {})[seg] = releve[nomBase][seg] || m.montants;
+    (releve[nomBase] = releve[nomBase] || {})[seg] = releve[nomBase][seg] || m.chiffres;
     if (tel && seg !== 'invoices') dit(m.grandVu, `G ${ou} : le grand titre « Argent » est visible en haut`);
     dit(m.pleins <= 1, `P ${ou} : au plus un bouton plein (${m.pleins})`);
     dit(!m.soulignes.length, `S ${ou} : aucun lien souligné`, m.soulignes);
@@ -138,8 +151,9 @@ async function unSegment(nav, nomBase, b, taille, sombre, seg) {
     dit(!ct.length, `C ${ou} : contraste ≥ 4,5:1`, ct);
     dit(!erreurs.length, `${ou} : aucune erreur JS`, erreurs);
     if (REF && REF[nomBase] && REF[nomBase][seg] && taille === '1512' && !sombre) {
-      const a = REF[nomBase][seg].join('|'), n = m.montants.join('|');
-      dit(a === n, `N ${ou} : les montants rendus sont les mêmes qu'avant (${m.montants.length})`, a === n ? '' : { avant: REF[nomBase][seg].filter((x) => !m.montants.includes(x)), apres: m.montants.filter((x) => !REF[nomBase][seg].includes(x)) });
+      const avant = REF[nomBase][seg], apres = m.chiffres;
+      const manquent = avant.filter((x) => !apres.includes(x)), neufs = apres.filter((x) => !avant.includes(x));
+      dit(!manquent.length && !neufs.length, `N ${ou} : chaque chiffre porté (data-*) est le même qu'avant (${avant.length})`, { manquent: manquent.slice(0, 20), neufs: neufs.slice(0, 20) });
     }
   } catch (e) { dit(false, `${ou} : le contrôle est allé au bout`, String(e && e.stack || e).slice(0, 500)); }
   await ctx.close();
