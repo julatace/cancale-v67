@@ -1038,6 +1038,17 @@
     .au6-retour { display: inline-flex !important; }
     .sec6, .au6-t, .pied6 { padding-left: 16px; padding-right: 16px; }
   }
+  /* 5.410.5 — une vérification de Vinted AFFICHÉE sur la page : le panneau s'écarte en une pastille, en HAUT, petite,
+     qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
+  .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-radius: 14px; cursor: pointer; pointer-events: auto;
+    background: #FFF4DD; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
+  .verif6[hidden] { display: none !important; }
+  .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
+  .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
+  .verif6[data-verif="faite"] .pv { background: #0068D6; }
+  @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
+  :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -1072,18 +1083,7 @@
   .carte, .carte.on { position: static; display: block; width: auto; max-height: none; overflow: visible; background: transparent; border: 0;
     box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-radius: 0; }
   .connexion, .carte > .connexion { margin: 0; border: 0; border-top: 0; padding: 0 0 2px; border-radius: 0; background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .carte.on { animation: none; }
-  /* 5.410.5 — une vérification de Vinted AFFICHÉE sur la page : le panneau s'écarte en une pastille, en HAUT, petite,
-     qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
-  .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
-    display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-radius: 14px; cursor: pointer; pointer-events: auto;
-    background: #FFF4DD; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
-  .verif6[hidden] { display: none !important; }
-  .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
-  .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
-  .verif6[data-verif="faite"] .pv { background: #0068D6; }
-  @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
-  :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }`;
+  .carte.on { animation: none; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
     // Le cadre part (navigation, quelle qu'elle soit) : la carte le cache AVANT
@@ -4430,7 +4430,9 @@
     const poserV = (e) => {
       etatV = e;
       if (!e) { pastilleV.hidden = true; hote.removeAttribute('data-verif-replie'); pastilleV.removeAttribute('data-verif'); return; }
-      const t = e === 'page' ? TU('a_verif_page') : TU('a_verif_faite_q');
+      // Le bandeau de l'écran d'action dit déjà la phrase ? La pastille ne la redit pas (une phrase, une fois) : « Ouvrir VRM ».
+      let bandeau = false; try { const a = document.getElementById('vrm-action'); bandeau = !!(a && a.style.display !== 'none' && a.hasAttribute('data-cote-bas')); } catch (_) {}
+      const t = e === 'page' ? (bandeau ? TU('a_ouvrir_vrm') : TU('a_verif_page')) : TU('a_verif_faite_q');
       pastilleV.replaceChildren(); const pv = document.createElement('span'); pv.className = 'pv'; pv.setAttribute('aria-hidden', 'true'); const tx = document.createElement('span'); tx.textContent = t; pastilleV.append(pv, tx);
       pastilleV.setAttribute('data-verif', e); pastilleV.setAttribute('aria-label', t + ' · ' + TU('a_ouvrir_vrm'));
       pastilleV.hidden = false; hote.setAttribute('data-verif-replie', e); placerV();
@@ -4438,7 +4440,7 @@
     const regarderV = () => {
       minuteV = null;
       const la = verifPresente();
-      if (la) { if (!ouvertMalgre && etatV !== 'page') poserV('page'); else if (etatV === 'page') placerV(); }
+      if (la) { if (!ouvertMalgre && etatV !== 'page') poserV('page'); else if (etatV === 'page') poserV('page'); }
       else if (etatV === 'page') poserV('faite');                 // disparue : on le DIT, on ne relance rien
       else if (ouvertMalgre && !la) ouvertMalgre = false;          // une prochaine vérification repliera à nouveau
     };
@@ -4448,7 +4450,7 @@
       poserV('');
       try { doigt = true; carte.classList.add('on'); rendre(); } catch (_) {}
     });
-    try { new MutationObserver(bientotV).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'id'] }); } catch (_) {}
+    try { new MutationObserver(bientotV).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'id', 'data-cote-bas'] }); } catch (_) {}
     window.addEventListener('resize', () => { if (etatV) placerV(); });
     setTimeout(regarderV, 300);
     globalThis.__vrmBadgeVerif = () => ({ etat: etatV, replie: hote.hasAttribute('data-verif-replie') });   // pour les bancs (lecture seule)
