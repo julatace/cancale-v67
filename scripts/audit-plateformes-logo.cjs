@@ -163,7 +163,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const hote = (() => { const a = APP.indexOf('function HotePublierAilleurs('); const b = APP.indexOf('\nfunction EntreePublierAilleurs(', a); return a < 0 || b < 0 ? '' : APP.slice(a, b); })();
   dit(!!hote && !/vmrCmd|appelEbay|fetch\([^)]*\/api\//.test(PAsrc + hote), 'B18 le parcours n’envoie rien : ni commande à l’extension, ni appel eBay (les moteurs existants publient)');
   dit(!/AgentEbay|agentEbay|ebay\.agent|autoPub/.test(PAsrc + hote), 'B19 l’agent eBay n’est pas réintroduit');
-  dit(/DEMANDE_LBC_FICHE\.id = id/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote) && /DEMANDE_VC_PAIRE\.id = id/.test(hote), 'B20 « Publier » ouvre le moteur existant sur CET article (fiche Leboncoin, formulaire eBay, ligne Vestiaire)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire : le panneau de l'extension sur CET article ; eBay : son formulaire.
+  dit(/if \(sx === 'leboncoin' \|\| sx === 'vestiaire'\) \{ ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\)/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote), 'B20 « Publier » : Leboncoin / Vestiaire dans l’extension sur CET article, eBay dans son formulaire');
 
   // ── C. Relier un achat : les filtres ──
   const A = [
@@ -189,7 +190,9 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(rangees === 0, 'D1 plus aucune rangée de sites écrite à la main : toutes passent par SelecteurSites', String(rangees));
   // (11 nov., lot DJ3) Colis n'est plus un onglet : la rangée « Colis · Leboncoin » est remplacée par le filtre de Ventes
   // (un seul filtre en haut) ; reste celle de l'écran Colis seul. Même règle : un seul composant de sélecteur.
-  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 2 && /return <SelecteurSites id=\{tache\}/.test(APP) && !/<select\b[^>]*data-site/.test(APP), 'D2 Annonces, Ventes, Achats, Messages (FiltreSites) et Colis : le même sélecteur');
+  // (20 nov., décision du sélecteur de plateforme global) `FiltreSites` est retiré : Annonces, Ventes, Achats, Messages et
+  // Aujourd'hui portent LE sélecteur global (`SelecteurSiteCoque` ⇒ src/natif/SelecteurSite.jsx) ; l'écran Colis seul garde SelecteurSites.
+  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 1 && /function SelecteurSiteCoque\(/.test(APP) && (APP.match(/<SelecteurSiteCoque\/>/g) || []).length >= 2 && !/function FiltreSites\(/.test(APP) && !/<select\b[^>]*data-site/.test(APP), 'D2 un seul sélecteur de plateforme (global) en tête des écrans principaux ; plus de FiltreSites');
   dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte="">· <CompteVente compte=\{compte\}/.test(APP) && /<CompteVente compte=\{compte\} plateforme=\{plateforme\} ou="ligne"\/>/.test(APP) && /Vendue sur <CompteVente compte=\{compte\}/.test(APP), 'D3 la ligne de vente porte le compte (repliée, carte Fusion, détail), écrit par UN composant (`CompteVente`)');
   dit(/sous=\{sous\} compte=\{compte\} ton=\{ton\} montant=\{(?:lbcEuro|montant)\(/.test(APP) && /compte: compteVenteLbc\(o, itemsLbc, annLbc\)/.test(APP), 'D4 Leboncoin : le compte de la transaction (ou de SON annonce), par identité');
   dit(/compte=\{compteVenteEbay\(o, comptesEbay\)\}/.test(APP) && /const ref = identiteCompteVente\('ebay', o\);/.test(APP), 'D5 eBay : le compte de la ligne de commandes (identité de src/plateformes.js)');

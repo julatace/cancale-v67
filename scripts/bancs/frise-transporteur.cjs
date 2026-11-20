@@ -4,7 +4,7 @@ require('./_porte-banc.cjs');
 //  progression avance pas ». Règle : src/friseTransporteur.js (« le transporteur tranche », une preuve jamais retirée,
 //  « Validé » à Vinted seul). Base INVENTÉE : une vente que Vinted dit « en cours d'acheminement », son bordereau (n° de
 //  suivi), et la ligne du transporteur (`depart_…`) qui dit « livré au relais de l'acheteur » il y a 2 jours.
-//  Mesure, sur l'écran RENDU, dans les DEUX designs (Ventes → En route) :
+//  Mesure, sur l'écran RENDU (Ventes → En route ; depuis le 20 nov. la fiche native, `data-vn-*`) :
 //    · éteint : les quatre étapes (`data-vv-etapes`) ont « Livré » fait, « Validé » pas fait ; la phrase du transporteur
 //      sous la frise dit « Livré au relais » (la même source) ;
 //    · allumé : la rangée est dans « Livrés », sa piste à 3 sur 4 (« Étape 3 sur 4 : Livré »), sa 3e ligne dit
@@ -52,48 +52,28 @@ function baseFrise() {
   try {
     for (const [W, sombre] of [[390, false], [390, true], [1512, false], [1512, true]]) {
       const th = `${W}-${sombre ? 'sombre' : 'clair'}`;
-      // ÉTEINT
-      { const { ctx, pg, erreurs } = await P.ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
-        // « Ancien design » posé ('0') : le nouveau est allumé par défaut depuis le 17 nov. au soir.
-        await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
-        await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '0')); await pg.reload({ waitUntil: 'domcontentloaded' });
-        await attendre(pg, () => !!document.querySelector('[data-ventes-seg-choix="envoyes"]'));
-        await pg.locator('[data-ventes-seg-choix="envoyes"]').first().click({ timeout: 8000 }).catch(() => {});
-        const vu = await attendre(pg, (tx) => !!document.querySelector(`[data-vv-etapes="v:${tx}"]`), 30000, tx);
-        await pg.waitForTimeout(2500);
-        const r = await pg.evaluate((tx) => { const e = document.querySelector(`[data-vv-etapes="v:${tx}"]`); const c = e && e.closest('[data-colis-envoye]');
-          if (c) c.scrollIntoView({ block: 'center' });
-          const f = (k) => (e && e.querySelector(`[data-etape="${k}"]`) || { getAttribute: () => null }).getAttribute('data-fait');
-          return { livre: f('livre'), valide: f('valide'), phrase: c ? /Livré au relais/.test(c.textContent) : null }; }, tx);
-        dit(vu && r.livre === '1' && r.valide === '0', `éteint ${th} : la frise dit « Livré » (le transporteur tranche), « Validé » reste à Vinted`, r);
-        dit(r.phrase === true, `éteint ${th} : la phrase sous la frise dit « Livré au relais » (même source)`, r);
-        await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `frise-eteint-${th}.png`) });
-        dit(!erreurs.length, `éteint ${th} : aucune erreur JS`, erreurs); await ctx.close(); }
-      // ALLUMÉ
-      { const { ctx, pg, erreurs } = await P.ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
-        await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
-        await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
-        await attendre(pg, () => !!document.querySelector('[data-v2v-seg="envoyes"]'));
-        await pg.locator('[data-v2v-seg="envoyes"]').first().click({ timeout: 8000 }).catch(() => {});
-        const vu = await attendre(pg, (tx) => !!document.querySelector(`[data-v2v-ligne="v:${tx}"]`), 30000, tx);
-        await pg.waitForTimeout(2500);
-        const r = await pg.evaluate((tx) => { const l = document.querySelector(`[data-v2v-ligne="v:${tx}"]`); if (l) l.scrollIntoView({ block: 'center' });
-          const p = l && l.querySelector('.v2-piste'); const pistes = [...document.querySelectorAll('[data-v2v-liste="route"] .v2-piste')].map((x) => { const q = x.getBoundingClientRect(); return Math.round(q.width) + 'x' + Math.round(q.height); });
-          const t3 = l && l.querySelector('[data-v2l-l3="etape"]'); const q3 = t3 && t3.getBoundingClientRect();
-          return { groupe: l && l.getAttribute('data-v2v-groupe'), n: p && p.getAttribute('data-v2-piste'), aria: p && p.getAttribute('aria-label'), mot: t3 ? t3.textContent.trim() : '',
-            unique: [...new Set(pistes)], uneLigne: q3 ? q3.height <= 20 && q3.right <= l.getBoundingClientRect().right + 1 && t3.scrollWidth <= t3.clientWidth + 1 : null }; }, tx);
-        dit(vu && r.groupe === 'livre' && r.n === '3' && /3 sur 4/.test(r.aria || ''), `allumé ${th} : la rangée est dans « Livrés », sa piste à 3 sur 4 (« ${r.aria} »)`, r);
-        dit(/Livré au relais/.test(r.mot), `allumé ${th} : à côté de la piste, l'étape en mots et sa date, de la même source que le transporteur (« ${r.mot} »)`, r);
-        // (18 nov.) Aucune rangée ne dit « Livré » à côté d'une piste restée avant « livré » : la phrase et la piste lisent
-        // les mêmes preuves (Vinted : l'état de la commande ET le détail de la transaction ; le transporteur).
-        const contra = await pg.evaluate(() => [...document.querySelectorAll('[data-v2v-liste="route"] [data-v2v-ligne]')].map((l) => {
-          const p = l.querySelector('.v2-piste'); const m = ((l.querySelector('[data-v2l-l3="etape"]') || {}).textContent || '').trim();
-          return { cle: l.getAttribute('data-v2v-ligne'), n: p ? Number(p.getAttribute('data-v2-piste')) : null, m }; })
-          .filter((x) => /\blivr[ée]|retir[ée]/i.test(x.m) && !/non\s+livr/i.test(x.m) && !(x.n >= 3)));
-        dit(!contra.length, `allumé ${th} : aucune rangée ne dit « Livré » à côté d'une piste avant « livré » (${contra.length})`, contra.slice(0, 4));
-        dit(r.unique.length === 1 && r.uneLigne === true, `allumé ${th} : la piste a la même boîte sur chaque rangée (${r.unique.join(', ')}) et tient sur une ligne, dans la rangée`, r);
-        await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `frise-allume-${th}.png`) });
-        dit(!erreurs.length, `allumé ${th} : aucune erreur JS`, erreurs); await ctx.close(); }
+      // (20 nov., chasse-bugs-2) « VRM natif » (19 nov.) est le seul design : Ventes → « En route », la rangée et sa fiche
+      // (src/natif/ecrans/Ventes.jsx : `data-vn-route`, `data-vn-etape` = étapes faites, `data-vn-etapes` / `data-etape`).
+      const { ctx, pg, erreurs } = await P.ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
+      await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+      await attendre(pg, () => [...document.querySelectorAll('button, [role="radio"], [role="tab"]')].some((x) => /^En route/.test((x.textContent || '').trim())));
+      await pg.locator('button, [role="radio"], [role="tab"]').filter({ hasText: /^En route/ }).first().click({ timeout: 8000 }).catch(() => {});
+      const vu = await attendre(pg, (tx) => !!document.querySelector(`[data-vn-route$="${tx}"]`), 30000, tx);
+      await pg.waitForTimeout(1500);
+      const r = await pg.evaluate((tx) => { const l = document.querySelector(`[data-vn-route$="${tx}"]`); if (l) l.scrollIntoView({ block: 'center' });
+        return { n: l && l.getAttribute('data-vn-etape'), texte: l ? l.textContent.replace(/\s+/g, ' ') : '' }; }, tx);
+      dit(vu && r.n === '3' && /Livré/.test(r.texte), `${th} : la rangée « En route » est à « Livré » (3 étapes faites sur 4), le transporteur tranche`, r);
+      // Aucune rangée ne dit « Livré » à côté d'étapes restées avant « livré » (la phrase et les étapes lisent les mêmes preuves).
+      const contra = await pg.evaluate(() => [...document.querySelectorAll('[data-vn-route]')].map((l) => ({ cle: l.getAttribute('data-vn-route'), n: Number(l.getAttribute('data-vn-etape')), t: (l.textContent || '').replace(/\s+/g, ' ') }))
+        .filter((x) => /\bLivr[ée]/.test(x.t) && !/non\s+livr/i.test(x.t) && !(x.n >= 3)));
+      dit(!contra.length, `${th} : aucune rangée ne dit « Livré » à côté d'étapes avant « livré » (${contra.length})`, contra.slice(0, 4));
+      await pg.locator(`[data-vn-route$="${tx}"]`).first().click({ timeout: 6000 }).catch(() => {});
+      const vuF = await attendre(pg, (tx) => !!document.querySelector(`[data-vn-etapes$="${tx}"]`), 15000, tx);
+      const f = await pg.evaluate((tx) => { const e = document.querySelector(`[data-vn-etapes$="${tx}"]`); const g = (k) => (e && e.querySelector(`[data-etape="${k}"]`) || { getAttribute: () => null }).getAttribute('data-fait');
+        return { livre: g('livre'), valide: g('valide'), depose: g('depose') }; }, tx);
+      dit(vuF && f.livre === '1' && f.depose === '1' && f.valide === '0', `${th} : la fiche dit « Livré » (et donc « Déposé »), « Validé » reste à Vinted`, f);
+      await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `frise-natif-${th}.png`) });
+      dit(!erreurs.length, `${th} : aucune erreur JS`, erreurs); await ctx.close();
     }
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1200)); }
   await nav.close(); P.srv.close();

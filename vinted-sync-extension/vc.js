@@ -77,7 +77,10 @@
           titre: String((x && x.titre) || '').slice(0, 120),
           photo: /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String((x && x.photo) || '')) ? String(x.photo).slice(0, 400) : '',
           prix: x && x.prix && isFinite(Number(x.prix.valeur)) ? { valeur: Number(x.prix.valeur), devise: String(x.prix.devise || '').slice(0, 3), cle: String(x.prix.cle || '').slice(0, 60) } : null,
-          statut: String((x && x.statut) || '').slice(0, 40) }));
+          statut: String((x && x.statut) || '').slice(0, 40),
+          // 5.410 : la date de mise en ligne LUE chez Vestiaire (`listingDate`), et les négociations (trois nombres).
+          misEnLigne: /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String((x && x.misEnLigne) || '')) ? String(x.misEnLigne).slice(0, 30) : '',
+          negos: x && x.negos && typeof x.negos === 'object' ? { total: Number.isInteger(x.negos.total) ? x.negos.total : null, enCours: Number.isInteger(x.negos.enCours) ? x.negos.enCours : null, aToi: Number.isInteger(x.negos.aToi) ? x.negos.aToi : null } : null }));
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
         return;
       }

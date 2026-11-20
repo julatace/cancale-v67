@@ -248,56 +248,56 @@ function fond(seed, local0, opts = {}) {
   await essaie('suppression acceptée', async () => {
     const p = page({ reseau: site(200, '{"ok":true}') });
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: versPage(p) });
-    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     await attendre(40);
     dit(r && r.accepte === true && r.etape === 'fait' && r.statut === 200, 'Leboncoin répond 200 ⇒ « fait », avec la réponse telle quelle', JSON.stringify(r));
     dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.action === 'lbcSupprimeAnnonce' && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,compte,from,id' && f.messagesOnglet[0].msg.compte === MON, 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant et le compte attendu (revérifié dans la page)', JSON.stringify(f.messagesOnglet));
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(it.status === 'deleted' && !!it.supprimeeAt && it.supprimeeStatut === 200 && it.statutLbc === 'active' && it.subject === 'Nike shox TL noir', 'l’annonce est notée supprimée (rien n’est effacé de la base : sa fiche reste)', JSON.stringify(it));
     dit((f.local.vrmLbcSuppressions || []).length === 1, 'la suppression compte dans le plafond horaire');
-    const r2 = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r2 = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     dit(r2 && r2.code === 'deja' && f.messagesOnglet.length === 1, 'recliquer sur une annonce déjà notée supprimée ⇒ rien ne repart', JSON.stringify(r2));
   });
   await essaie('suppression refusée', async () => {
     const p = page({ reseau: site(403, '{"error":"forbidden"}') });
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: versPage(p) });
-    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(r && r.etape === 'refuse' && r.statut === 403 && /forbidden/.test(r.reponse) && it.status === 'active' && !it.supprimeeAt, 'Leboncoin refuse (403) ⇒ « pas fait », sa réponse rendue, rien de noté', JSON.stringify(r));
   });
   await essaie('pas de réponse', async () => {
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: () => undefined });
-    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(r && r.etape === 'incertain' && !it.supprimeeAt, 'l’onglet ne répond pas ⇒ « je ne sais pas », jamais « fait »', JSON.stringify(r));
   });
   await essaie('autre compte', async () => {
     const f = fond(baseS(), transport(AUTRE), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
-    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     dit(r && r.accepte === false && r.code === 'autre-compte' && !f.messagesOnglet.length && /Totomondu/.test(r.raison || '') && /ShopAutre/.test(r.raison || ''), 'Leboncoin connecté sur un AUTRE compte ⇒ refusé, rien n’est envoyé, les deux comptes sont nommés', JSON.stringify(r));
   });
   await essaie('lecture ratée, inconnue', async () => {
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
-    const r1 = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: '3111111111', confirme: true });
+    const r1 = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: '3111111111', confirme: true, sansRetour: true });
     const g = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }), pannes: ['lbc_listings'] });
-    const r2 = await g.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r2 = await g.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     dit(r1 && r1.code === 'inconnue' && r2 && r2.code === 'lecture' && !f.messagesOnglet.length && !g.messagesOnglet.length, 'annonce absente de SES annonces, base muette ⇒ refusé, rien n’est envoyé', [r1, r2].map((x) => x && x.code).join(' · '));
   });
   await essaie('une à la fois', async () => {
     const p = page({ reseau: site(200, '{}') });
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: (id, msg) => attendre(80).then(() => p.ordre(msg)) });
-    const [a, b] = await Promise.all([f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true }), f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID })]);
+    const [a, b] = await Promise.all([f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true }), f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID })]);
     dit(f.messagesOnglet.length === 1 && [a, b].some((x) => x && x.code === 'en-cours'), 'une suppression et une pause en même temps ⇒ UNE seule part', JSON.stringify([a && (a.etape || a.code), b && (b.etape || b.code)]));
   });
   await essaie('plafond', async () => {
     const pleins = Array.from({ length: 10 }, (_, i) => Date.now() - i * 60e3);
     const f = fond(baseS(), Object.assign(transport(MON), { vrmLbcSuppressions: pleins }), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
-    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     dit(r && r.code === 'plafond' && !f.messagesOnglet.length, '10 suppressions dans l’heure ⇒ la 11e est refusée, rien n’est envoyé', JSON.stringify(r));
   });
   await essaie('commande et état', async () => {
     const f = fond(baseS(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
-    const r = await f.ctx.executerCommande({ cmd: 'lbcSupprime', id: ID, confirme: true });
+    const r = await f.ctx.executerCommande({ cmd: 'lbcSupprime', id: ID, confirme: true, sansRetour: true });
     const e = await f.ctx.etatPourApp();
     dit(r && r.etape === 'fait', 'la commande « lbcSupprime » de l’app arrive à la suppression', JSON.stringify(r));
     dit(e && e.lbcSupprime === true, 'l’état de l’extension dit qu’elle SAIT supprimer (l’app ne montre le bouton qu’à elle)', JSON.stringify(e && e.lbcSupprime));
@@ -305,14 +305,14 @@ function fond(seed, local0, opts = {}) {
     dit(!rc || !!rc.refus, 'le relais du téléphone ne la transporte pas (liste blanche inchangée)', JSON.stringify(rc));
   });
 
-  console.log('\n── 3. L’APP : LA CONFIRMATION « SANS RETOUR » AVANT TOUT ENVOI');
+  // (20 nov., décision de Julien) Supprimer se fait dans le PANNEAU de l'extension (qui demande la confirmation « sans retour » ;
+  // l'extension exige `confirme`, vérifié plus haut) : l'app ne fait qu'ouvrir le lien, sur l'annonce désignée par identité.
+  console.log('\n── 3. L’APP : SUPPRIMER S’OUVRE DANS L’EXTENSION, RIEN N’EST ENVOYÉ D’ICI');
   await essaie('app', async () => {
-    const i = APP.indexOf('const supprimerSurLbc = async (r) => {');
-    const corpsF = i >= 0 ? APP.slice(i, APP.indexOf('\n  };', i)) : '';
-    const iConf = corpsF.indexOf('await askConfirm('), iEnvoi = corpsF.indexOf("cmd: 'lbcSupprime'");
-    dit(iConf > 0 && iEnvoi > iConf && /if \(!ok\) return;/.test(corpsF.slice(iConf, iEnvoi)), 'la confirmation est demandée AVANT l’envoi, et « Annuler » n’envoie rien');
-    dit(/sans retour/.test(corpsF) && /danger: true/.test(corpsF), 'elle dit « sans retour », en rouge');
-    dit(/confirme: true/.test(corpsF.slice(iEnvoi)), 'l’envoi porte la confirmation (l’extension la revérifie)');
+    const i = APP.indexOf('const supprimerSurLbc = (r) =>');
+    const corpsF = i >= 0 ? APP.slice(i, APP.indexOf('\n', i)) : '';
+    dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids: \[String\(r\.id\)\], action: 'supprimer' \}\)/.test(corpsF), 'supprimer ouvre le panneau sur CETTE annonce (par son identifiant)');
+    dit(!/cmd: 'lbcSupprime'/.test(APP), 'aucune suppression n’est envoyée de l’écran Leboncoin');
   });
 
   console.log('── Une notion, deux constantes : le plafond de suppressions par heure');

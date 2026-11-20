@@ -67,19 +67,21 @@ function prixAttCommande(d) {
   const vouluC = prixAttCents(a.prix), avantC = prixAttCents(a.prixAvant);
   if (!Number.isInteger(vouluC) || !Number.isInteger(avantC) || Math.abs(Number(a.prix) * 100 - vouluC) > 1e-6 || Math.abs(Number(a.prixAvant) * 100 - avantC) > 1e-6) return { refus: 'arguments' };
   if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
-  if (!(vouluC < avantC)) return { refus: 'hausse' };
+  const hausse = d.hausse === true && d.source === 'panneau' && vouluC > avantC && vouluC <= avantC * 10;
+  if (!(vouluC < avantC) && !hausse) return { refus: 'hausse' };
+  const h = hausse ? { hausse: true } : {};
   const id = String(a.id == null ? '' : a.id);
   if (site === 'vinted') {
     const uid = String(a.uid == null ? '' : a.uid);
     if (!/^\d{1,20}$/.test(uid) || !/^\d{4,15}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: { cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: Object.assign({ cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (site === 'leboncoin') {
     if (!/^\d{6,12}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: { cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (!/^\d{3,15}$/.test(id)) return { refus: 'arguments' };
-  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: { cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true } };
+  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true }, h) };
 }
 // La date après laquelle une commande ne part plus (jamais plus de 24 h après la demande).
 function prixAttFin(d) {

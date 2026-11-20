@@ -185,9 +185,10 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     dit(/if \(reconnusNum\.length\) direNumerosReconnus\(reconnusNum\);/.test(APP) && /function direNumerosReconnus\(liste\) \{[\s\S]{0,600}accompagner\('numero\.reconnu'[\s\S]{0,200}alerteLocale\(/.test(APP), '« N°42 reconnu par sa photo » est DIT (bandeau, notification si l’app est en arrière-plan)');
     const sk = (APP.match(/const SYNC_KEYS\s*=\s*\[[\s\S]*?\];/) || [''])[0];
     dit(['vrm_photos_vrm', 'vrm_empreintes_fiches', 'vrm_republie_reponses', 'vrm_republie_attente'].every((k) => sk.includes(`'${k}'`)), 'registre, empreintes gardées, réponses et attente : synchronisés');
-    dit(/onCree=\{\(f, r, uid, photos\) => \{[\s\S]{0,200}enregistrerPhotosProduites\(photos, f\.numero, r\.draftId, uid\)/.test(APP) && /async function enregistrerPhotosProduites\([\s\S]{0,600}empreinteImageLocale\(u\)[\s\S]{0,300}ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), entrees\)/.test(APP), '« Créer sur Vinted » : les photos remises à l’extension (envoyées sans réglage) entrent au registre, avec le N° et l’annonce rendue');
-    const cv = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src/CreerSurVinted.jsx'), 'utf8'));
-    dit(/onCree\(f, r, compte\.uid, photos\[f\.id\] \|\| \[\]\)/.test(cv), '… la feuille passe les photos envoyées');
+    // (20 nov., décision de Julien) « Créer sur Vinted » se fait dans le PANNEAU de l'extension : ses photos produites arrivent par
+    // `photo_vrm_{uid}` (l'extension les range), versées au registre par `verserPhotosVrmExtension` — l'atelier de l'app est retiré.
+    dit(/async function verserPhotosVrmExtension\(\)[\s\S]{0,900}ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), entrees\)/.test(APP) && !fs.existsSync(path.join(RACINE, 'src/CreerSurVinted.jsx')),
+      '« Créer sur Vinted » (dans l’extension) : les photos produites entrent au registre par `photo_vrm_*`, avec le N°');
     const rep = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src/ecrans/Republier.jsx'), 'utf8'));
     dit(/registre\.push\(\{ h, n: String\(numero\)/.test(rep) && /ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), registre\)/.test(rep), 'chaque photo PRODUITE pour un N° (feuille guidée, kit, « Publier à la main ») entre au registre');
   });

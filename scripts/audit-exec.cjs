@@ -124,7 +124,10 @@ const REPONSE = { uid: UID, method: 'POST', endpoint: '/api/v2/conversations/123
     // 20 oct. : accepter VEND la paire — l'app doit dire qu'il a confirmé.
     const a0 = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept' });
     dit(a0 && a0.ok === false && a0.code === 'confirmation' && envois.length === 0, 'accepter une offre SANS confirmation de l\'app : refusé, rien ne part', JSON.stringify(a0));
-    const a = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept', confirme: true });
+    // 5.410 : la garde anti double-vente — annonce pas sûre (aucune garde lue) ⇒ « vérifie », rien ne part ; SON second toucher (`avisVu`) fait partir.
+    const a1 = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept', confirme: true });
+    dit(a1 && a1.ok === false && a1.code === 'avis' && envois.length === 0, 'accepter une offre sans garde sûre : « vérifie qu’elle n’est pas vendue ailleurs », rien ne part', JSON.stringify(a1));
+    const a = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept', confirme: true, avisVu: true });
     const b = await envoyer({ uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/reject' });
     const c = await envoyer({ uid: UID, method: 'POST', endpoint: '/api/v2/transactions/123/offers', body: { offer: { price: '45', currency: 'EUR' } } });
     dit(a && a.ok && b && b.ok && c && c.ok && envois.length === 3, 'accepter, refuser, faire une offre : sur SON clic, ça part', envois.join(','));

@@ -173,7 +173,7 @@ async function auditer(dossier) {
   });
   await essaie('57', async () => {
     const f = fondLbc({ vrmPauseLbcMsg: { jusqua: Date.now() + 30 * 60000, statut: 429 } });
-    const r = await f.ctx.supprimeLbcDepuisApp({ id: AD, confirme: true });
+    const r = await f.ctx.supprimeLbcDepuisApp({ id: AD, confirme: true, sansRetour: true });
     dit(r && r.accepte === false && r.code === 'lbc-pause', '57 Leboncoin a demandé de ralentir (429/403) : une suppression ne part pas', r);
   });
   // ── 60 : un script de la page forge un résultat — jamais cru ──

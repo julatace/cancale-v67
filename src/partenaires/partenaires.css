@@ -55,7 +55,7 @@ html[data-vrm-d24] body { min-height: 100vh; margin: 0; background: linear-gradi
 .vrm-pp-note { margin: 10px 0 0; font: 500 14px/1.5 var(--sb-police-texte, inherit); color: var(--sb-encre-2); }
 .vrm-pp-loi { color: var(--sb-encre); }
 .vrm-pp-pause { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font: 600 14px/1.4 var(--sb-police-texte, inherit); color: var(--sb-encre); }
-.vrm-pp-carte { margin-top: 18px; padding: 16px; border-radius: var(--sb-r-tuile, 22px); background: var(--sb-porcelaine-degrade); box-shadow: var(--sb-ombre-plan); }
+.vrm-pp-carte { margin-top: 18px; padding: 16px; border-radius: var(--sb-r-tuile, 22px); background: var(--sb-porcelaine-degrade); box-shadow: none; }
 .vrm-pp-tete { display: flex; flex-direction: column; gap: 16px; }
 .vrm-pp-chiffre { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .vrm-pp-libelle { margin: 0 0 10px; font: 600 13px/1.2 var(--sb-police-texte, inherit); color: var(--sb-encre-2); }

@@ -13,7 +13,7 @@ function PrixMarche({ data, baseKO, sousNav = null }) {
   const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 };
   return (
     <div data-prix-marche="" data-espace="argent" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ScreenHead icon="euro" title={tr('nav.compta')} sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
+      <ScreenHead titreCoque icon="euro" title={tr('nav.compta')} sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}
         desc="Ce que tes ventes disent du prix — par modèle et taille, pour tarifer et racheter juste." />
       {baseKO ? (
         <LignePanne>{tr('stats.ventesLuesPrix')}</LignePanne>

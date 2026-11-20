@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
+import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
@@ -32,7 +33,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe, siteCourantCoque } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -58,7 +59,10 @@ import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
-import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';
+import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
+import { useSiteCourant } from '../siteCourant.js';   // (20 nov.) le site courant : une source (src/siteCourant.js)
+import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
+import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
 import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
 import { ChampRecherche } from '../composants/ChampRecherche.jsx';
@@ -893,6 +897,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,argentNav=null}) {
   const designV2 = useDesignV2();   // (17 nov., phase 2) allumé : les segments SOUS le titre, dans l'en-tête (avant les actions)
+  const ordiFac = useOrdinateur();
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -1140,15 +1145,17 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   // « Nouvelle facture » sur la ligne du titre, la cloche à droite), la ligne comptes et le segmenté d'Argent, puis UNE
   // recherche (+ « ⋯ » : relire, Excel, ma facture, réglages — les mêmes gestes, la même feuille), UN segmenté
   // En attente · Comptabilisées, la liste (le même tableau) ou un état vide dessiné ; les cartes d'hier dessous.
+  // (20 nov., lot argent-natif) Au téléphone, « Argent » est le grand titre de la coque : l'écran ne le redit pas.
   if (designV2 && argentNav) return (
     <div data-espace="argent" data-argent-factures="" className="v2-fac" style={{padding:16}}>
       <header className="v2-tete-tache v2-tete-argent" data-v2-factures-tete="">
-        <div className="v2-titre-ligne"><h1>{L.argent}</h1>
-          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div>
+        {ordiFac ? <div className="v2-titre-ligne"><h1>{L.argent}</h1>
+          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div> : null}
         {argentNav}
       </header>
       <div className="v2-fac-outils" data-v2-fac-outils="">
         <div className="v2-fac-champ"><ChampRecherche valeur={searchInput} onChange={(v)=>{ setSearchInput(v); setSearch(v); setPage(null); }} placeholder={tr('v2.fac.chercher')} label={tr('v2.fac.chercher')} data-v2-fac-recherche=""/></div>
+        {ordiFac ? null : <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2>}
         <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)} attrs={{ 'data-fac-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': menuFac }}/>
       </div>
       {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
@@ -3350,7 +3357,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                 </div>
                 {(
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
-                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'8px 14px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>{tr('compta.declarerUrssaf')}</a>
+                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.accentTexte||C.accent,background:'transparent',borderRadius:12,padding:'8px 4px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>{tr('compta.declarerUrssaf')}</a>
                   {finie && aNoter.length > 0 && (
                     <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
                       style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
@@ -3508,10 +3515,12 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
             {moisChoix.map((ym)=><option key={ym} value={ym}>{libelleMois(ym)}</option>)}
           </select>
         </div>
-        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="primaire" icone="printer" data-recap-imprimer="" disabled={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} style={{flex:'1 1 140px'}} title={tr('compta.recapImprimerTitre')}>{recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')}</Bouton>
-          <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
-          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
+        {/* (20 nov., lot argent-natif) Trois RANGÉES sobres (icône, geste, chevron) au lieu de trois gros boutons empilés
+            pleine largeur (une règle du design du 17 nov. étire tout groupe de trois boutons dans Argent). */}
+        <div className="n-arg n-arg-rangees" data-recap-gestes="">
+          <NRangee icone={<Icon name="printer" size={22}/>} titre={recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')} fin="chevron" indisponible={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} attrs={{ 'data-recap-imprimer': '', title: tr('compta.recapImprimerTitre') }}/>
+          <NRangee icone={<Icon name="doc" size={22}/>} titre={recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('pdf')} attrs={{ 'data-recap-pdf': '' }}/>
+          <NRangee icone={<Icon name="save" size={22}/>} titre={recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('csv')} attrs={{ 'data-recap-csv': '', title: tr('compta.fichierExcelNumbers') }}/>
         </div>
         <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
@@ -3738,7 +3747,11 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P, regLu, regPret } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  const sel = { site: 'toutes', compte: null, periode: null };
+  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
+  // de site d'hier) ; « tous » = les chiffres de toujours.
+  const [siteBrut] = useSiteCourant();
+  const siteCourant = siteCourantCoque(siteBrut);   // 'toutes' | un site relié (un site plus relié vaut « toutes »)
+  const sel = { site: siteCourant, compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
@@ -3835,12 +3848,16 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  const sel = { site: 'toutes', compte: null, periode: null };
+  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
+  // de site d'hier) ; « tous » = les chiffres de toujours.
+  const [siteBrut] = useSiteCourant();
+  const siteCourant = siteCourantCoque(siteBrut);   // 'toutes' | un site relié (un site plus relié vaut « toutes »)
+  const sel = { site: siteCourant, compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
   const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
-  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice');
+  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice'), qV = Q.find((x) => x.id === 'vendu');
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   // La phrase de l'affiche : la note de la MÊME règle (le manque, les ventes à dater), sinon « au jour du versement ».
   const phrase = qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
@@ -3882,7 +3899,9 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [calc, ym, versements, ventesVcER]);
   const MAX = 30;
-  const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  // Un site choisi : ses versements seulement (un filtre d'affichage sur la plateforme de chaque ligne, rien de recalculé).
+  const NOM_PF = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+  const lignesV = livre ? [...livre.lignes].filter((l) => siteCourant === 'toutes' || String(l.plateforme || '').toLowerCase().startsWith(String(NOM_PF[siteCourant] || siteCourant).toLowerCase().slice(0, 4))).sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
   const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
   // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
   // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
@@ -3902,7 +3921,8 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}/>;
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} sansBarres={siteCourant !== 'toutes'}
+    vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
 // Le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
@@ -3957,37 +3977,41 @@ function PrevisionUrssafCarte({ onNav }) {
   const parL = Object.entries(parP).filter(([, n]) => n > 0);
   const parTxt = parL.length > 1 ? parL.map(([k, n]) => `${n} ${k}`).join(', ') : '';   // une seule plateforme : rien à détailler
   const tauxTxt = String(tauxUrssaf()).replace('.', ',');
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis — Julien : « gros bouton Copier pleine largeur », trop chargé. UNE carte :
+  // l'en-tête (« Déclarer octobre 2026 », la date limite), (1) le montant à recopier EN GRAND avec un petit « Copier » à côté,
+  // les cotisations en ligne secondaire ; (2) ce qui manque en UNE ligne (ambre s'il manque quelque chose, avec son geste) ;
+  // (3) LE plein « J'ai déclaré » et « Ouvrir l'URSSAF ↗ » en bouton texte. Les mêmes chiffres, les mêmes « ? », les mêmes data-*.
+  const manque = P.ca == null || P.partiel || P.aDater > 0;
   return (
-    <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={tr('compta.declarationUrssaf', { label: String(P.label) })}>
-      <div className="vrm-urssaf-geste-tete">
-        <h3>{trj('compta.declarer', { label: P.label })}</h3>
-        <span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{tr('compta.avant2')} {date}{jour ? ` · ${jour}` : ''}</span>
-      </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="1"><span className="vrm-urssaf-num" aria-hidden="true">1</span><b>{tr('compta.texte9')}</b><small>{tr('compta.recopierUrssaf')}</small></div>
-      <div className="vrm-urssaf-ligne" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
-        <span className="vrm-urssaf-lib"><b>{tr('compta.chiffreAffaires2')} <SourceChiffre id="ca">{P.ca == null ? <>{tr('compta.calculeDansEcran')}</> : <>{tr('compta.somme')} {nP === 1 ? tr('compta.venteFinalisee') : tr('compta.ventesFinalisees', { nP: String(nP) })}{parTxt ? ` (${parTxt})` : ''} {tr('compta.dontArgentT')} {P.label} {tr('compta.vintedJourTransaction')}</>}</SourceChiffre></b><small>{tr('compta.ventesMarchandisesRecu')}</small></span>
-        <span className="vrm-urssaf-val">{P.ca == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.ca)}</>}</span>
-        {P.ca != null ? <button type="button" className="vrm-urssaf-copier" data-urssaf-copier="ca" data-urssaf-texte={caTxt} aria-label={tr('compta.copier', { caTxt: String(caTxt) })} onClick={() => copier('ca', caTxt)}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</button> : <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>}
-      </div>
-      <div className="vrm-urssaf-ligne" data-urssaf-ligne="cotis" data-eur={P.apayer == null ? '' : String(P.apayer)}>
-        <span className="vrm-urssaf-lib"><b>{tr('compta.cotisations3')} <SourceChiffre id="cotis">{P.apayer == null ? <>{tr('compta.ellesCalculentChiffre')}</> : <>{fmt(P.ca)} × {tauxTxt}{tr('compta.tauxMicroEntreprise')} {fmt(P.apayer)}{tr('compta.estimationVerifierSite')}</>}</SourceChiffre></b><small>{trj('compta.estimationVrmComparer', { tauxTxt: tauxTxt })}</small></span>
-        <span className="vrm-urssaf-val">{P.apayer == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.apayer)}</>}</span>
-        <span className="vrm-urssaf-copier-vide" aria-hidden="true"/>
-      </div>
-      <div className="vrm-urssaf-etape" data-urssaf-etape="2"><span className="vrm-urssaf-num" aria-hidden="true">2</span><b>{tr('compta.manque')}</b></div>
-      {(P.ca == null || P.partiel || P.aDater > 0) ? (
-        <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
-          {P.ca == null ? <><span>{tr('stats.encoreCalculeOuvre')}</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton> : null}</>
-            : P.aDater > 0 ? <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>
-            : <>{tr('compta.manqueVentesEncore')}</>}
+    <NCarte className={'vrm-urssaf-geste n-arg-declarer' + (urgent ? ' is-urgent' : '')} titre={trj('compta.declarer', { label: P.label })}
+      sousTitre={<span data-urssaf-echeance={P.daysLeft == null ? '' : String(P.daysLeft)}>{tr('compta.avant2')} {date}{jour ? ` · ${jour}` : ''}</span>} tonSous={urgent ? 'ambre' : 'neutre'}
+      attrs={{ ...attrs, 'data-urssaf-parcours': '3', 'aria-label': tr('compta.declarationUrssaf', { label: String(P.label) }) }}>
+      <div className="n-arg-montant" data-urssaf-etape="1" data-urssaf-ligne="ca" data-eur={P.ca == null ? '' : String(P.ca)}>
+        <div className="n-arg-montant-texte">
+          <span className="n-arg-montant-lib">{tr('compta.chiffreAffaires2')} <SourceChiffre id="ca">{P.ca == null ? <>{tr('compta.calculeDansEcran')}</> : <>{tr('compta.somme')} {nP === 1 ? tr('compta.venteFinalisee') : tr('compta.ventesFinalisees', { nP: String(nP) })}{parTxt ? ` (${parTxt})` : ''} {tr('compta.dontArgentT')} {P.label} {tr('compta.vintedJourTransaction')}</>}</SourceChiffre></span>
+          <span className="n-arg-montant-val">{P.ca == null ? '—' : <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.ca)}</>}</span>
         </div>
-      ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">{tr('compta.rienToutesVentes')}</div>}
-      <div className="vrm-urssaf-etape" data-urssaf-etape="3"><span className="vrm-urssaf-num" aria-hidden="true">3</span><b>{tr('compta.declarer2')}</b><small>{aNoter.length ? tr('compta.recopieMontantSite') : tr('compta.dejaNoteIci')}</small></div>
-      <div className="vrm-urssaf-gestes">
-        <Bouton variante="secondaire" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</Bouton>
-        {aNoter.length ? <Bouton variante="primaire" data-fu-geste="" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}>{tr('compta.aiDeclare')}</Bouton> : null}
+        {P.ca != null ? <NBouton variante="teinte" onClick={() => copier('ca', caTxt)} attrs={{ 'data-urssaf-copier': 'ca', 'data-urssaf-texte': caTxt, 'aria-label': tr('compta.copier', { caTxt: String(caTxt) }) }}>{copie === 'ca' ? VERBES.copie : VERBES.copier}</NBouton> : null}
       </div>
-    </section>
+      <NRangee titre={<>{tr('compta.cotisations3')} <SourceChiffre id="cotis">{P.apayer == null ? <>{tr('compta.ellesCalculentChiffre')}</> : <>{fmt(P.ca)} × {tauxTxt}{tr('compta.tauxMicroEntreprise')} {fmt(P.apayer)}{tr('compta.estimationVerifierSite')}</>}</SourceChiffre></>}
+        sousTitre={trj('compta.estimationVrmComparer', { tauxTxt: tauxTxt })}
+        valeur={P.apayer == null ? '—' : (P.partiel ? tr('journee.moins') + ' ' : '') + fmt(P.apayer)}
+        attrs={{ 'data-urssaf-ligne': 'cotis', 'data-eur': P.apayer == null ? '' : String(P.apayer) }}/>
+      <div data-urssaf-etape="2">
+        {manque ? (
+          P.aDater > 0 && P.ca != null && !P.partiel
+            ? <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={<LigneDatesVersement as="span" avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>} sousLignes={2} attrs={{ 'data-urssaf-manque': String(P.aDater) }}/>
+            : P.ca == null
+              ? <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={tr('stats.encoreCalculeOuvre')} fin={onNav ? 'chevron' : null} onClick={onNav ? () => onNav('cat_ventes') : null} attrs={{ 'data-urssaf-manque': 'passu', 'data-urssaf-ventes': '' }}/>
+              : <NRangee ton="ambre" titre={tr('compta.manque')} sousTitre={P.aDater > 0 ? <LigneDatesVersement as="span" avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/> : tr('compta.manqueVentesEncore')} sousLignes={2} attrs={{ 'data-urssaf-manque': P.aDater > 0 ? String(P.aDater) : 'partiel' }}/>
+        ) : <NRangee titre={tr('compta.manque')} valeur={tr('arn.rien')} attrs={{ 'data-urssaf-rien-manque': '' }}/>}
+      </div>
+      <div className="n-arg-gestes" data-urssaf-etape="3">
+        {aNoter.length ? <NBouton variante="plein" onClick={() => demanderDeclaration(aNoter[0], onNav)} attrs={{ 'data-fu-geste': '', 'data-urssaf-cest-declare': aNoter[0] }}>{tr('compta.aiDeclare')}</NBouton>
+          : <p className="n-arg-note">{tr('compta.dejaNoteIci')}</p>}
+        <a className="n-arg-lien n-arg-lien-bouton" href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-fu-declarer-urssaf="" data-urssaf-site="">{tr('compta.ouvrirUrssaf')}</a>
+      </div>
+    </NCarte>
   );
 }
 // (6 nov.) « D'OÙ VIENT CE CHIFFRE ? » — un « ? » à côté d'un chiffre, qui déplie UNE
@@ -4070,6 +4094,9 @@ function ComptaFusion({ compta, onNav }) {
 }
 // ⟦← App.jsx #35⟧
 function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansCompte = false }) {
+  // (20 nov., fusion avec argent-natif) La carte du bénéfice suit le site choisi en tête d'Argent (la sélection { site } de la
+  // carte des chiffres, sa règle d'hier) ; « Tous » = 'toutes', les chiffres de toujours.
+  const [siteArgent] = useSiteCourant();
   const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuagePret(true)), []);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
@@ -4139,7 +4166,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {/* (3 nov., carte réglable par page) Le grand chiffre et les trois cases de cette carte se
               choisissent (« Modifier ») ; défaut = la maquette : bénéfice (`chiffreBenefice`, CETTE
               lecture), à déclarer, URSSAF, ventes finalisées — de la période choisie au-dessus. */}
-          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: 'toutes', compte: null, periode }} locaux={locauxCarte} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
+          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: siteCourantCoque(siteArgent), compte: null, periode }} locaux={locauxCarte} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
             attrsDe={(x) => x.place.id === 'benefice' ? { 'data-compta-chiffre': 'gagne', 'data-eur': e2(x.valeur) } : (x.place.id === 'declarer' || x.place.id === 'urssaf') ? { 'data-fu-case': x.place.id, 'data-eur': e2(x.valeur) } : null}/>
           {/* (3 nov., finitions) Aucune vente finalisée : plus de phrase sous la carte (la carte dit « — »/0). */}
           {(() => {
@@ -4419,7 +4446,7 @@ function RapportMoisCarte({ liveStats, compta, panelOff, accounts }) {
       <select aria-label={tr('compta.moisRapport')} data-rapport-choix="" value={ym} onChange={(e) => setYm(e.target.value)} style={{ width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
         {choix.map((p) => <option key={p} value={p}>{libelleMoisRapport(p)}{p === ymCourant() ? tr('stats.cours3') : ''}</option>)}
       </select>
-      <Bouton variante="primaire" icone="doc" data-rapport-creer="" disabled={!pret || occupe} occupe={occupe} onClick={creer} style={{ marginTop: 10, width: '100%' }}>
+      <Bouton variante="discret" icone="doc" data-rapport-creer="" disabled={!pret || occupe} occupe={occupe} onClick={creer} style={{ marginTop: 10 }}>
         {occupe ? tr('compta.jePrepareRapport') : partageable ? tr('compta.partagerRapportPdf') : tr('compta.telechargerRapportPdf')}
       </Bouton>
       {retour && <p role="status" data-rapport-fin={retour.fin} data-rapport-manques={retour.manques != null ? retour.manques : ''} style={{ margin: '8px 0 0', fontSize: 13, color: retour.fin === 'ko' ? C.warn : C.muted, lineHeight: 1.5 }}>
@@ -4756,7 +4783,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
           « Argent » et ses quatre segments. Chaque segment montre SES cartes ; les autres restent
           montées (`hidden` : mêmes lectures, mêmes états, mêmes data-*), jamais supprimées. */}
-      {vue !== 'factures' ? <ScreenHead icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
+      {vue !== 'factures' ? <ScreenHead titreCoque icon="euro" title={L.argent} phrase="compta" sous={argentNav} desc="Ce que tu as vendu, reçu, gagné, et ce que tu dois déclarer." /> : null}
       {vue !== 'factures' && !ligneComptaPub && <div data-compta-pas-calcule="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'var(--vrm-b-teinte)', fontSize: 13, color: C.text }}>
         {/* (2 nov.) Un compte neuf, sans compte Vinted : « ouvre Ventes » ne menait
             nulle part (Ventes n'a rien à publier). La cause vraie et son geste —
@@ -5040,7 +5067,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
                     <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? tr('journee.moins3') : ''}{fmt(recettesAnnee)}</span>
                     <span>{tr('compta.caDeclare')}</span>
-                    <span style={{ color: C.border }}>—</span>
+                    <span style={{ color: C.muted }}>—</span>
                     <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                     <span>{tr('compta.charges2')}{charges.aboTotal > 0 ? tr('compta.dontAbonnements', { fmt: String(fmt(charges.aboTotal)) }) : ''}</span>
                   </div>

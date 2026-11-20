@@ -1,0 +1,12 @@
+/* ── src/natif/ecrans/argent-pont.css — le PONT d'Argent (20 nov., lot argent-natif) ─────────────────────────────────
+   Les cartes d'AVANT qui restent dans Argent (Statistiques, Déclarer) sont dessinées par des règles d'avant SANS couche et
+   `!important` (styles-premium.css, styles-design-2026.css, styles-coque.css). Julien, 20 nov. : « titres de taille
+   incohérente ». Comme src/coque-native.css, ce fichier SANS couche ramène ce qu'il faut au style §2 bis — sur Argent
+   seulement ([data-espace="argent"]). Il disparaît avec la dernière carte d'avant. */
+/* Les titres des cartes d'avant : le titre de carte du natif (13/18, 600, petites capitales grises). */
+:root:root:root body .vrm-app-shell .vrm-main [data-espace="argent"] :is(.vrm-sv-carte-titre, h2.vrm-ac-titre, .vrm-sv-repliee-titre, .vrm-compta-question) {
+  font: 600 13px/18px -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif !important;
+  letter-spacing: .04em !important; text-transform: uppercase !important; color: var(--n-encre-2) !important;
+}
+/* Les rangs et les « — » de « Ce qui rapporte le plus » étaient à 2,9:1 : le gris lisible (≥ 4,5:1) du natif. */
+:root:root:root body .vrm-app-shell .vrm-main [data-espace="argent"] :is(.vrm-cr-rang, .vrm-cr-brut[data-vide]) { color: var(--n-encre-2) !important; }

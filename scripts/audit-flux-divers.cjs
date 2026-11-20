@@ -293,8 +293,8 @@ const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) =
     dit(typeof fil === 'function' && fil(oc('2026-10-29T10:00:00Z')) === true && fil(oc('2026-10-31T10:00:00Z')) === false && fil(oc(null)) === false && fil({ ...oc('2026-10-29T10:00:00Z'), conversation: { transaction: { item_id: 9001, current_user_side: 'buyer' } } }) === false,
       'A13 `annonceDuFilPartie` (exécutée) : partie seulement si une lecture complète APRÈS la dernière activité ne la montre plus ; sinon, et côté acheteur, pas su');
     dit(/const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,700}majAuGeste\(oc\.inboxUpdatedAt \|\| null, oc\.messages\)[\s\S]{0,500}annonceOffreEnVente\([\s\S]{0,300}lectureOffres\) === 'non';/.test(CODE)
-      && /<RapidesConv liste=\{rapidesDuFil\(listeRapides\(quickReplies\), annonceDuFilPartie\(openConv\)\)\}/.test(CODE),
-      'A13 le fil ouvert passe ses réponses rapides par `rapidesDuFil(…, annonceDuFilPartie(openConv))` (règle de l’offre, datée de la dernière activité)');
+      && /<BoutonExtension action="repondre" ids=\{\[String\(openConv\.convId\|\|''\)\]\} large\/>/.test(CODE),
+      'A13 (20 nov.) la règle `annonceDuFilPartie` reste ; la réponse (et ses réponses rapides) se fait dans le panneau de l’extension');
   });
 
   // ── A14. `vinted_sales_hidden` n'est plus rapatriée ───────────────────────

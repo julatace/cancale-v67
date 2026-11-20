@@ -10,7 +10,7 @@
    qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
    Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
    ════════════════════════════════════════════════════════════════════════════ */
-:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article, .n-fil-vignette) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *):is(:not([class]), [class=""], [class^="n-"], [class*=" n-"], [class^="nf-"], [class*=" nf-"], [class^="arv-"], [class*=" arv-"], [class^="sm-"], [class*=" sm-"]) {
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article, .n-fil-vignette, .n-arg, .n-carte, .n-tuiles, .n-selecteur-site) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *):is(:not([class]), [class=""], [class^="n-"], [class*=" n-"], [class^="nf-"], [class*=" nf-"], [class^="arv-"], [class*=" arv-"], [class^="sm-"], [class*=" sm-"]) {
   all: revert-layer;
 }
 /* (20 nov., intégration 20nov) + `arv-…` (écran d'arrivée) et `sm-…` (meuble dessiné) : leurs contrôles vivent dans la couche
@@ -19,6 +19,8 @@
 /* (20 nov., chantier « boutons natifs ») Le renvoi ci-dessus ne vise plus que les contrôles NATIFS (classe `n-…`, `nf-…`) et
    ceux sans classe : il effaçait aussi le dessin d'un contrôle d'écran posé dans une page poussée ou une feuille — mesuré
    (banc boutons-inventaire) : le pavé de « Compléter » (`.vrm-cp-t`) retombait en boutons gris du navigateur de 22 px. */
+/* (20 nov., lot argent-natif) La ligne « Comptes · N › » d'Argent : un bouton natif posé seul dans l'en-tête d'avant. */
+button.n-arg-comptes { all: revert-layer; }
 /* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
    `!important`) lui posait un fond gris dans le champ blanc ; un `!important` d'avant ne se renvoie pas par revert-layer.
    L'identifiant de <main> (#vrm-contenu) suffit à passer devant, sans surenchère ailleurs. */

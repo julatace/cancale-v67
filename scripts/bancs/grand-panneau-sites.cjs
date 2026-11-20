@@ -60,7 +60,7 @@ const AUTO = { offres: { actif: true, minis: 12, refus: true }, favoris: { regle
 const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' },
   annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN, toutes: TOUTES, nTous: TOUTES.length, statuts: { en_vente: 5, brouillon: 2, masque: 1, reserve: 1, vendu: 1, a_confirmer: 0 } }, automatisations: AUTO, notifications: NOTIFS, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
-const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true },
+const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.410.0', code: '5.410.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true },
   site: { id: '111', nom: 'shop_sophie', choix: 'oui', jauge: { h: 12, maxH: 50, j: 40, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 8 }, file: null } },
   secu: { niveau: 'ok', texte: 'Tout va bien sur ce compte' }, toutArrete: false,
   flux: { okAt: T0 - 3 * MIN }, liens: [{ cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }], capteCoupe: false };
@@ -148,10 +148,10 @@ const montrer = async (pg, mobile) => {
 
 
 const SITES = {
-  leboncoin: { url: 'https://www.leboncoin.fr/mes-annonces', etat: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: 'lbc-account:moi', nom: 'Sophie' }, lbc: { compte: { ok: true, texte: 'Sophie' }, annonces: { ok: true, texte: '2 annonces' }, ventes: { ok: true, texte: '1 vente' } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
-    listes: { ok: true, plateforme: 'leboncoin', compte: { id: 'moi', nom: 'Sophie' }, annonces: { lu: T0 - H, aConfirmer: false, total: 2, liste: [], toutes: [{ id: 'a1', titre: 'Paire A', prix: 80, statut: 'en_vente', url: 'https://www.leboncoin.fr/ad/a1', photos: [], photo: '' }, { id: 'a2', titre: 'Paire B', prix: 60, statut: 'masque', url: 'https://www.leboncoin.fr/ad/a2', photos: [], photo: '' }], nTous: 2, statuts: { en_vente: 1, brouillon: 0, masque: 1, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 124 }, ventes: { lu: null, total: 1, liste: [{ tx: 'T1', titre: 'Paire A', prix: 80, date: T0 - H, etat: 'a_expedier', vendue: true, num: '' }] }, messages: { lu: null, site: 'leboncoin', nonlusSite: 3, liste: [] }, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [{ p: 'leboncoin', c: 'moi', s: 'ventes', id: 'T1', t: T0 - H }] }, autres: null } },
-  vestiaire: { url: 'https://www.vestiairecollective.com/', etat: { ok: true, plateforme: 'vestiaire', capte: true, version: '5.409.0', code: '5.409.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: '42', nom: 'Sophie VC' }, vcCapte: { ventes: { n: 1, at: T0 - H } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
-    listes: { ok: true, plateforme: 'vestiaire', compte: { id: '42', nom: 'Sophie VC' }, annonces: { lu: T0 - H, aConfirmer: false, total: 1, liste: [], toutes: [{ id: 'p1', titre: 'Sac', prix: 300, statut: 'en_vente', favoris: 7, photos: [], photo: '' }], nTous: 1, statuts: { en_vente: 1, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 0 }, ventes: { lu: null, total: 1, liste: [{ tx: 'p9', titre: 'Sac vendu', prix: 250, date: T0 - H, etat: 'a_expedier', vendue: true, num: '', bordereau: true, transporteur: 'Chronopost' }] }, messages: { lu: T0 - H, site: 'vestiaire', liste: [{ conv: 'conv-1', qui: 'Sac', texte: 'Bonjour, prix ferme ?', at: T0 - H, nonlu: true, photo: '' }] }, automatisations: null, notifications: { vu: T0 - 2 * H, liste: [] }, autres: null } },
+  leboncoin: { url: 'https://www.leboncoin.fr/mes-annonces', etat: { ok: true, plateforme: 'leboncoin', capte: true, version: '5.410.0', code: '5.410.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: 'lbc-account:moi', nom: 'Sophie' }, lbc: { compte: { ok: true, texte: 'Sophie' }, annonces: { ok: true, texte: '2 annonces' }, ventes: { ok: true, texte: '1 vente' } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
+    listes: { ok: true, plateforme: 'leboncoin', compte: { id: 'moi', nom: 'Sophie' }, annonces: { lu: T0 - H, aConfirmer: false, total: 2, liste: [], toutes: [{ id: 'a1', titre: 'Paire A', prix: 80, statut: 'en_vente', url: 'https://www.leboncoin.fr/ad/a1', photos: [], photo: '' }, { id: 'a2', titre: 'Paire B', prix: 60, statut: 'masque', url: 'https://www.leboncoin.fr/ad/a2', photos: [], photo: '' }], nTous: 2, statuts: { en_vente: 1, brouillon: 0, masque: 1, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 124 }, ventes: { lu: null, total: 1, liste: [{ tx: 'T1', titre: 'Paire A', prix: 80, date: T0 - H, etat: 'a_expedier', vendue: true, num: '' }] }, messages: { lu: null, site: 'leboncoin', nonlusSite: 3, liste: [] }, automatisations: { site: 'leboncoin', cle: 'lbc:moi', baisse: { actif: false, pct: null, jours: null } }, notifications: { vu: T0 - 2 * H, liste: [{ p: 'leboncoin', c: 'moi', s: 'ventes', id: 'T1', t: T0 - H }] }, autres: null } },
+  vestiaire: { url: 'https://www.vestiairecollective.com/', etat: { ok: true, plateforme: 'vestiaire', capte: true, version: '5.410.0', code: '5.410.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr' }, site: { id: '42', nom: 'Sophie VC' }, vcCapte: { ventes: { n: 1, at: T0 - H } }, flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false },
+    listes: { ok: true, plateforme: 'vestiaire', compte: { id: '42', nom: 'Sophie VC' }, annonces: { lu: T0 - H, aConfirmer: false, total: 1, liste: [], toutes: [{ id: 'p1', titre: 'Sac', prix: 300, depuis: T0 - 9 * 864e5, depuisAuMoins: true, statut: 'en_vente', favoris: 7, photos: [], photo: '' }], nTous: 1, statuts: { en_vente: 1, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 }, sansCompte: 0 }, ventes: { lu: null, total: 1, liste: [{ tx: 'p9', titre: 'Sac vendu', prix: 250, date: T0 - H, etat: 'a_expedier', vendue: true, num: '', bordereau: true, transporteur: 'Chronopost' }] }, messages: { lu: T0 - H, site: 'vestiaire', liste: [{ conv: 'conv-1', qui: 'Sac', texte: 'Bonjour, prix ferme ?', at: T0 - H, nonlu: true, photo: '' }] }, automatisations: { site: 'vestiaire', cle: 'vc:42', baisse: { actif: false, pct: null, jours: null } }, notifications: { vu: T0 - 2 * H, liste: [] }, autres: null } },
 };
 async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
   const S = SITES[site];
@@ -167,7 +167,7 @@ async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
     const orig = Element.prototype.attachShadow;
     Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
     window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
-      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; setTimeout(() => cb && cb(rep), 0); } },
+      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; else if (msg.action === 'interessesLbc') rep = { ok: true, compte: 'moi', appris: true, annonces: [{ annonce: 'a1', n: 2, aEcrire: 1, attendent: 1 }], liste: [{ conv: 'c1', annonce: 'a1', messagesDeLui: 2, dernierAt: new Date(Date.now() - 3600000).toISOString(), attendTaReponse: true, dejaEcrit: false }, { conv: 'c2', annonce: 'a1', messagesDeLui: 1, dernierAt: new Date(Date.now() - 7200000).toISOString(), attendTaReponse: false, dejaEcrit: true }], serie: null, parToucher: 10, ecartS: [40, 90] }; else if (msg.action === 'ecrireInteressesLbc') rep = msg.confirme === true ? { accepte: true } : { accepte: false }; else if (msg.action === 'reglageAuto') rep = msg.confirme === true || !(msg.valeur && msg.valeur.actif) ? { ok: true } : { ok: false, code: 'confirmation' }; else if (msg.action === 'supprimerLbcCarte') rep = msg.sansRetour === true ? { accepte: true, etape: 'fait' } : { accepte: false, code: 'sans-retour', confirmation: { titre: 'Supprimer le N°7 de Leboncoin ?', lignes: ['N°7 · Paire A'], reste: 'L’article reste dans ton stock, avec son N°.', sansRetour: 'C’est sans retour : Leboncoin ne rend pas une annonce supprimée.', ok: 'Oui, supprimer de Leboncoin', irreversible: true } }; setTimeout(() => cb && cb(rep), 0); } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -179,8 +179,9 @@ const lireS = (pg) => pg.evaluate(() => {
   const r = document.getElementById('vrm-badge').shadowRoot, q = (s) => r.querySelector(s);
   const carte = q('.carte'), b = carte ? carte.getBoundingClientRect() : null;
   return { grand: !!(carte && carte.hasAttribute('data-grand')), on: !!(carte && carte.classList.contains('on')), w: b ? Math.round(b.width) : 0,
-    onglets: Array.from(r.querySelectorAll('[data-onglet-b]')).map((x) => x.getAttribute('data-onglet-b')),
-    lignes: r.querySelectorAll('.table5 [data-annonce]').length, sansCompte: q('[data-sans-compte]') ? q('[data-sans-compte]').getAttribute('data-sans-compte') : null,
+    onglets: Array.from(r.querySelectorAll('.side6 [data-onglet-b]')).map((x) => x.getAttribute('data-onglet-b')),
+    vx: q('[data-vx]') ? q('[data-vx]').getAttribute('data-page') : null, grpSite: Array.from(r.querySelectorAll('.side6 .grp6')).map((x) => x.textContent.trim()).join('|'),
+    lignes: r.querySelectorAll('.table6 [data-annonce]').length, sansCompte: q('[data-sans-compte]') ? q('[data-sans-compte]').getAttribute('data-sans-compte') : null,
     options: q('[data-ann-action]') ? Array.from(q('[data-ann-action]').options).map((o) => o.value).filter(Boolean) : [],
     ventes: Array.from(r.querySelectorAll('[data-vente]')).map((x) => x.getAttribute('data-vente') + ':' + x.getAttribute('data-vente-etat')),
     favSite: q('[data-favoris-site]') ? q('[data-favoris-site]').innerText : '', autoSite: q('[data-auto-site]') ? q('[data-auto-site]').innerText : '',
@@ -214,9 +215,49 @@ const lireS = (pg) => pg.evaluate(() => {
         a = await lireS(t.pg);
         await t.pg.screenshot({ path: path.join(SORTIE, `${site}-annonces-${largeur}-${scheme}.png`) });
         dit(a.on && a.grand && (mobile ? a.w >= largeur - 1 : a.w >= largeur * 0.7) && !a.debord, `${T} : le grand panneau s’ouvre aussi ici`, JSON.stringify(a));
-        dit(a.onglets.join(',') === 'messages,annonces,favoris,ventes,notifications,automatisations,parametres', `${T} : les mêmes onglets`, a.onglets.join(','));
-        dit(a.lignes === (site === 'leboncoin' ? 1 : 1) && JSON.stringify(a.options) === JSON.stringify(['baisser', 'ouvrir']), `${T} : annonces « En vente » du compte de l’onglet ; « Choisir une action » sans Republier ni Offre aux favoris`, JSON.stringify(a));
+        dit(a.onglets.join(',') === 'accueil,annonces,ventes,messages,favoris,notifications,automatisations,parametres' && a.vx === 'annonces' && a.grpSite.includes(site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'), `${T} : la même barre latérale « comme Vintex », le site nommé`, JSON.stringify({ o: a.onglets, g: a.grpSite }));
+        dit(a.lignes === (site === 'leboncoin' ? 2 : 1) && JSON.stringify(a.options) === JSON.stringify(site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : ['baisser', 'ouvrir']), `${T} : toutes les annonces du compte de l’onglet (tous statuts, comme Vintex) ; « Choisir une action » sans Republier ni Offre aux favoris`, JSON.stringify(a));
+        if (site === 'leboncoin') {
+          // 5.410 : « Supprimer » d'UNE annonce : la confirmation « sans retour » du fond, puis SON « Oui ».
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-ann-sel="a1"]'); c.checked = true; c.dispatchEvent(new Event('change')); });
+          await t.pg.waitForTimeout(150);
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const s2 = r.querySelector('[data-ann-action]'); s2.value = 'supprimer'; s2.dispatchEvent(new Event('change')); });
+          await t.pg.waitForTimeout(250);
+          const c1 = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-ann-confirme="supprimer"]'); return b ? b.innerText : ''; });
+          await t.pg.screenshot({ path: path.join(SORTIE, `${site}-supprimer-${largeur}-${scheme}.png`) });
+          const env1 = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'supprimerLbcCarte'));
+          dit(/sans retour/.test(c1) && /Oui, supprimer de Leboncoin/.test(c1) && env1.length === 1 && env1[0].sansRetour !== true, `${T} : « Supprimer » : la confirmation « sans retour » d'abord, rien ne part`, JSON.stringify({ c1, env1 }));
+          await clic(t.pg, '[data-ann-confirme-ok]');
+          await t.pg.waitForTimeout(200);
+          const env2 = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'supprimerLbcCarte'));
+          dit(env2.length === 2 && env2[1].sansRetour === true && env2[1].confirme === true && env2[1].id === 'a1', `${T} : « Oui, supprimer de Leboncoin » ⇒ la demande part avec « sans retour »`, JSON.stringify(env2));
+        }
         if (site === 'leboncoin') dit(a.sansCompte === '124', `${T} : les 124 annonces lues sans compte sont DITES, jamais montrées`, a.sansCompte);
+        // 5.410 (lot lbc-vc-interesses) : Leboncoin — les intéressés et « Leur écrire » confirmé ; Vestiaire — la date « au moins ».
+        if (site === 'leboncoin') {
+          await clic(t.pg, '[data-onglet-b="annonces"]');
+          await t.pg.waitForTimeout(200);
+          await clic(t.pg, '[data-lbc-int-voir="a1"]');
+          const gi = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelector('[data-lbc-interesses]') && r.querySelector('[data-lbc-interesses]').getAttribute('data-lbc-interesses'), gens: Array.from(r.querySelectorAll('[data-lbc-int-conv]')).map((c) => c.getAttribute('data-lbc-int-conv') + ':' + (c.checked ? 'coche' : '') + (c.disabled ? 'deja' : '')) }; });
+          await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-lbc-int-texte="0"]'); ta.value = 'Bonjour, toujours dispo !'; ta.dispatchEvent(new Event('input')); ta.dispatchEvent(new Event('change')); });
+          await t.pg.waitForTimeout(150);
+          await clic(t.pg, '[data-lbc-int-ecrire]');
+          await t.pg.screenshot({ path: path.join(SORTIE, `${site}-interesses-${largeur}-${scheme}.png`) });
+          const avant = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'ecrireInteressesLbc').length);
+          await clic(t.pg, '[data-lbc-int-oui]');
+          const ei = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'ecrireInteressesLbc'));
+          dit(gi.n === '1' && gi.gens.join(',') === 'c1:coche,c2:deja' && avant === 0 && ei.length === 1 && ei[0].annonce === 'a1' && ei[0].convs.join(',') === 'c1' && ei[0].textes[0] === 'Bonjour, toujours dispo !' && ei[0].confirme === true, `${T} : intéressés de l’annonce (déjà écrits grisés) ; « Leur écrire » ⇒ récapitulatif ⇒ SA confirmation`, JSON.stringify({ gi, ei }));
+        } else {
+          await clic(t.pg, '[data-onglet-b="annonces"]');
+          const am = await t.pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-date-au-moins]'); return x ? x.innerText : ''; });
+          dit(/au moins depuis/.test(am), `${T} : Vestiaire — date de mise en ligne « au moins » (jamais une date inventée)`, am);
+        }
+        await clic(t.pg, '[data-onglet-b="automatisations"]');
+        await clic(t.pg, '[data-ra-bascule="baisse"]');
+        await clic(t.pg, '[data-ra-oui]');
+        await t.pg.screenshot({ path: path.join(SORTIE, `${site}-baisse-${largeur}-${scheme}.png`) });
+        const rb = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'reglageAuto'));
+        dit(rb.length === 1 && rb[0].cle === 'vinted_baisse_regle' && rb[0].valeur.uid === (site === 'leboncoin' ? 'lbc:moi' : 'vc:42') && rb[0].confirme === true && (site === 'leboncoin' || !!(await t.pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-au-baisse-vc-date]')))), `${T} : baisse par règle de CE compte ${site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire (date « au moins » dite)'} réglée ici, allumer ⇒ confirmation`, JSON.stringify(rb));
         await clic(t.pg, '[data-onglet-b="ventes"]');
         await clic(t.pg, '[data-fiche-b]');
         a = await lireS(t.pg);

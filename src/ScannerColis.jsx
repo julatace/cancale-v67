@@ -425,7 +425,8 @@ export default function ScannerColis({ Photo = null, mode = 'envoi', trouver, on
             <span className="vrm-scan-quoi is-n">{res.lu} · rien n’est coché</span>
           </div>
         ) : <span className="vrm-scan-attente">{camera === 'sans' ? '' : 'Vise le code-barres.'}</span>}
-        {montrePaire && res.etat === 'trouve'
+        {/* (20 nov., chasse-bugs-2 — décision « 4 oui ») Sans geste confié (envoi : le dépôt est constaté par le suivi), le scanner montre le colis, sans bouton. */}
+        {montrePaire && res.etat === 'trouve' && (onConfirmer || onDeposer)
           ? <button type="button" className="vrm-scan-geste" data-scan-confirmer={String(c.cle)} onClick={confirmer}>{M.geste}</button> : null}
         {vente ? <BoutonPhotoCarton vente={{ ...vente, num: c.num || '' }} ton="sombre"/> : null}
         {montrePaire && res.etat === 'fait' && enAttente && onAnnuler

@@ -11,6 +11,8 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { quoiRacheter, TRIS_RACHAT, MIN_RACHAT } from '../quoiRacheter.js';
 import '../argent-choix.css';
+import { Carte, Rangee, Segmente as NSegmente } from '../natif/index.js';
+import { AideArgent } from '../natif/ecrans/AideArgent.jsx';
 
 const cents = (v) => (v == null ? '' : String(Math.round(Number(v) * 100)));
 const VISIBLES = 8;
@@ -23,69 +25,49 @@ export default function QuoiRacheter({ lignes, Segmente, fmt, etat, onSaisirPrix
   const choisir = (v) => { setTri(v); setTout(false); try { localStorage.setItem('vrm_qr_tri', v); } catch (_) {} };
   const Q = React.useMemo(() => (Array.isArray(lignes) ? quoiRacheter(lignes, { tri }) : null), [lignes, tri]);
   const montant = (v) => (v == null ? '—' : fmt(v));
-  const titre = <h2 className="vrm-ac-titre">{tr('ac.qr.titre')}</h2>;
-
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis : une carte à filet (« MODÈLE ET TAILLE », la couverture en une ligne
+  // grise), « Comment c'est calculé » en « ? » dans l'en-tête ; « À racheter » puis le classement en rangées sobres (le
+  // nom, « N vendues · X € par paire · N j » en gris, le chiffre du tri à droite). La même règle (`quoiRacheter`).
   if (!Q || !Q.nReliees) {
     return (
-      <section className="vrm-ac-section vrm-sv-repliee" data-stats-carte="sv-racheter" data-qr-etat={Q ? 'lu' : (etat || 'passu')} data-qr-n={Q ? Q.n : ''} data-qr-reliees={Q ? Q.nReliees : ''}>
-        {titre}
-        <p className="vrm-ac-couv">{!Q ? (etat === 'encours' ? tr('ac.qr.encours') : tr('ac.qr.pasLu')) : Q.n ? tr('ac.qr.aucuneReliee', { n: Q.n }) : tr('ac.qr.aucune')}</p>
-        {Q && Q.n && onSaisirPrix ? <button type="button" className="vrm-lien-action vrm-ac-lien" data-qr-saisir="" onClick={onSaisirPrix}>{tr('ac.qr.saisir')}</button> : null}
-      </section>
+      <Carte titre={tr('ac.qr.titre')} className="vrm-sv-repliee" sousTitre={!Q ? (etat === 'encours' ? tr('ac.qr.encours') : tr('ac.qr.pasLu')) : Q.n ? tr('ac.qr.aucuneReliee', { n: Q.n }) : tr('ac.qr.aucune')}
+        attrs={{ 'data-stats-carte': 'sv-racheter', 'data-qr-etat': Q ? 'lu' : (etat || 'passu'), 'data-qr-n': Q ? Q.n : '', 'data-qr-reliees': Q ? Q.nReliees : '' }}>
+        {Q && Q.n && onSaisirPrix ? <Rangee titre={tr('ac.qr.saisir')} ton="ambre" fin="chevron" onClick={onSaisirPrix} attrs={{ 'data-qr-saisir': '' }}/> : null}
+      </Carte>
     );
   }
   const vus = tout ? Q.groupes : Q.groupes.slice(0, VISIBLES);
-  const options = TRIS_RACHAT.filter((v) => v !== 'nombre').map((v) => ({ v, l: tr('ac.qr.tri.' + v), data: { 'data-qr-tri': v } }));
+  const options = TRIS_RACHAT.filter((v) => v !== 'nombre').map((v) => ({ cle: v, libelle: tr('ac.qr.tri.' + v), attrs: { 'data-qr-tri': v } }));
+  const droite = (g) => (tri === 'moyen' ? montant(g.moyen) : tri === 'marge' ? (g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`) : tri === 'vite' ? jours(g.mediane) : tri === 'nombre' ? String(g.n) : montant(g.brut));
+  const libDroite = tri === 'moyen' ? tr('ac.qr.parPaire') : tri === 'marge' ? tr('ac.qr.marge') : tri === 'vite' ? tr('ac.qr.pourVendre') : tri === 'nombre' ? tr('ac.qr.ventes') : tr('ac.qr.benefice');
   return (
-    <section className="vrm-ac-section" data-stats-carte="sv-racheter" data-qr-etat="lu" data-qr-n={Q.n} data-qr-reliees={Q.nReliees} data-qr-ndelai={Q.nDelai} data-qr-ecartees={Q.ecartees}
-      data-qr-autres={Q.autres.n} data-qr-classables={Q.classables} data-qr-peu={Q.peu ? '1' : '0'} data-qr-tri-actif={tri}>
-      <div className="vrm-ac-tete">
-        {titre}
-        <p className="vrm-ac-couv" data-qr-couv={`${Q.nReliees}/${Q.n}`}>{tr('ac.qr.couverture', { reliees: Q.nReliees, n: Q.n })}</p>
+    <Carte titre={tr('ac.qr.titre')} sousTitre={<span data-qr-couv={`${Q.nReliees}/${Q.n}`}>{tr('ac.qr.couverture', { reliees: Q.nReliees, n: Q.n })}</span>}
+      action={<AideArgent titre={tr('ac.qr.comment')}>
+        <p>{tr('ac.qr.commentTexte', { min: MIN_RACHAT })}</p>
+        {Q.autres.n ? <p data-qr-autres-texte="">{tr('ac.qr.autres', { n: Q.autres.n })}</p> : null}
+        {Q.ecartees ? <p>{tr('ac.qr.ecartees', { n: Q.ecartees })}</p> : null}
+      </AideArgent>}
+      attrs={{ 'data-stats-carte': 'sv-racheter', 'data-qr-etat': 'lu', 'data-qr-n': Q.n, 'data-qr-reliees': Q.nReliees, 'data-qr-ndelai': Q.nDelai, 'data-qr-ecartees': Q.ecartees,
+        'data-qr-autres': Q.autres.n, 'data-qr-classables': Q.classables, 'data-qr-peu': Q.peu ? '1' : '0', 'data-qr-tri-actif': tri }}>
+      <div className="n-arg-sous-groupe" data-qr-racheter={Q.aRacheter.map((g) => g.k).join(',')}>
+        <h3 className="n-arg-sous-titre">{tr('ac.qr.aRacheter')}</h3>
+        {Q.peu ? <Rangee titre={tr('ac.qr.peu', { min: MIN_RACHAT })} attrs={{ 'data-qr-peu-texte': '' }}/>
+          : !Q.aRacheter.length ? <Rangee titre={tr('ac.qr.aucunRachat')}/>
+            : Q.aRacheter.slice(0, 3).map((g) => (
+              <Rangee key={g.k} titre={g.nom} valeur={montant(g.moyen)} detailValeur={tr('ac.qr.parPaire')} sousTitre={`${jours(g.mediane)} ${tr('ac.qr.pourVendre')}`}
+                attrs={{ 'data-qr-rachat': g.k, 'data-moyen': cents(g.moyen), 'data-mediane': g.mediane }}/>
+            ))}
       </div>
-      <div className="vrm-at-carte vrm-ac-carte vrm-ac-racheter" data-qr-racheter={Q.aRacheter.map((g) => g.k).join(',')}>
-        <div className="vrm-ac-libelle vrm-ac-etiquette">{tr('ac.qr.aRacheter')}</div>
-        {Q.peu ? <p className="vrm-ac-note" data-qr-peu-texte="">{tr('ac.qr.peu', { min: MIN_RACHAT })}</p>
-          : !Q.aRacheter.length ? <p className="vrm-ac-note">{tr('ac.qr.aucunRachat')}</p>
-            : (
-              <ol className="vrm-ac-liste-rachat">
-                {Q.aRacheter.slice(0, 3).map((g) => (
-                  <li key={g.k} className="vrm-ac-rachat" data-qr-rachat={g.k} data-moyen={cents(g.moyen)} data-mediane={g.mediane}>
-                    <span className="vrm-ac-rachat-nom">{g.nom}</span>
-                    <span className="vrm-ac-rachat-chiffres">
-                      <span><b className="vrm-ac-chiffre">{montant(g.moyen)}</b><span className="vrm-ac-libelle">{tr('ac.qr.parPaire')}</span></span>
-                      <span><b className="vrm-ac-chiffre">{jours(g.mediane)}</b><span className="vrm-ac-libelle">{tr('ac.qr.pourVendre')}</span></span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            )}
-      </div>
-      <Segmente label={tr('ac.qr.trier')} className="vrm-ac-tris" value={tri} onChange={choisir} options={options}/>
-      <ol className="vrm-at-carte vrm-ac-carte vrm-ac-liste" data-qr-liste={Q.groupes.length}>
+      <div className="n-arg-tri"><NSegmente libelle={tr('ac.qr.trier')} valeur={tri} onChange={choisir} options={options}/></div>
+      <div className="n-arg-liste" data-qr-liste={Q.groupes.length}>
         {vus.map((g, rang) => (
-          <li key={g.k} className="vrm-ac-groupe vrm-at-rangee" data-qr-ligne={g.k} data-n={g.n} data-brut={cents(g.brut)} data-moyen={cents(g.moyen)}
-            data-marge={g.marge == null ? '' : g.marge} data-mediane={g.mediane == null ? '' : g.mediane} data-ndelai={g.nDelai}
-            data-qr-a-racheter={Q.aRacheter.some((x) => x.k === g.k) ? '1' : undefined}>
-            <span className="vrm-ac-rang">{rang + 1}</span>
-            <span className="vrm-ac-corps">
-              <span className="vrm-ac-titre-ligne">{g.nom}</span>
-              <span className="vrm-ac-sous">{tr('ac.qr.vendues', { n: g.n })}{g.moyen != null ? ` · ${tr('ac.qr.moyPaire', { x: fmt(g.moyen) })}` : ''}{g.mediane != null ? ` · ${jours(g.mediane)}` : ''}</span>
-            </span>
-            <span className="vrm-ac-droite">
-              <b className="vrm-ac-montant">{tri === 'moyen' ? montant(g.moyen) : tri === 'marge' ? (g.marge == null ? '—' : `${String(g.marge).replace('.', ',')} %`) : tri === 'vite' ? jours(g.mediane) : tri === 'nombre' ? String(g.n) : montant(g.brut)}</b>
-              <span className="vrm-ac-libelle">{tri === 'moyen' ? tr('ac.qr.parPaire') : tri === 'marge' ? tr('ac.qr.marge') : tri === 'vite' ? tr('ac.qr.pourVendre') : tri === 'nombre' ? tr('ac.qr.ventes') : tr('ac.qr.benefice')}</span>
-            </span>
-          </li>
+          <Rangee key={g.k} titre={`${rang + 1}. ${g.nom}`} valeur={droite(g)} valeurForte detailValeur={libDroite}
+            sousTitre={`${tr('ac.qr.vendues', { n: g.n })}${g.moyen != null ? ` · ${tr('ac.qr.moyPaire', { x: fmt(g.moyen) })}` : ''}${g.mediane != null ? ` · ${jours(g.mediane)}` : ''}`}
+            attrs={{ 'data-qr-ligne': g.k, 'data-n': g.n, 'data-brut': cents(g.brut), 'data-moyen': cents(g.moyen), 'data-marge': g.marge == null ? '' : g.marge, 'data-mediane': g.mediane == null ? '' : g.mediane,
+              'data-ndelai': g.nDelai, 'data-qr-a-racheter': Q.aRacheter.some((x) => x.k === g.k) ? '1' : undefined }}/>
         ))}
-      </ol>
-      {Q.groupes.length > VISIBLES ? <button type="button" className="vrm-lien-action vrm-ac-lien" data-qr-tout={tout ? '1' : '0'} onClick={() => setTout(!tout)}>{tout ? tr('ac.qr.moins') : tr('ac.qr.toutVoir', { n: Q.groupes.length })}</button> : null}
-      <details className="vrm-repli vrm-ac-repli">
-        <summary>{tr('ac.qr.comment')}</summary>
-        <p className="vrm-ac-note">{tr('ac.qr.commentTexte', { min: MIN_RACHAT })}</p>
-        {Q.autres.n ? <p className="vrm-ac-note" data-qr-autres-texte="">{tr('ac.qr.autres', { n: Q.autres.n })}</p> : null}
-        {Q.ecartees ? <p className="vrm-ac-note">{tr('ac.qr.ecartees', { n: Q.ecartees })}</p> : null}
-      </details>
-    </section>
+        {Q.groupes.length > VISIBLES ? <Rangee titre={tout ? tr('ac.qr.moins') : tr('ac.qr.toutVoir', { n: Q.groupes.length })} fin="chevron" onClick={() => setTout(!tout)} attrs={{ 'data-qr-tout': tout ? '1' : '0' }}/> : null}
+      </div>
+    </Carte>
   );
 }

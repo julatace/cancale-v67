@@ -30,15 +30,13 @@ import { jaugeDuCompte, heureFr } from './jaugeActions.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
 import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth, load, save, onCloudReady } from './App.jsx';
-import NegociationPaliers from './NegociationPaliers.jsx';   // (19 nov., ext. 5.409) la négociation par paliers
+import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov., décision de Julien) les réglages du moteur : dans l'extension
 import PrixMiniManquants from './PrixMiniManquants.jsx';
 import { tr, localeCourante } from './i18n/index.js';
 import './offres-auto.css';
-import AutresVersions from './AutresVersions.jsx';
 // (intégration g1) prix-mini (textes par tr) × vocabulaire-article (« paire » seulement pour un vendeur
 // Sneakers) : les clés qui nomment l'article ont une variante `.art`, choisie par le vocabulaire du vendeur.
 const tv = (k, p) => tr(motsVendeur().nom === 'paire' ? k : k + '.art', p);
-import { erreurMessageAuto } from './messageSur.js';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -147,9 +145,8 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
             <b>{tr('oa.titre')}</b>
             <span data-oa-statut="">{actif ? tv('oa.allumees', { n: nAvec }) : tr('oa.eteintes')}</span>
           </div>
-          <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label={tr('oa.interrupteur')}>
-            <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
-          </button>
+          {/* (20 nov., décision de Julien) Allumer, éteindre, régler le moteur : dans l'extension. L'app en dit l'état. */}
+          <BoutonExtension className="vrm-ao-second" action="automatisations" ids={['offres']} attrs={{ 'data-offres-auto-etat': actif ? '1' : '0' }}/>
         </div>
         <ul className="vrm-oa-regles" data-oa-regles="">
           <li><span className="vrm-oa-regle-icone is-oui" aria-hidden="true"><Icon name="check" size={14}/></span>{tr('oa.regle.accepte', { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX })}</li>
@@ -244,12 +241,11 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
       {/* ── 6. LE MESSAGE DE REFUS (son texte, vide par défaut) ── */}
       <h3 className="vrm-oa-titre">{tr('oa.refus.titre')}</h3>
       <div className="vrm-oa-groupe">
-        <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder={tr('oa.refus.vide')} aria-label={tr('oa.refus.label')}/>
-        {/* (12 nov., ext. 5.369) Ses autres versions : une au hasard, jamais celle du refus précédent. */}
-        {setRefusVariantes ? <AutresVersions nom="refus" premier={refusMsg} variantes={refusVariantes} onChange={setRefusVariantes} extOk={variantesOk}/> : null}
-        {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
+        <p className="vrm-oa-refus" data-oa-refus-msg="">{refusMsg || tr('oa.refus.vide')}</p>
+        <BoutonExtension className="vrm-ao-second" action="automatisations" ids={['offres-refus']}/>
       </div>
-      <NegociationPaliers load={load} save={save} onCloudReady={onCloudReady} askConfirm={askConfirm}/>
+      {/* (20 nov.) La négociation par paliers se règle dans l'extension (src/negociationPaliers.js reste la règle). */}
+      <BoutonExtension action="automatisations" ids={['paliers']} libelle={tr('actionsExt.paliers')}/>
     </section>
   );
 }

@@ -319,6 +319,6 @@
 }
 
 /* La carte « Démarrer avec VRM » : posée (ombre douce, aucune bordure), le pas en cours en avant. */
-:root:root body .vrm-main [data-parcours-carte] { border: 0 !important; box-shadow: var(--d-ombre-douce) !important; border-radius: 20px !important; }
+:root:root body .vrm-main [data-parcours-carte] { border: 0 !important; box-shadow: none !important; border-radius: 20px !important; }
 
 } /* fin @layer vrm-premium */

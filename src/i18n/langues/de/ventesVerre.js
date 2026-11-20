@@ -124,5 +124,17 @@ export default {
   "vn.e.coches": {"one": "{n} ausgewählt", "other": "{n} ausgewählt"},
   "vn.e.deposer": {"one": "{n} abzugeben", "other": "{n} abzugeben"},
   "vn.auMoins": "mindestens {n} zu versenden",
-  "vn.detailVide": "Tippe auf einen Verkauf, um ihn hier zu sehen."
+  "vn.detailVide": "Tippe auf einen Verkauf, um ihn hier zu sehen.",
+  "vn.lbc.aGenerer": "Etikett zu erstellen",
+  "vn.lbc.prets": "Bereit zum Drucken",
+  "vn.lbc.genererTous": "Alle erstellen",
+  "vn.lbc.generer": "zu erstellen",
+  "vn.lbc.pret": "bereit",
+  "vn.lbc.fait": "Paket fertig",
+  "vn.lbc.pasEncore": "Noch nicht",
+  "vn.lbc.poste": "Aufgegeben",
+  "vn.lbc.suivre": "Verfolgen",
+  "vn.lbc.rien": "Kein Leboncoin-Paket zu versenden.",
+  "vn.lbc.pasLu": "Leboncoin-Pakete: noch nicht gelesen.",
+  "vn.lbc.limite": "Das Etikett wird auf leboncoin.fr erstellt: Tippen auf den Verkauf öffnet es dort."
 };

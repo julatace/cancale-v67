@@ -191,7 +191,8 @@ async function auditer(src, { parite = true } = {}) {
   dit(!!ecran && !/vmrCmd|vmrExec|executerCommande|offer_requests|\/api\/v2\//.test(ecran), 'C4 l’écran n’envoie rien chez Vinted (aperçu seulement)');
   const actions = [...ecran.matchAll(/action: '([a-z_]+)'/g)].map((m) => m[1]);
   dit(actions.length >= 2 && actions.every((a) => a === 'auto_stop' || a === 'arreter'), '« Tout arrêter » n’emploie que des actions qui ÉTEIGNENT (auto_stop, arreter)'.replace(/^/, 'C5 '), actions.join(','));
-  dit(/basculer=\{basculerOffresAuto\}/.test(app) && /onClick=\{basculer\}/.test(ecran), 'C6 l’interrupteur est LE même (confirmation qui dit le risque, éteint par défaut)');
+  // (20 nov., décision de Julien) Allumer / éteindre se fait dans le panneau de l'extension (sa confirmation) : l'écran le dit et l'ouvre.
+  dit(!/basculerOffresAuto = /.test(app) && /<BoutonExtension className="vrm-ao-second" action="automatisations" ids=\{\['offres'\]\}/.test(ecran), 'C6 (20 nov.) l’interrupteur est dans l’extension ; l’écran l’ouvre');
   dit(/select=id,e:data->e/.test(ecran) && !/select=data[&'`]/.test(ecran), 'C7 l’historique se lit en projection (jamais select=data)');
   dit(/virguleLue=\{extSait\('offrespage'\)==='ok'\}/.test(app) && /apercuMoteur\(\{[^)]*virgule: virguleLue === true \}\)/.test(ecran), 'C8 la virgule n’est lue dans l’aperçu QUE pour une extension 5.342 (capacité offrespage), jamais supposée');
   return out;

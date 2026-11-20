@@ -66,3 +66,17 @@
   .n-eg-prop[data-eg-prop-forme="cellule"] .n-eg-prop-gestes { flex-wrap: nowrap; }
   .n-eg-prop .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }
 }
+
+/* (20 nov., Julien : « améliore le visuel » + « divise par comptes ») La recherche et « Actions » (un rond ⋯ natif) sur une
+   ligne ; aucune pastille bleu clair ; l'en-tête d'un compte : logo · pseudo, son nombre ; le plein détaché des onglets. */
+@layer vrm-natif {
+  .n-eg-recherche { display: flex; align-items: center; gap: 8px; }
+  .n-eg-recherche > :first-child { flex: 1 1 auto; min-width: 0; }
+  .n-eg-outils:not([data-eg-outils]) { display: none; }
+  .n-eg-compte { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .n-eg-compte-logo { display: inline-flex; flex: 0 0 auto; width: 16px; height: 16px; align-items: center; justify-content: center; }
+  .n-eg-compte-logo > * { max-width: 16px; max-height: 16px; }
+  .n-page-contenu[data-eg-ecran] > .n-page-plein { padding-bottom: 16px; }
+  .n-tt-intertitre-th { padding: 20px 12px 6px; text-align: start; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); background: var(--n-fond); }
+  .n-tt-intertitre-n { margin-inline-start: 8px; font-weight: 400; text-transform: none; letter-spacing: normal; }
+}

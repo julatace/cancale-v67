@@ -5,7 +5,7 @@
    un refus (un geste à faire, §7) ; le bleu seulement sur le bouton principal. */
 .vrm-pp-feuille { max-width: 620px; }
 .vrm-pp-source { display: flex; align-items: center; gap: 6px; margin: 0 4px 12px; font-size: 13px; color: var(--fu-gris, #6e6e73); }
-.vrm-pp-reglage, .vrm-pp-article { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 12px 14px; margin-bottom: 12px; }
+.vrm-pp-reglage, .vrm-pp-article { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 12px 14px; margin-bottom: 12px; }
 .vrm-pp-reglage h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
 .vrm-pp-reglage-ligne { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 48px; }
 .vrm-pp-reglage-ligne + .vrm-pp-reglage-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }

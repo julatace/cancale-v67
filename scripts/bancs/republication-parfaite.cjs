@@ -1,4 +1,5 @@
 // Banc : REPUBLIER ÉTAPE PAR ÉTAPE (17 nov., extension 5.408 — `repubetapes`, `repubreprise`).
+// (20 nov., 5.410) L'atelier de l'app (A, C) est passé dans le panneau de l'extension : voir grand-panneau.cjs.
 // Données INVENTÉES. Le vrai build (dist) et les vrais fichiers de l'extension (vrm-ui.js, vrm-action.js).
 //   A. L'atelier AVANT : « 3 annonces · environ … · fin vers HH:MM » (data-repub-plan).
 //   B. PENDANT : sur vinted.fr, l'écran plein dit la chaîne de LA paire (Coffre ✓ › Brouillon ✓ ›
@@ -146,66 +147,16 @@ async function ecranPlein(b, vp, theme, tag) {
       const vp = { width: w, height: w < 600 ? 844 : 900 };
       const tag = `${w}-${theme}`;
       console.log(`── ${tag}`);
+      // (20 nov., ext. 5.410 — « toute action se fait dans l'extension ») L'atelier de l'APP (A, C) est retiré : il vit
+      // dans le PANNEAU de l'extension (contrôle avant de lancer, ordre, espacement, réglage photo, suivi, Reprendre),
+      // jugé par scripts/bancs/grand-panneau.cjs. Ici : l'app ne republie plus rien elle-même, et l'écran plein (B).
       { const { ctx, pg, errs } = await pageApp(b, vp, theme);
         await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-        await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-        await pg.locator('[data-actions-ouvrir]').first().click();
-        await pg.waitForSelector('[data-selection-vue]', { timeout: 8000 });
-        for (const id of ['9102', '9103', '9104']) await pg.locator(`[data-selection-compte="111"] [data-selection-annonce="${id}"] input`).first().check();
-        const parVrm = pg.locator('.vrm-sel-barre [data-republier-lancer]');
-        if (await parVrm.count()) await parVrm.first().click(); else { await pg.locator('[data-actions-possibles]').click(); await pg.locator('[data-action-sel="recreer"]').click(); }
-        await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 6000 });
-        for (let i = 0; i < 3; i++) { const s = pg.locator('[data-republier-suivant]'); if (await s.count() && await s.isVisible()) { await s.click(); await pg.waitForTimeout(250); } }
-        await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
-        await pg.locator('[data-republier-esp-fixe]').fill('0').catch(() => {});
-        const plan = pg.locator('[data-repub-plan]');
-        await plan.waitFor({ timeout: 5000 }).catch(() => {});
-        const pl = await plan.first().evaluate((e) => ({ n: e.getAttribute('data-repub-plan-n'), sec: Number(e.getAttribute('data-repub-plan')), t: e.textContent })).catch(() => null);
-        dit(pl && pl.n === '3' && pl.sec >= 3 * 45 && /3 annonces · environ \d+ min · fin vers \d\d:\d\d/.test(pl.t), `A1 ${tag} le plan avant de lancer : « 3 annonces · environ … min · fin vers HH:MM »`, pl && pl.t);
-        // Pas de « bulle » : un bloc de l'atelier plus haut que 60 px n'a jamais un rayon de pilule.
-        const bulles = await pg.evaluate(() => [...document.querySelectorAll('[data-republier] div')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 60 && parseFloat(getComputedStyle(e).borderTopLeftRadius) > 40; }).length);
-        dit(bulles === 0, `A3 ${tag} aucune « bulle » (bloc haut au rayon de pilule)`, String(bulles));
-        const esp = await pg.locator('[data-republier-esp-fixe]').inputValue().catch(() => '');
-        await pg.locator('[data-republier-esp-fixe]').blur().catch(() => {}); await pg.waitForTimeout(150);
-        const esp2 = await pg.locator('[data-republier-esp-fixe]').inputValue().catch(() => '');
-        dit(esp2 === '8' && await pg.locator('[data-republier-esp-min="8"]').count() === 1, `A4 ${tag} « 0 s » refusé : 8 s au moins, et c'est dit`, `${esp} → ${esp2}`);
-        await plan.first().scrollIntoViewIfNeeded().catch(() => {});
-        await shot(pg, `rp1-atelier-plan-${tag}.png`);
-        await pg.locator('[data-republier-confirme]').check();
-        await pg.locator('[data-republier-lancer]').last().click();
-        try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 1500 }); if (f) { await pg.click('[data-verif-publier]'); } } catch (_) {}
-        await attendre(async () => (await pg.evaluate(() => window.__repub.length)) >= 3, 45000);   // 8 s au moins entre deux (REPUB_ESP_MIN)
-        await pg.waitForTimeout(800);
-        await shot(pg, `rp2-pendant-suivi-${tag}.png`);
-        const tot = await pg.evaluate(() => window.__repub.map((x) => x.total));
-        dit(tot.length === 3 && tot.every((t) => t === 3), `A2 ${tag} chaque commande dit la taille de la série (l'écran plein compte « 1 sur 3 »)`, JSON.stringify(tot));
-        await pg.evaluate(() => window.__finir('9102'));
-        // La feuille « VRM travaille » se ferme comme lui : « Fermer ».
-        await attendre(async () => (await pg.locator('[data-suivi-fermer]').count()) > 0, 8000);
-        await pg.locator('[data-suivi-fermer]').first().click().catch(() => {});
-        await pg.waitForTimeout(300);
-        const bil = pg.locator('[data-repub-bilan]');
-        await bil.waitFor({ timeout: 8000 }).catch(() => {});
-        const bl = await bil.evaluate((e) => ({ l: e.getAttribute('data-repub-en-ligne'), f: e.getAttribute('data-repub-a-finir'), t: e.querySelector('.vrm-repub-bilan-tete').textContent, gestes: [...e.querySelectorAll('[data-repub-bilan-ligne]')].map((x) => x.getAttribute('data-repub-bilan-ligne') + ':' + x.getAttribute('data-repub-geste')) })).catch(() => null);
-        dit(bl && bl.l === '1' && bl.f === '2' && /1 en ligne/.test(bl.t) && /2 à finir/.test(bl.t), `C1 ${tag} le bilan : « 1 en ligne · 2 à finir »`, bl && bl.t);
-        dit(bl && bl.gestes.join(',') === '9103:choisir,9104:reessayer', `C2 ${tag} UN geste par problème : la taille ⇒ Choisir, pas partie ⇒ Réessayer`, bl && bl.gestes.join(','));
-        const ch = await pg.$$eval('[data-repub-chaine]', (els) => els.map((e) => e.getAttribute('data-repub-chaine') + '/' + (e.getAttribute('data-repub-probleme') || ''))).catch(() => []);
-        dit(ch.join(',') === '4/,3/enligne,0/', `C3 ${tag} la chaîne sous chaque ligne : 4 étapes · brouillon prêt arrêté avant « en ligne » · rien coché pour la pas partie`, ch.join(','));
-        const hb = await pg.$$eval('[data-repub-bilan] button, [data-repub-bilan] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
-        dit(hb.length >= 2 && hb.every((h) => h >= (w < 600 ? 44 : 32)), `C4 ${tag} les gestes du bilan à la bonne taille (44 px au doigt)`, hb.join(','));
-        const coupes = await pg.$$eval('[data-repub-ligne-titre]', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis').length).catch(() => -1);
-        const nTit = await pg.locator('[data-repub-ligne-titre]').count();
-        dit(nTit === 3 && coupes === 0, `C7 ${tag} les titres des lignes sont entiers (aucun « … »)`, `${nTit} titres, ${coupes} coupés`);
-        await bil.scrollIntoViewIfNeeded().catch(() => {});
-        await shot(pg, `rp3-bilan-${tag}.png`);
-        // « Choisir la taille » : SA réponse repart pour CETTE paire seulement.
-        await pg.locator('[data-repub-bilan-geste="choisir"]').first().click();
-        const opt = pg.locator('[data-ask-choix] button').first();
-        if (await opt.waitFor({ timeout: 4000 }).then(() => true).catch(() => false)) { await shot(pg, `rp4-choisir-${tag}.png`); await opt.click(); }
-        await attendre(async () => (await pg.evaluate(() => window.__repub.filter((x) => x.reponses).length)) >= 1, 6000);
-        const env = await pg.evaluate(() => window.__repub.filter((x) => x.reponses).map((x) => x.id + ':' + JSON.stringify(x.reponses)));
-        dit(env.length === 1 && /^9103:\{"size":"56"\}$/.test(env[0]), `C5 ${tag} « Choisir » : la commande repart pour 9103 seule, avec SA réponse`, env.join(','));
-        dit(!errs.length, `C6 ${tag} aucune erreur de page`, errs.slice(0, 2).join(' | '));
+        await pg.waitForTimeout(2500);
+        const atelierApp = await pg.locator('[data-republier]').count();
+        const repub = await pg.evaluate(() => (window.__repub || []).length);
+        dit(atelierApp === 0 && repub === 0, `A0 ${tag} l'app n'a plus d'atelier Republier et n'envoie aucune republication (elle se fait dans le panneau)`, `${atelierApp} atelier, ${repub} commande(s)`);
+        dit(!errs.length, `A5 ${tag} aucune erreur de page`, errs.slice(0, 2).join(' | '));
         await ctx.close();
       }
       await ecranPlein(b, vp, theme, tag);
