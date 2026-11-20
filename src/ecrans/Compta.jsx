@@ -3356,7 +3356,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
                 </div>
                 {(
                 <div style={{display:'flex',alignItems:'center',gap:'6px 12px',flexWrap:'wrap',marginTop:12}}>
-                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'8px 14px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>{tr('compta.declarerUrssaf')}</a>
+                  <a href="https://www.autoentrepreneur.urssaf.fr" target="_blank" rel="noopener noreferrer" data-declarer-urssaf="" style={{fontSize:13,fontWeight:600,color:C.accentTexte||C.accent,background:'transparent',borderRadius:12,padding:'8px 4px',textDecoration:'none',minHeight:44,boxSizing:'border-box',display:'inline-flex',alignItems:'center'}}>{tr('compta.declarerUrssaf')}</a>
                   {finie && aNoter.length > 0 && (
                     <button type="button" data-urssaf-cest-declare={aNoter[0]} onClick={() => demanderDeclaration(aNoter[0], onNav)}
                       style={{fontSize:13,fontWeight:600,color:C.text,background:'transparent',border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit'}}>
@@ -3515,9 +3515,9 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
           </select>
         </div>
         <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="primaire" icone="printer" data-recap-imprimer="" disabled={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} style={{flex:'1 1 140px'}} title={tr('compta.recapImprimerTitre')}>{recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')}</Bouton>
-          <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
-          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
+          <Bouton variante="secondaire" icone="printer" data-recap-imprimer="" disabled={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} style={{flex:'0 0 auto'}} title={tr('compta.recapImprimerTitre')}>{recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')}</Bouton>
+          <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'0 0 auto'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
+          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'0 0 auto'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
         </div>
         <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
@@ -5051,7 +5051,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 10, fontSize: 13, color: C.muted, lineHeight: 1.45 }}>
                     <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{caPartiel ? tr('journee.moins3') : ''}{fmt(recettesAnnee)}</span>
                     <span>{tr('compta.caDeclare')}</span>
-                    <span style={{ color: C.border }}>—</span>
+                    <span style={{ color: C.muted }}>—</span>
                     <span className="vrm-display" style={{ color: C.text, fontWeight: 600 }}>{fmt(chargesAnnee)}</span>
                     <span>{tr('compta.charges2')}{charges.aboTotal > 0 ? tr('compta.dontAbonnements', { fmt: String(fmt(charges.aboTotal)) }) : ''}</span>
                   </div>

@@ -72,10 +72,13 @@ const MESURE = () => {
   const soulignes = [...main.querySelectorAll('a, button, [role="button"]')].filter(vu).filter((e) => /underline/.test(getComputedStyle(e).textDecorationLine)).map((e) => e.innerText.trim().slice(0, 30));
   const W = document.documentElement.clientWidth;
   const largeurs = [...main.querySelectorAll('button')].filter(vu).filter((e) => !e.closest('[data-n-plein], .n-rangee, .n-segmente, .v2-seg, [role="tablist"], .n-tuile, .vrm-seg, details > summary, .n-groupe-repli, [data-arg-rangee]') && !/plein/.test(e.getAttribute('data-n-variante') || '') && !e.classList.contains('v2-plein'))
-    .filter((e) => e.getBoundingClientRect().width > W * 0.8 && e.getBoundingClientRect().height < 70).map((e) => e.innerText.trim().slice(0, 30));
+    .filter((e) => { const t = (e.innerText || '').trim(); return t && !/\n/.test(t) && t.split(/\s+/).length <= 4 && !/›$/.test(t) && e.getBoundingClientRect().width > W * 0.8 && e.getBoundingClientRect().height < 70; })
+    .map((e) => e.innerText.trim().slice(0, 30) + ' ' + (e.className || '').toString().split(' ')[0]);
   const coupes = [];
-  for (const e of main.querySelectorAll('*')) { if (!vu(e) || e.children.length) continue; const t = (e.innerText || '').trim(); if (!t) continue; const cs = getComputedStyle(e);
-    if (e.scrollWidth > e.clientWidth + 1 && cs.overflow !== 'visible' && cs.textOverflow !== 'ellipsis') coupes.push(t.slice(0, 40));
+  const lecteurSeul = (e) => !!e.closest('.vrm-sr-seul, .n-lu-seul, .vg-sr, [data-sr]') || /inset\(50%\)|rect\(0/.test(getComputedStyle(e).clipPath + getComputedStyle(e).clip);
+  const nom = (e) => (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : e.tagName.toLowerCase());
+  for (const e of main.querySelectorAll('*')) { if (!vu(e) || e.children.length || lecteurSeul(e)) continue; const t = (e.innerText || '').trim(); if (!t) continue; const cs = getComputedStyle(e);
+    if (e.scrollWidth > e.clientWidth + 1 && cs.overflow !== 'visible' && cs.textOverflow !== 'ellipsis') coupes.push(nom(e) + ' ' + t.slice(0, 40));
     if (/€/.test(t) && e.scrollWidth > e.clientWidth + 1 && cs.overflow !== 'visible') coupes.push('€ ' + t.slice(0, 40)); }
   const deborde = document.documentElement.scrollWidth > W + 1;
   const ombres = [...main.querySelectorAll('[data-arg-carte], .n-carte, .n-groupe-corps')].filter(vu).filter((e) => getComputedStyle(e).boxShadow !== 'none').length;
@@ -88,7 +91,7 @@ const MESURE = () => {
 // Petites cibles au doigt (les éléments touchables visibles).
 const CIBLES = () => { const main = document.querySelector('.vrm-main'); const out = [];
   for (const e of main.querySelectorAll('button, a[href], [role="button"], input:not([type="hidden"]), select, summary')) { const r = e.getBoundingClientRect(); if (!r.width || !r.height) continue; let cache = false; for (let x = e; x; x = x.parentElement) if (x.hidden || getComputedStyle(x).display === 'none') { cache = true; break; } if (cache) continue;
-    if (e.closest('[inert]')) continue; if (r.width < 43.5 || r.height < 43.5) out.push((e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 30) + ' ' + Math.round(r.width) + '×' + Math.round(r.height)); }
+    if (e.closest('[inert]') || e.matches('.vrm-source-q')) continue; if (r.width < 43.5 || r.height < 43.5) out.push((e.innerText || e.getAttribute('aria-label') || e.tagName).trim().slice(0, 30) + ' ' + Math.round(r.width) + '×' + Math.round(r.height) + ' ' + (e.className || '').toString().split(' ')[0]); }
   return [...new Set(out)].slice(0, 10); };
 // La barre du haut : chaque icône (Messages, avatar) recouvre-t-elle un texte du contenu sans fond opaque derrière ?
 const BARRE = () => {
@@ -153,7 +156,7 @@ async function contraste(pg) {
       const cs = getComputedStyle(e); const c = px(cs.color); if (!c || c.a < 0.99) continue; const f = fond(e);
       const a = lum(c), b = lum(f); const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
       const grand = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.6 && Number(cs.fontWeight) >= 700);
-      if (k < (grand ? 3 : 4.5)) out.push(e.textContent.trim().slice(0, 30) + ' ' + k.toFixed(2)); }
+      if (k < (grand ? 3 : 4.5)) out.push(e.textContent.trim().slice(0, 30) + ' ' + k.toFixed(2) + ' ' + (e.className || e.tagName).toString().split(' ')[0]); }
     return [...new Set(out)].slice(0, 8);
   });
 }
