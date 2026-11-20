@@ -2105,7 +2105,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
             <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'article')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 13, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 13, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
-            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div data-republier-liste style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? `Le compte ouvert ${NAV.dansNu} n’est pas encore connu.` : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucun article en ligne sur ce compte n'a été lu pour l'instant."}</div>}
               {liste.map((a) => (
                 <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} data-republier-place={a.place || undefined} data-republier-compte-paire={action === 'enLigne' ? (a.uid || '') : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
@@ -2298,7 +2298,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
                 l’article en cours et SON étape en une ligne (la liste des étapes repliée),
                 combien sont faites / restent, ce qui a raté. Plus de seconde barre par
                 ligne : la ligne ne dit que son état. */}
-            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div data-republier-liste style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
               {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.muted }}>
                 <span style={{ flex: '1 1 160px' }}>{ordre ? 'Ordre réglé à la main' : 'Ordre : celui de ta sélection'}</span>
                 {ordre && <Bouton variante="discret" data-republier-ordre-selection onClick={() => setOrdre(null)}>Revenir à ma sélection</Bouton>}

@@ -119,13 +119,23 @@ const shot = async (pg, nom) => { if (SHOTS) { await pg.waitForTimeout(350); awa
       const tag = `${w}-${theme}`;
       console.log(`── ${tag}`);
       const { ctx, pg, errs } = await pageApp(b, vp, theme);
+      // (VRM natif, 19 nov.) Annonces → « Actions » → Republier → cocher → lancer (téléphone) ; au tableau de l'ordinateur :
+      // « Choisir une action » → Republier → cocher → lancer. Les deux mènent à l'atelier par `demanderActionAnnonces`.
       await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-      await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-      await pg.locator('[data-actions-ouvrir]').first().click();
-      await pg.waitForSelector('[data-selection-vue]', { timeout: 8000 });
-      for (const id of ['9102', '9103', '9104']) await pg.locator(`[data-selection-compte="111"] [data-selection-annonce="${id}"] input`).first().check();
-      const parVrm = pg.locator('.vrm-sel-barre [data-republier-lancer]');
-      if (await parVrm.count()) await parVrm.first().click(); else { await pg.locator('[data-actions-possibles]').click(); await pg.locator('[data-action-sel="recreer"]').click(); }
+      if (w < 900) {
+        await pg.locator('[data-eg-actions]').first().waitFor({ state: 'visible', timeout: 20000 });
+        await pg.locator('[data-eg-actions]').first().click();
+        await pg.locator('[data-eg-action="recreer"]').first().click();
+        for (const id of ['9102', '9103', '9104']) { const l = pg.locator(`[data-eg-article$="${id}"]`).first(); await l.click(); await pg.waitForTimeout(80); }
+        await pg.locator('[data-eg-lancer="recreer"]').first().click();
+      } else {
+        await pg.locator('[data-tt-ouvre="action"]').first().waitFor({ state: 'visible', timeout: 20000 });
+        await pg.locator('[data-tt-ouvre="action"]').first().click(); await pg.waitForTimeout(150);
+        await pg.locator('[data-tt-action="recreer"]').first().click(); await pg.waitForTimeout(150);
+        const boites = pg.locator('[data-tt-tableau] tbody input[type="checkbox"]:not([disabled])');
+        const nb = await boites.count(); for (let i = 0; i < nb; i++) { await boites.nth(i).click(); await pg.waitForTimeout(60); }
+        await pg.locator('[data-tt-lancer]').first().click();
+      }
       await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 6000 });
       for (let i = 0; i < 3; i++) { const s = pg.locator('[data-republier-suivant]'); if (await s.count() && await s.isVisible()) { await s.click(); await pg.waitForTimeout(250); } }
       const v = pg.locator('[data-repub-verif]');
@@ -147,8 +157,12 @@ const shot = async (pg, nom) => { if (SHOTS) { await pg.waitForTimeout(350); awa
       dit(!deborde, `V3b ${tag} rien ne déborde de l'écran`);
       await v.scrollIntoViewIfNeeded().catch(() => {});
       await shot(pg, `rv1-recap-${tag}.png`);
-      await pg.locator('[data-repub-verif-ligne="9103"]').scrollIntoViewIfNeeded().catch(() => {});
+      await pg.evaluate(() => { const e = document.querySelector('[data-repub-verif-ligne="9103"]'); if (e) e.scrollIntoView({ block: 'center' }); });
       await shot(pg, `rv2-lignes-${tag}.png`);
+      // (20 nov.) La liste des lignes de l'atelier avait une hauteur NULLE au téléphone (flex qui rétrécit, overflow caché) : visible ?
+      const hl = await pg.evaluate(() => { const l = document.querySelector('[data-republier-liste]'); return l ? Math.round(l.getBoundingClientRect().height) : -1; });
+      dit(hl > 100, `V2c ${tag} la liste des annonces de l'atelier est visible (hauteur ${hl} px, plus jamais écrasée à 0)`, String(hl));
+      await pg.evaluate(() => { const e = document.querySelector('[data-repub-verif-choisir="size"]'); if (e) e.scrollIntoView({ block: 'center' }); });
       await pg.locator('[data-repub-verif-choisir="size"]').click();
       const opt = pg.locator('[data-ask-choix] button').first();
       if (await opt.waitFor({ timeout: 4000 }).then(() => true).catch(() => false)) { await shot(pg, `rv3-choisir-${tag}.png`); await opt.click(); }

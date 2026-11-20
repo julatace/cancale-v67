@@ -32,8 +32,6 @@
 
 /* (20 nov., ext. 5.410 `repubverif`) Le contrôle avant de lancer : une ligne de faits, ambre pour ce qui reste à faire. */
 .vrm-repub-verif { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font: 600 14px/1.45 var(--sb-police-texte, inherit); color: var(--sb-encre, #0C1D30); font-variant-numeric: tabular-nums; }
-.vrm-repub-verif > span + span::before { content: '·'; margin-right: 14px; color: var(--sb-encre-2, #3F5468); font-weight: 400; }
 .vrm-repub-verif-panne { flex-basis: 100%; font-weight: 400; color: var(--sb-encre-2, #3F5468); }
-.vrm-repub-verif-panne::before { content: none !important; }
 .vrm-repub-verif-ligne { font: 400 13px/1.45 var(--sb-police-texte, inherit); color: var(--sb-ambre, #9A5B00); display: grid; gap: 4px; }
 .vrm-repub-verif-ligne[data-repub-verif-etat="corrige"], .vrm-repub-verif-discret { color: var(--sb-encre-2, #3F5468); }
