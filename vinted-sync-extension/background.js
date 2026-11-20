@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.1';
+const CODE_VERSION = '5.410.2';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4045,6 +4045,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.377 : Favoris · Annonces · Ventes du compte de l'onglet (lecture seule ; autres comptes floutés).
+    // 5.410.2 : l'état du panneau de CET onglet, et le PDF du bordereau d'une vente (lecture seule).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'panneauEtat') {
+      panneauEtatCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauCarte') {
+      bordereauCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'carteListes') {
       carteListes(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -21887,6 +21896,76 @@ async function lignesComptesCarte(uid, n) {
   const prendre = (r, pre) => (r ? Array.from({ length: n }, (_, i) => r[pre + i]).filter((x) => x && typeof x === 'object') : []);
   return { listings: { cap: rl ? Date.parse(rl.cap || '') : NaN, n: rl ? Number(rl.n) : NaN, items: prendre(rl, 'i') }, ventes: { cap: rv ? Date.parse(rv.cap || '') : NaN, n: rv ? Number(rv.n) : NaN, items: prendre(rv, 'o') } };
 }
+// ══ 5.410.2 — LE PANNEAU RESTE OUVERT (Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ») ══
+// L'état du grand panneau de CET onglet (ouvert, page, sélection, fiche, conversation, défilement) : rangé par le fond
+// dans chrome.storage.session (il survit au service worker tué, §4.9 ; effacé à la fermeture du navigateur), sinon
+// chrome.storage.local. Rien de la page, aucune requête : de l'état d'écran, borné et nettoyé (12 h au plus).
+const PANNEAU_ETAT_CLE = 'vrmPanneauEtat';
+const PANNEAU_ETAT_TTL = 12 * 3600000;
+const PANNEAU_PAGES = ['accueil', 'messages', 'annonces', 'favoris', 'ventes', 'notifications', 'automatisations', 'parametres'];
+const RE_ONGLET_PANNEAU = /^https:\/\/([a-z0-9-]+\.)*(vinted\.[a-z.]{2,6}|leboncoin\.fr|vestiairecollective\.com)\//i;
+function zonePanneauEtat() { try { if (chrome.storage && chrome.storage.session && typeof chrome.storage.session.get === 'function') return chrome.storage.session; } catch (_) {} return chrome.storage.local; }
+function panneauEtatNormalise(e) {
+  if (!e || typeof e !== 'object' || e.ouvert !== true) return null;
+  const page = PANNEAU_PAGES.includes(e.page) ? e.page : 'accueil';
+  const sel = (Array.isArray(e.sel) ? e.sel : []).map(String).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 200);
+  const fiche = typeof e.fiche === 'string' && /^[av]:[\w-]{1,40}$/.test(e.fiche) ? e.fiche : '';
+  const conv = typeof e.conv === 'string' && /^[\w@:.-]{1,80}$/.test(e.conv) ? e.conv : '';
+  const defil = {};
+  if (e.defil && typeof e.defil === 'object') for (const k of Object.keys(e.defil).slice(0, 12)) { const v = Number(e.defil[k]); if (/^[\w-]{1,30}$/.test(k) && Number.isFinite(v) && v > 0 && v < 1e6) defil[k] = Math.round(v); }
+  return { ouvert: true, page, sel, fiche, conv, defil };
+}
+async function panneauEtatCarte(msg, sender) {
+  const tab = sender && sender.tab;
+  if (!tab || !(Number(tab.id) >= 0) || !RE_ONGLET_PANNEAU.test(String(tab.url || '')) || (sender.frameId != null && sender.frameId > 0)) return { ok: false, code: 'origine' };
+  const z = zonePanneauEtat();
+  let tout;
+  try { const g = await z.get(PANNEAU_ETAT_CLE); tout = Object.assign({}, (g && g[PANNEAU_ETAT_CLE]) || {}); } catch (_) { return { ok: false, code: 'stockage' }; }
+  const maintenant = Date.now(), k = String(tab.id);
+  let change = false;
+  for (const c of Object.keys(tout)) if (!(maintenant - Number(tout[c] && tout[c].at) < PANNEAU_ETAT_TTL)) { delete tout[c]; change = true; }
+  if (msg.quoi === 'lire') { if (change) { try { await z.set({ [PANNEAU_ETAT_CLE]: tout }); } catch (_) {} } return { ok: true, etat: tout[k] ? panneauEtatNormalise(tout[k]) : null }; }
+  if (msg.quoi === 'poser') { const e = panneauEtatNormalise(msg.etat); if (!e) return { ok: false, code: 'invalide' }; tout[k] = Object.assign(e, { at: maintenant }); }
+  else if (msg.quoi === 'fermer') delete tout[k];
+  else return { ok: false, code: 'invalide' };
+  try { await z.set({ [PANNEAU_ETAT_CLE]: tout }); } catch (_) { return { ok: false, code: 'stockage' }; }
+  return { ok: true };
+}
+
+// ══ 5.410.2 — IMPRIMER LE BORDEREAU DEPUIS LE PANNEAU ══════════════════════════════════════════════════════════
+// Julien, 20 nov. : « quand j'ai fait une vente, on doit pouvoir imprimer le bordereau, avoir le livreur ».
+// LECTURE SEULE de ce que VRM a déjà rangé (§3 « ce qui EST autorisé » : récupérer le PDF d'un bordereau) — AUCUNE
+// requête vers Vinted, rien d'acheté (eBay : l'acheteur paie, §2.8 ; ce chemin ne touche pas eBay). Par IDENTITÉ :
+// le n° de transaction ET le compte de l'onglet — `harvest_{compte}_label_{tx}` (capté par l'extension), sinon
+// l'e-mail du bordereau `email_bord_{tx}` de CE compte (sa version tamponnée du N° d'abord). Un PDF à la fois
+// (projection scalaire du seul champ du PDF, jamais `select=data`, §4.4). Pas de PDF ⇒ `manque` (« pas encore de
+// bordereau »), base muette ⇒ `passu` — jamais confondus.
+const BORDEREAU_CARTE_MAX = 10;
+async function bordereauCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine' };
+  const txs = [...new Set((Array.isArray(msg.txs) ? msg.txs : []).map(String).filter((x) => /^\d{1,20}$/.test(x)))];
+  if (!txs.length || txs.length > BORDEREAU_CARTE_MAX) return { ok: false, code: 'invalide' };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid) return { ok: false, code: 'compte' };
+  const u = String(uid), pdfs = [], manque = [], passu = [];
+  const estPdf = (b64) => typeof b64 === 'string' && b64.length > 100 && b64.startsWith('JVBERi0');   // « %PDF- » : une page d'erreur n'est pas un bordereau
+  for (const tx of txs) {
+    const r1 = await sbGet(`app_data?id=eq.harvest_${u}_label_${tx}&select=pdf:data->>pdfB64`);
+    if (r1 === null) { passu.push(tx); continue; }
+    let b64 = r1 && r1[0] && r1[0].pdf, source = 'vinted';
+    if (!estPdf(b64)) {
+      const r2 = await sbGet(`app_data?id=eq.email_bord_${tx}&select=uid:data->>uid,t:data->>pdfTamponneB64,pdf:data->>pdfB64`);
+      if (r2 === null) { passu.push(tx); continue; }
+      const l = r2 && r2[0];
+      b64 = l && !(l.uid && String(l.uid) !== u) ? (estPdf(l.t) ? l.t : l.pdf) : null; source = 'email';
+    }
+    if (estPdf(b64)) pdfs.push({ tx, b64, source }); else manque.push(tx);
+  }
+  try { noterDiag(`bordereau_carte_${pdfs.length ? 'ok' : manque.length ? 'manque' : 'passu'}`); } catch (_) {}
+  return { ok: true, pdfs, manque, passu };
+}
 async function carteListes(msg, sender) {
   const o = ongletCarte(sender);
   if (!o) return { ok: false, code: 'origine' };
@@ -21975,7 +22054,18 @@ async function carteListes(msg, sender) {
     try {
       const txs = lignes.map((x) => x.tx).filter((x) => /^\d{1,20}$/.test(x));
       if (txs.length) {
-        const bs = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi`);
+        const bs = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,lim:data->>dateLimite,uid:data->>uid`);
+        // 5.410.2 (Julien : « quand j'ai fait une vente, on doit pouvoir imprimer le bordereau, avoir le livreur ») :
+        // le n° de suivi et la date limite LUS dans l'e-mail du bordereau de CETTE vente (par son n° de transaction,
+        // et du compte de l'onglet quand l'e-mail le dit) ; jamais devinés. Le PDF : `bordereauCarte`.
+        const parTxB = new Map((lignes || []).map((x) => [x.tx, x]));
+        for (const b of Array.isArray(bs) ? bs : []) {
+          const x = b && parTxB.get(String(b.tx || '')); if (!x || (b.uid && String(b.uid) !== u)) continue;
+          const sv = String(b.suivi || '').replace(/[^\w-]/g, '').slice(0, 40); if (sv && !x.suivi) x.suivi = sv;
+          const lim = String(b.lim || '').trim().slice(0, 40); if (lim && !x.limite) x.limite = lim;
+        }
+        const avecPdfMail = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&data->>pdfB64=not.is.null&select=tx:meta->>transaction,uid:data->>uid`);
+        for (const b of Array.isArray(avecPdfMail) ? avecPdfMail : []) { const x = b && parTxB.get(String(b.tx || '')); if (x && !(b.uid && String(b.uid) !== u) && x.etat === 'a_expedier') x.bordereau = true; }
         const parSuivi = new Map();
         for (const b of Array.isArray(bs) ? bs : []) { const sv = String((b && b.suivi) || '').replace(/[^\w-]/g, ''); if (sv && b.tx) parSuivi.set(sv, String(b.tx)); }
         if (parSuivi.size) {
