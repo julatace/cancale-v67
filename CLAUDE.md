@@ -477,6 +477,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Des boutons beaux et fiables partout (boutons-natifs)** : `BoutonBase`/`Btn`/`BoutonV2`/segmentés d'avant dessinent le `Bouton`/`Segmente` natif ; un geste qui rend une promesse ne se double pas et dit son résultat ; 261 `vrm-b` bruts convertis ; banc `boutons-inventaire`, `audit-boutons-natifs` (plafonds). `2026-11-20-boutons-natifs.md`. Geste : aucun.
 - **19 nov. soir · L'app en tableaux de travail (NATIF §2 bis)** : `TableauTravail` (Statut à compteurs, colonnes mémorisées, tri, sélection) sur Annonces, Ventes « Toutes », Achats, Notifications à l'ordinateur ; écran Automatisations (réglages des moteurs existants ; négociation par paliers rangée `vinted_offres_nego`, « bientôt », rien envoyé ; pas de boost de favoris). `2026-11-19-app-tableaux.md`. Geste : aucun.
 - **19 nov. · Publier sur… : fiche neutre + agent sans IA (ext. `publierfiche`, 5.409)** : tables par champ et par site dans les deux sens, Vinted cible par `creerVintedFiche`, une question groupée par article, réponses retenues (`vrm_agent_publier`), l'extension publie, catégorie relue, formulaires Leboncoin appris. `2026-11-19-publier-agent.md`. Geste : publier UN article Leboncoin → Vestiaire et regarder.
 - **19 nov. · Fiche d'un article refaite (fiche-directe)** : un toucher ⇒ la fiche produit (page poussée au téléphone, volet à l'ordinateur), les messages passagers rangés DANS la fiche (`src/natif/zoneMessages.js`). `2026-11-19-fiche-directe.md`. Geste : aucun.

@@ -21,6 +21,7 @@ import { carnetDuCompte } from './discretion.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
+import { Bouton as BoutonNatif } from './natif/Bouton.jsx';
 
 // ── LES LECTURES (une fois pour les trois places, relues quand l'extension écrit) ──
 // La même projection que « Notes reçues » de Statistiques (petites lignes, jamais `select=data`).
@@ -212,12 +213,12 @@ function Compte({ c }) {
       {c.raison ? (
         <div className="vrm-sc-raison">
           <span data-sc-raison-texte="">{texteRaison(c.raison)}{autres > 0 ? ' · ' + tr('sante.autres', { n: autres }) : ''}</span>
-          <button type="button" className="vrm-lien-action vrm-sc-geste" data-sc-geste={c.raison.geste} onClick={() => aller(c.raison.geste)}>{tr('sante.voir')}</button>
+          <BoutonNatif variante="texte" taille="compact" className="vrm-sc-geste" onClick={() => aller(c.raison.geste)} attrs={{ 'data-sc-geste': c.raison.geste }}>{tr('sante.voir')}</BoutonNatif>
         </div>
       ) : (
         <p className="vrm-sc-sous" data-sc-sous="">{tr('sante.lus', { n: c.lus, sur: c.sur })}</p>
       )}
-      <button type="button" className="vrm-sc-pourquoi" aria-expanded={ouvert} data-sc-pourquoi="" onClick={() => setOuvert((o) => !o)}>{tr('sante.pourquoi')}</button>
+      <BoutonNatif variante="texte" taille="compact" className="vrm-sc-pourquoi" onClick={() => setOuvert((o) => !o)} attrs={{ 'aria-expanded': ouvert, 'data-sc-pourquoi': '' }}>{tr('sante.pourquoi')}</BoutonNatif>
       {ouvert ? <ul className="vrm-sc-inds" data-sc-inds="">{lignes.map((i) => <Indicateur key={i.k} i={i}/>)}</ul> : null}
     </section>
   );

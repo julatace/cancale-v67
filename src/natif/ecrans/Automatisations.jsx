@@ -13,7 +13,9 @@ import { tr } from '../../i18n/index.js';
 import { Page, PagePoussee } from '../Page.jsx';
 import { Groupe } from '../Groupe.jsx';
 import { Rangee, Interrupteur } from '../Rangee.jsx';
-import { Bouton } from '../Bouton.jsx';
+import { Bouton, BoutonIcone } from '../Bouton.jsx';
+import { Segmente } from '../Segmente.jsx';
+import { Glyphe } from '../icones.jsx';
 import { Feuille } from '../Feuille.jsx';
 import { useOrdinateur } from '../Coque.jsx';
 import '../jetons.css';
@@ -71,13 +73,13 @@ export function MessagesAuto({ messages, onModifier, onSupprimer, onBasculer, on
       {messages.map((m, i) => (
         <div key={i} className="n-au-message" data-au-message={i} data-au-message-actif={m.actif ? '1' : '0'}>
           <div className="n-au-message-texte"><span className="n-au-message-corps">{m.texte}</span>{etiquette ? <span className="n-au-message-etiquette">{etiquette}</span> : null}</div>
-          <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.msg.modifier')} title={tr('auto.msg.modifier')} data-au-modifier={i} onClick={() => setEdition({ i, texte: m.texte })}>✎</button>
-          <button type="button" className="n-tt-bouton n-tt-bouton-icone n-au-icone" aria-label={tr('auto.msg.supprimer')} title={tr('auto.msg.supprimer')} data-au-supprimer={i} onClick={() => onSupprimer(i)}>🗑</button>
+          <BoutonIcone libelle={tr('auto.msg.modifier')} icone={<Glyphe nom="pencil"/>} className="n-au-icone" taille="compact" onClick={() => setEdition({ i, texte: m.texte })} attrs={{ 'data-au-modifier': i }}/>
+          <BoutonIcone libelle={tr('auto.msg.supprimer')} icone={<Glyphe nom="trash"/>} className="n-au-icone" taille="compact" onClick={() => onSupprimer(i)} attrs={{ 'data-au-supprimer': i }}/>
           <Interrupteur actif={m.actif} libelle={tr('auto.msg.actif', { n: i + 1 })} onChange={(v) => onBasculer(i, v)} attrs={{ 'data-au-basculer': i }}/>
         </div>
       ))}
       {erreur ? <p className="n-au-phrase" data-au-ton="ambre" role="alert" data-au-erreur="">{erreur}</p> : null}
-      {messages.length < maxi ? <span><button type="button" className="n-tt-bouton" data-au-ajouter="" onClick={() => setEdition({ i: -1, texte: '' })}>＋ {tr('auto.msg.ajouter')}</button></span> : null}
+      {messages.length < maxi ? <span><Bouton variante="texte" icone={<Glyphe nom="plus"/>} onClick={() => setEdition({ i: -1, texte: '' })} attrs={{ 'data-au-ajouter': '' }}>{tr('auto.msg.ajouter')}</Bouton></span> : null}
       <Feuille ouverte={!!edition} onFermer={() => setEdition(null)} titre={edition && edition.i < 0 ? tr('auto.msg.nouveau') : tr('auto.msg.modifier')} attrs={{ 'data-au-edition': '' }}
         pied={<Bouton variante="plein" onClick={enregistrer} attrs={{ 'data-au-edition-ok': '' }}>{tr('auto.msg.garder')}</Bouton>}>
         {edition ? <div className="n-au-edition"><textarea className="n-au-zone" rows={5} value={edition.texte} aria-label={tr('auto.msg.texte')} onChange={(e) => setEdition({ ...edition, texte: e.target.value })} data-au-zone=""/></div> : null}
@@ -100,7 +102,7 @@ export default function Automatisations({ items = [], choisi = '', onChoisir, Ic
   );
   const pied = it && (it.plein || it.reinitialiser) ? (
     <div className="n-au-pied" data-au-pied="">
-      {it.reinitialiser ? <Bouton variante="texte" onClick={it.reinitialiser} indisponible={!it.modifie} raison={!it.modifie ? '' : ''} attrs={{ 'data-au-reinit': '' }}>{tr('auto.reinitialiser')}</Bouton> : <span/>}
+      {it.reinitialiser ? <Bouton variante="texte" onClick={it.reinitialiser} indisponible={!it.modifie} raison={!it.modifie ? tr('auto.reinit.rien') : ''} attrs={{ 'data-au-reinit': '' }}>{tr('auto.reinitialiser')}</Bouton> : <span/>}
       {it.plein ? <Bouton variante="plein" chargement={!!it.plein.chargement} indisponible={!!it.plein.indisponible} raison={it.plein.raison || ''} onClick={it.plein.onClick} attrs={{ 'data-au-plein': it.cle, 'data-v2-principal': 'auto' }}>{it.plein.libelle}</Bouton> : null}
     </div>
   ) : null;
@@ -111,7 +113,7 @@ export default function Automatisations({ items = [], choisi = '', onChoisir, Ic
         <EtatAuto actif={it.actif}/>
       </header>
       {it.compte ? <div className="n-au-compte"><ReglageAuto libelle={tr('auto.compte')}><ChoixAuto libelle={tr('auto.compte')} valeur={it.compte.valeur} options={it.compte.options} onChange={it.compte.onChange} attrs={{ 'data-au-compte': '' }}/></ReglageAuto></div> : null}
-      {it.onglets && it.onglets.length > 1 ? <div className="n-au-onglets" role="tablist">{it.onglets.map((o) => <button key={o.cle} type="button" role="tab" aria-selected={onglet === o.cle} className="n-au-onglet" data-au-onglet={o.cle} onClick={() => setOnglet(o.cle)}>{o.libelle}</button>)}</div> : null}
+      {it.onglets && it.onglets.length > 1 ? <div className="n-au-onglets"><Segmente libelle={it.titre} valeur={onglet} onChange={setOnglet} options={it.onglets.map((o) => ({ cle: o.cle, libelle: o.libelle, attrs: { 'data-au-onglet': o.cle } }))}/></div> : null}
       <div className="n-au-corps">{it.detail(onglet)}</div>
     </div>
   ) : null;

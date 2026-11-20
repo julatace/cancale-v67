@@ -18,6 +18,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { PAS_SU, VERBES } from '../libelles.js';
+import { BoutonBase } from './Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 export function EtatPanne({ quoi, raison, onReessayer, compact = false, className = '', ...rest }) {
   const [occupe, setOccupe] = React.useState(false);
@@ -41,10 +42,10 @@ export function EtatPanne({ quoi, raison, onReessayer, compact = false, classNam
         <p className="vrm-etat-panne-raison">{raison || PAS_SU.sansRaison}</p>
       </div>
       {onReessayer ? (
-        <button type="button" className="vrm-b vrm-b-secondaire vrm-etat-panne-bouton" data-etat-panne-reessayer="" onClick={relire}
+        <BoutonBase variante="secondaire" className="vrm-etat-panne-bouton" data-etat-panne-reessayer="" onClick={relire}
           disabled={occupe} aria-busy={occupe ? 'true' : undefined}>
           {occupe ? PAS_SU.enCours : VERBES.reessayer}
-        </button>
+        </BoutonBase>
       ) : null}
     </div>
   );

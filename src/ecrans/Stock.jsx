@@ -948,19 +948,19 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {/* (5 nov.) « Voir l'état » : la fiche complète du N°, avec tout ce qui se
             calcule (prix d'achat, temps achat → vente, réception → mise en ligne,
             mise en ligne → vente, republications) — `etatArticle`. */}
-        <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>{tr('stock.voirEtat')}</button>
+        <Bouton variante="secondaire" data-fiche-voir-etat={cleDeFiche(f)} onClick={() => { const n = String(f.numero); fermerModal(); try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })); } catch (_) {} }} style={{ width: '100%', marginBottom: 9 }}>{tr('stock.voirEtat')}</Bouton>
         {/* (15 nov.) Un article sans case : « Ranger ici » le pose dans SA case proposée (SON toucher) ; « Autre case »
             garde le choix sur le plan. */}
-        {!m && !sold && caseProposeeDe(modal.cle) ? <button className="vrm-b vrm-b-primaire" type="button" data-fiche-ranger-ici={(() => { const c = caseProposeeDe(modal.cle); return c.meubleId + ':' + c.i; })()} onClick={() => { const c = caseProposeeDe(modal.cle); fermerModal(); fermerLigne(); if (c) poser(modal.cle, c.meubleId, c.i); }} style={{ ...btnPri, width: '100%', marginBottom: 9 }}>{tr('stock.rangerIci')}</button> : null}
+        {!m && !sold && caseProposeeDe(modal.cle) ? <Bouton variante="primaire" data-fiche-ranger-ici={(() => { const c = caseProposeeDe(modal.cle); return c.meubleId + ':' + c.i; })()} onClick={() => { const c = caseProposeeDe(modal.cle); fermerModal(); fermerLigne(); if (c) poser(modal.cle, c.meubleId, c.i); }} style={{ ...btnPri, width: '100%', marginBottom: 9 }}>{tr('stock.rangerIci')}</Bouton> : null}
         <div style={{ display: 'flex', gap: 9 }}>
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
-          <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</button>
+          <Bouton variante="secondaire" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</Bouton>
           {/* (16 nov., train — décision de Julien) « Retirer de la case » n'est plus dans la fiche ni dans sa feuille ⋯ :
               la case s'allume dans le Stock (lot retirer-case-compact) ; « Déplacer » reste. */}
         </div>
         {/* (16 nov.) Plus de « Je l'ai sorti » ici : le toucher de la case allumée (`sortirAnnulable`). */}
-        {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}
+        {hors && <Bouton variante="secondaire" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</Bouton>}
       </>);
     }
     if (modal.type === 'fiche') return <DansFiche cle={cleFicheStock} place="contexte" seulementFiche><div className="vrm-stock-dans-fiche" data-stock-fiche={modal.cle}>{corps}</div></DansFiche>;
@@ -1129,7 +1129,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       <span className="vrm-s2d-txt"><span className="vrm-s2d-txt-t"><b>N°{f.numero}</b> · {f.title || '—'}</span>
         {sous ? <span className="vrm-s2d-txt-s" data-stock-retour-libelle="">{sous}</span> : null}
         <span className="vrm-s2d-txt-s">{ou ? <><b>{ou.meuble.name}</b> {tr('stock.rangee4')} {ou.rangee}{tr('stock.colonne')} {ou.colonne}</> : (f.retour && !slots[cleDeFiche(f)] ? 'pas encore rangé — à mettre dans une case' : tr('stock.caseIntrouvable'))}</span></span>
-      <div className="vrm-s2d-gestes">{ou && <button className="vrm-b vrm-b-secondaire" type="button" onClick={() => montrer(f)}>{tr('stock.voirCase')}</button>}{gestes}</div>
+      <div className="vrm-s2d-gestes">{ou && <Bouton variante="secondaire" onClick={() => montrer(f)}>{tr('stock.voirCase')}</Bouton>}{gestes}</div>
     </div>); };
   // (13 nov., point 29) LES ARTICLES REVENUS D'UN RETOUR : sous SON N°, « Retour du <date lue> — à vérifier
   // et remettre en ligne ». « Remettre en ligne » mène aux Retours (Colis → Envoyés), où SON clic ouvre
@@ -1139,7 +1139,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <Card style={{ padding: '12px 13px' }}>
       <div data-stock-retours={revenus.length} data-stock-retours-a-numeroter={retoursANumeroter || undefined}>
         <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>{revenus.length + retoursANumeroter > 1 ? `${revenus.length + retoursANumeroter} articles revenus d’un retour` : 'Un article revenu d’un retour'}</div>
-        {revenus.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-en-ligne={cleDeFiche(f)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' })); } catch (_) {} }}>Remettre en ligne</button>, libelleRetour(f.retour)))}
+        {revenus.map((f) => ligneRangee(f, <Bouton variante="secondaire" data-stock-remettre-en-ligne={cleDeFiche(f)} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' })); } catch (_) {} }}>Remettre en ligne</Bouton>, libelleRetour(f.retour)))}
         {retoursANumeroter > 0 && <p data-stock-retours-sans-num="" style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', lineHeight: 1.45 }}>{retoursANumeroter > 1 ? `${retoursANumeroter} sans N° connu : à numéroter` : 'Un sans N° connu : à numéroter'} — {retoursANumeroter > 1 ? 'ils recevront' : 'il recevra'} un N° à la remise en ligne.</p>}
       </div>
     </Card>) : null;
@@ -1156,8 +1156,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <p>{tr('stock.rangeesMaisPlus')}</p>
         </InfoPop>
         {plusEnLigne.map((f) => ligneRangee(f, <>
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>{tr('stock.jeAiRetiree')}</button>
-          <button className="vrm-b vrm-b-discret" type="button" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>{tr('stock.encore')}</button>
+          <Bouton variante="secondaire" data-stock-retirer-case={cleDeFiche(f)} onClick={() => sortirDeLaCase(f)}>{tr('stock.jeAiRetiree')}</Bouton>
+          <Bouton variante="discret" data-stock-encore-la={cleDeFiche(f)} onClick={() => encoreLa(f)}>{tr('stock.encore')}</Bouton>
         </>))}
       </div>
     </Card>) : null;
@@ -1271,7 +1271,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           aConfTxt ? <p className="vrm-aide" data-stock-a-confirmer-quand="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45 }}>{aConfTxt} — {aConfGeste}</p> : null)}
         {repliAPart('masquees', tr('stock.masqueesVinted'), parEtat.masquees, (a) => ligneAPart(a, a.comptes.map((u) => comptesNoms.get(u) || u).join(', ') || 'Vinted'))}
         {repliAPart('gardees', tr('stock.gardeesChezToi'), gardees, (g) => ligneAPart(g, tr('stock.horsLigneRepublier')),
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-republier="" style={{ width: '100%', marginTop: 6 }} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=republier' })); } catch (_) {} }}>{tr('stock.republier')}</button>)}
+          <Bouton variante="secondaire" data-stock-republier="" style={{ width: '100%', marginTop: 6 }} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=republier' })); } catch (_) {} }}>{tr('stock.republier')}</Bouton>)}
       </div>
     </Card>) : null;
 
@@ -1380,7 +1380,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
             {/* (15 nov., étagères) Dans une pile : qui est descendu quand ce colis est parti (l'emplacement, jamais le N°). */}
             {Array.isArray(x.descendus) && x.descendus.length ? <span data-sorti-descendus={x.descendus.join(',')} style={{ display: 'block', color: C.text, fontSize: 12 }}>{phraseDescentes(x.descendus.map((k) => ({ cle: k, crans: 1 })))}</span> : null}
           </span>
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre-meuble={x.cle} onClick={() => remettre(x)}>{tr('stock.remettre')}</button>
+          <Bouton variante="secondaire" data-stock-remettre-meuble={x.cle} onClick={() => remettre(x)}>{tr('stock.remettre')}</Bouton>
         </div>
       ))}
     </div>
@@ -1421,7 +1421,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                   <span style={{ color: C.accentTexte, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</span>
                 </button>
               ); })}
-          {resultats.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>{trj('stock.montrerToutesDans', { resultatsN: resultats.length })}</button>}
+          {resultats.length > 1 && <Bouton variante="discret" data-stock-tout-montrer={resultats.length} onClick={() => { setCibles(resultats.map(cleDeFiche)); setQ(''); }} style={{ width: '100%' }}>{trj('stock.montrerToutesDans', { resultatsN: resultats.length })}</Bouton>}
           {resultats.length > MAX_RES && <div style={{ padding: '9px 12px', fontSize: 12, color: C.muted }}>{trj('stock.trouveesAfficheesPrecise', { resultatsN: resultats.length, MAX_RES: MAX_RES })}</div>}
         </div>
       )}
@@ -1434,7 +1434,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <b>{tr('stock.allerChercher')}{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
             <span style={{ flex: 1 }} />
-            <button className="vrm-b vrm-b-discret" type="button" onClick={() => setCibles([])}>{tr('creerVinted.fermer')}</button>
+            <Bouton variante="discret" onClick={() => setCibles([])}>{tr('creerVinted.fermer')}</Bouton>
           </div>
           {tri.map((k) => { const f = ficheParCle[k]; const ou = f && ouEst(f);
             return (
@@ -2596,7 +2596,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
               <option value="sold">{tr('stock.vendu')}</option>
             </select>
             <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>{tr('achats.annuler')}</button>
+              <Bouton variante="discret" onClick={()=>{setEditing(null);setEditDraft(null);}} style={{...btn('transparent',C.text),border:`1px solid ${C.border}`}}>{tr('achats.annuler')}</Bouton>
               <button type="button" onClick={commitEdit} style={btn(C.accent)}>{tr('lbcplus.remise.enregistrer')}</button>
             </div>
           </div>

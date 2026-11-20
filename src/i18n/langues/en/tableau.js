@@ -153,6 +153,7 @@ export default {
   "auto.ciblage": "Targeting",
   "auto.delais": "Timing",
   "auto.reinitialiser": "Reset",
+  "auto.reinit.rien": "Nothing to reset: these are the original settings.",
   "auto.demarrer": "Start",
   "auto.arreter": "Stop",
   "auto.enregistrer": "Save",

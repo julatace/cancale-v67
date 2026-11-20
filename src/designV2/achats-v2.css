@@ -31,6 +31,4 @@
   html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-price { font-size: 17px !important; font-weight: 600 !important; line-height: 22px !important; }
   /* Le suivi : UNE ligne, toujours la même place (plus de second bloc qui double la rangée). */
   html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { max-height: 22px !important; overflow: hidden !important; margin: 0 !important; font-size: 13px !important; line-height: 22px !important; }
-  /* « ⋯ » : une icône discrète dans une cible de 44, plus un grand rond blanc sur chaque rangée. */
-  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-more { width: 32px !important; min-width: 32px !important; height: 44px !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--v2-muet, #4A5B6D) !important; }
 }

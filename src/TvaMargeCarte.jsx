@@ -18,6 +18,7 @@ import { tr, heure, date } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireTvaMarge, declarationMarge, aDaterMarge, periodesMarge, moisParis, trimestreDe, csvDeclarationMarge,
   eurosC, jourParisTs, SOURCES_TVA_MARGE, CLE_TVA_MARGE, EVT_TVA_MARGE } from './tvaMarge.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 function usePublication(owner) {
   const lire = React.useCallback(() => { try { return lireTvaMarge(localStorage.getItem(CLE_TVA_MARGE), owner); } catch (_) { return null; } }, [owner]);
@@ -117,7 +118,7 @@ export default function TvaMargeCarte({ deps }) {
                 ))}
                 {d.aCompleter.length > 8 ? <li>…</li> : null}
               </ul>
-              {d.aCompleter.some((v) => v.etat === 'achat') ? <button type="button" className="vrm-b vrm-b-secondaire vrm-tvm-porte" data-tva-marge-porte="" onClick={saisir}>{tr('tvaMarge.saisir')}</button> : null}
+              {d.aCompleter.some((v) => v.etat === 'achat') ? <BoutonBase variante="secondaire" className="vrm-tvm-porte" data-tva-marge-porte="" onClick={saisir}>{tr('tvaMarge.saisir')}</BoutonBase> : null}
             </div>
           ) : null}
         </>
@@ -126,8 +127,8 @@ export default function TvaMargeCarte({ deps }) {
       {sansDate.length ? <p className="vrm-tvm-muet" data-tva-marge-sansdate={String(sansDate.length)}>{tr('tvaMarge.aDater', { n: sansDate.length })}</p> : null}
       {d && d.n ? (
         <div className="vrm-tvm-actions">
-          <button type="button" className="vrm-b vrm-b-secondaire" data-tva-marge-export="csv" onClick={exporterCsv}>{tr('tvaMarge.csv')}</button>
-          <button type="button" className="vrm-b vrm-b-secondaire" data-tva-marge-export="pdf" disabled={pdfOcc} onClick={exporterPdf}>{tr('tvaMarge.pdf')}</button>
+          <BoutonBase variante="secondaire"  data-tva-marge-export="csv" onClick={exporterCsv}>{tr('tvaMarge.csv')}</BoutonBase>
+          <BoutonBase variante="secondaire"  data-tva-marge-export="pdf" disabled={pdfOcc} onClick={exporterPdf}>{tr('tvaMarge.pdf')}</BoutonBase>
           {pub.at ? <small className="vrm-tvm-muet">{tr('tvaMarge.calcule', { heure: heure(pub.at) })}</small> : null}
         </div>
       ) : null}

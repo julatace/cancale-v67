@@ -14,6 +14,8 @@ import './styles-annonces-outils.css';
 import './styles-sources-achats.css';
 import './styles-meilleures-sources.css';
 import { tr } from './i18n/index.js';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 export function useMeilleures(owner) {
   const [v, setV] = useState(() => lireMeilleures(owner));
@@ -44,7 +46,7 @@ function Feuille({ titre, onFermer, Retour, children }) {
       <div className="vrm-ao-feuille vrm-ms-feuille" role="dialog" aria-modal="true" aria-label={titre}>
         <header className="vrm-ao-tete">
           <h2>{titre}</h2>
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-ms-fermer="" onClick={onFermer}>×</button>
+          <BoutonIconeNatif libelle="Fermer" icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} attrs={{ 'data-ms-fermer': "" }}/>
         </header>
         {children}
       </div>
