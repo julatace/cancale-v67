@@ -38,17 +38,26 @@ export function SelecteurSite({ sites = [], valeur = 'toutes', onChange, nom = (
     const g = el.scrollLeft > 2, d = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
     setBords((b) => (b.g === g && b.d === d ? b : { g, d }));
   }, []);
-  // La pastille choisie revient dans la vue (défilement de la rangée seule, jamais de la page).
-  React.useLayoutEffect(() => {
+  // La pastille choisie revient dans la vue (défilement de la rangée seule, jamais de la page) : tout de suite au premier
+  // rendu et quand la rangée change de taille (police chargée, compteurs arrivés) ; en douceur quand on choisit.
+  const vu = React.useRef(false);
+  const ramener = React.useCallback((doux) => {
     const el = refPiste.current; if (!el) return;
     const b = el.querySelector('[aria-checked="true"]');
     if (b) {
-      const g = b.offsetLeft - 16, d = b.offsetLeft + b.offsetWidth + 16 - el.clientWidth;
-      const x = g < el.scrollLeft ? g : d > el.scrollLeft ? d : null;
-      if (x != null) { try { el.scrollTo({ left: Math.max(0, x), behavior: reduit() ? 'auto' : 'smooth' }); } catch (_) { el.scrollLeft = Math.max(0, x); } }
+      const rp = el.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      const g = rb.left - rp.left - 16, d = rb.right - rp.right + 16;
+      const x = g < 0 ? el.scrollLeft + g : d > 0 ? el.scrollLeft + d : null;
+      if (x != null) { const l = Math.max(0, x); if (doux && !reduit()) { try { el.scrollTo({ left: l, behavior: 'smooth' }); } catch (_) { el.scrollLeft = l; } } else el.scrollLeft = l; }
     }
     mesurer();
-  }, [v, liste.join('|'), mesurer]);
+  }, [mesurer]);
+  React.useLayoutEffect(() => { ramener(vu.current); vu.current = true; }, [v, liste.join('|'), ramener]);
+  React.useEffect(() => {
+    const el = refPiste.current; if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => ramener(false)); ro.observe(el); for (const c of el.children) ro.observe(c);
+    return () => ro.disconnect();
+  }, [ramener, liste.join('|')]);
   React.useEffect(() => { const f = () => mesurer(); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, [mesurer]);
   if (liste.length < 2) return null;
   if (indisponible) {
