@@ -111,7 +111,9 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '' }) {
+  // `avantOutils` (20 nov., Ventes en tableau) : un nœud posé entre la barre de titre et la barre d'outils (le segmenté de Ventes).
+  // `ligneChoisie` : la clé de la ligne dont le détail est ouvert à côté (teintée, `aria-current`).
   // `groupe(l)` (20 nov., « divise par comptes ») ⇒ { cle, titre } : sans tri choisi, un INTERTITRE à chaque nouveau groupe
   // (les lignes arrivent déjà rangées par groupe). Un tri par colonne mélange les groupes : plus d'intertitre.
   const ordinateur = useOrdinateur();
@@ -310,11 +312,11 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
             const coche = sel.has(l.cle); const grise = !cochable(l) && (A || l.grise); const m = menuDe(l); const st = statutDe(l);
             return (<React.Fragment key={l.cle}>{inter}
               <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
-                aria-selected={coche ? 'true' : 'false'} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)} {...(l.attrs || {})}>
+                aria-selected={coche ? 'true' : 'false'} aria-current={ligneChoisie && ligneChoisie === l.cle ? 'true' : undefined} data-tt-choisie={ligneChoisie && ligneChoisie === l.cle ? '1' : undefined} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)} {...(l.attrs || {})}>
                 <td className="n-tt-td n-tt-td-case" onClick={(e) => e.stopPropagation()}><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={coche} disabled={!cochable(l)} aria-label={tr('tableau.cocher', { titre: l.titre || '' })} onChange={() => basculer(l)}/></label></td>
                 <td className="n-tt-td n-tt-td-article" data-tt-col="article">
                   <span className="n-tt-article">
-                    {l.icone ? <span className="n-tt-avatar" aria-hidden="true">{l.icone}</span> : <Vignette src={l.photo || ''} alt="" taille={48}/>}
+                    {l.icone ? <span className="n-tt-avatar" aria-hidden="true">{l.icone}</span> : <Vignette src={l.photo || ''} alt="" taille={48} image={l.image || null}/>}
                     <span className="n-tt-article-texte">
                       <span className="n-tt-article-titre" title={l.titre || ''}>{l.titre || tr('tableau.sansTitre')}</span>
                       {l.sous ? <span className="n-tt-article-sous" title={typeof l.sous === 'string' ? l.sous : undefined}>{l.sous}</span> : null}
@@ -357,7 +359,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const listeTel = (
     <Groupe attrs={{ 'data-tt-liste': '' }}>
       {visibles.map((l) => { const t = ligneTel ? ligneTel(l) : {}; const st = statutDe(l); const coche = sel.has(l.cle);
-        return <Rangee key={l.cle} vignette={l.icone ? null : <Vignette src={l.photo || ''} alt=""/>} icone={l.icone || null} titre={l.titre || tr('tableau.sansTitre')} lignes={2}
+        return <Rangee key={l.cle} vignette={l.icone ? null : <Vignette src={l.photo || ''} alt="" image={l.image || null}/>} icone={l.icone || null} titre={l.titre || tr('tableau.sansTitre')} lignes={2}
           plaque={t.plaque || null} sousTitre={t.sousTitre != null ? t.sousTitre : (typeof l.sous === 'string' ? l.sous : '')} ton={t.ton || (st && st.ton === 'ambre' ? 'ambre' : 'neutre')}
           valeur={t.valeur != null ? t.valeur : null} valeurForte detailValeur={t.detailValeur != null ? t.detailValeur : (l.statutLibelle || (st ? st.libelle : ''))}
           fin={A ? (coche ? 'coche' : <span className="n-tt-rond" aria-hidden="true"/>) : (onOuvrir ? 'chevron' : null)} selectionnee={A ? coche : false}
@@ -391,6 +393,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     <div className={cx('n-tt', ordinateur ? 'n-tt-ordi' : 'n-tt-tel')} ref={refRacine} data-tt={id} data-tt-vue={ordinateur ? vue : 'tel'} data-tt-etat={lignes === undefined ? 'lecture' : lignes === null ? 'passu' : 'lu'} {...(attrs || {})}>
       <Page titre={titre} plein={barreSel || plein}>
         {tete}
+        {avantOutils}
         {outils}
         {haut}
         {Array.isArray(lignes) ? nombre : null}

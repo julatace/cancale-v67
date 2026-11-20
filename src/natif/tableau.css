@@ -102,6 +102,8 @@
   .n-tt-tr:hover > .n-tt-td { background: var(--n-carte-2); }
   .n-tt-tr:focus-visible > .n-tt-td { background: var(--n-carte-2); box-shadow: inset 0 2px 0 var(--n-accent), inset 0 -2px 0 var(--n-accent); }
   .n-tt-tr[data-tt-coche="1"] > .n-tt-td { background: var(--n-teinte); }
+  .n-tt-tr[data-tt-choisie="1"] > .n-tt-td { background: var(--n-carte-2); }
+  .n-tt-tr[data-tt-choisie="1"] > .n-tt-td-case { box-shadow: inset 3px 0 0 var(--n-accent); }
   .n-tt-tr[data-tt-grise="1"] { cursor: default; }
   .n-tt-tr[data-tt-grise="1"] .n-tt-article-titre { color: var(--n-encre-2); }
   .n-tt-td { height: 68px; padding: 0 8px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); white-space: nowrap; }
@@ -189,4 +191,23 @@
 @layer vrm-natif {
   .n-fil-vignette { flex: 0 0 auto; display: inline-flex; width: 44px; height: 44px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); align-self: center; }
   .n-fil-vignette img { width: 100%; height: 100%; object-fit: cover; }
+}
+
+/* (20 nov.) VENTES À L'ORDINATEUR EN TABLEAU (src/natif/ecrans/Ventes.jsx, VentesBureau) : le tableau pleine largeur ; le détail
+   d'une vente touchée se pose à DROITE (jamais un volet vide permanent) ; le transporteur en logo ; la date limite proche en ambre. */
+@layer vrm-natif {
+  .n-vt { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; min-width: 0; }
+  .n-vt[data-vt-detail="1"] { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
+  .n-vt-volet { position: sticky; top: 0; box-sizing: border-box; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+    border-left: .5px solid var(--n-trait); background: var(--n-fond); padding-bottom: 24px; }
+  .n-vt-volet-tete { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 4px 8px 4px var(--n-marge);
+    background: var(--n-fond); border-bottom: .5px solid var(--n-trait); }
+  .n-vt-volet-titre { flex: 1 1 auto; min-width: 0; font: var(--n-t-corps-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-vt-volet-corps { padding-top: 12px; }
+  .n-vt-segment { padding: 0 var(--n-marge) 8px; max-width: 560px; }
+  .n-vt-segment-seul { display: flex; align-items: center; gap: 12px; max-width: none; padding-top: 8px; }
+  .n-vt-segment-seul .n-segmente { flex: 0 1 520px; }
+  .n-vt-limite { white-space: nowrap; color: var(--n-encre-2); }
+  .n-vt-limite[data-vt-ambre="1"] { color: var(--n-ambre); font-weight: 600; }
+  .n-vt-logo { display: inline-flex; align-items: center; flex: 0 0 auto; margin-left: 6px; }
 }

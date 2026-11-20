@@ -20852,7 +20852,7 @@ function CacheSiV2({ si, children }) {
 const ECRANS_NATIFS = new Set(['annonces', 'ventes', 'automatisations']);
 // (19 nov. soir, NATIF.md §2 bis) Un écran en TABLEAU DE TRAVAIL prend toute la largeur à l'ordinateur : pas de troisième volet
 // (le tableau ne tient pas dans une colonne de 520) ; sa fiche s'ouvre en panneau à droite (`.n-tt-fiche`).
-const ECRANS_TABLEAU = new Set(['annonces', 'automatisations']);
+const ECRANS_TABLEAU = new Set(['annonces', 'automatisations', 'ventes']);   // (20 nov.) Ventes : tableau, détail posé par l'écran au toucher
 const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: null });
 // (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
 // un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
@@ -48814,7 +48814,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const titre = e.__autre === 'vc' ? (v.titre || '') : (x.titre || o.title || '');
         const photo = e.__autre === 'eb' ? (x.ordre ? photoCommande(x.ordre) : null) : e.__autre === 'lbc' ? photoArticle(o) : (v.photo || null);
         const cle = String(e.key);
-        return rangeeEnvoyer({ cle, site, autreSite: true, num, titre, photo, transporteur: e.tr && e.tr.nom, compte: e.__autre === 'eb' ? (x.pseudo || x.compte || '') : '',
+        return rangeeEnvoyer({ cle, site, autreSite: true, num, titre, photo, transporteur: e.tr && e.tr.nom, transporteurCle: e.tr && e.tr.cle,
+          t: [v.date, v.soldAt, v.dateVente, x.date, x.creationDate, x.ordre && x.ordre.creationDate, o.date, o.createdAt], compte: e.__autre === 'eb' ? (x.pseudo || x.compte || '') : '',
           echeance: e.lim ? echeanceCourteColis(e.lim) : null, limiteEstimee: !!(e.lim && e.lim.limite === 'estimee'), presse: avantDemainColis(e), attente: attenteColis(e),
           ligneLot: lotPar.get(cle) || null, coches, place: num ? (() => { try { return emplacementVente(ouDansMeubles(num)); } catch (_) { return null; } })() : null,
           fiche: attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + cle, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre }),
@@ -48847,7 +48848,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       return rangeeEnvoyer({ cle, site: 'vinted', tx: e.txn || '', compte: acc ? accNameOf(acc) : ((b && b.account) || ''), acheteur: pseudoAcheteur(o),
         num, numDouble: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))), titre, photo,
         taille: o && (typeof o.size_title === 'string' ? o.size_title : (typeof o.size === 'string' ? o.size : '')),
-        prix, transporteur: trV && trV.nom, pdf, imprime, depose: !!posted,
+        prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
         notes: [lit ? { cle: 'litige', texte: `L'email disait N°${lit.mail}, la vente dit N°${lit.txn} — on garde celui de la vente.` } : null,
@@ -48910,7 +48911,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
     return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
       taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: x.photo && !imgMortes.has(x.photo) ? x.photo : null,
-      prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, suivi: su,
+      prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
+      t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
       lienSuivi: su ? trackUrl((x.tr && x.tr.cle) || '', su) : '',
       fiche: attrsFicheLigne({ contexte: 'colis', site: x.site, cle: 'c' + (tx || cle), nums: x.num ? [x.num] : [], tx, photo: typeof x.photo === 'string' ? x.photo : '', titre: x.titre || '' }),
       gestes: {
@@ -56776,12 +56778,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       envoyer: { lu: !voitSite('vinted') || (Array.isArray(sales.items) && !sales.loading), erreur: !!(voitSite('vinted') && sales.error && !(sales.items || []).length),
                         rangs: rangsNV, ecart: ecartNomme(rangsNV, nCochesV), plein: pleinImprimer({ nC: nCochesV, nR: nNR, occupe: !!batchBusy || !!imprBusy, total: resLot.total + Lret.length }),
                         retours: Lret.map((l) => ({ cle: l.cle, tx: l.tx, num: l.num || '', titre: l.titre || '', vendeur: l.vendeur || '', on: choixNR.has(l.cle) })),
-                        format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0 },
+                        format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0,
+                        bordsPasSu: !!(voitSite('vinted') && emailBordsKO && emailBords === null) },
                       route: onglet === 'envoyes' && !toutesSeules ? routeNatif() : null },
                     g: { onglet: (v) => onOngletColis && onOngletColis(v),
                       basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
                       // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
+                      // (20 nov., Ventes en tableau) « Imprimer les bordereaux » des ventes cochées DANS LE TABLEAU : le même `imprimerLot`, sa sélection.
+                      imprimerChoix: (cles) => { const c = new Set((cles || []).map(String)); if (c.size) imprimerLot(c, { retours: new Set() }); },
                       format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot,
                       scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
