@@ -37,7 +37,7 @@ export default {
   "egalite.etatAnnonce.enligne": "online",
   "egalite.etatAnnonce.masquee": "von der Seite ausgeblendet",
   "egalite.etatAnnonce.pause": "pausiert",
-  "egalite.etatAnnonce.aconfirmer": "zu bestätigen",
+  "egalite.etatAnnonce.aconfirmer": "länger nicht geprüft",
   "egalite.etatAnnonce.brouillon": "Entwurf",
   "egalite.etatAnnonce.vendue": "verkauft",
   "egalite.etatAnnonce.retiree": "entfernt",
