@@ -19604,12 +19604,8 @@ async function sequenceFavoriBleam(x) {
   const texte = texteJamaisRepete(brut, pseudo, await textesRecents(uid));
   if (texte == null || !texte.trim()) return { resultat: 'refuse', raison: 'historique_non_verifie' };
   if (!texteSurVinted(texte).ok) { noterDiag('favori_texte_final_interdit'); return { resultat: 'refuse', raison: 'texte_interdit' }; }
-  // 1. La conversation marquée lue (comme la page, avant de répondre) — une lecture, hors du plafond des gestes.
-  etape('lue');
-  const lu = await vintedPage(acc, 'PUT', `/api/v2/conversations/${convId}/mark_as_read`, null, { timeoutMs: 12000 });
-  if (lu && lu.sansPage) return { resultat: 'refuse', raison: 'onglet_vinted' };
-  if (lu && lu.pause) return { resultat: 'refuse', raison: 'pause_vinted' };
-  { const f = freinFavoriAuto(lu); if (f) return { resultat: 'refuse', status: lu.status, raison: f }; }
+  // 1. (5.410.5) PLUS de `PUT mark_as_read` : l'export de l'Observateur (20 nov.) montre que Bleam ne marque PAS
+  //    lue la conversation qu'il ouvre pour un favori (ses `mark_as_read` vont aux conversations où l'acheteur a écrit).
   // 2. Le message : le temps d'écriture, puis l'envoi.
   await pauseFavori('reponse', uid);
   etape('ecriture');
@@ -19739,11 +19735,15 @@ async function executerMessageFavori(uid,acc,body){
     const r=await fetch(`https://vrm.center/api/compte?mode=favoris&uid=${encodeURIComponent(uid)}`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'verifier',jeton}),signal:AbortSignal.timeout(12000)});
     if(!r.ok)return rep('refuse',r.status,'autorisation_expiree');const j=await r.json();if(!j.ok||!j.autorise||String(j.uid)!==String(uid))return rep('refuse');
   }catch{return rep('refuse');} // no reply has been sent yet
-  await pauseFavori('transaction', uid);
+  // 5.410.5 (« fais tout comme Bleam », export de l'Observateur du 20 nov.) : chez Bleam, la conversation créée est
+  // RELUE (GET /api/v2/conversations/{id}) 0,76 s après, puis le message part ~6 s après la création — ni
+  // `mark_as_read`, ni lecture de la transaction entre les deux. Séquence allumée ⇒ la même chose ici.
+  const seqBleam=!!cbF.favoris;
+  await pauseFavori(seqBleam?'fil':'transaction', uid);
   etape('verification');
-  // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant).
+  // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant). Bleam : toujours relu.
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
-  if(!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
+  if(seqBleam||!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
@@ -19759,7 +19759,15 @@ async function executerMessageFavori(uid,acc,body){
   // La transaction, comme Vintex (elle porte le prix de l'annonce pour l'offre).
   const tx=String(c?.transaction?.id||cc?.transaction?.id||'');
   let prixAnnonce=null,devise='EUR';
-  if(id(tx)){
+  // Bleam ne relit pas la transaction : le prix vient du fil relu quand il le porte ; la transaction n'est lue
+  // que si une offre est demandée et que le fil ne dit pas le prix (jamais un prix deviné).
+  const prFil=seqBleam?prixDeTransaction(c&&c.transaction&&typeof c.transaction==='object'?c.transaction:null):null;
+  if(prFil){prixAnnonce=prFil.montant;devise=prFil.devise;}
+  if(seqBleam&&(prFil||!offre)){
+    noterDiag('favori_bleam_sans_tx');
+    const itF=c&&c.transaction&&c.transaction.item&&typeof c.transaction.item==='object'?c.transaction.item:null;
+    {const ind=itF?annonceIndisponible(itF,null,null):'';if(ind){noterDiag('favori_annonce_fil_'+ind);return rep('ignore',lu.status,'annonce_indisponible');}}
+  }else if(id(tx)){
     const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000});
     if(!frein)frein=freinFavoriAuto(t);
     if(t.sansPage)return rep('refuse',0,'onglet_vinted');
@@ -20691,9 +20699,16 @@ function freinFavoriAuto(r) {
   if (!r || typeof r !== 'object') return '';
   if (r.robot) return 'vinted_robot';                // 5.398 : arrêté à la source (vérification anti-robot)
   if (r.pause) return 'pause_vinted';
+  // ⚠️⚠️ 5.410.5 (20 nov., capture de Julien 22:29 — « 0 sur 15 envoyés », AUCUNE vérification sur la page) :
+  //    une réponse NORMALE de Vinted (2xx/3xx) n'est JAMAIS un frein. MESURÉ : la transaction relue (GET, 200)
+  //    porte `"is_suspicious": false` sur chaque photo ; le mot « suspicious » ci-dessous l'a prise pour un
+  //    contrôle anti-robot ⇒ file en pause, « fais la vérification sur la page » — une vérification qui
+  //    n'existait pas (sécurité du compte : robot null, prudence null). Les mots ne se lisent que dans un REFUS.
+  const st = Number(r.status) || 0;
+  if (r.ok === true || (st >= 200 && st < 400)) return '';
   let txt = '';
   try { txt = r.json == null ? '' : JSON.stringify(r.json).slice(0, 4000); } catch (_) {}
-  if (/captcha|datadome|automat|robot|\bbots?\b|unusual activity|activit[ée] inhabituelle|suspicious/i.test(txt)) return 'vinted_robot';
+  if (/captcha|datadome|\bautomat|\brobot|\bbots?\b|unusual activity|activit[ée] inhabituelle|\bsuspicious/i.test(txt)) return 'vinted_robot';   // `\b` : une clé `is_suspicious` n'est pas un mot
   if (r.status === 429 || r.status === 403) return 'vinted_frein';
   return '';
 }
@@ -20701,7 +20716,7 @@ function freinFavoriAuto(r) {
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
 // (5.372) Le temps APRÈS l'offre est désormais de 8 à 20 s (`attendreOffreMessage`) ; `offre` reste
 // la courte pause entre la transaction relue et l'offre.
-const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550] };
+const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550], fil: [500, 1200] };   // 5.410.5 : `fil` = la relecture de la conversation chez Bleam (0,76 s mesurée)
 async function pauseFavori(quoi, uid) {
   const p = PAUSES_FAVORI[quoi] || [400, 800];
   const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));   // 5.357 : doublée en prudence

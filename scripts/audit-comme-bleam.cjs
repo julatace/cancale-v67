@@ -156,14 +156,17 @@ async function auditerRepub() {
 // ── LES FAVORIS ─────────────────────────────────────────────────────────────
 const JETON = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'jeton' };
-function monterFav({ offre = true, aimes = 1, fiche = { numero: '41', min: '40' }, achat = null, message = 'Bonjour {username} !', store, apresReponse } = {}) {
-  const conv = { id: 301, opposite_user: { id: 201, login: 'pseudo_banc' }, transaction: { id: 5001, item_id: 101 }, allow_reply: true, messages: [] };
+function monterFav({ offre = true, aimes = 1, fiche = { numero: '41', min: '40' }, achat = null, message = 'Bonjour {username} !', store, apresReponse, prixFil = false } = {}) {
+  // 5.410.5 : la VRAIE forme mesurée le 20 nov. — chaque photo porte `is_suspicious: false` (réponse normale, 200).
+  const photosVraies = [{ id: 1, is_suspicious: false }, { id: 2, is_suspicious: false }];
+  const conv = { id: 301, opposite_user: { id: 201, login: 'pseudo_banc' }, transaction: { id: 5001, item_id: 101, ...(prixFil ? { item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' }, photos: photosVraies } } : {}) }, allow_reply: true, messages: [] };
   const lignes = { main: { vinted_annonce_numeros: { '101': fiche }, ...(achat ? { vinted_buyprice_by_num: { '41': achat } } : {}) } };
   const f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store: store || { __commeBleamDefaut: true },
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/conversations$/.test(e.chemin)) return { status: 200, body: { conversation: conv, code: 0 } };
       if (e.methode === 'PUT' && /\/mark_as_read$/.test(e.chemin)) return { status: 200, body: { code: 0 } };
-      if (e.methode === 'GET' && /\/api\/v2\/transactions\/\d+$/.test(e.chemin)) return { status: 200, body: { transaction: { id: 5001, item_id: 101, item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' } } } } };
+      if (e.methode === 'GET' && /\/api\/v2\/conversations\/\d+$/.test(e.chemin)) return { status: 200, body: { conversation: conv } };
+      if (e.methode === 'GET' && /\/api\/v2\/transactions\/\d+$/.test(e.chemin)) return { status: 200, body: { transaction: { id: 5001, item_id: 101, item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' }, photos: photosVraies } } } };
       if (e.methode === 'POST' && /\/offers$/.test(e.chemin)) return { status: 200, body: { code: 0 } };
       if (e.methode === 'POST' && /\/replies$/.test(e.chemin)) { if (apresReponse) apresReponse(f); return { status: 200, body: { code: 0 } }; }
       return { status: 404, body: {} };
@@ -188,7 +191,7 @@ async function auditerFavoris() {
     const c = corpsDe(f, /conversations$/)[0] || {};
     const off = (f.ctx.__vrmPausesVues || []).filter((x) => x[0] === 'favori:offreBleam');
     const o = corpsDe(f, /offers$/)[0];
-    dit(r && r.json && r.json.resultat === 'envoye' && seqFav(f) === 'CLMO' && c.initiator === 'seller_enters_notification', 'F1 — conversation (`seller_enters_notification`) → marquée lue → message → offre, dans cet ordre', `${seqFav(f)} ${JSON.stringify(c)} ${JSON.stringify(r && r.json)}`);
+    dit(r && r.json && r.json.resultat === 'envoye' && seqFav(f) === 'CMO' && c.initiator === 'seller_enters_notification', 'F1 — conversation (`seller_enters_notification`) → message → offre, dans cet ordre, sans `mark_as_read` (Bleam ne le fait pas pour un favori)', `${seqFav(f)} ${JSON.stringify(c)} ${JSON.stringify(r && r.json)}`);
     dit(off.length === 1 && off[0][1] >= 8000 && off[0][1] <= 15000, 'F2 — l’offre part 8 à 15 s après le message (dans la même conversation)', JSON.stringify(off));
     dit(o && o.offer && o.offer.price === '45.00', 'F3 — au prix de SA règle (−10 % de 50 € = 45 €), au-dessus du prix mini (40 €)', JSON.stringify(o));
     dit(((f.store.vrmActions || {})[UID] || []).length === 3, 'F4 — 3 écritures comptées (conversation, message, offre) ; la lecture marquée ne compte pas', JSON.stringify(f.store.vrmActions)); }
@@ -208,10 +211,20 @@ async function auditerFavoris() {
   { const f = monterFav({ message: 'Je vous propose {prix} !' }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     dit(seqFav(f) === 'COM', 'F9 — un message qui annonce le prix de l’offre ({prix}) garde l’ordre d’avant : offre puis message (jamais un prix annoncé pour une offre pas faite)', seqFav(f)); }
   { const f = monterFav({ apresReponse: (ff) => { ff.store.vrmToutArrete = { on: true, at: Date.now() }; } }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
-    dit(seqFav(f) === 'CLM', 'F10 — « Tout arrêter » pendant l’attente de l’offre ⇒ l’offre ne part pas', seqFav(f)); }
+    dit(seqFav(f) === 'CM', 'F10 — « Tout arrêter » pendant l’attente de l’offre ⇒ l’offre ne part pas', seqFav(f)); }
   { const f = monterFav({ store: { vrmCommeBleam: { favoris: false } } }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const c = corpsDe(f, /conversations$/)[0] || {};
     dit(seqFav(f) === 'COM' && c.initiator === 'native-fixture', 'F11 — séquence « comme Bleam » éteinte (Paramètres) ⇒ l’ordre et l’ouverture d’avant', `${seqFav(f)} ${c.initiator}`); }
+  // F12 — 5.410.5 : les requêtes de Bleam, dans son ordre (export de l'Observateur) : POST conversations → GET conversations/{id}
+  //        → POST replies → POST offers ; le fil porte le prix ⇒ AUCUNE lecture de la transaction, aucun PUT.
+  { const f = monterFav({ prixFil: true }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    const seq = f.j.vinted.map((v) => `${v.methode} ${String(v.chemin).replace(/\d+/g, '#')}`).join(' | ');
+    dit(r.json.resultat === 'envoye' && seq === 'POST /api/v#/conversations | GET /api/v#/conversations/# | POST /api/v#/conversations/#/replies | POST /api/v#/transactions/#/offers', 'F12 — exactement les 4 requêtes de Bleam, dans son ordre (relecture du fil, ni `mark_as_read` ni transaction relue)', seq); }
+  // F13 — LE DÉFAUT DU 20 NOV. 22:29 : une réponse NORMALE (200) qui porte `is_suspicious: false` n'est pas un contrôle anti-robot.
+  { const f = monterFav(); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    const f2 = monterFav({ store: { vrmCommeBleam: { favoris: false } } }); const r2 = await f2.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(r.json.resultat === 'envoye' && r.json.raison !== 'vinted_robot' && r2.json.resultat === 'envoye' && r2.json.raison !== 'vinted_robot', 'F13 — transaction relue en 200 avec `is_suspicious: false` ⇒ le message part (plus de fausse « vérification »), Bleam ou pas', JSON.stringify([r.json, r2.json]));
+    dit(f.ctx.freinFavoriAuto({ status: 403, ok: false, json: { url: 'https://geo.captcha-delivery.com/captcha/?x=1' } }) === 'vinted_robot' && f.ctx.freinFavoriAuto({ status: 200, ok: true, json: { captcha: true } }) === '' && f.ctx.freinFavoriAuto({ status: 422, ok: false, json: { item: { photos: [{ is_suspicious: false }] } } }) === '', 'F14 — un VRAI refus captcha (403 + captcha-delivery) reste un arrêt ; une réponse 200 ne l’est jamais, ni une clé `is_suspicious` dans un refus', ''); }
 }
 
 async function auditer() { await auditerRepub(); await auditerFavoris(); }
@@ -226,7 +239,10 @@ const MUTATIONS = [
   ['sans-arret', "  try { if ((await toutArreteDepuis(null)) > 0) return { code: 'tout-arrete', raison: \"« Tout arrêter » a été touché\" }; } catch (_) {}", ''],
   ['sans-plancher', "  if (!pl) { noterDiag('favori_offre_sans_plancher'); return fini; }", "  if (!pl) { noterDiag('favori_offre_sans_plancher'); }\n  if (pl && Math.round(Number(prix) * 100) < pl.c) { return fini; }\n  if (false) { return fini; }"],
   ['initiateur', "initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator", 'initiator:body.initiator'],
-  ['lu-oublie', "  const lu = await vintedPage(acc, 'PUT', `/api/v2/conversations/${convId}/mark_as_read`, null, { timeoutMs: 12000 });", '  const lu = null;'],
+  ['fil-pas-relu', "  if(seqBleam||!filVerifiable(c)){", "  if(!filVerifiable(c)){"],
+  ['tx-toujours-lue', "  if(seqBleam&&(prFil||!offre)){", "  if(false){"],
+  ['frein-sur-200', "  if (r.ok === true || (st >= 200 && st < 400)) return '';", ''],
+  ['mot-sans-bord', "\\bsuspicious/i.test(txt)", "suspicious/i.test(txt)"],
 ];
 function lancerSur(src) { const r = cp.spawnSync(process.execPath, [__filename, '--bg', src], { env: { ...process.env, SILENCE: '1', VRM_PROUVE_ENFANT: '1' }, encoding: 'utf8', timeout: 600000 }); return r.status; }
 async function prouver() {
