@@ -133,24 +133,12 @@ const nomsCourts = () => ({
     }
   },
 });
-// (20 nov., iphone-rapide) LES SÉLECTEURS RANGÉS : `X :is(.a, .b)` devient `X .a, X .b` dans chaque feuille livrée (même
+// (20 nov., iphone-rapide) LES SÉLECTEURS RANGÉS : `X :is(.a, .b)` devient `X .a, X .b` dans chaque feuille (même
 // sélection, même spécificité, même ordre) — le moteur de style range enfin ces règles par classe au lieu de les essayer
-// sur chaque élément. Règle et prudences : scripts/_selecteurs-ranges.cjs ; preuve : scripts/bancs/styles-identiques.cjs.
-// Le dépôt garde les feuilles telles qu'écrites. `VRM_SANS_RANGER=1` livre les feuilles sans la réécriture (mesure).
-const selecteursRanges = () => ({
-  name: 'vrm-selecteurs-ranges',
-  apply: 'build',
-  enforce: 'post',
-  generateBundle(o, bundle) {
-    if (process.env.VRM_SANS_RANGER === '1') return;
-    const { rangerSelecteurs } = exiger('./scripts/_selecteurs-ranges.cjs');
-    for (const f of Object.values(bundle)) {
-      if (f.type !== 'asset' || !/\.css$/.test(f.fileName)) continue;
-      const src = typeof f.source === 'string' ? f.source : Buffer.from(f.source).toString('utf8');
-      f.source = rangerSelecteurs(src).css;
-    }
-  },
-});
+// sur chaque élément. Greffon PostCSS (avant le paquet : le nom du fichier livré suit son contenu). Règle et prudences :
+// scripts/_selecteurs-ranges.cjs ; preuve : scripts/bancs/styles-identiques.cjs. Le dépôt garde les feuilles telles
+// qu'écrites. `VRM_SANS_RANGER=1` livre les feuilles sans la réécriture (mesure avant/après).
+const greffonsCss = process.env.VRM_SANS_RANGER === '1' ? [] : [exiger('./scripts/_selecteurs-ranges.cjs').greffonPostcss()];
 const prechargerApp = () => ({
   name: 'vrm-precharger-app',
   apply: 'build',
@@ -187,8 +175,9 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne(), nomsCourts(), selecteursRanges()],
+  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne(), nomsCourts()],
   define: { __BUILD__: JSON.stringify(BUILD) },
+  css: { postcss: { plugins: greffonsCss } },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et
     // plus rapide à parser sur les téléphones récents (tous compatibles).

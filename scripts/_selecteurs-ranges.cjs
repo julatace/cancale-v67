@@ -154,26 +154,32 @@ function deplier(sel) {
   return out.length ? out : [s];
 }
 
+// Une règle : ses sélecteurs dépliés quand c'est sûr ; rend vrai si elle a changé.
+function rangerRegle(r, stats) {
+  if (r.parent && r.parent.type === 'atrule' && /keyframes/i.test(r.parent.name)) return false;
+  const sels = liste(r.selector);
+  let change = false;
+  const neufs = [];
+  for (const x of sels) { const d = deplier(x); if (d.length !== 1 || d[0] !== x.trim()) change = true; neufs.push(...d); }
+  if (stats) { stats.regles++; stats.selecteursAvant += sels.length; stats.selecteursApres += neufs.length; if (change) stats.depliees++; }
+  if (change) r.selector = neufs.join(',');
+  return change;
+}
+// Le greffon PostCSS (vite.config.js, `css.postcss`) : chaque feuille AVANT le paquet, donc l'empreinte du nom de
+// fichier livré suit le contenu réécrit (un contenu, un nom).
+const greffonPostcss = () => ({ postcssPlugin: 'vrm-selecteurs-ranges', Rule(r) { rangerRegle(r); } });
+greffonPostcss.postcss = true;
+
 // Le CSS entier : chaque règle dont un sélecteur se déplie ; rend { css, stats }.
 function rangerSelecteurs(css) {
   const postcss = require('postcss');
   const racine = postcss.parse(css);
   const stats = { regles: 0, depliees: 0, selecteursAvant: 0, selecteursApres: 0 };
-  racine.walkRules((r) => {
-    if (r.parent && r.parent.type === 'atrule' && /keyframes/i.test(r.parent.name)) return;
-    stats.regles++;
-    const sels = liste(r.selector);
-    stats.selecteursAvant += sels.length;
-    let change = false;
-    const neufs = [];
-    for (const x of sels) { const d = deplier(x); if (d.length !== 1 || d[0] !== x.trim()) change = true; neufs.push(...d); }
-    stats.selecteursApres += neufs.length;
-    if (change) { stats.depliees++; r.selector = neufs.join(','); }
-  });
+  racine.walkRules((r) => { rangerRegle(r, stats); });
   return { css: racine.toResult().css, stats };
 }
 
-module.exports = { rangerSelecteurs, deplier, specificite, argSur, liste };
+module.exports = { rangerSelecteurs, rangerRegle, greffonPostcss, deplier, specificite, argSur, liste };
 
 if (require.main === module) {
   const fs = require('fs');

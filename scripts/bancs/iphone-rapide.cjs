@@ -236,7 +236,10 @@ async function onglets(pg, cdp) {
   const tours = +(process.env.TOURS || 2);
   for (let t = 1; t <= tours; t++) {
     for (const id of ordre) {
+      const n0 = await pg.evaluate(() => performance.getEntriesByType('resource').length);
       const m = await tracer(pg, cdp, toucher(id), surEcran(id));
+      m.morceaux = await pg.evaluate((n) => performance.getEntriesByType('resource').slice(n).filter((r) => /\.js$/.test(r.name)).map((r) => r.name.split('/').pop().replace(/-[\w-]{8}\.js$/, '')), n0);
+      if (process.env.MORCEAUX && m.morceaux.length) console.log('      morceaux : ' + m.morceaux.join(' '));
       sortie.push({ geste: `${t === 1 ? '1er' : '2e'} → ${id}`, ...m, memoire: await memoire(cdp) });
       console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
     }
