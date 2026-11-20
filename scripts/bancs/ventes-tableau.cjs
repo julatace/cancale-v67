@@ -34,7 +34,9 @@ const THEMES = liste('THEMES', 'clair,sombre');
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };
 const attendre = async (pg, f, ms = 30000, arg) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(300); } return false; };
-const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(300); };
+const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click();
+  for (const e of document.querySelectorAll('body *')) { if (getComputedStyle(e).position !== 'fixed' || !/paires? numérotées?/.test(e.textContent || '') || e.closest('.n-onglets, .vrm-tabbar')) continue;
+    const f = [...e.querySelectorAll('button')].find((b) => /fermer|close|×/i.test((b.getAttribute('aria-label') || '') + b.textContent)); if (f) { f.click(); break; } } }).catch(() => {}); await pg.waitForTimeout(400); };
 
 // La base : celle de design-passe (3 comptes, colis à envoyer, envois partis). Chaque bordereau e-mail INVENTÉ nomme un
 // transporteur (le champ que la lecture des PDF pose, `transporteurPdf`), à tour de rôle ; un sur onze n'en nomme aucun (« — »).
@@ -83,7 +85,9 @@ function mesure(src) {
   });
   const rangsTel = [...document.querySelectorAll('[data-vn-liste] [data-vn-rang], [data-vn-liste] [data-vn-route]')].filter(vis).map((r) => ({
     cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo]'), trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
-    etiquette: (r.querySelector('.n-rangee-detail .n-pastille') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top) }));
+    etiquette: (r.querySelector('.n-vt-valeur .n-pastille') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom),
+    prix: !!(r.querySelector('.n-vt-valeur > span:not(.n-pastille)') || { textContent: '' }).textContent.trim(),
+    sousCoupe: (() => { const x = r.querySelector('.n-rangee-sous-texte'); return !!x && x.scrollWidth > x.clientWidth + 1; })() }));
   const entetes = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-th]')].map((t) => t.getAttribute('data-tt-th'));
   const plein = document.querySelector('[data-vn-plein]');
   const pleins = [...document.querySelectorAll('[data-n-variante="plein"], .sb-btn-plein')].filter(vis);
@@ -197,6 +201,9 @@ const segment = async (pg, i) => {
         dit(r.filter((x) => x.trCle).length >= 4 && r.every((x) => !x.trCle || x.logo), `logo du transporteur sur chaque rangée qui en a un (${r.filter((x) => x.logo).length}/${r.length})`);
         dit(r.every((x) => /exp[ée]dier/i.test(x.etiquette)), 'étiquette « À expédier » sur chaque rangée', r.slice(0, 3).map((x) => x.etiquette));
         dit(r[0] && r[0].haut <= 340, `1re rangée à ≤ 340 px (${r[0] && r[0].haut})`);
+        dit(r.every((x) => x.prix), 'le prix reste sur chaque rangée');
+        dit(r.every((x) => !x.sousCoupe), 'la ligne du N° et de la date limite n’est jamais coupée', r.filter((x) => x.sousCoupe).map((x) => x.cle).slice(0, 4));
+        dit(r.every((x) => x.bas - x.haut <= 96), `rangées compactes (la plus haute : ${Math.max(...r.map((x) => x.bas - x.haut))} px)`);
         dit(!m.petits.length, 'cibles ≥ 44 × 44', m.petits.slice(0, 6));
         await segment(pg, 1);
         const m3 = await pg.evaluate(mesure, CONTRASTE);

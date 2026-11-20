@@ -44,6 +44,9 @@ const logoTr = (r, taille = 20) => (r && r.transporteurCle ? <LogoTransporteur c
 const MOT_STATUT = { envoyer: 'vt.expedier', route: 'tableau.vente.route', livree: 'vt.livree', terminee: 'tableau.vente.terminee' };
 const motStatut = (r) => tr(MOT_STATUT[statutRangee(r)] || 'tableau.vente.route');
 const etiquetteTel = (r) => <Pastille ton={statutRangee(r) === 'envoyer' ? 'ambre' : 'neutre'}>{motStatut(r)}</Pastille>;
+// Au téléphone : le prix puis l'étiquette, l'un sous l'autre à droite du titre (deux lignes) — la ligne du N° et de la date limite
+// garde toute la largeur (jamais coupée).
+const valeurTel = (r) => <span className="n-vt-valeur">{r.prix ? <span>{r.prix}</span> : null}{etiquetteTel(r)}</span>;
 const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 18)}</span> : null);
 
 function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
@@ -62,7 +65,7 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)}
       ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'}
       pastilleSous={logoTel(r)}
-      valeur={r.prix || null} valeurForte detailValeur={etiquetteTel(r)}
+      valeur={valeurTel(r)} valeurForte
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
@@ -81,7 +84,7 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       sousTitre={joint(texteEtape(r.etapes), r.taille ? tr('vv.taille', { t: r.taille }) : '')}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
       pastilleSous={logoTel(r)}
-      valeur={r.prix || null} valeurForte detailValeur={etiquetteTel(r)}
+      valeur={valeurTel(r)} valeurForte
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}
       attrs={{ 'data-vn-route': r.cle, 'data-vn-num': r.num, 'data-vn-etape': String((r.etapes || []).filter((e) => e.fait).length) }}
