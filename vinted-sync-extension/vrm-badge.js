@@ -2063,13 +2063,13 @@
   // Vinted ne l'a pas encore fourni ⇒ « Pas encore de bordereau », dit ; la base muette ⇒ « pas su », dit.
   const venSel = new Set();
   let impEtat = null, impEnVol = false;
-  const imprimable = (x) => x && x.etat === 'a_expedier' && x.bordereau === true && /^\d{1,20}$/.test(String(x.tx || ''));
+  const imprimable = (x) => !!(x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === true && /^\d{1,20}$/.test(String(x.tx || '')));   // Leboncoin / Vestiaire : leurs bordereaux restent sur le site
   const transpHtml6 = (x, taille) => (x.transporteurCle && U.logoTransp ? `<span class="tr-l6">${U.logoTransp(x.transporteurCle, taille || 18)}<span>${esc(x.transporteur || U.nomTransp(x.transporteurCle))}</span></span>` : x.transporteur ? `<span class="tr-l6"><span>${esc(x.transporteur)}</span></span>` : '<span class="gris6">—</span>')
     + (x.suivi ? `<small class="suivi6" data-suivi="${esc(x.suivi)}">${esc(x.suivi)}</small>` : '');
   const limiteHtml6 = (x) => (x.limite ? `<span class="lim6" data-limite>${esc(TU('v_avant', { d: x.limite }))}</span>` : '<span class="gris6">—</span>');
   function boutonImp6(x) {
     if (imprimable(x)) return `<button type="button" class="imp6" data-imprimer="${esc(x.tx)}"${impEnVol ? ' disabled' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 8V3.5h10V8M7 17H4.5V9.5a1.5 1.5 0 0 1 1.5-1.5h12a1.5 1.5 0 0 1 1.5 1.5V17H17"/><path d="M7 13.5h10v7H7z"/></svg><span>${esc(TU('imp_un'))}</span></button>`;
-    if (x && x.etat === 'a_expedier' && x.bordereau === false) return `<span class="pas6" data-bordereau-manque="${esc(x.tx)}">${esc(TU('imp_pas'))}</span>`;
+    if (x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false) return `<span class="pas6" data-bordereau-manque="${esc(x.tx)}">${esc(TU('imp_pas'))}</span>`;
     return '<span class="gris6">—</span>';
   }
   function pdfDepuisB64(b64) { const bin = atob(String(b64 || '')); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: 'application/pdf' }); }
