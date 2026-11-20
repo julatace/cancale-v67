@@ -77,7 +77,17 @@ Branche `claude/arrivee-scan` (depuis `origin/main`), poussée à chaque commit,
   branchements). `--prouve` : **15/15 mutations rouges**. Sur l'arbre d'avant (`git archive origin/main`) : rouge (C0).
 - Banc `scripts/bancs/arrivee-scan.cjs` (390 tactile clair/sombre, 1512 clair/sombre, base de volume de 50 achats
   identiques + lot + doublon, base VIDE) : caméra SIMULÉE (un QR Mondial Relay dessiné dans le flux vidéo, lu par le vrai
-  lecteur WebAssembly). Résultats : voir le rapport du lot.
+  lecteur WebAssembly) : **216 verts** — P « J'ai retiré » ⇒ l'arrivée de CET achat, N°13 (trou 5 jamais redonné), première
+  case libre qui respire, rien d'écrit avant, case prise touchée sans effet, case libre choisie, « Ranger ici » ⇒ fiche liée,
+  case, pool, aucun prix sans reçu, pilule « N°13 rangé », « Déjà rangé » à la réouverture (une seule fiche) ; S QR ⇒ 9423
+  parmi 50 identiques, « Ranger ici » note aussi le colis retiré (`vinted_pickup_done`, même geste), « Scanner le suivant » ;
+  Q n° inconnu ⇒ dit, deux achats ⇒ 2 choix puis SON toucher ; L lot ⇒ 3 paires, N°13·14·15, 3 cases distinctes, 3 fiches
+  sans prix ; H hors ligne ⇒ reconnu par l'index, « le N° attend le réseau », « Noter l'arrivée » sans N° ; V base vide.
+  Un plein, 44 px, rien ne déborde, aucune clé brute, aucune erreur, sur les 4 vues. **Rouge sur le build de `origin/main`**
+  (P1 : « J'ai retiré » n'ouvre pas l'écran d'arrivée ; S, Q : pas de bouton « Arrivée »). Captures regardées (390/1512,
+  clair/sombre : écran, rangé, lot, deux achats, inconnu, hors ligne, caméra), non commitées.
+  Deux défauts du BANC trouvés en route, corrigés dans le banc : la base ne gardait pas les écritures de `main` (PATCH) ;
+  un lot écrit ses clés l'une après l'autre (on attend les cases, pas seulement les fiches).
 - Audits verts : traduction, tdz, variables, quoi-de-neuf, identite, icones.
 
 ## Reste / limites
