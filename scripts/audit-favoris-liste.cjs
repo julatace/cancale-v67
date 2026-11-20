@@ -294,7 +294,7 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
   console.log('\nB6. Un refus de Vinted : la raison exacte et le geste');
   {
     const sv = await serveur(a);
-    for (const [raison, motif] of [['offre_refusee', /offre de réduction/], ['conversation_deja_contactee', /Conversation avec des messages/], ['vinted_robot', /vérification \(anti-robot\).*Reprendre/]]) {
+    for (const [raison, motif] of [['offre_refusee', /offre de réduction/], ['conversation_deja_contactee', /Conversation avec des messages/], ['vinted_robot', /refusé l’envoi \(protection anti-robot\).*Reprendre/]]) {
       const F = sv.F; let d = null;
       d = F.lancerFile(d, { owner: OWNER, targets: [{ itemId: '5000', recipientId: '900', notificationId: 'n0', initiator: 'favourite' }, { itemId: '5006', recipientId: '906', notificationId: 'n6', initiator: 'favourite' }], message: 'x', intervalleMinutes: 0, maintenant: Date.now(), lot: 'l' }).data;
       const rs = F.reserverFile(d, { owner: OWNER, maintenant: Date.now(), jeton: '00000000-0000-4000-8000-000000000001', suivi: 's' }); d = rs.data;
