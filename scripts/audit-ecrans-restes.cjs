@@ -100,7 +100,13 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const a = PR.actionFiche({ ...p, resume: { ...(p.resume || {}), achat: 2000 } }, { peutBordereau: true });
     dit(a && a.sorte === 'bordereau' && a.limite && a.limite.jour === '2026-11-19', 'L6 la carte « À déposer » porte la limite', JSON.stringify(a));
     const fpx = sansCommentaires(lire('src/FichePaire.jsx'));
-    dit(/data-fd-limite=\{a\.limite\.jour/.test(fpx) && /\{a\.limite\.texte\}/.test(fpx), 'L7 la carte la REND (data-fd-limite, sa phrase)');
+    // (20 nov., chasse-bugs) Fiche refaite (19 nov., fiche-directe) : FichePaire passe la limite à la rangée d'action
+    // (`ligneAction` : sa phrase en valeur, `data-fd-limite` en attribut) et la fiche native la rend (`Rangee … attrs`).
+    const fnat = sansCommentaires(lire('src/natif/ecrans/Fiche.jsx'));
+    const ancienne = /data-fd-limite=\{a\.limite\.jour/.test(fpx) && /\{a\.limite\.texte\}/.test(fpx);
+    const native = /valeur: a\.limite \? a\.limite\.texte : ''/.test(fpx) && /'data-fd-limite': a\.limite\.jour/.test(fpx)
+      && /<Rangee titre=\{ligneAction\.titre\} valeur=\{ligneAction\.valeur[^}]*\}[^>]*attrs=\{ligneAction\.attrs\}/.test(fnat);
+    dit(ancienne || native, 'L7 la carte la REND (data-fd-limite, sa phrase)');
     const app = sansCommentaires(lire('src/App.jsx'));
     dit(/lireTout\('id=like\.email_bord_\*&select=id,tx:meta->>transaction,pdf:meta->>_pdf,dateLimite:meta->>dateLimite'/.test(app), 'L8 la limite est lue en SCALAIRE (meta, jamais le PDF, §4.4)');
     dit(/limiteEnvoi: \(v, b\) => \{ const l = limiteExpedition\(v,/.test(app), 'L9 l’app fournit LA règle de Colis (`limiteExpedition`)');
