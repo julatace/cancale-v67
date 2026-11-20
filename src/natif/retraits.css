@@ -110,3 +110,11 @@
   @media (prefers-reduced-motion: no-preference) { .n-rp-aupoint { animation: nRpEntre .24s cubic-bezier(.32,.72,0,1); } }
   @keyframes nRpEntre { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 }
+@layer vrm-natif {
+  .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+  .n-rp-code-btn b { font: inherit; }
+  .n-rp-code-btn:active { background: var(--n-appui); }
+  .n-rp-code-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rp-dedans { color: var(--n-encre-2); }
+  .n-rp-dedans.is-pas-lu { font-style: normal; }
+}

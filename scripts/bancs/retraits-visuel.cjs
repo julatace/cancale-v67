@@ -103,13 +103,19 @@ async function releve(pg) {
     return { cartes, resume, petits, deborde, relier, vide: !!document.querySelector('[data-rp-vide]') };
   });
 }
+// L'écran d'aujourd'hui (le garde-réseau des bancs pose sinon l'échafaudage du DOM d'avant, `vrm_banc_dom_ancien`).
+async function allumer(pg) {
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+}
 async function attendre(pg, f, ms = 30000) { const t0 = Date.now(); let r; while (Date.now() - t0 < ms) { r = await releve(pg); if (f(r)) return r; await pg.waitForTimeout(800); } return r; }
 
 async function cas(nav, { W, H = null, sombre, nom }) {
   const b = baseRV();
   const { ctx, pg, erreurs, tel } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
   if (H || W === 1280) await pg.setViewportSize({ width: W === 1512 || W === 1280 ? W : 390, height: H || 900 });
-  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+  await allumer(pg);
   const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 15);
   await pg.waitForTimeout(1500);
   const th = `${nom} ${sombre ? 'sombre' : 'clair'}`;
@@ -174,7 +180,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
 async function vide(nav, { W, sombre }) {
   const b = baseVide();
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
-  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+  await allumer(pg);
   const r = await attendre(pg, (x) => x.vide, 30000);
   dit(r.vide && r.cartes.length === 0, `V ${W} ${sombre ? 'sombre' : 'clair'} : base vide ⇒ « Rien à retirer » et son illustration`, r);
   const v = pg.locator('[data-rp-vide]').first(); if (await v.count()) await v.screenshot({ path: path.join(SHOTS, `vide-${W}-${sombre ? 'sombre' : 'clair'}.png`) }).catch(() => {});

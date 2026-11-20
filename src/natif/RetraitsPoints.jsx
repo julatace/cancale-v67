@@ -19,6 +19,7 @@ import { tr } from '../i18n/index.js';
 import { CLE_RETRAITS_VUS, estNouveau, marquerVu } from '../retraitsNouveaux.js';
 import { trierPoints, resumeRetraits, limiteDuPoint, compteARebours, lienItineraire, appareilApple } from '../retraitsVue.js';
 import { MiniCarte } from './MiniCarte.jsx';
+import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './retraits.css';
 
 const ANNULER_MS = 10000;
@@ -72,26 +73,35 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
   const code = conflit ? '' : (x.code || '');
   const qr = aides.qrSrc(x);
   const ouvrir = aides.enGrand(x);
-  const prix = aides.prixDe ? aides.prixDe(x) : '';
+  // Ce qu'il y a DEDANS (src/contenuColis.js : l'achat relié par identité, prix payé, compte ; ou « pas encore lu »).
+  const contenu = x.contenu || null;
+  const contenuTxt = texteContenu(contenu, tr);
+  const prix = contenuTxt ? '' : (aides.prixDe ? aides.prixDe(x) : '');
+  const rg = rangeeRetrait(x) || { codeEtat: '', qr: false, limite: {}, titreDe: '', transporteur: {} };
   const photo = x.photo && Photo ? Photo(x.photo) : null;
   const retireBientot = !!enCours[x.cle || x.id];
   const voirQr = ouvrir && qr ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
+  const voirCode = ouvrir ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
   return (
-    <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '') + (retireBientot ? ' is-retire' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''}>
+    <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '') + (retireBientot ? ' is-retire' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''}
+      data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
       <div className="n-rp-colis-haut">
-        <span className="n-rp-vignette" aria-hidden="true" data-rp-photo={photo ? '1' : '0'}>{photo || <Icon name="box" size={22}/>}</span>
+        <span className="n-rp-vignette v2-passe-photo" aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-v2-photo-article={photo ? '' : undefined}>{photo || <Icon name="box" size={22}/>}</span>
         <span className="n-rp-colis-texte">
-          <span className="n-rp-colis-titre">{aides.titre(x)}</span>
+          <span className="n-rp-colis-titre v2-passe-titre">{aides.titre(x)}</span>
           <span className="n-rp-colis-meta">
             {neuf ? <span className="n-rp-etiquette" data-n-ton="accent" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
             {x.num ? <span className="n-rp-num" data-rp-num={x.num}>N° {x.num}</span> : null}
             {prix ? <span className="n-rp-prix" data-rp-prix="">{prix}</span> : null}
+            {contenuTxt ? <span className={'n-rp-dedans' + (contenu.etat === 'pas-lu' ? ' is-pas-lu' : '')} data-rp-prix={contenu.etat === 'relie' && contenu.prix ? '' : undefined} data-v2-contenu={contenu.etat} data-v2-contenu-tx={contenu.tx || undefined} data-v2-contenu-raison={contenu.etat === 'pas-lu' ? contenu.raison : undefined} data-v2-contenu-compte={contenu.compte || undefined}>{contenuTxt}</span> : null}
           </span>
         </span>
       </div>
       <div className="n-rp-code-zone">
         {code ? <>
-          <b className="n-rp-code" data-rp-code-grand="">{code}</b>
+          {voirCode
+            ? <div role="button" tabIndex={0} className="n-rp-code n-rp-code-btn" onClick={voirCode} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); voirCode(); } }} data-v2-en-grand="" aria-label={tr('v2.passe.afficherCode') + ' · ' + code}><b data-rp-code-grand="" data-v2-code-grand="">{code}</b></div>
+            : <b className="n-rp-code" data-rp-code-grand="" data-v2-code-grand="">{code}</b>}
           <Copier code={code}/>
         </> : <span className="n-rp-sans-code" data-rp-sans-code={conflit ? 'conflit' : 'pas-lu'}>{tr(conflit ? 'v2.passe.codesEnConflit' : 'retraits.v.codePasLu')}</span>}
         {qr ? <button type="button" className="n-rp-qr-mini" onClick={voirQr || undefined} data-rp-qr="" aria-label={tr('v2.passe.afficherQr') + ' · ' + aides.titre(x)}><img src={qr} alt="" loading="lazy" decoding="async"/></button> : null}
@@ -109,7 +119,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, enCours, onAuPoint,
   const lien = lienItineraire(p, { apple });
   const lieu = p.nom || tr('v2.retirer.pointInconnu');
   return (
-    <article className="n-rp-carte" id={'n-rp-' + (p.cle || p.numero)} data-rp-point={p.inconnu ? 'inconnu' : String(p.numero || '')} data-rp-n={String(colis.length)} data-rp-sorte={p.consigne ? 'consigne' : 'comptoir'} aria-label={tr('v2.passe.aria', { lieu, n: colis.length })}>
+    <article className="n-rp-carte" data-v2-passe={p.inconnu ? 'inconnu' : String(p.numero || '')} data-v2-passe-n={String(colis.length)} id={'n-rp-' + (p.cle || p.numero)} data-rp-point={p.inconnu ? 'inconnu' : String(p.numero || '')} data-rp-n={String(colis.length)} data-rp-sorte={p.consigne ? 'consigne' : 'comptoir'} aria-label={tr('v2.passe.aria', { lieu, n: colis.length })}>
       <header className="n-rp-tete">
         <div className="n-rp-tete-ligne">
           <span className="n-rp-transp" data-rp-transp={transp}>{transp && Logo ? <Logo cle={transp} taille={20}/> : null}<span>{nomT || tr('retraits.v.transpInconnu')}</span></span>
@@ -234,7 +244,7 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo }) {
             </button></li>); })}
         </ol>
       </section>
-      <div className="n-rp-cartes">
+      <div className="n-rp-cartes" data-v2-bloc="passes">
         {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} enCours={differe.enCours} onAuPoint={ouvrirAuPoint} apple={apple}/>)}
       </div>
       {pOuvert ? <AuPoint p={pOuvert} aides={aides} onFermer={fermer} differe={differe}/> : null}

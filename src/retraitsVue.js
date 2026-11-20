@@ -13,10 +13,13 @@ export function limiteDuPoint(p) {
   let best = null;
   for (const x of (p && p.arrives) || []) {
     if (!x || x.aVerifier || x.horsCompte) continue;
+    // Une limite ESTIMÉE (garde du transporteur, « vers le ») n'est jamais un compte à rebours (src/contenuColis.js `limiteDuColis`).
+    if (x.limite && typeof x.limite === 'object' && x.limite.source && x.limite.source !== 'lue') continue;
     const j = Number.isFinite(x.jours) ? x.jours : null;
     if (j == null) continue;
-    if (!best || j < best.jours) best = { jours: j, heure: heureLimite(x.limiteAt) };
-    else if (j === best.jours && !best.heure) best.heure = heureLimite(x.limiteAt);
+    const at = (x.limite && typeof x.limite === 'object' && x.limite.at) || x.limiteAt;
+    if (!best || j < best.jours) best = { jours: j, heure: heureLimite(at) };
+    else if (j === best.jours && !best.heure) best.heure = heureLimite(at);
   }
   return best;
 }
