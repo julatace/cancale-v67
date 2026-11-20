@@ -28646,6 +28646,12 @@ function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
 // adresse. Le NOM de l'article est montré pour que tu le reconnaisses — il ne
 // relie JAMAIS un achat à une paire (§5). Le montant n'entre dans aucun prix
 // d'achat ni aucun total : c'est toi qui saisis tes prix d'achat (§2.5).
+// (20 nov., intégration 5.410) Achats Leboncoin : la disposition native garde le flou des achats d'un AUTRE compte
+// Leboncoin (`lbcFloute`, audit-regroupe-comptes S5) — perdu au passage à `AchatsSite`.
+function AchatsSiteLeboncoin({ lbcVentes }) {
+  const lbcOuvert = useCompteLbcOuvert();
+  return <AchatsSiteLazy site="leboncoin" lbcVentes={lbcVentes} floute={(o) => lbcFloute(lbcOuvert, o.account)}/>;
+}
 function AchatsVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
@@ -28662,7 +28668,8 @@ function AchatsVestiaire() {
     window.addEventListener('vrm:ext', f); return () => window.removeEventListener('vrm:ext', f);
   }, [relire]);
   // (20 nov.) La disposition des achats Vinted : `src/achats/AchatsSite.jsx` (chargé avec l'écran).
-  return <AchatsSiteLazy site="vestiaire" d={d}/>;
+  // (20 nov., intégration 5.410) Le flou des achats d'un AUTRE compte Vestiaire (`vcFloute`, audit-regroupe-comptes S7) reste.
+  return <AchatsSiteLazy site="vestiaire" d={d} floute={(v) => vcFloute(vcOuvert, v.compte)}/>;
 }
 function VestiaireMesure() {
   const [m, setM] = useState(undefined);
@@ -66896,7 +66903,7 @@ function AppCoeur() {
               ]} note={vide ? "Pas encore lues : ouvre « Mes transactions » sur leboncoin.fr." : (lbcVentes.maj ? <span data-lbc-lu="">Lu sur Leboncoin {ilYaCourt(lbcVentes.maj)} <Pourquoi label="Rafraîchir">Ouvre « Mes transactions » sur leboncoin.fr, avec l'extension à jour : tes ventes sont relues.</Pourquoi></span> : null)}/>; })()}
             {((lbcVentes.ventes||[]).length>0||lbcVentes.inconnues>0) && <VentesLeboncoin lbcVentes={lbcVentes} sansTotaux/>}
           </>}</div>}
-          {sec==='achats'&&<div data-achats-site-hote="">{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsSiteLazy site="leboncoin" lbcVentes={lbcVentes}/>}</div>}
+          {sec==='achats'&&<div data-achats-site-hote="">{baseKO?<LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne>:<AchatsSiteLeboncoin lbcVentes={lbcVentes}/>}</div>}
           {/* ⚠️ Les quatre sous-onglets voisins se gardaient de la panne, celui-ci
               non : pendant une panne il disait sa lecture ratée en quatre
               messages, plus « ouvre leboncoin.fr » — le mauvais geste (§7). */}

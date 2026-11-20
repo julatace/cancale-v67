@@ -47,7 +47,7 @@ const PREUVES = {
   'clic-favoris': [['src/favorisAuto.js', 'actif: false']],
   'clic-supprimer': [[BG, 'async function supprimeLbcDepuisApp'], [BG, 'const LBC_SUPPRIME_MAX_HEURE']],
   'clic-republier': [[BG, 'async function recreerVinted']],
-  'clic-publier': [[BG, 'async function publierVestiaire'], ['src/BaissePrixSerie.jsx', 'Rien ne part avant son clic']],
+  'clic-publier': [[BG, 'async function publierVestiaire'], ['vinted-sync-extension/vrm-badge.js', "envoyer6({ action: 'prixCarte', items, confirme: true"]],   // (20 nov.) la baisse en série vit dans le panneau : elle part sur SON « Confirmer »,
   'auto-offres': [[BG, 'const actif = m.vinted_offres_auto === true;']],
   'auto-ebay-offres': [['api/ebay.js', 'BestOfferAutoAcceptPrice']],
   'auto-favoris': [['src/favorisAuto.js', 'export const AUTO_DEFAUT']],
@@ -255,7 +255,7 @@ const PREUVES = {
     for (const [nom, f, avant, apres] of MUT) {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'confiance-mut-'));
       const ecrire = (rel, s) => { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), s); };
-      const tous = new Set(['public/confiance.html', 'public/confiance.js', 'public/etat.html', 'public/etat.js', 'public/sw.js', 'public/sitemap.xml', 'public/logo-vrm-96.png', 'public/vrm-icon-v4-192.png', 'vercel.json', 'src/Accueil.jsx', 'src/App.jsx', 'src/favorisAuto.js', 'src/discretion.js', 'src/freinRelaisVinted.js', 'src/ecrans/Ebay.jsx', 'src/ecrans/Reglages.jsx', 'src/composants/TesDonnees.jsx', 'src/prixAchatPropose.js', 'src/BaissePrixSerie.jsx', 'src/i18n/langues/fr.js', 'api/ebay.js', 'api/email-inbound.js', 'api/vinted-connect.js', 'public/legal/confidentialite.html', 'supabase/migrations/001-multi-utilisateurs.sql', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}-accueil.js`)]);
+      const tous = new Set(['public/confiance.html', 'public/confiance.js', 'public/etat.html', 'public/etat.js', 'public/sw.js', 'public/sitemap.xml', 'public/logo-vrm-96.png', 'public/vrm-icon-v4-192.png', 'vercel.json', 'src/Accueil.jsx', 'src/App.jsx', 'src/favorisAuto.js', 'src/discretion.js', 'src/freinRelaisVinted.js', 'src/ecrans/Ebay.jsx', 'src/ecrans/Reglages.jsx', 'src/composants/TesDonnees.jsx', 'src/prixAchatPropose.js', 'vinted-sync-extension/vrm-badge.js', 'src/i18n/langues/fr.js', 'api/ebay.js', 'api/email-inbound.js', 'api/vinted-connect.js', 'public/legal/confidentialite.html', 'supabase/migrations/001-multi-utilisateurs.sql', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}-accueil.js`)]);
       for (const x of fs.readdirSync(path.join(R, 'vinted-sync-extension'))) if (/\.(js|json)$/.test(x)) tous.add('vinted-sync-extension/' + x);
       for (const rel of tous) { const p = path.join(R, rel); if (fs.existsSync(p)) ecrire(rel, fs.readFileSync(p)); }
       const src = fs.readFileSync(path.join(dir, f), 'utf8');

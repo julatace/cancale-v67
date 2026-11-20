@@ -115,6 +115,10 @@ const COUPLES = {
   'src/agendaEcheances.js|calendar.google.com': ['lien', LIEN + ' — « Ajouter à Google Agenda » (le lien de SON calendrier)'],
   // (intégration g1) liens ouverts d'un clic, nés des lots favoris-clair, livre-registre, retours-litiges.
   'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
+  // (20 nov., actions-extension) Le lien qui ouvre le PANNEAU de l'extension sur le site (`lienPanneau`), sur SON toucher.
+  'src/ouvrirPanneau.js|www.vinted.fr': ['lien', LIEN + ' — le panneau de l’extension sur vinted.fr'],
+  'src/ouvrirPanneau.js|www.leboncoin.fr': ['lien', LIEN + ' — le panneau de l’extension sur leboncoin.fr'],
+  'src/ouvrirPanneau.js|fr.vestiairecollective.com': ['lien', LIEN + ' — le panneau de l’extension sur Vestiaire'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
   // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».

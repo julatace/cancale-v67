@@ -159,7 +159,10 @@ async function lancer(mutation) {
     dit((/\{!offrePartieDuFil\(openConv\) && <div className="vrm-chat-rapides"/.test(APP)
       || (/\{!offrePartieDuFil\(openConv\) && <RapidesConv liste=\{rapidesDuFil\(listeRapides\(quickReplies\), annonceDuFilPartie\(openConv\)\)\}/.test(APP)
         && /function RapidesConv\([^)]*\) \{\s*return \(\s*<div className="vrm-chat-rapides"/.test(APP)
-        && /const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,500}annonceOffreEnVente\(/.test(APP))), "pas de réponse rapide « toujours disponible » sous une annonce partie");
+        && /const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,500}annonceOffreEnVente\(/.test(APP))
+      // (20 nov., actions-extension) Une conversation Vinted se répond dans le panneau de l'extension : l'app ne pose plus
+      // AUCUNE réponse rapide sous un fil Vinted (aucun `<RapidesConv` dans App.jsx) — rien ne peut dire « toujours disponible ».
+      || !/<RapidesConv\b/.test(APP)), "pas de réponse rapide « toujours disponible » sous une annonce partie");
     dit(/data-offre-retirer/.test(APP) && !/« Retirer », en haut/.test(APP), 'le bloc porte LE geste, sans renvoyer à un bouton sans texte');
     // (8 nov.) La règle a été mémorisée par conversation (vitesse, 7 nov.) : ce qui est jugé est que
     // le calcul de `reponseAttendue` — direct ou dans son mémo — écarte d'abord une offre close.

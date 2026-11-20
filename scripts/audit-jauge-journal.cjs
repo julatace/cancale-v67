@@ -57,7 +57,7 @@ function monter(src, { store = {}, lignes = {}, connecte = UID, refus = () => fa
   return faireFond({ src, lignes: l, store, vinted, connecte, comptes: [{ vinted_user_id: UID, login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }] });
 }
 const repondre = (c, texte = 'Bonjour Camille, merci pour ton message') => ({ uid: UID, method: 'POST', endpoint: `/api/v2/conversations/${c}/replies`, body: { reply: { body: texte } } });
-const accepter = (tx, oid) => ({ uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, confirme: true });
+const accepter = (tx, oid) => ({ uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, confirme: true, avisVu: true });   // 5.410 : son second toucher après « vérifie » (garde anti double-vente pas sûre ici)
 const refuser = (tx, oid) => ({ uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/reject` });
 const lire = (c) => ({ uid: UID, method: 'GET', endpoint: `/api/v2/conversations/${c}` });
 const lignesDe = (f, prefixe) => Object.keys(f.lignes).filter((k) => k.startsWith(prefixe)).map((k) => ({ id: k, ...f.lignes[k] }));

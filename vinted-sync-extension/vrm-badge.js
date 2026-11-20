@@ -1879,9 +1879,9 @@
     R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
     R.querySelectorAll('[data-prix-pct]').forEach((b) => b.addEventListener('click', () => { const p = Number(b.getAttribute('data-prix-pct')); const toutes = (listes.annonces && listes.annonces.toutes) || [];
       for (const id of geste6.ids) { const x = toutes.find((y) => y.id === id); if (x && Number(x.prix) > 0) geste6.prix[id] = (Math.round(Number(x.prix) * (100 - p)) / 100).toFixed(2).replace('.', ','); } rendre(); }));
-    const hOui = R.querySelector('[data-prix-hausse-oui]'); if (hOui) hOui.addEventListener('click', () => { geste6.hausseConf = null; geste6.hausseOk = true; const b = R.querySelector('[data-prix-confirmer]'); if (b) b.click(); });
+    const hOui = R.querySelector('[data-prix-hausse-oui]'); if (hOui) hOui.addEventListener('click', () => { geste6.hausseConf = null; geste6.hausseOk = true; confirmerPrix6(); });   // (20 nov.) la même fonction, jamais un clic simulé (audit-confiance-publique G5)
     const hNon = R.querySelector('[data-prix-hausse-non]'); if (hNon) hNon.addEventListener('click', () => { geste6.hausseConf = null; rendre(); });
-    const pc = R.querySelector('[data-prix-confirmer]'); if (pc) pc.addEventListener('click', () => {
+    const confirmerPrix6 = () => {
       const toutes = (listes.annonces && listes.annonces.toutes) || [];
       const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; return { id, prix: String(geste6.prix[id] || '').replace(',', '.'), prixVu: x.prix, num: x.num || '' }; }).filter((x) => x.prix);
       if (!items.length) { geste6Etat = { ok: false, texte: TU('g6_prix_vide') }; rendre(); return; }
@@ -1892,7 +1892,8 @@
       envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
         geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code).join(' · ') : '') };
         if (n) chargerListes(true); });
-    });
+    };
+    const pc = R.querySelector('[data-prix-confirmer]'); if (pc) pc.addEventListener('click', confirmerPrix6);
     // Atelier
     R.querySelectorAll('[data-atelier-haut],[data-atelier-bas]').forEach((b) => b.addEventListener('click', () => { const h = b.hasAttribute('data-atelier-haut'); const i = Number(b.getAttribute(h ? 'data-atelier-haut' : 'data-atelier-bas')); const j = h ? i - 1 : i + 1; const l = geste6.ids; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; rendre(); }));
     R.querySelectorAll('[data-atelier-mode]').forEach((b) => b.addEventListener('click', () => { geste6.mode = b.getAttribute('data-atelier-mode'); if (geste6.mode === 'aleatoire' && !(geste6.max > geste6.min)) geste6.max = geste6.min + 3; rendre(); }));

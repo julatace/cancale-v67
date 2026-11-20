@@ -21,6 +21,6 @@ export function phraseEnLigneVc(it, tr, langue = 'fr-FR') {
   const d = dateEnLigneVc(it);
   if (!d) return '';
   let jour = '';
-  try { jour = new Date(d.t).toLocaleDateString(langue, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }); } catch (_) { jour = new Date(d.t).toISOString().slice(0, 10); }
+  try { jour = new Date(d.t).toLocaleDateString(langue, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }); } catch (_) { jour = new Date(d.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }); }   // langue inconnue : le jour de Paris, jamais l'UTC
   return d.exacte ? tr('vcDate.depuis', { jour }) : tr('vcDate.auMoins', { jour });
 }
