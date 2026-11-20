@@ -3723,6 +3723,11 @@
     setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
   }
 
+  // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
+  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
+  function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
+  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+
   // ══ 5.410.2 — LE PANNEAU RESTE OUVERT, DANS LE MÊME ÉTAT, JUSQU'À SON × ═══════════════════════════════════════
   // Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ». Mesuré au banc
   // (scripts/bancs/panneau-persistant.cjs) sur la 5.410.1 — quatre façons de le perdre :
@@ -3788,10 +3793,6 @@
     if (defil && carte.classList.contains('on')) { defilARendre = defil; defilJusque = Date.now() + 15000; reposerDefil(); }
   }
   if (!CADRE && !LISTES) setInterval(() => { if (!vivant()) { try { hote.remove(); } catch (_) {} return; } replacerHote(); }, 1000);
-  // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
-  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
-  function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
   // ══ 5.351 (lot extension-visuel) : DÉPLACER, RÉDUIRE, TEINTE ══
   // (5.376 : la carte n'ouvre plus VRM — « Colis · Messages · Offres » sont retirés.)
