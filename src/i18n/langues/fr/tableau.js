@@ -262,4 +262,5 @@ export default {
   "vt.trInconnu": "Transporteur pas encore lu",
   "vt.bordsPasSu": "Bordereaux reçus par e-mail : pas encore lus, l’écran réessaie seul.",
   "vt.chercher": "N°, modèle, acheteur, transporteur…",
+  "vt.sansBordMeta": "sans bordereau",
 };

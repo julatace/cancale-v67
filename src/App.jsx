@@ -56790,6 +56790,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
                       // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
+                      relire: voitSite('vinted') ? () => loadOrders('sold', setSales, true) : null,
                       format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot,
                       scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
@@ -57498,7 +57499,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {voitSite('ebay') && colisEb && colisEb.aPoster.length>0 && ebayLuA && Math.floor((Date.now() - ebayLuA) / 3600000) >= 6 ? (() => { const ageH = Math.floor((Date.now() - ebayLuA) / 3600000);
           return <p className="vrm-colis-note-ebay" data-colis-ebay-age={ageH} style={{fontSize:12,color:C.muted,lineHeight:1.45,margin:'0 2px 10px'}}>Commandes eBay lues il y a {ageH >= 48 ? `${Math.floor(ageH/24)} j` : `${ageH} h`}, peut-être pas à jour : eBay → Compte → Rafraîchir.</p>; })() : null}
         {voitSite('vinted') && sales.loading && !sales.items && <Skeleton variant="row" count={4}/>}
-        {voitSite('vinted') && sales.error && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
+        {/* (20 nov.) Sur Ventes natif, l'écran dit lui-même « pas su » avec « Réessayer » (une seule vérité, une seule phrase). */}
+        {voitSite('vinted') && sales.error && !(VENTES_NATIF && colisDans === 'ventes') && <div data-colis-ventes="passu" style={{marginBottom:10}}><EtatPanne compact quoi="Tes ventes Vinted" raison="Les colis à envoyer ne sont pas connus tant qu’elles ne sont pas lues." onReessayer={()=>loadOrders('sold',setSales,true)}/></div>}
         {(()=>{
           // ⚠️ 30 septembre (Julien : « les bordereaux doivent s'enlever quand
           // les ventes sont expédiées ») : un colis coché « colis fait » QUITTE

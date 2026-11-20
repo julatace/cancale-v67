@@ -18,6 +18,8 @@ import { Pastille } from '../Pastille.jsx';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
+// Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
+const morceaux = (...x) => x.filter(Boolean).map((t, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<span className="n-vt-morceau">{t}</span></React.Fragment>);
 // La photo d'une rangée : la <PhotoVinted> de l'app quand elle est passée (sans référent, relais de l'extension quand l'adresse
 // Vinted a expiré — sinon le CDN refuse et la vignette restait un carré vide), sinon l'icône dessinée.
 const vignette = (r, Photo) => <Vignette src={r.photo || ''} alt="" image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
@@ -43,14 +45,19 @@ const logoTr = (r, taille = 20) => (r && r.transporteurCle ? <LogoTransporteur c
 // L'ÉTIQUETTE d'état (« À expédier » ambre ; « En route », « Livrée », « Terminée » neutres) — `statutRangee`, aucune règle neuve.
 const MOT_STATUT = { envoyer: 'vt.expedier', route: 'tableau.vente.route', livree: 'vt.livree', terminee: 'tableau.vente.terminee' };
 const motStatut = (r) => tr(MOT_STATUT[statutRangee(r)] || 'tableau.vente.route');
+// (20 nov., « corrige le défaut visuel ») Un colis SANS bordereau n'a pas de rond (rien ne se coche) : sa raison est dite à la
+// dans la méta (« N° 40 · sans bordereau · vers le 23 nov. », qui passe à la ligne plutôt que d'être coupée).
+const sansBordereau = (r) => r.bordereau === 'attente' && !(r.coche && r.coche.possible);
 const etiquetteTel = (r) => <Pastille ton={statutRangee(r) === 'envoyer' ? 'ambre' : 'neutre'}>{motStatut(r)}</Pastille>;
+// La date limite COURTE de la rangée (« avant le 25 nov. », « vers le 23 nov. ») : le « dans N j » reste dans la fiche.
+const echeanceCourte = (e) => (!e ? '' : e.code !== 'date' ? e.texte : e.sorte === 'estimee' ? tr('v2v.versLe', { date: e.texte }) : tr('vv.ech.avantLe', { date: e.texte }));
 // Au téléphone : le prix puis l'étiquette, l'un sous l'autre à droite du titre (deux lignes) — la ligne du N° et de la date limite
 // garde toute la largeur (jamais coupée).
 const valeurTel = (r) => <span className="n-vt-valeur">{r.prix ? <span>{r.prix}</span> : null}{etiquetteTel(r)}</span>;
 const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 18)}</span> : null);
 
 function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
-  const ech = texteEcheance(r.echeance);
+  const ech = echeanceCourte(r.echeance);
   const actions = [
     r.gestes.depose ? { cle: 'depose', libelle: tr('vn.b.depose'), ton: 'neutre', icone: <Icon name="check" size={20}/>, onClick: r.gestes.depose } : null,
     r.gestes.imprimer ? { cle: 'imprimer', libelle: tr('vn.b.imprimer'), icone: <Icon name="printer" size={20}/>, onClick: () => r.gestes.imprimer(), franc: true } : null,
@@ -62,13 +69,15 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       plaque={r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null}
       // (19 nov., intégration — capture 390 du coordinateur) Sur la rangée : le N° et la date limite SEULEMENT (jamais coupés) ;
       // la place et la taille vont dans la fiche (« Où », plus bas). Le titre tient sur deux lignes (contrat NATIF).
-      sousTitre={joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)}
+      sousTitre={sansBordereau(r) ? morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', tr('vt.sansBordMeta'), ech) : joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ech)} sousLignes={sansBordereau(r) ? 2 : 1}
       ton={r.echeance && r.echeance.ambre ? 'ambre' : 'neutre'}
       pastilleSous={logoTel(r)}
       valeur={valeurTel(r)} valeurForte
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
-      selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
+      // Pas de chevron : la rangée entière s'ouvre (comme une liste en mode choix) ; le titre garde ses deux lignes entières.
+      className={sansBordereau(r) ? 'n-vt-rang n-vt-sans-case' : 'n-vt-rang'}
+      selectionnee={choisie} fin={null} onClick={() => onOuvrir(r.cle)} actions={actions.length ? actions : null}
       attrs={{ 'data-vn-rang': r.cle, 'data-vn-bordereau': r.bordereau || '', 'data-vn-limite': r.echeance ? r.echeance.sorte : '', 'data-vn-limite-code': r.echeance ? r.echeance.code : '',
         'data-vn-num': r.num, 'data-vn-place': r.place ? `${r.place.nom || ''}|${r.place.rangee}|${r.place.colonne}` : '', 'data-vn-coche-on': r.coche.on ? '1' : '0', 'data-vn-prix': r.prix }}
     />
@@ -166,13 +175,14 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   const erreur = surEnvoyer ? (E.erreur && !E.rangs.length) : !!(R && R.erreur && !R.lu);
   const ouverte = rangChoisi(rangs, choisie);
   // La fraîcheur : l'heure où la liste montrée a été lue ici (« pas su » si la lecture a échoué) ; ⟳ relance la lecture EXISTANTE.
-  React.useEffect(() => { if (lu) setMajLe(Date.now()); else if (erreur) setMajLe(null); }, [lu, erreur, rangs]);
+  React.useEffect(() => { if (erreur) setMajLe(null); else if (lu) setMajLe(Date.now()); }, [lu, erreur, rangs]);
   React.useEffect(() => {
     if (!ouverte) return undefined;
     const f = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) setChoisie(null); };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
   }, [ouverte]);
-  const lignes = !lu ? (erreur ? null : undefined) : rangs.map((r) => {
+  // UNE vérité : une lecture ratée sans rien de lu ⇒ « pas su » (jamais « Mis à jour à l'instant » + « Rien à envoyer »).
+  const lignes = erreur ? null : !lu ? undefined : rangs.map((r) => {
     const st = surEnvoyer ? statutEnvoyer(r) : statutRangee(r);
     const sous = surEnvoyer ? (st === 'site' ? '' : tr('vt.st.' + st)) : (r.etat && r.etat.texte) || '';
     return { cle: r.cle, r, titre: r.titre, photo: r.photo || '', image: r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null,
@@ -221,7 +231,8 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
           ...(l.r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vv.volet.suivre'), onClick: () => { try { window.open(l.r.lienSuivi, '_blank', 'noopener'); } catch (_) {} } }] : [])]}
         unite={unite} placeholder={tr('vt.chercher')} avantOutils={segment} haut={<>{avant}{surEnvoyer ? null : avantRoute}</>} outilsPlus={outilsPlus}
         pied={surEnvoyer && E.bordsPasSu ? tr('vt.bordsPasSu') : ''} grille={false}
-        vide={tr(surEnvoyer ? 'v2v.vide.envoyer' : 'v2v.vide.route')} pasSu={tr('v2v.erreur')} Icon={Icon}
+        vide={tr(surEnvoyer ? 'v2v.vide.envoyer' : 'v2v.vide.route')} pasSu={tr('v2v.erreur')} Icon={Icon} iconeVide={surEnvoyer ? 'box' : 'truck'}
+        actionPasSu={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}
         enfants={<>{retours}{surEnvoyer ? apresListe : null}</>} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet, 'data-vn-liste': surEnvoyer ? 'envoyer' : 'route', 'data-vn-n': String(rangs.length), 'data-vn-affiche': surEnvoyer && m.nEnv != null ? String(m.nEnv) : '' }}/>
       {ouverte ? <aside className="n-vt-volet" data-vn-detail={ouverte.cle} aria-label={ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}>
         <div className="n-vt-volet-tete">
@@ -305,7 +316,8 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
         {avant}
         {surEnvoyer ? <>
           {!E.lu && !E.rangs.length ? <Attente forme="rangees" n={5} vignette={56} titre/>
-            : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/>
+            : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}
+                action={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
             : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
                 {rangs.map((r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}

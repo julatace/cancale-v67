@@ -226,5 +226,8 @@
     .n-vt[data-vt-detail="1"] .n-tt-transporteur > span:last-child { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
     .n-vt-volet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(400px, 42vw); max-height: none; box-shadow: var(--n-ombre); }
   }
+  /* (20 nov.) Un colis sans bordereau : pas de rond (ni pointillé ni vide) — la place reste, la raison est sous le prix. */
+  .n-vt-sans-case .n-case-dessin { visibility: hidden; }
+  .n-vt-morceau { white-space: nowrap; }
   .n-vt-logo { display: inline-flex; align-items: center; flex: 0 0 auto; margin-left: 6px; }
 }

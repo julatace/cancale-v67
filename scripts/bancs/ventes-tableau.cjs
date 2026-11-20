@@ -87,6 +87,11 @@ function mesure(src) {
     cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo]'), trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
     etiquette: (r.querySelector('.n-vt-valeur .n-pastille') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom),
     prix: !!(r.querySelector('.n-vt-valeur > span:not(.n-pastille)') || { textContent: '' }).textContent.trim(),
+    meta: (r.querySelector('.n-rangee-sous') || { textContent: '' }).textContent.trim(), bord: r.getAttribute('data-vn-bordereau'), rond: (() => { const d = r.querySelector('.n-case-dessin'); return !!d && getComputedStyle(d).visibility !== 'hidden' && d.getBoundingClientRect().width > 0; })(),
+    pointille: (() => { const d = r.querySelector('.n-case-dessin'); return !!d && getComputedStyle(d).visibility !== 'hidden' && getComputedStyle(d).borderStyle === 'dashed'; })(),
+    // Un titre ne se coupe qu'APRÈS ses deux lignes entières (jamais « spezial taill… » sur une 2e ligne qui avait la place).
+    titreCoupe: (() => { const t = r.querySelector('.n-rangee-titre'); if (!t || t.scrollHeight <= t.clientHeight + 1) return false; const lh = parseFloat(getComputedStyle(t).lineHeight) || 22; return t.clientHeight < 2 * lh - 1; })(),
+    titreLarg: (() => { const t = r.querySelector('.n-rangee-titre'); return t ? Math.round(t.getBoundingClientRect().width) : 0; })(),
     sousCoupe: (() => { const x = r.querySelector('.n-rangee-sous-texte'); return !!x && x.scrollWidth > x.clientWidth + 1; })() }));
   const entetes = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-th]')].map((t) => t.getAttribute('data-tt-th'));
   const plein = document.querySelector('[data-vn-plein]');
@@ -206,12 +211,21 @@ const segment = async (pg, i) => {
         const r = m.rangsTel;
         dit(r.length > 0, `la liste du téléphone est rendue (${r.length})`);
         dit(r.filter((x) => x.trCle).length >= 4 && r.every((x) => !x.trCle || x.logo), `logo du transporteur sur chaque rangée qui en a un (${r.filter((x) => x.logo).length}/${r.length})`);
-        dit(r.every((x) => /exp[ée]dier/i.test(x.etiquette)), 'étiquette « À expédier » sur chaque rangée', r.slice(0, 3).map((x) => x.etiquette));
+        const sansB = r.filter((x) => x.bord === 'attente'), avecB = r.filter((x) => x.bord !== 'attente');
+        dit(avecB.length && avecB.every((x) => /exp[ée]dier/i.test(x.etiquette) && x.rond) && sansB.every((x) => /exp[ée]dier/i.test(x.etiquette)), 'bordereau là : un rond ; « À expédier » sous le prix partout', avecB.slice(0, 3).map((x) => x.etiquette + ':' + x.rond));
+        dit(sansB.length && sansB.every((x) => !x.rond && /sans bordereau/i.test(x.meta)), 'sans bordereau : AUCUN rond, la raison « sans bordereau » dans la méta', sansB.slice(0, 3).map((x) => x.meta + ':' + x.rond));
+        dit(!r.some((x) => x.pointille), 'aucun rond pointillé');
+        dit(r.every((x) => !x.titreCoupe) && r.every((x) => x.titreLarg >= 130), `chaque titre a ses deux lignes entières avant l’ellipse, ≥ 130 px (mini ${Math.min(...r.map((x) => x.titreLarg))})`, r.filter((x) => x.titreCoupe).map((x) => x.cle).slice(0, 4));
         dit(r[0] && r[0].haut <= 340, `1re rangée à ≤ 340 px (${r[0] && r[0].haut})`);
         dit(r.every((x) => x.prix), 'le prix reste sur chaque rangée');
         dit(r.every((x) => !x.sousCoupe), 'la ligne du N° et de la date limite n’est jamais coupée', r.filter((x) => x.sousCoupe).map((x) => x.cle).slice(0, 4));
-        dit(r.every((x) => x.bas - x.haut <= 96), `rangées compactes (la plus haute : ${Math.max(...r.map((x) => x.bas - x.haut))} px)`);
+        dit(r.every((x) => x.bas - x.haut <= (x.bord === 'attente' ? 108 : 96)), `rangées compactes (≤ 96, ≤ 108 quand la méta dit « sans bordereau ») (la plus haute : ${Math.max(...r.map((x) => x.bas - x.haut))} px)`);
         dit(!m.petits.length, 'cibles ≥ 44 × 44', m.petits.slice(0, 6));
+        // La capture des colis SANS bordereau (plus bas dans la liste).
+        await pg.evaluate(() => { const e = document.querySelector('[data-vn-liste] [data-vn-bordereau="attente"]'); if (e) e.scrollIntoView({ block: 'center' }); });
+        await pg.waitForTimeout(500);
+        await pg.screenshot({ path: path.join(SHOTS, `ventes-${W}-${th}-sans-bordereau.png`) });
+        await pg.evaluate(() => { try { (document.scrollingElement || document.documentElement).scrollTop = 0; for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; } catch (_) {} });
         await segment(pg, 1);
         const m3 = await pg.evaluate(mesure, CONTRASTE);
         await pg.screenshot({ path: path.join(SHOTS, `route-${W}-${th}.png`) });
@@ -230,7 +244,12 @@ const segment = async (pg, i) => {
       const { ctx, pg, erreurs } = await ouvrirVentes(nav, { W, sombre: th === 'sombre', b: baseVide() });
       const m = await pg.evaluate(mesure, CONTRASTE);
       await pg.screenshot({ path: path.join(SHOTS, `ventes-vide-${W}-${th}.png`) });
-      dit(m.vide && !m.lignes.length && !m.rangsTel.length, 'base vide : « Aucun colis à envoyer »', m.texte);
+      dit(m.vide && !m.lignes.length && !m.rangsTel.length, 'base vide : l’écran le dit (rien à envoyer, ou pas su)', m.texte);
+      const verite = await pg.evaluate(() => { const v = document.querySelector('[data-vn="ventes"] .n-vide'); const maj = document.querySelector('[data-vn="ventes"] [data-tt-maj]');
+        const passu = !!v && /pas pu|pas su/i.test(v.textContent); const loupe = !!(v && v.querySelector('svg') && /search/.test(v.innerHTML));
+        const pannes = [...document.querySelectorAll('[data-colis-ventes="passu"]')].filter((e) => e.getClientRects().length).length;
+        return { passu, maj: maj ? maj.getAttribute('data-tt-maj') : null, texte: v ? v.textContent.trim().slice(0, 80) : '', pannes, reessayer: !!document.querySelector('[data-vt-reessayer]') }; });
+      dit(!verite.passu || (verite.maj !== 'lu' && verite.reessayer && verite.pannes === 0), `une seule vérité : « pas su » ⇒ jamais « Mis à jour », un « Réessayer », une seule phrase (${JSON.stringify(verite)})`);
       dit(m.pleins === 0 && !m.desactives, `base vide : aucun plein, aucun bouton désactivé (${m.pleins})`);
       dit(!m.detail.length, 'base vide : aucun volet vide');
       dit(!m.faibles.length, 'base vide : contraste', m.faibles.slice(0, 4));

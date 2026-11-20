@@ -111,7 +111,8 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null }) {
+  // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
   // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
   // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
   // d'office là où le bordereau est prêt) — le tableau ne tient alors aucune sélection à lui et ne montre pas sa barre de sélection.
@@ -390,8 +391,8 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   ) : null;
 
   const corps = lignes === undefined ? <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>
-    : lignes === null ? <Vide icone={ic('alert', 40)} phrase={pasSu || tr('tableau.pasSu')}/>
-    : !affichees.length ? <Vide icone={ic('search', 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
+    : lignes === null ? <Vide icone={ic('cloudOff', 40)} phrase={pasSu || tr('tableau.pasSu')} action={actionPasSu}/>
+    : !affichees.length ? <Vide icone={ic(q || nStatuts ? 'search' : iconeVide, 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
         action={q || nStatuts ? <Bouton variante="texte" onClick={() => { setQ(''); setStatutsSel(new Set()); }} attrs={{ 'data-tt-effacer': '' }}>{tr('tableau.effacerFiltres')}</Bouton> : null}/>
     : !ordinateur ? listeTel : vue === 'grille' ? grilleVue : tableau;
 

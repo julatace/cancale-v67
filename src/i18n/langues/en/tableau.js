@@ -262,4 +262,5 @@ export default {
   "vt.trInconnu": "Carrier not read yet",
   "vt.bordsPasSu": "Labels received by email: not read yet, the screen retries on its own.",
   "vt.chercher": "No., model, buyer, carrier…",
+  "vt.sansBordMeta": "no label yet",
 };

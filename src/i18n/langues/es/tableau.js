@@ -262,4 +262,5 @@ export default {
   "vt.trInconnu": "Transportista aún no leído",
   "vt.bordsPasSu": "Etiquetas recibidas por correo: aún no leídas, la pantalla lo reintenta sola.",
   "vt.chercher": "N.º, modelo, comprador, transportista…",
+  "vt.sansBordMeta": "sin etiqueta",
 };

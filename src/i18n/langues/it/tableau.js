@@ -262,4 +262,5 @@ export default {
   "vt.trInconnu": "Corriere non ancora letto",
   "vt.bordsPasSu": "Etichette ricevute via e-mail: non ancora lette, lo schermo riprova da solo.",
   "vt.chercher": "N°, modello, acquirente, corriere…",
+  "vt.sansBordMeta": "senza etichetta",
 };
