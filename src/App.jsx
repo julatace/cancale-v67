@@ -781,6 +781,7 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
@@ -938,8 +939,21 @@ import ModeRelais from "./ModeRelais.jsx";
 import ModeDepot from "./ModeDepot.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
-import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
+import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+// (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
+// ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
+// crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
+let M_NOUVEAUTES = null;
+const chargerNouveautes = () => import('./nouveautes.js').then((m) => { M_NOUVEAUTES = m; return m; });
+const nouveautesAVoir = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesAVoir(...a) : []);
+const nouveautesDuCompte = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesDuCompte(...a) : []);
+const lireVuesNouveautes = (r) => (M_NOUVEAUTES ? M_NOUVEAUTES.lireVues(r) : {});
+// (20 nov., iphone-rapide) Les composants « Quoi de neuf » à la demande avec leur liste ; leur feuille de style reste
+// importée ICI (la cascade ne bouge pas).
+import './quoi-de-neuf.css';
+const QuoiDeNeufCarte = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufCarte })));
+const QuoiDeNeufFeuille = aLaDemandeFeuille(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufFeuille })));
+const QuoiDeNeufReglage = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufReglage })));
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
@@ -3049,6 +3063,46 @@ function ligneCommandes(r) {
   return { id: r.id, updated_at: r.updated_at, cap: r.cap, data };
 }
 function idsCommandes(uids) { return (uids || []).flatMap((u) => [`harvest_${u}_orders_sold`, `harvest_${u}_orders_purchased`]); }
+// ── (20 nov., lectures-legeres) LES COMMANDES PAR LA ROUTE LÉGÈRE ──────────────
+// Mesuré au profil de Julien (4G 1,6 Mbit/s) : la lecture à froid des commandes de tous
+// ses comptes pesait 1,9 Mo (`payload` de 30 lignes, ~5 300 commandes) — plus de 9 s.
+// `GET /api/compte?mode=commandes-lire` (api/_lib/commandes-lecture.js) rend les MÊMES
+// lignes (forme `SEL_COMMANDES`), du vendeur de la SESSION (jamais un owner du navigateur),
+// chaque commande réduite aux champs que VRM lit (rien d'autre n'existe dans sa base),
+// compressées (~6×), avec un ETag (304 si rien n'a changé : le navigateur revalide seul,
+// `Cache-Control: private, no-cache`). Trois états tenus :
+//   · la route rend ses lignes ⇒ elles (filtrées des comptes supprimés, comme `lireTout`) ;
+//   · la route est absente, refuse, est en panne, ou rend autre chose ⇒ `undefined` :
+//     l'appelant fait la lecture d'AVANT (jamais un écran vide) ;
+//   · jamais `[]` inventé : une liste vide n'est rendue que si la route l'a dite (200).
+// Sans session (accès direct), hors ligne, ou plus de 200 lignes : la lecture d'avant.
+const ROUTE_COMMANDES = '/api/compte?mode=commandes-lire';
+let _routeCommandesAbsente = 0;   // jusqu'à quand ne plus essayer (route absente de ce déploiement)
+async function lireCommandesRoute(ids) {
+  try {
+    if (!MULTI_USER || !(AUTH.session && AUTH.session.access_token && AUTH.user && AUTH.user.id)) return undefined;
+    if (Date.now() < _routeCommandesAbsente || horsLigneMaintenant()) return undefined;
+    const l = Array.isArray(ids) ? [...new Set(ids.map(String))] : null;
+    if (l && (!l.length || l.length > 200 || !l.every((x) => /^harvest_\d{1,20}_orders_(sold|purchased)$/.test(x)))) return undefined;
+    const qui = AUTH.user.id;
+    const r = await fetch(`${ROUTE_COMMANDES}${l ? `&ids=${encodeURIComponent(l.sort().join(','))}` : ''}`, { headers: { Authorization: `Bearer ${AUTH.session.access_token}` } });
+    if (!r || !r.ok) { if (r && (r.status === 404 || r.status === 405)) _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    if (!/json/i.test(String((r.headers && r.headers.get && r.headers.get('content-type')) || ''))) { _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    const j = await r.json().catch(() => null);
+    // La session a changé pendant la lecture : ces lignes ne sont pas celles du vendeur d'à présent.
+    if (!AUTH.user || AUTH.user.id !== qui) return undefined;
+    if (!j || j.ok !== true || !Array.isArray(j.rows)) return undefined;
+    if (j.rows.some((x) => !x || typeof x !== 'object' || !/^harvest_\d{1,20}_orders_(sold|purchased)$/.test(String(x.id)) || (l && !l.includes(String(x.id))))) return undefined;
+    return sansComptesSupprimes(j.rows);
+  } catch (_) { return undefined; }
+}
+// Les commandes nommées (`ids`), ou toutes (`null`) : la route, sinon la lecture d'avant
+// (`lireTout`, mêmes lignes, même projection). Rend le tableau ou `null` (pas su).
+async function lireCommandesLegeres(ids) {
+  const r = await lireCommandesRoute(ids);
+  if (Array.isArray(r)) return r;
+  return lireTout(Array.isArray(ids) ? `id=in.(${ids.join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+}
 // ── LES DRESSINGS ET LES AUTRES LIGNES D'UN COMPTE : LA MÊME PROJECTION ──────
 // (6 nov., vitesse 2) Mesuré sur sa base (lecture seule, `length(data::text)`) :
 // les lignes `harvest_*_listings` pèsent ~298 Ko, dont ~46 Ko d'un compte qui
@@ -3160,21 +3214,24 @@ const prechargerDemarrage = () => {
     // Première ouverture sur l'appareil (comptes pas encore connus) : les versions par le
     // même motif nomment les lignes ; illisibles ⇒ la lecture d'avant.
     const uidCopie = AUTH.user?.id || '';
-    const lireCommandes = (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+    // (20 nov., lectures-legeres) par la route légère, sinon la lecture d'avant.
+    const lireCommandes = (l) => lireCommandesLegeres(l);
     const famille = (uidCopie
       ? (async () => {
           const versMotif = memo ? null : await lireTout(`id=like.harvest_*_orders_*d&select=${SEL_VERSION}`, { strict: true }).catch(() => null);
-          if (!memo && !Array.isArray(versMotif)) return lireTout(`id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (!memo && !Array.isArray(versMotif)) return lireCommandesLegeres(null);
           const ids = memo ? idsCommandes(memo) : versMotif.map((r) => String(r && r.id)).filter((x) => x && x !== 'undefined');
           if (!ids.length) return [];
           const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant,
             lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
             lireLignes: lireCommandes });
-          if (r.incoherent) return lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (r.incoherent) return lireCommandesLegeres(memo ? idsCommandes(memo) : null);
           return r.ok ? r.rows : null;
         })()
-      : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
+      : lireCommandesLegeres(memo ? idsCommandes(memo) : null))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
+    // (20 nov., lectures-legeres) Les dressings attendent ces commandes (voir `poserPorteDressings`).
+    poserPorteDressings(); famille.then(ouvrirPorteDressings, ouvrirPorteDressings);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
     // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
     const couvre = (rows, uid) => Array.isArray(rows) && (!memo || (rows.length > 0 && memo.includes(String(uid))));
@@ -7425,7 +7482,7 @@ const oublierDressing = (uid) => {
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
-// et <TopProgress/> affiche une fine barre tant qu'il en reste. Résultat :
+// et (jusqu'au 20 nov.) une fine barre s'affichait tant qu'il en restait. Résultat :
 // l'utilisateur voit TOUJOURS que l'app travaille, sur n'importe quel écran,
 // sans avoir à câbler un indicateur dans chaque composant.
 let _busy = 0;
@@ -7808,8 +7865,26 @@ const lireMoissonGroupee = (id) => {
   const famille = String(id).slice(String(id).lastIndexOf('_') + 1);
   return idGroupable(id) ? _groupeMoisson.charger(id, `${auth}|${famille}`) : _lireLigneMoissonSeule(id, auth);
 };
+// ── (20 nov., lectures-legeres) LES DRESSINGS ATTENDENT LES VENTES AU DÉMARRAGE ──────────────────────────
+// Mesuré au banc iphone-rapide (SESSION=1, 4G lente 1,6 Mbit/s) : les dressings de tous les comptes (~560 Ko)
+// partaient en même temps que les ventes et se partageaient le débit — le tableau de bord, la cloche et le
+// retrait automatique eBay les demandent dès l'ouverture, alors que l'écran ouvert (Aujourd'hui) ne les montre
+// pas. La porte est posée par le préchargement (`prechargerDemarrage`) et s'ouvre quand SES commandes sont
+// réglées (lues ou en panne), au plus tard 6 s après ; l'écran Annonces / Bordereaux (qui les montre) l'ouvre
+// tout de suite ; une relecture demandée (`force`) ne l'attend jamais. Mêmes lectures, mêmes résultats :
+// seulement plus tard. Sans préchargement (aucune porte), rien n'attend.
+let _porteDressings = null;   // { p, ouvrir }
+function poserPorteDressings() {
+  if (_porteDressings) return _porteDressings;
+  let lacher = null; const p = new Promise((r) => { lacher = r; });
+  const t = setTimeout(() => lacher(), 6000);
+  _porteDressings = { p, ouvrir: () => { clearTimeout(t); lacher(); } };
+  return _porteDressings;
+}
+function ouvrirPorteDressings() { try { if (_porteDressings) _porteDressings.ouvrir(); } catch (_) {} }
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
+  if (type === 'listings' && !opts.force && _porteDressings) await _porteDressings.p;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
   return cachedRow(`h:${uid}:${type}`, () => fetchHarvestBrut(uid, type, opts));
 };
@@ -9203,6 +9278,8 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
 };
 
 const fetchHarvestOrdersBrut = async (uid) => {
+  // (20 nov., lectures-legeres) Ses deux lignes par la route légère ; indisponible ⇒ la lecture d'avant.
+  if (/^\d{1,20}$/.test(String(uid))) { const r = await lireCommandesRoute(idsCommandes([uid])); if (Array.isArray(r)) return r.map(ligneCommandes); }
   try {
     // (6 nov.) Ses ventes et ses achats seulement, projetés (voir `SEL_COMMANDES`).
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_*d&select=${SEL_COMMANDES}`, {
@@ -9297,16 +9374,51 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // (revue colis, intégration) — `cap` (l'heure de la lecture, que le suivi des commandes exige) y est déjà, par `VERSION_META`.
 // (personne ne lit `id`, `cap`… ici). Partagée 60 s, comme `memo` ; un échec n'est pas gardé.
 const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
-const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title`;
+// (20 nov., lectures-legeres) + `ti` (l'intitulé de l'état) : les preuves de vente (`lirePreuvesVenteVinted`)
+// relisaient la MÊME famille sous une autre projection (~144 Ko à CHAQUE ouverture, la plus grosse lecture au
+// chaud) ; elles la prennent désormais ici (gardée sur l'appareil, revalidée par version). La copie change de
+// forme ⇒ elle change de nom (`txn2`) : une copie d'avant, sans `ti`, n'est jamais servie.
+const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title,ti:meta->>status_title`;
+const TXN_FAMILLE = 'txn2';
 let _txnMeta = null;
 const lireTxnMeta = () => {
   const qui = AUTH.user?.id || '';
   if (_txnMeta && _txnMeta.qui === qui && Date.now() - _txnMeta.at < ROW_TTL_MS) return _txnMeta.p;
-  const p = lireFamilleCopiee('txn', TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
+  const p = lireFamilleCopiee(TXN_FAMILLE, TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
   const e = { qui, at: Date.now(), p };
   _txnMeta = e;
   p.then((rows) => { if (!Array.isArray(rows) && _txnMeta === e) _txnMeta = null; });
   return p;
+};
+// (20 nov., lectures-legeres) Deux lectures lourdes servies 20 s à leurs voisines (src/memoCourt.js) : les dates
+// de capture (`lireCapturesDetail`) et les transactions des preuves de vente (`lirePreuvesVenteVinted`). Oubliées à
+// toute écriture qui peut toucher leurs lignes et à tout signal de l'extension (`lecturesPartagees.abonner`), au
+// retour du réseau et à `onCloudReady` ; jamais servies à un autre vendeur ; un « pas su » n'est jamais gardé.
+const MEMO_LECTURES_MS = 20000;
+const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); };
+try {
+  const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp && typeof lp.abonner === 'function') {
+    lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
+    // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
+    lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
+} catch (_) {}
+onCloudReady(oublierMemosLectures);
+// Les transactions des preuves de vente (`lirePreuvesVenteVinted`) : la MÊME famille que `lireTxnMeta` (gardée sur
+// l'appareil, revalidée par version), rendue sous les noms de l'ancienne lecture — mêmes lignes, mêmes valeurs que
+// `id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt` ;
+// servie 20 s aux voisines (`_memoPreuvesTxn`), oubliée à toute écriture qui peut la toucher ; `force` relit.
+// Rend le tableau, ou `null` (pas su).
+const lireTxnPreuves = (opts = {}) => {
+  if (opts.force) _txnMeta = null;
+  return _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', async () => {
+    const l = await lireTxnMeta();
+    return Array.isArray(l) ? l.map((r) => ({ id: r.id, tx: r.tx, it: r.item, ti: r.ti, at: r.su, cap: r.cap })) : null;
+  }, { force: !!opts.force });
 };
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
@@ -20484,36 +20596,6 @@ function DetailsRepliOuvert({ className, attrs, resume, children }) {
   const [ouvert, setOuvert] = React.useState(false);
   return <details className={className} {...(attrs || {})} onToggle={(e) => setOuvert(!!e.currentTarget.open)}><summary>{resume}</summary>{ouvert ? children : null}</details>;
 }
-function TopProgress() {
-  const [busy, setBusy] = React.useState(false);
-  const [pct, setPct] = React.useState(0);
-  const [show, setShow] = React.useState(false);
-  React.useEffect(() => onBusy(setBusy), []);
-  React.useEffect(() => {
-    let t;
-    if (busy) {
-      setShow(true); setPct(p => (p > 0 && p < 90 ? p : 8));
-      // Progression qui s'essouffle : jamais 100 % tant que ça charge.
-      t = setInterval(() => setPct(p => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.08))), 180);
-    } else {
-      setPct(100);
-      t = setTimeout(() => { setShow(false); setPct(0); }, 340);
-    }
-    return () => { clearInterval(t); clearTimeout(t); };
-  }, [busy]);
-  if (!show) return null;
-  return (
-    <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
-      <div style={{
-        height:'100%', width:`${pct}%`,
-        background:C.accent,
-        borderRadius:'0 999px 999px 0',
-        transition:'width .22s ease, opacity .3s ease',
-        opacity: pct>=100 ? 0 : 1,
-      }}/>
-    </div>
-  );
-}
 
 // ── LE SHELL D'ORDINATEUR ───────────────────────────────────────────────────
 // ⚠️ Julien : « le rendu est presque pareil, je veux quelque chose qui
@@ -24733,7 +24815,7 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
     setRelu(undefined);
     if (!aLaCoque) setComptesLus(undefined);
     (async () => {
-      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail()]);
+      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail({ force: !aLaCoque })]);
       if (stop) return;
       setComptesLus(Array.isArray(c) ? c : null);
       setRelu(caps && caps.by ? caps.by : null);
@@ -31835,11 +31917,11 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
 // (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
 // parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
-let _capturesEnVol = null;
-function lireCapturesDetail() {
-  if (_capturesEnVol) return _capturesEnVol;
-  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
-  return _capturesEnVol;
+// (20 nov., lectures-legeres) Et la réponse RÉUSSIE sert 20 s aux voisins (banc iphone-rapide : 3 lectures de
+// ~124 Ko en 3 s à l'ouverture) — src/memoCourt.js : même vendeur seulement, oubliée à toute écriture qui peut
+// toucher `harvest_*`, à tout signal de l'extension, à `onCloudReady` ; `{ force: true }` relit (Réessayer).
+function lireCapturesDetail(opts) {
+  return _memoCaptures.lire((AUTH.user && AUTH.user.id) || '', lireCapturesDetailUne, { force: !!(opts && opts.force) });
 }
 async function lireCapturesDetailUne() {
   try {
@@ -32280,7 +32362,8 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
+    // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
+    const rows = await lireTxnPreuves(opts);
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
@@ -35054,7 +35137,7 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
     // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
     // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
-    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail({ force: true }).catch(() => {});
   } catch (_) {}
 });
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
@@ -42515,7 +42598,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (20 nov., lectures-legeres) Annonces et Bordereaux MONTRENT les dressings : la porte des dressings
+  // (`porteDressings`) s'ouvre tout de suite pour eux ; ailleurs ils attendent les ventes.
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) { if (curSub==='annonces'||curSub==='bordereaux') ouvrirPorteDressings(); loadListings(); } /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
@@ -63270,7 +63355,10 @@ function useQuoiDeNeuf() {
     // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
     vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
-  const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
+  const [, setCharge] = React.useState(!!M_NOUVEAUTES);
+  React.useEffect(() => { if (!M_NOUVEAUTES) chargerNouveautes().then(() => setCharge(true), () => {}); }, []);
+  // « Vu » ne se marque qu'après un toucher sur la carte (donc la liste chargée) ; sinon, on attend la liste.
+  const marquer = (ids) => { const faire = (m) => { const suite = m.marquerVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); }; if (M_NOUVEAUTES) faire(M_NOUVEAUTES); else chargerNouveautes().then(faire, () => {}); };
   // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un
   // autre appareil, son statut) ⇒ rien : jamais un compte faux qui change sous ses yeux ni une carte qui clignote.
   const pret = p.uid === (AUTH.user?.id || '') && !!p.uid && isCloudReady();
@@ -64269,7 +64357,13 @@ function AppCoeur() {
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
   // sinon la page dépasse ou laisse une bande vide.
   React.useEffect(()=>{
-    const onResize=()=>applyZoom(readZoom());
+    // (20 nov., iphone-rapide) Sur l'iPhone, Safari envoie `resize` quand sa barre d'adresse se replie ou revient (à
+    // chaque changement de sens du défilement) : seule la HAUTEUR change. `applyZoom` ne dépend que de la LARGEUR (zoom,
+    // largeur rendue), du réglage de densité et du texte en grand ; le refaire forçait un recalcul de style de tout le
+    // document en plein défilement. Même largeur, même réglage ⇒ rien à refaire. Une rotation (`orientationchange`) refait
+    // toujours tout, comme avant.
+    let derniere=null;
+    const onResize=(e)=>{ const cle=(window.innerWidth||0)+'|'+readZoom()+'|'+lireTailleTexte()+'|'+(window.devicePixelRatio||1); if(e && e.type==='resize' && cle===derniere) return; derniere=cle; applyZoom(readZoom()); };
     onResize();
     window.addEventListener('resize',onResize);
     window.addEventListener('orientationchange',onResize);
@@ -67749,9 +67843,8 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
         </>}/> : null}
-      {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
-          chargement, sur n'importe quel écran. */}
-      <TopProgress/>
+      {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
+          restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>

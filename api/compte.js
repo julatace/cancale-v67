@@ -92,6 +92,7 @@ import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
+import { routeCommandesLecture } from './_lib/commandes-lecture.js';   // (20 nov., lectures-legeres) ventes et achats lus légers
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
 import { traiterAgenda } from './_lib/agenda-ics.js';
@@ -2335,6 +2336,8 @@ export default async function handler(req, res) {
   if (mode === 'operations') return routeOperations(req, res);
   // (8 nov., extension 5.326) Les ventes/achats envoyés LÉGERS par l'extension :
   // la fenêtre lue en abrégé, fusionnée ici dans la ligne (api/_lib/commandes-leger.js).
+  // (20 nov., lectures-legeres) Les ventes et achats de la session, réduits, compressés, ETag/304.
+  if (mode === 'commandes-lire') return routeCommandesLecture(req, res);
   if (mode === 'commandes') {
     if (m === 'POST') { req.body = await lireCorpsJson(req); if (req.body === null) return repondre(res, 400, { ok: false, erreur: 'json' }); }
     return routeCommandes(req, res);
