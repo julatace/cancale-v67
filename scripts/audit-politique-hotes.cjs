@@ -240,6 +240,14 @@ const COUPLES = {
   'src/abonnement/etatAbonnement.js|vrm.center': ['vrm', 'VRM lui-même (le lien de parrainage, 8 nov.)'],
   'src/ecrans/Reglages.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/ecrans/Reglages.jsx|vercel.com': ['lien', LIEN],
+  // (20 nov., chasse-bugs) Groupes (19 nov.) : le lien d'invitation Discord que le créateur COLLE — vérifié par sa forme
+  // (`lienDiscordGroupe`), jamais appelé par la page ; l'exemple du champ dans les cinq langues.
+  'src/communaute/coucou.js|discord.com': ['lien', 'invitation Discord collée par le créateur du groupe (forme vérifiée, ouverte sur son clic)'],
+  'src/i18n/langues/fr/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/en/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/es/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/it/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/de/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
   'src/ecrans/Republier.jsx|www.vinted.fr': ['lien', LIEN + ' — « compléter sur Vinted » (page de modification de l’annonce)'],
   'src/ecrans/Vestiaire.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » l’annonce encore en ligne sur Vinted'],
   'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
