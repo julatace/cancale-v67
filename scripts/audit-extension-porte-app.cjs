@@ -23,7 +23,7 @@ const MUTATIONS = {
   pilote_captcha: ["if (av && av.stop) return fin(av.stop, { uid });", ''],
   pilote_eteint: ["if (!r.actif) return fin('eteint', { uid });", ''],
   veille_conditions: ["if (manques.length) { await modifierLigneCas", "if (false) { await modifierLigneCas"],
-  veille_photo: ["if (!GARDES_APP.photoNeutre(p.reglages && p.reglages.photo)) manques.push({ cle: 'photo' });", ''],
+  veille_photo: ["...(p.reglages && p.reglages.photo && !GARDES_APP.photoNeutre(p.reglages.photo) ? { reglages: reglagesPhotoSurs(p.reglages.photo) } : {}),", ''],
   veille_cas: ["if (pris !== true) { faits.push({ id: p.id, etat: 'pas-pris' }); continue; }", ''],
   garde_bloque: ["if (av && av.bloque) return { ok: false, code: 'vendue-ailleurs', avis: av.texte, error: av.texte };", ''],
   garde_passu: ["if (av && av.pasSu && msg.avisVu !== true) return", "if (false) return"],
@@ -117,10 +117,10 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     await v2.f.ctx.veilleRepubTick(Date.now());
     const p2 = v2.f.lignes.vrm_repub_programme.programmes[UID];
     dit(v2.cmds.length === 0 && p2.etat === 'pas-partie' && p2.raisons.some((x) => x.cle === 'frein'), 'veille : frein de Vinted ⇒ « pas partie » avec la raison, rien ne part', JSON.stringify(p2));
-    const v3 = fondVeille(prog({ reglages: { ...prog().reglages, photo: { ...PHOTO0, rot: 90 } } }), { onglet: true, frein: null });
+    const v3 = fondVeille(prog({ action: 'recreer', reglages: { ...prog().reglages, photo: { ...PHOTO0, rot: 5, bright: 1.2 } } }), { onglet: true, frein: null });
+    v3.f.ctx.republieesEnBase = async () => [];
     await v3.f.ctx.veilleRepubTick(Date.now());
-    const p3 = v3.f.lignes.vrm_repub_programme.programmes[UID];
-    dit(v3.cmds.length === 0 && p3.etat === 'pas-partie' && p3.raisons.some((x) => x.cle === 'photo'), 'veille : photo réglée (le fond ne retouche pas) ⇒ « pas partie », dit', JSON.stringify(p3));
+    dit(v3.cmds.length === 2 && v3.cmds.every((c) => c.cmd === 'recreerVinted' && c.reglages && c.reglages.rot === 5 && c.reglages.bright === 1.2), 'veille : SON réglage photo part avec chaque paire (le fond retouche la photo, `photoReglee`) — jamais découvert au départ', JSON.stringify(v3.cmds.map((c) => c.reglages)));
     const v4 = fondVeille(prog({ at: Date.now() + 3600000 }), { onglet: true, frein: null });
     const r4 = await v4.f.ctx.veilleRepubTick(Date.now());
     dit(v4.cmds.length === 0 && v4.f.lignes.vrm_repub_programme.programmes[UID].etat === 'attente' && r4.etat === 'rien', 'veille : pas encore l’heure ⇒ rien (index léger seulement)', JSON.stringify(r4));
