@@ -20891,7 +20891,7 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     if (!ordi) { setHote(null); return undefined; }
     const vis = (e) => e && e.getClientRects().length;
     const trouver = () => { let t = null; for (let p = refAncre.current && refAncre.current.parentElement; p && !t; p = p.parentElement) t = [...p.querySelectorAll('h1')].find(vis) || null; return t; };
-    const h = document.createElement('span'); h.className = 'n-site-hote'; h.setAttribute('data-site-hote', '');
+    const h = document.createElement('span'); h.className = 'n-site-hote'; h.setAttribute('data-site-hote', ''); h.style.setProperty('margin-left', '20px', 'important');   // l'écart au titre (des règles d'avant mettent les marges à 0)
     let titre = null;
     // Un titre posé dans un bloc passe EN LIGNE (style posé sur lui : aucune règle d'avant ne le bat) pour que les pastilles
     // tiennent à côté de lui.
