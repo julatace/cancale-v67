@@ -20900,7 +20900,7 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
       if (!t.hasAttribute('data-avec-pastilles')) t.setAttribute('data-avec-pastilles', '');
       // La rangée prend la place qui RESTE sur la ligne du titre (elle défile au-delà).
       const pc = getComputedStyle(t.parentElement), lib = t.parentElement.clientWidth - parseFloat(pc.paddingLeft) - parseFloat(pc.paddingRight) - t.getBoundingClientRect().width - 28;
-      const mx = Math.max(160, Math.floor(lib)) + 'px'; if (h.style.maxWidth !== mx) h.style.maxWidth = mx; };
+      const mx = Math.max(160, Math.floor(lib)) + 'px'; if (h.style.maxWidth !== mx) h.style.setProperty('max-width', mx, 'important'); };
     // Le titre de la coque peut être re-rendu (et l'hôte, posé à côté, retiré avec lui) : on le repose à chaque changement.
     const placer = () => {
       const t = trouver(); if (!t || !t.parentElement) return;
