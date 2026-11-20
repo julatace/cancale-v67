@@ -116,7 +116,38 @@ les bancs de chiffres comparent le texte rendu, et la recherche dans la page de 
 
 ## 4. Preuves que rien ne change à l'écran ni dans les chiffres
 
-PREUVES
+- **Styles calculés identiques** (`styles-identiques`, version livrée `dist-apres4` contre `origin/main` dd3336382) : 8 écrans
+  (Aujourd'hui, Annonces, Ventes, Achats, Argent, Messages, Stock, Paramètres) × 390 et 1512 × clair et sombre = **32 écrans,
+  ~108 000 éléments, toutes leurs propriétés calculées identiques** (Achats · 1512 · sombre rouge une fois — barre latérale et
+  bandeau de fraîcheur pas encore posés au relevé — vert en le relançant seul). Mutation `VRM_RANGER_MUTATION=specificite`
+  (complément de spécificité retiré) : **Achats rouge** (couleurs du bouton de sélection), le contrôle voit l'erreur.
+  Mutation `MUTATION=1` (une règle ajoutée) : rouge.
+- **Formats** : `node scripts/tests/formats-rapides.test.mjs` 8 378 comparaisons identiques ; `--prouve` rouge.
+- **Audits** : `audit-tdz`, `audit-variables`, `audit-traduction` (45 verts), `audit-quoi-de-neuf`, `audit-poids-demarrage`
+  (+ `--prouve` 2/2) verts.
+- **natif-coque** : 146 verts ; **K8b reste rouge au téléphone** (59–69 ms contre 84–92 avant ; 48 ms à l'ordinateur, vert).
+- Pas relancés faute de temps (machine partagée à charge 11–20 une grande partie du chantier) : aujourdhui-natif, natif-ventes,
+  fiche-directe, app-tableaux, chiffres-volume, drapeaux-justes. Aucune règle de calcul n'a changé (le code des chiffres
+  n'est pas touché ; les formats rendent le même texte), mais ce n'est pas prouvé par banc : à passer à l'intégration.
+
+## 4 bis. Après la fusion de `origin/main` (train du 20 nov., d7bc5598a) — « l'app est trop longue à charger »
+
+- Fusion par un vrai `git merge` (conflits : CLAUDE.md, budget — celui de main, 2 020 Ko, repris). Démarrage mesuré après
+  fusion : **2 005 Ko** compressés (App 1 524 Ko JS + 333 Ko CSS).
+- **4G lente (1,6 Mbit/s, `MBIT=1.6 LECTURES=1`)**, base de volume : à froid, coque à **15,0 s**, écran prêt **17,5 s** — dont
+  ~10 s pour télécharger 2 Mo de JS+CSS ; puis la base : 175 lectures, 3,8 Mo, dont **les commandes de tous les comptes en
+  UNE lecture de 1,8 Mo (16,8 → 26,3 s)** et les dressings (560 Ko, 18,7 → 21,7 s), 38 lectures en double. C'est ce que la
+  barre bleue attendait sur Annonces / Ventes (« bloquée à 80 % ») : elle ne redescend qu'à la fin de la DERNIÈRE lecture.
+  Au chaud : 148 lectures, 678 Ko, écran prêt ~13 s — là c'est le calcul (§5.1, §5.2).
+- **La barre bleue du haut est retirée** (Julien). Le compteur `onBusy` reste.
+- Essayé, pas gardé : sortir le Stock 3D / le plan (`RoomPlan`, `AssistantRangement`, `PlanDessus`, 173 Ko de source) par
+  `decouper-app.cjs` : le morceau part bien (110 Ko), mais le morceau App ne baisse pas (1 524 → 1 527 Ko : 45 noms
+  exportés en plus ne se raccourcissent plus) — annulé.
+- **Objectif −30 % du démarrage (≤ 1 404 Ko) : PAS atteint.** 40 % d'App.jsx est UNE fonction (`Comptabilite`, 2,25 Mo) qui
+  porte Aujourd'hui ; les découpes mécaniques restantes ne déplacent que des miettes. Il faut d'abord découper
+  `Comptabilite` par écran (Aujourd'hui seul au démarrage).
+- **États de chargement refaits** (demande du 20 nov. : copie locale par écran, « Mise à jour… » discret, squelette aux vraies
+  hauteurs, vignettes en fondu, « Pas à jour · Réessayer », planche 0 / 300 ms / 1 s / 3 s) : **pas faits** dans ce lot.
 
 ## 5. Ce qui reste — le plus gros d'abord (objectifs : chaud < 1 s, froid 4G < 3 s, onglet < 150 ms CPU, défilement sans
 tâche > 50 ms — PAS atteints)
