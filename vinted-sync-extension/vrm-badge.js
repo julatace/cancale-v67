@@ -835,7 +835,7 @@
   .marque6 { display: flex; align-items: center; gap: 8px; padding: 2px 10px 12px; font: 700 17px/22px -apple-system, Inter, system-ui, sans-serif; }
   .marque6 img { border-radius: 6px; }
   .grp6 { padding: 14px 12px 4px; font: 600 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
-  .nav6 { appearance: none; border: 0; background: transparent; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 12px; border-radius: 10px; color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; text-align: left; width: 100%; }
+  .nav6 { appearance: none; border: 0; background: transparent; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; text-align: left; width: 100%; }
   .nav6:hover { background: rgb(127 127 127 / .08); }
   .nav6[aria-current="page"] { background: var(--n-teinte); color: var(--n-accent); font-weight: 600; }
   .nav6:focus-visible, .th6:focus-visible, .rond6:focus-visible, .maj6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 1px; }
@@ -849,12 +849,17 @@
   .compte6 { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; border: .5px solid var(--n-trait); font: 500 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .compte6 i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--n-teinte); color: var(--n-accent); font: 700 11px/1 -apple-system, Inter, system-ui, sans-serif; font-style: normal; }
   .esp6 { flex: 1; }
-  .rond6 { appearance: none; border: 0; background: transparent; width: 40px; height: 40px; border-radius: 10px; display: inline-grid; place-items: center; color: var(--n-encre-2); cursor: pointer; font-size: 22px; position: static !important; float: none !important; }
+  .rond6 { appearance: none; border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; display: inline-grid; place-items: center; color: var(--n-encre-2); cursor: pointer; font-size: 22px; position: static !important; float: none !important; }
   .rond6:hover { background: rgb(127 127 127 / .10); }
-  .maj6 { appearance: none; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .maj6 { appearance: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; justify-content: center; padding: 0 14px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .corps6 { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 24px; }
   .corps6 .gestes, .corps6 .listes5, .corps6 .panneau { background: transparent !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
   .corps6 .seg5 { display: none !important; }
+  .corps6 .listes5 { display: block !important; grid-template-columns: none !important; }
+  .corps6 .listes5 > .panneau { width: auto !important; max-width: none !important; }
+  .vx6 { grid-template-rows: minmax(0, 1fr); }
+  .vx6 > .side6, .vx6 > .main6 { min-height: 0; }
+  .main6 { overflow: hidden; }
   .ext6 { margin: 12px 16px 0; }
   .ext6 > * { margin: 0 !important; border-radius: 12px; }
   .barre6 { padding: 14px 16px; border-bottom: .5px solid var(--n-trait); gap: 10px; }
@@ -871,6 +876,9 @@
   .table6 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
   .table6 .rangs { margin: 0; padding: 0; list-style: none; }
   .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
+  .table6 .rangs > li, .corps6 .gauche5 .rangs > li, .corps6 .gauche5 .rang { background: var(--n-carte) !important; }
+  .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
+  .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
   .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
   .tr6 .cels6 { display: grid; grid-template-columns: repeat(var(--n6, 4), minmax(92px, auto)); gap: 0 12px; align-items: center; }
   .th6r { min-height: 44px; background: var(--n-carte); border-bottom: .5px solid var(--n-trait); }
@@ -890,7 +898,7 @@
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
   .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
   .et6[data-statut="en_vente"] { background: var(--n-teinte); color: var(--n-accent); }
-  .plus6 { appearance: none; border: 0; background: transparent; width: 40px; height: 40px; border-radius: 10px; color: var(--n-encre-2); font-size: 20px; cursor: pointer; }
+  .plus6 { appearance: none; border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; color: var(--n-encre-2); font-size: 20px; cursor: pointer; }
   .plus6:hover { background: rgb(127 127 127 / .10); }
   .table6 li[data-coche] > .tr6 { background: var(--n-teinte); }
   .vide6 { margin: 24px 16px; text-align: center; }
@@ -917,7 +925,8 @@
   .msg6 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .apercu6 { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--n-encre); }
   .pied6 { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; border-top: .5px solid var(--n-trait); }
-  .pied6 .vu-plein { min-height: 44px; padding: 0 18px; border-radius: 12px; }
+  .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
+  .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
@@ -927,13 +936,12 @@
   /* Au téléphone / Orion : la barre latérale devient une rangée défilante en haut ; le tableau, des rangées empilées. */
   @media (max-width: 760px) {
     .carte[data-grand] { top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; border-radius: 0; }
-    .vx6, .vx6[data-reduit] { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-    .side6 { flex-direction: row; overflow-x: auto; padding: max(6px, env(safe-area-inset-top)) 8px 6px; border-right: 0; border-bottom: .5px solid var(--n-trait); gap: 4px; scrollbar-width: none; order: 2; }
+    .vx6, .vx6[data-reduit] { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    .side6 { flex-direction: row; overflow-x: auto; padding: 6px 84px max(6px, env(safe-area-inset-bottom)) 8px; border-right: 0; border-bottom: .5px solid var(--n-trait); gap: 4px; scrollbar-width: none; order: 2; }
     .main6 { order: 1; min-height: 0; }
-    .vx6 { grid-template-rows: minmax(0, 1fr) auto; }
     .side6 .marque6, .side6 .grp6 { display: none; }
     .side6 .bas6 { margin: 0; padding: 0; border: 0; }
-    .nav6 { flex: none; flex-direction: column; gap: 2px; min-height: 52px; min-width: 64px; padding: 4px 8px; font-size: 11px; line-height: 14px; justify-content: center; }
+    .nav6 { flex: none; width: auto; flex-direction: column; gap: 2px; min-height: 52px; min-width: 64px; padding: 4px 8px; font-size: 11px; line-height: 14px; justify-content: center; }
     .vx6[data-reduit] .nav6 span { display: inline; }
     .tete6 { padding: max(6px, env(safe-area-inset-top)) 8px 6px; }
     .tete6 [data-vx-reduire] { display: none; }
@@ -2082,7 +2090,7 @@
     const enVente = l.annonces && l.annonces.statuts ? l.annonces.statuts.en_vente : (l.annonces ? l.annonces.total : null);
     const j = e && e.plateforme === 'vinted' ? site.jauge : null;
     const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
-    const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.slice(0, 5) : null;
+    const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.filter((x) => !l.notifications.vu || Number(x.t) > Number(l.notifications.vu)).slice(0, 5) : null;
     const nomCompte = (l.compte && l.compte.nom) || site.nom || '—';
     return `<div class="acc6" data-accueil-page>
       <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
