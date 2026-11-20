@@ -34,9 +34,10 @@ export function PropositionLiaison({ l, onRelier, onAutre, onPropre, Photo = nul
           <Bouton variante="texte" onClick={(e) => { arreter(e); onAutre(l); }} attrs={{ 'data-eg-autre': `${l.site}:${l.id}` }}>{tr('liaL.autre')}</Bouton>
         </span>
       </> : <>
-        <span className="n-eg-prop-texte"><span className="n-eg-prop-etat" data-ton="gris">{tr('liaL.aucune')}</span></span>
+        {/* Dans une cellule du tableau : la place est comptée — le geste dit tout (« Que sur ce site ») ; ailleurs, la phrase entière. */}
+        {forme === 'cellule' ? null : <span className="n-eg-prop-texte"><span className="n-eg-prop-etat" data-ton="gris">{tr('liaL.aucune')}</span></span>}
         <span className="n-eg-prop-gestes">
-          <Bouton variante="texte" onClick={(e) => { arreter(e); onPropre(l); }} attrs={{ 'data-eg-propre': `${l.site}:${l.id}` }}>{tr('liaL.propre', { site: l.site })}</Bouton>
+          <Bouton variante="texte" onClick={(e) => { arreter(e); onPropre(l); }} attrs={{ 'data-eg-propre': `${l.site}:${l.id}`, 'aria-label': tr('liaL.propre', { site: l.site }) }}>{forme === 'cellule' ? tr('liaL.propreCourt') : tr('liaL.propre', { site: l.site })}</Bouton>
           <Bouton variante="texte" onClick={(e) => { arreter(e); onAutre(l); }} attrs={{ 'data-eg-autre': `${l.site}:${l.id}` }}>{tr('liaL.autre')}</Bouton>
         </span>
       </>}

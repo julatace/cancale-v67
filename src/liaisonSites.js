@@ -664,10 +664,11 @@ export function compteurLiaison(res) {
 //   · « sûr » : la candidate mise en avant par le parcours (`avant` : même photo sûre, unique, sans doute) ;
 //   · sinon « à vérifier » : la PREMIÈRE de `candidatesPour` (taille de l'annonce), si elle est seule à son rang ET à sa
 //     proximité (deux candidates à égalité ⇒ AUCUNE : 50 paires identiques ne proposent rien), si elle a un appui
-//     (même photo à vérifier, N° écrit sur l'annonce, publiée par VRM, ou même taille LUE des deux côtés + 2 mots du modèle
-//     en commun), et si le jugement ne la refuse pas (taille différente, déjà prise, N° double…).
+//     (même photo à vérifier, N° écrit sur l'annonce, publiée par VRM, ou même taille + 2 mots du modèle en commun), et si le jugement ne la refuse pas (taille différente, déjà prise, N° double…).
 // Rend Map(cle ⇒ { cle, paireId, numero, photo, titre, niveau: 'sur'|'verifier', raison }) ; rien relié ici.
-export const PROCHE_PROPOSITION = 22;   // taille sûre des deux côtés (20) + 2 mots du modèle en commun
+// Même taille (lue sur l'annonce ou dans son titre : 10, sûre des deux côtés : 20) + au moins 2 mots du modèle en commun. Une
+// annonce Leboncoin n'a souvent sa taille que dans son titre (« Adidas Spezial vert taille 39,5 ») : c'est le cas courant.
+export const PROCHE_PROPOSITION = 12;
 export function propositionsDe(res, { cle = cleDefaut, marqueDe = null, numerosDouteux = null } = {}) {
   const out = new Map();
   if (!res || !res.lu) return out;
