@@ -54,6 +54,18 @@ Une fiche ou un atelier = une page poussée (retour ‹ en haut à gauche, balay
 texte `--n-accent`), liste 380–520, détail (la fiche) qui prend le reste, borné à 760. Sans sélection : état vide
 dessiné. UNE recherche, en tête de la liste. Clavier : ↑ ↓ Entrée Échap, ⌘K / « / » pour chercher.
 
+## 1 bis. La règle de Julien (20 nov.) : « tout le site doit être comme la fiche Paramètres, simple et minimaliste »
+
+Référence : la feuille « Plus » / Paramètres (listes groupées iOS). Partout :
+- fond gris très clair, GROUPES blancs arrondis (rayon 12), rangées 52–60 : icône bleue fine 22 à gauche (facultative),
+  libellé 17, valeur ou pastille alignée à droite, chevron gris ; séparateurs en retrait ;
+- en-tête de groupe en petites capitales grises (13), pied de groupe en gris (13) seulement s'il est indispensable ;
+- un écran = un grand titre + des groupes ; le détail est derrière le toucher de la rangée (page poussée ou feuille) ;
+- AUCUNE carte décorée, aucune ombre, aucun texte d'explication permanent (un « ? » discret si besoin), aucun lien souligné,
+  aucun bouton gris pleine largeur ; un seul plein par écran, sinon des actions en texte bleu ou des rangées ;
+- les chiffres importants : grands mais sobres (noir, pas de couleur), unités en gris ;
+- à l'ordinateur : même grammaire, groupes sur une ou deux colonnes, tableaux (§2 bis) au même style (filets fins, rien d'autre).
+
 ## 2 bis. Les listes « tableau de travail » (Julien, 19 nov. soir : « mêmes fonctionnalités, même rendu grosso modo, j'aime bien ce style, les options proposées »)
 
 Référence de STRUCTURE (pas de marque, pas de couleurs) : un outil de vendeur en tableaux clairs. Chaque écran de liste
