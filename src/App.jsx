@@ -35261,6 +35261,26 @@ function confirmerOffresAuto() {
       desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
 }
+// (20 nov., bugs-terrain) L'index de `bordForItem` : bordereaux par N° (`cleNum`, dans l'ordre de la liste) et premier
+// bordereau par annonce (`txnItem[transaction]`). Gardé par la liste et la table (WeakMap) : recalculé quand l'une change.
+const _indexBordsItem = new WeakMap();
+const indexBordsItem = (list, txnItem) => {
+  let parTable = _indexBordsItem.get(list); if (!parTable) { parTable = new WeakMap(); _indexBordsItem.set(list, parTable); }
+  const cleT = txnItem && typeof txnItem === 'object' ? txnItem : _indexBordsVide;
+  let ix = parTable.get(cleT);
+  if (!ix) {
+    const parNum = new Map(), parItem = new Map();
+    for (const bb of list) {
+      if (!bb) continue;
+      if (bb.numero) { const k = cleNum(bb.numero); if (k) { const l = parNum.get(k); if (l) l.push(bb); else parNum.set(k, [bb]); } }
+      if (bb.transaction) { const it = String(cleT[String(bb.transaction)] || ''); if (!parItem.has(it)) parItem.set(it, bb); }
+    }
+    ix = { parNum, parItem }; parTable.set(cleT, ix);
+  }
+  return ix;
+};
+const _indexBordsVide = {};
+const _indexBordsListeVide = [];
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
   // (20 nov., sélecteur de plateforme) Le site choisi pour toute l'app : Aujourd'hui ne montre que les colis, retraits et
   // ventes de CE site (le site de chaque ligne est connu par identité : la plateforme de sa vente).
@@ -35975,11 +35995,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Vinted la dit (`txnItem`). ⚠️ Le repli PAR TITRE est retiré (3 octobre) :
   // mesuré, 7 couples annonce/bordereau au titre identique, 0 même article —
   // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
+  // (20 nov., bugs-terrain) Par INDEX (`indexBordsItem`, gardé par liste de bordereaux et table des transactions — partagé par
+  // tous les moteurs) au lieu de parcourir les bordereaux pour chaque annonce : 1 000 annonces × 249 bordereaux à chaque
+  // rendu (1 s au profil d'Achats). Même résultat : le PREMIER bordereau de la liste qui convient, dans le même ordre.
   const bordForItem = (itemId, numero) => {
-    const list = emailBords || [];
-    if (cleNum(numero)) { const hit = list.find(bb => bb.numero && cleNum(bb.numero) === cleNum(numero) && numeroEmailAdmis(bb, numeros)); if (hit) return hit; }   // (11 nov.) « 07 » = « 7 » (cleNum)
+    const list = emailBords || _indexBordsListeVide;
+    const ix = indexBordsItem(list, txnItem);
+    const k = cleNum(numero);
+    if (k) { for (const bb of (ix.parNum.get(k) || [])) if (numeroEmailAdmis(bb, numeros)) return bb; }   // (11 nov.) « 07 » = « 7 » (cleNum)
     if (!itemId) return null;
-    return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
+    return ix.parItem.get(String(itemId)) || null;
   };
   // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
