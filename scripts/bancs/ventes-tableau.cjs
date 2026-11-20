@@ -173,7 +173,9 @@ const segment = async (pg, i) => {
         await pg.screenshot({ path: path.join(SHOTS, `ventes-${W}-${th}-detail.png`) });
         const d = m2.detail.find((x) => x.cle === cle);
         const droiteT = m2.lignes.length ? Math.max(...m2.lignes.map((l) => l.droite)) : 0;
-        dit(!!d && d.gauche >= droiteT - 1 && m2.lignes.length > 5, `toucher ⇒ SON détail à droite, le tableau reste visible (${d && d.gauche} ≥ ${droiteT})`, m2.detail);
+        // ≥ 1440 : le détail à CÔTÉ du tableau (rien caché) ; plus étroit : posé au bord droit, par-dessus, le tableau visible à gauche.
+        if (W >= 1440) dit(!!d && d.gauche >= droiteT - 1 && m2.lignes.length > 5, `toucher ⇒ SON détail à droite, le tableau reste visible (${d && d.gauche} ≥ ${droiteT})`, m2.detail);
+        else dit(!!d && Math.abs(d.gauche + d.larg - W) <= 2 && d.larg <= 0.45 * W && m2.lignes.length > 5, `toucher ⇒ SON détail posé au bord droit (${d && d.gauche}+${d && d.larg} / ${W}), le tableau reste visible`, m2.detail);
         dit(!m2.faibles.length, 'contraste avec le détail ouvert', m2.faibles.slice(0, 6));
         dit(m2.deb <= 1, `rien ne déborde avec le détail ouvert (${m2.deb})`);
         await pg.locator('[data-vt-fermer]').click({ timeout: 4000 }).catch(() => {});
@@ -195,6 +197,11 @@ const segment = async (pg, i) => {
         await pg.screenshot({ path: path.join(SHOTS, `terminees-${W}-${th}.png`) });
         dit(m4.recherches === 1 && m4.deb <= 1, `Terminées : une recherche, rien ne déborde (${m4.recherches} · ${m4.deb})`);
         dit(!m4.detail.length, 'Terminées : aucun volet vide');
+        const seg4 = await pg.evaluate(() => { const e = document.querySelector('.n-vt-segment-seul'); if (!e) return 'absent'; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
+          let x = e, cache = ''; while (x && x !== document.body) { const c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') { cache = x.className || x.tagName; break; } x = x.parentElement; } const regles = []; const voir = (L) => { for (const R of L) { if (R.cssRules && !R.selectorText) { try { voir(R.cssRules); } catch (_) {} continue; } try { if (R.selectorText && e.matches(R.selectorText) && /display:\s*none/.test(R.cssText)) regles.push(R.cssText.slice(0, 200)); } catch (_) {} } };
+          for (const ss of document.styleSheets) { try { voir(ss.cssRules); } catch (_) {} }
+          return { h: Math.round(r.height), top: Math.round(r.top), cache, regles, parent: e.parentElement && e.parentElement.outerHTML.slice(0, 200) }; });
+        dit(m4.seg.length === 3, `Terminées : le segmenté reste là pour revenir (${m4.seg.join(' | ')})`, seg4);
       } else {
         const r = m.rangsTel;
         dit(r.length > 0, `la liste du téléphone est rendue (${r.length})`);
@@ -210,6 +217,10 @@ const segment = async (pg, i) => {
         await pg.screenshot({ path: path.join(SHOTS, `route-${W}-${th}.png`) });
         dit(m3.rangsTel.length > 0 && m3.rangsTel.every((x) => /route|livr|termin/i.test(x.etiquette)), `En route : étiquette d’état sur chaque rangée (${m3.rangsTel.length})`, m3.rangsTel.slice(0, 3));
         dit(!m3.faibles.length && m3.deb <= 1, 'En route : contraste, rien ne déborde', m3.faibles.slice(0, 4));
+        await segment(pg, 2);
+        const m4 = await pg.evaluate(mesure, CONTRASTE);
+        await pg.screenshot({ path: path.join(SHOTS, `terminees-${W}-${th}.png`) });
+        dit(m4.seg.length === 3, `Terminées : le segmenté reste là pour revenir (${m4.seg.join(' | ')})`);
       }
       dit(!erreurs.length, 'aucune erreur de page', erreurs.slice(0, 3));
       await ctx.close();

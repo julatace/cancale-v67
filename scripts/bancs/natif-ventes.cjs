@@ -56,7 +56,9 @@ const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'banc-natif-ventes');
 fs.mkdirSync(SHOTS, { recursive: true });
 const DSF = process.env.SHOTS ? 2 : 1;
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
-const LARG = liste('VUES', '390,1512,1280').map(Number);
+// (20 nov.) À l'ordinateur, Ventes est un TABLEAU DE TRAVAIL : son banc est scripts/bancs/ventes-tableau.cjs (la règle « O » —
+// liste bornée à 560 — ne vaut plus). Ce banc juge le téléphone.
+const LARG = liste('VUES', '390').map(Number);
 const THEMES = liste('THEMES', 'clair,sombre');
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600) : '')); } return c; };

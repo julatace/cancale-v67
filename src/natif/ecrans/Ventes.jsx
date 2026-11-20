@@ -292,7 +292,10 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
       {feuilles}
     </>;
   }
-  if (ordinateur) return <><div className="n-vt-segment n-vt-segment-seul" data-vn="ventes" data-vn-onglet="toutes">{segment}{filtre}</div>{children}{feuilles}</>;
+  // `vv-tete` : la section des colis cache tout le reste sous « Toutes » (src/design/ventes-verre.css) — le segmenté doit rester.
+  // Sous « Terminées », la liste est VentesToutes (son tableau à l'ordinateur) : ici, seulement le segmenté pour revenir
+  // (avant le 20 nov., la page natif de « Toutes » était cachée par cette règle : on ne revenait plus à « À envoyer »).
+  if (m.onglet === 'toutes') return <><div className="vv-tete"><div className={ordinateur ? 'n-vt-segment n-vt-segment-seul' : 'n-vt-segment n-vt-segment-tel'} data-vn="ventes" data-vn-onglet="toutes">{segment}{ordinateur ? filtre : null}</div></div>{children}{feuilles}</>;
   return (
     <>
       <Page titre={tr('vn.titre')} plein={plein} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet }}
