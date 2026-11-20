@@ -71,3 +71,20 @@ Même mesure fixe (Achats, 12 comptes, ×4, 42 s, ~26 s de tâches longues) :
 ⇒ Diviser par 3 demande de SORTIR le calcul du moteur : les dérivés (`pickupUnion`, `expeditions`, `cartesColis`,
 `listeEnvoyes`, l'affectation, `usePasEnLigne`) dans un magasin de module recalculé quand ses SOURCES changent (pas à chaque
 rendu), et les lectures asynchrones du moteur regroupées (un rendu par vague de données, pas un par lecture).
+
+### Vagues (2) et premier dérivé (1) — 20 nov., soir
+- `origin/claude/lectures-legeres` fusionnée (vrai merge ; leur retrait de la barre bleue gardé).
+- **(2) Vagues** (9534e042e) : dans le moteur, `useState = useStateVague` — un setState hors geste est gardé ≤ 80 ms puis appliqué
+  avec les autres en `startTransition` ; un geste vide d'abord la vague. Compteur de rendus : PAS moins de rendus (45–56 par
+  moteur : les données arrivent étalées sur 20 s, et un rendu de transition interrompu recompte) ; le gain vient du rendu
+  par tranches. Mesure sous une machine chargée (load 11–19), 3 passes alternées par build :
+  Achats tâches longues 29,4 → 26,9 s en moyenne, prêt 13,1 → 10,5 s ; Annonces 12,4 → 10,7 s. Le bruit (±3 s) est du
+  même ordre que l'écart : une première mesure à 19,8 s (machine calme) n'a pas été retrouvée.
+- **Achetés pas en ligne** (00d5c62fe) : candidats calculés seulement là où ils sont montrés.
+- **(1) Dérivés en magasin de module : pas fait.** `cartesColis` (le plus coûteux : 1,8 s Achats, 2,8 s Ventes) lit ~40 valeurs
+  du moteur, dont des fonctions recréées à chaque rendu (`effEntry`, `isShipDone`, `numForBord`, `commandeRetrait`,
+  `transporteurVente`…) qui lisent elles-mêmes l'état. Un magasin « recalculé quand ses sources changent » exige d'abord de
+  rendre ces sources explicites ; une seule oubliée = un colis affiché avec un état périmé (§5 : pire qu'un blanc). À faire en
+  chantier dédié, fonction par fonction, chacune avec chiffres-volume ET un banc qui change UNE source et vérifie la carte.
+- chiffres-volume : identique (le banc trie désormais les attributs d'un même élément ; la prévision haute dépend de
+  l'heure — comparer deux relevés pris à la même heure).
