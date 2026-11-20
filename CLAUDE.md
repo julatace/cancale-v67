@@ -499,9 +499,6 @@ sans la fonction.
 - **19 nov. · Compléter (reprise-completer)** : une question à la fois (prix d'achat, prix mini, N°) ; prix d'achat repris du reçu. `2026-11-19-completer-infos.md`. Geste : aucun.
 - **19 nov. · Annonces à égalité (annonces-a-egalite)** : Leboncoin, eBay, Vestiaire portent prix mini, achat, N° comme Vinted (`vrm_articles_sites`). `2026-11-19-annonces-a-egalite.md`. Geste : aucun.
 - **19 nov. · Changer le prix en un geste, baisse par règle, vendue ailleurs masquée (prix-sans-manuel)** : ext. `prixattente` `baisseregle` `masquerailleurs`. `2026-11-19-prix-sans-manuel.md`. Geste : allumer la règle s'il la veut.
-- **19 nov. · Compte bloqué par Vinted (compte-bloque)** : VRM demande pause/garder, remet seul au déblocage (ext. `comptebloque`). `2026-11-19-compte-bloque.md`. Geste : répondre à la question pour le compte bloqué.
-- **19 nov. · Colis : ce qu'il y a dedans, seul (colis-achat-auto + codes de retrait en liste, PR #1273)** : plus de « Relier l'achat » (ext. `suivicolis`). `2026-11-19-colis-achat-auto.md`. Geste : aucun.
-- **19 nov. · E-mails comme Mail (emails-mail)** : segments en haut, liste en grand, l'e-mail à côté ; « Relier ma boîte » pas à pas (Gmail, Outlook, iCloud), essai vérifié en direct. `2026-11-19-emails-mail.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 nov. et les plus anciennes du 19 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
