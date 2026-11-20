@@ -7382,7 +7382,7 @@ const oublierDressing = (uid) => {
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
-// et <TopProgress/> affiche une fine barre tant qu'il en reste. Résultat :
+// et (jusqu'au 20 nov.) une fine barre s'affichait tant qu'il en restait. Résultat :
 // l'utilisateur voit TOUJOURS que l'app travaille, sur n'importe quel écran,
 // sans avoir à câbler un indicateur dans chaque composant.
 let _busy = 0;
@@ -20425,36 +20425,6 @@ function Toaster() {
   return dansFiche ? createPortal(pile, zoneFiche) : pile;
 }
 
-function TopProgress() {
-  const [busy, setBusy] = React.useState(false);
-  const [pct, setPct] = React.useState(0);
-  const [show, setShow] = React.useState(false);
-  React.useEffect(() => onBusy(setBusy), []);
-  React.useEffect(() => {
-    let t;
-    if (busy) {
-      setShow(true); setPct(p => (p > 0 && p < 90 ? p : 8));
-      // Progression qui s'essouffle : jamais 100 % tant que ça charge.
-      t = setInterval(() => setPct(p => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.08))), 180);
-    } else {
-      setPct(100);
-      t = setTimeout(() => { setShow(false); setPct(0); }, 340);
-    }
-    return () => { clearInterval(t); clearTimeout(t); };
-  }, [busy]);
-  if (!show) return null;
-  return (
-    <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
-      <div style={{
-        height:'100%', width:`${pct}%`,
-        background:C.accent,
-        borderRadius:'0 999px 999px 0',
-        transition:'width .22s ease, opacity .3s ease',
-        opacity: pct>=100 ? 0 : 1,
-      }}/>
-    </div>
-  );
-}
 
 // ── LE SHELL D'ORDINATEUR ───────────────────────────────────────────────────
 // ⚠️ Julien : « le rendu est presque pareil, je veux quelque chose qui
@@ -68060,9 +68030,8 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
         </>}/> : null}
-      {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
-          chargement, sur n'importe quel écran. */}
-      <TopProgress/>
+      {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
+          restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
