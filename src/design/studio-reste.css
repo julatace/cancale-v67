@@ -21,10 +21,10 @@
 
 /* ══ 0. JETONS PROPRES À CE CHANTIER (la fondation, studio.css, porte tous les autres — les copies
    « provisoire » d'avant la fusion sont retirées, 14 nov., version studio). `:where` : spécificité nulle. */
-:where(:root) { --sb-sur-encre: #FFFFFF; --sb-gravure: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9); }
-:where(:root[data-theme="dark"]) { --sb-sur-encre: #0C1D30; --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06); }
+:where(:root) { --sb-sur-encre: #FFFFFF; --sb-gravure: none; }
+:where(:root[data-theme="dark"]) { --sb-sur-encre: #0C1D30; --sb-gravure: none; }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) { --sb-sur-encre: #0C1D30; --sb-gravure: inset 0 .5px 1px rgb(0 0 0 / .6), inset 0 0 0 .5px rgb(0 0 0 / .3), 0 .5px 0 rgb(255 255 255 / .06); }
+  :where(:root:not([data-theme="light"])) { --sb-sur-encre: #0C1D30; --sb-gravure: none; }
 }
 /* L'aplat de chaque espace : ±2 points, jamais une autre teinte. */
 :where([data-espace="argent"]) { --sb-aplat: #D6E8F5; }
@@ -51,7 +51,7 @@
 :root:root:root .vrm-boite, :root:root:root .vrm-boite-feuille, :root[data-theme="dark"]:root:root .vrm-boite, :root[data-theme="dark"]:root:root .vrm-boite-feuille {
   --bx-encre: var(--sb-encre); --bx-doux: var(--sb-encre-2); --bx-carte: var(--sb-porcelaine); --bx-sol: var(--sb-aplat);
   --bx-filet: rgb(var(--sb-o) / .12); --bx-fin: rgb(var(--sb-o) / .07); --bx-gris: var(--sb-creux);
-  --bx-accent: var(--sb-diode); --bx-accent-texte: var(--sb-lien); --bx-ambre: var(--sb-ambre); --bx-ombre: var(--sb-ombre-plan);
+  --bx-accent: var(--sb-diode); --bx-accent-texte: var(--sb-lien); --bx-ambre: var(--sb-ambre); --bx-ombre: none;
   --seg-actif: var(--sb-creux); --seg-actif-texte: var(--sb-encre);
 }
 
@@ -512,7 +512,7 @@
 /* Communauté : son écran a ses propres jetons (--cm-*) ; ils lisent ceux du Studio. */
 :root:root .vrm-communaute, :root:root .vrm-communaute[data-dark="true"] {
   --cm-fond: var(--sb-creux); --cm-carte: var(--sb-porcelaine); --cm-encre: var(--sb-encre); --cm-doux: var(--sb-encre-2);
-  --cm-bord: rgb(var(--sb-o) / .10); --cm-accent: var(--sb-lien); --cm-accent-fond: var(--sb-creux); --cm-ombre: var(--sb-ombre-plan);
+  --cm-bord: rgb(var(--sb-o) / .10); --cm-accent: var(--sb-lien); --cm-accent-fond: var(--sb-creux); --cm-ombre: none;
 }
 :root:root:root:root:root:root body .vrm-communaute .vrm-cm-carton { border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
 :root:root:root:root:root:root body .vrm-communaute :is(h2, .vrm-cm-entete h2) { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.02em !important; }

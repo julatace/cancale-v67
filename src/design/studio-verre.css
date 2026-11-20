@@ -41,7 +41,7 @@
   --sb-verre: var(--sv-verre-barre) !important; --sb-verre-plan: var(--sv-verre) !important; --sb-verre-flou: var(--sv-flou) !important;
   --sb-puits: rgb(255 255 255 / .92) !important;
   --sb-lien: var(--sv-lien) !important;
-  --sb-ombre-plan: var(--sv-ombre) !important;
+  --sb-ombre-plan: none !important;
   /* Les cartes des familles d'avant, que la nuit reposait en gris neutre (#1C1C1E, styles-premium.css, fusion.css) : le verre. */
   --d-carte: var(--sv-verre) !important; --fu-carte: var(--sv-verre) !important; --p-carte: var(--sv-verre) !important;
   --w-carte: var(--sv-verre) !important; --vrm-surface: var(--sv-verre) !important;

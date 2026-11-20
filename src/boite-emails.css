@@ -16,9 +16,9 @@
   --bx-accent:var(--vrm-accent,#0071E3); --bx-accent-texte:var(--vrm-accent-texte,#0066CC); --bx-sur-accent:var(--vrm-on-accent,#FFFFFF);
   --bx-ambre:var(--vrm-warn,#B25000); --bx-ambre-doux:var(--vrm-warn-soft,#FFF4E5);
   --bx-sortie:cubic-bezier(.23,1,.32,1); --bx-tiroir:cubic-bezier(.32,.72,0,1);
-  --bx-ombre:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.07);
+  --bx-ombre: none;
 }
-:root[data-theme="dark"] .vrm-boite,:root[data-theme="dark"] .vrm-boite-feuille{--bx-ombre:0 0 0 1px rgba(255,255,255,.06)}
+:root[data-theme="dark"] .vrm-boite,:root[data-theme="dark"] .vrm-boite-feuille{--bx-ombre: none}
 .vrm-boite{padding:0 16px 24px;color:var(--bx-encre);font-size:15px;line-height:1.45;min-width:0;box-sizing:border-box}
 .vrm-boite *,.vrm-boite-feuille *{box-sizing:border-box}
 .vrm-boite button,.vrm-boite select,.vrm-boite-feuille button{font:inherit;color:inherit;min-height:44px;border-radius:12px;border:1px solid var(--bx-filet);background:var(--bx-carte);padding:0 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform .12s var(--bx-sortie),background-color .2s ease}

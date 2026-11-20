@@ -11,7 +11,7 @@
   --sr-muet: var(--v2-muet, #4A5B6D);
   --sr-filet: var(--v2-filet, rgb(18 52 96 / .12));
   --sr-socle: var(--v2-socle, #EEF3F8);
-  --sr-ombre: var(--v2-carte-ombre, 0 .5px 0 rgb(18 52 96 / .06), 0 1px 2px rgb(18 52 96 / .07), 0 10px 24px -14px rgb(18 52 96 / .28));
+  --sr-ombre: none;
   --sr-teinte: var(--v2-teinte-fond, rgb(0 96 204 / .10));
   --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(0 96 204 / .18));
   --sr-teinte-texte: var(--v2-teinte-texte, #0050A8);
@@ -34,7 +34,7 @@
   --sr-page: var(--v2-page-texte, #F2F7FD); --sr-page-muet: var(--v2-page-muet, #B9C8D8);
   --sr-carte: var(--v2-carte, #16273C); --sr-encre: #EAF2FB; --sr-muet: var(--v2-muet, #A7B8CB);
   --sr-filet: var(--v2-filet, rgb(255 255 255 / .10)); --sr-socle: var(--v2-socle, #1E3149);
-  --sr-ombre: var(--v2-carte-ombre, 0 0 0 .5px rgb(255 255 255 / .06), 0 12px 26px -14px rgb(0 0 0 / .8));
+  --sr-ombre: none;
   --sr-teinte: var(--v2-teinte-fond, rgb(74 163 255 / .16)); --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(74 163 255 / .26));
   --sr-teinte-texte: var(--v2-teinte-texte, #8CC4FF); --sr-plein: var(--v2-plein-fond, #EAF2FB); --sr-plein-appui: var(--v2-plein-fond-appui, #C9D9EA);
   --sr-plein-texte: var(--v2-plein-texte, #06111F); --sr-accent: #0A84FF; --sr-ambre: var(--v2-ambre, #F2B65E); --sr-page-ambre: var(--v2-page-ambre, #F2B65E);

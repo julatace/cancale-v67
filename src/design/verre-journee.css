@@ -12,14 +12,14 @@
    RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-*, aucun geste ne change ici.
    ════════════════════════════════════════════════════════════════════════════ */
 :root {
-  --vj-plein: #0C1D30; --vj-plein-t: #FFFFFF; --vj-plein-ombre: 0 10px 20px -10px rgb(8 26 50 / .7);
+  --vj-plein: #0C1D30; --vj-plein-t: #FFFFFF; --vj-plein-ombre: none;
   --vj-touche: rgb(255 255 255 / .72); --vj-touche-bord: rgb(12 29 48 / .12);
   --vj-libre: rgb(255 255 255 / .34); --vj-libre-bord: rgb(12 29 48 / .24);
   --vj-ac: #0060CC; --vj-ac-halo: rgb(0 96 204 / .25); --vj-ou: rgb(0 96 204 / .08); --vj-ou-bord: rgb(0 96 204 / .18);
   --vj-pastille: rgb(12 29 48 / .07); --vj-site: rgb(255 255 255 / .94);
 }
 :root[data-theme="dark"] {
-  --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; --vj-plein-ombre: 0 10px 20px -10px rgb(0 0 0 / .7);
+  --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; --vj-plein-ombre: none;
   --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
   --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
   --vj-ac: #6AABFF; --vj-ac-halo: rgb(106 171 255 / .3); --vj-ou: rgb(106 171 255 / .10); --vj-ou-bord: rgb(106 171 255 / .25);
@@ -27,7 +27,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; --vj-plein-ombre: 0 10px 20px -10px rgb(0 0 0 / .7);
+    --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; --vj-plein-ombre: none;
     --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
     --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
     --vj-ac: #6AABFF; --vj-ac-halo: rgb(106 171 255 / .3); --vj-ou: rgb(106 171 255 / .10); --vj-ou-bord: rgb(106 171 255 / .25);

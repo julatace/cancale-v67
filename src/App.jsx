@@ -1011,7 +1011,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
-import { abonnerNombresAnnonces, lireNombresAnnonces, viderNombresAnnonces, poserNombreAnnonces, compterVcEnLigne } from "./plateformes/nombresAnnonces.js";
+import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
 import "./styles-ios.css";       // (6 nov., v36-visuel) rangées « Réglages » d'iOS, « ⓘ » en feuille
@@ -20677,8 +20677,6 @@ const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: nul
 // (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
 // un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
 const SITES_COQUE = { v: ['vinted'] };
-const choisirSiteTache = (tache, site) => { try { window.dispatchEvent(new CustomEvent('vrm:site-tache', { detail: { tache, site } })); } catch (_) {} };
-const NOMS_SITES_COQUE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire', toutes: '' };
 // (20 nov., sélecteur de plateforme global) Le filtre « Site » des tableaux de travail est le sélecteur global : plus de filtre
 // local (rend une liste vide ; la fonction reste pour les écrans qui l'appellent).
 const filtreSiteTableau = () => [];
@@ -62998,50 +62996,8 @@ function AncreDefilement() {
   }, []);
   return <span ref={ref} aria-hidden="true" data-ancre-retraits=""/>;
 }
-// ── LA RANGÉE DE FILTRES DE SITE (31 oct., navigation par tâche) ────────────
-// En tête d'Annonces, Ventes et Messages : « Toutes » (Ventes seulement) puis
-// les sites où il a un compte (`sites` : Set, ou `null` = pas su ⇒ tous). Le
-// site choisi reste toujours montré, même si son compte n'est plus lu. La forme
-// est celle des pastilles de filtre de l'app (`vrm-filtres`, §7).
-function FiltreSites({ tache, site, sites, onSite, onChoix = null, enLigneVinted = undefined }) {
-  // (5 nov.) Le sélecteur À LOGOS (`SelecteurSites`, règles `src/plateformes.js`) :
-  // Les sites choisis ou reliés, dans le même ordre ; « Tous » sur Ventes.
-  // Un site choisi avant sa connexion dit ce qui manque et le geste (`OngletManque`).
-  const t = TACHES_SITE[tache] || {};
-  // (8 nov.) Ses plateformes, en Simple comme en Complet ; « Tous » conserve tous les calculs.
-  const p = useProfilVendeur();
-  const ctx = { mode: p.mode, relies: p.relies, choisi: site, plateformes: p.plateformes };
-  React.useEffect(() => { if (Array.isArray(p.plateformes) && site !== 'toutes' && !p.plateformes.includes(site) && p.plateformes.length) onSite(t.toutes ? 'toutes' : p.plateformes[0]); }, [site, p.plateformes?.join('|')]);
-  // (9 nov., zéro banc rouge) Ses plateformes PAS ENCORE SUES (le nuage pas lu) : aucune rangée.
-  // Avant, les quatre sites s'affichaient puis la rangée disparaissait (un seul site affiché) :
-  // la barre du haut passait de 82 à 60 px et tout l'écran remontait (banc chargement, Annonces).
-  // (15 nov., Annonces propre) Annonces : chaque touche de site dit son nombre d'annonces, tel que SA règle le compte
-  // (src/plateformes/nombresAnnonces.js ; Vinted : `online` des chiffres de l'app, la valeur « en ligne » de la bande).
-  const nbPublies = React.useSyncExternalStore(abonnerNombresAnnonces, lireNombresAnnonces, lireNombresAnnonces);
-  // Vestiaire compté sans ouvrir son écran : les deux lignes que SA liste lit (projetées), la même règle (`compterVcEnLigne`).
-  const vcMontre = tache === 'annonces' && Array.isArray(p.plateformes) && p.plateformes.includes('vestiaire');
-  React.useEffect(() => {
-    if (!vcMontre) return undefined;
-    let vivant = true;
-    const lire = async () => {
-      try {
-        const [rl, rv] = await Promise.all([
-          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,capturedAt:data->>capturedAt`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)),
-          fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)),
-        ]);
-        if (!vivant) return;
-        poserNombreAnnonces('vestiaire', Array.isArray(rl) ? compterVcEnLigne(rl[0] || null, Array.isArray(rv) && rv[0] ? rv[0].ventes : null) : null);
-      } catch (_) { if (vivant) poserNombreAnnonces('vestiaire', null); }
-    };
-    lire();
-    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && x.quoi === 'vestiaire') lire(); };
-    window.addEventListener('vrm:ext', f);
-    return () => { vivant = false; window.removeEventListener('vrm:ext', f); };
-  }, [vcMontre]);
-  const nombres = tache === 'annonces' ? { ...nbPublies, ...(Number.isFinite(enLigneVinted) ? { vinted: enLigneVinted } : {}) } : null;
-  if (!Array.isArray(p.plateformes)) return null;
-  return <SelecteurSites id={tache} nombres={nombres} options={optionsSelecteur({ site, sites: null, toutes: !!t.toutes }).filter((o) => siteMontre(o.id, ctx)).map((o) => (o.id !== 'toutes' && sites && !sites.has(o.id) ? { ...o, sansCompte: true } : o))} valeur={site} onChoix={(v) => { onSite(v); if (onChoix) onChoix(v); }}/>;
-}
+// (20 nov.) `FiltreSites` (la rangée de sites de chaque tâche) est retiré : LE sélecteur de plateforme global
+// (`SelecteurSiteCoque`, src/natif/SelecteurSite.jsx, src/siteCourant.js) le remplace partout.
 // (5 nov.) UN ONGLET SANS DONNÉE : ce qui manque et le geste (`ONGLET_SANS_DONNEE`,
 // src/plateformes.js). Montré quand le site choisi n'a aucun compte relevé
 // (`sitesPresents` LU et sans lui) — jamais sur « pas su » (la lecture en cours
@@ -64877,14 +64833,16 @@ function AppCoeur() {
   // Les sites RELIÉS (un compte Vinted, une lecture Leboncoin / eBay / Vestiaire) — pas « présents » : Vinted et Vestiaire
   // sont toujours dans `sitesPresents` (un écran « pas encore lu » y a son geste), le sélecteur ne propose que ce qui est
   // relié. Moins de deux ⇒ aucun sélecteur (un vendeur Leboncoin seul ne voit rien de plus).
+  const profilSites = useProfilVendeur();
   const sitesRelies = useMemo(() => {
     const r = [];
     if (Array.isArray(vintedAccounts) && vintedAccounts.length) r.push('vinted');
     if (sitesLus && sitesLus.leboncoin) r.push('leboncoin');
     if ((sitesLus && sitesLus.ebay) || (Array.isArray(comptesEbay) && comptesEbay.some((c) => c && !c.implicite))) r.push('ebay');
     if (sitesLus && sitesLus.vestiaire) r.push('vestiaire');
-    return r;
-  }, [vintedAccounts, sitesLus, comptesEbay]);
+    // SES plateformes (Paramètres, la même règle que les filtres d'hier : `siteMontre`) : un site qu'il a retiré n'est pas proposé.
+    return r.filter((x) => siteMontre(x, { mode: profilSites.mode, relies: profilSites.relies, plateformes: profilSites.plateformes }));
+  }, [vintedAccounts, sitesLus, comptesEbay, profilSites.mode, profilSites.relies, (profilSites.plateformes || []).join('|')]);
   const [siteCourantBrut, poserSiteCourant] = useSiteCourant();
   const siteGlobal = siteEffectif(siteCourantBrut, sitesRelies);
   // Le site courant ⇒ le filtre de la tâche affichée (Ventes, Annonces, Achats, Messages) ; « Tous » rend celui d'avant.

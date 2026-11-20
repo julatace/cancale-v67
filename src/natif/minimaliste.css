@@ -14,17 +14,9 @@
    ════════════════════════════════════════════════════════════════════════════ */
 @layer n-anciens {
 
-/* ══ 1. Les OMBRES DE CARTE d'hier : leurs jetons valent « rien » là où ils sont DÉFINIS (la racine, et les blocs qui les
-   redéfinissent : Boîte e-mails, Avis, Communauté, Tarifs, Stock v2) — jamais sur chaque élément : un sélecteur universel
-   qui pose vingt variables restylait 2 300 éléments au retour sur un écran (banc natif-coque K8b). ══ */
-html, html body, html body :is(.vrm-boite, .vrm-boite-feuille, .vrm-boite-avis, .av, .av-tuile, .av-panneau, .av-offre-solo, .av-fin-plaque, .av-tg, .av-faq-texte, .vrm-communaute, .vt, .sr-ecran, .sr-feuille) {
-  --fu-ombre: none !important; --w-ombre: none !important; --vrm-ombre-carte: none !important; --p-ombre: none !important;
-  --d-ombre-douce: none !important; --d-ombre-douce-haute: none !important; --d-ombre-levee: none !important;
-  --cm-ombre: none !important; --bx-ombre: none !important; --lit-ombre: none !important; --sr-ombre: none !important;
-  --vt-ombre: none !important; --seg-actif-ombre: none !important; --plein-ombre: none !important; --vj-plein-ombre: none !important;
-  --sb-touche-ombre: none !important; --sb-plein-ombre: none !important; --sb-ombre-pose: none !important; --sb-ombre-plan: none !important;
-  --sb-gravure: none !important;
-}
+/* ══ 1. Les OMBRES DE CARTE d'hier : leurs jetons (`--fu-ombre`, `--w-ombre`, `--vrm-ombre-carte`, `--p-ombre`,
+   `--d-ombre-douce`, `--cm-ombre`, `--bx-ombre`…) valent `none` À LEUR SOURCE (chaque feuille qui les définit) : plus
+   de remise à zéro ici (un sélecteur universel restylait 2 300 éléments — banc natif-coque K8b — et pesait au démarrage). ══ */
 
 /* ══ 2. Ombres posées en dur, nommées par le banc (390 / 1512, avant) ══ */
 /* Messages : la plaque gravée du N° et son chiffre ; le segment choisi. */

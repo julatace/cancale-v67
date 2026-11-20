@@ -93,7 +93,7 @@
   /* Ombres — deux niveaux. */
   --d-ombre-carte: 0 0 0 .5px rgba(0,0,0,.035), 0 1px 3px rgba(0,0,0,.05);
   --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16);
-  --d-ombre-levee: var(--d-ombre-flottant);
+  --d-ombre-levee: none;
 
   /* Mouvement — 150 / 200 / 250 ms, une sortie franche. */
   --d-sortie: cubic-bezier(.23,1,.32,1);
@@ -108,7 +108,7 @@
   --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-20); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
   --r-num: var(--d-r-num); --r-ctrl: var(--d-r-pilule); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-carte); --r-pilule: var(--d-r-pilule);
   --o-carte: var(--d-ombre-carte); --o-flottant: var(--d-ombre-flottant);
-  --vrm-ombre-carte: var(--d-ombre-carte); --vrm-r-carte: var(--d-r-carte);
+  --vrm-ombre-carte: none; --vrm-r-carte: var(--d-r-carte);
   --vrm-entre-sections: var(--d-entre-sections); --vrm-entre-cartes: var(--d-entre-cartes);
   --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir); --vrm-ease-sortie: var(--d-sortie);
   --vrm-remplissage: var(--d-remplir);
@@ -117,7 +117,7 @@
   --fu-fond: var(--d-fond); --fu-carte: var(--d-carte); --fu-case: var(--d-case); --fu-encre: var(--d-encre);
   --fu-gris: var(--d-gris); --fu-gris2: var(--d-gris); --fu-gris3: var(--d-glyphe);
   --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
-  --fu-ombre: var(--d-ombre-carte); --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-carte); --fu-r-photo: var(--d-r-case);
+  --fu-ombre: none; --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-carte); --fu-r-photo: var(--d-r-case);
   --fu-ambre: var(--d-point-ambre); --fu-ambre-txt: var(--d-ambre); --fu-ambre-fond: var(--d-ambre-fond);
   /* Premium (DA 1-4) */
   --p-marge: var(--d-marge); --p-marge-ordi: var(--d-marge-ordi);
@@ -129,13 +129,13 @@
   --p-fond: var(--d-fond); --p-carte: var(--d-carte); --p-case: var(--d-case); --p-remplir: var(--d-remplir);
   --p-encre: var(--d-encre); --p-gris: var(--d-gris); --p-gris-2: var(--d-gris); --p-filet: var(--d-filet);
   --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);
-  --p-ombre: var(--d-ombre-carte); --p-sortie: var(--d-sortie);
+  --p-ombre: none; --p-sortie: var(--d-sortie);
   /* Widgets (DA 6) */
   --w-fond: var(--d-fond); --w-carte: var(--d-carte); --w-carte-2: var(--d-case);
   --w-remplir: var(--d-remplir); --w-remplir-fort: var(--d-remplir-fort);
   --w-encre: var(--d-encre); --w-gris: var(--d-gris); --w-gris-2: var(--d-glyphe); --w-filet: var(--d-filet); --w-accent: var(--d-accent);
   --w-r: var(--d-r-carte); --w-r-tete: var(--d-r-carte); --w-r-photo: var(--d-r-carte); --w-r-vignette: var(--d-r-case);
-  --w-ecart: var(--d-entre-cartes); --w-ombre: var(--d-ombre-carte);
+  --w-ecart: var(--d-entre-cartes); --w-ombre: none;
   --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
   /* La colonne de gauche (DA 5) */
   --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
@@ -820,8 +820,8 @@
   --d-surface-atelier-2: #F7F7F9;        /* une case dans une carte */
 
   /* Profondeur, pas de traits : une ombre diffuse à deux couches ; la nuit, aucune. */
-  --d-ombre-douce: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
-  --d-ombre-douce-haute: 0 2px 6px rgb(0 0 0 / .05), 0 16px 40px rgb(0 0 0 / .09);   /* au survol, une feuille */
+  --d-ombre-douce: none;
+  --d-ombre-douce-haute: none;   /* au survol, une feuille */
   --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(14 31 61 / .45);
   --d-filet-indente: rgb(60 60 67 / .12);   /* séparateur fin, indenté après la vignette */
 
@@ -889,7 +889,7 @@
   --d-surface-atelier: #1C1C1E;             /* la nuit : la surface plus claire que le fond, sans ombre */
   --d-surface-atelier-2: #2C2C2E;
   --d-ombre-douce: none;
-  --d-ombre-douce-haute: 0 0 0 .5px rgb(255 255 255 / .08), 0 20px 48px rgb(0 0 0 / .55);
+  --d-ombre-douce-haute: none;
   --d-ombre-heros: 0 0 0 .5px rgb(255 255 255 / .08);
   --d-filet-indente: rgb(84 84 88 / .45);
   --d-heros-fond: #1C1C1E;

@@ -30,7 +30,7 @@
   --fu-ambre: #ff9f0a;
   --fu-ambre-txt: #b25000;
   --fu-ambre-fond: #fff4e5;
-  --fu-ombre: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
+  --fu-ombre: none;
   --fu-ombre-sombre: 0 12px 30px rgba(0,0,0,.18);
   /* (6 nov., vague 3) LA CARTE SOMBRE : son fond, son voile de case et ses deux encres sont des
      JETONS de src/themeMineral.js (`carteSombre`, `caseSombre`, `surSombre`, `surSombre2`, posés en
@@ -58,7 +58,7 @@
   --fu-ambre: #ff9f0a;
   --fu-ambre-txt: #ffb340;
   --fu-ambre-fond: rgba(255,159,10,.12);
-  --fu-ombre: 0 0 0 1px rgba(255,255,255,.05);
+  --fu-ombre: none;
   --fu-ombre-sombre: 0 0 0 1px rgba(255,255,255,.07), 0 12px 30px rgba(0,0,0,.5);
   /* (5 nov., chantier E1, revue 2.3) La nuit, la carte sombre finissait en #1c1c1e — la couleur
      exacte des cartes blanches du mode sombre : elle s'y fondait. Elle garde sa teinte bleu nuit

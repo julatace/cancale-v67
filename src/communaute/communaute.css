@@ -2,13 +2,13 @@
 .vrm-communaute {
   --cm-fond: #F2F2F7; --cm-carte: #FFFFFF; --cm-encre: #1C1C1E; --cm-doux: #636366;
   --cm-bord: #E5E5EA; --cm-accent: #0071E3; --cm-accent-fond: rgba(36,88,230,.10);
-  --cm-ombre: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+  --cm-ombre: none;
   color: var(--cm-encre); padding: 16px; max-width: 1080px; margin: 0 auto; box-sizing: border-box;
 }
 .vrm-communaute[data-dark="true"] {
   --cm-fond: #000000; --cm-carte: #1C1C1E; --cm-encre: #E5E5EA; --cm-doux: #AEAEB2;
   --cm-bord: #1D1D1F; --cm-accent: #8DB8F2; --cm-accent-fond: rgba(61,123,255,.16);
-  --cm-ombre: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --cm-ombre: none;
 }
 .vrm-communaute * { box-sizing: border-box; }
 .vrm-communaute.vrm-cm-portail { padding: 0; max-width: none; margin: 0; }

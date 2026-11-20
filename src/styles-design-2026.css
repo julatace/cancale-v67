@@ -64,7 +64,7 @@
 
   /* Ombres — toujours un décalage ET un flou ; deux couches (contact + diffusion). */
   --d-ombre-carte: 0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08);
-  --d-ombre-levee: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px -8px rgba(0,0,0,.14);
+  --d-ombre-levee: none;
   --d-ombre-flottant: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14);
 
   /* Mouvement — 150 à 250 ms, une sortie franche ; rien de tout ça en mouvement réduit. */
@@ -78,7 +78,7 @@
   --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-22); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
   --r-num: var(--d-r-num); --r-ctrl: var(--d-r-ctrl); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-sombre); --r-pilule: var(--d-r-pilule);
   --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-sombre); --fu-r-photo: var(--d-r-case);
-  --o-carte: var(--d-ombre-carte); --fu-ombre: var(--d-ombre-carte); --vrm-ombre-carte: var(--d-ombre-carte);
+  --o-carte: var(--d-ombre-carte); --fu-ombre: none; --vrm-ombre-carte: none;
   --o-flottant: var(--d-ombre-flottant);
   --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir);
   --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
@@ -97,7 +97,7 @@
   --d-point-ambre: #FF9F0A;
   --d-defile: rgba(235,235,245,.28);
   --d-ombre-carte: 0 0 0 .5px rgba(255,255,255,.06);
-  --d-ombre-levee: 0 0 0 .5px rgba(255,255,255,.08), 0 12px 32px -8px rgba(0,0,0,.6);
+  --d-ombre-levee: none;
   --d-ombre-flottant: 0 0 0 .5px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
 }
 
@@ -545,7 +545,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
    lecture vide n'est plus une grande carte blanche à l'ordinateur — Mail laisse
    le fond, un dessin et une phrase grise, rien d'autre. */
 :root:root body .vrm-boite, :root:root body .vrm-boite-feuille {
-  --bx-carte: var(--d-carte); --bx-ombre: var(--d-ombre-carte); --bx-doux: var(--d-gris); --bx-encre: var(--d-encre);
+  --bx-carte: var(--d-carte); --bx-ombre: none; --bx-doux: var(--d-gris); --bx-encre: var(--d-encre);
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture { background: transparent !important; box-shadow: none !important; padding-top: 120px !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-boite-vide-lecture p { font-size: var(--d-t-15) !important; color: var(--d-gris) !important; }

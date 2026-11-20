@@ -75,7 +75,7 @@
    le banc `jetons-coherence` mesure le retrait, la hauteur et les libellés. */
 :root {
   --seg-piste: rgba(118,118,128,.12); --seg-actif: #ffffff; --seg-actif-texte: #1d1d1f;
-  --seg-actif-ombre: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --seg-actif-ombre: none;
 }
 :root[data-theme="dark"] { --seg-piste: rgba(118,118,128,.24); --seg-actif: #636366; --seg-actif-texte: #ffffff; --seg-actif-ombre: none; }
 .vrm-seg-cadre { padding: 0 16px 12px; min-width: 0; }
