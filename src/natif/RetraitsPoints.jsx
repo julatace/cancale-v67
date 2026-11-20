@@ -95,6 +95,34 @@ function Trajet({ t }) {
   );
 }
 
+// Ce qu'il y a dans le colis : { photo, titre (2 lignes), taille · prix · compte, lot } — ou « pas encore lu ».
+function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, ap = false }) {
+  const relie = !!(c && c.etat === 'relie');
+  const pasLu = !!(c && c.etat === 'pas-lu');
+  const titre = relie ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
+  const phrase = texteContenu(c, tr);
+  const details = relie ? [c.taille ? tr('retraits.c.taille', { t: c.taille }) : '', phrase].filter(Boolean) : [];
+  return (
+    <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '') + (ap ? ' is-ap' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
+      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={photo && relie && c.photo ? c.photo : undefined} data-v2-photo-article={photo ? '' : undefined}>
+        {photo || <Icon name="box" size={26}/>}
+        {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
+      </span>
+      <span className="n-rp-colis-texte">
+        {titre ? <span className="n-rp-colis-titre v2-passe-titre" data-rp-titre="">{titre}</span> : null}
+        {pasLu ? <span className={'n-rp-pas-lu' + (titre ? '' : ' is-seul')} data-rp-pas-lu="" data-v2-contenu="pas-lu" data-v2-contenu-raison={c.raison} data-v2-contenu-compte={c.compte || undefined}>{phrase}</span> : null}
+        <span className="n-rp-colis-meta">
+          {neuf ? <span className="n-rp-etiquette" data-n-ton="accent" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
+          {x.num ? <span className="n-rp-num" data-rp-num={x.num}>N° {x.num}</span> : null}
+          {relie && c.nb ? <span className="n-rp-etiquette" data-n-ton="neutre">{tr('retraits.c.lot', { n: c.nb })}</span> : null}
+          {prix ? <span className="n-rp-prix" data-rp-prix="">{prix}</span> : null}
+          {details.length ? <span className="n-rp-dedans" data-rp-prix={c.prix ? '' : undefined} data-v2-contenu="relie" data-v2-contenu-tx={c.tx || undefined} data-v2-contenu-compte={c.compte || undefined}>{details.join(' · ')}</span> : null}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
   const neuf = !!(nouveaux && estNouveau(nouveaux.etat, x.cle || x.id));
   const conflit = x.codesDesaccord && x.codesDesaccord.length > 1;
@@ -115,18 +143,10 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux, enCours }) {
   return (
     <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '') + (retireBientot ? ' is-retire' : '') + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
       data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
-      <div className="n-rp-colis-haut">
-        <span className="n-rp-vignette v2-passe-photo" aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-v2-photo-article={photo ? '' : undefined}>{photo || <Icon name="box" size={22}/>}</span>
-        <span className="n-rp-colis-texte">
-          <span className="n-rp-colis-titre v2-passe-titre">{aides.titre(x)}</span>
-          <span className="n-rp-colis-meta">
-            {neuf ? <span className="n-rp-etiquette" data-n-ton="accent" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
-            {x.num ? <span className="n-rp-num" data-rp-num={x.num}>N° {x.num}</span> : null}
-            {prix ? <span className="n-rp-prix" data-rp-prix="">{prix}</span> : null}
-            {contenuTxt ? <span className={'n-rp-dedans' + (contenu.etat === 'pas-lu' ? ' is-pas-lu' : '')} data-rp-prix={contenu.etat === 'relie' && contenu.prix ? '' : undefined} data-v2-contenu={contenu.etat} data-v2-contenu-tx={contenu.tx || undefined} data-v2-contenu-raison={contenu.etat === 'pas-lu' ? contenu.raison : undefined} data-v2-contenu-compte={contenu.compte || undefined}>{contenuTxt}</span> : null}
-          </span>
-        </span>
-      </div>
+      {/* (20 nov., Julien : « même quand c'est à retirer, on doit voir ce qu'il y a à l'intérieur ») LE CONTENU D'ABORD, EN GRAND :
+          la photo et le titre de l'achat relié PAR IDENTITÉ (x.contenu), sa taille, le prix payé, le compte, « lot » s'il l'est ;
+          pas encore lu ⇒ vignette grise et la phrase qui dit quoi faire — jamais « Colis Mondial Relay » mis en avant. */}
+      <Contenu x={x} c={contenu} rg={rg} photo={photo} aides={aides} Icon={Icon} prix={prix} neuf={neuf}/>
       {mention ? <p className="n-rp-verif" data-rp-verif-mention={mention}><span className="n-rp-etiquette" data-n-ton="ambre">{tr(MENTION[mention] || MENTION.autre)}</span>{mention === 'autre' && x.raisonVerif ? <span className="n-rp-verif-raison">{x.raisonVerif}</span> : null}</p> : null}
       <Trajet t={x.trajet}/>
       <div className={'n-rp-code-zone' + (qr ? ' avec-qr' : '')}>
@@ -187,7 +207,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, enCours, onAuPoint,
 }
 
 // ── « JE SUIS AU POINT » ─────────────────────────────────────────────────────
-function AuPoint({ p, aides, onFermer, differe }) {
+function AuPoint({ p, aides, onFermer, differe, Photo, Icon }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
     let verrou = null, vivant = true;
@@ -219,7 +239,7 @@ function AuPoint({ p, aides, onFermer, differe }) {
         {colis.map((x) => { const k = x.cle || x.id; const conflit = x.codesDesaccord && x.codesDesaccord.length > 1; const code = conflit ? '' : (x.code || ''); const qr = aides.qrSrc(x); const ec = differe.enCours[k];
           return (
             <li key={k} className={'n-rp-ap-colis' + (ec ? ' is-retire' : '')} data-rp-ap-colis={k} data-rp-ap-code={code}>
-              <span className="n-rp-ap-titre">{aides.titre(x)}{x.num ? ` · N° ${x.num}` : ''}</span>
+              <Contenu x={x} c={x.contenu || null} rg={rangeeRetrait(x)} photo={x.photo && Photo ? Photo(x.photo) : null} aides={aides} Icon={Icon} prix="" neuf={false} ap/>
               {mentionVerif(x) ? <span className="n-rp-ap-verif" data-rp-ap-verif={mentionVerif(x)}>{tr(MENTION[mentionVerif(x)] || MENTION.autre)}</span> : null}
               {code ? <b className="n-rp-ap-code" data-rp-ap-code-grand="">{code}</b> : <span className="n-rp-ap-sans">{tr(conflit ? 'v2.passe.codesEnConflit' : 'retraits.v.codePasLu')}</span>}
               {x.code2 ? <span className="n-rp-ap-code2">{tr('retraits.v.identifiant', { c: x.code2 })}</span> : null}
@@ -293,7 +313,7 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo }) {
       <div className="n-rp-cartes" data-v2-bloc="passes">
         {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} enCours={differe.enCours} onAuPoint={ouvrirAuPoint} apple={apple}/>)}
       </div>
-      {pOuvert ? <AuPoint p={pOuvert} aides={aides} onFermer={fermer} differe={differe}/> : null}
+      {pOuvert ? <AuPoint p={pOuvert} aides={aides} onFermer={fermer} differe={differe} Photo={Photo} Icon={Icon}/> : null}
     </div>
   );
 }

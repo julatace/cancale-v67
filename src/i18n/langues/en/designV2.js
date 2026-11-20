@@ -87,6 +87,8 @@ export default {
   "retraits.m.horsCompte": "Not counted in “to pick up”: code and QR kept until something proves it was picked up or sent back.",
   "retraits.v.nVerif": {"one": "{n} to check", "other": "{n} to check"},
   "retraits.v.qrEnGrand": "Show the QR code full size",
+  "retraits.c.taille": "Size {t}",
+  "retraits.c.lot": "Bundle · {n} items",
   "retraits.v.depasse": "deadline passed",
   "retraits.v.aujourdhui": "today",
   "retraits.v.aujourdhuiHeure": "today · {h}",

@@ -151,3 +151,19 @@
   .n-rp-dedans { color: var(--n-encre-2); }
   .n-rp-dedans.is-pas-lu { font-style: normal; }
 }
+/* (20 nov., Julien : « on doit voir ce qu'il y a à l'intérieur ») Le contenu d'abord, en grand : la photo de la paire (72 px,
+   88 px à l'ordinateur), le titre sur deux lignes, taille · prix · compte ; « pas encore lu » : vignette grise et la phrase. */
+@layer vrm-natif {
+  .n-rp-contenu { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  .n-rp-contenu .n-rp-vignette { position: relative; width: 72px; height: 72px; border-radius: 12px; }
+  .n-rp-contenu .n-rp-vignette.is-lot { box-shadow: 4px -4px 0 -1px var(--n-carte), 4px -4px 0 0 var(--n-trait); }
+  .n-rp-lot-n { position: absolute; right: 4px; bottom: 4px; min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-legende-fort); text-align: center; }
+  .n-rp-contenu .n-rp-colis-titre { font: var(--n-t-corps-fort); font-size: 17px; line-height: 22px; }
+  .n-rp-pas-lu { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-pas-lu.is-seul { font: var(--n-t-corps-fort); color: var(--n-encre-2); }
+  @media (min-width: 1024px) { .n-rp-contenu .n-rp-vignette { width: 88px; height: 88px; } }
+  .n-rp-contenu.is-ap { width: 100%; }
+  .n-rp-contenu.is-ap .n-rp-vignette { width: 64px; height: 64px; background: var(--n-rp-ap-carte); }
+  .n-rp-contenu.is-ap .n-rp-colis-titre { color: var(--n-rp-ap-encre); }
+  .n-rp-contenu.is-ap .n-rp-pas-lu, .n-rp-contenu.is-ap .n-rp-colis-meta, .n-rp-contenu.is-ap .n-rp-dedans, .n-rp-contenu.is-ap .n-rp-num { color: var(--n-rp-ap-encre-2); }
+}

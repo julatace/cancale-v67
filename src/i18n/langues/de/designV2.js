@@ -87,6 +87,8 @@ export default {
   "retraits.m.horsCompte": "Nicht bei „abzuholen“ gezählt: Code und QR bleiben, bis etwas beweist, dass es abgeholt oder zurückgeschickt wurde.",
   "retraits.v.nVerif": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "retraits.v.qrEnGrand": "QR-Code groß anzeigen",
+  "retraits.c.taille": "Größe {t}",
+  "retraits.c.lot": "Paket · {n} Artikel",
   "retraits.v.depasse": "Frist abgelaufen",
   "retraits.v.aujourdhui": "heute",
   "retraits.v.aujourdhuiHeure": "heute · {h}",

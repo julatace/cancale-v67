@@ -130,7 +130,7 @@ async function releve(pg) {
       itin: !!c.querySelector('[data-rp-itineraire]'), transp: (c.querySelector('[data-rp-transp]') || { getAttribute: () => '' }).getAttribute('data-rp-transp'), copier: q('[data-rp-copier]', c).length,
       gauche: Math.round(c.getBoundingClientRect().left), verifN: Number(c.getAttribute('data-rp-verif-n') || 0) }));
     // (20 nov.) Chaque colis : sa mention « à vérifier », son trajet, la place du QR par rapport au code, le code sur UNE ligne.
-    const colis = q('[data-rp-colis]').map((li) => {
+    const colis = q('li[data-rp-colis]').map((li) => {
       const code = li.querySelector('[data-rp-code-grand]'); const qrE = li.querySelector('[data-rp-qr]');
       const cb = code ? code.getBoundingClientRect() : null; const qb = qrE ? qrE.getBoundingClientRect() : null;
       const fs = code ? parseFloat(getComputedStyle(code).fontSize) : 0;
@@ -166,7 +166,8 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const { ctx, pg, erreurs, tel } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
   if (H || W === 1280) await pg.setViewportSize({ width: W === 1512 || W === 1280 ? W : 390, height: H || 900 });
   await allumer(pg);
-  const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 14 && x.colis.some((c) => c.verif === 'depasse'));
+  const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 14 && x.colis.some((c) => c.verif === 'depasse')
+    && (x.colis.find((c) => String(c.cle || '').includes('87100001')) || { trajet: [] }).trajet.some((e) => e.cle === 'expedie' && e.lue));
   await pg.waitForTimeout(1500);
   const r2 = await releve(pg); Object.assign(r, r2);
   const th = `${nom} ${sombre ? 'sombre' : 'clair'}`;
@@ -224,7 +225,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   await c1.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte1.png`) }).catch(() => {});
   const cv = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-qr]') }).first();
   if (await cv.count()) await cv.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte-qr.png`) }).catch(() => {});
-  const cd = pg.locator('[data-rp-colis]', { has: pg.locator('[data-rp-code="931931"]') }).first();
+  const cd = pg.locator('li[data-rp-colis][data-rp-code="931931"]').first();
   if (await cd.count()) { await cd.scrollIntoViewIfNeeded().catch(() => {}); await cd.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-depasse.png`) }).catch(() => {}); }
   const ct = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="111111"]') }).first();
   if (await ct.count()) { await ct.scrollIntoViewIfNeeded().catch(() => {}); await ct.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-trajet.png`) }).catch(() => {}); }

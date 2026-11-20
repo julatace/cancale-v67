@@ -87,6 +87,8 @@ export default {
   "retraits.m.horsCompte": "Pas compté dans « à retirer » : code et QR gardés tant que rien ne prouve qu’il est retiré ou reparti.",
   "retraits.v.nVerif": {"one": "{n} à vérifier", "other": "{n} à vérifier"},
   "retraits.v.qrEnGrand": "Afficher le QR en grand",
+  "retraits.c.taille": "Taille {t}",
+  "retraits.c.lot": "Lot · {n} articles",
   "retraits.v.depasse": "délai dépassé",
   "retraits.v.aujourdhui": "aujourd’hui",
   "retraits.v.aujourdhuiHeure": "aujourd’hui · {h}",

@@ -87,6 +87,8 @@ export default {
   "retraits.m.horsCompte": "Non contato in «da ritirare»: codice e QR restano finché nulla prova che è stato ritirato o rispedito.",
   "retraits.v.nVerif": {"one": "{n} da verificare", "other": "{n} da verificare"},
   "retraits.v.qrEnGrand": "Mostra il QR in grande",
+  "retraits.c.taille": "Taglia {t}",
+  "retraits.c.lot": "Lotto · {n} articoli",
   "retraits.v.depasse": "scadenza superata",
   "retraits.v.aujourdhui": "oggi",
   "retraits.v.aujourdhuiHeure": "oggi · {h}",

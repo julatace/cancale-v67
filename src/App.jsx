@@ -47419,7 +47419,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       try {
         const p = o ? montantCommandeLu(o) : null;
         return contenuDuColis({ ligne: t, suivi: t ? suiviDeLigne(t) : '', achat: o, autreSite: autre, site, photo: o ? photoAchat(o) : null,
-          prix: p != null && p > 0 ? montant(p) : '', compteAchat: plusieursComptesC && o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', compteColis: t ? (compteDuColisEmail(t) || '') : '' });
+          prix: p != null && p > 0 ? montant(p) : '', compteAchat: plusieursComptesC && o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', compteColis: t ? (compteDuColisEmail(t) || '') : '',
+          taille: o ? (((effEntry(o) || {}).taille) || '') : '', nb: o ? (nArticlesTx[String(o.transaction_id)] ?? null) : null });
       } catch (_) { return null; }
     };
     // (19 nov.) + ce qu'il faut pour écrire le colis en UNE RANGÉE (`rangeeRetrait(x)`, src/contenuColis.js — l'écran

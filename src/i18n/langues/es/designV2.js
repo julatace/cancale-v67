@@ -87,6 +87,8 @@ export default {
   "retraits.m.horsCompte": "No cuenta en «por recoger»: código y QR se guardan hasta que algo pruebe que se recogió o se devolvió.",
   "retraits.v.nVerif": {"one": "{n} a comprobar", "other": "{n} a comprobar"},
   "retraits.v.qrEnGrand": "Ver el QR en grande",
+  "retraits.c.taille": "Talla {t}",
+  "retraits.c.lot": "Lote · {n} artículos",
   "retraits.v.depasse": "plazo vencido",
   "retraits.v.aujourdhui": "hoy",
   "retraits.v.aujourdhuiHeure": "hoy · {h}",
