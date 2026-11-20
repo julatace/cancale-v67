@@ -112,7 +112,8 @@ async function verifier(textes) {
   ok(/masquerAchats\(ok\.map/.test(actA) && /gesteVrm\(L\.length > 1 \? `\$\{L\.length\} achats masqués`[^;]*txs\.map\(tx => \(\{ k: ACHATS_MASQUES/.test(tranche(app, 'const masquerAchats', 900)), 'B3 « Masquer » : vinted_purchases_hidden, en UN geste');
   ok(/demanderVue\('sansachat'\)/.test(actA) && !/ecritureRelierAchat|buyFromId/.test(actA), 'B4 « Relier » : jamais par ressemblance — la file « Sans achat relié », SON tap relie');
   const actV = tranche(app, 'const actionsSerieVentes', 4600);
-  ok(/estParti\(o\) \? 'déjà déposée' : !aExpedier\(o\) \? 'pas à envoyer' : true/.test(actV) && /gesteVrm\(ok\.length > 1 \? `\$\{ok\.length\} colis déposés`/.test(actV) && /'vinted_ship_done'/.test(actV) && /'vinted_bords_shipped'/.test(actV), 'B5 « Je dépose » : l’écriture de « Colis déposé » (ship_done + bordereau), seulement à envoyer, UN geste');
+  // (20 nov., chasse-bugs-2) Décision « 4 oui » : « Je dépose » en série est RETIRÉ (scripts/audit-depose-retire.cjs) ; le dépôt est constaté par le suivi.
+  ok(!/k: 'depose', libelle: 'Je dépose'/.test(actV) && !/colis déposés/.test(actV), 'B5 « Je dépose » en série n’existe plus (décision « 4 oui ») : le dépôt est constaté par le suivi du transporteur');
   ok(/lignesLotTous\(\)/.test(actV) && /await batchBordereaux\(new Set\(ok\.map/.test(actV), 'B6 « Imprimer » : le lot « Tout imprimer » (mêmes bordereaux, même confirmation)');
   ok(/envoyerFacturesSerie\(DEPS_FACTURE/.test(actV) && /action: 'emettre', confirme: true/.test(tranche(fac, 'export async function envoyerFacturesSerie', 5000)) && /action: 'envoyer', confirme: true/.test(tranche(fac, 'export async function envoyerFacturesSerie', 5000)), 'B7 « Facture Pro » : les gestes de « Tout envoyer » (émettre puis envoyer)');
   const fs1 = tranche(fac, 'export async function envoyerFacturesSerie', 5000);
