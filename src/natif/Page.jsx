@@ -119,9 +119,7 @@ function useTitreReduit(refBarre, refTitre) {
       // Un écran d'avant (pas de grand titre natif : un repère) pose son propre titre dessous : le petit titre attend ~48 px de défilement.
       const marge = cible && !cible.classList.contains('n-grand-titre') ? 48 : 0;
       const reduit = !!cible && cible.getBoundingClientRect().bottom <= bas - marge;
-      // (20 nov., iphone-rapide) Seulement quand l'état CHANGE : relu toutes les 1,5 s et à chaque défilement, l'attribut
-      // reposé à l'identique replanifiait un recalcul de style de la barre.
-      if (reduit !== barre.hasAttribute('data-n-reduit')) { if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit'); }
+      if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
     };
     const demander = () => { if (!image) image = requestAnimationFrame(verifier); };
     demander();
