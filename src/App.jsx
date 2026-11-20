@@ -934,8 +934,21 @@ import ModeDepot from "./ModeDepot.jsx";
 import { colisDepotHorsLigne } from "./modeDepot.js";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
-import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
+import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+// (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
+// ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
+// crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
+let M_NOUVEAUTES = null;
+const chargerNouveautes = () => import('./nouveautes.js').then((m) => { M_NOUVEAUTES = m; return m; });
+const nouveautesAVoir = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesAVoir(...a) : []);
+const nouveautesDuCompte = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesDuCompte(...a) : []);
+const lireVuesNouveautes = (r) => (M_NOUVEAUTES ? M_NOUVEAUTES.lireVues(r) : {});
+// (20 nov., iphone-rapide) Les composants « Quoi de neuf » à la demande avec leur liste ; leur feuille de style reste
+// importée ICI (la cascade ne bouge pas).
+import './quoi-de-neuf.css';
+const QuoiDeNeufCarte = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufCarte })));
+const QuoiDeNeufFeuille = aLaDemandeFeuille(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufFeuille })));
+const QuoiDeNeufReglage = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufReglage })));
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta, questionsArgent } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
@@ -63378,7 +63391,10 @@ function useQuoiDeNeuf() {
     // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
     vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
-  const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
+  const [, setCharge] = React.useState(!!M_NOUVEAUTES);
+  React.useEffect(() => { if (!M_NOUVEAUTES) chargerNouveautes().then(() => setCharge(true), () => {}); }, []);
+  // « Vu » ne se marque qu'après un toucher sur la carte (donc la liste chargée) ; sinon, on attend la liste.
+  const marquer = (ids) => { const faire = (m) => { const suite = m.marquerVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); }; if (M_NOUVEAUTES) faire(M_NOUVEAUTES); else chargerNouveautes().then(faire, () => {}); };
   // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un
   // autre appareil, son statut) ⇒ rien : jamais un compte faux qui change sous ses yeux ni une carte qui clignote.
   const pret = p.uid === (AUTH.user?.id || '') && !!p.uid && isCloudReady();
