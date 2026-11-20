@@ -35279,7 +35279,10 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   const setSeuil = (v) => { const x = seuilValidePasEnLigne(v); setSeuilEtat(x); save(CLE_SEUIL_PAS_EN_LIGNE, x); };
   const [lecture, setLecture] = useState(undefined);
   const [tic, setTic] = useState(0);
+  // (20 nov., bugs-terrain) Inactif ⇒ rien à juger : les candidats ne se calculent pas (ils se calculaient dans chaque moteur
+  // monté, même ceux qui ne montrent pas « Achetés, pas en ligne »).
   const cand = useMemo(() => {
+    if (!actif) return { candidats: [], achatsSu: false };
     const numeros = load('vinted_annonce_numeros', {}) || {};
     const connus = new Set(Object.values(numeros).map((f) => (f && f.numero != null ? cleNum(f.numero) : '')).filter(Boolean));
     const venduSig = load('vrm_stock_vendus', null);
@@ -35288,7 +35291,7 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
     return candidatsPasEnLigne({ hors, masquesHors: new Set((horsMasques || []).map(String)), importes: lireStockImporte(), achats: A,
       liens: liensParAchat(numeros, load('vinted_sale_overrides', {}) || {}), connus, vendus, prixParNum: load('vinted_buyprice_by_num', {}) || {}, cle: cleNum });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [achats, hors, horsMasques, tic]);
+  }, [actif, achats, hors, horsMasques, tic]);
   const besoin = !!actif && cand.candidats.length > 0;
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   useEffect(() => {
@@ -44350,7 +44353,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (src/pasEnLigne.js). Les achats Vinted ne sont jugés que LUS (pas su ⇒ aucun).
   // (16 nov., lot achats-retour) Un achat en retour / litige / remboursé n'est pas « acheté, pas en ligne ».
   const buysAJuger = useMemo(() => buysBase.filter((o) => !achatHorsRelier(o, achatsHorsRelierRes)), [buysBase, achatsHorsRelierRes]);
-  const pasEnLigne = usePasEnLigne({ actif: curSub === 'journee' || curSub === 'achats', accounts, achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null, hors: offBuysTous, horsMasques });
+  // (20 nov., bugs-terrain) Pas dans le moteur des outils de retrait (`modeRetraits`) : il ne montre pas « Achetés, pas en ligne ».
+  const pasEnLigne = usePasEnLigne({ actif: (curSub === 'journee' || curSub === 'achats') && !modeRetraits, accounts, achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null, hors: offBuysTous, horsMasques });
   const pasEnLigneJ = pasEnLigne.r && pasEnLigne.r.su ? pasEnLigne.r : null;
   const [feuillePasEnLigne, setFeuillePasEnLigne] = useState(false);
   const ouvrirPasEnLigne = (c) => {
