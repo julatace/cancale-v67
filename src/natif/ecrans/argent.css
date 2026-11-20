@@ -60,6 +60,9 @@
   .n-arg-pied, .n-arg-vide { margin: 0; padding: 10px 16px; border-top: 1px solid var(--n-trait); font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-arg-vide { border-top: 0; }
   /* Une coche « réglé », un « — » muet (Mois bouclé). */
+  .n-arg-actions { display: flex; align-items: center; gap: 4px; }
+  .n-arg-liste-filet { border-top: 1px solid var(--n-trait); }
+  .n-arg-num { margin-inline-end: 6px; font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
   .n-arg-coche { color: var(--n-encre-2); }
   .n-arg-muet { font: var(--n-t-second); color: var(--n-encre-2); }
   .n-arg-select { min-height: var(--n-cible); max-width: 180px; padding: 0 8px; border: 1px solid var(--n-trait); border-radius: var(--n-r-bouton); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-second); }

@@ -79,7 +79,7 @@ export default function MoisBoucle({ portes = {} }) {
   return (
     <Carte className="vrm-mb n-arg-mb" titre="Mois bouclé" tonSous={K.etat === 'manque' ? 'ambre' : 'neutre'}
       sousTitre={<span role="status"><span className="vrm-mb-titre-etat">{etatTxt}</span>{K.montant && K.montant.ca != null ? <> · <span className="vrm-mb-montant" data-mb-a-declarer={String(Math.round(K.montant.ca * 100))}>{somme(K.montant.ca)} à déclarer</span></> : null}</span>}
-      action={<select className="vrm-mb-mois n-arg-select" aria-label="Mois à boucler" data-mb-choix="" value={K.ym} onChange={(e) => setYm(e.target.value)}>
+      action={<select className="n-arg-select" aria-label="Mois à boucler" data-mb-choix="" value={K.ym} onChange={(e) => setYm(e.target.value)}>
         {choix.map((m) => <option key={m} value={m}>{libelleMois(m)}</option>)}
       </select>}
       attrs={{ 'data-mois-boucle': K.ym, 'data-mb-etat': K.etat, 'data-mb-a-regler': K.aRegler, 'data-mb-montant': K.montant && K.montant.ca != null ? String(Math.round(K.montant.ca * 100)) : '', 'aria-label': `Mois bouclé : ${libelleMois(K.ym)}` }}>

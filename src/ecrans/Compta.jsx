@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
+import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titres des cartes d'avant au style §2 bis
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
@@ -1147,12 +1148,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
   if (designV2 && argentNav) return (
     <div data-espace="argent" data-argent-factures="" className="v2-fac" style={{padding:16}}>
       <header className="v2-tete-tache v2-tete-argent" data-v2-factures-tete="">
-        <div className="v2-titre-ligne">{ordiFac ? <h1>{L.argent}</h1> : <span/>}
-          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div>
+        {ordiFac ? <div className="v2-titre-ligne"><h1>{L.argent}</h1>
+          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div> : null}
         {argentNav}
       </header>
       <div className="v2-fac-outils" data-v2-fac-outils="">
         <div className="v2-fac-champ"><ChampRecherche valeur={searchInput} onChange={(v)=>{ setSearchInput(v); setSearch(v); setPage(null); }} placeholder={tr('v2.fac.chercher')} label={tr('v2.fac.chercher')} data-v2-fac-recherche=""/></div>
+        {ordiFac ? null : <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2>}
         <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)} attrs={{ 'data-fac-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': menuFac }}/>
       </div>
       {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
