@@ -75,6 +75,10 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null,
   transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined, vraisComptes = false, globales = null } = {}) {
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
+  // 20 nov. (ext. 5.410.3) : la republication par le FORMULAIRE et la séquence des favoris « comme Bleam » sont la méthode
+  // par défaut ; les audits d'avant jugent la méthode DIRECTE (toujours choisissable) — sauf ceux qui demandent le défaut.
+  if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'directe', favoris: false };
+  delete store.__commeBleamDefaut;
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
   // (5.366) « N'agir que si tu es là » : par défaut, le banc est quelqu'un qui vient d'utiliser
@@ -172,17 +176,22 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {} },
       tabs: { onUpdated: { addListener(fn) { ecoutesOnglets.push(fn); } }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => onglets,
         get: async (id) => { const t = onglets.find((o) => o && o.id === id); if (!t) throw new Error('No tab with id: ' + id); return copie(t); },
-        sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); }, create: dual({}) },
+        sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); },
+        // 5.410.3 : l'onglet qui travaille (republication par le formulaire) — créé, puis mené de page en page.
+        create: async (o = {}) => { const t = { id: 100 + onglets.length, url: String(o.url || 'https://www.vinted.fr/'), status: 'complete', active: o.active !== false, windowId: 1 }; onglets.push(t); (j.ongletsCrees = j.ongletsCrees || []).push(copie(t)); return copie(t); },
+        update: async (id, o = {}) => { const t = onglets.find((x) => x && x.id === id); if (!t) throw new Error('No tab with id: ' + id); if (o.url) { t.url = String(o.url); (j.navigations = j.navigations || []).push({ id, url: t.url }); } if (o.active != null) t.active = !!o.active; return copie(t); } },
       storage: { local: {
         get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = copie(store[c]); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
         set(o, cb) { const ch = {}; for (const k of Object.keys(o || {})) ch[k] = { oldValue: copie(store[k]), newValue: copie(o[k]) }; Object.assign(store, copie(o)); setTimeout(() => signaler(ch), 0); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
         remove(k, cb) { for (const c of [].concat(k)) delete store[c]; if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
       }, onChanged: { addListener(f) { ecoutesStockage.push(f); }, removeListener(f) { const i = ecoutesStockage.indexOf(f); if (i >= 0) ecoutesStockage.splice(i, 1); } } },
       webNavigation: { onCompleted: { addListener() {} } },
-      scripting: { executeScript: async ({ target, func, args }) => {
+      scripting: { executeScript: async ({ target, func, args, files }) => {
         // Le document COURANT de l'onglet (aucune épingle d'origine, comme Chrome).
         const t = onglets.find((o) => o && target && o.id === target.tabId) || onglets[0];
         j.injections++;
+        // 5.410.3 : un fichier injecté (vrm-formulaire.js) est NOTÉ ; l'audit sert lui-même la page (`globalThis.__vrmFormulaire`).
+        if (Array.isArray(files)) { (j.fichiers = j.fichiers || []).push({ tabId: t && t.id, files: files.slice() }); return [{ result: undefined }]; }
         try { ctx.location = new URL((t && t.url) || 'https://www.vinted.fr/'); } catch (_) { ctx.location = undefined; }
         return [{ result: await func(...(args || [])) }];
       } },
