@@ -118,7 +118,7 @@ async function visiter(ctx, ecran) {
         return {
           inerte: !!(h && h.hasAttribute('inert')), etat: cop && cop.getAttribute('data-copie-etat'), age: cop && cop.getAttribute('data-copie-age'),
           mention: !!(cop && cop.parentElement.querySelector('[data-copie-mention]')), on: tout.filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
-          href: tout.filter((e) => e.hasAttribute('href')).length, id: tout.filter((e) => e.hasAttribute('id')).length, script: tout.filter((e) => /^(script|iframe|object|embed)$/i.test(e.localName)).length,
+          href: tout.filter((e) => e.hasAttribute('href')).length, idDevant: tout.filter((e) => e.id && document.getElementById(e.id) === e && [...document.querySelectorAll('#' + CSS.escape(e.id))].length > 1).length, script: tout.filter((e) => /^(script|iframe|object|embed)$/i.test(e.localName)).length,
           fiche: !!document.querySelector('[data-fiche-paire]'), url: location.pathname + location.search, encore: !!cop, rangees: cop ? cop.querySelectorAll('.n-rangee').length : 0,
         };
       });
@@ -128,7 +128,8 @@ async function visiter(ctx, ecran) {
       dit(!apres.fiche, 'aucune fiche ouverte depuis la copie');
       dit(apres.encore && apres.inerte, 'la copie est toujours là, INERTE');
       dit(apres.mention && apres.etat === 'mise-a-jour' && apres.age != null, `elle est DATÉE (« Mis à jour il y a ${apres.age} min ») et dit sa mise à jour`);
-      dit(apres.on === 0 && apres.href === 0 && apres.id === 0 && apres.script === 0, `son HTML est nettoyé (on* ${apres.on}, href ${apres.href}, id ${apres.id}, script ${apres.script})`);
+      dit(apres.on === 0 && apres.href === 0 && apres.script === 0, `son HTML est nettoyé (on* ${apres.on}, href ${apres.href}, script ${apres.script})`);
+      dit(apres.idDevant === 0, `aucun id de la copie ne passe devant l'écran vrai (${apres.idDevant})`);
       dit(apres.rangees >= 5, `elle montre des rangées (${apres.rangees})`);
       relacher();
       const remplacee = await pg.waitForFunction(() => !document.querySelector('#root [data-copie-ecran="annonces"]') && !!document.querySelector('[data-attente-ecran="annonces"][data-attente="pret"]'), null, { timeout: 60000 }).then(() => true, () => false);

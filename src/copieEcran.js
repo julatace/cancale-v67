@@ -69,8 +69,11 @@ const BALISES = new Set(['div', 'span', 'section', 'header', 'footer', 'main', '
   'dl', 'dt', 'dd', 'b', 'strong', 'i', 'em', 'small', 'sup', 'sub', 'br', 'hr', 'img', 'picture', 'figure', 'figcaption', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th',
   'caption', 'colgroup', 'col', 'button', 'a', 'label', 'input', 'form', 'time', 'abbr', 'mark', 'output', 'progress', 'meter', 'details', 'summary', 'svg', 'g', 'path', 'circle',
   'rect', 'line', 'polyline', 'polygon', 'ellipse', 'defs', 'lineargradient', 'radialgradient', 'stop', 'use', 'symbol', 'title', 'text', 'tspan', 'clippath', 'mask', 'style', 'select', 'option', 'optgroup', 'textarea']);
-// Attributs gardés (en plus de `data-*` et `aria-*` sûrs). Jamais un `on*`, un `href`, un `id`, un `for`, un `name`…
-const ATTRS = new Set(['class', 'style', 'role', 'width', 'height', 'alt', 'title', 'src', 'srcset', 'sizes', 'loading', 'decoding', 'type', 'placeholder', 'value', 'checked', 'disabled', 'readonly',
+// Attributs gardés (en plus de `data-*` et `aria-*` sûrs). Jamais un `on*`, un `href`, un `for`, un `name`…
+// L'`id` est GARDÉ (des feuilles le visent : `#vrm-achats-retirer-corps`, sans lui Achats se décalait de 16 px) : la copie est
+// posée APRÈS l'écran vrai caché dans l'attente (src/AttenteEcran.jsx), donc `getElementById` rend toujours l'écran vrai
+// dès qu'il est monté ; un `id` qui n'est pas un nom simple (`:r1:` de React) part.
+const ATTRS = new Set(['id', 'class', 'style', 'role', 'width', 'height', 'alt', 'title', 'src', 'srcset', 'sizes', 'loading', 'decoding', 'type', 'placeholder', 'value', 'checked', 'disabled', 'readonly',
   'colspan', 'rowspan', 'dir', 'lang', 'datetime', 'open', 'max', 'min', 'low', 'high', 'optimum',
   // SVG
   'viewbox', 'd', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'fill-rule', 'clip-rule', 'cx', 'cy', 'r', 'rx', 'ry',
@@ -106,6 +109,7 @@ export function nettoyer(el) {
       for (const a of [...c.attributes]) {
         const nom = a.name.toLowerCase();
         let garde = ATTRS.has(nom) || ARIA_OK.test(nom) || (nom.startsWith('data-') && !DATA_INTERDITS.test(nom));
+        if (garde && nom === 'id' && !/^[A-Za-z][\w-]{0,80}$/.test(a.value)) garde = false;
         if (garde && (nom === 'src')) { const s = srcSur(a.value); if (s == null) garde = false; }
         if (garde && nom === 'srcset' && !String(a.value).split(',').every((p) => srcSur(p.trim().split(/\s+/)[0]) != null)) garde = false;
         if (garde && nom === 'style' && styleSur(a.value) == null) garde = false;
