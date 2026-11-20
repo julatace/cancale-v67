@@ -163,6 +163,22 @@ les deux lignes gardées). L'app ne fait plus aucun geste ; dans la 5.410.0 l'ex
 - Bancs : `repub-verifier` refait sur le PANNEAU (V1–V6, 390/1512 clair/sombre) ; `republication-parfaite` ré-axé (A0 :
   l'app n'a plus d'atelier ; B : l'écran plein sur vinted.fr) — l'atelier lui-même est jugé par `grand-panneau`.
 
+### Retouches avant le train (et fusion de `claude/lbc-vc-interesses`, 4d58124dd)
+- **Hausse sur SON clic** : « Changer le prix » accepte un prix plus haut après « Monter à X € ? » (`hausseConfirmee`) ;
+  la commande `cmd_prix` porte `hausse`, `prixAttCommande` ne la laisse passer que de source `panneau`, et
+  `remisePermise` (les trois chemins de prix) n'accepte `hausse` que confirmée, jamais de `source: 'regle'`, au plus
+  ×10. Les baisses par RÈGLE restent des baisses, bornées au plancher.
+- **Réponses de « Publier sur… » retenues** : la mémoire de l'agent (`vrm_agent_publier`) est une clé de la ligne
+  `vrm_reglages_auto` (même règle de lecture `superposerReglagesAuto` pour l'app et le panneau) ; le panneau la complète
+  par comparer-et-échanger (`retenirReponses`, jamais `main`) ; une question répondue ne se repose plus. (Avant ce
+  correctif, les réponses du panneau n'étaient même pas appliquées : forme `{champ: valeur}` au lieu de la liste de
+  l'agent — corrigé, clé `site|champ`.)
+- **Leboncoin** (Articles) : les intéressés par annonce (`interessesLbc`), « Voir », les personnes (déjà écrites
+  grisées), SES versions du message, « Leur écrire (N) » ⇒ récapitulatif (un à la fois, 40–90 s au hasard, 10 au plus
+  par toucher) ⇒ « Oui, leur écrire » (`ecrireInteressesLbc`, `confirme`). Envoi pas encore appris ⇒ dit, fermé.
+- **Leboncoin / Vestiaire** (Automatisations) : la baisse par règle de CE compte (`lbc:{id}` / `vc:{id}`), allumer ⇒
+  confirmation ; Vestiaire : la date « au moins » dite (Articles : « au moins depuis … » quand Vestiaire ne la dit pas).
+
 ### Ce qui reste
 - Les réponses aux questions de « Publier sur… » servent à CET envoi (le fond n'écrit pas `main`) : elles seront
   reposées à la prochaine publication du même article.
