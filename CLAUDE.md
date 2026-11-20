@@ -477,6 +477,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Train du 20 nov. (intégration, branche `claude/integration-20nov`)** : boutons-natifs, relier-depuis-liste, retraits-visuel, ce-qui-manque, arrivee-scan, demarrage-store, chasse-bugs + chasse-bugs-2 ; extension inchangée (5.409.0) ; manifeste au fond natif ; N° du meuble jamais coupé ; budget de démarrage 2 020 Ko. `2026-11-20-integration.md`. Geste : aucun.
 - **20 nov. · Des boutons beaux et fiables partout (boutons-natifs)** : `BoutonBase`/`Btn`/`BoutonV2`/segmentés d'avant dessinent le `Bouton`/`Segmente` natif ; un geste qui rend une promesse ne se double pas et dit son résultat ; 261 `vrm-b` bruts convertis ; banc `boutons-inventaire`, `audit-boutons-natifs` (plafonds). `2026-11-20-boutons-natifs.md`. Geste : aucun.
 - **20 nov. · Colis à retirer visuels (retraits-visuel)** : une carte par point, le contenu d'abord (photo de l'achat relié), barre du trajet sur dates LUES (`src/retraitTrajet.js`), QR à droite du code ; rétention : un « à vérifier » (date limite dépassée) garde code et QR jusqu'à une fin PROUVÉE ; « Je suis au point » retiré (sa décision). `2026-11-20-retraits-visuel.md`. Geste : aucun.
 - **20 nov. · Ce qui manque (ce-qui-manque)** : vues et favoris lus dans le dressing (aucune requête de plus, `vrm_vues_lues`, carte d'Aujourd'hui, colonnes du tableau) ; stock au prix affiché (`vrm_stock_valeur`, une paire comptée une fois) ; Messages très grand texte ; compte bloqué : changer d'avis depuis la page Extension ; Stock « Personnaliser », « La pièce », glisser à la souris. `2026-11-20-ce-qui-manque.md`. Geste : aucun.
@@ -500,8 +501,6 @@ sans la fonction.
 - **19 nov. · Compte bloqué par Vinted (compte-bloque)** : VRM demande pause/garder, remet seul au déblocage (ext. `comptebloque`). `2026-11-19-compte-bloque.md`. Geste : répondre à la question pour le compte bloqué.
 - **19 nov. · Colis : ce qu'il y a dedans, seul (colis-achat-auto + codes de retrait en liste, PR #1273)** : plus de « Relier l'achat » (ext. `suivicolis`). `2026-11-19-colis-achat-auto.md`. Geste : aucun.
 - **19 nov. · E-mails comme Mail (emails-mail)** : segments en haut, liste en grand, l'e-mail à côté ; « Relier ma boîte » pas à pas (Gmail, Outlook, iCloud), essai vérifié en direct. `2026-11-19-emails-mail.md`. Geste : aucun.
-- **19 nov. · Page Extension (extension-claire puis extension-utile)** : UN endroit pour l'extension et les comptes, dit avant le geste (ext. `etatici`) ; grand panneau, feuille « Depuis ta dernière visite » (ext. `captejournal`), rythme favoris 40–90 s, `audit-actions-gardees`. `2026-11-19-extension-claire.md`, `2026-11-19-extension-utile.md`. Geste : aucun.
-- **19 nov. · Capacité 3 000 vendeurs (capacite-3000)** : mesures et plan ; Vercel reste Hobby, 048 appliquée, trains 1–2/jour. `docs/capacite-3000.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 nov. et les plus anciennes du 19 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
