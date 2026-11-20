@@ -234,18 +234,20 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   dit(r.relier === 0, `G ${th} : aucun « Relier » (décision du 19 nov.)`);
   dit(!erreurs.length, `${th} : aucune erreur de page`, erreurs);
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
+  await evitementCache(pg, th);
   const haut = pg.locator('[data-rp]').first();
   await haut.scrollIntoViewIfNeeded().catch(() => {});
   await pg.waitForTimeout(500);
   await pg.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}.png`) });
   const c1 = pg.locator('[data-rp-point]').first();
-  await c1.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte1.png`) }).catch(() => {});
+  await capturerVu(pg, c1, path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte1.png`));
   const cv = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-qr]') }).first();
-  if (await cv.count()) await cv.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte-qr.png`) }).catch(() => {});
+  await capturerVu(pg, cv, path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte-qr.png`));
   const cd = pg.locator('li[data-rp-colis][data-rp-code="931931"]').first();
   if (await cd.count()) { await cd.scrollIntoViewIfNeeded().catch(() => {}); await cd.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-depasse.png`) }).catch(() => {}); }
   const ct = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="111111"]') }).first();
-  if (await ct.count()) { await ct.scrollIntoViewIfNeeded().catch(() => {}); await ct.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-trajet.png`) }).catch(() => {}); }
+  await evitementCache(pg, th + ' (avant la capture du trajet)'); await carteDecouverte(pg, th);
+  await capturerVu(pg, ct, path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-trajet.png`));
   // Q — toucher le QR ⇒ le QR en grand (l'écran « code et QR » d'avant, `openQrView`).
   const bq = pg.locator('[data-rp-colis="r:e:XW700000001TS"] [data-rp-qr], [data-rp-code="601234"] [data-rp-qr]').first();
   if (await bq.count()) {
@@ -311,8 +313,52 @@ async function siteSeul(nav, { site, W, sombre }) {
   dit(!!dep && dep.c && dep.c.verif === 'depasse', `S ${th} : date limite dépassée ⇒ gardé, « à vérifier », code visible`, dep && dep.c);
   dit(!erreurs.length, `S ${th} : aucune erreur de page`, erreurs);
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
-  const c1 = pg.locator('[data-rp-point]').first(); if (await c1.count()) { await c1.scrollIntoViewIfNeeded().catch(() => {}); await c1.screenshot({ path: path.join(SHOTS, `${site}-seul-${W}-${sombre ? 'sombre' : 'clair'}.png`) }).catch(() => {}); }
+  await evitementCache(pg, th); await carteDecouverte(pg, th);
+  await capturerVu(pg, pg.locator('[data-rp-point]').first(), path.join(SHOTS, `${site}-seul-${W}-${sombre ? 'sombre' : 'clair'}.png`));
   await ctx.close();
+}
+
+// (20 nov., coordinateur) Le lien d'évitement « Aller au contenu » n'apparaît qu'au focus CLAVIER : sans lui, hors de l'écran.
+// (20 nov., coordinateur) Une carte plus haute que l'écran, capturée par `locator.screenshot`, est photographiée dans
+// une fenêtre AGRANDIE où les éléments fixes (lien d'évitement, barre du haut) se posent par-dessus : la capture
+// montrait « Aller au contenu » et la bulle Messages sur la carte, ce que l'écran réel ne montre pas. On capture
+// donc ce que voit l'utilisateur : la carte amenée sous la barre du haut, l'écran tel quel, découpé sur la carte.
+async function capturerVu(pg, loc, fichier) {
+  if (!(await loc.count())) return;
+  const clip = await loc.evaluate((el) => {
+    el.scrollIntoView({ block: 'start' });
+    const haut = [...document.querySelectorAll('header, [data-n-barre-haut], .vrm-app-header')].reduce((m, h) => { const r = h.getBoundingClientRect(); const st = getComputedStyle(h).position; return (st === 'sticky' || st === 'fixed') && r.top <= 0 + 1 && r.bottom > 0 ? Math.max(m, r.bottom) : m; }, 0);
+    window.scrollBy(0, -(haut + 8));
+    const r = el.getBoundingClientRect();
+    const y = Math.max(0, r.top - 4), b = Math.min(window.innerHeight, r.bottom + 4);
+    return { x: Math.max(0, r.left - 4), y, width: Math.min(window.innerWidth, r.right + 4) - Math.max(0, r.left - 4), height: Math.max(1, b - y) };
+  }).catch(() => null);
+  await pg.waitForTimeout(250);
+  if (clip) await pg.screenshot({ path: fichier, clip }).catch(() => {});
+}
+// (20 nov., coordinateur) La carte n'est recouverte par RIEN : l'étiquette « Comptoir / Consigne », le nom du point et
+// son adresse, amenés au milieu de l'écran, sont bien ce qui est sous le doigt (pas la bulle Messages, pas l'avatar).
+async function carteDecouverte(pg, th) {
+  // `MUTATION=couvrir` : une bande fixe posée sur tout l'écran (comme une barre qui recouvre) ⇒ ce contrôle doit rougir.
+  if (process.env.MUTATION === 'couvrir') await pg.evaluate(() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:2147483646'; document.body.appendChild(d); });
+  const r = await pg.evaluate(async () => {
+    const out = [];
+    for (const sel of ['.n-rp-sorte', '.n-rp-nom', '[data-rp-adresse]']) {
+      const el = document.querySelector('[data-rp-point] ' + sel); if (!el) { out.push({ sel, absent: true }); continue; }
+      el.scrollIntoView({ block: 'center' }); await new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f)));
+      const q = el.getBoundingClientRect(); const pts = [[q.left + 4, q.top + q.height / 2], [q.left + q.width / 2, q.top + q.height / 2], [q.right - 4, q.top + q.height / 2]];
+      const dessus = pts.map(([x, y]) => document.elementFromPoint(x, y)).filter((h) => h && !el.contains(h) && !h.contains(el));
+      out.push({ sel, dessus: dessus.map((h) => (h.tagName + '.' + String(h.className || '')).slice(0, 60)) });
+    }
+    return out;
+  });
+  dit(r.every((x) => !x.absent && !x.dessus.length), `C ${th} : la carte n'est recouverte par rien (sorte, nom, adresse sous le doigt)`, r);
+}
+
+async function evitementCache(pg, th) {
+  const e = await pg.evaluate(() => { const a = document.querySelector('[data-aller-contenu]'); if (!a) return { absent: true };
+    const r = a.getBoundingClientRect(); return { bas: Math.round(r.bottom), focus: document.activeElement === a, focusVisible: a.matches(':focus-visible'), tf: getComputedStyle(a).transform, actif: (document.activeElement && (document.activeElement.tagName + '.' + document.activeElement.className).slice(0, 80)) || '' }; });
+  dit(e.absent || e.bas <= 0 || e.focusVisible, `A ${th} : « Aller au contenu » hors de l'écran tant qu'il n'a pas le focus clavier`, e);
 }
 
 async function vide(nav, { W, sombre }) {
