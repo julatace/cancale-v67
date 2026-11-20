@@ -18,6 +18,10 @@ Julien : « Colis à retirer beaucoup plus visuel, c'est pas exceptionnel, tu pe
   sont lus par une lecture BORNÉE (`id=in.(…)` ≤ 60 lignes, `select=id,ev:data->evenements`) des seuls colis montrés.
 - **Le QR à droite du code** : 124 px au téléphone, 168 px à l'ordinateur, fond blanc, toucher = plein écran (`openQrView`,
   comme avant). Jamais fabriqué. Le code ne se coupe plus en deux (taille selon la largeur).
+- **Toutes les plateformes** (Julien : « les mêmes dispositions sur toutes les plateformes ») : un colis d'un achat
+  Leboncoin ou Vestiaire (relié par SON n° de suivi, `achatsAutres`) a la même carte : photo et titre de SON achat, le
+  site dit, trajet, code, QR, rétention ; le filtre de site d'Achats garde la même mise en page. Corrigé en passant : un
+  colis Leboncoin/Vestiaire « à vérifier » était rangé « vinted » et disparaissait sous le filtre de son site.
 - **« Je suis au point » retiré** (Julien, 20 nov. : « je ne veux plus de Je suis au point ») : ni bouton, ni plein
   écran, textes retirés des 5 langues. « J'ai retiré » reste dans « Tout le détail des retraits ».
 
@@ -36,11 +40,13 @@ Julien : « Colis à retirer beaucoup plus visuel, c'est pas exceptionnel, tu pe
 ## Preuves
 - `node scripts/audit-retraits-visuel.cjs` (rétention, trajet) et `--mutation` : 11/11 (masquer à la limite dans la vue,
   la carte, `pickupUnion`, la copie des codes ; étape devinée ; évènement non mesuré ; courante pas la plus loin).
-- Banc `scripts/bancs/retraits-visuel.cjs` : 390 tactile clair/sombre, Safari 390×664, 1512 clair/sombre, 1280, base
-  vide ; 15 colis + dépassé (code + QR) + retourné + annulé + 50 achats au même titre (aucune photo de leurre).
-  ⚠️ Dernier passage complet impossible : disque du conteneur plein (0 Mo, fichiers d'autres agents). Le passage
-  d'avant le retrait de « Je suis au point » : 134 verts ; les rouges restants étaient des sélecteurs du banc (corrigés).
-  **À relancer** : `BANC_PORT=… SHOTS=… node scripts/bancs/retraits-visuel.cjs`, puis `retraits-parfaits`, `colis-achat-auto`.
+- Banc `scripts/bancs/retraits-visuel.cjs` : **215 verts, 0 rouge** — 390 tactile clair/sombre, Safari 390×664,
+  1512 clair/sombre, 1280, base vide ; 15 colis + dépassé (code + QR) + retourné + annulé + 50 achats au même titre
+  (aucune photo de leurre) ; acheteur QUE Leboncoin et QUE Vestiaire (390 et 1512). `CAS=sites` pour ces deux-là seuls.
+  La photo d'un achat Leboncoin est jugée par identité (`data-rp-photo-src`) : l'image de img.leboncoin.fr ne se charge
+  pas dans le banc (celle de Vestiaire oui), l'app la montre comme les autres.
+- `retraits-parfaits` 17 verts (il jugeait l'échafaudage d'avant : `vrm_banc_dom_ancien` retiré), `colis-achat-auto`
+  121 verts, audits `retraits-parfaits`, `quoi-de-neuf`, `traduction`, `coherence` verts.
 
 ## Geste de Julien
 Aucun.
