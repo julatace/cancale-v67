@@ -4015,6 +4015,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.409 : répondre depuis le volet Messages du panneau — SEULEMENT depuis la carte de l'onglet vinted.fr.
+    // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'reglageAuto') {
+      reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'repondreCarte') {
       repondreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -17839,6 +17844,23 @@ async function secuPourCarte(pf, compte) {
     return { niveau: ph.niveau, texte: secuTexte(SECU_PHRASES, ph.cle, ph.v), arrete: arret.arrete };
   } catch (_) { return null; }
 }
+// 5.410 — LA CADENCE DE SON COMPTE (Julien, 20 nov. « vas-y fais ») : `vinted_cadence` de la ligne des réglages
+// (`vrm_reglages_auto`, la même source que l'app), relue au plus une fois par minute ; lecture ratée ⇒ la dernière
+// lue, sinon les DÉFAUTS (50/h, 15 favoris/h, plafond du jour de « Discrétion », pause 40–90 s). Un compte qui n'est
+// pas Vinted garde les défauts. `poses` : ce qu'il a réellement posé (le reste suit les réglages d'avant).
+const CADENCE_CACHE = 'vrmCadenceLue';
+async function cadenceCompte(uid) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Object.assign({}, RA_CADENCE_DEFAUT, { poses: [] });
+  const t = Date.now();
+  let c = null; try { c = (await chrome.storage.local.get(CADENCE_CACHE))[CADENCE_CACHE] || null; } catch (_) { c = null; }
+  if (!c || !(t - Number(c.at) < 60000 && t >= Number(c.at))) {
+    let m = null; try { m = await lireMain(['vinted_cadence']); } catch (_) { m = null; }
+    if (m) { c = { at: t, v: m.vinted_cadence || null }; try { await chrome.storage.local.set({ [CADENCE_CACHE]: c }); } catch (_) {} }
+  }
+  const brut = c && c.v && c.v.comptes && typeof c.v.comptes === 'object' ? c.v.comptes[u] : null;
+  return Object.assign(cadenceDe(c && c.v, u), { poses: brut && typeof brut === 'object' ? Object.keys(brut).filter((k) => k !== 'at') : [] });
+}
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai)); }
 // (5.406) `essai` : la MÊME règle, sans rien prendre ni écrire — « une place est-elle libre, et sinon dans combien ? »
 async function compterActionUn(uid, plafond, n = 1, essai = false) {
@@ -17847,7 +17869,12 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
     const list = (cur[uid] || []).filter(x => x > ilYaUneHeure).sort((a, b) => a - b);
-    const max = Math.min(ACTIONS_MAX_HEURE, plafond);
+    // 5.410 : le plafond de l'heure est SA cadence (50 par défaut, 10 à 100) ; un geste automatique garde sa réserve
+    //    (`decal` : 5 sous le plafond, comme avant) ; ses clics prennent le plafond entier.
+    const cad = await cadenceCompte(uid);
+    const capH = /^\d{1,20}$/.test(String(uid)) ? cad.actionsHeure : ACTIONS_MAX_HEURE;
+    const decal = Math.max(0, ACTIONS_MAX_HEURE - Math.min(ACTIONS_MAX_HEURE, plafond));
+    const max = Math.max(1, capH - decal);
     // (29 oct.) `n` places d'un coup : une republication RÉSERVE ses 3 gestes avant
     // le premier (brouillon, suppression, mise en ligne) — jamais une paire arrêtée
     // entre la suppression et la mise en ligne par le plafond.
@@ -17858,11 +17885,11 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     // ⚠️ 5.362 (revue, moyenne 40) : les autres Chrome NE SONT PAS LUS (base muette)
     //    ⇒ ce Chrome ne prend que SA moitié (`ACTIONS_SANS_AUTRES`) : deux Chrome en
     //    panne de base ne font plus 50 + 50 sur le compte. Le plafond (50) ne bouge pas.
-    const maxBase = autres === null ? Math.min(max, ACTIONS_SANS_AUTRES) : max;
+    const maxBase = autres === null ? Math.min(max, Math.max(1, Math.floor(capH * ACTIONS_SANS_AUTRES / ACTIONS_MAX_HEURE))) : max;
     // 5.370 (discrétion, point 13) : Vinted a demandé une vérification (ce Chrome ou un
     //    autre du compte) ⇒ AUCUN geste automatique tant qu'il n'a pas touché « Reprendre ».
     //    Ses clics (plafond entier) passent.
-    if (max < ACTIONS_MAX_HEURE && /^\d{1,20}$/.test(String(uid))) {
+    if (decal > 0 && /^\d{1,20}$/.test(String(uid))) {
       const ta = await toutArreteDepuis(autres);
       if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, n: list.length };
       const cap = await captchaEnCours(String(uid), autres);
@@ -17880,7 +17907,7 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     const vinted = /^\d{1,20}$/.test(String(uid));
     let montee = null;
     if (vinted) { try { montee = plafondMontee(await debutMontee(String(uid), t), t); } catch (_) { montee = null; } }
-    if (montee && montee < maxP + (ACTIONS_MAX_HEURE - max)) maxP = Math.min(maxP, Math.max(1, montee - (ACTIONS_MAX_HEURE - max)));
+    if (montee && montee < maxP + decal) maxP = Math.min(maxP, Math.max(1, montee - decal));
     const tous = list.concat(autres ? autres.toutes : []).sort((a, b) => a - b);
     if (tous.length + k > maxP) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - maxP)] + 3600000 - t), ...(enPrudence ? { prudence: prJusqua } : {}), ...(montee && maxP < maxBase ? { montee } : {}) };
     // 5.370 (discrétion, point 2) : LE PLAFOND DU JOUR, tous Chrome du compte confondus.
@@ -17888,8 +17915,8 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     //    pas lus ⇒ ce Chrome n'en prend que la moitié (la règle de l'heure).
     if (vinted) {
       let capJour = DISCRETION_JOUR_DEFAUT;
-      try { capJour = await plafondJourDe(String(uid), (await reglagesDiscretion()).parJour, t); } catch (_) {}
-      const capEff = Math.max(1, (autres === null ? Math.floor(capJour / 2) : capJour) - (max < ACTIONS_MAX_HEURE ? ACTIONS_MAX_HEURE - max : 0));
+      try { capJour = await plafondJourDe(String(uid), cad.parJour || (await reglagesDiscretion()).parJour, t); } catch (_) {}
+      const capEff = Math.max(1, (autres === null ? Math.floor(capJour / 2) : capJour) - decal);
       const nJour = (await actionsDuJour(String(uid), t)).length + (autres ? Number(autres.nJour) || 0 : 0);
       if (nJour + k > capEff) return { ok: false, code: 'plafond-jour', n: tous.length, nJour, maxJour: capJour, resteMs: Math.max(60000, finJourParis(t) - t) };
     }
@@ -18328,7 +18355,9 @@ async function porteDiscretion(uid, sorte, opts = {}) {
   const minutes = (ms) => Math.max(1, Math.ceil(ms / 60000));
   if (SORTES_LIMITEES.includes(sorte)) {
     const reg = await reglagesDiscretion();
-    const lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
+    let lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
+    // 5.410 : SA cadence de messages aux favoris (1 à 60/h), quand il l'a posée pour CE compte.
+    if (sorte === 'favori' && /^\d{1,20}$/.test(u)) { const cad = await cadenceCompte(u); if (cad.poses.includes('favorisHeure')) lim = cad.favorisHeure; }
     const tous = (await sortesHeure(u, sorte, t)).concat(autres && autres.so && Array.isArray(autres.so[sorte]) ? autres.so[sorte] : []).sort((a, b) => a - b);
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
@@ -19040,7 +19069,10 @@ async function favorisCarte(msg, sender) {
     const avant = await lireEtatFavorisCarte();
     if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
     // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}) });
+    // 5.410 : SA pause entre deux messages (cadence du compte), toujours une PLAGE tirée au hasard par le serveur.
+    let plage = null;
+    try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && (cad.poses.includes('pauseMin') || cad.poses.includes('pauseMax'))) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
@@ -21075,8 +21107,8 @@ async function automatisationsCarte(u, owner) {
   } catch (_) { auto = null; }
   const r0 = Array.isArray(rg) ? (rg[0] || null) : undefined;
   return {
-    offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus } : null,
-    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length } : null,
+    offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
+    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false } : null,
     favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 200), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 200)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
@@ -25734,10 +25766,143 @@ const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_
   'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
+// <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
+const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence'];
+// (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
+// un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
+// arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
+// l'onglet, temps d'écriture, réserve de 5 gestes.
+const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90 };
+const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
+// La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
+function cadenceDe(regle, uid) {
+  const c = regle && typeof regle === 'object' && regle.comptes && typeof regle.comptes === 'object' ? regle.comptes[String(uid)] : null;
+  const out = Object.assign({}, RA_CADENCE_DEFAUT);
+  if (!c || typeof c !== 'object') return out;
+  for (const k of Object.keys(RA_CADENCE_BORNES)) { const v = Number(c[k]), b = RA_CADENCE_BORNES[k]; if (Number.isInteger(v) && v >= b[0] && v <= b[1]) out[k] = v; }
+  if (!(out.pauseMax > out.pauseMin)) { out.pauseMin = RA_CADENCE_DEFAUT.pauseMin; out.pauseMax = RA_CADENCE_DEFAUT.pauseMax; }
+  return out;
+}
+const RA_BAISSE_PCT = [5, 10, 15];
+const RA_BAISSE_JOURS = [7, 14, 30];
+const RA_TEXTE_MAX = 1000;
+const RA_VARIANTES_MAX = 4;
+// La valeur lue : `main` superposé de la ligne (clé présente dans la ligne ⇒ elle gagne).
+function superposerReglagesAuto(main, ligne) {
+  const out = Object.assign({}, main && typeof main === 'object' ? main : {});
+  const c = ligne && typeof ligne === 'object' && ligne.cles && typeof ligne.cles === 'object' && !Array.isArray(ligne.cles) ? ligne.cles : null;
+  if (c) for (const k of REGLAGES_AUTO_CLES) if (Object.prototype.hasOwnProperty.call(c, k)) out[k] = c[k];
+  return out;
+}
+function raTexte(v) { return typeof v === 'string' && v.trim().length <= RA_TEXTE_MAX ? v.trim() : null; }
+function raPaliers(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const pcts = (Array.isArray(o.paliers) ? o.paliers : [50, 80, 100]).map(Number).filter((x) => Number.isFinite(x) && x > 0 && x <= 100);
+  const uniques = [...new Set(pcts.map((x) => Math.round(x)))].sort((a, b) => a - b).slice(0, 6);
+  const rm = Number(o.remiseMax);
+  return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [50, 80, 100],
+    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= RA_TEXTE_MAX).slice(0, 5), arrondi: o.arrondi !== false };
+}
+// Une demande d'écriture → { ok: true, valeur } ou { ok: false, code, raison }. `actuelle` = la valeur lue avant
+// (superposée) ; `confirme` = SON toucher sur la confirmation ; `maintenant` = l'heure.
+function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
+  if (!REGLAGES_AUTO_CLES.includes(cle)) return { ok: false, code: 'cle', raison: 'Ce réglage ne se règle pas ici.' };
+  const allume = (avant, apres) => apres === true && avant !== true;
+  const refus = { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Allumer ».' };
+  if (cle === 'vinted_offres_auto') {
+    if (typeof demande !== 'boolean') return { ok: false, code: 'forme', raison: 'Oui ou non.' };
+    if (allume(actuelle, demande) && confirme !== true) return refus;
+    return { ok: true, valeur: demande };
+  }
+  if (cle === 'vinted_offre_refus_msg') {
+    const t = raTexte(demande);
+    return t == null ? { ok: false, code: 'forme', raison: `Un texte de ${RA_TEXTE_MAX} caractères au plus.` } : { ok: true, valeur: t };
+  }
+  if (cle === 'vinted_offre_refus_variantes') {
+    if (!Array.isArray(demande)) return { ok: false, code: 'forme', raison: 'Une liste de textes.' };
+    const l = demande.map(raTexte);
+    if (l.some((t) => t == null)) return { ok: false, code: 'forme', raison: `Chaque version : ${RA_TEXTE_MAX} caractères au plus.` };
+    const pleines = l.filter(Boolean);
+    if (pleines.length > RA_VARIANTES_MAX) return { ok: false, code: 'forme', raison: `${RA_VARIANTES_MAX + 1} versions au plus.` };
+    return { ok: true, valeur: pleines };
+  }
+  if (cle === 'vinted_offres_paliers') {
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande)) return { ok: false, code: 'forme', raison: 'Réglage illisible.' };
+    const v = raPaliers(demande);
+    const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
+    if (allume(avant, v.actif) && confirme !== true) return refus;
+    return { ok: true, valeur: v };
+  }
+  if (cle === 'vinted_cadence') {
+    // { uid, favorisHeure, actionsHeure, parJour, pauseMin, pauseMax } pour UN compte ; plus vite que le défaut ⇒ `confirme`.
+    const d = demande && typeof demande === 'object' ? demande : {};
+    const uid = String(d.uid == null ? '' : d.uid);
+    if (!/^\d{1,20}$/.test(uid)) return { ok: false, code: 'forme', raison: 'Compte inconnu.' };
+    const c = {};
+    for (const k of Object.keys(RA_CADENCE_BORNES)) {
+      if (d[k] == null || d[k] === '') continue;
+      const v = Number(d[k]), b = RA_CADENCE_BORNES[k];
+      if (!Number.isInteger(v) || v < b[0] || v > b[1]) return { ok: false, code: 'bornes', raison: `Hors des bornes (${k} : ${b[0]} à ${b[1]}).` };
+      c[k] = v;
+    }
+    const pm = c.pauseMin != null ? c.pauseMin : RA_CADENCE_DEFAUT.pauseMin, px = c.pauseMax != null ? c.pauseMax : RA_CADENCE_DEFAUT.pauseMax;
+    if (!(px > pm)) return { ok: false, code: 'bornes', raison: 'La pause doit rester une plage (au hasard) : le maximum au-dessus du minimum.' };
+    const plusVite = (c.favorisHeure || 0) > RA_CADENCE_DEFAUT.favorisHeure || (c.actionsHeure || 0) > RA_CADENCE_DEFAUT.actionsHeure || pm < RA_CADENCE_DEFAUT.pauseMin || (c.parJour != null && c.parJour > 200);
+    if (plusVite && confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme la cadence plus rapide.' };
+    const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
+    comptes[uid] = Object.assign(c, { at: Number(maintenant) || 0 });
+    return { ok: true, valeur: { v: 1, comptes } };
+  }
+  // vinted_baisse_regle : { uid, actif, pct, jours } pour UN compte ; les autres comptes ne bougent pas.
+  const d = demande && typeof demande === 'object' ? demande : {};
+  const uid = String(d.uid == null ? '' : d.uid);
+  if (!/^(\d{1,20}|lbc:[\w-]{1,40}|vc:[\w-]{1,40})$/.test(uid)) return { ok: false, code: 'forme', raison: 'Compte inconnu.' };
+  const pct = Number(d.pct), jours = Number(d.jours);
+  if (!RA_BAISSE_PCT.includes(pct) || !RA_BAISSE_JOURS.includes(jours)) return { ok: false, code: 'forme', raison: 'Choisis 5, 10 ou 15 % après 7, 14 ou 30 jours.' };
+  const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
+  const avant = comptes[uid] && comptes[uid].actif === true;
+  if (allume(avant, d.actif === true) && confirme !== true) return refus;
+  comptes[uid] = { actif: d.actif === true, pct, jours, at: Number(maintenant) || 0 };
+  return { ok: true, valeur: { v: 1, comptes } };
+}
+// La ligne à écrire après SON geste (les autres clés de la ligne ne bougent pas).
+function ligneAvecReglage(ligne, cle, valeur, par, maintenant) {
+  const cles = Object.assign({}, ligne && ligne.cles && typeof ligne.cles === 'object' ? ligne.cles : {});
+  cles[cle] = valeur;
+  return { v: 1, at: Number(maintenant) || 0, par: par === 'app' ? 'app' : 'extension', cles };
+}
+// </reglages-auto-ligne>
+// 5.410 — LA LECTURE DE `main` PASSE PAR LA LIGNE DES RÉGLAGES quand elle en demande un (une seule règle :
+// `superposerReglagesAuto`, la même que l'app). Ligne illisible ⇒ null : le moteur ne fait rien (« pas su »).
 async function lireMain(cles) {
   const rows = await sbGet(qMain(cles));
   if (rows === null) return null;
-  return (rows && rows[0]) || {};
+  const m = (rows && rows[0]) || {};
+  if (!cles.some((k) => REGLAGES_AUTO_CLES.includes(k))) return m;
+  const l = await sbGet(`app_data?id=eq.${REGLAGES_AUTO_ID}&select=cles:data->cles`);
+  if (l === null) return null;
+  return superposerReglagesAuto(m, l && l[0] ? { cles: l[0].cles } : null);
+}
+// 5.410 — ÉCRIRE UN RÉGLAGE D'AUTOMATISATION DEPUIS LE PANNEAU (Julien, 20 nov. : « toute action doit être faite dans
+// l'extension »). Sur SON toucher (`confirme` pour allumer), dans la ligne dédiée `vrm_reglages_auto` — JAMAIS `main` —
+// par comparer-et-échanger (`modifierLigneCas`) ; relue après l'écriture et rendue telle que les moteurs la liront.
+// Aucune requête vers Vinted, aucun plafond touché ; noté au journal du compte de l'onglet.
+async function reglageAutoCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const cle = String(msg && msg.cle || '');
+  if (!REGLAGES_AUTO_CLES.includes(cle)) return { ok: false, code: 'cle', raison: 'Ce réglage ne se règle pas ici.' };
+  const avant = await lireMain([cle]);
+  if (avant === null) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’a changé.' };
+  const n = reglageAutoNormalise(cle, msg.valeur, avant[cle], msg.confirme === true, Date.now());
+  if (!n.ok) return n;
+  const r = await modifierLigneCas(REGLAGES_AUTO_ID, (d) => ligneAvecReglage(d, cle, n.valeur, 'extension', Date.now()));
+  if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
+  const apres = await lireMain([cle]);
+  const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
+  try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
+  return { ok: true, relu: relu === true, valeur: n.valeur };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

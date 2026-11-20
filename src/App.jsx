@@ -32,6 +32,7 @@ import ARetirerAilleurs from './ARetirerAilleurs.jsx';
 import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
 // (19 nov., décisions « 1 oui, 3 oui », ext. 5.409) La baisse par règle (éteinte par défaut) et « vendue ailleurs ⇒ masquée ».
 import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
+import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage } from './reglagesAutoLigne.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
@@ -4448,6 +4449,55 @@ const cloudLoad = async () => {
   } catch (_) { return undefined; }
 };
 
+// ════════════════════════════════════════════════════════════════════════
+// (20 nov., ext. 5.410) LES RÉGLAGES DES AUTOMATISATIONS : UNE SEULE SOURCE, LA LIGNE `vrm_reglages_auto`
+// (src/reglagesAutoLigne.js). Le panneau de l'extension l'écrit (jamais `main`) ; l'app la LIT au chargement et au
+// retour sur l'onglet (une clé présente dans la ligne gagne sur `main`, la même règle que l'extension), et y RECOPIE
+// chaque réglage qu'elle range encore elle-même. Lecture ratée ⇒ rien ne change (pas su).
+// ════════════════════════════════════════════════════════════════════════
+const lireReglagesAutoLigne = async () => {
+  const owner = AUTH.user?.id;
+  if (!owner || !AUTH.session?.access_token) return undefined;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${REGLAGES_AUTO_ID}&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth(), cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const rows = await res.json();
+    if (!Array.isArray(rows) || AUTH.user?.id !== owner) return undefined;
+    return rows[0] && rows[0].data && typeof rows[0].data === 'object' ? rows[0].data : null;
+  } catch (_) { return undefined; }
+};
+const appliquerReglagesAutoLigne = async () => {
+  const l = await lireReglagesAutoLigne();
+  if (!l || !l.cles || typeof l.cles !== 'object') return;
+  const changees = [];
+  for (const k of REGLAGES_AUTO_CLES) {
+    if (!Object.prototype.hasOwnProperty.call(l.cles, k) || _saveTimers[k]) continue;   // un geste en cours ici gagne
+    const txt = JSON.stringify(l.cles[k]);
+    try { if (localStorage.getItem(k) !== txt) { localStorage.setItem(k, txt); changees.push(k); } } catch (_) {}
+  }
+  if (changees.length) emettreClesRelues(changees);
+};
+const ecrireReglagesAutoLigne = async (owner, k, v) => {
+  for (let n = 0; n < 5; n++) {
+    if (!owner || AUTH.user?.id !== owner) return false;
+    let rows;
+    try { const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${REGLAGES_AUTO_ID}&owner=eq.${encodeURIComponent(owner)}&select=data`, { headers: sbAuth(), cache: 'no-store' }); if (!res.ok) return false; rows = await res.json(); } catch (_) { return false; }
+    if (!Array.isArray(rows)) return false;
+    const d = rows[0] ? (rows[0].data || {}) : null;
+    if (d && d.cles && JSON.stringify(d.cles[k]) === JSON.stringify(v)) return true;
+    const rev0 = d && Number.isSafeInteger(d.rev) && d.rev >= 0 ? d.rev : null;
+    const data = Object.assign(ligneAvecReglage(d, k, v, 'app', Date.now()), { rev: (rev0 || 0) + 1 });
+    try {
+      const w = !rows[0]
+        ? await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, { method: 'POST', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify([{ id: REGLAGES_AUTO_ID, owner, data }]) })
+        : await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${REGLAGES_AUTO_ID}&owner=eq.${encodeURIComponent(owner)}&${rev0 == null ? 'data->>rev=is.null' : `data->>rev=eq.${rev0}`}&select=id`, { method: 'PATCH', headers: sbAuth({ 'Content-Type': 'application/json', Prefer: 'return=representation' }), body: JSON.stringify({ data }) });
+      if (!w.ok) return false;
+      const out = await w.json().catch(() => null);
+      if (Array.isArray(out) && out.length) return true;
+    } catch (_) { return false; }
+  }
+  return false;
+};
 // Envoie TOUT le contenu local vers le cloud (groupe, differe)
 // ⚠️ SÉCURITÉ ANTI-EFFACEMENT (juillet 2026) : ce push écrase la ligne cloud
 // avec le contenu du localStorage. Si un appareil pousse AVANT d'avoir chargé le
@@ -5126,7 +5176,7 @@ if (typeof window !== 'undefined') {
   // (2 nov.) Des changements attendent dans la file : on les renvoie (le même
   // chemin, qui relit et fusionne) ; sinon on relit simplement.
   const renvoyerFile = () => { if (!isCloudReady() || _pushBloque || _pushEnVol || _cloudTimer || !fileNonVide()) return false; _repriseN = 0; reprendreSyncMaintenant(); return true; };
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (renvoyerFile()) return; relireNuage(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (renvoyerFile()) return; Promise.resolve(relireNuage()).catch(() => {}).finally(() => { if (_cloudReady) appliquerReglagesAutoLigne(); }); });
   window.addEventListener('pageshow', (e) => { if (e && e.persisted) relireNuage({ force: true }); });
   // (6 nov., charge) Au rythme commun (src/rythmeLectures.js) : rien pour un
   // onglet caché, plus lentement quand personne n'y touche, tout de suite au réveil.
@@ -5246,6 +5296,8 @@ const save = (k,v,quand) => {
     delete _saveTimers[k];
     _rendreQuand(k, true);
     if (k === 'vinted_annonce_numeros' && !r.conflit) noterJournalNumeros(_lireJson(avantTxt), r.v);
+    // (20 nov., 5.410) Un réglage d'automatisation rangé par l'app est recopié dans SA ligne dédiée (la source lue par l'extension).
+    if (owner && REGLAGES_AUTO_CLES.includes(k) && !r.conflit) ecrireReglagesAutoLigne(owner, k, r.v);
     // (12 nov., intégration) Plusieurs écrans montés ensemble (Ventes porte « À expédier » en tête) : chacun
     // tient SES fiches. Les fiches et le pool rangés ici sont relus par les autres tout de suite — sinon un
     // écran en retard numérotait une 2e fois une annonce déjà numérotée (banc achats-sourcing : N°7 puis N°8).
@@ -65119,6 +65171,8 @@ function AppCoeur() {
       }
       setSynced(true);
       markCloudReady(); // débloque la numérotation (le cloud est chargé)
+      // (20 nov., 5.410) Les réglages des automatisations : la ligne dédiée gagne sur `main` (écrite par le panneau).
+      appliquerReglagesAutoLigne();
     })();
     return () => { stop = true; off(); poserStatutBouton('idle'); };
   }, []);

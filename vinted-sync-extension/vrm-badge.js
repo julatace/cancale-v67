@@ -931,6 +931,12 @@
   .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
+  .champ6 { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: .5px solid var(--n-trait); }
+  .champ6 b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
+  .au6-d .conf5 { margin: 12px 24px 0; }
+  .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
   .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
@@ -1982,6 +1988,7 @@
   //    réglages se changent dans VRM (l'extension n'écrit jamais la ligne `main`) ; « Démarrer » des favoris ouvre le
   //    parcours pas à pas de la carte (rien ne part sans SA confirmation).
   let autoChoisie = 'favoris';
+  let raBrouillon = {}, raConfirme = null, raEtat = null, raEnVol = false;   // 5.410 : réglages écrits depuis le panneau
   const apercuPaliers6 = (pcts) => { const p = 100, f = 85, out = [p]; for (const pct of (pcts || []).slice().sort((a, b) => a - b)) { let v = Math.round(p - (p - f) * pct / 100); if (v < f) v = f; if (v < p && v < out[out.length - 1]) out.push(v); } return out; };
   function automatisationsHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
@@ -2009,17 +2016,36 @@
         + section('au6_ciblage', ligne('f5_rythme', f ? TU(f.rythme === 'prudent' ? 'fr_rythme_prudent' : f.rythme === 'perso' ? 'au_rythme_perso' : 'fr_rythme_normal') : null, 'au6_rythme_note') + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
         + section('au6_delais', ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null, 'au6_attente_note') + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null))
         + pied('?tab=messages&site=vinted&vue=favoris', `<button type="button" class="vu-btn vu-plein" data-auto-guide>${esc(TU('au6_demarrer'))}</button>`);
-    } else if (autoChoisie === 'offres') {
-      droite = tete + section('au6_regle', ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null, 'au6_minis_note') + ligne('au_refus', o ? TU(o.refus ? 'au_oui' : 'au_non') : null))
-        + section('au6_delais', ligne('au_attente', TU('au6_offres_delai'))) + pied('?tab=messages&site=vinted&vue=offres');
-    } else if (autoChoisie === 'paliers') {
-      const ap = pa ? apercuPaliers6(pa.paliers) : null;
-      droite = tete + section('au6_regle', ligne('au_paliers_pcts', pa ? pa.paliers.map((x) => x + ' %').join(' · ') : null) + ligne('au_paliers_plancher', pa ? (pa.remiseMax ? TU('au_plancher_remise', { r: pa.remiseMax }) : TU('au_plancher_mini')) : null))
-        + section('au6_apercu', `<p class="apercu6" data-paliers-apercu="${ap ? ap.join('>') : ''}">${ap ? esc(ap.join(' → ')) + ' · ' + esc(TU('au6_plancher', { p: 85 })) : '—'}</p>`)
-        + section('au6_messages', ligne('au_messages', pa ? (pa.messages ? TU('au_versions', { n: pa.messages }) : TU('au_pas_de_message')) : null))
-        + pied('?tab=messages&site=vinted&vue=offres');
     } else {
-      droite = tete + section('au6_regle', ligne('au_baisse_regle', ba && ba.pct ? TU('au_baisse_pct', { p: ba.pct, j: ba.jours }) : null) + `<p class="note5">${esc(TU('au_baisse_plancher'))}</p>`) + pied('?tab=annonces&site=vinted');
+      // 5.410 (Julien, 20 nov. : les automatisations vivent dans l'extension) : offres auto, paliers et baisse par
+      // règle se RÈGLENT ici, sur SON toucher ; allumer demande « Oui, allumer » ; écrit dans `vrm_reglages_auto`.
+      const cleDe = { offres: 'vinted_offres_auto', paliers: 'vinted_offres_paliers', baisse: 'vinted_baisse_regle' }[autoChoisie];
+      const on = autoChoisie === 'offres' ? (o ? o.actif === true : null) : autoChoisie === 'paliers' ? (pa ? pa.actif === true : null) : (ba ? ba.actif === true : null);
+      const b0 = raBrouillon[autoChoisie] || {};
+      const bascule = on == null ? '' : `<div class="rg6"><span><b>${esc(TU('ra_etat'))}</b><small>${esc(TU('ra_confirme_note'))}</small></span><button type="button" class="vu-btn${on ? '' : ' vu-plein'}" data-ra-bascule="${autoChoisie}" aria-pressed="${on}">${esc(TU(on ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`;
+      const conf = raConfirme && raConfirme.auto === autoChoisie ? `<div class="conf5" role="alertdialog" data-ra-confirme="${esc(raConfirme.cle)}"><p>${esc(TU('ra_confirme_q', { nom: TU(ch.titre) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      const etat = raEtat && raEtat.auto === autoChoisie ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
+      let corpsR = '';
+      if (autoChoisie === 'offres') {
+        const t = b0.refus != null ? b0.refus : (o && o.refusTexte) || '';
+        corpsR = section('au6_regle', ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null, 'au6_minis_note'))
+          + section('au6_messages', `<label class="champ6"><b>${esc(TU('ra_refus_msg'))}</b><small>${esc(TU('ra_refus_note'))}</small><textarea data-ra-champ="refus" maxlength="1000" rows="3">${esc(t)}</textarea></label>`)
+          + section('au6_delais', ligne('au_attente', TU('au6_offres_delai')));
+      } else if (autoChoisie === 'paliers') {
+        const pcts = b0.paliers != null ? b0.paliers : (pa ? pa.paliers.join(', ') : '50, 80, 100');
+        const rem = b0.remise != null ? b0.remise : (pa && pa.remiseMax ? String(pa.remiseMax) : '');
+        const ap = apercuPaliers6(String(pcts).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100));
+        corpsR = section('au6_regle', `<label class="champ6"><b>${esc(TU('ra_paliers_pcts'))}</b><small>${esc(TU('ra_paliers_note'))}</small><input type="text" inputmode="numeric" data-ra-champ="paliers" value="${esc(pcts)}"></label>`
+          + `<label class="champ6"><b>${esc(TU('ra_remise'))}</b><small>${esc(TU('ra_remise_note'))}</small><input type="number" min="1" max="89" step="1" data-ra-champ="remise" value="${esc(rem)}"></label>`)
+          + section('au6_apercu', `<p class="apercu6" data-paliers-apercu="${ap.join('>')}">${esc(ap.join(' → '))} · ${esc(TU('au6_plancher', { p: 85 }))}</p>`)
+          + section('au6_messages', ligne('au_messages', pa ? (pa.messages ? TU('au_versions', { n: pa.messages }) : TU('au_pas_de_message')) : null));
+      } else {
+        const pct = Number(b0.pct || (ba && ba.pct) || 5), jours = Number(b0.jours || (ba && ba.jours) || 14);
+        const seg = (k, l, v, suf) => `<div class="vu-seg vue5" role="group" data-ra-seg="${k}">${l.map((x) => `<button type="button" data-ra-${k}="${x}" aria-pressed="${x === v}">${x}${suf}</button>`).join('')}</div>`;
+        corpsR = section('au6_regle', `<div class="rg6"><span><b>${esc(TU('ra_pct'))}</b></span>${seg('pct', [5, 10, 15], pct, ' %')}</div><div class="rg6"><span><b>${esc(TU('ra_jours'))}</b></span>${seg('jours', [7, 14, 30], jours, ' j')}</div><p class="note5">${esc(TU('au_baisse_plancher'))}</p>`);
+      }
+      droite = tete + conf + etat + `<section class="sec6">${bascule}</section>` + corpsR
+        + `<div class="pied6" data-ra-pied="${esc(cleDe)}"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-ra-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
     }
     return `<div class="deux5 au6" data-automatisations data-auto-choisie="${autoChoisie}"><div class="gauche5">${gauche}</div><div class="volet5 au6-d">${droite}</div></div>`;
   }
@@ -2177,6 +2203,39 @@
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
     racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); rendre(); }));
+    // 5.410 : régler une automatisation ici. Rien ne part sans SON toucher ; allumer passe par « Oui, allumer ».
+    const raValeur = (auto, actif) => {
+      const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};
+      if (auto === 'offres') return { cle: 'vinted_offres_auto', valeur: actif };
+      if (auto === 'paliers') { const pa = au.paliers || {}; const pcts = String(b0.paliers != null ? b0.paliers : (pa.paliers || [50, 80, 100]).join(',')).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100); const rem = Number(b0.remise != null ? b0.remise : pa.remiseMax); return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false } }; }
+      const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: listes && listes.compte && listes.compte.id, actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
+    };
+    const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
+    const raEnvoyer = (auto, cle, valeur, confirme) => {
+      if (raEnVol) return; raEnVol = true; raEtat = null; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle, valeur, confirme: confirme === true }, (r) => {
+          void chrome.runtime.lastError; raEnVol = false; raConfirme = null;
+          raEtat = { auto, ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
+          if (r && r.ok) { delete raBrouillon[auto]; chargerListes(true); }
+          rendre();
+        });
+      } catch (_) { raEnVol = false; raEtat = { auto, ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    racine.querySelectorAll('[data-ra-bascule]').forEach((b) => b.addEventListener('click', () => {
+      const auto = b.getAttribute('data-ra-bascule'), allumer = !raActif(auto), v = raValeur(auto, allumer);
+      if (allumer) { raConfirme = { auto, cle: v.cle, valeur: v.valeur }; raEtat = null; rendre(); } else raEnvoyer(auto, v.cle, v.valeur, false);
+    }));
+    const raOui = racine.querySelector('[data-ra-oui]'); if (raOui) raOui.addEventListener('click', () => { const c = raConfirme; if (c) raEnvoyer(c.auto, c.cle, c.valeur, true); });
+    const raNon = racine.querySelector('[data-ra-non]'); if (raNon) raNon.addEventListener('click', () => { raConfirme = null; rendre(); });
+    racine.querySelectorAll('[data-ra-champ]').forEach((c) => c.addEventListener('input', () => { const k = c.getAttribute('data-ra-champ'); (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = c.value; }));
+    racine.querySelectorAll('[data-ra-pct],[data-ra-jours]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-ra-pct') ? 'pct' : 'jours'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = Number(b.getAttribute('data-ra-' + k)); rendre(); }));
+    const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
+    const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
+      const auto = autoChoisie, b0 = raBrouillon[auto] || {};
+      if (auto === 'offres') { if (b0.refus == null) { raEtat = { auto, ok: true, texte: TU('ra_rien') }; rendre(); return; } raEnvoyer(auto, 'vinted_offre_refus_msg', String(b0.refus), false); return; }
+      const v = raValeur(auto, raActif(auto)); raEnvoyer(auto, v.cle, v.valeur, false);
+    });
     const gd = racine.querySelector('[data-auto-guide]'); if (gd) gd.addEventListener('click', () => { ongletListe = 'favoris'; ranger({ vrmCarteOnglet: ongletListe }); rendre(); chargerFavoris(e, false); });
     racine.querySelectorAll('[data-rep-envoyer]').forEach((b) => b.addEventListener('click', () => envoyerReponse(b.getAttribute('data-rep-envoyer'))));
     racine.querySelectorAll('[data-rep-texte]').forEach((t) => t.addEventListener('input', () => { brouillons.set(t.getAttribute('data-rep-texte'), t.value); const b = carte.querySelector(`[data-rep-envoyer="${t.getAttribute('data-rep-texte')}"]`); if (b) b.disabled = !t.value.trim() || repEnVol; }));

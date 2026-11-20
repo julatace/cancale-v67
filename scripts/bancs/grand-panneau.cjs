@@ -91,6 +91,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
+          else if (msg.action === 'reglageAuto') rep = { ok: true, relu: true };
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
         } },
@@ -277,6 +278,23 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         await cap(t.pg, N('paliers'));
         dit(a.autoListe.includes('paliers:on*') && a.apercu === '100>93>88>85', `${T} : paliers : l’aperçu 100 → 93 → 88 → 85 (jamais sous le plancher)`, JSON.stringify({ l: a.autoListe, ap: a.apercu }));
+        // 5.410 : régler ici. Éteindre les paliers part sans confirmation ; allumer la baisse demande « Oui, allumer ».
+        await clic(t.pg, '[data-ra-bascule="paliers"]');
+        a = await lire(t.pg);
+        const ra1 = a.envoyes.filter((m) => m.action === 'reglageAuto');
+        dit(ra1.length === 1 && ra1[0].cle === 'vinted_offres_paliers' && ra1[0].valeur.actif === false && ra1[0].confirme === false, `${T} : « Éteindre » les paliers part tout de suite (ligne des réglages)`, JSON.stringify(ra1));
+        await clic(t.pg, '[data-auto-choix="baisse"]');
+        await clic(t.pg, '[data-ra-pct="10"]');
+        await clic(t.pg, '[data-ra-bascule="baisse"]');
+        a = await lire(t.pg);
+        await cap(t.pg, N('reglage-confirme'));
+        const avantOui = a.envoyes.filter((m) => m.action === 'reglageAuto').length;
+        const conf = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ra-confirme="vinted_baisse_regle"]'));
+        dit(conf && avantOui === 1, `${T} : « Allumer » la baisse demande « Oui, allumer » ; rien ne part avant`, JSON.stringify({ conf, avantOui }));
+        await clic(t.pg, '[data-ra-oui]');
+        a = await lire(t.pg);
+        const ra2 = a.envoyes.filter((m) => m.action === 'reglageAuto')[1];
+        dit(ra2 && ra2.cle === 'vinted_baisse_regle' && ra2.confirme === true && ra2.valeur.uid === '111' && ra2.valeur.actif === true && ra2.valeur.pct === 10 && ra2.valeur.jours === 14, `${T} : confirmé : la règle de CE compte part (10 % après 14 j)`, JSON.stringify(ra2));
         // Notifications.
         await clic(t.pg, '[data-onglet-b="notifications"]');
         a = await lire(t.pg);
