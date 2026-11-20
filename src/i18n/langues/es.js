@@ -80,6 +80,7 @@ import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-com
 import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
 import ecran_compteBloque from './es/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
+import ecran_lbcVcInteresses from './es/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -88,6 +89,7 @@ import ecran_arrivee_scan from './es/arriveeScan.js';   // (20 nov., lot arrivee
 import ecran_stock_etiquetage from './es/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
 import ecran_natif from './es/natif.js';
+import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
   ...ecran_accessibilite,
@@ -2337,6 +2339,7 @@ export default {
   ...ecran_compteBloque,
   ...ecran_ceQuiManque,
   ...ecran_favorisSites,
+  ...ecran_lbcVcInteresses,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
@@ -2366,4 +2369,5 @@ export default {
   ...ecran_demarrage,
   ...ecran_natif,
   ...ecran_extension,
+  ...ecran_actions_ext,
 };

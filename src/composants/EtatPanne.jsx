@@ -42,7 +42,7 @@ export function EtatPanne({ quoi, raison, onReessayer, compact = false, classNam
         <p className="vrm-etat-panne-raison">{raison || PAS_SU.sansRaison}</p>
       </div>
       {onReessayer ? (
-        <BoutonBase variante="secondaire" className="vrm-etat-panne-bouton" data-etat-panne-reessayer="" onClick={relire}
+        <BoutonBase variante="discret" className="vrm-etat-panne-bouton" data-etat-panne-reessayer="" onClick={relire}
           disabled={occupe} aria-busy={occupe ? 'true' : undefined}>
           {occupe ? PAS_SU.enCours : VERBES.reessayer}
         </BoutonBase>

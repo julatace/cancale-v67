@@ -46,7 +46,7 @@
   --w-r-photo: 22px;
   --w-r-vignette: 12px;
   --w-ecart: 16px;                /* entre deux cartes */
-  --w-ombre: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px -8px rgba(0,0,0,.10);
+  --w-ombre: none;
   --w-ombre-tete: 0 2px 4px rgba(0,0,0,.06), 0 18px 40px -18px rgba(16,24,40,.45);
   --w-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='14' viewBox='0 0 8 14'%3E%3Cpath d='M1.2 1.2 6.8 7l-5.6 5.8' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
@@ -131,7 +131,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
   text-align: left !important; gap: 4px !important; min-height: 108px !important; height: auto !important;
   padding: 14px 16px 16px !important; margin: 0 !important;
   background: var(--w-carte) !important; color: var(--w-encre) !important;
-  border: 0 !important; border-radius: var(--w-r) !important; box-shadow: var(--w-ombre) !important;
+  border: 0 !important; border-radius: var(--w-r) !important; box-shadow: none !important;
   transition: transform 160ms cubic-bezier(.23,1,.32,1) !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases > .vrm-fu-case > span {
@@ -188,7 +188,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 /* ── 4. LES GROUPES (Réglages d'iOS) ───────────────────────────────────────── */
 :root:root body .vrm-main :is(.vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir,
   .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-ios-groupe, .vrm-reglages-groupe) {
-  border-radius: var(--w-r) !important; border: 0 !important; box-shadow: var(--w-ombre) !important;
+  border-radius: var(--w-r) !important; border: 0 !important; box-shadow: none !important;
   background-color: var(--w-carte) !important; overflow: hidden !important;
 }
 /* Les rangées d'un groupe : vignette 44 rayon 12, et l'air de la rangée. */
@@ -226,7 +226,7 @@ html body, .vrm-app-shell, :root:root body .vrm-app-shell .vrm-main { background
 
 /* Les autres groupes (Compta, Réglages) : le même rayon, sans bordure. */
 :root:root body .vrm-main :is(.vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-compta-replis, .vrm-surface, .vrm-set-groupe) { border-radius: var(--w-r) !important; border: 0 !important; }
-:root:root body .vrm-main :is(.vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-compta-replis):not(:is(.vrm-compta-replis, .vrm-surface) *) { box-shadow: var(--w-ombre) !important; }
+:root:root body .vrm-main :is(.vrm-set-liste, .vrm-settings-todo, .vrm-fu-panneau, .vrm-compta-replis):not(:is(.vrm-compta-replis, .vrm-surface) *) { box-shadow: none !important; }
 /* Messages : l'espace de travail sans cadre ; « Réponses rapides » avec l'air d'une rangée. */
 :root:root body .vrm-main .vrm-message-workspace { border: 0 !important; box-shadow: none !important; }
 :root:root body .vrm-main details.vrm-quick-settings > summary { padding-left: 20px !important; padding-right: 20px !important; min-height: 52px !important; }

@@ -112,9 +112,9 @@ async function audit(src, bavard) {
   const bloc = (/<QuoiRepublier site="vinted"[\s\S]*?\/>\s*\) : null\}/.exec(code) || [''])[0];
   dit(/annSort==='republier' && /.test(code) && bloc && /setSelAnn\(/.test(bloc) && /x\.uid===l\.uid && x\.id===l\.id/.test(bloc), 'la carte Vinted coche dans la sélection de l’atelier Republier, par identité');
   dit(bloc && /a\.raisonPas/.test(bloc) && !/vmrCmd|setRepubAction|setKitMain|fetch\(/.test(bloc), 'la carte ne lance rien (ni commande, ni atelier) et respecte les refus de la liste');
-  const lbloc = (/<QuoiRepublier site="leboncoin"[\s\S]*?\/> : null\}/.exec(lbc) || [''])[0];
-  dit(lbloc && /sel\.has\(l\.cle\)/.test(lbloc) && /REPUB_LBC_MAX/.test(lbloc) && !/vmrCmd|lancer\(|setEtape/.test(lbloc), 'Leboncoin : la carte coche dans « Republier sur Leboncoin » (identifiant LBC, plafond du passage), ne lance rien');
-  dit(/quoiRepublier\(liste\.map\(\(it\) => \(\{ cle: String\(it\.lbc\.id\), id: String\(it\.lbc\.id\), age: ageDepuis\(it\.lbc\.publieeLe\), vues: it\.lbc\.vues, favoris: it\.lbc\.favoris,/.test(lbc), 'Leboncoin : âge depuis la date LUE, vues et favoris LUS, la même règle');
+  // (20 nov., décision de Julien) « Republier sur Leboncoin » se fait dans le PANNEAU de l'extension (l'atelier de l'app, et sa carte
+  // « Quelles annonces republier ? », sont retirés) : la règle `quoiRepublier` reste pour l'extension et pour Vinted ici.
+  dit(/<FeuilleExtension action="republier" site="leboncoin" ids=\{data\.repub\.map\(\(x\) => String\(x\.id\)\)\}/.test(lbc) && !/vmrCmd\(\{ cmd: 'lbcSupprime'/.test(lbc), 'Leboncoin : « Republier » ouvre le panneau sur ses annonces (identifiant LBC), rien ne part d’ici');
   dit(/ligneJourneeRepublier\(quoiRep\)/.test(code) && /id: 'quoi-republier'/.test(code) && /demanderVue\('quoirepublier'\)/.test(code) && /prendreVue\('quoirepublier'\)\) setAnnSort\('republier'\)/.test(code), 'Ma journée : une ligne seulement s’il y en a ; « Voir » ouvre Annonces → Republier');
   dit(/republier: jobRepublier \? \[tache\(jobRepublier, 97\)\] : \[\]/.test(code) && /j\.id !== 'quoi-republier'/.test(code), 'Ma journée : SA carte (cachable, « Modifier ma journée »), pas mêlée aux autres rappels');
   dit(/tr\('qr\.raison\.vuesPasLues'\)/.test(carte) && /tr\('qr\.raison\.favorisPasLus'\)/.test(carte) && /\['src\/design\/QuoiRepublier\.jsx', \['\*'\]\]/.test(fs.readFileSync(path.join(R, 'scripts', 'audit-traduction.cjs'), 'utf8')), 'la carte : « pas lues » dit ; aucun texte en dur (fichier migré, contrôlé par audit-traduction F1)');

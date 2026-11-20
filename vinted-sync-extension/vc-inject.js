@@ -231,6 +231,25 @@
     return { n, cle };
   }
   const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
+  // 5.410 (20 nov., lot lbc-vc-interesses) — LA DATE DE MISE EN LIGNE d'un article : MESURÉE le 20 nov. dans
+  // « Mes articles » (`users/me/product-listings?…&sort=listingDate:desc`), clé `listingDate` à côté du produit,
+  // une date ISO avec fuseau (« 2026-10-30T14:53:37+00:00 »). Lue sous CE nom seulement : une date valide, ni
+  // avant Vestiaire, ni dans le futur ; sinon '' (pas su — le fond datera alors à la 1re lecture, « au moins »).
+  function dateMiseVc(e) {
+    const v = e && typeof e === 'object' ? e.listingDate : null;
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return '';
+    const t = Date.parse(v);
+    return Number.isFinite(t) && t > Date.UTC(2009, 0, 1) && t < Date.now() + 864e5 ? new Date(t).toISOString() : '';
+  }
+  // 5.410 — les NÉGOCIATIONS d'un article (mesurées : `negotiationsSummary.{totalNegotiationsCount,
+  // ongoingNegotiationsCount, pendingSellerActionCount}`) : trois NOMBRES, jamais qui. Rien de lu ⇒ null.
+  function negosVc(e) {
+    const s = e && typeof e === 'object' ? e.negotiationsSummary : null;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+    const n = (x) => (Number.isInteger(x) && x >= 0 && x < 100000 ? x : null);
+    const r = { total: n(s.totalNegotiationsCount), enCours: n(s.ongoingNegotiationsCount), aToi: n(s.pendingSellerActionCount) };
+    return r.total == null && r.enCours == null && r.aToi == null ? null : r;
+  }
   // 5.296 (1er nov.) — LA FICHE D'UNE ANNONCE : Julien veut ses annonces Vestiaire
   // « en fiches comme Vinted ». La forme d'une annonce de `product-listings`
   // n'a JAMAIS été vue pleine chez lui : on ne lit que des clés dont le NOM dit
@@ -358,7 +377,7 @@
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
-      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut, misEnLigne: dateMiseVc(e), negos: negosVc(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });

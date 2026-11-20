@@ -16,7 +16,6 @@ import AnnoncesTableau from '../../src/natif/ecrans/AnnoncesTableau.jsx';
 import VentesTableau from '../../src/natif/ecrans/VentesTableau.jsx';
 import AchatsTableau from '../../src/natif/ecrans/AchatsTableau.jsx';
 import NotificationsTableau from '../../src/natif/ecrans/NotificationsTableau.jsx';
-import Automatisations, { SectionAuto, MessagesAuto, ReglageAuto, ChampNombre } from '../../src/natif/ecrans/Automatisations.jsx';
 import { construireArticles, statutTableau, compterArticles, trierArticles, NOM_SITE } from '../../src/articles/modele.js';
 import { apercuPaliers, plancherDe, PALIERS_DEFAUT } from '../../src/negociationPaliers.js';
 import '../../src/natif/ecrans/annonces.css';
@@ -77,24 +76,11 @@ function VueNotifsBanc() {
   return <NotificationsTableau entrees={entrees} lu={lu} types={[{ id: 'ventes', titre: 'Ventes' }, { id: 'offres', titre: 'Offres' }, { id: 'messages', titre: 'Messages' }, { id: 'poster', titre: 'Colis à poster' }]}
     nomType={(f) => f} majLe={M} onRafraichir={() => {}} estLue={(e, l) => e.seq <= l.luJusqua} icone={() => <Icon name="bell2" size={22}/>} onOuvrir={() => {}} onMarquerLues={() => {}} Icon={Icon}/>;
 }
-function VueAutoBanc() {
-  const [choisi, setChoisi] = React.useState('');
-  const [msgs, setMsgs] = React.useState([{ texte: 'Bonjour ! Tu as mis cet article en favori : je te propose une offre dessus.', actif: true }, { texte: 'Coucou, il est encore dispo, je te fais un prix ?', actif: false }]);
-  const ap = apercuPaliers(100, plancherDe(100, null, 15), PALIERS_DEFAUT);
-  const items = [
-    { cle: 'favoris', titre: tr('auto.favoris.titre'), sous: tr('auto.favoris.sous'), icone: 'heart', actif: false, plein: { libelle: tr('auto.demarrer'), onClick: () => {} }, reinitialiser: () => {}, modifie: true,
-      detail: () => <><SectionAuto titre={tr('auto.messages')} phrase={tr('auto.messages.phrase')}><MessagesAuto messages={msgs} etiquette="Offre −10 %" onModifier={() => {}} onSupprimer={(i) => setMsgs((m) => m.filter((_, j) => j !== i))} onBasculer={(i, v) => setMsgs((m) => m.map((x, j) => (j === i ? { ...x, actif: v } : x)))} onAjouter={(t) => setMsgs((m) => [...m, { texte: t, actif: true }])}/></SectionAuto>
-        <SectionAuto titre={tr('auto.delais')}><ReglageAuto libelle={tr('auto.favoris.entre')} phrase={tr('auto.favoris.entrePhrase')}><ChampNombre valeur="6" libelle="min" unite="min" onChange={() => {}}/></ReglageAuto></SectionAuto></> },
-    { cle: 'offres', titre: tr('auto.offres.titre'), sous: tr('auto.offres.sous'), icone: 'chat', actif: true, onglets: [{ cle: 'config', libelle: tr('auto.onglet.config') }, { cle: 'nego', libelle: tr('auto.onglet.nego') }],
-      plein: { libelle: tr('auto.arreter'), onClick: () => {} }, detail: (o) => (o === 'nego' ? <SectionAuto titre={tr('auto.nego.prix')}><p className="n-au-apercu" data-au-apercu={ap.chaine.join('>') + '|' + ap.plancher}>{tr('auto.nego.apercu', { suite: ap.chaine.join(' → '), plancher: ap.plancher })}</p></SectionAuto> : <SectionAuto titre={tr('auto.ciblage')}><ReglageAuto libelle={tr('auto.offres.accepte')} phrase={tr('auto.offres.acceptePhrase')}/></SectionAuto>) },
-    { cle: 'baisse', titre: tr('auto.baisse.titre'), sous: tr('auto.baisse.sous'), icone: 'tag', actif: null, detail: () => <SectionAuto titre={tr('auto.ciblage')}><ReglageAuto libelle={tr('auto.baisse.plancher')} phrase={tr('auto.baisse.plancherPhrase')}/></SectionAuto> },
-  ];
-  return <Automatisations items={items} choisi={choisi} onChoisir={setChoisi} Icon={Icon} compte="vendeur_1"/>;
-}
+// (20 nov.) Plus de vue « auto » : l'écran Automatisations de l'app est retiré (elles se règlent dans l'extension).
 const ONGLETS = [['journee', 'Aujourd’hui', 'soleilLevant'], ['annonces', 'Annonces', 'tag'], ['ventes', 'Ventes', 'bag'], ['achats', 'Achats', 'cart'], ['compta', 'Argent', 'euro']]
   .map(([cle, libelle, ic]) => ({ cle, libelle, icone: <Icon name={ic} size={24}/>, iconeLaterale: <Icon name={ic} size={20}/> }));
 function Ecran() {
-  const V = { annonces: VueAnnoncesBanc, ventes: VueVentesBanc, achats: VueAchatsBanc, notifs: VueNotifsBanc, auto: VueAutoBanc }[VUE] || VueAnnoncesBanc;
+  const V = { annonces: VueAnnoncesBanc, ventes: VueVentesBanc, achats: VueAchatsBanc, notifs: VueNotifsBanc }[VUE] || VueAnnoncesBanc;
   const titre = { annonces: 'Annonces', ventes: 'Ventes', achats: 'Achats', notifs: 'Notifications', auto: 'Automatisations' }[VUE];
   return <Coque onglets={ONGLETS} plus={[]} actif={VUE === 'notifs' || VUE === 'auto' ? 'journee' : VUE} onChoisir={() => {}} titre={titre} compte={{ initiales: 'CE', nom: 'Camille Exemple' }}><V/></Coque>;
 }

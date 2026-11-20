@@ -124,5 +124,17 @@ export default {
   "vn.e.coches": {"one": "{n} ticked", "other": "{n} ticked"},
   "vn.e.deposer": {"one": "{n} to drop off", "other": "{n} to drop off"},
   "vn.auMoins": "at least {n} to send",
-  "vn.detailVide": "Tap a sale to see it here."
+  "vn.detailVide": "Tap a sale to see it here.",
+  "vn.lbc.aGenerer": "Label to generate",
+  "vn.lbc.prets": "Ready to print",
+  "vn.lbc.genererTous": "Generate all",
+  "vn.lbc.generer": "to generate",
+  "vn.lbc.pret": "ready",
+  "vn.lbc.fait": "Parcel done",
+  "vn.lbc.pasEncore": "Not yet",
+  "vn.lbc.poste": "Posted",
+  "vn.lbc.suivre": "Track",
+  "vn.lbc.rien": "No Leboncoin parcel to send.",
+  "vn.lbc.pasLu": "Leboncoin parcels: not read yet.",
+  "vn.lbc.limite": "The label is generated on leboncoin.fr: tapping the sale opens it there."
 };

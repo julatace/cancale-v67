@@ -226,7 +226,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {achatRelie.recu ? <Bouton variante="texte" taille="compact" className="nf-lien" onClick={achatRelie.onRecu} attrs={{ 'data-fd-recu': achatRelie.tx }}>{T.recu}</Bouton> : null}
               <Bouton variante="texte" ton="ambre" taille="compact" className="nf-lien" onClick={achatRelie.onDelier} attrs={{ 'data-fd-delier': achatRelie.tx, 'data-fd-achat-relie': achatRelie.tx }}>{T.delier}</Bouton>
             </div> : null}
-            {tous.length > HISTOIRE_REPLIEE || blocs.toutVoir ? <span className="nf-tout"><Bouton variante="texte" taille="compact" onClick={() => setToutHist((x) => !x)} attrs={{ 'data-fd-tout-voir': '', 'aria-expanded': toutHist ? 'true' : 'false' }}>{toutHist ? T.replier : T.toutVoir}</Bouton></span> : null}
+            {tous.length > HISTOIRE_REPLIEE || blocs.toutVoir ? <span className="nf-tout"><Bouton variante="texte" onClick={() => setToutHist((x) => !x)} attrs={{ 'data-fd-tout-voir': '', 'aria-expanded': toutHist ? 'true' : 'false' }}>{toutHist ? T.replier : T.toutVoir}</Bouton></span> : null}
           </section> : null}
           {histoire && toutHist && blocs.toutVoir ? <Herite attrs={{ 'data-fiche-plus': '' }}>{blocs.toutVoir}</Herite> : null}
           {blocs.contexte || null}

@@ -30,10 +30,20 @@ Dernier passage complet (6 conditions × 2 tailles × 14 onglets) : 1 347 OK ; l
 - `reseau-instable` : la réponse « perdue » est coupée en `connectionaborted` (la garde réseau prenait `ERR_CONNECTION_RESET` pour une requête vers la production) — `_base-ecritures.cjs`, partagé par 28 bancs.
 
 ## Vus, laissés (à qui)
-- **Décision « 4 oui » pas tout à fait appliquée** : « Je dépose » existe encore hors ligne (Aujourd'hui, mode comptoir) et en ligne (feuille « ⋯ » de Ventes, `data-depot-ouvrir`), « Marquer déposé » dans la fiche d'une vente → chantier Ventes natif / Julien.
-- Fiche d'une vente « À envoyer » montrant « En route ✓ · Livrée ✓ » (base inventée au volume) : à vérifier sur de vraies données (`etapesFicheVente` fait confiance à la frise de la vente, `aExpedier` à `transaction_user_status`).
 - Statistiques (Argent, chantier argent-natif) : deux pleins bleus (« Commencer », « Continuer ») sous « Configure VRM » / « Démarrer avec VRM » ; texte agrandi : un bouton de 42 px.
 - Annonces (chantier minimaliste) : rien de rouge au parcours.
 - Paramètres : la lecture des points de restauration part encore 4 fois en 12 s au banc — c'est le point du jour qui réessaie parce que le banc répond `[]` à l'écriture (forme du banc, pas de l'app).
 - Pas couvert : session expirée en ligne (le jeton expiré hors ligne l'est par `hors-ligne`), contraste mesuré (`lisible-partout` le fait, non relancé ici).
 - Extension : rien de neuf relevé (aucun parcours n'y entre).
+
+## Suite (même jour) — décision « 4 oui » appliquée, fiche cohérente avec la liste
+- **Gestes d'envoi retirés** (§3) : « Je dépose » (hors ligne, feuille « ⋯ », série, ligne, balayage, fiche, volet, carte de colis),
+  la tournée de dépôt, « Préparer mes colis », « Emballer » (feuille, tâche d'Aujourd'hui, fiche), le scanner d'envoi qui cochait
+  « Colis fait », « Colis fait » Leboncoin et Vestiaire. Les marques notées avant restent lues (« Noté déposé » hors ligne) ; une
+  marque hors ligne pas encore envoyée se synchronise (donnée déjà notée, aucune action sur un site). Gardé : « Déposé » d'un
+  RETOUR d'achat. Garde-fou : `scripts/audit-depose-retire.cjs` (rouge avant, 4 mutations).
+- **Fiche « À envoyer » qui cochait « En route · Livrée »** : mesuré sur la vraie base, 1 vente sur 12 en attente d'envoi (la
+  ligne du transporteur disait « en route » sans prise en charge lue ; la liste exige la prise en charge). La fiche juge par la
+  règle de la liste : une vente gardée « à envoyer » n'a rien de coché après « Bordereau prêt ». Banc `fiche-envoyer-coherente`
+  (rouge avant). `frise-transporteur` remis sur la fiche native (vert, `MUTER=1` rouge) — il a attrapé une première version
+  trop stricte (la preuve du transporteur écartée aussi pour une vente déjà partie chez Vinted), corrigée.

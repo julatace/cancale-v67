@@ -298,7 +298,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   const i = app.indexOf('function HotePublierPartout(');
   const hote = i >= 0 ? app.slice(i, app.indexOf('\n}\n', i)) : '';
   dit(!!hote, 'G1 l\'hôte HotePublierPartout existe');
-  dit(/cmd: 'lbcPublier'/.test(hote) && /valideAnnonceLbc\(/.test(hote) && /cmd: 'vcPreparer'/.test(hote) && /preparerBrouillonPartout/.test(hote), 'G2 chaque site par SA voie (lbcPublier + fiche, vcPreparer, brouillon eBay)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire se publient dans le PANNEAU de l'extension (« Publier dans l'extension » sur
+  // leur case, src/PublierPartout.jsx) ; eBay garde sa voie (brouillon par l'API serveur).
+  dit(/leboncoin: refusSite,/.test(hote) && /vestiaire: refusSite,/.test(hote) && !/cmd: 'lbcPublier'|cmd: 'vcPreparer'/.test(hote) && /preparerBrouillonPartout/.test(hote), 'G2 (20 nov.) eBay par SA voie ; Leboncoin / Vestiaire : rien ne part d’ici (panneau de l’extension)');
   dit(!/action: 'publish'/.test(hote) && !/supprim|lbcSupprime/.test(hote), 'G3 l\'hôte ne publie rien sur eBay et ne supprime rien');
   dit(/raisonExtGlobale\(sansSouris, \{ cap: 'publication'/.test(hote) && /cap: 'vcpublier'/.test(hote), 'G4 les gardes d\'extension des voies (publication, vcpublier)');
   dit(/sitesPrixDe\(/.test(hote) && /enLigneSur\(/.test(hote), 'G5 « déjà en ligne » par sitesDuNumero (identité)');
@@ -313,7 +315,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/\{ k: 'partout',/.test(src.actions || '') && /k==='partout'/.test(app), 'G11 en série : Annonces → Actions → « Publier partout… »');
   dit(/aussiSur\(\{ lbc:/.test(app) && /vcNumsAnn\.has\(cleNum\(num\)\)/.test(app), 'G12 pastilles « aussi sur » Leboncoin · eBay · Vestiaire sur l\'annonce');
   dit(/'vrm_partout_params',/.test(src.app || '') && /onParamAnnonce=/.test(hote) && /reglageParams\(/.test(hote), 'G13 les paramètres par défaut synchronisés, et par annonce');
-  dit(/publier: !finir && extSait\('vcauto'\) === 'ok'/.test(hote), 'G14 Vestiaire à finir ⇒ le dépôt s\'ouvre sans publier tout seul');
+  dit(/<BoutonExtension className="vrm-ao-second" action="publier" site=\{x\.site\} ids=\{\[String\(l\.id\)\]\}/.test(fs.readFileSync(path.join(RACINE, 'src', 'PublierPartout.jsx'), 'utf8')), 'G14 (20 nov.) Leboncoin / Vestiaire : la case ouvre « Publier dans l’extension » sur CETTE annonce Vinted');
   dit(/prixDe=\{\(site, p\) => prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP \}\)/.test(app) && !/baisseCoque/.test(app) && /envoyer: envoisPrixVrm\(/.test(app), 'G16 « Changer le prix » : ajustement par site ; (19 nov.) Vinted part par l\'extension sur « Appliquer », la feuille « Baisser le prix » n\'est plus ouverte par-dessus');
   dit(/suiviPourPartout\(await chargerSuivi\(\)/.test(hote) && /doitSArreter: sv \? sv\.doitSArreter/.test(hote), 'G15 le suivi commun (SuiviTravail) branché, avec Pause / Arrêter');
 

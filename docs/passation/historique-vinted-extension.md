@@ -1193,3 +1193,17 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `numerotes` | `annoncerNumerotes` | **5.382.0** (15 nov.) | les N° neufs que VRM vient de donner aux annonces publiées hors de VRM (app Vinted) dits une fois : bandeau, notification, et « VRM a numéroté » dans la carte du logo (identités `id:N°`, compte de l'onglet) ; « je numérote moi-même » ⇒ l'app DEMANDE le N° de chaque nouvel article |
 | `lbccriteres` | `criteresFicheLbc` | **5.381.0** (15 nov.) | Publier partout : la catégorie, l'univers et le type Leboncoin posés depuis la table `src/correspondances.js` (par `catalog_id` Vinted, jamais le titre) ; pas posé ⇒ rien publié, dit |
 | `relevemois` | `apprendreRecetteReleve` | **5.378.0** (15 nov.) | relevé du porte-monnaie d'un mois passé : adresse APPRISE de son propre geste (Porte-monnaie → Historique → un mois), mois listés par Vinted seulement, 2 par visite, budget de lecture ; ne date une vente qu'après ≥ 5 accords avec le détail « Commande finalisée » et 0 désaccord (`src/versementReleve.js`) |
+
+
+### CLAUDE.md §8 — lignes déplacées telles quelles le 20 nov. (intégration 5.410)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `popupcapte` `cartelistes` `favoriscoches` | `annoncerCapte` · `carteListes` · `listeFavTriee` (vrm-badge.js) | **5.377.0** (14 nov.) | « VRM a capté · 2 nouvelles ventes » près du logo et dans l'app (par identité, une fois, réglage partagé) ; carte Favoris · Annonces · Ventes du compte de l'onglet, autres comptes floutés `inert` ; favoris du plus récent, cochés |
+| `remiseprix` | `remisePermise` | **5.376.0** (14 nov.) | « Remettre les prix » d'un solde : la seule hausse des chemins de baisse (Vinted, Leboncoin, Vestiaire), `remise` + `confirme` + prix = l'origine mémorisée, sur son clic |
+| `importpasse` | `importerAnnonces` | **5.375.0** (13 nov.) | « Import de ton passé · 340 / ~1 200 ventes » : 12 mois (horizon par date), annonces d'un trait, état noté après chaque page, souci dit ; `import_vinted_{uid}` v 2 |
+| `favoriattente` | `attendreOffreMessage` | **5.372.0** (12 nov.) | favoris : après l'offre ACCEPTÉE, 8 à 20 s au hasard (jamais deux fois la même valeur) puis le temps d'écriture ; attente dans `chrome.storage.local` (`vrmFavoriAttente`), reprise par un worker neuf (`reprendreMessagesFavoris`) ; Tout arrêter, captcha, pause, autre compte, onglet fermé ⇒ le message ne part pas, dit |
+| `suivinumero` | `suiviDeTransaction` | **5.372.0** (12 nov.) | chaque achat en cours (payé, en attente de livraison, expédié, au point, livré sans n°) reçoit n° de suivi + transporteur + point de destination (détail de la transaction quand le suivi ne les porte pas), 6 lectures/h ; codes de retrait cherchés aussi quand Vinted demande son geste ou que le suivi dit « disponible » |
+| `vccategorie` | `categorieVcDemandee` | **5.399.0** (16 nov. ; 5.397 sur sa branche, servie après la 5.398) | « Publier partout » envoie la catégorie Vestiaire ; posée seulement si chaque libellé existe tel quel dans le catalogue capté, sinon dépôt ouvert sans publier |
+| `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
+| `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |

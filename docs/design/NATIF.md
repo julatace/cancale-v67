@@ -92,7 +92,7 @@ lignes, sous-titre, valeur à droite, chevron | interrupteur | coche, balayage �
 texte | destructif-avec-confirmation ; chargement, indisponible AVEC sa raison) · `Segmente` · `Feuille` (détentes
 moitié / pleine, poignée, `FermeAuRetour`) · `Faits` (grille 2–4 colonnes : libellé 13 gris, valeur 17/600 ; une valeur
 « — » se touche et ouvre sa saisie) · `Plaque` (N°) · `Pastille` · `Affiche` (grand chiffre + unité + écart nommé) ·
-`Vide` (icône, une phrase, un geste) · `Attente` (squelette de la forme exacte, jamais de saut) · `Toast` (au-dessus
+`SelecteurSite` (20 nov. : LE sélecteur de plateforme global, src/siteCourant.js) · `Vide` (icône, une phrase, un geste) · `Attente` (squelette de la forme exacte, jamais de saut) · `Toast` (au-dessus
 de la barre, annulable 10 s) · `BarreOnglets` · `BarreLaterale`.
 Aucun style en ligne dans les écrans neufs ; aucun `!important` ; aucun `:has()` ancré sur `html`, `body`, `#root`.
 

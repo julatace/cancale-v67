@@ -251,18 +251,18 @@ if (arg.includes('--prouve')) {
     b.store.vrmLbcTransport = { 7: { source: 'prive', compte: 'lbc-account:aaaa1111-0000-0000-0000-000000000001', at: 1 }, 8: { source: 'prive', compte: 'lbc-account:aaaa1111-0000-0000-0000-000000000002', at: 2 } };
     b.onglets = undefined;
     c.chrome.tabs.get = async (id) => ({ id, url: id === 8 || id === 7 ? 'https://www.leboncoin.fr/compte/part/mes-annonces' : 'https://fr.vestiairecollective.com/' });
-    const r1 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'leboncoin', fiche: ficheL });
+    const r1 = await c.publierFicheSite({ cmd: 'publierFiche', verifVu: true, site: 'leboncoin', fiche: ficheL });
     dit(r1 && r1.accepte === false && r1.code === 'deux-comptes' && crees === 0 && !b.store.vrmPendingAd, 'G4 deux comptes Leboncoin ouverts ⇒ rien ne part (aucun onglet, aucun dépôt)', r1);
     b.store.vrmLbcTransport = { 7: { source: 'prive', compte: 'lbc-account:aaaa1111-0000-0000-0000-000000000001', at: 1 } };
-    const r2 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'leboncoin', fiche: ficheL });
+    const r2 = await c.publierFicheSite({ cmd: 'publierFiche', verifVu: true, site: 'leboncoin', fiche: ficheL });
     dit(r2 && r2.accepte === true && crees === 1 && b.store.vrmPendingAd && b.store.vrmPendingAd.ad.category === 'Chaussures' && b.store.vrmPendingAd.ad.publier === true, 'G5 un seul compte ⇒ dépôt ouvert, catégorie et critères portés', r2);
-    const r3 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'leboncoin', fiche: { ...ficheL, numero: '44', description: 'Réf. VRM-44' } });
+    const r3 = await c.publierFicheSite({ cmd: 'publierFiche', verifVu: true, site: 'leboncoin', fiche: { ...ficheL, numero: '44', description: 'Réf. VRM-44' } });
     dit(r3 && r3.accepte === false && r3.code === 'en-cours' && crees === 1, 'G6 un dépôt à la fois : le second attend la fin du premier', r3);
     b.store.vrmVcOnglets = { 8: { compte: '12345', at: Date.now() } };
     c.chrome.tabs.query = async () => [{ id: 8, url: 'https://fr.vestiairecollective.com/', active: true }];
-    const r4 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'vestiaire', fiche: { ...ficheV, marque: 'Nike SB' } });
+    const r4 = await c.publierFicheSite({ cmd: 'publierFiche', verifVu: true, site: 'vestiaire', fiche: { ...ficheV, marque: 'Nike SB' } });
     dit(r4 && r4.accepte === false && r4.code === 'marque-hors-liste' && crees === 1 && !b.store.vrmPendingVc, 'G7 Vestiaire : marque absente de SA liste ⇒ pas vendable ici, rien ne part', r4);
-    const r5 = await c.publierFicheSite({ cmd: 'publierFiche', site: 'vestiaire', fiche: ficheV });
+    const r5 = await c.publierFicheSite({ cmd: 'publierFiche', verifVu: true, site: 'vestiaire', fiche: ficheV });
     dit(r5 && r5.accepte === true && b.store.vrmPendingVc && b.store.vrmPendingVc.ad.marque === 'Nike' && b.store.vrmPendingVc.ad.vcCategorie.sous === 'Baskets', 'G8 Vestiaire : marque listée, catégorie exacte ⇒ préparation ouverte', r5);
     // P. photos d'un autre hôte : le fond les télécharge (droit d'hôte du manifeste), jamais un nom approchant.
     dit(c.urlPhotoPermise('https://i.ebayimg.com/images/g/x/s-l1600.jpg') && c.urlPhotoPermise('https://img.leboncoin.fr/api/v1/a.jpg') && !c.urlPhotoPermise('https://x.i.ebayimg.com/a.jpg') && !c.urlPhotoPermise('https://evil-ebayimg.com/a.jpg') && !c.urlPhotoPermise('https://exemple.invalid/a.jpg'),

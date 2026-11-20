@@ -97,7 +97,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   });
   await essaie('V2', async () => {
     const { envoyer, envois } = faireCtx();
-    const r = await envoyer(Object.assign({ confirme: true }, ACCEPTE));
+    const r = await envoyer(Object.assign({ confirme: true, avisVu: true }, ACCEPTE));
     dit(r && r.ok && envois.filter((e) => /accept$/.test(e)).length === 1, "V2 — autre sens : avec SA confirmation, l'acceptation part, une fois", envois.join(','));
   });
   await essaie('V3', async () => {

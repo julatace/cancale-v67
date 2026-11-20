@@ -16,6 +16,9 @@ import './styles-meilleures-sources.css';
 import { tr } from './i18n/index.js';
 import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from './natif/icones.jsx';
+import { Carte, Rangee, Segmente as NSegmente } from './natif/index.js';
+import { AideArgent } from './natif/ecrans/AideArgent.jsx';
+import './natif/ecrans/argent.css';
 
 export function useMeilleures(owner) {
   const [v, setV] = useState(() => lireMeilleures(owner));
@@ -102,79 +105,48 @@ export default function MeilleuresSources({ owner = '', Retour = null, ici = 'ar
   const [ouverte, setOuverte] = useState('');
   const maintenant = Date.now();
   const sources = useMemo(() => (r ? classer(r.sources, par) : []), [r, par]);
-  const tete = (
-    <div className="vrm-ms-tete">
-      <h2 className="vrm-ms-titre">Tes meilleures sources</h2>
-      {r && r.sources.length > 1 ? (
-        <div role="group" aria-label="Classer" className="vrm-ms-seg" data-ms-par={par}>
-          <button type="button" aria-pressed={par === 'benefice'} data-ms-classer="benefice" onClick={() => setPar('benefice')}>{tr('achats.ms.benefice')}</button>
-          <button type="button" aria-pressed={par === 'vitesse'} data-ms-classer="vitesse" onClick={() => setPar('vitesse')}>{tr('achats.ms.vitesse')}</button>
-        </div>
-      ) : null}
-    </div>
-  );
-  let corps;
-  if (!r) corps = <p className="vrm-sa-vide vrm-ms-surface" data-ms-etat="passu">— · ouvre Achats pour les calculer</p>;
-  else if (!r.sources.length) corps = <p className="vrm-sa-vide vrm-ms-surface" data-ms-etat="lu" data-ms-n="0">Aucun achat enregistré pour l’instant.</p>;
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis — Julien : « “Tes meilleures sources” énorme ». Une carte à filet
+  // (« TES MEILLEURES SOURCES » en petites capitales), « Bénéfice · Vitesse » en segmenté, une RANGÉE par source (le nom,
+  // « investi · marge · délai » et la couverture en une ligne grise, le chiffre du classement à droite, chevron ⇒ ses
+  // achats) ; ce qui n'entre dans aucune source en une ligne grise ; « Comment c'est calculé » en « ? » dans l'en-tête.
+  // Les mêmes textes (src/meilleuresSources.js), les mêmes data-ms-*.
+  let corps, hors = [];
+  if (!r) corps = <Rangee titre="—" sousTitre="ouvre Achats pour les calculer" attrs={{ 'data-ms-etat': 'passu' }}/>;
+  else if (!r.sources.length) corps = <Rangee titre="Aucun achat enregistré pour l’instant." attrs={{ 'data-ms-etat': 'lu', 'data-ms-n': '0' }}/>;
   else {
-    const premier = sources.find((s) => s.cle !== 'non-saisie' && (par === 'vitesse' ? s.delaiMoyen != null : s.benefice != null && s.benefice > 0));
-    const hors = texteHorsSources(r);
-    // Une tuile : le gros chiffre, le libellé dessous. « — » reste « — » (pas su ≠ 0, §5).
-    // « au moins 300 € » : « au moins » en petit AU-DESSUS du chiffre (les mêmes mots ; le chiffre tient dans sa tuile).
-    // (AJOUT 3 : jamais une case pour « — ») Une tuile sans valeur n'est pas dessinée : le « — » de la source le dit
-    // déjà sur sa ligne, et « Comment c'est calculé » dit pourquoi.
-    const tuile = (cle, val, lib) => { if (val === '—') return null; const m = /^(au moins|au plus) (.+)$/.exec(val);
-      // L'argent rendu lisible (comme une app de banque) : le nombre en grand, l'unité (€, %, jours) plus petite à côté —
-      // les MÊMES caractères (« 60 500 € »), seule la taille change.
-      const corps = m ? m[2] : val; const u = /^(.*?)(\s(?:€|%|jours?))$/.exec(corps);
-      const chiffre = u ? <>{u[1]}<span className="vrm-ms-unite">{u[2]}</span></> : corps;
-      return <span className="vrm-ms-tuile" data-ms-tuile={cle}><b>{m ? <><span className="vrm-ms-pre">{m[1]} </span>{chiffre}</> : chiffre}</b><small>{lib}</small></span>; };
+    const premier = sources.find((x) => x.cle !== 'non-saisie' && (par === 'vitesse' ? x.delaiMoyen != null : x.benefice != null && x.benefice > 0));
+    hors = texteHorsSources(r);
+    const sous = (x) => [texteInvesti(x) !== '—' ? `${tr('achats.ms.investi')} ${texteInvesti(x)}` : '', texteMarge(x) !== '—' ? `${tr('achats.ms.marge')} ${texteMarge(x)}` : '',
+      par === 'vitesse' ? (texteBenefice(x) !== '—' ? `${tr('achats.ms.benefice')} ${texteBenefice(x)}` : '') : (texteDelai(x) !== '—' ? texteDelai(x) : ''), texteCouvertureSource(x)].filter(Boolean).join(' · ');
     corps = (
       <div className="vrm-ms-corps" data-ms-etat="lu" data-ms-n={sources.length}>
-        <ol className="vrm-ms-lignes vrm-ms-surface">
-          {sources.map((s, i) => (
-            <li key={s.cle}>
-              <button type="button" className="vrm-ms-ligne" data-ms-source={s.cle} data-ms-rang={i + 1} data-ms-tete={premier === s ? '1' : undefined}
-                data-ms-benefice={s.benefice == null ? '' : String(s.benefice)} data-ms-delai={s.delaiMoyen == null ? '' : String(s.delaiMoyen)}
-                data-ms-articles={s.articles} data-ms-revendus={s.revendus} data-ms-sans-prix={s.sansPrix} data-ms-pas-revendus={s.pasRevendus}
-                onClick={() => setOuverte(s.cle)}>
-                {/* (11 nov., lot accessibilité) Nommé par ce qu'il montre (source, chiffres) + le geste lu à la
-                    fin ; un aria-label « source : ouvrir ses achats » taisait les chiffres affichés (WCAG 2.5.3). */}
-                <span className="vrm-ms-nom">{s.libelle}{s.genre ? <span className="vrm-ms-genre"> · {s.genre}</span> : null}</span>
-                <span className="vrm-ms-chiffre">{par === 'vitesse' ? texteDelai(s) : texteBenefice(s)}</span>
-                <span className="vrm-ms-chevron" aria-hidden="true">›</span>
-                <span className="vrm-ms-tuiles">
-                  {tuile('investi', texteInvesti(s), tr('achats.ms.investi'))}
-                  {tuile('marge', texteMarge(s), tr('achats.ms.marge'))}
-                  {par === 'vitesse' ? tuile('benefice', texteBenefice(s), tr('achats.ms.benefice')) : tuile('delai', texteDelai(s), tr('achats.ms.pourRevendre'))}
-                </span>
-                {/* §5 : la couverture À CÔTÉ des chiffres, en une ligne (la même phrase qu'avant) — « revendus sur
-                    achetés » n'a pas de tuile : le même nombre ne s'écrit qu'une fois (§7). */}
-                <span className="vrm-ms-sur" title={texteCouvertureSource(s)}>{texteCouvertureSource(s)}</span>
-                <span className="vrm-sr-seul"> · {texteAttente(s)} — ouvrir ses achats</span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        {/* Ce qui n'est compté dans AUCUNE source : dit en une ligne courte (le début de la même phrase) ; la phrase
-            entière, et le pourquoi, dans « Comment c'est calculé ». */}
-        {hors.map((t, i) => <p key={i} className="vrm-ms-hors" data-ms-hors={i} title={t}>{premierePartie(t)}</p>)}
-        <details className="vrm-ms-calcul" data-ms-calcul="">
-          <summary>{tr('compta.commentCalcule')}</summary>
-          <ul>
-            {sources.map((s) => <li key={s.cle}><b>{s.libelle}</b> · {texteAttente(s)}</li>)}
-            {hors.map((t, i) => <li key={'h' + i}>{t}</li>)}
-            <li>Bénéfice et marge : sur les articles revendus et reliés à leur achat · « pas encore revendu » : aucune vente reliée (en stock, ou vendu sans achat relié).</li>
-          </ul>
-        </details>
+        {r.sources.length > 1 ? (
+          <div className="n-arg-tri" data-ms-par={par}><NSegmente libelle="Classer" valeur={par} onChange={setPar}
+            options={[{ cle: 'benefice', libelle: tr('achats.ms.benefice'), attrs: { 'data-ms-classer': 'benefice' } }, { cle: 'vitesse', libelle: tr('achats.ms.vitesse'), attrs: { 'data-ms-classer': 'vitesse' } }]}/></div>
+        ) : null}
+        {sources.map((x, i) => (
+          <Rangee key={x.cle} titre={<>{x.libelle}{x.genre ? <span className="n-arg-gris"> · {x.genre}</span> : null}<span className="vrm-sr-seul"> · {texteAttente(x)} — ouvrir ses achats</span></>}
+            sousTitre={sous(x)} sousLignes={2} valeur={<span className="vrm-ms-chiffre">{par === 'vitesse' ? texteDelai(x) : texteBenefice(x)}</span>} valeurForte fin="chevron" onClick={() => setOuverte(x.cle)}
+            attrs={{ 'data-ms-source': x.cle, 'data-ms-rang': i + 1, 'data-ms-tete': premier === x ? '1' : undefined, 'data-ms-benefice': x.benefice == null ? '' : String(x.benefice),
+              'data-ms-delai': x.delaiMoyen == null ? '' : String(x.delaiMoyen), 'data-ms-articles': x.articles, 'data-ms-revendus': x.revendus, 'data-ms-sans-prix': x.sansPrix, 'data-ms-pas-revendus': x.pasRevendus }}/>
+        ))}
+        {hors.map((t, i) => <p key={i} className="n-arg-pied vrm-ms-hors" data-ms-hors={i} title={t}>{premierePartie(t)}</p>)}
       </div>
     );
   }
   const s = ouverte ? (r && r.sources.find((x) => x.cle === ouverte)) : null;
   return (
-    <section className="vrm-ms-carte" data-stats-carte="meilleures-sources" data-ms-ici={ici}>
-      {tete}{corps}
+    <Carte titre="Tes meilleures sources" className="vrm-ms-carte n-arg-ms"
+      action={r && r.sources.length ? <AideArgent titre={tr('compta.commentCalcule')} attrs={{ 'data-ms-calcul': '' }}>
+        <ul>
+          {sources.map((x) => <li key={x.cle}><b>{x.libelle}</b> · {texteAttente(x)}</li>)}
+          {hors.map((t, i) => <li key={'h' + i}>{t}</li>)}
+          <li>Bénéfice et marge : sur les articles revendus et reliés à leur achat · « pas encore revendu » : aucune vente reliée (en stock, ou vendu sans achat relié).</li>
+        </ul>
+      </AideArgent> : null}
+      attrs={{ 'data-stats-carte': 'meilleures-sources', 'data-ms-ici': ici }}>
+      {corps}
       {s ? <Feuille titre={s.libelle} Retour={Retour} onFermer={() => setOuverte('')}><ListeAchats s={s} maintenant={maintenant}/></Feuille> : null}
-    </section>
+    </Carte>
   );
 }

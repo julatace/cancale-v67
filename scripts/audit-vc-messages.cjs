@@ -312,7 +312,8 @@ function m9() {
   dit(/titreArticle:\s*String\(v\.titre/.test(bloc) && /(?:titre|nom)=\{\(fv && fv\.titre\) \|\| v\.titreArticle/.test(bloc), 'M9 · l’écran Messages → Vestiaire affiche le titre de l’article lu quand la conversation n’est reliée à aucune fiche');
   dit(/photoArticle:\s*urlPhotoVc\(/.test(bloc) && /photo=\{\(fv && fv\.photo\) \|\| v\.photoArticle\}/.test(bloc), 'M9 · … et sa photo (adresse vestiairecollective.com vérifiée)');
   const fil = APP.slice(APP.indexOf('function FilVestiaire('), debut);
-  dit(/envoi && envoi\.raison === 'messagerie-stream'/.test(fil) && /data-vc-envoi-stream/.test(fil), 'M9 · le pied du fil dit pourquoi VRM n’envoie pas (messagerie à part) au lieu d’un code');
+  // (20 nov., décision de Julien) Répondre se fait dans le PANNEAU de l'extension : le pied du fil l'ouvre (plus de raison technique ici).
+  dit(/<BoutonExtension action="repondre" site="vestiaire" ids=\{\[String\(conv\)\]\} large\/>/.test(fil), 'M9 · le pied du fil ouvre « Répondre dans l’extension » sur CETTE conversation');
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
   const man = JSON.parse(fs.readFileSync(path.join(path.dirname(F.inject), 'manifest.json'), 'utf8'));
   // (4 nov., 5.319) La version d'ARRIVÉE (5.317.0), jamais la dernière publiée (§8) : comparer au manifeste rougissait à chaque montée de version.

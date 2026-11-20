@@ -6,7 +6,7 @@
 .vrm-vp-entree, .vrm-rf {
   display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; min-height: 56px;
   padding: 12px 16px; margin: 0 0 12px; border: 0; text-align: left; font: inherit; color: var(--sb-encre, #0C1D30);
-  background: var(--sb-porcelaine-degrade, #fff); border-radius: var(--sb-r-tuile, 22px); box-shadow: var(--sb-ombre-pose);
+  background: var(--sb-porcelaine-degrade, #fff); border-radius: var(--sb-r-tuile, 22px); box-shadow: none;
 }
 .vrm-vp-entree { cursor: pointer; }
 .vrm-vp-entree:focus-visible, .vrm-rf-ligne:focus-visible { outline: 2px solid var(--sb-diode, #0060CC); outline-offset: 2px; }
@@ -16,7 +16,7 @@
 .vrm-vp-chevron { font-size: 22px; line-height: 1; color: var(--sb-encre-2, #44546A); flex: none; }
 
 /* La feuille : porcelaine opaque (la classe .vrm-ao-feuille), la liste en plaques. */
-.vrm-bc-liste { list-style: none; margin: 0 0 12px; padding: 0; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); overflow: hidden; }
+.vrm-bc-liste { list-style: none; margin: 0 0 12px; padding: 0; background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; overflow: hidden; }
 .vrm-bc-ligne { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 4px; min-height: 64px; }
 .vrm-bc-ligne + .vrm-bc-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-bc-zone { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; cursor: pointer; }

@@ -822,6 +822,183 @@
   .conf5 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .conf5 span { flex: 1 1 200px; }
   .conf5 .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
+
+  /* ══ 5.410 — LE GRAND PANNEAU (Julien, 20 nov. : « tu fais pareil que [l’outil qu’il cite] ») : presque plein écran à
+     l'ordinateur, barre latérale fixe 232 px (réductible à 64), en-tête 56, la page en tableau sur fond blanc, filets fins,
+     étiquettes douces neutres (ambre = à faire), accent bleu rare. Jamais de rouge, de vert vif ni de violet. */
+  .carte[data-grand] { top: 12px !important; bottom: 12px !important; left: 12px !important; right: 12px !important; width: auto !important; padding: 0 !important; overflow: hidden !important; border-radius: 14px; }
+  .carte[data-grand] .contenu { height: 100%; }
+  .carte[data-grand] .contenu > .vx6 { background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; height: 100%; }
+  .vx6 { display: grid; grid-template-columns: 232px minmax(0, 1fr); height: 100%; color: var(--n-encre); font: 400 15px/20px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; }
+  .vx6[data-reduit] { grid-template-columns: 64px minmax(0, 1fr); }
+  .side6 { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; background: var(--n-fond); border-right: .5px solid var(--n-trait); overflow-y: auto; }
+  .marque6 { display: flex; align-items: center; gap: 8px; padding: 2px 10px 12px; font: 700 17px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .marque6 img { border-radius: 6px; }
+  .grp6 { padding: 14px 12px 4px; font: 600 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .nav6 { appearance: none; border: 0; background: transparent; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; text-align: left; width: 100%; }
+  .nav6:hover { background: rgb(127 127 127 / .08); }
+  .nav6[aria-current="page"] { background: var(--n-teinte); color: var(--n-accent); font-weight: 600; }
+  .nav6:focus-visible, .th6:focus-visible, .rond6:focus-visible, .maj6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 1px; }
+  .ico6 { flex: none; }
+  .bas6 { margin-top: auto; padding-top: 10px; border-top: .5px solid var(--n-trait); }
+  .vx6[data-reduit] .nav6 span, .vx6[data-reduit] .grp6, .vx6[data-reduit] .marque6 b { display: none; }
+  .vx6[data-reduit] .nav6 { justify-content: center; padding: 0; }
+  .main6 { display: flex; flex-direction: column; min-width: 0; background: var(--n-carte); }
+  .tete6 { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 16px; border-bottom: .5px solid var(--n-trait); }
+  .tete6 h1 { margin: 0; font: 700 20px/26px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .compte6 { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; border: .5px solid var(--n-trait); font: 500 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .compte6 i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--n-teinte); color: var(--n-accent); font: 700 11px/1 -apple-system, Inter, system-ui, sans-serif; font-style: normal; }
+  .esp6 { flex: 1; }
+  .rond6 { appearance: none; border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; display: inline-grid; place-items: center; color: var(--n-encre-2); cursor: pointer; font-size: 22px; position: static !important; float: none !important; }
+  .rond6:hover { background: rgb(127 127 127 / .10); }
+  .maj6 { appearance: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; justify-content: center; padding: 0 14px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .corps6 { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 24px; }
+  .corps6 .gestes, .corps6 .listes5, .corps6 .panneau { background: transparent !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+  .corps6 .seg5 { display: none !important; }
+  .vx6 input[type=checkbox] { accent-color: var(--n-accent); }
+  @media (prefers-color-scheme: dark) { .vx6 { color-scheme: dark; } }
+  .corps6 .listes5 { display: block !important; grid-template-columns: none !important; }
+  .corps6 .listes5 > .panneau { width: auto !important; max-width: none !important; }
+  .vx6 { grid-template-rows: minmax(0, 1fr); }
+  .vx6 > .side6, .vx6 > .main6 { min-height: 0; }
+  .main6 { overflow: hidden; }
+  .ext6 { margin: 12px 16px 0; }
+  .ext6 > * { margin: 0 !important; border-radius: 12px; }
+  .barre6 { padding: 14px 16px; border-bottom: .5px solid var(--n-trait); gap: 10px; }
+  .barre6 .act5 { min-width: 200px; }
+  .barre6 .cherche5 { max-width: 420px; }
+  .statut6 .cols5-l label { justify-content: space-between; }
+  .statut6 .cols5-l label span { flex: 1; }
+  .statut6 .cols5-l b { color: var(--n-encre-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .statut6 .cols5-l { left: 0; right: auto; }
+  .n6 { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px 8px; color: var(--n-encre-2); font: 400 14px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .n6-d { display: inline-flex; align-items: center; gap: 8px; }
+  .n6 .vue5 { min-width: 0; }
+  .n6 .vue5 button { min-width: 44px; font-size: 16px; }
+  .table6 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
+  .table6 .rangs { margin: 0; padding: 0; list-style: none; }
+  .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
+  .corps6 .table5 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; }
+  .corps6 .table5 .rangs > li, .table6 .rangs > li, .corps6 .gauche5 .rangs > li, .corps6 .gauche5 .rang { background: var(--n-carte) !important; }
+  .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
+  .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
+  .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
+  .tr6 .cels6 { display: grid; grid-template-columns: repeat(var(--n6, 4), minmax(92px, auto)); gap: 0 12px; align-items: center; }
+  .th6r { min-height: 44px; background: var(--n-carte); border-bottom: .5px solid var(--n-trait); }
+  .th6 { appearance: none; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 44px; padding: 0; font: 500 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); cursor: pointer; text-align: right; }
+  .th6r > .th6 { justify-content: flex-start; }
+  .th6 i { font-style: normal; font-size: 11px; opacity: .7; }
+  .th6[aria-sort="ascending"], .th6[aria-sort="descending"] { color: var(--n-encre); }
+  .art6 { appearance: none; border: 0; background: transparent; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; text-align: left; color: var(--n-encre); cursor: pointer; font: inherit; min-width: 0; }
+  .art6 .vig { width: 48px; height: 48px; border-radius: 8px; flex: none; object-fit: cover; background: var(--n-carte-2); }
+  .art6 .ti { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .art6 .st6 { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cel6 { text-align: right; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cel6 b { font-weight: 600; }
+  .cel6[data-col="statut"], .cel6[data-col="transporteur"] { text-align: left; }
+  .tr-l6 { display: inline-flex; align-items: center; gap: 8px; }
+  .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
+  .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
+  .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .et6[data-statut="en_vente"] { background: var(--n-teinte); color: var(--n-accent); }
+  .plus6 { appearance: none; border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; color: var(--n-encre-2); font-size: 20px; cursor: pointer; }
+  .plus6:hover { background: rgb(127 127 127 / .10); }
+  .table6 li[data-coche] > .tr6 { background: var(--n-teinte); }
+  .vide6 { margin: 24px 16px; text-align: center; }
+  .av6 { width: 40px; height: 40px; border-radius: 50%; flex: none; object-fit: cover; display: inline-grid; place-items: center; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 16px/1 -apple-system, Inter, system-ui, sans-serif; }
+  .vig6 { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: none; margin-left: auto; background: var(--n-carte-2); }
+  .carte[data-grand] .corps6 .deux5 { min-height: calc(100vh - 120px); }
+  .carte[data-grand] .corps6 .gauche5 .rangs .rang { min-height: 64px; }
+  .au6-l { list-style: none; margin: 0; padding: 0; }
+  .au6-i { appearance: none; border: 0; background: transparent; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 72px; padding: 10px 16px; text-align: left; color: var(--n-encre); cursor: pointer; border-bottom: .5px solid var(--n-trait); font: inherit; }
+  .au6-i[aria-selected="true"] { background: var(--n-teinte); box-shadow: inset 3px 0 0 var(--n-accent); }
+  .au6-i .ti { display: block; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .au6-i .me { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .au6-d { padding: 0 !important; display: flex; flex-direction: column; }
+  .au6-t { padding: 16px 24px; border-bottom: .5px solid var(--n-trait); }
+  .au6-t h2 { margin: 0; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .au6-t p { margin: 2px 0 0; color: var(--n-encre-2); font-size: 14px; }
+  .sec6 { padding: 12px 24px 4px; }
+  .sec6 h3 { margin: 8px 0 6px; font: 600 12px/16px -apple-system, Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); }
+  .rg6 { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: .5px solid var(--n-trait); }
+  .rg6 b { display: block; font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .rg6 small { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .rg6 .v6 { font-weight: 600; text-align: right; }
+  .msg6 { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 6px 0; border: .5px solid var(--n-trait); border-radius: 12px; color: var(--n-encre); }
+  .msg6 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .apercu6 { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .pied6 { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; border-top: .5px solid var(--n-trait); }
+  .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
+  .pied6 .vu-lien { white-space: nowrap; }
+  .acc6 { padding: 8px 0; max-width: 980px; }
+  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .geste6 { margin: 12px 16px; padding: 12px 16px; border: .5px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
+  .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .prix6 { width: 110px; min-height: 44px; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .geste6 select { min-height: 44px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; max-width: 520px; }
+  .geste6 .au6-l li { border-bottom: .5px solid var(--n-trait); }
+  .geste6 .pied6 { padding: 12px 0 0; }
+  .offre6 .conf5 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+  @media (max-width: 760px) { .geste6 { margin: 8px; } .offre6 { flex-direction: column; align-items: stretch; } .geste6 .rg6 { flex-wrap: wrap; } }
+  .cd6-l { display: flex; align-items: center; gap: 12px; max-width: 520px; }
+  .cd6-l input[type=range] { flex: 1; min-height: 44px; accent-color: var(--n-accent); padding: 0; border: 0; background: transparent; }
+  .cd6-l output { min-width: 88px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .champ6 { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: .5px solid var(--n-trait); }
+  .champ6 b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .champ6 small { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
+  .au6-d .conf5 { margin: 12px 24px 0; }
+  .conf5[data-irreversible] { display: block !important; }
+  .conf5[data-irreversible] p { margin: 0 0 8px; }
+  /* (20 nov., intégration 5.410) Cadence : la question et ses deux touches sur une ligne ; « Enregistrer » se retire
+     pendant la question (un seul plein à l'écran). */
+  [data-cad-confirme] p { flex: 1 1 220px; margin: 0; }
+  [data-cad-confirme] .outils { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
+  .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
+  .au6-d [data-ra-etat] { margin: 8px 24px 0; }
+  .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
+  .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .tu6 b { display: block; font: 700 28px/34px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .tu6[data-ton="ambre"] b { color: var(--n-ambre, #8A4B00); }
+  /* Au téléphone / Orion : la barre latérale devient une rangée défilante en haut ; le tableau, des rangées empilées. */
+  @media (max-width: 760px) {
+    .carte[data-grand] { top: 0 !important; bottom: 0 !important; left: 0 !important; right: 0 !important; border-radius: 0; }
+    .vx6, .vx6[data-reduit] { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    .side6 { flex-direction: row; overflow-x: auto; padding: 6px 8px max(6px, env(safe-area-inset-bottom)) 8px; border-right: 0; border-bottom: .5px solid var(--n-trait); gap: 4px; scrollbar-width: none; order: 2; }
+    .main6 { order: 1; min-height: 0; }
+    .side6 .marque6, .side6 .grp6 { display: none; }
+    .side6 .bas6 { margin: 0; padding: 0; border: 0; }
+    .nav6 { flex: none; width: auto; flex-direction: column; gap: 2px; min-height: 52px; min-width: 64px; padding: 4px 8px; font-size: 11px; line-height: 14px; justify-content: center; }
+    .vx6[data-reduit] .nav6 span { display: inline; }
+    .tete6 { padding: max(6px, env(safe-area-inset-top)) 8px 6px; }
+    .tete6 [data-vx-reduire] { display: none; }
+    .tete6 h1 { font-size: 22px; }
+    .maj6 span { display: none; }
+    .compte6 { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .barre6 { padding: 10px 12px; }
+    /* (20 nov., intégration 5.410) « Choisir une action » n'est plus coupé au téléphone : action et Statut sur la 1re ligne,
+       la recherche en dessous sur toute la largeur. */
+    .barre6 .act5 { min-width: 0; flex: 1 1 140px; }
+    .barre6 .cherche5 { flex: 1 1 100%; max-width: none; order: 3; }
+    .table6 { margin: 0 8px; }
+    .th6r { display: none !important; }
+    .tr6 { grid-template-columns: 44px minmax(0, 1fr) 40px; padding: 4px 4px; }
+    .tr6 .cels6 { grid-column: 2 / 4; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0 0 10px 60px; }
+    .tr6 > .plus6 { grid-column: 3; grid-row: 1; }
+    .cel6 { text-align: left; font-size: 14px; }
+    .tuiles6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .au6 .volet5, .au6 .au6-d { display: flex !important; }
+    .au6 { display: block !important; }
+    /* 5.410.1 : au téléphone, le grand panneau occupe l'écran — le rond VRM s'écarte (le × ferme), il ne couvre plus
+       la barre du bas ; Automatisations : la LISTE seule, puis le détail en page poussée avec « ‹ Retour ». */
+    .carte.on[data-grand] ~ .btn { display: none !important; }
+    .au6[data-auto-vue="liste"] .au6-d { display: none !important; }
+    .au6[data-auto-vue="detail"] .gauche5 { display: none !important; }
+    .au6-retour { display: inline-flex !important; }
+    .sec6, .au6-t, .pied6 { padding-left: 16px; padding-right: 16px; }
+  }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -1126,7 +1303,6 @@
   // L'écran de VRM où s'écrit le message aux favoris (Messages → Favoris) : la MÊME adresse
   // que l'app reconnaît (`tab=messages&vue=favoris`), dans un NOUVEL onglet — l'onglet Vinted
   // reste où il est. Le seul lien de la carte vers VRM, et seulement quand le message manque.
-  const ECRIRE_MESSAGE_URL = 'https://vrm.center/?tab=messages&vue=favoris';
   const BLOCAGES_FAV = {
     reglages: 'Pour leur écrire d’ici, écris ton message une fois pour ce compte (Messages → Favoris → Ton message).',
     favoris_absents: 'Ouvre une fois ta cloche Vinted (tes notifications) : VRM y lit qui a mis tes articles en favori.',
@@ -1173,6 +1349,7 @@
       return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
         <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans">· ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
         <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}">${esc(quoi)}</div>
+        ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
         ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
         ${inc ? `<div class="p-pour ambre" data-fav-verifier="${inc}">${esc(TU('f_verifier', { n: inc }))}</div>` : ''}
         <button class="vu-btn vu-sec" data-fav-ok>OK</button>
@@ -1186,7 +1363,8 @@
     const quand = x.date ? depuis(Date.parse(x.date)) : '';
     return `<li class="rang" data-fav-qui="${esc(x.id)}"${x.date ? ` data-fav-date="${esc(x.date)}"` : ''} data-fav-etat="${esc(x.etat || '')}">${photoFav(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Article')}</span><span class="me"><span class="sg">${esc(x.pseudo || 'Un acheteur')}</span>${quand ? ' · <span class="sg">' + esc(quand) + '</span>' : ''}${etatT ? ' · <span class="sg">' + esc(etatT) + '</span>' : ''}</span></span></li>`;
   };
-  const gesteEcrire = () => `<div class="ecrire" data-fav-ecrire-bloc><div class="val gris">${esc(BLOCAGES_FAV.reglages)}</div><a class="lien-site lien-vrm" data-fav-ecrire href="${ECRIRE_MESSAGE_URL}" target="_blank" rel="noopener"><span>Écris d’abord ton message dans VRM</span><i aria-hidden="true"></i></a></div>`;
+  // 5.410 : le message se règle DANS le panneau (Automatisations · Messages aux favoris), plus dans VRM.
+  const gesteEcrire = () => `<div class="ecrire" data-fav-ecrire-bloc><div class="val gris">${esc(BLOCAGES_FAV.reglages)}</div><button type="button" class="lien-site" data-fav-ecrire data-onglet-b="automatisations"><span>${esc(TU('g6_ecrire_message'))}</span><i aria-hidden="true"></i></button></div>`;
   // L'onglet Favoris de la carte (compte de l'onglet, Vinted).
   // 5.409 (Julien : « pour les messages aux favoris, un accompagnement parfait de A à Z pour ne pas être perdu ») :
   // les étapes numérotées au-dessus de chaque écran du parcours (1 Choisir · 2 Offre et message · 3 Rythme ·
@@ -1549,10 +1727,10 @@
   // Tout vient du service worker (`carteListes`, lecture seule) ; pas su ⇒ « — », dit.
   // 5.409 (Julien, 19 nov. : « Fais un onglet Messages (très important), Mes annonces / mon dressing, Favoris, et
   // Ventes […] Tu peux faire des Paramètres dans l'extension ») : cinq onglets ; « Messages » d'abord.
-  const ONGLETS5 = ['messages', 'annonces', 'favoris', 'ventes', 'notifications', 'automatisations', 'parametres'];
+  const ONGLETS5 = ['accueil', 'messages', 'annonces', 'favoris', 'ventes', 'notifications', 'automatisations', 'parametres'];
   let ficheOuverte = '';   // 'a:{id}' (une annonce) ou 'v:{tx}' (une vente) dépliée — une à la fois
-  let menuCompteOuvert = false, ongletListe = 'messages', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
-  try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (ONGLETS5.includes(g.vrmCarteOnglet)) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
+  let menuCompteOuvert = false, ongletListe = 'accueil', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
+  try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (ONGLETS5.includes(g.vrmCarteOnglet) && !hote.hasAttribute('data-lien-panneau')) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   // 5.409 (captures « Commandes » de Vintex) : l'état en mots clairs — « Action requise : à expédier » en ambre, le reste neutre.
   const ETAT_VENTE = { a_expedier: 'Action requise : à expédier', en_route: 'En route : rien à faire', finalisee: 'Terminée', annulee: 'Annulée — pas une vente', pas_su: 'État pas encore lu' };
@@ -1583,11 +1761,188 @@
   //    « Colonnes ▾ » mémorisé (chrome.storage.local), cases + « tout ». Rien ne part d'ici : une action ouvre le
   //    geste gardé (VRM, ou le parcours des favoris de la carte).
   const COLS5 = ['num', 'prix', 'mini', 'achat', 'date', 'vues', 'favoris', 'place', 'statut'];
-  const COLS5_DEFAUT = ['num', 'prix', 'mini', 'date', 'favoris', 'statut'];
+  const COLS5_DEFAUT = ['prix', 'date', 'vues', 'favoris', 'statut'];
+  // 5.410 (comme Vintex) : le N° est la plaque devant le titre, plus une colonne ; les colonnes de Vintex d'abord.
+  const COLS6 = ['prix', 'date', 'vues', 'favoris', 'statut', 'mini', 'achat', 'place'];
   const STATUTS5 = ['en_vente', 'brouillon', 'masque', 'reserve', 'vendu', 'a_confirmer'];
-  let annConfirme = null, annEnVol = false, annResultat = null;
+  let annConfirme = null, annEnVol = false, annResultat = null, annActionPre = '';
+  // ══ 5.410 — LES GESTES DU PANNEAU (l'app ne les fait plus) : prix, atelier Republier, publier, offres ══
+  //    Chacun passe par le chemin gardé du fond ; rien n'ouvre vrm.center.
+  let geste6 = null, geste6Etat = null, geste6EnVol = false, offreConf = null, offreEtat = null, offreContre = {};
+  const euroTxt = (n) => (Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  // Le plancher montré (la règle du fond le revérifie) : le prix mini, sinon l'achat + 10 %, sinon « pas su ».
+  const plancher6 = (x) => (Number(x.mini) > 0 ? { v: Number(x.mini), de: 'mini' } : Number(x.achat) > 0 ? { v: Math.ceil(Number(x.achat) * 110) / 100, de: 'achat' } : null);
+  const envoyer6 = (msg, fin) => { geste6EnVol = true; rendre(); try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge' }, msg), (r) => { void chrome.runtime.lastError; geste6EnVol = false; try { fin(r || null); } catch (_) {} rendre(); }); } catch (_) { geste6EnVol = false; fin(null); rendre(); } };
+  function geste6Html() {
+    if (!geste6) return '';
+    const toutes = (listes && listes.annonces && listes.annonces.toutes) || [];
+    const de = (id) => toutes.find((y) => y.id === id) || { id };
+    const etat = geste6Etat ? `<p class="note5" role="status" data-geste-etat="${geste6Etat.ok ? 'ok' : 'ko'}">${esc(geste6Etat.texte)}</p>` : '';
+    const fermer = `<button type="button" class="vu-btn" data-geste-fermer>${esc(TU('ra_annuler'))}</button>`;
+    if (geste6.k === 'prix') {
+      const lignes = geste6.ids.map((id) => { const x = de(id); const pl = plancher6(x); const v = geste6.prix[id] != null ? geste6.prix[id] : '';
+        return `<div class="rg6" data-prix-ligne="${esc(id)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b><small>${esc(TU('g6_prix_vu', { p: Number(x.prix) > 0 ? euroTxt(x.prix) : '—' }))} · ${esc(pl ? TU(pl.de === 'mini' ? 'g6_plancher_mini' : 'g6_plancher_achat', { p: euroTxt(pl.v) }) : TU('g6_plancher_pas_su'))}</small></span><input type="text" inputmode="decimal" class="prix6" data-prix-nouveau="${esc(id)}" value="${esc(v)}" aria-label="${esc(TU('g6_nouveau_prix'))}" placeholder="${esc(TU('g6_nouveau_prix'))}"></div>`; }).join('');
+      const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_confirmer'))}</button></div></section>`;
+    }
+    if (geste6.k === 'atelier') {
+      const g = geste6, ph = g.photo;
+      const liste = g.ids.map((id, i) => { const x = de(id); const v = g.verif && g.verif.paires ? g.verif.paires[id] : null;
+        const detail = v ? `${etiquette5(v.etat, TU('g6_v_' + (['ok', 'corrige', 'a-corriger', 'absente'].includes(v.etat) ? v.etat.replace('-', '_') : 'pas_verifie')), v.etat === 'a-corriger' ? 'ambre' : '')}${(v.corrections || []).map((c) => `<small>${esc((c.nom || c.champ) + ' : ' + (c.raison || ''))}</small>`).join('')}${(v.manque || []).map((m) => `<small>${esc(TU('g6_manque', { m }))}</small>`).join('')}${v.raison && v.etat !== 'ok' ? `<small>${esc(v.raison)}</small>` : ''}${v.etat === 'a-corriger' && v.question && Array.isArray(v.question.options) ? `<label class="champ6"><b>${esc(TU('g6_choisir', { nom: v.question.nom || v.question.champ }))}</b><select data-atelier-question="${esc(id)}" data-champ="${esc(v.question.champ)}"><option value=""></option>${v.question.options.map((o) => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></label>` : v.etat === 'a-corriger' && v.question && v.question.geste ? `<small>${esc(v.question.geste)}</small>` : ''}${v.etat === 'a-corriger' || v.etat === 'absente' ? `<button type="button" class="vu-btn" data-atelier-retirer="${esc(id)}">${esc(TU('g6_retirer'))}</button>` : ''}` : '';
+        return `<li class="rg6" data-atelier-paire="${esc(id)}" data-verif="${esc(v ? v.etat : '')}"><span><b>${i + 1}. ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${detail}</span><span class="outils"><button type="button" class="rond6" data-atelier-haut="${i}" aria-label="${esc(TU('g6_monter'))}"${i ? '' : ' disabled'}>↑</button><button type="button" class="rond6" data-atelier-bas="${i}" aria-label="${esc(TU('g6_descendre'))}"${i < g.ids.length - 1 ? '' : ' disabled'}>↓</button></span></li>`; }).join('');
+      const curseur = (k, min, max, pas, lib) => `<label class="champ6 cd6"><b>${esc(TU(lib))}</b><span class="cd6-l"><input type="range" min="${min}" max="${max}" step="${pas}" value="${ph[k]}" data-atelier-photo="${k}"><output>${esc(String(ph[k]))}</output></span></label>`;
+      const rs = g.verif && g.verif.resume, lp = g.verif && g.verif.lancer;
+      const recap = g.verifEnCours ? `<p class="note5" data-atelier-recap="cours">${esc(TU('g6_verif_cours'))}</p>` : rs ? `<p class="note5" data-atelier-recap="${rs.aCorriger ? 'bloque' : 'ok'}"><b>${esc(TU('g6_verif_recap', { v: rs.verifiees, c: rs.corrige, a: rs.aCorriger }))}</b>${rs.absente ? ' · ' + esc(TU('g6_verif_absentes', { n: rs.absente })) : ''}${rs.pasVerifie ? ' · ' + esc(TU('g6_verif_pas', { n: rs.pasVerifie })) : ''}</p>` : '';
+      return `<section class="geste6" data-geste="atelier"><h3>${esc(TU('g6_atelier_titre', { n: g.ids.length }))}</h3><p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${etat}${recap}<ol class="au6-l">${liste}</ol>
+        <div class="rg6"><span><b>${esc(TU('g6_espacement'))}</b></span><div class="vu-seg vue5" role="group">${['fixe', 'aleatoire'].map((k) => `<button type="button" data-atelier-mode="${k}" aria-pressed="${g.mode === k}">${esc(TU('g6_' + k))}</button>`).join('')}</div></div>
+        <div class="rg6"><span><b>${esc(TU(g.mode === 'aleatoire' ? 'g6_entre' : 'g6_toutes'))}</b></span><span class="outils"><input type="number" min="1" max="120" class="prix6" data-atelier-min value="${g.min}" aria-label="min">${g.mode === 'aleatoire' ? `<input type="number" min="1" max="120" class="prix6" data-atelier-max value="${g.max}" aria-label="max">` : ''}<span>min</span></span></div>
+        ${curseur('bright', 0.5, 1.5, 0.05, 'g6_luminosite')}${curseur('contrast', 0.5, 1.5, 0.05, 'g6_contraste')}${curseur('sat', 0, 2, 0.05, 'g6_saturation')}${curseur('zoom', 1, 2, 0.05, 'g6_zoom')}${curseur('rot', -15, 15, 1, 'g6_rotation')}
+        <label class="rg6"><span><b>${esc(TU('g6_lettre'))}</b></span><input type="checkbox" data-atelier-lettre${g.lettre ? ' checked' : ''}></label>
+        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('g6_lancer'))}</button></div>${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
+    }
+    if (geste6.k === 'publier') {
+      const g = geste6, x = de(g.id);
+      const q = (g.questions || []).map((qq) => `<label class="champ6"><b>${esc(TU('g6_q_' + (['categorie', 'etat', 'pointure', 'marque'].includes(qq.champ) ? qq.champ : 'autre')))}</b>${(() => { const k = (qq.site ? qq.site + '|' : '') + qq.champ; return qq.choix && qq.choix.length ? `<select data-publier-rep="${esc(k)}"><option value=""></option>${qq.choix.map((c) => `<option${g.reponses[k] === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>` : `<input type="text" data-publier-rep="${esc(k)}" value="${esc(g.reponses[k] || '')}">`; })()}</label>`).join('');
+      const pb = (g.problemes || []).map((p) => `<p class="note5" data-publier-probleme="${esc(p.code)}">· ${esc(p.texte)}</p>`).join('');
+      return `<section class="geste6" data-geste="publier"><h3>${esc(TU('g6_publier_titre'))} — ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || g.id)}</h3>${etat}
+        <div class="rg6"><span><b>${esc(TU('g6_publier_sur'))}</b></span><div class="vu-seg vue5" role="group">${['leboncoin', 'vestiaire'].map((k) => `<button type="button" data-publier-site="${k}" aria-pressed="${g.site === k}">${k === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'}</button>`).join('')}</div></div>
+        ${q}${pb ? `<div data-publier-verif>${pb}</div>` : ''}
+        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-publier-envoyer${geste6EnVol ? ' disabled' : ''}>${esc(TU(pb ? 'g6_publier_quand_meme' : 'g6_publier'))}</button></div></section>`;
+    }
+    return '';
+  }
+  // L'atelier en cours (fond) : chaque paire et son étape ; « Reprendre » une paire arrêtée ; « Arrêter ».
+  // 5.410 (lot lbc-vc-interesses) — LEBONCOIN : les INTÉRESSÉS de chaque annonce (lecture : `interessesLbc`) et
+  //    « Leur écrire » (SA série, récapitulatif CONFIRMÉ : `ecrireInteressesLbc`, un message à la fois, temps au hasard).
+  let lbcInt = null, lbcIntEtat = null;
+  function interessesLbcHtml() {
+    if (!listes || listes.plateforme !== 'leboncoin') return '';
+    if (!lbcInt) { lbcInt = { charge: true }; try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'interessesLbc' }, (r) => { void chrome.runtime.lastError; lbcInt = { data: r && r.ok ? r : null, raison: r && !r.ok ? r.raison : '', coches: new Set(), textes: [''], annonce: '', etat: lbcIntEtat }; lbcIntEtat = null; rendre(); }); } catch (_) {} return ''; }
+    if (lbcInt.charge) return `<section class="geste6" data-lbc-interesses="charge"><p class="note5">${esc(TU('m_charge'))}</p></section>`;
+    const d = lbcInt.data;
+    if (!d) return lbcInt.raison ? `<section class="geste6" data-lbc-interesses="ko"><p class="note5">${esc(lbcInt.raison)}</p></section>` : '';
+    const toutes = (listes.annonces && listes.annonces.toutes) || [];
+    const titre = (id) => { const x = toutes.find((y) => String(y.id) === String(id)); return x ? x.titre : '#' + id; };
+    const etat = lbcInt.etat ? `<p class="note5" role="status" data-lbc-int-etat="${lbcInt.etat.ok ? 'ok' : 'ko'}">${esc(lbcInt.etat.texte)}</p>` : '';
+    const serie = d.serie ? `<p class="note5" data-lbc-int-serie>${esc(TU('li_serie', { n: d.serie.reste || 0 }))}</p>` : '';
+    const annonces = (d.annonces || []).map((a) => `<div class="rg6" data-lbc-int-annonce="${esc(a.annonce)}"><span><b>${esc(titre(a.annonce))}</b><small>${esc(TU('li_n', { n: a.n, a: a.attendent }))}</small></span><button type="button" class="vu-btn" data-lbc-int-voir="${esc(a.annonce)}" aria-pressed="${lbcInt.annonce === a.annonce}">${esc(TU('li_voir'))}</button></div>`).join('');
+    let detail = '';
+    if (lbcInt.annonce) {
+      const gens = (d.liste || []).filter((x) => x.annonce === lbcInt.annonce);
+      const n = [...lbcInt.coches].filter((c) => gens.some((g) => g.conv === c && !g.dejaEcrit)).length;
+      detail = `<div data-lbc-int-gens="${gens.length}">${gens.map((g) => `<label class="rg6"><span><b>${esc(TU('li_personne', { n: g.messagesDeLui }))}</b><small>${esc(depuis(Date.parse(g.dernierAt)) || '')}${g.attendTaReponse ? ' · ' + esc(TU('li_attend')) : ''}${g.dejaEcrit ? ' · ' + esc(TU('li_deja')) : ''}</small></span><input type="checkbox" data-lbc-int-conv="${esc(g.conv)}"${lbcInt.coches.has(g.conv) ? ' checked' : ''}${g.dejaEcrit ? ' disabled' : ''}></label>`).join('')}</div>`
+        + lbcInt.textes.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-lbc-int-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join('')
+        + (d.appris ? '' : `<p class="note5" data-lbc-int-pas-appris>${esc(TU('li_pas_appris'))}</p>`)
+        + (lbcInt.conf ? `<div class="conf5" role="alertdialog" data-lbc-int-confirme="${n}"><p>${esc(TU('li_conf', { n, a: d.ecartS ? d.ecartS[0] : 40, b: d.ecartS ? d.ecartS[1] : 90, m: d.parToucher || 10 }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-lbc-int-oui>${esc(TU('li_oui'))}</button><button type="button" class="vu-btn" data-lbc-int-non>${esc(TU('ra_annuler'))}</button></div></div>`
+          : `<div class="pied6"><span></span><button type="button" class="vu-btn vu-plein" data-lbc-int-ecrire${!n || !d.appris || d.serie || !lbcInt.textes.some((t) => t.trim()) ? ' disabled' : ''}>${esc(TU('li_ecrire', { n }))}</button></div>`);
+    }
+    return `<section class="geste6" data-lbc-interesses="${(d.annonces || []).length}"><h3>${esc(TU('li_titre', { n: (d.liste || []).length }))}</h3>${etat}${serie}${annonces || `<p class="note5">${esc(TU('li_aucun'))}</p>`}${detail}</section>`;
+  }
+  function brancherLbcInt(R) {
+    R.querySelectorAll('[data-lbc-int-voir]').forEach((b) => b.addEventListener('click', () => { lbcInt.annonce = b.getAttribute('data-lbc-int-voir'); lbcInt.coches = new Set((lbcInt.data.liste || []).filter((x) => x.annonce === lbcInt.annonce && !x.dejaEcrit).map((x) => x.conv)); lbcInt.conf = false; rendre(); }));
+    R.querySelectorAll('[data-lbc-int-conv]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-lbc-int-conv'); if (c.checked) lbcInt.coches.add(k); else lbcInt.coches.delete(k); rendre(); }));
+    R.querySelectorAll('[data-lbc-int-texte]').forEach((c) => c.addEventListener('input', () => { lbcInt.textes[Number(c.getAttribute('data-lbc-int-texte'))] = c.value; }));
+    R.querySelectorAll('[data-lbc-int-texte]').forEach((c) => c.addEventListener('change', () => { if (lbcInt.textes.length < 5 && lbcInt.textes[lbcInt.textes.length - 1].trim()) lbcInt.textes.push(''); rendre(); }));
+    const ec = R.querySelector('[data-lbc-int-ecrire]'); if (ec) ec.addEventListener('click', () => { lbcInt.conf = true; rendre(); });
+    const non = R.querySelector('[data-lbc-int-non]'); if (non) non.addEventListener('click', () => { lbcInt.conf = false; rendre(); });
+    const oui = R.querySelector('[data-lbc-int-oui]'); if (oui) oui.addEventListener('click', () => {
+      const gens = (lbcInt.data.liste || []).filter((x) => x.annonce === lbcInt.annonce && !x.dejaEcrit && lbcInt.coches.has(x.conv)).map((x) => x.conv);
+      envoyer6({ action: 'ecrireInteressesLbc', annonce: lbcInt.annonce, convs: gens, textes: lbcInt.textes.map((t) => t.trim()).filter(Boolean), confirme: true }, (r) => { lbcInt.conf = false; lbcInt.etat = { ok: !!(r && r.accepte), texte: r && r.accepte ? TU('li_parti') : (r && r.raison) || TU('ra_ko') }; if (r && r.accepte) { lbcIntEtat = lbcInt.etat; lbcInt = null; } });
+    });
+  }
+  function atelierEtatHtml() {
+    const a = listes && listes.atelier;
+    if (!a || !Array.isArray(a.ids)) return '';
+    const toutes = (listes.annonces && listes.annonces.toutes) || [];
+    const l = a.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; const p = a.paires && a.paires[id]; const et = p ? p.etape : 'attente';
+      return `<div class="rg6" data-atelier-etape="${esc(id)}:${esc(et)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${p && p.raison ? `<small>${esc(p.raison)}</small>` : ''}</span><span>${etiquette5(et, TU('g6_e_' + (['cours', 'fait', 'planifiee', 'arret'].includes(et) ? et : 'attente')), et === 'arret' ? 'ambre' : '')}${et === 'arret' ? ` <button type="button" class="vu-btn" data-atelier-reprendre="${esc(id)}">${esc(TU('g6_reprendre'))}</button>` : ''}</span></div>`; }).join('');
+    return `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
+  }
+  // Les OFFRES en attente (Messagerie, Commandes) : accepter (vend la paire : confirmation, garde anti double-vente),
+  // contre-offre (au-dessus de son offre, jamais sous ton plancher), refuser.
+  function offresHtml(conv) {
+    const l = listes && Array.isArray(listes.offres) ? listes.offres.filter((o) => !conv || String(o.conv) === String(conv)) : [];
+    if (!l.length) return '';
+    const etat = offreEtat ? `<p class="note5" role="status" data-offre-etat="${offreEtat.ok ? 'ok' : 'ko'}">${esc(offreEtat.texte)}</p>` : '';
+    return `<section class="geste6" data-offres="${l.length}"><h3>${esc(TU('g6_offres', { n: l.length }))}</h3>${etat}${l.map((o) => { const k = o.tx + ':' + o.oid; const c = offreConf && offreConf.k === k ? offreConf : null;
+      return `<div class="rg6 offre6" data-offre="${esc(k)}"><span><b>${esc(euroTxt(o.prix))} · ${esc(o.pseudo || '')}</b><small>${esc(o.titre || '')}</small></span><span class="outils">`
+        + (c ? `<span class="conf5" role="alertdialog" data-offre-confirme="${esc(c.quoi)}"><span>${esc(c.avis || TU(c.quoi === 'accept' ? 'g6_accepter_q' : 'g6_refuser_q', { p: euroTxt(o.prix) }))}</span>${c.bloque ? '' : `<button type="button" class="vu-btn vu-plein" data-offre-oui${geste6EnVol ? ' disabled' : ''}>${esc(TU(c.avis ? 'g6_verifie_accepter' : c.quoi === 'accept' ? 'g6_accepter' : 'g6_refuser'))}</button>`}<button type="button" class="vu-btn" data-offre-non>${esc(TU('ra_annuler'))}</button></span>`
+          : `<button type="button" class="vu-btn" data-offre-quoi="accept">${esc(TU('g6_accepter'))}</button><input type="text" inputmode="decimal" class="prix6" data-offre-contre-prix="${esc(k)}" value="${esc(offreContre[k] || '')}" placeholder="${esc(TU('g6_contre_prix'))}" aria-label="${esc(TU('g6_contre_prix'))}"><button type="button" class="vu-btn" data-offre-quoi="contre">${esc(TU('g6_contre'))}</button><button type="button" class="vu-btn" data-offre-quoi="reject">${esc(TU('g6_refuser'))}</button>`)
+        + `</span></div>`; }).join('')}</section>`;
+  }
+  // Le contrôle avant de lancer (fond : `verifierRepub`) ; `ids` vides ⇒ seulement recalculer pour la file actuelle.
+  function atelierVerifier6(ids, reponses) {
+    const g = geste6; if (!g || g.k !== 'atelier') return;
+    const cibles = ids && ids.length ? ids : g.ids;
+    if (!cibles.length) { g.verif = null; rendre(); return; }
+    g.verifEnCours = true; rendre();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'atelierVerifier', ids: cibles, tous: g.ids.slice(), ...(reponses ? { reponses } : {}) }, (r) => { void chrome.runtime.lastError; if (geste6 !== g) return; g.verifEnCours = false; if (r && r.ok) g.verif = { paires: r.paires, resume: r.resume, lancer: r.lancer }; else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; rendre(); }); } catch (_) { g.verifEnCours = false; rendre(); }
+  }
+  function brancherGestes6(racine) {
+    const R = racine;
+    try { brancherLbcInt(R); } catch (_) {}
+    const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
+    // Prix
+    R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
+    R.querySelectorAll('[data-prix-pct]').forEach((b) => b.addEventListener('click', () => { const p = Number(b.getAttribute('data-prix-pct')); const toutes = (listes.annonces && listes.annonces.toutes) || [];
+      for (const id of geste6.ids) { const x = toutes.find((y) => y.id === id); if (x && Number(x.prix) > 0) geste6.prix[id] = (Math.round(Number(x.prix) * (100 - p)) / 100).toFixed(2).replace('.', ','); } rendre(); }));
+    const hOui = R.querySelector('[data-prix-hausse-oui]'); if (hOui) hOui.addEventListener('click', () => { geste6.hausseConf = null; geste6.hausseOk = true; confirmerPrix6(); });   // (20 nov.) la même fonction, jamais un clic simulé (audit-confiance-publique G5)
+    const hNon = R.querySelector('[data-prix-hausse-non]'); if (hNon) hNon.addEventListener('click', () => { geste6.hausseConf = null; rendre(); });
+    const confirmerPrix6 = () => {
+      const toutes = (listes.annonces && listes.annonces.toutes) || [];
+      const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; return { id, prix: String(geste6.prix[id] || '').replace(',', '.'), prixVu: x.prix, num: x.num || '' }; }).filter((x) => x.prix);
+      if (!items.length) { geste6Etat = { ok: false, texte: TU('g6_prix_vide') }; rendre(); return; }
+      // Une HAUSSE se confirme d'abord (« Monter à X € ? ») — jamais automatique.
+      const hausses = items.filter((x) => Number(x.prix) > Number(x.prixVu));
+      if (hausses.length && !geste6.hausseOk) { geste6.hausseConf = hausses; geste6.items = items; rendre(); return; }
+      geste6.hausseOk = false;
+      envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
+        geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code).join(' · ') : '') };
+        if (n) chargerListes(true); });
+    };
+    const pc = R.querySelector('[data-prix-confirmer]'); if (pc) pc.addEventListener('click', confirmerPrix6);
+    // Atelier
+    R.querySelectorAll('[data-atelier-haut],[data-atelier-bas]').forEach((b) => b.addEventListener('click', () => { const h = b.hasAttribute('data-atelier-haut'); const i = Number(b.getAttribute(h ? 'data-atelier-haut' : 'data-atelier-bas')); const j = h ? i - 1 : i + 1; const l = geste6.ids; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; rendre(); }));
+    R.querySelectorAll('[data-atelier-mode]').forEach((b) => b.addEventListener('click', () => { geste6.mode = b.getAttribute('data-atelier-mode'); if (geste6.mode === 'aleatoire' && !(geste6.max > geste6.min)) geste6.max = geste6.min + 3; rendre(); }));
+    const am = R.querySelector('[data-atelier-min]'); if (am) am.addEventListener('change', () => { geste6.min = Math.max(1, Math.min(120, Math.round(Number(am.value)) || 1)); rendre(); });
+    const ax = R.querySelector('[data-atelier-max]'); if (ax) ax.addEventListener('change', () => { geste6.max = Math.max(1, Math.min(120, Math.round(Number(ax.value)) || 1)); rendre(); });
+    R.querySelectorAll('[data-atelier-photo]').forEach((c) => c.addEventListener('input', () => { geste6.photo[c.getAttribute('data-atelier-photo')] = Number(c.value); const o = c.parentNode.querySelector('output'); if (o) o.textContent = c.value; }));
+    const al = R.querySelector('[data-atelier-lettre]'); if (al) al.addEventListener('change', () => { geste6.lettre = al.checked; });
+    R.querySelectorAll('[data-atelier-question]').forEach((c) => c.addEventListener('change', () => { if (!c.value) return; const id = c.getAttribute('data-atelier-question'); atelierVerifier6([id], { [id]: { [c.getAttribute('data-champ')]: c.value } }); }));
+    R.querySelectorAll('[data-atelier-retirer]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-atelier-retirer'); geste6.ids = geste6.ids.filter((x) => x !== id); atelierVerifier6([], null); }));
+    const la = R.querySelector('[data-atelier-lancer]'); if (la) la.addEventListener('click', () => {
+      const g = geste6;
+      envoyer6({ action: 'atelierLancer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, confirme: true }, (r) => {
+        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
+    });
+    R.querySelectorAll('[data-atelier-reprendre]').forEach((b) => b.addEventListener('click', () => envoyer6({ action: 'atelierReprendre', id: b.getAttribute('data-atelier-reprendre'), confirme: true }, () => chargerListes(true))));
+    const aa = R.querySelector('[data-atelier-arreter]'); if (aa) aa.addEventListener('click', () => envoyer6({ action: 'atelierArreter' }, () => chargerListes(true)));
+    // Publier
+    R.querySelectorAll('[data-publier-site]').forEach((b) => b.addEventListener('click', () => { geste6.site = b.getAttribute('data-publier-site'); geste6.questions = []; geste6.problemes = []; geste6Etat = null; rendre(); }));
+    R.querySelectorAll('[data-publier-rep]').forEach((c) => c.addEventListener('change', () => { geste6.reponses[c.getAttribute('data-publier-rep')] = c.value; }));
+    const pe = R.querySelector('[data-publier-envoyer]'); if (pe) pe.addEventListener('click', () => {
+      const g = geste6; const rep = Object.fromEntries(Object.entries(g.reponses).filter(([, v]) => v));
+      envoyer6({ action: 'publierCarte', site: g.site, id: g.id, ...(Object.keys(rep).length ? { reponses: rep } : {}), ...(g.problemes && g.problemes.length ? { verifVu: true } : {}) }, (r) => {
+        if (r && r.accepte) { geste6Etat = { ok: true, texte: TU('g6_publie') }; g.problemes = []; g.questions = []; }
+        else if (r && r.code === 'questions') { g.questions = r.questions || []; geste6Etat = { ok: false, texte: TU('g6_questions') }; }
+        else if (r && r.code === 'verification') { g.problemes = r.problemes || []; geste6Etat = { ok: false, texte: TU('g6_verifier') }; }
+        else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
+    });
+    // Offres
+    R.querySelectorAll('[data-offre-contre-prix]').forEach((c) => c.addEventListener('input', () => { offreContre[c.getAttribute('data-offre-contre-prix')] = c.value; }));
+    R.querySelectorAll('[data-offre-quoi]').forEach((b) => b.addEventListener('click', () => { const k = b.closest('[data-offre]').getAttribute('data-offre'); const quoi = b.getAttribute('data-offre-quoi');
+      if (quoi === 'contre') { const [tx, oid] = k.split(':'); envoyer6({ action: 'offreCarte', quoi: 'contre', tx, oid, prix: String(offreContre[k] || '').replace(',', '.'), confirme: true }, (r) => { offreEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('g6_contre_ok') : (r && r.raison) || TU('ra_ko') }; if (r && r.ok) chargerListes(true); }); return; }
+      offreConf = { k, quoi }; offreEtat = null; rendre(); }));
+    const on = R.querySelector('[data-offre-non]'); if (on) on.addEventListener('click', () => { offreConf = null; rendre(); });
+    const oo = R.querySelector('[data-offre-oui]'); if (oo) oo.addEventListener('click', () => { const c = offreConf; if (!c) return; const [tx, oid] = c.k.split(':');
+      envoyer6({ action: 'offreCarte', quoi: c.quoi, tx, oid, confirme: true, ...(c.avis ? { avisVu: true } : {}) }, (r) => {
+        if (r && r.ok) { offreConf = null; offreEtat = { ok: true, texte: TU(c.quoi === 'accept' ? 'g6_accepte_ok' : 'g6_refuse_ok') }; chargerListes(true); }
+        else if (r && r.code === 'avis') { offreConf = Object.assign({}, c, { avis: r.avis || r.raison }); }
+        else if (r && r.code === 'vendue-ailleurs') { offreConf = Object.assign({}, c, { avis: r.avis || r.raison, bloque: true }); }
+        else { offreConf = null; offreEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; } }); });
+  }
   let annStatut = 'en_vente', annVue = 'liste', annCols = new Set(COLS5_DEFAUT), annSel = new Set(), annCherche = '', annColsOuvert = false;
-  try { chrome.storage.local.get(['vrmPanneauAnnonces'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} const v = g && g.vrmPanneauAnnonces; if (v && typeof v === 'object') { if (v.vue === 'grille' || v.vue === 'liste') annVue = v.vue; if (Array.isArray(v.cols)) annCols = new Set(v.cols.filter((c) => COLS5.includes(c))); } }); } catch (_) {}
+  try { chrome.storage.local.get(['vrmPanneauAnnonces'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} const v = g && g.vrmPanneauAnnonces; if (v && typeof v === 'object') { if (v.vue === 'grille' || v.vue === 'liste') annVue = v.vue; if (Array.isArray(v.cols)) annCols = new Set(v.cols.filter((c) => COLS6.includes(c))); } }); } catch (_) {}
   const garderAnn = () => ranger({ vrmPanneauAnnonces: { vue: annVue, cols: [...annCols] } });
   const celluleAnn = (x, c) => {
     if (c === 'num') return x.num ? plaque(x.num) : '—';
@@ -1601,40 +1956,96 @@
     if (c === 'statut') return `<span class="st5" data-statut="${esc(x.statut || '')}">${esc(TU('s_' + (x.statut || 'a_confirmer')))}</span>`;
     return '';
   };
+  // ══ 5.410 (Julien, 20 nov. : « pour l'extension, tu fais pareil que Vintex ») — ARTICLES EN TABLEAU ═══════════════
+  //    « Choisir une action ▾ », recherche, « Statut ▾ » (cases À COMPTEURS lus), « N articles », liste ⇄ grille,
+  //    « Colonnes ▾ » (mémorisé) ; tableau : case | vignette 48 + titre (N° en plaque) | colonnes triables ↑↓ alignées à
+  //    droite | Statut en étiquette douce | ⋯ (la fiche). Rien ne part d'ici sans SON toucher de confirmation.
+  const dateCourte5 = (t) => { const n = Number(t); if (!(n > 0)) return '—'; try { const d = new Date(n); const p = (x) => String(x).padStart(2, '0'); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; } catch (_) { return '—'; } };
+  const jourCourt5 = (t) => dateCourte5(t).split(' ')[0];
+  let annStatuts = null, annStatutOuvert = false, annTri = { col: 'date', sens: -1 };
+  const valeurTri5 = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.depuis) || 0 : c === 'vues' ? Number(x.vues) || 0 : c === 'favoris' ? Number(x.favoris) || 0 : c === 'mini' ? Number(x.mini) || 0 : c === 'achat' ? Number(x.achat) || 0 : c === 'statut' ? String(x.statut || '') : c === 'num' ? String(x.num || '') : String(x.titre || '').toLowerCase());
+  const trier5 = (l, tri) => l.slice().sort((a, b) => { const va = valeurTri5(a, tri.col), vb = valeurTri5(b, tri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * tri.sens; });
+  const etiquette5 = (k, texte, ton) => `<span class="et6" data-statut="${esc(k)}"${ton ? ` data-ton="${ton}"` : ''}>${esc(texte)}</span>`;
+  const enTeteTri5 = (c, libelle, attrTri) => `<button type="button" class="th6" ${attrTri}="${c}" aria-sort="${annTri.col === c ? (annTri.sens > 0 ? 'ascending' : 'descending') : 'none'}">${esc(libelle)}<i aria-hidden="true">${annTri.col === c ? (annTri.sens > 0 ? '↑' : '↓') : '↕'}</i></button>`;
   function annoncesGrandHtml(e) {
     const a = listes.annonces;
     const ici = ORIGINE_ICI || 'https://www.vinted.fr';
     const st = a.statuts || null;
     const q = annCherche.trim().toLowerCase();
     const toutes = Array.isArray(a.toutes) ? a.toutes : a.liste.map((x) => Object.assign({ statut: a.aConfirmer ? 'a_confirmer' : 'en_vente' }, x));
-    const vus = toutes.filter((x) => (annStatut === 'tous' || x.statut === annStatut) && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q));
+    const choisis = annStatuts || new Set(STATUTS5);
+    const vus = trier5(toutes.filter((x) => choisis.has(x.statut || 'a_confirmer') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)), annTri);
     for (const id of [...annSel]) if (!toutes.some((x) => x.id === id)) annSel.delete(id);
     const nSel = [...annSel].length;
-    const chip = (k, n) => `<button type="button" class="chip5" data-ann-statut="${k}" aria-pressed="${annStatut === k ? 'true' : 'false'}">${esc(TU('s_' + k))} · ${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</button>`;
-    const cols = COLS5.filter((c) => annCols.has(c));
+    const cols = COLS6.filter((c) => annCols.has(c));
+    const site = (e && e.plateforme) || 'vinted';
+    const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'publier', 'masquer', 'afficher', 'favoris', 'ouvrir'];
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
-      + (e && e.plateforme === 'leboncoin' || e && e.plateforme === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'masquer', 'afficher', 'favoris', 'ouvrir']).map((k) => `<option value="${k}"${(k === 'ouvrir' && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
-    const outils = `<div class="barre5">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">`
-      + `<div class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}">${esc(TU('a_liste'))}</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}">${esc(TU('a_grille'))}</button></div>`
-      + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS5.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></div>`
-      + `<div class="chips5" role="group" aria-label="${esc(TU('a_statut'))}">${chip('tous', a.nTous != null ? a.nTous : toutes.length)}${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => chip(k, st ? st[k] : null)).join('')}</div>`
+      + gestes.map((k) => `<option value="${k}"${((k === 'ouvrir' || k === 'supprimer' || k === 'publier') && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
+    const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU('s_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
+    const outils = `<div class="barre5 barre6">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">${statutMenu}</div>`
       + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`);
-    const conf = annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
+    const ligneN = `<div class="n6"><span data-ann-n="${vus.length}">${esc(TU('a_n_articles', { n: vus.length }))}</span><span class="n6-d"><span class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}" aria-label="${esc(TU('a_liste'))}">☰</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}" aria-label="${esc(TU('a_grille'))}">▦</button></span>`
+      + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS6.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></span></div>`;
+    // 5.410 : supprimer sur Leboncoin — LA confirmation de l'app (recopiée dans le fond : titre, l'annonce, ce qui reste,
+    //    « sans retour »), rendue par le fond lui-même ; « Oui, supprimer de Leboncoin » renvoie avec `sansRetour`.
+    const cs = annConfirme && annConfirme.k === 'supprimer' && annConfirme.conf ? annConfirme.conf : null;
+    const conf = cs ? `<div class="conf5" role="alertdialog" data-ann-confirme="supprimer" data-irreversible><p><b>${esc(cs.titre)}</b></p>${(cs.lignes || []).map((l) => `<p>${esc(l)}</p>`).join('')}<p class="note5">${esc(cs.reste || '')}</p><p><b>${esc(cs.sansRetour || '')}</b></p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(cs.ok)}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div></div>`
+      : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
     const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
-    const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${esc(TU('a_lues', { quand: depuis(a.lu) || '—' }))}${a.relecture ? ' · ' + esc(TU('a_relecture')) : ''}</div>`;
-    if (!vus.length) return outils + conf + res + tete + `<div class="val gris" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
+    const haut = outils + conf + res + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
+    if (!vus.length) return haut + `<div class="val gris vide6" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
     if (annVue === 'grille') {
-      return outils + conf + res + tete + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))}</span></button></li>`).join('')}</ul>`
+      return haut + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))} · ${etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')))}</span></button></li>`).join('')}</ul>`
         + (ficheOuverte.startsWith('a:') ? (() => { const x = vus.find((y) => 'a:' + y.id === ficheOuverte); return x ? ficheAnnonceHtml(x, ici) : ''; })() : '');
     }
-    const enTete = `<div class="tr5 th5" style="--n5:${cols.length}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label><span>${esc(TU('c5_article'))}</span><span class="cels5">${cols.map((c) => `<span>${esc(TU('c5_' + c))}</span>`).join('')}</span></div>`;
-    return outils + conf + res + tete + `<div class="table5" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr5" style="--n5:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="rang art5" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${esc(x.titre || '')}</span></button><span class="cels5">${cols.map((c) => `<span class="cel5" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${celluleAnn(x, c)}</span>`).join('')}</span></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const cellule = (x, c) => {
+      if (c === 'prix') return `<b>${esc(eurosL(x.prix))}</b>`;
+      if (c === 'date') return x.depuis ? (x.depuisAuMoins ? `<span data-date-au-moins title="${esc(TU('g6_au_moins_note'))}">${esc(TU('g6_au_moins', { d: dateCourte5(x.depuis) }))}</span>` : esc(dateCourte5(x.depuis))) : '—';
+      if (c === 'statut') return etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')), x.statut === 'brouillon' || x.statut === 'a_confirmer' ? 'ambre' : '');
+      return celluleAnn(x, c);
+    };
+    const enTete = `<div class="tr6 th6r" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
+    return haut + `<div class="table6" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}" data-tri="${annTri.col}:${annTri.sens}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr6" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="art6" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}</span></button><span class="cels6">${cols.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="a:${esc(x.id)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+  }
+  // ══ 5.410 — COMMANDES (= les ventes) EN TABLEAU, comme Vintex : article + statut DE VINTED en sous-titre, Prix, Date,
+  //    Transporteur (son logo, la copie de l'app ; rien relié ⇒ « — », jamais « inconnu »), état en étiquette (« Action
+  //    requise » en ambre, le reste neutre), ⋯ (la fiche). « Choisir une action » : ouvrir la conversation, voir dans VRM.
+  const COLS_V6 = ['prix', 'date', 'transporteur', 'statut'];
+  let venStatuts = null, venStatutOuvert = false, venTri = { col: 'date', sens: -1 }, venCherche = '';
+  const ETAT_V6 = { a_expedier: ['v_action', 'ambre'], en_route: ['v_rien', ''], finalisee: ['v_terminee', ''], annulee: ['v_annulee', ''], pas_su: ['v_pas_su', ''] };
+  function ventesGrandHtml(e) {
+    const v = listes.ventes;
+    const ici = ORIGINE_ICI || 'https://www.vinted.fr';
+    const q = venCherche.trim().toLowerCase();
+    const etats = ['a_expedier', 'en_route', 'finalisee', 'annulee', 'pas_su'];
+    const compte = Object.fromEntries(etats.map((k) => [k, v.liste.filter((x) => (x.etat || 'pas_su') === k).length]));
+    const choisis = venStatuts || new Set(etats);
+    const valeur = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.date) || 0 : c === 'transporteur' ? String(x.transporteur || '') : c === 'statut' ? String(x.etat || '') : String(x.titre || '').toLowerCase());
+    const vus = v.liste.filter((x) => choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
+    const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
+    const outils = `<div class="barre5 barre6"><select class="act5" disabled aria-label="${esc(TU('a_choisir'))}"><option>${esc(TU('a_choisir'))}</option></select><input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
+    const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>`;
+    if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>`;
+    const transp = (x) => (x.transporteurCle && U.logoTransp ? `<span class="tr-l6">${U.logoTransp(x.transporteurCle, 18)}<span>${esc(x.transporteur || U.nomTransp(x.transporteurCle))}</span></span>` : x.transporteur ? esc(x.transporteur) : '—');
+    const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transp(x) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
+    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => enTeteTri5(c, TU('c6_' + c), 'data-ven-tri')).join('')}</span><span></span></div>`;
+    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length}"><span></span><button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   function brancherAnnonces(racine) {
-    racine.querySelectorAll('[data-ann-statut]').forEach((b) => b.addEventListener('click', () => { annStatut = b.getAttribute('data-ann-statut'); rendre(); }));
+    racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));
+    const sm = racine.querySelector('[data-ann-statut-menu]'); if (sm) sm.addEventListener('toggle', () => { annStatutOuvert = sm.open; });
+    racine.querySelectorAll('[data-ann-tri]').forEach((b) => b.addEventListener('click', () => { const c = b.getAttribute('data-ann-tri'); annTri = annTri.col === c ? { col: c, sens: -annTri.sens } : { col: c, sens: c === 'titre' ? 1 : -1 }; rendre(); }));
+    racine.querySelectorAll('[data-ven-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-statut'); const base = venStatuts || new Set(['a_expedier', 'en_route', 'finalisee', 'annulee', 'pas_su']); if (c.checked) base.add(k); else base.delete(k); venStatuts = base; rendre(); }));
+    const vm = racine.querySelector('[data-ven-statut-menu]'); if (vm) vm.addEventListener('toggle', () => { venStatutOuvert = vm.open; });
+    racine.querySelectorAll('[data-ven-tri]').forEach((b) => b.addEventListener('click', () => { const c = b.getAttribute('data-ven-tri'); venTri = venTri.col === c ? { col: c, sens: -venTri.sens } : { col: c, sens: c === 'titre' ? 1 : -1 }; rendre(); }));
+    const vc = racine.querySelector('[data-ven-cherche]'); if (vc) vc.addEventListener('input', () => { venCherche = vc.value; const pos = vc.selectionStart; rendre(); const n = carte.querySelector('[data-ven-cherche]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } });
     racine.querySelectorAll('[data-ann-vue]').forEach((b) => b.addEventListener('click', () => { annVue = b.getAttribute('data-ann-vue'); garderAnn(); rendre(); }));
     const cd = racine.querySelector('[data-ann-cols]'); if (cd) cd.addEventListener('toggle', () => { annColsOuvert = cd.open; });
+    // (20 nov., intégration 5.410) Un menu Colonnes / Statut ouvert se ferme quand on touche ailleurs : resté ouvert, il
+    // couvrait la colonne Statut et la table pendant « Changer le prix » ou « Publier sur… » (planche du panneau).
+    if (!racine.__vrmMenusFerme) { racine.__vrmMenusFerme = true; racine.addEventListener('pointerdown', (e) => { racine.querySelectorAll('details.cols5[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; }); }, true); }
     racine.querySelectorAll('[data-ann-col]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-col'); if (c.checked) annCols.add(k); else annCols.delete(k); garderAnn(); rendre(); }));
     racine.querySelectorAll('[data-ann-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-sel'); if (c.checked) annSel.add(k); else annSel.delete(k); rendre(); }));
     const t = racine.querySelector('[data-ann-tout]'); if (t) t.addEventListener('change', () => { racine.querySelectorAll('[data-ann-sel]').forEach((c) => { const k = c.getAttribute('data-ann-sel'); if (t.checked) annSel.add(k); else annSel.delete(k); }); rendre(); });
@@ -1643,6 +2054,19 @@
     const cok = racine.querySelector('[data-ann-confirme-ok]');
     if (cok) cok.addEventListener('click', () => {
       const c = annConfirme; if (!c || annEnVol) return;
+      if (c.k === 'supprimer') {
+        annEnVol = true; rendre();
+        const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === c.ids[0]) || {};
+        try {
+          chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'supprimerLbcCarte', id: c.ids[0], numero: x.num || '', titre: x.titre || '', confirme: true, sansRetour: true }, (r) => {
+            void chrome.runtime.lastError; annEnVol = false; annConfirme = null;
+            annResultat = r && r.accepte ? { ok: true, texte: TU('a_supprime_ok') } : { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+            if (r && r.accepte) { annSel.clear(); chargerListes(true); }
+            rendre();
+          });
+        } catch (_) { annEnVol = false; annConfirme = null; annResultat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+        return;
+      }
       annEnVol = true; rendre();
       try {
         chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'masquerCarte', ids: c.ids, voulu: c.k === 'masquer', confirme: true }, (r) => {
@@ -1656,16 +2080,23 @@
     });
     const act = racine.querySelector('[data-ann-action]');
     if (act) act.addEventListener('change', () => {
-      const k = act.value; act.value = '';
+      const k = act.value; act.value = ''; annActionPre = '';
       const ids = [...annSel];
       if (!k || !ids.length) return;
       // Les gestes en série passent par leurs chemins GARDÉS : l'atelier Republier et la baisse de VRM (sur SON
       // clic là-bas), le parcours des favoris de la carte. Jamais de suppression en série.
-      if (k === 'republier') { try { window.open('https://vrm.center/?tab=annonces&site=vinted&vue=republier', '_blank', 'noopener'); } catch (_) {} return; }
-      if (k === 'baisser') { try { window.open('https://vrm.center/?tab=annonces&site=' + (listes && listes.plateforme ? listes.plateforme : 'vinted'), '_blank', 'noopener'); } catch (_) {} return; }
+      if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false }; geste6Etat = null; rendre(); atelierVerifier6(null, null); return; }
+      if (k === 'baisser') { geste6 = { k: 'prix', ids: ids.slice(0, 20), prix: {} }; geste6Etat = null; rendre(); return; }
+      if (k === 'publier' && ids.length === 1) { geste6 = { k: 'publier', id: ids[0], site: 'leboncoin', questions: [], problemes: [], reponses: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
       // 5.409 : masquer / afficher sur Vinted, sur SON clic CONFIRMÉ (le geste appris de la règle « vendue ailleurs »).
       if ((k === 'masquer' || k === 'afficher') && ids.length <= 10) { annConfirme = { k, ids }; annResultat = null; rendre(); return; }
+      // 5.410 : supprimer sur Leboncoin, UNE annonce : le fond rend d'abord SA confirmation « sans retour » (rien ne part).
+      if (k === 'supprimer' && ids.length === 1) {
+        const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]) || {};
+        try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'supprimerLbcCarte', id: ids[0], numero: x.num || '', titre: x.titre || '', confirme: true }, (r) => { void chrome.runtime.lastError; if (r && r.code === 'sans-retour' && r.confirmation) { annConfirme = { k: 'supprimer', ids, conf: r.confirmation }; annResultat = null; } else annResultat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; rendre(); }); } catch (_) {}
+        return;
+      }
       if (k === 'favoris') { ongletListe = 'favoris'; if (ids.length === 1) filtreAnnonce = ids[0]; ranger({ vrmCarteOnglet: ongletListe }); rendre(); }
     });
   }
@@ -1688,6 +2119,7 @@
     const v = listes.ventes;
     if (!v) return '<div class="val gris" data-ventes="pas_su">Tes ventes n’ont pas pu être lues pour l’instant : rien n’est affiché plutôt qu’une liste fausse.</div>';
     if (!v.liste.length) return '<div class="val gris" data-ventes="0">Aucune vente lue sur ce compte pour l’instant : ouvre une fois la page de tes ventes sur Vinted.</div>';
+    if (!LISTES && carte.hasAttribute('data-grand')) return ventesGrandHtml(e);
     const lu = depuis(v.lu);
     const tete = `<div class="lu" data-ventes-total="${Number(v.total || v.liste.length)}">${nbVentes(v.total || v.liste.length)}${lu ? ' · lues ' + esc(lu) : ''}</div>`;
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
@@ -1754,6 +2186,8 @@
       + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>` : ''}`
       + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button>${listes && listes.plateforme === 'leboncoin' ? `<a class="vu-btn vu-sec" href="https://www.leboncoin.fr/messages" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_site'))}</a>` : listes && listes.plateforme === 'vestiaire' ? '' : `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a>`}</div></div></div>`;
   }
+  // 5.410 (comme Vintex) : l'avatar de l'acheteur (sa photo Vinted, sinon son initiale sur un rond neutre).
+  const avatar6 = (x) => (x.avatar ? `<img class="av6" src="${esc(x.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="av6" aria-hidden="true">${esc(String(x.qui || '?').trim().charAt(0).toUpperCase() || '?')}</span>`);
   function messagesHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
@@ -1769,46 +2203,121 @@
     const outils = LISTES ? '' : `<div class="outils5"><input type="search" class="cherche5" data-msg-cherche placeholder="${esc(TU('m_chercher'))}" aria-label="${esc(TU('m_chercher'))}" value="${esc(msgCherche)}"><button type="button" class="filtre5" data-msg-nonlus aria-pressed="${msgNonLus ? 'true' : 'false'}">${esc(TU('m_filtre_nonlus', { n: nl }))}</button></div>`;
     const liste = `<ul class="rangs" data-messages="${vus.length}" data-defil="messages">${vus.map((x) => LISTES
       ? `<li><a class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="_blank" rel="noopener">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span></a></li>`
-      : `<li${x.conv === convChoisie ? ' data-ouverte' : ''}><button type="button" class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" data-conv-b="${esc(x.conv)}" aria-pressed="${x.conv === convChoisie ? 'true' : 'false'}">${vignette(x.photo)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span><span class="px quand">${esc(x.at ? depuis(x.at) : '')}</span></button>${x.conv === convChoisie ? `<div class="conv5-sous">${convHtml(x, ici)}</div>` : ''}</li>`).join('')}</ul>`;
+      : `<li${x.conv === convChoisie ? ' data-ouverte' : ''}><button type="button" class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" data-conv-b="${esc(x.conv)}" aria-pressed="${x.conv === convChoisie ? 'true' : 'false'}">${avatar6(x)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.at ? depuis(x.at) : '')}${x.texte ? ' · ' + esc(x.texte) : ''}</span></span>${x.photo ? `<img class="vig6" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</button>${x.conv === convChoisie ? `<div class="conv5-sous">${convHtml(x, ici)}</div>` : ''}</li>`).join('')}</ul>`;
     const tete = `<div class="lu" data-messages-nonlus="${nl}">${esc(nl ? TU('m_nonlus', { n: nl }) : TU('m_tous_lus'))}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`;
     if (LISTES) return tete + liste;
-    const droite = `<div class="volet5" data-volet-conv="${choisie ? esc(choisie.conv) : ''}">${choisie ? convHtml(choisie, ici) : `<div class="vide5"><b>${esc(TU('m_choisir'))}</b><span>${esc(TU('m_choisir_note'))}</span></div>`}</div>`;
-    return `<div class="deux5"><div class="gauche5">${outils}${tete}${vus.length ? liste : `<div class="val gris" data-messages-filtre="0">${esc(TU('m_aucun_filtre'))}</div>`}</div>${droite}</div>`;
+    const droite = `<div class="volet5" data-volet-conv="${choisie ? esc(choisie.conv) : ''}">${choisie ? offresHtml(choisie.conv) + convHtml(choisie, ici) : `<div class="vide5"><b>${esc(TU('m_choisir'))}</b><span>${esc(TU('m_choisir_note'))}</span></div>`}</div>`;
+    return `${carte.hasAttribute('data-grand') && !LISTES ? offresHtml() : ''}<div class="deux5"><div class="gauche5">${outils}${tete}${vus.length ? liste : `<div class="val gris" data-messages-filtre="0">${esc(TU('m_aucun_filtre'))}</div>`}</div>${droite}</div>`;
   }
   // ══ 5.409 — AUTOMATISATIONS (capture « Automatisations » de Vintex) : l'état LU de ses vrais réglages — messages
   //    aux favoris (versions tirées au hasard, rythme, mode automatique et ses délais), offres auto (prix mini posés),
   //    baisse automatique (pas encore livrée : dit). Ils se changent dans VRM (les mêmes clés, le même serveur) : la
   //    carte n'écrit pas `main` (l'extension n'écrit JAMAIS la ligne `main`, CLAUDE.md §5).
   const pastilleEtat = (on) => `<span class="et5" data-etat="${on === true ? 'on' : on === false ? 'off' : 'pas-su'}">${esc(TU(on === true ? 'au_active' : on === false ? 'au_desactive' : 'au_pas_su'))}</span>`;
+  // ══ 5.410 — AUTOMATISATIONS EN DEUX VOLETS (comme Vintex) : à gauche la liste des automatismes avec leur état
+  //    « Activé / Désactivé » (LU dans les vrais réglages) ; à droite le détail en sections MESSAGES · CIBLAGE · DÉLAIS
+  //    (négociation : l'aperçu « 100 → 93 → 88 → 85 »), en bas « Modifier dans VRM » et un plein « Démarrer ». Les
+  //    réglages se changent dans VRM (l'extension n'écrit jamais la ligne `main`) ; « Démarrer » des favoris ouvre le
+  //    parcours pas à pas de la carte (rien ne part sans SA confirmation).
+  let autoChoisie = 'favoris', autoDetail = false;   // 5.410.1 : au téléphone, le détail est une page poussée
+  let raBrouillon = {}, raConfirme = null, raEtat = null, raEnVol = false;   // 5.410 : réglages écrits depuis le panneau
+  const apercuPaliers6 = (pcts) => { const p = 100, f = 85, out = [p]; for (const pct of (pcts || []).slice().sort((a, b) => a - b)) { let v = Math.round(p - (p - f) * pct / 100); if (v < f) v = f; if (v < p && v < out[out.length - 1]) out.push(v); } return out; };
   function automatisationsHtml() {
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
     if (!listes) return `<div class="val gris" role="status" data-listes-charge>${esc(TU('m_charge'))}</div>`;
     const au = listes.automatisations;
     if (!au) return `<div class="val gris" data-auto="pas_su">${esc(TU('au_pas_su_tout'))}</div>`;
-    const f = au.favoris, o = au.offres, fa = f && f.auto;
-    const ligne = (k, v) => `<div class="rg5 rg5-l"><span>${esc(TU(k))}</span><b>${v == null || v === '' ? '—' : esc(v)}</b></div>`;
-    const carteA = (id, titre, etat, corps, lien, guide) => `<section class="au5" data-auto-carte="${id}"><div class="au5-t"><h3>${esc(TU(titre))}</h3>${etat}</div>${corps}<div class="ge5">${guide || ''}<a class="vu-btn vu-sec" href="https://vrm.center/${lien}" target="_blank" rel="noopener" data-auto-modifier="${id}">${esc(TU('au_modifier'))}</a></div></section>`;
-    const rythme = f ? TU(f.rythme === 'prudent' ? 'fr_rythme_prudent' : f.rythme === 'perso' ? 'au_rythme_perso' : 'fr_rythme_normal') : null;
-    return `<div class="par5" data-automatisations>`
-      + carteA('favoris', 'au_favoris', pastilleEtat(fa ? fa.actif : null),
-        ligne('au_messages', f ? (f.regle ? TU('au_versions', { n: f.versions }) : TU('au_pas_de_message')) : null)
-        + ligne('f5_rythme', rythme)
-        + ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null)
-        + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null)
-        + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null),
-        '?tab=messages&site=vinted&vue=favoris', `<button type="button" class="vu-btn vu-plein" data-auto-guide>${esc(TU('au_guide'))}</button>`)
-      + carteA('offres', 'au_offres', pastilleEtat(o ? o.actif : null),
-        ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null) + ligne('au_refus', o ? TU(o.refus ? 'au_oui' : 'au_non') : null),
-        '?tab=messages&site=vinted&vue=offres')
-      + carteA('paliers', 'au_paliers', pastilleEtat(au.paliers ? au.paliers.actif : null),
-        ligne('au_paliers_pcts', au.paliers ? au.paliers.paliers.map((x) => x + ' %').join(' · ') : null)
-        + ligne('au_paliers_plancher', au.paliers ? (au.paliers.remiseMax ? TU('au_plancher_remise', { r: au.paliers.remiseMax }) : TU('au_plancher_mini')) : null)
-        + ligne('au_messages', au.paliers ? (au.paliers.messages ? TU('au_versions', { n: au.paliers.messages }) : TU('au_pas_de_message')) : null),
-        '?tab=messages&site=vinted&vue=offres')
-      + carteA('baisse', 'au_baisse', pastilleEtat(au.baisse ? au.baisse.actif : null),
-        ligne('au_baisse_regle', au.baisse && au.baisse.pct ? TU('au_baisse_pct', { p: au.baisse.pct, j: au.baisse.jours }) : null)
-        + `<p class="note5">${esc(TU('au_baisse_plancher'))}</p>`, '?tab=annonces&site=vinted')
-      + `</div>`;
+    const f = au.favoris, o = au.offres, fa = f && f.auto, pa = au.paliers, ba = au.baisse;
+    const items = [
+      { id: 'favoris', titre: 'au_favoris', sous: 'au6_favoris_sous', on: fa ? fa.actif : null },
+      { id: 'offres', titre: 'au_offres', sous: 'au6_offres_sous', on: o ? o.actif : null },
+      { id: 'paliers', titre: 'au_paliers', sous: 'au6_paliers_sous', on: pa ? pa.actif : null },
+      { id: 'baisse', titre: 'au_baisse', sous: 'au6_baisse_sous', on: ba ? ba.actif : null },
+    ];
+    // 5.410 : sur Leboncoin / Vestiaire, la baisse par règle de CE compte seulement.
+    if (au.site === 'leboncoin' || au.site === 'vestiaire') { items.splice(0, items.length, ...items.filter((x) => x.id === 'baisse')); autoChoisie = 'baisse'; }
+    if (!items.some((x) => x.id === autoChoisie)) autoChoisie = 'favoris';
+    const gauche = `<ul class="au6-l" role="listbox" aria-label="${esc(TU('c_automatisations'))}">${items.map((x) => `<li><button type="button" class="au6-i" role="option" data-auto-choix="${x.id}" aria-selected="${autoChoisie === x.id}"><span class="mil"><span class="ti">${esc(TU(x.titre))}</span><span class="me">${esc(TU(x.sous))}</span></span>${pastilleEtat(x.on)}</button></li>`).join('')}</ul>`;
+    const ligne = (k, v, note) => `<div class="rg6"><span><b>${esc(TU(k))}</b>${note ? `<small>${esc(TU(note))}</small>` : ''}</span><span class="v6">${v == null || v === '' ? '—' : esc(v)}</span></div>`;
+    const section = (k, corps) => `<section class="sec6"><h3>${esc(TU(k))}</h3>${corps}</section>`;
+    let droite = '';
+    const ch = items.find((x) => x.id === autoChoisie);
+    const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
+    if (autoChoisie === 'favoris') {
+      // 5.410 : les messages aux favoris se RÈGLENT ici (textes, rythme, mode auto) — leur ligne dédiée
+      //    `vrm_favoris_reglages_{uid}` (règle de l'app) et le mode auto chez VRM (`auto_regler`) ; allumer ⇒ « Oui, allumer ».
+      const textes = f && Array.isArray(f.textes) ? f.textes : [];
+      const b0 = raBrouillon.favoris || {};
+      const tx = Array.isArray(b0.textes) ? b0.textes : textes.slice();
+      while (tx.length < Math.min(5, Math.max(2, tx.length + (tx[tx.length - 1] ? 1 : 0)))) tx.push('');
+      const ry = b0.rythme || (f && f.rythme) || 'normal';
+      const autoOn = fa ? fa.actif === true : null;
+      const conf = raConfirme && raConfirme.auto === 'favoris' ? `<div class="conf5" role="alertdialog" data-ra-confirme="favoris-auto"><p>${esc(TU('ra_confirme_q', { nom: TU('au_favoris') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      const etat = raEtat && raEtat.auto === 'favoris' ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
+      droite = tete + conf + etat
+        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`}</section>`
+        + section('au6_messages', `<p class="note5">${esc(TU('au6_messages_note'))}</p>` + tx.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-rf-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join(''))
+        + section('au6_ciblage', `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('au6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>` + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
+        + section('au6_delais', ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null, 'au6_attente_note') + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null))
+        + `<div class="pied6"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><span class="outils"><button type="button" class="vu-btn" data-auto-guide>${esc(TU('au6_demarrer'))}</button><button type="button" class="vu-btn vu-plein" data-rf-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></span></div>`;
+    } else {
+      // 5.410 (Julien, 20 nov. : les automatisations vivent dans l'extension) : offres auto, paliers et baisse par
+      // règle se RÈGLENT ici, sur SON toucher ; allumer demande « Oui, allumer » ; écrit dans `vrm_reglages_auto`.
+      const cleDe = { offres: 'vinted_offres_auto', paliers: 'vinted_offres_paliers', baisse: 'vinted_baisse_regle' }[autoChoisie];
+      const on = autoChoisie === 'offres' ? (o ? o.actif === true : null) : autoChoisie === 'paliers' ? (pa ? pa.actif === true : null) : (ba ? ba.actif === true : null);
+      const b0 = raBrouillon[autoChoisie] || {};
+      const bascule = on == null ? '' : `<div class="rg6"><span><b>${esc(TU('ra_etat'))}</b><small>${esc(TU('ra_confirme_note'))}</small></span><button type="button" class="vu-btn ra6" data-ra-bascule="${autoChoisie}" aria-pressed="${on}">${esc(TU(on ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`;
+      const conf = raConfirme && raConfirme.auto === autoChoisie ? `<div class="conf5" role="alertdialog" data-ra-confirme="${esc(raConfirme.cle)}"><p>${esc(autoChoisie === 'offres' ? TU('ra_confirme_offres') : TU('ra_confirme_q', { nom: TU(ch.titre) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      const etat = raEtat && raEtat.auto === autoChoisie ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
+      let corpsR = '';
+      if (autoChoisie === 'offres') {
+        const t = b0.refus != null ? b0.refus : (o && o.refusTexte) || '';
+        corpsR = section('au6_regle', ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null, 'au6_minis_note'))
+          + section('au6_messages', `<label class="champ6"><b>${esc(TU('ra_refus_msg'))}</b><small>${esc(TU('ra_refus_note'))}</small><textarea data-ra-champ="refus" maxlength="1000" rows="3">${esc(t)}</textarea></label>`)
+          + section('au6_delais', ligne('au_attente', TU('au6_offres_delai')));
+      } else if (autoChoisie === 'paliers') {
+        const pcts = b0.paliers != null ? b0.paliers : (pa ? pa.paliers.join(', ') : '50, 80, 100');
+        const rem = b0.remise != null ? b0.remise : (pa && pa.remiseMax ? String(pa.remiseMax) : '');
+        const ap = apercuPaliers6(String(pcts).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100));
+        corpsR = section('au6_regle', `<label class="champ6"><b>${esc(TU('ra_paliers_pcts'))}</b><small>${esc(TU('ra_paliers_note'))}</small><input type="text" inputmode="numeric" data-ra-champ="paliers" value="${esc(pcts)}"></label>`
+          + `<label class="champ6"><b>${esc(TU('ra_remise'))}</b><small>${esc(TU('ra_remise_note'))}</small><input type="number" min="1" max="89" step="1" data-ra-champ="remise" value="${esc(rem)}"></label>`)
+          + section('au6_apercu', `<p class="apercu6" data-paliers-apercu="${ap.join('>')}">${esc(ap.join(' → '))} · ${esc(TU('au6_plancher', { p: 85 }))}</p>`)
+          + section('au6_messages', ligne('au_messages', pa ? (pa.messages ? TU('au_versions', { n: pa.messages }) : TU('au_pas_de_message')) : null));
+      } else {
+        const pct = Number(b0.pct || (ba && ba.pct) || 5), jours = Number(b0.jours || (ba && ba.jours) || 14);
+        const seg = (k, l, v, suf) => `<div class="vu-seg vue5" role="group" data-ra-seg="${k}">${l.map((x) => `<button type="button" data-ra-${k}="${x}" aria-pressed="${x === v}">${x}${suf}</button>`).join('')}</div>`;
+        corpsR = section('au6_regle', `<div class="rg6"><span><b>${esc(TU('ra_pct'))}</b></span>${seg('pct', [5, 10, 15], pct, ' %')}</div><div class="rg6"><span><b>${esc(TU('ra_jours'))}</b></span>${seg('jours', [7, 14, 30], jours, ' j')}</div><p class="note5">${esc(TU('au_baisse_plancher'))}</p>${au.site === 'vestiaire' ? `<p class="note5" data-au-baisse-vc-date>${esc(TU('g6_vc_date'))}</p>` : ''}`);
+      }
+      droite = tete + conf + etat + `<section class="sec6">${bascule}</section>` + corpsR
+        + `<div class="pied6" data-ra-pied="${esc(cleDe)}"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-ra-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
+    }
+    const vueAuto = items.length <= 1 || autoDetail ? 'detail' : 'liste';
+    droite = (items.length > 1 ? `<button type="button" class="au6-retour" data-auto-retour>‹ ${esc(TU('au6_retour'))}</button>` : '') + droite;
+    return `<div class="deux5 au6" data-automatisations data-auto-choisie="${autoChoisie}" data-auto-vue="${vueAuto}"><div class="gauche5">${gauche}</div><div class="volet5 au6-d">${droite}</div></div>`;
+  }
+  // ══ 5.410 — LA CADENCE (Julien, 20 nov. « vas-y fais ») : SON réglage par compte, ici dans Paramètres. Défauts
+  //    inchangés ; plus vite que le défaut ⇒ « Oui, aller plus vite ». Le reste (captcha, prudence, 403/429, un compte
+  //    à la fois, une requête à la fois, compte de l'onglet, temps d'écriture, réserve de 5) n'est pas réglable.
+  let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
+  function cadenceHtml() {
+    const c0 = listes && listes.automatisations && listes.automatisations.cadence;
+    if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
+    if (!c0) return `<section class="grp5" data-cadence="pas-su"><h3>${esc(TU('cd_titre'))}</h3><p class="note5">—</p></section>`;
+    const c = Object.assign({}, c0, cadBrouillon || {});
+    const jour = c.parJour || 200;
+    const LIB = { favorisHeure: TU('cd_fav_h'), actionsHeure: TU('cd_act_h'), parJour: TU('cd_jour'), pauseMin: TU('cd_pause_min'), pauseMax: TU('cd_pause_max') };
+    const curseur = (k, min, max, pas, val, txt) => `<label class="champ6 cd6"><b>${esc(LIB[k])}</b><span class="cd6-l"><input type="range" min="${min}" max="${max}" step="${pas}" value="${val}" data-cad="${k}" aria-label="${esc(LIB[k])}"><output data-cad-v="${k}">${esc(txt)}</output></span></label>`;
+    return `<section class="grp5" data-cadence="${esc(listes.compte.id)}"><h3>${esc(TU('cd_titre'))}</h3>
+      ${curseur('favorisHeure', 1, 60, 1, c.favorisHeure, TU('cd_par_heure', { n: c.favorisHeure }))}
+      ${curseur('actionsHeure', 10, 100, 1, c.actionsHeure, TU('cd_par_heure', { n: c.actionsHeure }))}
+      ${curseur('parJour', 20, 1000, 10, jour, TU('cd_par_jour', { n: jour }))}
+      ${curseur('pauseMin', 20, 240, 5, c.pauseMin, TU('cd_secondes', { n: c.pauseMin }))}
+      ${curseur('pauseMax', 20, 240, 5, c.pauseMax, TU('cd_secondes', { n: c.pauseMax }))}
+      <p class="note5" data-cad-risque>${esc(TU('cd_risque'))}</p>
+      ${cadConfirme ? `<div class="conf5" role="alertdialog" data-cad-confirme><p>${esc(TU('cd_confirme_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-cad-oui>${esc(TU('cd_oui'))}</button><button type="button" class="vu-btn" data-cad-non>${esc(TU('ra_annuler'))}</button></div></div>` : ''}
+      ${cadEtat ? `<p class="note5" role="status" data-cad-etat="${cadEtat.ok ? 'ok' : 'ko'}">${esc(cadEtat.texte)}</p>` : ''}
+      ${cadConfirme ? '' : `<div class="outils"><button type="button" class="vu-lien" data-cad-defaut>${esc(TU('cd_defaut'))}</button><button type="button" class="vu-btn vu-plein" data-cad-enregistrer${cadEnVol || !cadBrouillon ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`}
+    </section>`;
   }
   // ══ 5.409 — NOTIFICATIONS (capture « Notifications » de Vintex) : le journal capté des 7 derniers jours, en tableau
   //    filtrable (type, statut « nouveau » / « vu » selon le marqueur de l'app), chaque ligne mène à VRM par identité.
@@ -1843,13 +2352,87 @@
     }).join('')}</div>`;
   }
   // Le bloc entier (carte du site, ou fenêtre de l'extension).
+  // ══ 5.410 — LE PANNEAU « COMME VINTEX » : barre latérale fixe (Accueil · Articles · Commandes · Messagerie · Favoris ·
+  //    Notifications · Automatisations ; Paramètres en bas ; réductible en icônes), en-tête « {Page} · pastille du compte »
+  //    et « Mis à jour il y a … ⟳ » à droite, la page dessous. Au téléphone / Orion : la même chose empilée (la barre
+  //    devient une rangée d'onglets défilante en haut).
+  let vxReduit = false;
+  try { chrome.storage.local.get(['vrmPanneauReduit'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} vxReduit = !!(g && g.vrmPanneauReduit === true); }); } catch (_) {}
+  const ICO6 = {
+    accueil: '<path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/>',
+    annonces: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
+    ventes: '<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
+    messages: '<path d="M4 5h16v11H9l-5 4z"/>',
+    favoris: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    notifications: '<path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    automatisations: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/>',
+    parametres: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
+  };
+  const ico6 = (k) => `<svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICO6[k] || ''}</svg>`;
+  const PAGES6 = { accueil: 'v6_accueil', annonces: 'v6_articles', ventes: 'v6_commandes', messages: 'v6_messagerie', favoris: 'c_favoris', notifications: 'c_notifications', automatisations: 'c_automatisations', parametres: 'c_parametres' };
+  // L'heure de la dernière lecture de CE que la page montre (jamais une heure inventée ; « — » sinon).
+  function luDeLaPage(e) {
+    const l = listes || {};
+    const pick = ongletListe === 'annonces' ? l.annonces && l.annonces.lu : ongletListe === 'ventes' ? l.ventes && l.ventes.lu : ongletListe === 'messages' ? l.messages && l.messages.lu : null;
+    return Number(pick) || Number(listesAt) || Number(e && e.flux && e.flux.okAt) || 0;
+  }
+  // L'ACCUEIL : un petit tableau de bord — le compte de l'onglet et sa liaison à VRM, les chiffres du jour, la jauge,
+  // ce que l'extension vient de capter. Tout vient de ce qui est déjà lu ; « — » quand ce n'est pas su.
+  function accueilHtml(e) {
+    const l = listes || {};
+    const site = (e && e.site) || {};
+    const v = e && e.vrm;
+    const auj = new Date(); auj.setHours(0, 0, 0, 0);
+    const ventesJour = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => Number(x.date) >= auj.getTime() && x.etat !== 'annulee').length : null;
+    const aExpedier = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => x.etat === 'a_expedier').length : null;
+    const nonLus = l.messages && Array.isArray(l.messages.liste) ? l.messages.liste.filter((x) => x.nonlu).length : (l.messages && l.messages.nonlusSite != null ? l.messages.nonlusSite : null);
+    const enVente = l.annonces && l.annonces.statuts ? l.annonces.statuts.en_vente : (l.annonces ? l.annonces.total : null);
+    const j = e && e.plateforme === 'vinted' ? site.jauge : null;
+    const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
+    const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.filter((x) => !l.notifications.vu || Number(x.t) > Number(l.notifications.vu)).slice(0, 5) : null;
+    const nomCompte = (l.compte && l.compte.nom) || site.nom || '—';
+    return `<div class="acc6" data-accueil-page>
+      <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
+        <div class="rg6"><span><b>${esc(nomCompte)}</b><small>${esc(NOM_SITE[e.plateforme] || '')} · ${esc(TU('v6_compte_onglet'))}</small></span><span class="v6">${etiquette5('lie', TU(v && v.connecte ? 'v6_lie' : 'v6_pas_lie'), v && v.connecte ? '' : 'ambre')}</span></div>
+        <div class="rg6"><span><b>${esc((v && v.email) || '—')}</b><small>${esc(TU('v6_compte_vrm'))}</small></span><span class="v6">${esc(e && e.version ? 'VRM ' + e.version : '')}</span></div>
+      </section>
+      <section class="sec6"><h3>${esc(TU('v6_aujourdhui'))}</h3><div class="tuiles6">
+        ${tuile('v6_ventes_jour', ventesJour, 'ventes')}${tuile('v6_a_expedier', aExpedier, 'ventes', aExpedier ? 'ambre' : '')}${tuile('v6_non_lus', nonLus, 'messages')}${tuile('v6_en_vente', enVente, 'annonces')}
+      </div>${j ? `<p class="note5" data-accueil-jauge>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))} · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</p>` : ''}</section>
+      <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
+    </div>`;
+  }
+  function vxHtml(e, corps, extras) {
+    const cle = PAGES6[ongletListe] ? ongletListe : 'accueil';
+    const nav = (k) => `<button type="button" class="nav6" data-onglet-b="${k}" aria-current="${ongletListe === k ? 'page' : 'false'}" title="${esc(TU(PAGES6[k]))}">${ico6(k)}<span>${esc(TU(PAGES6[k]))}</span></button>`;
+    const nom = (listes && listes.compte && listes.compte.nom) || (e && e.site && e.site.nom) || '';
+    const lu = luDeLaPage(e);
+    return `<div class="vx6"${vxReduit ? ' data-reduit' : ''} data-vx data-page="${cle}">
+      <nav class="side6" aria-label="VRM">
+        <div class="marque6"><img src="${esc(chrome.runtime.getURL('logo-vrm-96.png'))}" alt="" width="24" height="24"><b>VRM</b></div>
+        <div class="grp6">${esc(TU('v6_general'))}</div>${nav('accueil')}
+        <div class="grp6">${esc(NOM_SITE[e.plateforme] || TU('v6_plateforme'))}</div>${nav('annonces')}${nav('ventes')}${nav('messages')}${nav('favoris')}${nav('notifications')}${nav('automatisations')}
+        <div class="bas6">${nav('parametres')}</div>
+      </nav>
+      <div class="main6">
+        <header class="tete6"><button type="button" class="rond6" data-vx-reduire aria-label="${esc(TU('v6_reduire'))}" title="${esc(TU('v6_reduire'))}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
+          <h1 data-vx-titre>${esc(TU(PAGES6[cle]))}</h1>${nom ? `<span class="compte6" data-vx-compte><i aria-hidden="true">${esc(nom.charAt(0).toUpperCase())}</i>${esc(nom)}</span>` : ''}
+          <span class="esp6"></span><button type="button" class="maj6" data-vx-maj data-lu="${lu || ''}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>${esc(lu ? TU('v6_mis_a_jour', { quand: depuis(lu) || '' }) : TU('v6_mettre_a_jour'))}</span></button>
+          <button class="fermer rond6" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button></header>
+        <div class="corps6">${extras || ''}${corps}</div>
+      </div>
+    </div>`;
+  }
   function listesHtml(e, parametres) {
+    if (ongletListe === 'accueil' && (LISTES || !carte.hasAttribute('data-grand'))) ongletListe = 'messages';
     const vinted = !e || e.plateforme === 'vinted';
     const nomSite = (e && NOM_SITE[e.plateforme]) || 'ce site';
     let panneau;
-    if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`
+    if (ongletListe === 'accueil' && !LISTES && carte.hasAttribute('data-grand')) panneau = accueilHtml(e);
+    else if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations' && listes && listes.automatisations && listes.automatisations.baisse) panneau = `<p class="note5" data-auto-site="${esc(e.plateforme)}">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p>` + automatisationsHtml();
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations') panneau = `<div class="par5" data-auto-site="${esc(e.plateforme)}"><p class="note5">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p></div>`;
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = ventesHtml(e);
@@ -1871,6 +2454,7 @@
     </section>`;
   }
   function brancherListes(racine, e) {
+    try { brancherGestes6(racine); } catch (_) {}
     racine.querySelectorAll('[data-onglet-b]').forEach((b) => b.addEventListener('click', () => {
       ongletListe = b.getAttribute('data-onglet-b'); ranger({ vrmCarteOnglet: ongletListe });
       if (ongletListe !== 'favoris') chargerListes(false);
@@ -1886,8 +2470,96 @@
       if (LISTES) rendreListesSeules(); else rendre();
     }));
     brancherAnnonces(racine);
+    const rd = racine.querySelector('[data-vx-reduire]'); if (rd) rd.addEventListener('click', () => { vxReduit = !vxReduit; ranger({ vrmPanneauReduit: vxReduit }); rendre(); });
+    const mj = racine.querySelector('[data-vx-maj]'); if (mj) mj.addEventListener('click', () => { chargerListes(true); });
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
+    racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; rendre(); }));
+    const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
+    // 5.410 : la cadence (Paramètres). Un curseur change le brouillon ; « Enregistrer » écrit (plus vite ⇒ confirmation).
+    racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('input', () => {
+      const k = c.getAttribute('data-cad'); const v = Number(c.value);
+      cadBrouillon = Object.assign({}, cadBrouillon || {}, { [k]: v });
+      if (k === 'pauseMin' && (cadBrouillon.pauseMax || (listes.automatisations.cadence || {}).pauseMax) <= v) cadBrouillon.pauseMax = Math.min(240, v + 5);
+      if (k === 'pauseMax' && (cadBrouillon.pauseMin || (listes.automatisations.cadence || {}).pauseMin) >= v) cadBrouillon.pauseMin = Math.max(20, v - 5);
+      cadConfirme = false; cadEtat = null;
+      const o = racine.querySelector(`[data-cad-v="${k}"]`); if (o) o.textContent = TU(k === 'parJour' ? 'cd_par_jour' : /pause/.test(k) ? 'cd_secondes' : 'cd_par_heure', { n: v });
+      const e = racine.querySelector('[data-cad-enregistrer]'); if (e) e.disabled = false;
+    }));
+    racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('change', () => rendre()));
+    const cadEnvoyer = (confirme) => {
+      const c = Object.assign({}, (listes.automatisations && listes.automatisations.cadence) || {}, cadBrouillon || {});
+      const valeur = { uid: listes.compte.id, favorisHeure: c.favorisHeure, actionsHeure: c.actionsHeure, pauseMin: c.pauseMin, pauseMax: c.pauseMax, ...(cadBrouillon && cadBrouillon.parJour != null ? { parJour: cadBrouillon.parJour } : c.parJour ? { parJour: c.parJour } : {}) };
+      cadEnVol = true; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vinted_cadence', valeur, confirme: confirme === true }, (r) => {
+          void chrome.runtime.lastError; cadEnVol = false;
+          if (r && r.code === 'confirmation') { cadConfirme = true; cadEtat = null; }
+          else { cadConfirme = false; cadEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { cadBrouillon = null; chargerListes(true); } }
+          rendre();
+        });
+      } catch (_) { cadEnVol = false; cadEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
+    const cadO = racine.querySelector('[data-cad-oui]'); if (cadO) cadO.addEventListener('click', () => cadEnvoyer(true));
+    const cadN = racine.querySelector('[data-cad-non]'); if (cadN) cadN.addEventListener('click', () => { cadConfirme = false; rendre(); });
+    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 40, pauseMax: 90 }; cadConfirme = false; cadEtat = null; rendre(); });
+    // 5.410 : régler une automatisation ici. Rien ne part sans SON toucher ; allumer passe par « Oui, allumer ».
+    const raValeur = (auto, actif) => {
+      const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};
+      if (auto === 'offres') return { cle: 'vinted_offres_auto', valeur: actif };
+      if (auto === 'paliers') { const pa = au.paliers || {}; const pcts = String(b0.paliers != null ? b0.paliers : (pa.paliers || [50, 80, 100]).join(',')).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100); const rem = Number(b0.remise != null ? b0.remise : pa.remiseMax); return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false } }; }
+      const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: au.cle || (listes && listes.compte && listes.compte.id), actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
+    };
+    const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
+    const raEnvoyer = (auto, cle, valeur, confirme) => {
+      if (raEnVol) return; raEnVol = true; raEtat = null; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle, valeur, confirme: confirme === true }, (r) => {
+          void chrome.runtime.lastError; raEnVol = false; raConfirme = null;
+          raEtat = { auto, ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
+          if (r && r.ok) { delete raBrouillon[auto]; chargerListes(true); }
+          rendre();
+        });
+      } catch (_) { raEnVol = false; raEtat = { auto, ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    racine.querySelectorAll('[data-ra-bascule]').forEach((b) => b.addEventListener('click', () => {
+      const auto = b.getAttribute('data-ra-bascule'), allumer = !raActif(auto), v = raValeur(auto, allumer);
+      if (allumer) { raConfirme = { auto, cle: v.cle, valeur: v.valeur }; raEtat = null; rendre(); } else raEnvoyer(auto, v.cle, v.valeur, false);
+    }));
+    const raOui = racine.querySelector('[data-ra-oui]'); if (raOui) raOui.addEventListener('click', () => { const c = raConfirme; if (c && c.cle !== 'favoris-auto') raEnvoyer(c.auto, c.cle, c.valeur, true); });
+    const raNon = racine.querySelector('[data-ra-non]'); if (raNon) raNon.addEventListener('click', () => { raConfirme = null; rendre(); });
+    racine.querySelectorAll('[data-ra-champ]').forEach((c) => c.addEventListener('input', () => { const k = c.getAttribute('data-ra-champ'); (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = c.value; }));
+    racine.querySelectorAll('[data-ra-pct],[data-ra-jours]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-ra-pct') ? 'pct' : 'jours'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = Number(b.getAttribute('data-ra-' + k)); rendre(); }));
+    // 5.410 : messages aux favoris — textes, rythme, mode auto.
+    const rfEnvoyer = (action, donnees) => {
+      if (raEnVol) return; raEnVol = true; raEtat = null; rendre();
+      try {
+        chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge', action }, donnees), (r) => {
+          void chrome.runtime.lastError; raEnVol = false;
+          if (r && r.code === 'confirmation' && action === 'favorisAuto') { raConfirme = { auto: 'favoris', cle: 'favoris-auto', valeur: donnees }; }
+          else { raConfirme = null; raEtat = { auto: 'favoris', ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { delete raBrouillon.favoris; chargerListes(true); } }
+          rendre();
+        });
+      } catch (_) { raEnVol = false; raEtat = { auto: 'favoris', ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    const rfBr = () => { const au = (listes && listes.automatisations && listes.automatisations.favoris) || {}; return (raBrouillon.favoris = raBrouillon.favoris || { textes: Array.isArray(au.textes) ? au.textes.slice() : [] }); };
+    racine.querySelectorAll('[data-rf-texte]').forEach((c) => c.addEventListener('input', () => { const b = rfBr(); b.textes = Array.isArray(b.textes) ? b.textes : []; b.textes[Number(c.getAttribute('data-rf-texte'))] = c.value; }));
+    racine.querySelectorAll('[data-rf-texte]').forEach((c) => c.addEventListener('change', () => rendre()));
+    racine.querySelectorAll('[data-rf-rythme]').forEach((b) => b.addEventListener('click', () => { rfBr().rythme = b.getAttribute('data-rf-rythme'); rendre(); }));
+    const rfEn = racine.querySelector('[data-rf-enregistrer]'); if (rfEn) rfEn.addEventListener('click', () => {
+      const b = raBrouillon.favoris; if (!b) { raEtat = { auto: 'favoris', ok: true, texte: TU('ra_rien') }; rendre(); return; }
+      const t = (Array.isArray(b.textes) ? b.textes : []).map((x) => String(x || '').trim()).filter(Boolean);
+      rfEnvoyer('reglagesFavoris', { message: t[0] || '', variantes: t.slice(1, 5), ...(b.rythme ? { rythme: b.rythme } : {}) });
+    });
+    const rfA = racine.querySelector('[data-rf-auto]'); if (rfA) rfA.addEventListener('click', () => { const on = rfA.getAttribute('aria-pressed') === 'true'; rfEnvoyer('favorisAuto', { actif: !on }); });
+    const raOuiF = racine.querySelector('[data-ra-confirme="favoris-auto"] [data-ra-oui]'); if (raOuiF) raOuiF.addEventListener('click', (ev) => { ev.stopImmediatePropagation(); const c = raConfirme; raConfirme = null; if (c) rfEnvoyer('favorisAuto', Object.assign({}, c.valeur, { confirme: true })); }, true);
+    const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
+    const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
+      const auto = autoChoisie, b0 = raBrouillon[auto] || {};
+      if (auto === 'offres') { if (b0.refus == null) { raEtat = { auto, ok: true, texte: TU('ra_rien') }; rendre(); return; } raEnvoyer(auto, 'vinted_offre_refus_msg', String(b0.refus), false); return; }
+      const v = raValeur(auto, raActif(auto)); raEnvoyer(auto, v.cle, v.valeur, false);
+    });
     const gd = racine.querySelector('[data-auto-guide]'); if (gd) gd.addEventListener('click', () => { ongletListe = 'favoris'; ranger({ vrmCarteOnglet: ongletListe }); rendre(); chargerFavoris(e, false); });
     racine.querySelectorAll('[data-rep-envoyer]').forEach((b) => b.addEventListener('click', () => envoyerReponse(b.getAttribute('data-rep-envoyer'))));
     racine.querySelectorAll('[data-rep-texte]').forEach((t) => t.addEventListener('input', () => { brouillons.set(t.getAttribute('data-rep-texte'), t.value); const b = carte.querySelector(`[data-rep-envoyer="${t.getAttribute('data-rep-texte')}"]`); if (b) b.disabled = !t.value.trim() || repEnVol; }));
@@ -2279,15 +2951,22 @@
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
+      ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
-      <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=discretion', 'r_rythme')}${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>
+      <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>
       ${connecte && e.toutArrete ? '<div class="outils"><button class="lien" data-tout-reprendre>Reprendre les gestes automatiques</button></div>' : ''}
       ${detailsHtml.replace('<div class="outils">' + outils + '</div>', '<div class="outils">' + [v && v.connecte && !changerCompte ? '<button class="lien" data-changer-vrm>Changer de compte VRM</button>' : '', v && v.connecte ? '<button class="lien" data-rapport>Envoyer un rapport</button>' : ''].join('') + '</div>')}
     </div>` : '';
     if (grand5) carte.setAttribute('data-grand', ''); else carte.removeAttribute('data-grand');
     const principal = connecte && e.plateforme === 'vinted' ? favorisFileHtml(e) : '';
-    poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}
+    if (grand5) {
+      // 5.410 : le panneau « comme Vintex ». Ce qui se passe maintenant (envoi en cours, version, réparation, lecture de
+      // l'historique, alertes du site) reste AU-DESSUS de la page ; les listes sont la page.
+      const extras = [principal, majHtml(e.maj), Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : '', repHtml(), progression, historique, lignePerime, ligneDeCote, aRetirerLbc, diagnosticLbc, bascule].filter(Boolean).map((h) => `<div class="ext6">${h}</div>`).join('');
+      const liste = listesHtml(e, parametres5);
+      poserHtml(contenu, vxHtml(e, `<div class="gestes">${liste}</div>`, extras));
+    } else poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}
       ${lbcVisible ? `<div class="lbc5"><div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}</div>` : ''}
       ${principal}
       ${sous5}
@@ -2887,6 +3566,40 @@
         try { location.assign(r.url); } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
       }
     });
+  }
+  // ══ 5.410 — LE LIEN DE L'APP (Julien, 20 nov. : « toute action doit être faite dans l'extension ») : VRM ouvre le site
+  //    avec `?vrm=panneau&page=…&ids=…&action=…` (src/ouvrirPanneau.js `lienPanneau`, le même contrat) ⇒ le panneau
+  //    s'ouvre sur la page, la sélection PRÉ-COCHÉE, l'action PRÉ-CHOISIE. Rien ne part : un geste qui écrit attend SA
+  //    confirmation dans le panneau (la barre « Masquer N annonces ? », le récapitulatif des favoris…). Les paramètres
+  //    `vrm*` sont retirés de l'adresse (un rechargement ne rouvre rien) ; ids : chiffres et tirets seulement, 50 au plus.
+  // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
+  // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
+  const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
+  // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
+  const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
+  function lireLienPanneau() {
+    try {
+      if (CADRE || LISTES || !/(^|\.)(vinted\.[a-z.]+|leboncoin\.fr|vestiairecollective\.com)$/i.test(String(location.hostname || ''))) return null;
+      const p = new URLSearchParams(String(location.search || ''));
+      if (p.get('vrm') !== 'panneau') return null;
+      const page = PAGES_LIEN[String(p.get('page') || '').toLowerCase()] || 'accueil';
+      const ids = String(p.get('ids') || '').split(',').map((x) => x.trim()).filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 200);
+      let action = String(p.get('action') || '').toLowerCase();
+      if (!ACTIONS_LIEN.includes(action)) action = p.get('page') === 'republier' ? 'republier' : p.get('page') === 'prix' ? 'baisser' : '';
+      try { for (const k of ['vrm', 'page', 'ids', 'action']) p.delete(k); const q = p.toString(); history.replaceState(history.state, '', location.pathname + (q ? '?' + q : '') + location.hash); } catch (_) {}
+      return { page, ids, action };
+    } catch (_) { return null; }
+  }
+  const lienPanneau = lireLienPanneau();
+  if (lienPanneau) {
+    ongletListe = lienPanneau.page;
+    for (const id of lienPanneau.ids) annSel.add(id);
+    if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
+    else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
+    if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
+    hote.setAttribute('data-lien-panneau', lienPanneau.page);
+    setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
   }
   // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
   try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { fermerCarte(); } }, true); } catch (_) {}

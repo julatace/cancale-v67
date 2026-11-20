@@ -23,6 +23,7 @@ import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
+import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
 import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
@@ -31,7 +32,8 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm } from '../App.jsx';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -113,7 +115,10 @@ export async function lireAnnoncesEgalite(accounts) {
   return { annonces: out, manque };
 }
 
-export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
+// `site` (20 nov., sélecteur de plateforme global — src/siteCourant.js) : le site choisi pour toute l'app ('toutes' | un site).
+// Donné, il REMPLACE le filtre de site de l'écran (liste et tableau) : plus de menu des sites ici. Absent (bancs d'hier) :
+// le filtre local d'avant.
+export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null, site: siteGlobal = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   const { pause: pauseCB } = useComptesBloques();
@@ -125,6 +130,12 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [relit, setRelit] = React.useState(false);
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
+  const siteG = siteGlobal == null ? null : (siteGlobal === 'toutes' ? 'tous' : siteGlobal);
+  React.useEffect(() => {
+    if (siteG == null) return;
+    setFiltre((f) => (f.site === siteG ? f : { ...f, site: siteG }));
+    setFiltreT((f) => (f.site === siteG ? f : { ...f, site: siteG, compte: '' }));
+  }, [siteG]);
   const [q, setQ] = React.useState('');
   const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
@@ -196,26 +207,18 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // `baisserPrixLbc`, Vestiaire `baisserPrixVestiaire`, chacun avec ses garde-fous) — un article à la fois ; la PAUSE Leboncoin
   // sur son geste CONFIRMÉ (`lbcPause`, une à la fois, la réponse de Leboncoin dite), jamais une suppression.
   const lbcEnLigne = (a) => a.annonces.filter((x) => x.site === 'leboncoin' && x.etat === 'enligne');
-  const pauseLbcSue = () => (vmrExtPresent() && __vmrEtat && __vmrEtat.lbcPause === true);
   actions.push(
     { cle: 'prixSites', libelle: tr('egalite.action.prixSites'), icone: 'tag', phrase: tr('egalite.action.prixSites.phrase'),
       pour: (a) => !!a.numero && a.annonces.some((x) => x.etat === 'enligne'),
       juger: (sel) => (sel.length === 1 ? { ok: true } : { ok: false, raison: sel.length ? tr('egalite.action.unALaFois') : tr('egalite.selection.aucune') }) },
-    { cle: 'pauseLbc', libelle: tr('egalite.action.pauseLbc'), icone: 'archive', phrase: tr('egalite.action.pauseLbc.phrase'),
+    // (20 nov., décision de Julien) La pause Leboncoin se fait dans le panneau de l'extension, sur leboncoin.fr.
+    { cle: 'pauseLbc', libelle: tr('actionsExt.pause'), icone: 'archive', phrase: tr('actionsExt.phrase', { site: 'Leboncoin' }),
       pour: (a) => lbcEnLigne(a).length > 0,
-      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : !pauseLbcSue() ? { ok: false, raison: tr('egalite.action.pauseLbc.ext') } : { ok: true }) });
-  const pauserLbc = async (choisis) => {
-    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), numero: a.numero || '', titre: a.titre || '' })));
+      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : { ok: true }) });
+  const pauserLbc = (choisis) => {
+    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => String(x.id)));
     if (!ids.length) return;
-    const ok = await askConfirm({ title: tr('egalite.pauseLbc.titre', { n: ids.length }), desc: tr('egalite.pauseLbc.desc'), ok: tr('egalite.action.pauseLbc'), cancel: tr('egalite.pauseLbc.annuler') });
-    if (!ok) return;
-    let faits = 0, refus = 0;
-    for (const x of ids) {   // une à la fois : l'extension relit l'annonce, vérifie le compte de l'onglet, garde, sécurité
-      let rep = null; try { rep = await vmrCmd({ cmd: 'lbcPause', id: x.id }, 70000); } catch (_) { rep = null; }
-      if (rep && rep.accepte && rep.etape === 'fait') faits++; else refus++;
-    }
-    toast(tr('egalite.pauseLbc.bilan', { faits, refus }));
-    setTic((t) => t + 1);
+    ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids, action: 'pause' });
   };
   const onAction = (k, choisis) => {
     if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }
@@ -241,11 +244,12 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   }, [modele, siteT, compteT, filtreT.dort, seuil]);
   const nomCompte = (c) => (c.pseudo || ('#' + c.compte)) + (filtreT.site === 'tous' && sites.length > 1 ? ' · ' + nomSite(c.site) : '');
   const tableau = {
+    site: siteT,   // (20 nov.) le site du tableau : les intertitres par compte s'y rangent
     articles: lignesT, majLe, rafraichit: relit, onRafraichir: () => { setRelit(true); setTic((t) => t + 1); },
     compte: cptChoisi ? nomCompte(cptChoisi) : '',
-    onAutomatisations: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} },
+    // (20 nov., précision de Julien) Plus d'entrée « Automatisations » dans Annonces : elles vivent dans l'extension.
     filtres: [
-      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+      ...(sites.length > 1 && siteG == null ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
         options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
@@ -274,7 +278,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces filtreSite={siteG == null} Logo={(s) => <LogoSite site={s}/>}
+      onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

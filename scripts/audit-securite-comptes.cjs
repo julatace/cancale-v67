@@ -282,12 +282,12 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
   const elb = ((gs.store.vrmSecu || {}).comptes || {})[CLBC] || {};
   dit(!!elb.robot, 'E14 Leboncoin : un défi anti-robot vu par la page pendant une baisse ⇒ ce compte s’arrête (secuObserver)', { x, elb });
   gs = monterGeste({ robot: CLBC });
-  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, repub: true }); } catch (e) { x = { err: String(e) }; }
+  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
   dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcSupprimeAnnonce'), 'E15 Republier sur Leboncoin : après un contrôle anti-robot, la suppression ne part pas, dit', { x, envoisPage });
   // « Tout arrêter » coupe aussi la republication en série Leboncoin (mode `serie`), pas une suppression seule (son clic).
   gs = monterGeste({});
   gs.lignes.main.vrm_securite_comptes = { evts: [{ s: 'arret', at: Date.now() - 1000, par: 'app' }] };
-  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, repub: true }); } catch (e) { x = { err: String(e) }; }
+  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
   dit(x && x.accepte === false && !envoisPage.includes('lbcSupprimeAnnonce'), 'E16 « Tout arrêter » : la republication Leboncoin en série ne supprime rien', { x, envoisPage });
   // Créer sur Vinted (annonce-vinted) et le départ programmé de Republier (republier-programme) : la sorte et le mode.
   const sansCom = bgTxt.replace(/\/\/[^\n]*/g, '');

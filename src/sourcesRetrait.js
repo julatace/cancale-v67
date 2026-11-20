@@ -112,21 +112,32 @@ export function sourcesDuColis({ t = null, o = null, r = null, tr = null, vs = n
 // « vérifié à 14:32 » (aujourd'hui), « vérifié hier 18:05 », « vérifié le 6 nov. » ; null ⇒ ''.
 const PAR = { email: 'par e-mail', sms: 'par SMS', vinted: 'par Vinted', message: 'par message Vinted', transporteur: 'par le transporteur', mondialrelay: 'par Mondial Relay', chronopost: 'par Chronopost', vinted_go: 'par Vinted Go', colissimo: 'par Colissimo' };
 export const parQui = (par) => (par ? (PAR[par] || (par === 'vinted' ? 'par Vinted' : '')) : '');
+// (20 nov., bugs-terrain) TROIS FORMATEURS GARDÉS, jamais un par appel. `toLocale…String(…, { timeZone })` construit un
+// `Intl.DateTimeFormat` NEUF à chaque appel (~0,5 ms) : appelée par chaque ligne de retrait à chaque rendu, elle prenait
+// 7 s sur 25 s de calcul à l'ouverture d'Achats (profil, volume de sa base : 12 comptes, ~2 700 achats, processeur ×4).
+// Mêmes options, mêmes textes (`scripts/audit-texte-verifie.cjs` compare à l'ancienne écriture).
+let _fmtHm = null, _fmtJour = null, _fmtCourt = null;
+const fmt = () => {
+  if (!_fmtHm) {
+    _fmtHm = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    _fmtJour = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris' });
+    _fmtCourt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
+  }
+  return { hm: _fmtHm, jour: _fmtJour, court: _fmtCourt };
+};
 export function texteVerifie(ms, maintenant = Date.now(), par = null) {
   if (!Number.isFinite(ms)) return '';
   if (par && parQui(par)) return texteVerifie(ms, maintenant).replace(/^vérifié/, `vérifié ${parQui(par)}`);
+  const f = fmt();
   const d = new Date(ms), n = new Date(maintenant);
-  const hm = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-  const jour = (x) => x.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
-  if (jour(d) === jour(n)) return `vérifié à ${hm}`;
-  if (jour(d) === jour(new Date(maintenant - 86400000))) return `vérifié hier ${hm}`;
-  return `vérifié le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' })}`;
+  const hm = f.hm.format(d);
+  const jour = (x) => f.jour.format(x);
+  const jd = jour(d);
+  if (jd === jour(n)) return `vérifié à ${hm}`;
+  if (jd === jour(new Date(maintenant - 86400000))) return `vérifié hier ${hm}`;
+  return `vérifié le ${f.court.format(d)}`;
 }
-
-// (11 nov., retraits fiables — le colis « fantôme ») Plus de 48 h sans AUCUNE source datée qui revoie ce colis
-// (e-mail, lecture chez le transporteur, conversation, achats relus) : il n'est plus présenté comme sûr. La
-// ligne le dit en ambre, « pas confirmé depuis le 8 nov. ». Sans date du tout : rien (pas su ≠ ancien).
-export const CONFIRMATION_MAX_MS = 48 * 3600e3;
+const CONFIRMATION_MAX_MS = 48 * 3600e3;
 export const verifieAncien = (ms, maintenant = Date.now()) => Number.isFinite(ms) && maintenant - ms > CONFIRMATION_MAX_MS;
 export function texteNonConfirme(ms) {
   if (!Number.isFinite(ms)) return '';

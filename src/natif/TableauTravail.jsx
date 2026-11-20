@@ -111,7 +111,9 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null }) {
+  // `groupe(l)` (20 nov., « divise par comptes ») ⇒ { cle, titre } : sans tri choisi, un INTERTITRE à chaque nouveau groupe
+  // (les lignes arrivent déjà rangées par groupe). Un tri par colonne mélange les groupes : plus d'intertitre.
   const ordinateur = useOrdinateur();
   const memo0 = React.useMemo(() => lireMemo(id), [id]);
   const [q, setQ] = React.useState('');
@@ -300,10 +302,14 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
           {menuLigne ? <th scope="col" className="n-tt-th n-tt-th-menu"><span className="n-tt-sr">{tr('tableau.plusDActions')}</span></th> : null}
         </tr></thead>
         <tbody>
-          {visibles.map((l) => {
+          {visibles.map((l, i) => {
+            const g = groupe && !colTri ? groupe(l) : null;
+            const gAvant = g && i > 0 ? groupe(visibles[i - 1]) : null;
+            const inter = g && (!gAvant || gAvant.cle !== g.cle) ? <tr key={'g:' + g.cle} className="n-tt-intertitre" data-tt-groupe={g.cle}>
+              <th scope="colgroup" colSpan={2 + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{g.titre}</th></tr> : null;
             const coche = sel.has(l.cle); const grise = !cochable(l) && (A || l.grise); const m = menuDe(l); const st = statutDe(l);
-            return (
-              <tr key={l.cle} className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
+            return (<React.Fragment key={l.cle}>{inter}
+              <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
                 aria-selected={coche ? 'true' : 'false'} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)} {...(l.attrs || {})}>
                 <td className="n-tt-td n-tt-td-case" onClick={(e) => e.stopPropagation()}><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={coche} disabled={!cochable(l)} aria-label={tr('tableau.cocher', { titre: l.titre || '' })} onChange={() => basculer(l)}/></label></td>
                 <td className="n-tt-td n-tt-td-article" data-tt-col="article">
@@ -326,7 +332,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
                     </Deroulant>
                   </span> : null}
                 </td> : null}
-              </tr>
+              </tr></React.Fragment>
             );
           })}
         </tbody>

@@ -114,7 +114,8 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   dit(/data-plancher-saisir/.test(LP) && /if \(!onSaisir\) return null;/.test(LP), 'E2 sans prix d’achat : la porte « Saisir le prix d’achat », sinon rien');
   const A = sansCommentaires(fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8'));
   dit(/const plancherDeItem = \(item, devise = 'EUR'\) => \(item == null \|\| \(devise \|\| 'EUR'\) !== 'EUR' \? null : plancherVente\(numeros\[String\(item\)\] \|\| null\)\);/.test(A), 'E3 la fiche par IDENTITÉ (item_id) — autre devise ⇒ rien');
-  dit((A.match(/<LignePlancher plancher=\{plancherDeItem\(itemF,pc\?\.devise\)\}/g) || []).length === 2, 'E4 la ligne sous l’offre du fil (extension prête ou non)');
+  // (20 nov.) L'offre se tranche dans l'extension : la carte du fil (une seule désormais) garde la ligne du plancher.
+  dit((A.match(/<LignePlancher plancher=\{plancherDeItem\(itemF,pc\?\.devise\)\}/g) || []).length === 1, 'E4 la ligne sous l’offre du fil (la carte, avant « Répondre à l’offre dans l’extension »)');
   dit(/offreFacePlancher\(offre\.prix, plancherDeItem\(offre\.item, paire&&paire\.devise\)\)\?\.niveau==='sous'/.test(A) && /data-offre-sous-plancher="" [^>]*color:C\.warn/.test(A), 'E5 la liste : « à perte » en ambre sur l’offre sous le plancher');
   dit(!/plancherVente|plancherOffre|textePlancher|dejaEnStock/.test(fs.readFileSync(path.join(R, 'vinted-sync-extension', 'background.js'), 'utf8')), 'E6 le moteur `autoAccepterOffres` (extension) n’est pas touché');
   dit(!/setNumeros[^\n]*plancher|save\([^)]*plancher/i.test(A), 'E7 le plancher n’écrit rien');
