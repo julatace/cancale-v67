@@ -164,6 +164,7 @@ async function ouvrirApp(ctx, quand) {
       doublons: LECTURES.length - new Set(LECTURES.map((x) => x.u)).size, lourdes: LECTURES.slice().sort((a, b) => b.o - a.o).slice(0, 8).map((x) => `${Math.round(x.o / 1024)} Ko ${x.d}→${x.f} ms ${x.u}`) },
   };
   if (process.env.LECTURES) { console.log(`  (base ${quand} : ${r.base.lectures} lectures, ${r.base.ko} Ko ; avant « prêt » ${r.base.avantPret} / ${r.base.koAvantPret} Ko ; ${r.base.doublons} en double)`); for (const x of r.base.lourdes) console.log('     ' + x); }
+  if (process.env.LECTURES === '2') { const par = new Map(); for (const x of LECTURES) (par.get(x.u) || par.set(x.u, []).get(x.u)).push(x); for (const [u, l] of par) if (l.length > 1) console.log(`     ×${l.length} ${l.map((x) => x.d + '→' + x.f).join(' ')} ${Math.round(l[0].o / 1024)} Ko ${u.slice(0, 110)}`); }
   return { pg, cdp, r };
 }
 
