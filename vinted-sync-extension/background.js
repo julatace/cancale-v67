@@ -26866,7 +26866,7 @@ function bleamSection(nom, v) {
     const paire = (x, max) => { const mx = bleamEnt(x && x.max, 0, max, null); if (mx == null) return null; const mn = bleamEnt(x && x.min, 0, mx, mx); return { min: mn, max: mx }; };
     const jours = [...new Set((Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort();
     const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);
-    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: jours.length ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
+    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
