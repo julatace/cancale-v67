@@ -30,6 +30,13 @@ const MUTATIONS = {
   verif_publier: ["if (verif.length && msg.verifVu !== true) return", "if (false) return"],
   sans_retour: ["if (msg.sansRetour !== true) return { accepte: false, code: 'sans-retour'", "if (false) return { accepte: false, code: 'sans-retour'"],
   favoris_regle: ["try { return GARDES_APP.validerReglagesFavoris(voulu); }", "try { return voulu; }"],
+  prix_plancher: ["if (pl && vouluC < pl.c) { refus.push({ id, code: 'plancher'", "if (false) { refus.push({ id, code: 'plancher'"],
+  prix_confirme: ["if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Confirmer ».' };", ''],
+  atelier_photo: ["reglages: a.photo, ...(a.lettre", "...(a.lettre"],
+  atelier_arret: ["if (!fait) { a2.etat = 'arretee';", "if (false) { a2.etat = 'arretee';"],
+  offre_liste: ["if (!off) return { ok: false, code: 'offre'", "if (false) return { ok: false, code: 'offre'"],
+  contre_plancher: ["if (pl && pc < pl.c) return { ok: false, code: 'plancher'", "if (false) return { ok: false, code: 'plancher'"],
+  publier_questions: ["if (plan.etat !== 'pret') return { ok: false, code: 'questions'", "if (false) return { ok: false, code: 'questions'"],
   auto_confirme: ["if (v.actif && a.actif !== true && msg.confirme !== true) return", "if (false) return"],
 };
 if (args.includes('--prouve')) {
@@ -177,6 +184,55 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     dit(a1 && a1.code === 'confirmation' && !e.regle, 'mode auto : allumer sans « Oui, allumer » ⇒ rien n’est envoyé', JSON.stringify(a1));
     const a2 = await g.envoyer({ from: 'vrm-badge', action: 'favorisAuto', actif: true, confirme: true }, TAB);
     dit(a2 && a2.ok && e.regle && e.regle.reglages.actif === true && e.regle.confirme === true && e.regle.reglages.parHeure === 12, 'mode auto : confirmé ⇒ `auto_regler` validé (ses horaires et quotas gardés)', JSON.stringify(e.regle));
+  });
+  // ── H. LES GESTES DU PANNEAU ───────────────────────────────────────────
+  await essai('gestes', async () => {
+    const T2 = { tab: { id: 7, url: 'https://www.vinted.fr/' } };
+    const h = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12', min: '45' }, 5002: { numero: '13' } } } } });
+    h.ctx.relaisSessionOwner = async () => 'owner-banc';
+    let ticks = 0; h.ctx.prixAttenteTick = () => { ticks++; return Promise.resolve({}); };
+    const p0 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', items: [{ id: '5001', prix: '50', prixVu: 60 }] }, T2);
+    dit(p0 && p0.ok === false && p0.code === 'confirmation', 'prix : sans « Confirmer », rien n’est rangé', JSON.stringify(p0));
+    const p1 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5001', prix: '40', prixVu: 60 }, { id: '5002', prix: '70', prixVu: 60 }, { id: '5001', prix: '50', prixVu: 60 }] }, T2);
+    const cmds = Object.entries(h.lignes).filter(([k]) => /^cmd_prix_/.test(k)).map(([, d]) => d);
+    dit(p1 && p1.ranges.length === 1 && p1.refus.some((x) => x.code === 'plancher' && x.plancher === 45) && p1.refus.some((x) => x.code === 'hausse') && cmds.length === 1 && cmds[0].source === 'panneau' && cmds[0].args.prixAvant === 60 && cmds[0].args.prix === 50 && cmds[0].confirme === true && ticks === 1,
+      'prix : sous le plancher (prix mini 45) refusé, hausse refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite', JSON.stringify({ p1, cmds }));
+    // Atelier
+    const g = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12' } } } } });
+    const ex = []; let rep = { accepte: true, etape: 'fait' }; g.ctx.executerCommande = async (m) => { ex.push(m); return rep; };
+    const a1 = await g.envoyer({ from: 'vrm-badge', action: 'atelierLancer', confirme: true, ids: ['5002', '5001'], espacement: { mode: 'aleatoire', min: 2, max: 5 }, photo: { bright: 1.2, rot: 3 }, lettre: true }, T2);
+    await new Promise((r) => setTimeout(r, 30));
+    dit(a1 && a1.ok && ex.length === 1 && ex[0].cmd === 'recreerVinted' && ex[0].id === '5002' && ex[0].reglages && ex[0].reglages.bright === 1.2 && ex[0].reglages.rot === 3 && /^[a-z]$/.test(ex[0].lettre), 'atelier : « Lancer » ⇒ la 1re paire de SON ordre part (coffre → brouillon → suppression → mise en ligne), SON réglage photo, la lettre', JSON.stringify({ a1: a1 && a1.ok, ex }));
+    const st = g.store.vrmAtelierRepub; const ec = st && st.prochain - Date.now();
+    dit(st && st.i === 1 && ec >= 2 * MIN - 2000 && ec <= 5 * MIN + 60000, 'atelier : la suivante attend SON espacement au hasard (2 à 5 min), la file vit dans chrome.storage.local', JSON.stringify({ i: st && st.i, ec }));
+    const r0 = await g.ctx.atelierRepubTick(Date.now());
+    dit(r0.etat === 'attente' && ex.length === 1, 'atelier : pas avant l’heure');
+    rep = { accepte: false, code: 'frein-refus', raison: 'Vinted a freiné' };
+    await g.ctx.atelierRepubTick(Date.now() + 6 * MIN);
+    const st2 = g.store.vrmAtelierRepub;
+    dit(ex.length === 2 && st2.etat === 'arretee' && st2.paires['5001'].etape === 'arret', 'atelier : un arrêt (frein, captcha, plafond) arrête la file, dit', JSON.stringify(st2.paires));
+    rep = { accepte: true, etape: 'fait' };
+    const rp = await g.envoyer({ from: 'vrm-badge', action: 'atelierReprendre', id: '5001' }, T2);
+    dit(rp && rp.ok && ex[2] && ex[2].cmd === 'reprendreRepub' && ex[2].id === '5001' && g.store.vrmAtelierRepub.etat === 'finie', '« Reprendre » relit chez Vinted et finit la paire interrompue (`reprendreRepub`)', JSON.stringify({ rp, c: ex[2] }));
+    // Offres
+    const o = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12', min: '45' } } } } });
+    o.ctx.offresEnAttente = async () => [{ conv: '1', prix: 40, tx: '900', oid: '901', item: '5001' }];
+    const eo = []; o.ctx.executerPourAppCoeur = async (m) => { eo.push(m); return { ok: true }; };
+    const o1 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '999', confirme: true }, T2);
+    dit(o1 && o1.code === 'offre' && eo.length === 0, 'offre : une offre qui n’est pas en attente sur CE compte ⇒ rien ne part');
+    const o2 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '901', confirme: true }, T2);
+    dit(o2 && o2.ok && eo[0].endpoint === '/api/v2/transactions/900/offer_requests/901/accept' && eo[0].confirme === true && eo[0].item === '5001' && !eo[0].avisVu, 'offre : accepter passe par la porte gardée (confirmation, garde anti double-vente sur SON annonce)', JSON.stringify(eo[0]));
+    const o3 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '42', confirme: true }, T2);
+    const o4 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '38', confirme: true }, T2);
+    const o5 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '48', confirme: true }, T2);
+    dit(o3.code === 'plancher' && o4.code === 'prix' && o5.ok && eo[1] && eo[1].endpoint === '/api/v2/transactions/900/offers' && eo[1].body.offer.price === '48.00', 'contre-offre : jamais sous ton plancher (45), toujours au-dessus de son offre (40)', JSON.stringify({ o3, o4, e: eo[1] }));
+    // Publier
+    const pf = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12' } } } } });
+    pf.ctx.lireFicheAnnonce = async () => ({ photos: ['https://images1.vinted.net/a.jpg'], description: 'Belle paire', codes: {} });
+    pf.ctx.dressingLu = async () => ({ items: [{ id: 5001, title: 'Paire A', price: { amount: '50.0' } }] });
+    let pubs = 0; pf.ctx.publierFicheSite = async () => { pubs++; return { accepte: true }; };
+    const q1 = await pf.envoyer({ from: 'vrm-badge', action: 'publierCarte', site: 'leboncoin', id: '5001' }, T2);
+    dit(q1 && q1.code === 'questions' && q1.questions.some((x) => x.champ === 'categorie') && pubs === 0, 'publier : catégorie pas sûre ⇒ la question est posée dans le panneau, rien ne part (agent de l’app)', JSON.stringify(q1));
   });
   console.log(ko ? `\n❌ audit-extension-porte-app : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ audit-extension-porte-app : ${ok} contrôles`);
   process.exit(ko ? 1 : 0);
