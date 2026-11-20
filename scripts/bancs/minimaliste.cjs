@@ -362,7 +362,9 @@ async function selecteur() {
   const multi = () => { const b = E.baseFiches(); const l = baseSite('leboncoin'), e = baseSite('ebay'); b.rows.push(...l.rows.filter((x) => /^lbc_/.test(x.id)), ...e.rows.filter((x) => /^ebay_/.test(x.id))); return b; };
   const lire = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-selecteur-site]'); const t = document.querySelector('.vrm-tache');
     return { sel: s ? s.getAttribute('data-site-courant') : null, choix: s ? [...s.querySelectorAll('[data-site-choix]')].map((b) => b.getAttribute('data-site-choix')) : [],
-      tache: t ? t.getAttribute('data-tache-site') : null, eg: (document.querySelector('[data-eg-ecran]') || { getAttribute: () => null }).getAttribute('data-eg-site'),
+      tache: t ? t.getAttribute('data-tache-site') : null, eg: (document.querySelector('[data-eg-ecran][data-eg-site]') || { getAttribute: () => null }).getAttribute('data-eg-site'),
+      // À l'ordinateur, le tableau de travail : chaque rangée dit ses sites (`data-eg-sites`).
+      egSites: [...document.querySelectorAll('[data-eg-article]')].map((x) => x.getAttribute('data-eg-sites') || ''),
       tuiles: [...document.querySelectorAll('.n-tuile-valeur')].map((x) => x.textContent.trim()),
       locaux: document.querySelectorAll('[data-eg-filtre], [data-vn-plateforme], .vrm-filtre-sites, [data-filtre-sites]').length }; });
   const aller = async (o, url) => { await o.pg.goto(`http://localhost:${P.PORT}/${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE); };
@@ -386,7 +388,8 @@ async function selecteur() {
       for (const [url, cle] of [['?tab=journee', 'journee'], ['?tab=annonces', 'annonces'], ['?tab=achats', 'achats'], ['?tab=messages', 'messages']]) {
         await aller(o, url);
         const x = await lire(o.pg);
-        const ok = x.sel === 'leboncoin' && (cle === 'journee' || (cle === 'annonces' ? x.eg === 'leboncoin' : x.tache === 'leboncoin'));
+        const egOk = x.eg === 'leboncoin' || (W >= 1024 && x.egSites.length > 0 && x.egSites.every((v) => v.split(',').includes('leboncoin')));
+        const ok = x.sel === 'leboncoin' && (cle === 'journee' || (cle === 'annonces' ? egOk : x.tache === 'leboncoin'));
         dit(ok, `S2 ${W} ${cle} s'ouvre sur Leboncoin`, x);
         dit(x.locaux === 0, `S5 ${W} ${cle} : aucun filtre de site local`, x.locaux);
         await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `selecteur-${cle}-${W}.png`) }).catch(() => {});

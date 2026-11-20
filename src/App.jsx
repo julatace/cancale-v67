@@ -33945,7 +33945,10 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   //   l'objectif du mois (src/objectifMois.js : `valeurObjectif`, `progressionObjectif`, les jours qui restent).
   // Les cartes en plus (courbe, table par compte, objectif) se rangent DANS le morceau d'Aujourd'hui (src/aujourdhui/
   // Branche.jsx) : l'app ne lui donne que la question au propriétaire (`valeurSel` = `valeurChiffre` avec une sélection).
-  const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, maintenant), S);
+  // (20 nov.) Une question « tous les sites » (Jour · Semaine · Mois, la courbe, l'objectif) prend le site courant ; une question qui
+  // nomme SON site (la table par compte et par site) le garde.
+  const selDuSite = (sel) => (siteJ !== 'toutes' && (!sel || !sel.site || sel.site === 'toutes') ? { ...(sel || SEL_TOUT_V2), site: siteJ } : sel);
+  const valeurSel = (id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, selDuSite(sel), REGLES_CARTE, maintenant), S);
   const objectif = { mois: objectifMois, brut: objectifBrut, poser: poserObjectif, valeur: (o) => valeurObjectif(o, S, REGLES_CARTE, maintenant) };
   return { chiffres, aVenir: null, plus: { valeurSel, objectif, live, maintenant, regles: REGLES_CARTE, beneficeMois: M.mois.benefice } };
   };
@@ -66863,8 +66866,6 @@ function AppCoeur() {
     const lbcNatif = t === 'ventes' && site === 'leboncoin' && !baseKO;
     return (
       <section className="vrm-tache" data-tache={t} data-natif={natifV ? '1' : undefined} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]} data-espace={t==='annonces' ? 'paires' : (t === 'ventes' || t === 'achats' ? 'ventes' : undefined)}>
-        {/* (20 nov., décision) LE sélecteur de plateforme, en tête de chaque écran principal (src/natif/SelecteurSite.jsx). */}
-        {baseKO ? null : selecteurSite}
         {/* (17 nov., nouveau design) Allumé : une tête À SOI (`v2-tete-tache`) — les règles d'hier réservaient 150 px à droite
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
         {natifV ? null : <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
@@ -66912,6 +66913,8 @@ function AppCoeur() {
           </span> : null}
           {t === 'ventes' && !designV2App && !baseKO ? <span className="vv-tete-place" data-vv-tete-place="ventes"/> : null}
         </header>}
+        {/* (20 nov., décision) LE sélecteur de plateforme, sous le titre de chaque écran principal (src/natif/SelecteurSite.jsx). */}
+        {baseKO ? null : selecteurSite}
         {/* (19 nov., décision de Julien) « À régler · N » : ce qui était dans « À faire » d'Aujourd'hui, en tête de SON onglet (replié s'il ne presse pas).
             Ventes natif le pose lui-même sous ses segments (`avant`). */}
         {designV2App && !baseKO && !natifV && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}
@@ -68294,6 +68297,8 @@ function AppCoeur() {
             Les outils propres d'un site : « Tout l'écran {site} », en bas de la liste filtrée sur lui (rien n'est perdu, §4.11). */}
         {tab==='annonces'&&<GardeEcran nom="annonces">{!baseKO && !annoncesAncien && sectionDeTache('annonces', platSub)==='annonces'
           ? <>
+              {/* (20 nov.) LE sélecteur de plateforme en tête d'Annonces (la liste de tous les sites suit le site choisi). */}
+              <SelecteurSiteCoque/>
               <AnnoncesEgaliteLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}
                 onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }} site={siteGlobal}/>
               {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si>{rendreVinted('annonces')}</CacheSiV2> : null}

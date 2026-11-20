@@ -6,7 +6,7 @@
 //   valeur   'toutes' | un site
 //   onChange (site) => …
 //   nom      (site) => son nom (« Leboncoin »)
-//   Logo     (site) => le logo du site (nœud), facultatif ; au téléphone, à cinq choix, le logo seul (le nom reste lu)
+//   Logo     (site) => le logo du site (nœud), facultatif ; au téléphone, à quatre ou cinq choix, le logo seul (le nom reste lu)
 //   tous     le libellé de « Tous »
 //   libelle  le nom du groupe pour le lecteur d'écran
 // Exemple : <SelecteurSite sites={['vinted','ebay']} valeur={site} onChange={poser} nom={nomPlateforme} tous="Tous"/>
