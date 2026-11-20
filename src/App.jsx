@@ -289,7 +289,6 @@ import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
-const AutomatisationsLazy = aLaDemande(() => import('./automatisations/Branchement.jsx'));   // (19 nov. soir) Paramètres → Automatisations
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -19369,13 +19368,9 @@ const extensionSaitAttendre = () => {
 const envoisPrixVrm = (num) => envoisPrix({ appelEbay: (c) => appelEbay(c), resultatReviseEbay: (x) => resultatReviseEbay(x), corpsCompteEbay: (c) => corpsCompteEbay(c), vmrCmdSuivi: (p, t) => vmrCmdSuivi(p, t), sansReponse: TEXTE_SANS_REPONSE,
   ici: (site) => extSait(CAP_PRIX_SITE[site]) === 'ok',
   saitAttendre: extensionSaitAttendre,
-  deposer: async (c) => {
-    if (!(AUTH.user && AUTH.user.id) || !isCloudReady()) return null;
-    const cmd = nouvelleCommandePrix({ ...c, num, owner: String(AUTH.user.id), alea: Math.random().toString(36).slice(2, 10) });
-    const d = cmd ? await deposerPrixAttente(depPrixAttente(), cmd) : null;
-    if (d) suivrePrixAttente(d.id, { num, site: c.site, cle: d.data.cle });
-    return d;
-  } });
+  // (20 nov., décision de Julien) Plus de baisse rangée par l'app (`cmd_prix_*`) : sur Vinted, Leboncoin et Vestiaire le prix
+  // se change dans le panneau de l'extension. Seul eBay part de la feuille.
+  deposer: async () => null });
 // Les commandes rangées PENDANT cette session : relues toutes les 30 s (page visible) et au signe de
 // l'extension ; leur issue est dite UNE fois (prix relu, ou pourquoi rien n'est parti). Lecture seule.
 const __prixSuivis = new Map();   // id → { num, site, cle }
@@ -19475,7 +19470,7 @@ function HotePrixPartout({ num, numData, comptes, extra, onFermer, focusPrix = f
     // `regleBaisseLbcTick` et passe par `baisserPrixLbc`). Vestiaire : pas de date de mise en ligne lue ⇒ pas de règle.
     .concat([...new Set(sitesVus.filter((x) => x.site === 'leboncoin' && x.compte).map((x) => 'lbc:' + String(x.compte).replace(/^lbc-account:/i, '')))]
       .filter((k) => /^lbc:[\w:.-]{1,80}$/.test(k)).map((uid) => ({ uid, nom: 'Leboncoin', ...regleDuCompte(regles, uid) })));
-  const onRegle = (uid, maj) => { const v = avecRegle(load(REGLE_CLE, null), uid, maj); save(REGLE_CLE, v); setRegles(v); };
+  const onRegle = null;   // (20 nov.) la baisse par règle se règle dans l'extension ; la feuille en dit l'état
   return <PrixPartout key={num} num={rn.cle || num} focusPrix={focusPrix} sites={sitesVus} manques={lecture ? [] : manques} lecture={lecture} regles={comptesRegle} onRegle={onRegle}
     onFermer={onFermer} prixDe={(site, p) => prixParSite(site, p, reglageP)} attentes={att} saitAttendre={sait} compteDe={compteDe} dire={(t, sorte) => toast(t, sorte)}
     onAnnuler={async (v) => { const ok = await annulerPrixAttente(depPrixAttente(), v.id); __prixSuivis.delete(v.id); await relire(); return ok; }}
@@ -22955,6 +22950,10 @@ function etatExtensionFavorisAuto(uid){
   const actif=String(__vmrEtat?.vinted?.uid||'');
   if(actif!==String(uid))return {disponible:false,code:actif?'compte_vinted_different':'onglet_vinted',raison:actif?NAV.Ce+' est connecté à un autre compte Vinted : passe sur ce compte dans l’onglet vinted.fr.':'Ouvre vinted.fr '+NAV.dans+', connecté sur ce compte, et laisse l’onglet ouvert.'};
   return {disponible:true,raison:''};
+}
+// (20 nov.) Un ancien lien `?tab=automatisations` : la feuille qui ouvre le panneau (un toucher : jamais un onglet ouvert seul).
+function RedirigeAutomatisations({ onRetour }) {
+  return <FeuilleExtension action="automatisations" onFermer={onRetour} attrs={{ 'data-auto-redirige': '' }}/>;
 }
 function FavorisDansExtension({ nomCompte = '' }) {
   return <Natif.Groupe titre={tr('actionsExt.favoris.titre')} pied={tr('actionsExt.favoris.pied')} attrs={{ 'data-favoris-panneau': '' }}>
@@ -28020,37 +28019,12 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const vus = {};
   for (const l of lignes || []) for (const x of l.sites) if (x.deja === true) vus[l.id + ':' + x.site] = true;
   const parId = new Map((choisies || []).map((p) => [String(p.id), p]));
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire se publient dans le panneau de l'extension (la feuille montre
+  // « Publier dans l'extension » sur leur case) : rien ne part d'ici. eBay : l'API serveur, comme avant.
+  const refusSite = async () => refusPanneau(tr('actionsExt.refus'));
   const envoyer = {
-    leboncoin: async (e) => {
-      const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
-      const saitFiche = relaisVivant() ? 'ok' : extSait('lbcfiche');
-      const v = valideAnnonceLbc({ title: e.apercu.titre, description: e.apercu.description, price: String(e.apercu.prix).replace('.', ','), etat: (e.vocab && e.vocab.etat) || '', photos: e.apercu.photos },
-        { ref: e.apercu.ref, photos: p.photos || [], etat: p.etat });
-      if (!v.ok) return { accepte: false, code: 'fiche', raison: 'à corriger : ' + v.erreurs[0].raison };
-      // Une extension qui ne sait pas recevoir la fiche publierait SA version (prix Vinted) :
-      // un prix réglé ne partirait pas — on le dit, rien ne part (jamais un autre prix en silence).
-      if (saitFiche !== 'ok' && Number(e.apercu.prix) !== Number(p.prix)) return { accepte: false, code: 'fiche-retard', raison: `ton extension ne sait pas encore recevoir la fiche de VRM (${EXT_CAPACITES.lbcfiche}) : le prix réglé ne partirait pas` };
-      // (15 nov.) La catégorie et ses critères (univers, type, taille, état, couleur, marque) de la correspondance :
-      // seulement à une extension qui sait les poser (`lbccriteres`) ; sinon la case est restée bloquée.
-      const crit = lbcCriteres && e.lbc ? { ...(e.lbc.categorie ? { categorie: e.lbc.categorie } : {}), ...(Object.keys(e.lbc.criteres || {}).length ? { criteres: e.lbc.criteres } : {}) } : {};
-      let r = null; try { r = await vmrCmd({ cmd: 'lbcPublier', id: String(e.id), ...(saitFiche === 'ok' ? { annonce: { ...v.annonce, ...crit } } : {}) }, 30000); } catch (_) { r = null; }
-      if (r && !r.accepte && r.code === 'confirmer') return { accepte: false, code: 'confirmer', raison: 'VRM n’a pas vu la fin d’un dépôt précédent : si l’annonce est en ligne, rien à refaire ; sinon relance-la depuis sa fiche Leboncoin' };
-      if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() }); __vmrNotifier(); }
-      return r;
-    },
-    vestiaire: async (e) => {
-      // Un champ à finir sur Vestiaire (son choix que la voie ne porte pas, ou un requis introuvable) :
-      // le dépôt s'ouvre SANS publier tout seul — il le finit là-bas (jamais publié avec un autre choix).
-      const finir = Array.isArray(e.finir) && e.finir.length > 0;
-      // (16 nov.) La catégorie Vestiaire de la correspondance (univers › catégorie › sous-catégorie), entière seulement.
-      const cv = e.corr && e.corr.valeurs ? e.corr.valeurs : {};
-      const categorie = vcCategorie && cv.univers && cv.categorie && cv.sous ? { univers: cv.univers, categorie: cv.categorie, sous: cv.sous } : null;
-      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: !finir && extSait('vcauto') === 'ok', ...(categorie ? { categorie } : {}) }, 30000); } catch (_) { r = null; }
-      // Introuvable telle quelle sur Vestiaire : le dépôt est ouvert SANS publier — à finir là-bas (jamais une autre).
-      if (r && r.accepte && r.categorie === 'introuvable') r = { ...r, finir: [...new Set([...(Array.isArray(e.finir) ? e.finir : []), 'Catégorie']) ] };
-      if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); }
-      return r;
-    },
+    leboncoin: refusSite,
+    vestiaire: refusSite,
     ebay: async (e) => {
       const p = parId.get(e.id); if (!p) return { accepte: false, code: 'absente', raison: 'annonce plus en ligne sur Vinted' };
       // (15 nov.) LA catégorie eBay qu'il a choisie (parmi celles qu'eBay propose) ; sans elle, aucune n'est devinée.
@@ -36489,21 +36463,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (12 nov., sécurité des comptes) Le refus automatique envoie CE texte sans lui : un mot qui
   // fait bannir (numéro, PayPal, « hors Vinted »… src/messageSur.js) ⇒ jamais rangé (l'extension
   // refuse alors sans message) ; le champ garde ce qu'il a tapé et le dit en ambre.
-  const ecrireRefusMsg = (v) => { setRefusMsg(v); save('vinted_offre_refus_msg', erreurMessageAuto(v) ? '' : v); };
-  React.useEffect(() => onCloudReady(() => { const v = load('vinted_offre_refus_msg', '') || ''; if (v && erreurMessageAuto(v)) save('vinted_offre_refus_msg', ''); }), []);
+  // (20 nov., décision de Julien) Le message de refus se règle dans l'extension : l'app le LIT seulement.
   // (12 nov., ext. 5.369) Ses AUTRES versions du refus (2 à 5), rangées à côté (une source) :
   // l'extension en tire une, jamais celle du refus précédent. Même rattrapage au nuage.
   const [refusVariantes, setRefusVariantes] = useStateCle('vinted_offre_refus_variantes', () => variantesLues(load('vinted_offre_refus_variantes', [])));
   React.useEffect(() => onCloudReady(() => setRefusVariantes(v => (v && v.some(t => t && t.trim())) ? v : variantesLues(load('vinted_offre_refus_variantes', [])))), []);
   // (12 nov., intégration) chaque VARIANTE passe la même garde que le refus (src/messageSur.js) : une version risquée
   // n'est jamais rangée (l'extension ne la tire donc jamais) ; le champ la garde et la dit.
-  const changerRefusVariantes = (l) => { const v = variantesLues(l); setRefusVariantes(v); save('vinted_offre_refus_variantes', v.map((t) => (t && erreurMessageAuto(t) ? '' : t))); };
-  const basculerOffresAuto = async () => {
-    if (offresAuto) { setOffresAuto(false); save('vinted_offres_auto', false); return; }
-    const ok = await confirmerOffresAuto();
-    if (!ok) return;
-    setOffresAuto(true); save('vinted_offres_auto', true);
-  };
+  // (20 nov.) Allumer / éteindre les offres auto et leurs variantes : dans l'extension (« Régler dans l'extension »).
   // Répartiteur de lot : ventile le prix d'un achat groupé sur plusieurs paires.
   const [lotOpen, setLotOpen] = useState(false);
   const [lotTotal, setLotTotal] = useState('');
@@ -38359,19 +38326,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const presentesIds = React.useMemo(() => { const st = new Set(); for (const l of [listings.items, listings.aConfirmer, listings.masquees]) if (Array.isArray(l)) for (const it of l) if (it && it.id != null) st.add(String(it.id)); return st; }, [listings.items, listings.aConfirmer, listings.masquees]);
   const brRefaire = useBrouillonsARefaire(curSub === 'annonces' || actionsOpen || refaireOpen || !!repubAction, presentesIds, Array.isArray(listings.brouillons) ? listings.brouillons : null, listings.brLectures || null);
   const nRefaire = Array.isArray(brRefaire.liste) ? brRefaire.liste.length : 0;
-  // (28 oct.) Refaire UN brouillon raté, sur son clic confirmé : l'extension relit
-  // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
-  const refaireBrouillon = async (b) => {
-    if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    // (17 nov., 5.408) « Reprendre » (`reprendreRepub`) contient « Refaire » : il relit d'abord chez Vinted
-    // ce qui n'est pas prouvé (ancienne partie ? brouillon en ligne ?), puis refait ou met en ligne.
-    const cmdR = extSait('repubreprise')==='ok' ? 'reprendreRepub' : 'refaireBrouillon';
-    const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:cmdR, uid:String(b.uid), id:String(b.id), num:b.numero?String(b.numero):undefined, confirme:true, couleur, reponses }, 480000), b.titre||b.title||'');
-    brRefaire.relire(); brVinted.relire();
-    if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
-    if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };
-    return { etape:'echec', raison:(r&&(r.raison||r.error))||"l'extension n'a pas répondu" };
-  };
+  // (20 nov., décision de Julien) « Refaire un brouillon » se fait dans le panneau de l'extension (Republier).
   // Paires déclarées PERDUES (litige, annonce disparue qu'on retire du stock, masquée
   // « Elle n'est plus là »). ⚠️ Déclarée ICI : `disparues` et les annonces masquées
   // présentes (`masqueesSurEtagere`) la lisent pendant le rendu, et un useState
@@ -43679,42 +43634,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   },[curSub,cleComptes,openConv?.request]);
 
   const modifierReponse=texte=>{if(!openConv||openConv.owner!==(AUTH.user?.id||''))return;brouillonsReponse.current.ecrire(openConv.owner,openConv.acc.vinted_user_id,openConv.convId,texte);setReplyText(texte);setReplyNotice('');};
-  const sendReply = async () => {
-    const oc=openConv,text=replyText.trim();
-    if(!oc?.acc||!oc.owner||oc.owner!==(AUTH.user?.id||'')||!oc.convId||!text||replyBusy||verrouReponse.current||oc.conversation?.allow_reply===false)return;
-    const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
-    if(reponsesIncertaines[cle])return;
-    if (!(etatRelais().niveau === 'vivant') && (!vmrExtPresent() || extSait('messagerie')!=='ok' || __vmrPlusieurs)) { setReplyErr("Extension VRM non détectée sur cet appareil. Ouvre l'app dans le navigateur où l'extension est installée, ou réponds sur Vinted."); return; }
-    verrouReponse.current=true;setReplyBusy(true);setReplyErr(null);setReplyNotice('');
-    setEnvoiReponse({request:oc.request,texte:text,etat:'envoi'});
-    let retour;
-    try{
-      const r=await vmrExec({uid:oc.acc.vinted_user_id,method:'POST',endpoint:`/api/v2/conversations/${oc.convId}/replies`,body:{reply:{body:text,photo_temp_uuids:null,is_personal_data_sharing_check_skipped:false}}});
-      retour=retourReponseVinted(r);
-    }catch{retour=retourReponseVinted(null);}
-    finally{verrouReponse.current=false;setReplyBusy(false);}
-    if(oc.owner!==(AUTH.user?.id||''))return;
-    if(retour.etat==='confirme'){
-      const boite=(convs.items||[]).find(c=>String(c.id)===String(oc.convId)&&String(c._acc?.vinted_user_id)===String(oc.acc.vinted_user_id));
-      setCapturesRepondues(v=>({...v,[oc.owner+':'+cle]:boite?.updated_at||oc.inboxUpdatedAt}));
-      brouillonsReponse.current.confirmer(oc.owner,oc.acc.vinted_user_id,oc.convId,text);
-      const actuel=filOffreActuel.current;
-      if(actuel?.owner===oc.owner&&String(actuel.acc?.vinted_user_id)===String(oc.acc.vinted_user_id)&&String(actuel.convId)===String(oc.convId)){
-        setReplyText(v=>v.trim()===text?'':v);
-        if(actuel.request!==oc.request)setReplyNotice(retour.texte+' Actualise le fil pour le relire.');
-      }
-    }
-    if(retour.etat==='incertain')setReponsesIncertaines(v=>({...v,[cle]:true}));
-    setEnvoiReponse(e=>e&&e.request===oc.request&&e.texte===text?{...e,etat:retour.etat==='confirme'?'ok':retour.etat}:e);
-    if(conversationRequest.current!==oc.request)return;
-    if(retour.etat==='confirme'){
-      // Une lecture commencée avant cet accusé ne doit pas effacer le message confirmé.
-      lectureConversationRequest.current++;
-      // (11 nov.) « Envoyé ✓ » est dit sous la bulle (data-envoi="ok"), plus une seconde fois au-dessus du champ.
-      setReplyText(v=>v.trim()===text?'':v);setReplyNotice('');
-      setOpenConv(o=>o?.request===oc.request?({...o,refreshing:false,messages:[...o.messages,{kind:'message',mine:true,body:text,ts:Date.now(),photos:[],links:[]}]}):o);
-    }else setReplyErr(retour.texte);
-  };
+  // (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension : l'app n'envoie plus de réponse.
+  const sendReply = () => {};
   const autoriserNouvelleReponse=async()=>{
     const oc=openConv;if(!oc?.acc||!oc.owner||oc.owner!==(AUTH.user?.id||''))return;
     const cle=cleReponseVinted(oc.acc.vinted_user_id,oc.convId);
@@ -43728,65 +43649,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // répondre et de faire l'offre ». Toujours sur SON clic, par l'extension, au
   // nom du compte connecté dans Chrome (garde stricte, plafond d'actions par heure, une
   // requête à la fois). Accepter fixe le prix, sans confirmer le paiement.
-  const actionOffre = async (quoi, off, prixDirect = null) => {
-    const oc = openConv;
-    if (!oc || !oc.acc || !oc.owner || oc.owner!==AUTH.user?.id || offreBusy || verrouOffre.current) return;
-    const cleAction=cleActionOffreVinted(oc.owner,oc.acc.vinted_user_id,oc.convId);
-    if(actionsOffresIncertaines[cleAction])return;
-    verrouOffre.current=true;let tentative=false,resultatConfirme=false;
-    try {
-    let method = 'PUT', endpoint = '', body = null, p = 0;
-    if (quoi === 'accept' || quoi === 'reject') {
-      if (!off) return;
-      // (11 nov., revue robustesse) La MÊME garde anti double vente que le moteur
-      // automatique (`gardeRefuse`) : vendue ailleurs ⇒ rien ne part ; pas su ⇒ dit.
-      // La garde publiée n'existe que moteur allumé (et peut dater de 48 h) : elle est
-      // RECALCULÉE ici, sur son clic (une lecture) ; ratée ⇒ garde incomplète ⇒ « pas su ».
-      let gardeMain = null;
-      if (quoi === 'accept') { try { const dataG = await chargerRetraitsMulti(); gardeMain = gardeOffres(dataG, articlesVendusAilleurs(dataG)); } catch (_) { gardeMain = gardeOffres(null, null); } }
-      if (conversationRequest.current !== oc.request) return;
-      const avis = quoi === 'accept' ? avisAcceptationManuelle(gardeMain, (paireDeConv(oc.acc.vinted_user_id, oc.convId, oc.conversation) || {}).item) : null;
-      if (avis && avis.bloque) { setOffreMsg({ err: avis.texte }); return; }
-      if (quoi === 'accept' && !(await askConfirm({ title: `Accepter ${fmtE(off.prix)} ?`, desc:`Le prix sera accepté pour ${oc.header?.login || 'cet acheteur'}. La vente dépend ensuite de son paiement.${avis && avis.pasSu ? ' ' + avis.texte : ''}`, ok: 'Accepter', cancel: 'Annuler' }))) return;
-      endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
-    } else {
-      const tx = oc.conversation && oc.conversation.transaction && oc.conversation.transaction.id;
-      // (3 nov.) « Proposer X € » envoie SON montant (`prixDirect`, calculé depuis
-      // son prix mini), sans passer par le champ ; sinon le prix saisi.
-      const saisi = prixDirect != null ? String(prixDirect) : String(prixOffre);
-      p = Number(saisi.replace(',', '.'));
-      if (!tx) { setOffreMsg({ err: "Pas d'article rattaché à cette conversation : rien à proposer." }); return; }
-      if(!(p>0) || !Number.isFinite(p) || !/^\d+(?:[,.]\d{1,2})?$/.test(saisi.trim())) { setOffreMsg({ err: 'Indique un prix.' }); return; }
-      method = 'POST'; endpoint = `/api/v2/transactions/${tx}/offers`; body = { offer: { price: String(p), currency: 'EUR' } };
-    }
-    if(conversationRequest.current!==oc.request)return;
-    if(off){const actuelle=offreEnAttenteDe(filOffreActuel.current?.conversation);if(!actuelle||cleOffreVinted(oc.acc.vinted_user_id,actuelle)!==cleOffreVinted(oc.acc.vinted_user_id,off)||actuelle.prix!==off.prix){setOffreMsg({err:'Cette offre a changé pendant la confirmation. Vérifie la conversation avant de continuer.'});return;}}
-    if(off&&offresConfirmees.current.has(cleOffreVinted(oc.acc.vinted_user_id,off))){setOffreMsg({err:'Cette offre a déjà été traitée. Actualise la conversation.'});return;}
-    setOffreBusy(true); setOffreMsg(null);tentative=true;
-    const r = await vmrExec({ uid: oc.acc.vinted_user_id, method, endpoint, body, confirme: quoi === 'accept' });
-    if(oc.owner!==AUTH.user?.id)return;
-    const etat=etatActionVinted(r);resultatConfirme=etat==='confirme';
-    if(etat==='incertain')setActionsOffresIncertaines(v=>({...v,[cleAction]:true}));
-    if(etat==='confirme'&&off&&(quoi==='accept'||quoi==='reject'))offresConfirmees.current.set(cleOffreVinted(oc.acc.vinted_user_id,off),quoi==='accept'?20:30);
-    if(conversationRequest.current!==oc.request)return;
-    setOffreBusy(false);
-    if (etat==='confirme') {
-      if(off&&(quoi==='accept'||quoi==='reject'))setOpenConv(o=>{if(o?.request!==oc.request)return o;const c=filAvecOffres(o.conversation,oc.acc);return {...o,conversation:c,messages:normalizeConversationMessages(c)};});
-      setOffreMsg({ ok: quoi === 'accept' ? 'Prix accepté sur Vinted. Le paiement de la vente n’est pas confirmé par cette acceptation.' : quoi === 'reject' ? 'Offre refusée.' : `Offre de ${fmtE(p)} envoyée.` });
-      if(quoi==='offre')setPrixOffre(v=>Number(String(v).replace(',','.'))===p?'':v);
-      const lecture=++lectureConversationRequest.current;
-      const res = await fetchVintedConversationDetail(oc.acc,oc.convId,{force:true});
-      if (lecture===lectureConversationRequest.current&&oc.owner===AUTH.user?.id) setOpenConv(o => {
-        if(o?.request!==oc.request)return o;
-        const c=res.ok?(res.actualisationNonConfirmee&&o.conversation?o.conversation:fusionnerConversation(o.conversation,res.conversation)):null;
-        return {...o,refreshing:false,refreshError:!c||res.actualisationNonConfirmee?'Action confirmée, mais le fil n’a pas pu être actualisé. Réessaie ou ouvre-le sur Vinted.':null,...(c?{conversation:filAvecOffres(c,oc.acc),messages:c===o.conversation?o.messages:normalizeConversationMessages(filAvecOffres(c,oc.acc))}:{})};
-      });
-    } else {
-      setOffreMsg({ err: etat==='incertain'?'Action non confirmée. Vérifie sur Vinted avant de relancer.':r?.error||(typeof r?.data?.message==='string'?r.data.message:'')||'Vinted a refusé cette action.' });
-    }
-    } catch {if(tentative&&!resultatConfirme&&oc.owner===AUTH.user?.id)setActionsOffresIncertaines(v=>({...v,[cleAction]:true}));if(conversationRequest.current===oc.request){if(resultatConfirme)setOffreMsg(v=>({ok:(v?.ok||'Action confirmée sur Vinted.')+' Le fil n’a pas pu être relu ; actualise-le.'}));else setOffreMsg({err:'Réponse non confirmée. Vérifie la conversation sur Vinted avant de réessayer pour éviter un doublon.'});}}
-    finally {verrouOffre.current=false;if(oc.owner===AUTH.user?.id)setOffreBusy(false);}
-  };
+  // (20 nov., décision de Julien) Accepter, refuser, contre-offre : dans le panneau de l'extension (plus rien d'ici).
   const autoriserNouvelleActionOffre=async()=>{
     const oc=openConv;if(!oc?.owner||oc.owner!==AUTH.user?.id)return;
     if(!await askConfirm({title:'Autoriser une nouvelle action ?',desc:'Vérifie sur Vinted si l’offre a déjà été envoyée, acceptée ou refusée. Autoriser ne vérifie pas le résultat et n’envoie rien.',ok:'J’ai vérifié, autoriser',cancel:'Annuler'}))return;
@@ -54612,10 +54475,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 <span className="vrm-offres-auto-statut" data-offres-auto-statut>{etat}</span>
               </div>
               <button type="button" className="vrm-offres-auto-info" data-offres-auto-info aria-expanded={offresInfo} aria-controls="vrm-offres-auto-detail" aria-label={tr('annonces.commentMarchentOffres')} title={tr('annonces.commentCaMarche')} onClick={() => setOffresInfo((v) => !v)}>i</button>
-              <button type="button" role="switch" aria-checked={offresAuto} data-offres-auto-toggle={offresAuto?'1':'0'} onClick={basculerOffresAuto}
-                className="vrm-offres-auto-switch" aria-label={tr('annonces.acceptationAutomatiqueOffres')}>
-                <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
-              </button>
+              {/* (20 nov., décision de Julien) Allumer / éteindre les offres auto : dans l'extension. */}
+              <BoutonExtension className="vrm-lien-action" action="automatisations" ids={['offres']} attrs={{ 'data-offres-auto-etat-panneau': offresAuto?'1':'0' }}/>
             </div>
             {offresAuto && vintedDeChrome() ? <JaugeActions uid={vintedDeChrome().uid}/> : null}
             {/* (11 nov., lot DJ8) L'écran complet : seuils par paire, aperçu, historique (Messages → Favoris & offres → Offres auto). */}
@@ -54626,9 +54487,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {offresAuto && (
                   <div data-offre-refus className="vrm-offres-auto-refus">
                     <label htmlFor="vrm-offre-refus-msg">{tr('annonces.messageQuandVrm')} <span>{tr('annonces.videRefusSans')}</span></label>
-                    <textarea id="vrm-offre-refus-msg" data-offre-refus-msg value={refusMsg} onChange={e=>ecrireRefusMsg(e.target.value)}
-                      rows={2} placeholder={tr('annonces.exMerciOffre')}/>
-                    <AutresVersions nom="refus-annonces" premier={refusMsg} variantes={refusVariantes} onChange={changerRefusVariantes} extOk={extSait('variantes')==='ok'}/>
+                    <p id="vrm-offre-refus-msg" data-offre-refus-msg="">{refusMsg || tr('annonces.videRefusSans')}</p>
                     {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{margin:'6px 0 0',fontSize:13,fontWeight:600,color:C.warn}}>{erreurMessageAuto(refusMsg)}</p> : null}
                   </div>
                 )}
@@ -55856,9 +55715,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         {!designV2 && <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>}
-        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
-          refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
-          refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
+        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
+          refusMsg={refusMsg}
+          refusVariantes={refusVariantes} variantesOk={extSait('variantes')==='ok'}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}
           offres={offresConv} lireGarde={lireGardeOffres} comptes={(accounts||[]).filter(a=>/^\d{1,20}$/.test(String(a.vinted_user_id||''))&&!acctOffOf({_acc:a})).map(a=>({ uid:String(a.vinted_user_id), nom:accNameOf(a) }))}
           uidOnglet={(vintedDeChrome()||{}).uid||''} pause={__vmrEtat && __vmrEtat.pause ? __vmrEtat.pause : null} freinsVus={lireFreinsVus()}
@@ -68029,8 +67888,9 @@ function AppCoeur() {
         }}/></GardeEcran>}
         {tab==='sales'    &&<GardeEcran nom="sales"><Sales     catalog={catalog} setCatalog={setCatalog} sales={sales} setSales={setSales} invoices={invoices} invoiceSettings={invoiceSettings} entreprises={entreprises} activeEnt={activeEnt}/></GardeEcran>}
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
-        {/* (19 nov. soir, NATIF.md §2 bis) Automatisations : les automatismes existants, leur état LU, leurs réglages (src/automatisations/). */}
-        {tab==='automatisations' &&<GardeEcran nom="automatisations"><AutomatisationsLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}/></GardeEcran>}
+        {/* (20 nov., précision de Julien) L'écran Automatisations de l'app est RETIRÉ : les automatisations se règlent dans le
+            panneau de l'extension (Paramètres → « Automatisations · dans l'extension »). Un ancien lien `?tab=automatisations` y mène. */}
+        {tab==='automatisations' && <RedirigeAutomatisations onRetour={()=>setTab('settings')}/>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}

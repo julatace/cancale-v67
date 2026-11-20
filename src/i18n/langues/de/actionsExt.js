@@ -10,7 +10,6 @@ export default {
   "actionsExt.creerVinted": "In der Erweiterung auf Vinted anlegen",
   "actionsExt.publier": "In der Erweiterung veröffentlichen",
   "actionsExt.publierSur": "Auf {site} in der Erweiterung veröffentlichen",
-  "actionsExt.masquer": "In der Erweiterung aus- oder einblenden",
   "actionsExt.pause": "In der Erweiterung pausieren",
   "actionsExt.supprimer": "In der Erweiterung löschen",
   "actionsExt.repondre": "In der Erweiterung antworten",
@@ -30,4 +29,6 @@ export default {
   "actionsExt.favoris.pied": "Auswählen, schreiben und senden geschieht im Panel der Erweiterung, auf vinted.fr.",
   "actionsExt.favoris.auto": "Automatischer Favoritenmodus",
   "prixPartout.appliquerEbay": "Auf eBay anwenden",
+  "actionsExt.autoRangee": "Automatisierungen · in der Erweiterung",
+  "actionsExt.autoActives": {"one": "{n} aktiv", "other": "{n} aktiv"},
 };

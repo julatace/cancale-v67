@@ -31,13 +31,6 @@ function CarteOffre({ o, recettes, cap, numDe, envoyer, Photo, maintenant }) {
   const etats = Object.fromEntries(GESTES_OFFRE.map((g) => [g, etatGeste(recettes, g, cap)]));
   const prets = GESTES_OFFRE.filter((g) => etats[g].etat === 'pret');
   const pc = contre != null ? prixContre(contre, o) : null;
-  const faire = async (geste, cents) => {
-    if (enCours) return;
-    setEnCours(geste); setRes(null);
-    let r = null; try { r = await envoyer({ cmd: 'vcOffre', nego: o.id, geste, ...(geste === 'contre' ? { prixCents: cents } : {}) }); } catch (_) { r = null; }
-    setEnCours(''); setConfirme(''); setRes(etiquetteOffre(r, geste));
-    if (r && r.accepte === true && r.etape === 'fait') setContre(null);
-  };
   const lien = o.lien || 'https://fr.vestiairecollective.com/';
   const bientot = expireBientot(o, maintenant);
   return (

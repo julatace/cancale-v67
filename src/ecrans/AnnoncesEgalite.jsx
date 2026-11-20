@@ -210,7 +210,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const tableau = {
     articles: lignesT, majLe, rafraichit: relit, onRafraichir: () => { setRelit(true); setTic((t) => t + 1); },
     compte: cptChoisi ? nomCompte(cptChoisi) : '',
-    onAutomatisations: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} },
+    // (20 nov., précision de Julien) Plus d'entrée « Automatisations » dans Annonces : elles vivent dans l'extension.
     filtres: [
       ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
         options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),

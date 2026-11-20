@@ -52,18 +52,7 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   }, [relire]);
   const cap = extSait('lbcrepondre');
   const peut = cap === 'ok' && envoi && envoi.appris === true;
-  const envoyer = async () => {
-    const t = texte.trim();
-    if (!t || enCours || !peut) return;
-    setEnCours(true); setRes(null);
-    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
-    let r = null; try { r = await vmrCmd({ cmd: 'lbcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    const etat = etatEnvoiExtension(r);
-    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
-    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
-    setRes(etat === 'ok' ? null : etiquetteResultatLbc(r));
-    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
-  };
+  const envoyer = () => {};   // (20 nov., décision de Julien) répondre : dans le panneau de l'extension
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-lbc-fil-etat="charge" style={style}>…</div>;

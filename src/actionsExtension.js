@@ -20,7 +20,6 @@ export const ACTIONS_EXTENSION = {
   versBrouillon:   { page: 'republier', action: 'brouillon', cle: 'actionsExt.versBrouillon' },
   creerVinted:     { page: 'publier', action: 'creer', cle: 'actionsExt.creerVinted' },
   publier:         { page: 'publier', action: 'publier', cle: 'actionsExt.publier' },
-  masquer:         { page: 'annonces', action: 'masquer', cle: 'actionsExt.masquer' },
   pause:           { page: 'annonces', action: 'pause', cle: 'actionsExt.pause' },
   supprimer:       { page: 'annonces', action: 'supprimer', cle: 'actionsExt.supprimer' },
   repondre:        { page: 'messages', action: 'repondre', cle: 'actionsExt.repondre' },

@@ -22,7 +22,7 @@ const { chromium } = require(path.join(NM, 'playwright'));
 const esbuild = require(path.join(NM, 'esbuild'));
 const { contrastes } = require('./aujourdhui-propre.cjs');
 const liste = (v, d) => String(process.env[v] || d).split(',').map((x) => x.trim()).filter(Boolean);
-const VUES = liste('VUES', 'annonces,ventes,achats,notifs,auto'), BASES = liste('BASES', 'volume,vide,lbc,vestiaire');
+const VUES = liste('VUES', 'annonces,ventes,achats,notifs'), BASES = liste('BASES', 'volume,vide,lbc,vestiaire');
 const LARGEURS = liste('LARGEURS', '1512,1280,390').map(Number), THEMES = liste('THEMES', 'clair,sombre');
 const SHOTS = process.env.SHOTS || path.join(os.tmpdir(), 'banc-app-tableaux'); fs.mkdirSync(SHOTS, { recursive: true });
 const DOSSIER = fs.mkdtempSync(path.join(os.tmpdir(), 'app-tableaux-'));
@@ -169,7 +169,7 @@ async function comportements(pg, ctx, port, vue, ou, tel) {
   const src = ['src/natif/TableauTravail.jsx', 'src/natif/ecrans/AnnoncesTableau.jsx', 'src/natif/ecrans/VentesTableau.jsx', 'src/natif/ecrans/AchatsTableau.jsx', 'src/natif/ecrans/NotificationsTableau.jsx', 'src/natif/ecrans/Automatisations.jsx']
     .map((f) => fs.readFileSync(path.join(RACINE, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')).join('\n');
   dit(!/style=\{|!important/.test(src), 'N la source des vues : ni `style={`, ni `!important`');
-  const css = ['src/natif/tableau.css', 'src/natif/ecrans/automatisations.css'].map((f) => fs.readFileSync(path.join(RACINE, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
+  const css = ['src/natif/tableau.css']   // (20 nov.) l'écran Automatisations de l'app est retiré (elles vivent dans l'extension).map((f) => fs.readFileSync(path.join(RACINE, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
   dit(!/!important|:has\(|#[0-9a-fA-F]{3,8}\b|gradient/.test(css), 'N le CSS : ni `!important`, ni `:has()`, ni couleur en dur, ni dégradé');
   const s = await servir(); const port = s.address().port;
   const nav = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });

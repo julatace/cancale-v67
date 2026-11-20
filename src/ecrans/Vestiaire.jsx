@@ -531,38 +531,7 @@ function PublierVestiaire({ comptes }) {
     const t = setTimeout(() => { try { const el = document.querySelector(`[data-vc-paire="${CSS.escape(id)}"]`); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('vrm-cc-cible'); el.setAttribute('data-vc-demande', ''); setTimeout(() => el.classList.remove('vrm-cc-cible'), 2400); } } catch (_) {} }, 150);
     return () => clearTimeout(t);
   }, [paires]);
-  const preparer = async (p) => {
-    if (envoi) return;
-    if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
-    // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) ; la catégorie se choisit sur Vestiaire.
-    let achatV = null;
-    try { achatV = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[String(p.id)], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatV = null; }
-    // (11 nov., lot vestiaire-plus) Les photos que Vestiaire demande : ce que VRM SAIT manquer est dit AVANT (src/photosVestiaire.js).
-    { const rp = photosExigeesVc(photosDe(p));
-      if (rp.manque.length && !(await askConfirm({ title: tr('vcPhotos.confirme.titre', { n: rp.manque.length }), desc: textePhotosManquantes(rp), ok: tr('vcPhotos.confirme.ok'), cancel: tr('vcPhotos.confirme.annuler') }))) return; }
-    if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()),
-      // (11 nov.) Le N° écrit : jugé seulement si la description qui partira est sue.
-      numero: p.num || '', ...(typeof p.description === 'string' ? { description: p.description } : {}), ...optsNumeroVerif() }, 'vestiaire'), { site: 'vestiaire' }))) return;
-    setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
-    const t0 = Date.now();
-    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
-    setEnvoi('');
-    if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
-    if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
-    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
-    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : « publiée » seulement si l'extension le dit.
-    const id = String(p.id);
-    const t = suivi.demarrer({ sorte: auto ? 'publier-vc' : 'preparer-vc', titre: auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire', articles: [{ id, num: p.num || '', titre: p.title || '' }],
-      etapes: auto ? [['depot', 'Formulaire Vestiaire ouvert'], ['accepte', 'Publiée sur Vestiaire ✓']] : [['depot', 'Formulaire Vestiaire ouvert et rempli']] });
-    if (!t) return;
-    t.etape(id, 'depot');
-    if (!auto) { t.fin(id, { etat: 'main', raison: 'formulaire ouvert et rempli par l’extension', geste: 'Relis et publie sur Vestiaire' }); t.terminer(''); return; }
-    suivreJob(t, id, { jobId: r.jobId || 'vc:' + id, lireJobs: () => __vmrJobs, depuis: t0, delaiMs: 15 * 60000 }).then(({ fin }) => {
-      if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
-      else t.fin(id, { etat: 'main', raison: fin === 'abandonne' ? 'VRM n’a pas vu la fin de la publication' : fin === 'arret' ? 'la publication continue dans l’onglet Vestiaire' : 'VRM n’a pas vu la fin en 15 min', geste: 'Regarde l’onglet Vestiaire ; si elle est en ligne, clique « Déjà publiée »' });
-      t.terminer('');
-    });
-  };
+  // (20 nov., décision de Julien) Publier sur Vestiaire : dans le panneau de l'extension (le bouton plus bas).
   const marquer = async (p) => {
     if (envoi) return;
     const ok = await askConfirm({ title: `N°${p.num} déjà publiée sur Vestiaire ?`, desc: "Elle sort de cette liste. Rien n'est envoyé à Vestiaire.", ok: 'Oui, elle est en ligne', cancel: 'Annuler' });
@@ -958,18 +927,7 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
   }, [relire]);
   const cap = extSait('vcrepondre');
   const peut = cap === 'ok' && envoi && envoi.appris === true;
-  const envoyer = async () => {
-    const t = texte.trim();
-    if (!t || enCours || !peut) return;
-    setEnCours(true); setRes(null);
-    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
-    let r = null; try { r = await vmrCmd({ cmd: 'vcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    const etat = etatEnvoiExtension(r);
-    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
-    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
-    setRes(etat === 'ok' ? null : etiquetteResultatVc(r));
-    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
-  };
+  const envoyer = () => {};   // (20 nov., décision de Julien) répondre : dans le panneau de l'extension
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
