@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<title>Achats · après</title><link rel="stylesheet" href="maquette.css"></head>
+<body>
+<div class="tel" data-onglet="achats">
+  <div class="ecran">
+    <!-- 1. Le titre AVANT la recherche (comme Annonces / Ventes) ; « ? », loupe-ronde et boîte retirés de la tête -->
+    <div class="tete">
+      <div><h1>Achats</h1></div>
+      <div class="actions"><span class="ico" data-ico="bulle"><span class="pastille">9</span></span><span class="avatar">CE</span></div>
+    </div>
+    <div style="padding:0 var(--n-marge) 4px"><span class="menu-compte">Tous les comptes <span data-ico="bas" style="display:inline-flex"></span></span></div>
+    <!-- 2. UNE recherche (la seconde « Titre, N°, vendeur » + micro + calendrier + € disparaît) -->
+    <div class="recherche"><span data-ico="loupe"></span><span class="vide">Titre, N°, vendeur, n° de suivi</span><span class="scan" data-ico="scan"></span></div>
+    <!-- 3. Le segmenté porte les nombres (plus de 4 tuiles séparées par des filets + segmenté + coche + ⋯) -->
+    <div class="segmente"><span>À retirer <b>3</b></span><span class="actif">En route <b>60</b></span><span>Arrivés <b>120</b></span></div>
+    <!-- 4. La bande de chiffres : une ligne, au fond de la page, pas de carte -->
+    <div class="bande"><div><b>1 260 €</b><span>dépensés en novembre</span></div><div><b>60</b><span>en route</span></div></div>
+
+    <!-- 5. « À régler » regroupe « Relier achats et ventes » et « + 60 à vérifier » -->
+    <div class="groupe" style="margin-bottom:20px">
+      <div class="carte"><div class="rangee"><span class="point"></span><div class="corps"><div class="l1"><span class="titre">À régler</span><span class="val">8 à relier · 60 à vérifier</span></div></div><span class="chev" data-ico="chevron"></span></div></div>
+    </div>
+
+    <!-- 6. Rangées 72 : vignette (ou pastille d’icône teintée), titre, « vendeur · date », prix ; état en sous-titre, pas de ⋯ bleu -->
+    <div class="groupe">
+      <div class="entete"><span>Cette semaine</span></div>
+      <div class="carte">
+        <div class="rangee v"><span class="vg" data-vg="ach1"></span><div class="corps"><div class="l1"><span class="titre">Adidas spezial taille 41</span><span class="val fort">21 €</span></div><div class="l2"><span class="ambre">Au point relais · avant le 26</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="ach2"></span><div class="corps"><div class="l1"><span class="titre">Nike air max 90 taille 42</span><span class="val fort">35 €</span></div><div class="l2"><span>Mondial Relay · arrive lundi</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="ach3"></span><div class="corps"><div class="l1"><span class="titre">Salomon xt-6 taille 43</span><span class="val fort">48 €</span></div><div class="l2"><span>Vinted Go · expédié hier</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="ach4"></span><div class="corps"><div class="l1"><span class="titre">New Balance 550 taille 40</span><span class="val fort">29 €</span></div><div class="l2"><span>Colissimo · en route</span></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="maquette.js"></script>
+</body></html>

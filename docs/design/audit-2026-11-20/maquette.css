@@ -1,0 +1,130 @@
+/* Maquettes « après » de l'audit du 20 nov. 2026 — mêmes jetons que src/natif/jetons.css (recopiés tels quels),
+   composants dessinés avec les MÊMES mesures que src/natif/ (Rangee, Groupe, Segmente, Affiche, Faits, Plaque,
+   BarreOnglets). Données INVENTÉES. Ces fichiers ne sont pas chargés par l'app : ce sont des dessins à reproduire. */
+:root {
+  --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
+  --n-encre: #111114; --n-encre-2: #6C6C70; --n-encre-3: #8E8E93; --n-accent: #0068D6; --n-plein: #0068D6; --n-sur-plein: #FFFFFF;
+  --n-teinte: rgb(0 104 214 / .12); --n-sur-teinte: #0057B8; --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; --n-doublon: #D70015;
+  --n-barre: rgb(249 249 251 / .86); --n-flou: saturate(180%) blur(20px); --n-squelette: rgb(60 60 67 / .10);
+  --n-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --n-t-affiche: 700 48px/52px var(--n-police); --n-t-grand: 700 34px/41px var(--n-police); --n-t-section: 700 22px/28px var(--n-police);
+  --n-t-barre: 600 17px/22px var(--n-police); --n-t-corps: 400 17px/22px var(--n-police); --n-t-corps-fort: 600 17px/22px var(--n-police);
+  --n-t-second: 400 15px/20px var(--n-police); --n-t-second-fort: 600 15px/20px var(--n-police);
+  --n-t-legende: 400 13px/18px var(--n-police); --n-t-legende-fort: 600 13px/18px var(--n-police); --n-t-onglet: 600 10px/12px var(--n-police);
+  --n-marge: 16px; --n-r-carte: 12px; --n-r-bouton: 12px; --n-r-plein: 14px; --n-r-plaque: 8px; --n-r-vignette: 10px; --n-r-rond: 999px;
+}
+:root[data-theme="dark"] {
+  --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
+  --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-encre-3: #636366; --n-accent: #409CFF; --n-plein: #0068D6;
+  --n-teinte: rgb(64 156 255 / .20); --n-sur-teinte: #7DBBFF; --n-ambre: #FFB340; --n-ambre-fond: rgb(255 179 64 / .16);
+  --n-barre: rgb(22 22 24 / .86); --n-squelette: rgb(120 120 128 / .24);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #D8D8DE; }
+body { font: var(--n-t-corps); color: var(--n-encre); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+.tel { position: relative; width: 390px; height: 844px; overflow: hidden; background: var(--n-fond); margin: 0; }
+.ecran { position: absolute; inset: 0 0 83px 0; overflow: hidden; padding: 47px 0 24px; }
+
+/* Barre de titre (grand titre iOS) : 2 icônes au plus à droite */
+.statut { position: absolute; top: 0; left: 0; right: 0; height: 47px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; font: var(--n-t-second-fort); z-index: 3; }
+.tete { display: flex; align-items: flex-end; justify-content: space-between; padding: 4px var(--n-marge) 8px; }
+.tete h1 { margin: 0; font: var(--n-t-grand); letter-spacing: -.02em; }
+.tete .sous { font: var(--n-t-legende); color: var(--n-encre-2); margin: 0 0 2px; }
+.actions { display: flex; gap: 4px; align-items: center; margin-bottom: 2px; }
+.ico { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; color: var(--n-accent); position: relative; border-radius: var(--n-r-bouton); }
+.ico svg { width: 24px; height: 24px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-legende-fort); display: inline-flex; align-items: center; justify-content: center; }
+.pastille { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--n-r-rond); background: var(--n-encre); color: var(--n-carte); font: 600 11px/18px var(--n-police); text-align: center; }
+
+/* Menu compact du compte (remplace la rangée de pilules) */
+.menu-compte { display: inline-flex; align-items: center; gap: 4px; font: var(--n-t-second-fort); color: var(--n-accent); min-height: 44px; }
+
+/* Recherche : un champ, loupe + scanner DEDANS, 36 de haut */
+.recherche { margin: 0 var(--n-marge) 12px; height: 36px; border-radius: 10px; background: rgb(118 118 128 / .12); display: flex; align-items: center; gap: 6px; padding: 0 8px; color: var(--n-encre-2); font: var(--n-t-corps); }
+:root[data-theme="dark"] .recherche { background: rgb(118 118 128 / .24); }
+.recherche svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.recherche .vide { flex: 1; }
+.recherche .scan { color: var(--n-accent); }
+
+/* Contrôle segmenté iOS */
+.segmente { margin: 0 var(--n-marge) 16px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 9px; background: rgb(118 118 128 / .12); }
+:root[data-theme="dark"] .segmente { background: rgb(118 118 128 / .24); }
+.segmente span { min-height: 32px; display: flex; align-items: center; justify-content: center; gap: 4px; font: var(--n-t-legende-fort); border-radius: 7px; color: var(--n-encre); }
+.segmente span b { font-weight: 400; color: var(--n-encre-2); }
+.segmente span.actif { background: var(--n-carte); box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04); }
+:root[data-theme="dark"] .segmente span.actif { background: #636366; }
+
+/* Groupe (liste groupée inset) */
+.groupe { margin: 0 var(--n-marge) 24px; }
+.groupe > .entete { display: flex; justify-content: space-between; align-items: baseline; padding: 0 16px 6px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+.groupe > .entete a { text-transform: none; letter-spacing: 0; color: var(--n-accent); font: var(--n-t-second); text-decoration: none; }
+.groupe > .entete.section { text-transform: none; letter-spacing: -.01em; font: var(--n-t-section); color: var(--n-encre); padding: 0 0 8px; }
+.groupe > .pied { padding: 6px 16px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.carte { background: var(--n-carte); border-radius: var(--n-r-carte); overflow: hidden; }
+
+/* Rangée : 44 (texte) · 72 (vignette 56) ; séparateur en retrait */
+.rangee { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 11px 16px; }
+.rangee + .rangee::before { content: ""; position: absolute; top: 0; right: 0; left: var(--retrait, 16px); height: .5px; background: var(--n-trait); }
+.rangee.v { min-height: 72px; padding-block: 8px; --retrait: 84px; }
+.rangee.i { --retrait: 56px; }
+.rangee .vg { width: 56px; height: 56px; border-radius: var(--n-r-vignette); flex: 0 0 auto; overflow: hidden; }
+.rangee .vg svg { width: 100%; height: 100%; display: block; }
+.rangee .pic { width: 28px; height: 28px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; color: #fff; }
+.rangee .pic svg { width: 18px; height: 18px; }
+.rangee .corps { flex: 1; min-width: 0; }
+.rangee .l1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.rangee .titre { font: var(--n-t-corps); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rangee .titre.deux { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rangee .val { font: var(--n-t-corps); color: var(--n-encre-2); white-space: nowrap; }
+.rangee .val.fort { color: var(--n-encre); font: var(--n-t-corps-fort); }
+.rangee .l2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; }
+.rangee .l2 .ambre { color: var(--n-ambre); }
+.rangee .chev { color: var(--n-encre-3); flex: 0 0 auto; width: 8px; height: 14px; }
+.point { width: 8px; height: 8px; border-radius: 50%; background: var(--n-ambre); flex: 0 0 auto; }
+
+/* Plaque N° (8 de rayon, gravée) */
+.plaque { display: inline-flex; align-items: baseline; gap: 2px; padding: 0 6px; height: 20px; line-height: 20px; border-radius: 6px; background: var(--n-carte-2); color: var(--n-encre); font: 600 13px/20px var(--n-police); }
+.plaque i { font-style: normal; font-weight: 400; color: var(--n-encre-2); font-size: 11px; }
+
+/* Affiche + barres */
+.affiche { padding: 16px 16px 12px; }
+.affiche .chiffre { font: var(--n-t-affiche); letter-spacing: -.03em; }
+.affiche .chiffre small { font: 700 28px/1 var(--n-police); color: var(--n-encre-2); margin-left: 4px; letter-spacing: 0; }
+.affiche .lib { font: var(--n-t-second); color: var(--n-encre-2); margin-top: 2px; }
+.barres { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; align-items: end; height: 64px; padding: 0 16px; margin-top: 12px; }
+.barres i { display: block; border-radius: 4px; background: var(--n-squelette); }
+.barres i.auj { background: var(--n-encre); }
+.jours { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; padding: 6px 16px 14px; font: var(--n-t-legende); color: var(--n-encre-2); text-align: center; }
+
+/* Faits (grille 3 colonnes) */
+.faits { display: grid; grid-template-columns: repeat(3, 1fr); }
+.faits > div { padding: 12px 16px; }
+.faits > div + div { border-left: .5px solid var(--n-trait); }
+.faits .lib { font: var(--n-t-legende); color: var(--n-encre-2); }
+.faits .v { font: 700 22px/28px var(--n-police); letter-spacing: -.01em; margin-top: 2px; }
+.faits .v.manque { color: var(--n-accent); font: var(--n-t-corps-fort); }
+
+/* Bande de chiffres compacte (≤ 72 px, pas de carte) */
+.bande { display: flex; gap: 24px; padding: 0 calc(var(--n-marge) + 16px) 16px; }
+.bande div { display: flex; flex-direction: column; }
+.bande b { font: 700 22px/28px var(--n-police); letter-spacing: -.01em; }
+.bande span { font: var(--n-t-legende); color: var(--n-encre-2); }
+
+/* Plein collé au-dessus de la barre d'onglets */
+.plein-colle { position: absolute; left: var(--n-marge); right: var(--n-marge); bottom: 95px; height: 50px; border-radius: var(--n-r-plein); background: var(--n-plein); color: var(--n-sur-plein); font: var(--n-t-corps-fort); display: flex; align-items: center; justify-content: center; gap: 8px; z-index: 2; }
+.plein-colle svg { width: 20px; height: 20px; }
+.voile-bas { position: absolute; left: 0; right: 0; bottom: 83px; height: 84px; background: linear-gradient(to top, var(--n-fond) 55%, transparent); z-index: 1; }
+
+/* Barre d'onglets : 5 onglets égaux, 49 + zone sûre 34 */
+.onglets { position: absolute; left: 0; right: 0; bottom: 0; height: 83px; padding-bottom: 34px; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--n-barre); -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou); border-top: .5px solid var(--n-trait); z-index: 4; }
+.onglets a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--n-encre-3); font: var(--n-t-onglet); text-decoration: none; position: relative; }
+.onglets a svg { width: 26px; height: 26px; }
+.onglets a.actif { color: var(--n-accent); }
+.onglets a .p { position: absolute; top: 3px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--n-ambre); color: #fff; font: 600 11px/18px var(--n-police); text-align: center; }
+:root[data-theme="dark"] .onglets a .p { color: #1C1300; }
+.indicateur { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: var(--n-encre); z-index: 5; }
+
+/* Légende de planche (hors téléphone) */
+.planche { display: flex; gap: 32px; padding: 32px; align-items: flex-start; }
+.planche figure { margin: 0; }
+.planche figcaption { font: var(--n-t-second-fort); color: #111114; margin-bottom: 12px; }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<title>Annonces · après</title><link rel="stylesheet" href="maquette.css"></head>
+<body>
+<div class="tel" data-onglet="annonces">
+  <div class="ecran">
+    <!-- 1. Grand titre + menu compact du compte (remplace les pilules) ; pas de phrase sous le titre -->
+    <div class="tete">
+      <div><h1>Annonces</h1></div>
+      <div class="actions"><span class="ico" data-ico="bulle"><span class="pastille">9</span></span><span class="avatar">CE</span></div>
+    </div>
+    <div style="padding:0 var(--n-marge) 4px;display:flex;justify-content:space-between;align-items:center">
+      <span class="menu-compte">Tous les comptes <span data-ico="bas" style="display:inline-flex"></span></span>
+      <span class="menu-compte" style="color:var(--n-encre-2);font:var(--n-t-legende)">Lu il y a 2 min</span>
+    </div>
+    <!-- 2. Une recherche (scanner dedans), puis le segmenté avec ses nombres discrets -->
+    <div class="recherche"><span data-ico="loupe"></span><span class="vide">N°, modèle, compte</span><span class="scan" data-ico="scan"></span></div>
+    <div class="segmente"><span class="actif">En ligne <b>36</b></span><span>À publier <b>4</b></span><span>Dorment <b>9</b></span></div>
+
+    <!-- 3. UNE ligne « À régler » pour tout l’écran (au lieu d’une rangée « 12 prix d’achat » répétée dans chaque compte) -->
+    <div class="groupe" style="margin-bottom:20px">
+      <div class="carte"><div class="rangee"><span class="point"></span><div class="corps"><div class="l1"><span class="titre">À régler</span><span class="val">36 prix d’achat · 2 N°</span></div></div><span class="chev" data-ico="chevron"></span></div></div>
+    </div>
+
+    <!-- 4. La liste : en-tête de compte collant, rangées 72 ; la 1re rangée à 41 % de la hauteur -->
+    <div class="groupe">
+      <div class="entete"><span>vendeur_1 · 12</span></div>
+      <div class="carte">
+        <div class="rangee v"><span class="vg" data-vg="n157"></span><div class="corps"><div class="l1"><span class="titre">Nike samba taille 36</span><span class="val fort">30 €</span></div><div class="l2"><span class="plaque"><i>N°</i>157</span><span>T. 36 · 4 ♥ · 12 j</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="n154"></span><div class="corps"><div class="l1"><span class="titre">Adidas spezial taille 37</span><span class="val fort">37 €</span></div><div class="l2"><span class="plaque"><i>N°</i>154</span><span>T. 37 · 1 ♥ · 3 j</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="n151"></span><div class="corps"><div class="l1"><span class="titre">Salomon air max 1 taille 38</span><span class="val fort">44 €</span></div><div class="l2"><span class="plaque"><i>N°</i>151</span><span class="ambre">prix d’achat ?</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="n148"></span><div class="corps"><div class="l1"><span class="titre">New Balance xt-6 taille 39</span><span class="val fort">51 €</span></div><div class="l2"><span class="plaque"><i>N°</i>148</span><span>T. 39 · 0 ♥ · 21 j</span></div></div></div>
+        <div class="rangee v"><span class="vg" data-vg="n145"></span><div class="corps"><div class="l1"><span class="titre">Asics gazelle taille 40</span><span class="val fort">58 €</span></div><div class="l2"><span class="plaque"><i>N°</i>145</span><span>T. 40 · 2 ♥ · 6 j</span></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="voile-bas"></div>
+  <div class="plein-colle"><span data-ico="plus"></span>Publier un article</div>
+</div>
+<script src="maquette.js"></script>
+</body></html>
