@@ -98,6 +98,13 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
       const Bb = valeur('brut', p) || {};
       const m = /^(\d+) sur (\d+)$/.exec(String(Bb.couverture || ''));
       benefice = lu(Bb) ? { valeur: Bb.valeur, brut: true, partiel: !!Bb.partiel, couverture: m ? `${m[1]}/${m[2]}` : '', note: '' } : { valeur: null, brut: true, partiel: false, couverture: '', note: raisonCourte(Bb) || '' };
+      // (20 nov., chasse-bugs-2) La publication des jours (`vrm_benefice_jours`) arrive APRÈS la vente : « Ventes 1 · CA 60 € » à
+      // côté de « Bénéfice brut 0 € » (mesuré, mode exemple) — 0 sur AUCUNE vente comptée n'est pas un bénéfice de 0 €. Rien de
+      // compté alors que la période a vendu ⇒ « — · pas calculé » ; moins de ventes comptées que vendues ⇒ c'est dit (k/n).
+      if (benefice.valeur != null && Number.isFinite(Bb.n) && entier(ventes) && ventes.valeur > Bb.n) {
+        benefice = Bb.n === 0 ? { valeur: null, brut: true, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '' }
+          : { ...benefice, partiel: true, couverture: benefice.couverture || `${Bb.n}/${ventes.valeur}` };
+      }
     }
     let ecart = null;
     if (entier(vendu) && typeof precedente === 'function') {

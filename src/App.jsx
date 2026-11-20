@@ -31742,7 +31742,15 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // compte relu à 07:50 (annonces, boîte, profil) avait ses ventes figées à la
 // veille 15 h 11 — « relu il y a 2 min » cachait la vente du matin. Le panneau
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
-async function lireCapturesDetail() {
+// (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
+// parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
+let _capturesEnVol = null;
+function lireCapturesDetail() {
+  if (_capturesEnVol) return _capturesEnVol;
+  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
+  return _capturesEnVol;
+}
+async function lireCapturesDetailUne() {
   try {
     // (11 nov., ouverture-legere-2) Gardée sur l'appareil, revalidée par sa version
     // (`lireFamilleCopiee`) : ~244 Ko à chaque ouverture ⇒ le nombre et les lignes écrites depuis.

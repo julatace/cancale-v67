@@ -149,6 +149,10 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(e1.semaine.ecart === null, 'E3 la semaine d’avant n’a rien vendu au même moment ⇒ aucun écart (pas de « +∞ % »)', e1.semaine.ecart);
   dit(e1.jour.benefice.valeur === 20 && e1.jour.benefice.partiel === true && e1.jour.benefice.couverture === '8/10' && e1.mois.benefice.valeur === 187 && e1.mois.benefice.couverture === '12/30',
     'E4 bénéfice : le jour = le brut publié, « au moins » avec sa couverture (8/10) ; le mois = celui d’Argent (12/30)', { j: e1.jour.benefice, m: e1.mois.benefice });
+  // (20 nov., chasse-bugs-2) La publication des jours en retard sur la vente du jour : 0 sur aucune vente comptée ≠ 0 €.
+  const e7 = M.statsPeriodes({ valeur: proprietaire({ lignes: L2, brut: { jour: { valeur: 0, partiel: false, couverture: '', n: 0 }, semaine: { valeur: 90, partiel: false, couverture: '', n: 2 } } }), precedente: avant, raisonCourte, beneficeMois: BM });
+  dit(e7.jour.benefice.valeur === null && !!e7.jour.benefice.note && e7.semaine.benefice.valeur === 90 && e7.semaine.benefice.partiel === true && e7.semaine.benefice.couverture === '2/4',
+    'E8 vente du jour pas encore dans la publication ⇒ bénéfice « — » (jamais 0 €) ; 2 ventes comptées sur 4 ⇒ dit (2/4)', { j: e7.jour.benefice, s: e7.semaine.benefice });
   const e2 = M.statsPeriodes({ valeur: proprietaire({ lignes: L2, partielVendu: true }), precedente: avant, raisonCourte, beneficeMois: BM });
   dit(e2.jour.vendu.partiel === true && e2.jour.panier.valeur === null && e2.jour.panier.note === 'partiel' && e2.jour.ecart === null, 'E5 un prix pas lu ⇒ vendu « au moins », panier « — » (une moyenne sur une partie n’est pas un minimum), aucun écart', e2.jour);
   const e3 = M.statsPeriodes({ valeur: proprietaire({ lignes: null }), precedente: avant, raisonCourte, beneficeMois: null });

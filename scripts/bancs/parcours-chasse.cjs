@@ -25,7 +25,7 @@ const CONDS = liste('CHASSE', 'volume,vide,lente,panne,longs,grand');
 const TAILLES = liste('TAILLES', '390,1512').map(Number);
 const ONGLETS = liste('ONGLETS', 'journee,ventes,achats,garage,messages,emails,settings,extension,automatisations,dashboard,litiges,communaute,annonces,compta');
 const HORS_CHANTIER = new Set(['annonces', 'compta']);   // refaits ailleurs (minimaliste, argent-natif) : notés seulement
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.webp': 'image/webp', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.webp': 'image/webp', '.ico': 'image/x-icon', '.wasm': 'application/wasm', '.mjs': 'text/javascript' };
 const srv = http.createServer((q, r) => {
   let f = decodeURIComponent((q.url || '/').split('?')[0]); if (f === '/' || !path.extname(f)) f = '/index.html';
   const p = path.join(DIST, f);
