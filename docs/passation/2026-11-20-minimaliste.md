@@ -54,6 +54,39 @@ MUTATION=ombre|carte|souligne …                                        # pose 
   - Au téléphone, Ventes d'un site ne répète plus le grand titre (ni la date) que la coque montre déjà.
 - Aucune règle de calcul ne change (`chiffres-volume`, §4).
 
+## 2 bis. Le sélecteur de plateforme GLOBAL (décision du 20 nov.)
+
+Julien demandait s'il faut « une application par plateforme ». Décision appliquée : les onglets restent par FONCTION, et
+UN sélecteur de plateforme global se pose en tête de chaque écran principal.
+
+- **Une source** : `src/siteCourant.js` — clé `vrm_site_courant` (dans `SYNC_KEYS` : son choix sur tous ses appareils),
+  `lireSiteCourant`, `poserSiteCourant`, `useSiteCourant()` (le même site dans tous les écrans montés), `siteEffectif`
+  (un site plus relié vaut « Tous »), `sitePourTache` (« Tous » rend le filtre d'avant de la tâche : Toutes pour Ventes
+  et Messages, l'écran d'arrivée pour Annonces et Achats).
+- **Un composant** : `src/natif/SelecteurSite.jsx` (segmenté natif, logos, « Tous » + les sites RELIÉS, rien sous deux
+  sites ; au téléphone à cinq choix, le logo seul et le nom lu). Dans l'app : `SelecteurSiteCoque` (src/App.jsx), posé en
+  tête d'Aujourd'hui et de chaque tâche (Annonces, Ventes, Achats, Messages — `rendreTache`).
+- **Sites reliés** : un compte Vinted ; une lecture Leboncoin / eBay (ou un compte eBay au registre) / Vestiaire
+  (`sitesLus`) ; filtrés par SES plateformes (`siteMontre`, la règle des filtres d'hier).
+- **Remplacés** (plus de filtre local) : `FiltreSites` (retiré) et le menu de plateforme des tâches (le menu ne porte plus
+  que le compte Vinted), la plateforme de Ventes natif (`filtreNatif` nul), le filtre « Site » des tableaux de travail
+  (`filtreSiteTableau` rend []), le menu des sites d'Annonces (`AnnoncesEgalite` reçoit `site`, `VueAnnonces filtreSite={false}`).
+  `filtreRetenuCompte` lit le site courant ; un lien qui vise un site (`&site=`) CHANGE le site courant.
+- **Les chiffres suivent par les règles existantes** : Aujourd'hui pose la sélection `{ site }` de la carte des chiffres
+  (`valeurChiffre`, la même question qu'Argent) ; « Tous » = `SEL_TOUT_V2` (les chiffres d'avant, `chiffres-volume`).
+- **Plus** : une rangée par plateforme reliée (groupe « Plateformes ») ouvre ses réglages dans Paramètres (Vinted : comptes
+  liés ; Leboncoin, Vestiaire : connexions ; eBay : son compte) — `groupePlateformes`.
+- **Pas branché ici** : **Argent** (chantier `claude/argent-natif`) — il doit poser `<SelecteurSiteCoque/>` (ou
+  `Natif.SelecteurSite` avec `useSiteCourant()` et les sites reliés `SITES_RELIES_COQUE.v`) en tête, retirer son menu de
+  plateforme, et passer le site à SES questions : la sélection `{ site: siteEffectif(site, SITES_RELIES_COQUE.v), compte,
+  periode }` de `valeurChiffre` (« Tous » = `'toutes'`, comportement d'avant). **E-mails** : aucune règle de site côté
+  serveur (la liste est paginée par la base, ses nombres sont ceux de la base) ; un filtre par expéditeur (`siteExpediteur`)
+  appliqué à la page chargée ferait des nombres partiels — à faire dans la requête (api), lot à part. L'écran **Colis**
+  seul (`cat_bord`) garde son `SelecteurSites`.
+- Banc : `node scripts/bancs/minimaliste.cjs --selecteur` (S1 sélecteur et sites reliés, S2 changer sur Ventes ⇒ Aujourd'hui,
+  Annonces, Achats, Messages suivent, S3 « Tous » = mêmes chiffres, S4 Leboncoin seul ⇒ aucun sélecteur, S5 aucun filtre
+  local ; `MUTATION=local` rougit S2).
+
 ## 3. Les preuves
 
 Voir le rapport de fin de lot (tableau avant / après, planches, bancs et audits). Fichiers de sortie hors dépôt.

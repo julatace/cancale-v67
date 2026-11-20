@@ -477,6 +477,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Sélecteur de plateforme global (décision)** : onglets par fonction + UN segmenté « Tous · sites reliés » (`src/siteCourant.js`, `vrm_site_courant`, `src/natif/SelecteurSite.jsx`) qui remplace les filtres de site locaux ; Argent à brancher (`claude/argent-natif`). `2026-11-20-minimaliste.md` §2 bis. Geste : aucun.
 - **20 nov. · Tout le site simple « comme Paramètres » + mêmes dispositions sur chaque site (minimaliste)** : cartes → groupes, ombres de carte retirées (`src/natif/minimaliste.css`), Ventes · eBay et · Leboncoin dans la liste native de Vinted ; banc `minimaliste`. `2026-11-20-minimaliste.md`. Geste : aucun.
 - **20 nov. · Des boutons beaux et fiables partout (boutons-natifs)** : `BoutonBase`/`Btn`/`BoutonV2`/segmentés d'avant dessinent le `Bouton`/`Segmente` natif ; un geste qui rend une promesse ne se double pas et dit son résultat ; 261 `vrm-b` bruts convertis ; banc `boutons-inventaire`, `audit-boutons-natifs` (plafonds). `2026-11-20-boutons-natifs.md`. Geste : aucun.
 - **19 nov. soir · L'app en tableaux de travail (NATIF §2 bis)** : `TableauTravail` (Statut à compteurs, colonnes mémorisées, tri, sélection) sur Annonces, Ventes « Toutes », Achats, Notifications à l'ordinateur ; écran Automatisations (réglages des moteurs existants ; négociation par paliers rangée `vinted_offres_nego`, « bientôt », rien envoyé ; pas de boost de favoris). `2026-11-19-app-tableaux.md`. Geste : aucun.
