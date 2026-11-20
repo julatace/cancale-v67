@@ -55,7 +55,7 @@
     .n-site-hote .n-pastilles-site { padding: 4px 2px; }
     .n-site-hote .n-site-tous-seul { padding: 0; }
     [data-avec-pastilles] { display: inline-block; vertical-align: middle; }
-    [data-avec-pastilles] + .n-site-hote { display: inline-block; max-width: calc(100% - 200px); }
+    [data-avec-pastilles] + .n-site-hote { display: inline-block; }   /* sa largeur : la place qui reste (posée par la coque) */
     .n-site-hote > .n-selecteur-site { max-width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) { .n-pastille-site { transition: none; } .n-pastille-site:active { transform: none; } }

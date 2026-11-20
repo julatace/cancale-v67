@@ -20897,7 +20897,10 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     // tiennent à côté de lui.
     const marquer = (t) => { if (!t || !t.parentElement || getComputedStyle(t.parentElement).display.indexOf('flex') >= 0) return;
       if (t.style.display !== 'inline-block') { t.style.setProperty('display', 'inline-block', 'important'); t.style.verticalAlign = 'middle'; t.style.setProperty('width', 'auto', 'important'); t.style.setProperty('max-width', '50%', 'important'); }
-      if (!t.hasAttribute('data-avec-pastilles')) t.setAttribute('data-avec-pastilles', ''); };
+      if (!t.hasAttribute('data-avec-pastilles')) t.setAttribute('data-avec-pastilles', '');
+      // La rangée prend la place qui RESTE sur la ligne du titre (elle défile au-delà).
+      const pc = getComputedStyle(t.parentElement), lib = t.parentElement.clientWidth - parseFloat(pc.paddingLeft) - parseFloat(pc.paddingRight) - t.getBoundingClientRect().width - 28;
+      const mx = Math.max(160, Math.floor(lib)) + 'px'; if (h.style.maxWidth !== mx) h.style.maxWidth = mx; };
     // Le titre de la coque peut être re-rendu (et l'hôte, posé à côté, retiré avec lui) : on le repose à chaque changement.
     const placer = () => {
       const t = trouver(); if (!t || !t.parentElement) return;
@@ -20915,7 +20918,9 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
       else if (titre && (titre.style.display !== 'inline-block' || !titre.hasAttribute('data-avec-pastilles'))) marquer(titre);
     });
     mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'style'] });
-    return () => { mo.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.removeProperty('display'); titre.style.verticalAlign = ''; titre.style.removeProperty('width'); titre.style.removeProperty('max-width'); } };
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (titre) marquer(titre); }) : null;
+    if (ro && titre && titre.parentElement) ro.observe(titre.parentElement);
+    return () => { mo.disconnect(); if (ro) ro.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.removeProperty('display'); titre.style.verticalAlign = ''; titre.style.removeProperty('width'); titre.style.removeProperty('max-width'); } };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
     nombres={nombres} tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
