@@ -33,6 +33,9 @@ export const NOUVEAUTES = Object.freeze([
   // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
   { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
+  // (20 nov., Julien : « trie du plus récent, des filtres, jamais un achat pas encore livré, il manque des paires ») docs/passation/2026-11-20-relier-achats.md
+  { id: 'relier-achats', date: '2026-11-20', titre: 'Relier : toutes tes paires, plus récentes d’abord', phrase: 'Filtres plateforme, marque, taille ; seuls les achats reçus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'achats-suivi', date: '2026-11-20', titre: 'Achats : n° de suivi en colonne', phrase: 'À l’ordinateur : touche pour copier, ↗ pour suivre.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-tableau', date: '2026-11-20', titre: 'Ventes en tableau, transporteur en logo', phrase: 'À l’ordinateur : tri, statut, imprimer ; la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « tout le site doit être comme la fiche Paramètres, simple et minimaliste » ; « les mêmes dispositions sur toutes les plateformes ») docs/passation/2026-11-20-minimaliste.md
   { id: 'minimaliste', date: '2026-11-20', titre: 'Tout l’écran simple, comme Paramètres', phrase: 'Des groupes sobres ; Ventes pareil sur chaque site.', tab: 'ventes', pour: 'tous', mode: 'tous' },

@@ -126,6 +126,12 @@
   .n-tt-transporteur { display: inline-flex; align-items: center; gap: 8px; }
   .n-tt-transporteur img, .n-tt-transporteur svg { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 4px; }
   .n-tt-code { font: var(--n-t-second-fort); letter-spacing: .04em; }
+  /* (20 nov.) Le N° de suivi d'un achat : le n° (touché = copié), ↗ chez le transporteur. Chiffres tabulaires, jamais coupé. */
+  .n-tt-suivi { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .n-tt-suivi-n { appearance: none; -webkit-appearance: none; border: 0; background: transparent; padding: 4px 6px; margin: -4px -6px; border-radius: 8px; cursor: pointer; font: var(--n-t-second); font-variant-numeric: tabular-nums; letter-spacing: .01em; color: var(--n-encre); }
+  .n-tt-suivi-lien { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; border-radius: 8px; color: var(--n-accent); text-decoration: none; font-weight: 600; }
+  .n-tt-suivi-n:hover { background: color-mix(in srgb, var(--n-encre) 8%, transparent); }
+  .n-tt-suivi-lien:hover { background: color-mix(in srgb, var(--n-accent) 10%, transparent); }
 
   /* L'étiquette douce du Statut : neutre ; ambre = un geste à faire ; accent = en route. Jamais de rouge ni de vert vif. */
   .n-tt-etiquette { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--n-r-rond); font: var(--n-t-legende-fort); white-space: nowrap;

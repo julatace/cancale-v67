@@ -116,3 +116,15 @@ body[data-vrm-d35] .vrm-pil-zone { top: auto !important; bottom: calc(12px + env
 .vrm-rg-cherche:focus-within { border-color: var(--rg-accent, #0071E3); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent, #0071E3) 22%, transparent); }
 .vrm-rg-cherche-x { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: transparent; color: inherit; cursor: pointer; }
 @media (min-width: 900px) { .vrm-rg-cherche { min-height: 36px; } .vrm-rg-cherche > input { height: 34px; font-size: 14px; } }
+/* (20 nov.) Plateforme · marque · taille : une rangée de pastilles qui défile de côté (jamais sur deux lignes), chacune
+   ouvre le sélecteur NATIF (le <select> couvre la pastille, invisible). Choisie = encre pleine ; 44 px au doigt (36 à la souris). */
+.vrm-rg-facettes { flex: none; display: flex; gap: 6px; margin: -2px 0 8px; padding: 0 2px 2px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.vrm-rg-facettes::-webkit-scrollbar { display: none; }
+.vrm-rg-facette { position: relative; flex: none; min-height: 44px; max-width: 70vw; padding: 0 12px 0 14px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: var(--rg-carte, #fff); color: var(--rg-encre, #1d1d1f); font-size: 14px; font-weight: 600; cursor: pointer; }
+.vrm-rg-facette-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-rg-facette-chev { flex: none; opacity: .6; }
+.vrm-rg-facette[aria-pressed="true"] { background: var(--rg-encre, #1d1d1f); color: var(--rg-fond, #fff); border-color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-facette > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; -webkit-appearance: none; appearance: none; border: 0; }
+.vrm-rg-facette:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent, #0071E3) 28%, transparent); }
+@media (min-width: 900px) { .vrm-rg-facette { min-height: 32px; font-size: 13px; padding: 0 10px 0 12px; } .vrm-rg-facettes { margin-bottom: 6px; } }

@@ -471,6 +471,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Relier achats et ventes : toutes les paires (relier-achats)** : plus récent d'abord des deux côtés, pastilles plateforme/marque/taille gardées, seuls les achats arrivés ; ventes > 12 mois, masquées, Leboncoin/eBay/Vestiaire ajoutées ; Achats (ordi) : colonne n° de suivi. `2026-11-20-relier-achats.md`. Geste : aucun.
 - **20 nov. soir · Plus de sélecteur de plateforme (sans-selecteur)** : tout mélangé, logo du site sur chaque rangée, filtre « Site » seulement dans les filtres des tableaux à l'ordinateur ; `vrm_site_courant` ignoré. `2026-11-20-sans-selecteur.md`. Geste : aucun.
 - **20 nov. · Affichage instantané (instantane)** : chaque onglet s'ouvre sur SA copie (`src/copieEcran.js`, IndexedDB `vrm_copie_{owner}_{ecran}`, du jour, par compte, effacée à la déconnexion), inerte et datée, peinte même avant l'app ; base injoignable ⇒ « Pas à jour · Réessayer » ; squelettes natifs ≤ 6 %. `2026-11-20-instantane.md`. Geste : aucun.
 - **20 nov. · Ext. 5.410.2 : le panneau reste ouvert, bordereau et livreur, « pas revue »** : seuls son × / Échap le ferment (hôte replacé, état par onglet en `storage.session` via `panneauEtat`) ; Commandes et Accueil : transporteur, suivi, date limite, « Imprimer le bordereau » (`bordereauCarte`, lecture seule) ; « à confirmer » ⇒ « Pas revue depuis N j » (app et extension). `2026-11-20-extension-5412.md`. Geste : installer la 5.410.2.
