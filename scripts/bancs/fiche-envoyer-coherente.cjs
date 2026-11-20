@@ -2,7 +2,7 @@ require('./_porte-banc.cjs');
 // ═════════════════════════════════════════════════════════════════════════════
 //  BANC « LA FICHE ET LA LISTE NE SE CONTREDISENT PAS » (20 nov., chasse-bugs-2)
 //  Une vente rangée dans « À envoyer » (Ventes) ouvrait une fiche qui cochait « En route ✓ · Livrée ✓ ». Mesuré sur la
-//  vraie base (lecture seule) : la vente 2432…391, « Bordereau envoyé au vendeur » (`needs_action`), dont la ligne du
+//  vraie base (lecture seule) : une vente sur 12 en attente d'envoi, « Bordereau envoyé au vendeur » (`needs_action`), dont la ligne du
 //  transporteur dit « en route » SANS prise en charge lue — la liste (règle du départ : `ventesPartiesParPreuve`,
 //  prise en charge prouvée) la garde à envoyer, la frise (`preuvesTransporteur`, plus lâche) la disait partie.
 //  Règle : la fiche d'une vente que la liste garde « à envoyer » n'a rien de coché après « Bordereau prêt » ; une
