@@ -347,6 +347,10 @@ function aLaDemandeDiscret(charger) {
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
+// (20 nov., intégration 20nov — budget de démarrage) Colis à retirer : une carte par point (src/natif/RetraitsPoints.jsx,
+// lot retraits-visuel), chargée quand Achats l'affiche (hors du démarrage, comme les tableaux du 19 nov.).
+const RetraitsPoints = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx').then((m) => ({ default: m.RetraitsPoints })));
+const RienARetirer = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx').then((m) => ({ default: m.RienARetirer })));
 // (19 nov., intégration — budget de démarrage) Hors du démarrage : la feuille « Depuis ta dernière visite » (ext. 5.409),
 // les tableaux de travail de l'ordinateur et Ventes natif, chargés quand ils s'affichent.
 // (20 nov., chasse-bugs) Montée HORS des portes (à côté du cœur) : sa lecture `capte_journal_*` n'a le droit de partir qu'une fois la
@@ -1162,7 +1166,6 @@ import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
-import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";   // (20 nov.) colis à retirer : une carte par point (contenu, code, QR)
 import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
 import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";

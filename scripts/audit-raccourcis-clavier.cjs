@@ -88,7 +88,10 @@ async function audit(srcRegle, srcComposant, srcBouton, bavard) {
     dit(B.nomBoutonIcone('inconnue', {}) === 'Bouton', 'une icône sans nom connu ⇒ « Bouton » (jamais muet)');
     dit(B.nomBoutonIcone(null, {}) === null, 'un bouton sans icône : rien à ajouter');
   }
-  dit(/const occ = \{[^\n]*\.\.\.\(nomIcone \? \{ 'aria-label': nomIcone \} : \{\}\) \};/.test(sansCommentaires(srcBouton)), 'BoutonBase pose le nom lu sur le bouton');
+  // (20 nov., intégration) boutons-natifs : BoutonBase dessine le bouton natif ; le nom lu y est posé en `aria-label`
+  // (bouton texte) ET passé en `libelle` au BoutonIcone (icône seule). Les deux chemins sont exigés.
+  { const sb = sansCommentaires(srcBouton);
+    dit(/\{\.\.\.\(nomIcone \? \{ 'aria-label': nomIcone \} : \{\}\)\}/.test(sb) && /if \(nomIcone\) \{\s*return <BoutonIcone libelle=\{rest\['aria-label'\] \|\| nomIcone\}/.test(sb), 'BoutonBase pose le nom lu sur le bouton'); }
   return ko;
 }
 

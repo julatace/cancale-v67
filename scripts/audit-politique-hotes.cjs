@@ -163,6 +163,8 @@ const COUPLES = {
   'src/RetirerAilleurs.jsx|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site » : annonces actives eBay'],
   'src/ecrans/Compta.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » : ventes pas encore datées (relecture du détail)'],
   'src/ecrans/Compta.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire ↗ » : ventes pas encore datées'],
+  'src/retraitsVue.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le point de retrait (carte par point, retraits-visuel, 20 nov.)'],
+  'src/retraitsVue.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » Google Maps vers le point de retrait (hors Apple)'],
   'src/relaisChange.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le nouveau point relais (adresse lue dans l’e-mail)'],
   'src/relaisChange.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » (Google Maps) vers le nouveau point relais'],
   'src/App.jsx|vercel.com': ['lien', LIEN],
