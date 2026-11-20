@@ -102,7 +102,14 @@ Le contrôle préalable ne sert plus que pour le cas où Vinted a changé son ca
   `message-sur`, `traduction`, `tdz`, `variables`, `moteur-offres`, `quoi-de-neuf`, `actions-gardees`,
   `fonctions-api`, `icones`. `audit-coherence` : 3 rouges attendus « seuil 5.410.0, manifeste 5.409.0 » — verts
   une fois le manifeste monté par `claude/panneau-vintex` (vérifié en local : seul `EXT_ATTENDUE` reste, leur lot).
-- Banc `scripts/bancs/repub-verifier.cjs` (390 tactile, 1512 ; clair, sombre) : voir le rapport de session.
+- Banc `scripts/bancs/repub-verifier.cjs` (vrai build, coque native : Actions → Republier au téléphone, « Choisir une
+  action » du tableau à l'ordinateur) : 390 tactile clair, 1512 clair et sombre — **tout OK** (récapitulatif, lignes,
+  Lancer fermé puis ouvert, SA réponse pour SA paire au départ, 44 px, rien ne déborde). Captures regardées.
+- **Défaut trouvé en regardant la capture** (d'avant ce lot) : au téléphone, la liste des annonces de l'atelier avait une
+  hauteur de **0 px** (conteneur flex qui rétrécit, `overflow: hidden`) — on ne voyait ni les lignes ni leurs gestes.
+  Corrigé (`flexShrink: 0`, `data-republier-liste`), contrôle V2c du banc.
+- `scripts/bancs/republication-parfaite.cjs` ne passe plus depuis la coque native (il cherche `[data-actions-ouvrir]`,
+  caché) : à recâbler comme `repub-verifier` (non fait ici).
 
 ## Geste de Julien
 
