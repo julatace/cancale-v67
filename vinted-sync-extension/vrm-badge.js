@@ -855,6 +855,8 @@
   .corps6 { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 24px; }
   .corps6 .gestes, .corps6 .listes5, .corps6 .panneau { background: transparent !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
   .corps6 .seg5 { display: none !important; }
+  .vx6 input[type=checkbox] { accent-color: var(--n-accent); }
+  @media (prefers-color-scheme: dark) { .vx6 { color-scheme: dark; } }
   .corps6 .listes5 { display: block !important; grid-template-columns: none !important; }
   .corps6 .listes5 > .panneau { width: auto !important; max-width: none !important; }
   .vx6 { grid-template-rows: minmax(0, 1fr); }
