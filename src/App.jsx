@@ -1157,7 +1157,9 @@ import { useARegler } from "./designV2/useARegler.js";
 import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
-import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
+import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
+import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";   // (20 nov.) colis à retirer : une carte par point, « Je suis au point »
+import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
 import { GroupeConversations as GroupeConversationsV2, LigneConversation as LigneConversationV2 } from "./designV2/LigneConversation.jsx";
@@ -47492,7 +47494,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
+        ...lu, limiteAt: t.limiteAt || '', lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47512,7 +47514,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
+        ...lu, limiteAt: (eV && eV.limiteAt) || '', sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -57041,12 +57043,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   // qui arrive après « En route » le pousserait.
                   return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {videSite}
-                    <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
-                      aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis,
+                    {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :
+                        les mêmes points (`pointsARetirer`), les mêmes gestes ; le prix payé de l'achat relié par identité, les horaires LUS. */}
+                    {avecColis ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
+                      aides={{ titre: titreRetrait, retirer: retirerColis,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
+                        prixDe: (x) => { const t = (x.src && x.src.t) || null; const o = (x.src && x.src.o) || (t ? commandeRetrait(t) : null); if (!o) return '';
+                          const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
+                          return Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : ''; },
+                        horairesDe: (p) => { const h = horairesDuPoint((p.arrives || []).map((c) => (c && c.src && c.src.t ? { horaires: c.src.t.horaires, ms: Date.parse((c.src.t.horairesDuTransporteur && c.src.t.horairesAt) || c.src.t.emailAt || c.src.t.receivedAt || '') } : null)).filter(Boolean), (c) => c.ms);
+                          if (!h) return ''; return phraseOuverture(etatOuverture(h, Date.now())) || texteHoraires(h); },
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
+                      : (!videSite && toutLuRet && !baseKO ? <RienARetirer/> : null)}
                     {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
                         posée après « En route » le poussait (banc design-v2-chargement). */}
                     <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
