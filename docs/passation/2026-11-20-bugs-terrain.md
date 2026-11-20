@@ -33,3 +33,27 @@ puis rien ; Ventes « À envoyer » sans aucune photo ; Annonces en squelette.
   posées, les rangées viennent des e-mails (sans photo). C'est la lenteur, pas une donnée absente.
 - Leboncoin : `lbc_listings` garde 49 annonces actives de 47 AUTRES vendeurs (vues en naviguant) ; l'écran Leboncoin les écarte
   (`annonceLbcALui`), à vérifier chez chaque autre lecteur.
+
+## Suite (20 nov., soir) : le fil principal saturé
+Mesure fixe : sonde hors dépôt (`_base-volume` à 12 comptes, 2 600 ventes, 2 700 achats, 1 000 annonces ; 390 tactile,
+processeur ×4, 2e ouverture, 42 s). Origine = origin/main fusionnée (f57375a1c). Variance d'une passe à l'autre : ±2–3 s.
+
+| écran | prêt avant → après | tâches longues avant → après |
+|---|---|---|
+| Achats (À retirer lu) | 25,6 s → 10,5 s | 35,5 s → 25,8 s |
+| Ventes (photos affichées) | 6,7 s → 5,4 s | 27,8 s → 22,6 s |
+| Annonces (squelette fini) | 4,9 s → 4,6 s | 16,0 s → 12,9 s |
+
+Fait : formateurs gardés (`src/formatsRapides.js`, repris de claude/iphone-rapide), comparateurs gardés
+(`src/comparaisonsRapides.js`), cache de session oublié sans réécrire 1,5 Mo (`oublierAcct`), affectation des propositions
+hors du moteur des outils et recalculée quand les données se posent, `cartesColis`/`listeEnvoyes` une fois par rendu,
+`bordForItem` par index, photos des ventes sans tout relire, lots de suivis trois à la fois. `chiffres-volume` : 38 relevés
+identiques à origin/main. `achats-liaison` : 6 rouges préexistants sur origin/main (390), aucun de plus.
+
+Pas atteint : diviser les tâches longues par 3. Ce qui reste est réparti : ~45 rendus par moteur `Comptabilite` en 42 s (17–19
+seulement viennent de la coque, le reste de leurs propres lectures asynchrones et des magasins partagés), 3 moteurs sur
+Achats ; chaque rendu refait ses dérivés et réconcilie ~480 rangées (Achats) ; « (program) » (style, mise en page) ~1/3.
+Prochain levier : les dérivés lourds (`pickupUnion`, `expeditions`, `cartesColis`) calculés UNE fois pour tous les moteurs,
+dans un magasin indexé par leurs données ; rangées mémoïsées (props stables) ; le moteur des outils de retrait monté après
+le calme. Non fait, et pourquoi : `load()` mémoïsé (des appelants modifient l'objet rendu puis `save` : risque de fausse
+donnée) ; `useTitreReduit` et `ajusterChiffre` (le temps mesuré est la mise en page que l'image ferait de toute façon).
