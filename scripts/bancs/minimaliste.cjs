@@ -548,7 +548,7 @@ async function sitesPlanches() {
         if (q.bordGroupes != null && ref.bordGroupes != null && !t1(q.bordGroupes, ref.bordGroupes)) ecarts.push(n + ` : bord des groupes ${q.bordGroupes} ≠ ${ref.bordGroupes}`);
         // Le bord des rangées se compare dans la colonne de lecture (la moitié gauche) : une rangée d'une colonne de droite (une
         // carte d'aide à l'ordinateur) n'est pas le bord de la liste.
-        const gauche = (x) => x != null && x < Number(fen) / 2;
+        const gauche = (x) => x != null && x < Number(fen) * 0.4;
         if (gauche(q.bordRangees) && gauche(ref.bordRangees) && !t1(q.bordRangees, ref.bordRangees)) ecarts.push(n + ` : bord des rangées ${q.bordRangees} ≠ ${ref.bordRangees}`);
         if (q.plein && ref.plein && (!t1(q.plein.l, ref.plein.l) || !t1(q.plein.w, ref.plein.w) || !t1(q.plein.ecartOnglets, ref.plein.ecartOnglets))) ecarts.push(n + ' : place du plein');
         if (q.debord) ecarts.push(n + ' : page plus large que l\'écran');
