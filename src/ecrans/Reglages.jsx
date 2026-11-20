@@ -2158,6 +2158,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'copieannonces', type:'panneau', ic:'save', lib:tr('reglages.copieannonces.lib'), desc:tr('reglages.copieannonces.desc'), data:{ 'data-reglage-copieannonces':'' }, el:<CopieAnnonces comptes={comptes||[]}/> },
       // (31 oct., soir) L'ancien « eBay → Compte » : connexion et comptes eBay reliés.
       ebayCompte && { id:'ebay', type:'panneau', ic:'shop', lib:tr('reglages.ebay.lib'), desc:tr('reglages.ebay.desc'), el:ebayCompte },
+      // (20 nov. soir) Les rangées par plateforme ont quitté la barre de gauche : les recherches et alertes eBay s'ouvrent d'ici.
+      ebayCompte && { id:'ebay-recherches', type:'nav', ic:'search', lib:tr('ebay.recherches.titre'), desc:'', onClick:()=>{ try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} }, data:{ 'data-reglage-ebay-recherches':'' } },
     ]},
     { id:'emails-reglages', titre:tr('reglages.groupe.emails-reglages'), items:[
       // (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : l'ancien sous-écran est devenu

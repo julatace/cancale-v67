@@ -20955,15 +20955,6 @@ const SITES_COQUE = { v: ['vinted'] };
 const SITES_RELIES_COQUE = { v: [] };
 // Dans « Plus » (et la barre latérale), UNE rangée par plateforme reliée : sa page de réglages (comptes reliés et leur
 // lecture, connexion de l'extension sur ce site, réglages propres au site) — les panneaux de Paramètres qui les portent déjà.
-const REGLAGE_DU_SITE = { vinted: 'liens', leboncoin: 'connexions', ebay: 'ebay', vestiaire: 'connexions' };
-const groupePlateformes = (tab, setTab) => {
-  const l = SITES_RELIES_COQUE.v || [];
-  if (!l.length) return null;
-  return { titre: tr('site.plus.titre'), entrees: l.map((x) => ({ cle: 'site-' + x, libelle: nomPlateforme(x), icone: <span className="n-site-logo"><LogoSite site={x}/></span>,
-    onChoisir: () => { if (x === 'ebay') { try { window.dispatchEvent(new Event('vrm:ebay-recherches')); } catch (_) {} return; }
-      DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
-    attrs: { 'data-plus-site': x } })) };
-};
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
 const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
@@ -20981,7 +20972,8 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const groupes = [
     { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    groupePlateformes(tab, setTab),
+    // (20 nov. soir, Julien : « les onglets tu les dégages, tu dégages l'onglet Vinted ») plus de rangées par plateforme ;
+    // le filtre « Site » des tableaux reste, les réglages de chaque site restent dans Paramètres.
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
@@ -21018,7 +21010,8 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
   const groupes = plus ? [
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    groupePlateformes(tab, setTab),
+    // (20 nov. soir, Julien : « les onglets tu les dégages, tu dégages l'onglet Vinted ») plus de rangées par plateforme ;
+    // le filtre « Site » des tableaux reste, les réglages de chaque site restent dans Paramètres.
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={22}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
