@@ -18883,10 +18883,132 @@ async function executerPourAppCoeur(msg) {
     if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true), v: r.json.variante }); }
     else { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
   }
-  if(permis.favori&&r.json?.resultat==='ignore')logActivity('Favori ignoré : conversation déjà commencée, aucun message envoyé.');
+  if(permis.favori&&r.json?.resultat==='ignore')logActivity(({annonce_indisponible:'Favori sauté : annonce vendue, réservée ou masquée, aucun message envoyé.',offre_sous_plancher:'Favori sauté : l’offre serait sous ton prix mini, ni offre ni message.',conversation_refusee:'Favori sauté : Vinted refuse d’ouvrir la conversation avec cette personne, rien envoyé.'})[r.json.raison]||'Favori ignoré : conversation déjà commencée, aucun message envoyé.');
   else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+// ══ 5.410 (`messagesmalins`, 20 nov.) — UN MESSAGE QUE VINTED ACCEPTE, UN REFUS QUI APPREND ══════════
+// Julien : « plus d'intelligence […] pareil pour l'envoi des messages ». La règle « les mots qui font bannir
+// un compte » (src/messageSur.js, 12 nov., validée par Julien ; copie FABRIQUÉE par scripts/recopier-message-sur.cjs) :
+// téléphone, e-mail, lien, paiement, autre messagerie, vente hors plateforme, main propre ⇒ JAMAIS envoyé (ni « corrigé »).
+// Avant tout geste chez Vinted : une version sûre est tirée parmi SES versions ; aucune ⇒ rien ne part,
+// dit (`texte_interdit`). Une version refusée par Vinted (réponse 4xx au message, hors frein 403/429)
+// n'est plus jamais tirée sur ce compte : son EMPREINTE est gardée ici (`vrmVersionsRefusees`, 30 j).
+// Sauter proprement, AVANT d'écrire : annonce vendue / réservée / masquée (dressing ou transaction),
+// conversation déjà commencée, offre SOUS LE PRIX MINI posé dans VRM (jamais d'offre sous le plancher).
+// <message-sur-regle> — COPIE FABRIQUÉE de src/messageSur.js par scripts/recopier-message-sur.cjs (ne pas modifier à la main)
+const MESSAGE_SUR = (() => {
+const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', lbc: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+const nomSite = (site) => NOMS_SITES[site] || 'Vinted';
+const estLbc = (site) => site === 'leboncoin' || site === 'lbc';
+
+// Minuscule, sans accent, espaces simples ; les apostrophes typographiques ramenées à « ' ».
+const normaliser = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[‘’ʼ]/g, "'").toLowerCase().replace(/\s+/g, ' ');
+
+// Une négation dans les 30 caractères avant le mot : « je ne fais pas de main propre »,
+// « jamais de PayPal », « pas une copie », « sans WhatsApp ».
+const NEGATION = /(?:\bpas\b|\bjamais\b|\bsans\b|\bni\b|\baucun(?:e)?\b|\bn'(?:accepte|utilise|ai|est)\b|\bne\b[^.!?,;]{0,20}$)[^.!?,;]{0,22}$/;
+const nie = (t, i) => NEGATION.test(t.slice(Math.max(0, i - 30), i));
+
+// Le premier passage NON nié d'un motif (global) ; rend le passage lu, ou ''.
+function trouver(t, re, avecNegation = true) {
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(t))) {
+    if (!avecNegation || !nie(t, m.index)) return m[0].trim();
+    if (re.lastIndex === m.index) re.lastIndex++;
+  }
+  return '';
+}
+
+// ── Les motifs (sur le texte normalisé) ──────────────────────────────────────
+// Téléphone français : 06 12 34 56 78 · 06.12.34.56.78 · 0612345678 · +33 6 12 34 56 78.
+const RE_TEL = /(?:\+33|0033|\b0)\s*[1-9](?:[\s.-]?\d{2}){4}\b/g;
+// En toutes lettres (« zéro six… ») ou l'invitation à écrire/appeler en dehors.
+const RE_TEL_MOTS = /\bzero (?:six|sept)\b|\b(?:envoie|envoyez|ecris|ecrivez|appelle|appelez)[- ]?(?:moi|nous)? (?:un |par )?(?:sms|texto)\b|\bpar (?:sms|texto)\b|\bmon (?:portable|tel|06|07)\b/g;
+const RE_EMAIL_ADR = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/g;
+const RE_EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+|\b(?:gmail|hotmail|outlook|yahoo|icloud|laposte\.net|orange\.fr)\b|\barobase\b/g;
+// Un lien : http(s)://, www., ou nom.domaine connu — sauf vers le site lui-même.
+const RE_LIEN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]{2,}\.(?:com|fr|net|org|io|me|ly|co|be|shop|store|link)\b(?:\/\S*)?/g;
+const LIEN_DU_SITE = /(?:^|[/.])(?:vinted|leboncoin|vestiairecollective|ebay)\.[a-z.]+/;
+const RE_PAIEMENT = /\bpay ?pal\b|\bvirement\b|\blydia\b|\bpaylib\b|\bwero\b|\biban\b|\brib\b|\bwestern union\b|\bmandat cash\b|\bpaysafecard\b|\bcrypto\b|\bbitcoin\b/g;
+const RE_ESPECES = /\ben (?:especes|liquide|cash)\b|\bpaiement (?:en )?(?:especes|cash)\b/g;
+const RE_MESSAGERIE = /\bwhats ?app\b|\bwa\.me\b|\btelegram\b|\bsnap(?:chat)?\b|\binsta(?:gram)?\b|\bmessenger\b|\bfacebook\b/g;
+const RE_HORS = /\b(?:en dehors|hors|sans passer par|a cote) (?:de |du |d')?(?:la |l')?(?:vinted|leboncoin|le bon coin|vestiaire|ebay|plateforme|appli(?:cation)?|site)\b|\bhors plateforme\b|\b(?:payer|paie|paye|paies|payes|payez|regler|reglez)(?:[- ]moi)? (?:directement|en direct)\b|\bevit(?:er|e|es|ons|ez) les frais\b|\bsans (?:les )?frais (?:de )?(?:protection|vinted|plateforme)\b|\ben direct sans (?:vinted|leboncoin|vestiaire|ebay)\b/g;
+const RE_MAIN_PROPRE = /\b(?:en |remise en |remise |rdv en |rendez-vous en )?mains? propres?\b|\bje peux (?:passer|venir) (?:te |vous )?(?:la |le |les )?(?:deposer|donner|apporter)\b|\bon (?:se voit|peut se voir|se retrouve)\b/g;
+
+// Contrefaçon (annonces).
+const MARQUES = ['nike', 'adidas', 'jordan', 'air jordan', 'yeezy', 'new balance', 'asics', 'puma', 'vans', 'converse', 'reebok', 'salomon', 'gucci', 'louis vuitton', 'lv', 'dior', 'balenciaga', 'prada', 'chanel', 'hermes', 'off-white', 'off white', 'supreme', 'stone island', 'moncler', 'the north face', 'north face', 'lacoste', 'ralph lauren', 'burberry', 'versace', 'fendi', 'celine', 'saint laurent', 'ysl', 'bape', 'rolex', 'cartier', 'golden goose', 'alexander mcqueen', 'mcqueen', 'canada goose', 'arc\'teryx', 'arcteryx', 'trapstar', 'corteiz', 'essentials', 'fear of god'];
+const RE_MARQUE = MARQUES.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+const RE_CONTREFACON = new RegExp([
+  '\\br[e]?plica(?:s)?\\b', '\\breplique(?:s)?\\b', '\\bfake(?:s)?\\b', '\\bdupe(?:s)?\\b', '\\bimitation(?:s)?\\b', '\\bcontrefacon(?:s)?\\b',
+  '\\bcopie(?:s)?\\b(?! (?:de |du |d\'|de la )?(?:la |le )?(?:facture|ticket|preuve|recu|bon|carte|cni|piece|etiquette|boite|bordereau))',
+  '\\b1 ?[:/] ?1\\b', '\\b(?:non|pas) (?:authentique|original(?:e)?|officiel(?:le)?|d\'origine)\\b',
+  '\\binspire(?:e|es|s)? (?:de|par|d\'|du)\\b(?! (?:l\'univers|les annees|des annees|annees))',
+  '\\b(?:type|style|facon|genre|look) (?:' + RE_MARQUE + ')\\b',
+  '\\b(?:ua|top|best) ?batch\\b', '\\bqualite (?:miroir|identique a l\'original)\\b',
+].join('|'), 'g');
+
+// Les contrôles, dans un ordre fixe (le plus grave d'abord).
+const ETIQUETTES = {
+  telephone: 'Un numéro de téléphone',
+  email: 'Une adresse e-mail',
+  lien: 'Un lien vers un autre site',
+  paiement: 'Un paiement hors plateforme',
+  messagerie: 'Une autre messagerie',
+  hors: 'La vente proposée hors plateforme',
+  mainpropre: 'La main propre proposée',
+  contrefacon: 'Un mot de contrefaçon',
+};
+const CODES_RISQUE = Object.keys(ETIQUETTES);
+
+// → [{ code, mot, texte }] : `mot` = le passage lu (normalisé), `texte` = la ligne dite.
+function chercher(texte, site, famille) {
+  const t = normaliser(texte);
+  if (!t.trim()) return [];
+  const out = [];
+  const pose = (code, mot) => { if (mot && !out.some((x) => x.code === code)) out.push({ code, mot, texte: `${ETIQUETTES[code]} : « ${mot.slice(0, 32)} »` }); };
+  pose('telephone', trouver(t, RE_TEL, false) || trouver(t, RE_TEL_MOTS));
+  pose('email', trouver(t, RE_EMAIL, false));
+  // (une adresse e-mail n'est pas AUSSI un lien : « gmail.com » d'une adresse est retiré avant)
+  const tl = t.replace(RE_EMAIL_ADR, ' ');
+  RE_LIEN.lastIndex = 0; let m; let lien = '';
+  while ((m = RE_LIEN.exec(tl))) { if (!LIEN_DU_SITE.test(m[0])) { lien = m[0]; break; } }
+  pose('lien', lien);
+  pose('paiement', trouver(t, RE_PAIEMENT) || (estLbc(site) ? '' : trouver(t, RE_ESPECES)));
+  pose('messagerie', trouver(t, RE_MESSAGERIE));
+  pose('hors', trouver(t, RE_HORS));
+  if (!estLbc(site)) pose('mainpropre', trouver(t, RE_MAIN_PROPRE));
+  if (famille === 'annonce') pose('contrefacon', trouver(t, RE_CONTREFACON));
+  return out;
+}
+const risquesMessage = (texte, site = 'vinted') => chercher(texte, site, 'message');
+const risquesAnnonce = (texte, site = 'vinted') => chercher(texte, site, 'annonce');
+// Un message AUTOMATIQUE ne part que si rien n'est relevé (un texte vide n'a rien de risqué).
+const messageAutoPermis = (texte, site = 'vinted') => risquesMessage(texte, site).length === 0;
+return { risquesMessage, messageAutoPermis };
+})();
+function texteSurVinted(texte) { const r = MESSAGE_SUR.risquesMessage(texte, 'vinted'); return { ok: !r.length, motifs: r.map((x) => x.code) }; }
+// </message-sur-regle>
+const VERSIONS_REFUSEES = 'vrmVersionsRefusees';
+async function versionsRefusees(uid) {
+  try { const m = (await chrome.storage.local.get(VERSIONS_REFUSEES))[VERSIONS_REFUSEES] || {}; const t = Date.now(); return new Set((Array.isArray(m[String(uid)]) ? m[String(uid)] : []).filter((x) => x && t - Number(x.at) < 30 * 864e5).map((x) => String(x.e))); } catch (_) { return new Set(); }
+}
+async function noterVersionRefusee(uid, texte) {
+  try { const m = (await chrome.storage.local.get(VERSIONS_REFUSEES))[VERSIONS_REFUSEES] || {}; const l = Array.isArray(m[String(uid)]) ? m[String(uid)] : []; m[String(uid)] = l.filter((x) => x && x.e !== empreinteMessage(texte)).concat([{ e: empreinteMessage(texte), at: Date.now() }]).slice(-20); await chrome.storage.local.set({ [VERSIONS_REFUSEES]: m }); } catch (_) {}
+}
+// Les versions qu'on peut envoyer : sûres pour Vinted, jamais refusées sur ce compte.
+function versionsEnvoyables(versions, refusees) {
+  return (Array.isArray(versions) ? versions : []).filter((v) => v && texteSurVinted(v.texte).ok && !(refusees && refusees.has(empreinteMessage(v.texte))));
+}
+// Le prix mini posé dans VRM pour CETTE annonce (centimes), lu en scalaire ; null = pas posé ou pas su.
+async function prixMiniAnnonce(itemId) {
+  if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
+  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->${itemId}->>min`); } catch (_) { r = null; }
+  return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
 async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
@@ -18927,6 +19049,10 @@ async function executerMessageFavori(uid,acc,body){
   // ouvert sur ce compte, RIEN ne part.
   const pg=await pageVintedPour(acc);
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
+  // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
+  const refuseesIci=await versionsRefusees(uid);
+  const envoyables=versionsEnvoyables(versionsMessage(body.message,body.variantes),refuseesIci);
+  if(!envoyables.length){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
   // L'offre native de Vinted, si une réduction est choisie.
   // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
@@ -18942,7 +19068,7 @@ async function executerMessageFavori(uid,acc,body){
   // (5.398) Une PREUVE que l'annonce n'est plus disponible (dernier dressing capté de ce compte :
   // vendue, réservée, masquée, fermée ; ou supprimée dans ce navigateur) ⇒ RIEN ne part, avant
   // toute écriture chez Vinted (aucune conversation ouverte). Pas de preuve ⇒ comme avant.
-  {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('refuse',0,'annonce_indisponible');}}
+  {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
   const nA=offre?3:2;
   const recu={};
   const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
@@ -18958,6 +19084,9 @@ async function executerMessageFavori(uid,acc,body){
   if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(creation.pause)return rep('refuse',0,'pause_vinted');
+  // (5.410) Vinted REFUSE d'ouvrir la conversation (400/404/422 : acheteur qui a bloqué, compte fermé, annonce
+  // retirée) — certain, rien d'écrit chez lui : ce favori est SAUTÉ, la file continue. 401/403/429 : comme avant.
+  if(!creation.ok&&[400,404,422].includes(creation.status)&&!frein){noterDiag('favori_conversation_refusee_'+creation.status);return rep('ignore',creation.status,'conversation_refusee');}
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
   const cc=creation.json?.conversation;
   const convId=String(cc?.id||'');
@@ -18997,7 +19126,7 @@ async function executerMessageFavori(uid,acc,body){
     if(t.ok&&artTx&&artTx!==body.itemId)return rep('refuse',t.status,'identite_non_confirmee');
     // (5.398) L'annonce telle que Vinted la rend DANS la transaction relue : si elle porte une
     // preuve (fermée, vendue, réservée, masquée), ni offre ni message.
-    {const ind=t.ok?annonceIndisponible(tr&&tr.item&&typeof tr.item==='object'?tr.item:null,null,null):'';if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('refuse',t.status,'annonce_indisponible');}}
+    {const ind=t.ok?annonceIndisponible(tr&&tr.item&&typeof tr.item==='object'?tr.item:null,null,null):'';if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('ignore',t.status,'annonce_indisponible');}}
     const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
   }else noterDiag('favori_sans_transaction');
   // Les places de la conversation, de l'offre et du message sont réservées depuis le
@@ -19012,6 +19141,8 @@ async function executerMessageFavori(uid,acc,body){
   if(offre){
     const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
     if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+    // (5.410) Jamais une offre SOUS le prix mini posé dans VRM pour cette annonce : ni offre ni message, favori sauté.
+    {const mini=await prixMiniAnnonce(body.itemId);if(mini!=null&&Math.round(Number(prix)*100)<mini){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}}
     await pauseFavori('offre', uid);
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('offre');
@@ -19026,7 +19157,7 @@ async function executerMessageFavori(uid,acc,body){
   }
   // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
   // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
-  const version=choisirVariante(versionsMessage(body.message,body.variantes),await varianteDerniere(uid,'favori'));
+  const version=choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
   if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
@@ -19041,6 +19172,8 @@ async function executerMessageFavori(uid,acc,body){
   if(texteFinal==null){noterDiag('favori_texte_repete');return rep('refuse',0,'historique_non_verifie');}
   if(texteFinal!==texteBrut)noterDiag('favori_salutation_variee');
   if(!texteFinal.trim())return rep('refuse',400);
+  // (5.410) Le texte FINAL (pseudo, titre, prix posés) relu par la même règle : jamais envoyé s'il ne l'est plus.
+  if(!texteSurVinted(texteFinal).ok){noterDiag('favori_texte_final_interdit');return rep('refuse',0,'texte_interdit');}
   // (5.372) L'offre acceptée par Vinted : 8 à 20 s au hasard AVANT d'écrire le message
   // (écrit dans chrome.storage.local, repris après un réveil du worker ; Tout arrêter,
   // captcha, pause, autre compte ou onglet fermé pendant l'attente ⇒ le message ne part pas).
@@ -19065,6 +19198,9 @@ async function executerMessageFavori(uid,acc,body){
   if(r.sansPage)return rep('refuse',0,'onglet_vinted');
   if(r.pause)return rep('refuse',0,'pause_vinted');
   if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
+  // (5.410) Vinted REFUSE le message lui-même (400/422, sans frein) : CETTE version n'est plus jamais tirée sur ce compte.
+  // La forme du refus (clés, code — jamais le texte) est notée pour la passe suivante.
+  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
 }
