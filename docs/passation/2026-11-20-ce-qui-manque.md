@@ -35,8 +35,11 @@ fois ; prix = celui de l'annonce Vinted, sinon le PLUS BAS — dit (« prix Vint
 
 Rouges de `design-v2-messages` (« lea_sne / akers », « disponible » coupé). `LigneConversation` : le pseudo se replie à ses
 séparateurs (`nomSecable` : `<wbr>` après `_ . -`), `overflow-wrap: normal` ; en grand texte l'avatar décoratif (initiale)
-s'efface et la vignette passe à 40 px : la colonne de texte gagne ~60 px. Banc : l'air « bord gauche » ne juge plus un avatar
-absent.
+s'efface, la vignette passe à 40 px et la rangée devient une grille : le pseudo prend TOUTE la largeur (au-dessus de la
+vignette ; `.v2m-txt` / `.v2m-l1` en `display: contents`). Banc : l'air « bord gauche » ne juge plus un avatar absent, le
+« bord droit » mesure les enfants d'un texte dissous. Sur le build d'avant : 2 rouges (pseudos, mots coupés) ; après : 0.
+Reste rouge sur les DEUX builds (avant et après, même écart) : « éteint : messages a le DOM d'avant » — un toast
+`data-toast-numeros` présent ou non selon l'instant (l'ancien DOM, pas touché ici).
 
 ## 4. Compte bloqué : changer d'avis
 
@@ -60,10 +63,12 @@ blocage — la même clé `vrm_comptes_bloques` par `choixPose` (épisode gardé
 - `node scripts/audit-vues-stock.cjs` : 20 verts, 8 mutations sur 8 rougissent (une paire sur deux sites comptée deux fois,
   prix le plus haut, « à confirmer » comptée, publier sur une lecture ratée ×2, un « pas su » par-dessus le chiffre, point
   daté par l'écran, lecture ratée prise pour une réponse).
-- `node scripts/bancs/ce-qui-manque.cjs` (V vues/stock, R lecture ratée en 503, B compte bloqué, S Stock ; 390 tactile et
-  1512, clair et sombre), `node scripts/bancs/design-v2-messages.cjs`.
+- `node scripts/bancs/ce-qui-manque.cjs` : 140 verts, 0 rouge (V vues/stock, R lecture ratée en 503, B compte bloqué,
+  S Stock ; 390 tactile et 1512, clair et sombre ; captures regardées). `node scripts/bancs/design-v2-messages.cjs` :
+  104 verts, 1 rouge (le toast d'« éteint », rouge aussi sur le build d'avant).
 - Audits verts : identite, traduction, tdz, variables, coherence, icones, compte-bloque, extension-claire, stock-*,
-  quoi-de-neuf.
+  quoi-de-neuf. Rouges AUSSI sur `origin/main` (pas de ce lot) : benefice, coque-parametres, ecrans-restes,
+  numeros-nouvelles, offre-annonce-partie, offres-auto.
 
 ## Ce qui reste
 
