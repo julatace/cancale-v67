@@ -97,7 +97,7 @@
   transition: background-color .18s var(--vrm-ease-out, ease), box-shadow .18s ease;
 }
 :root .vrm-seg > .vrm-seg-btn:not(#vrm-seg):is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 .vrm-seg-btn:active:not(:disabled) { transform: none; }
 .vrm-seg-btn:disabled { opacity: .45; cursor: not-allowed; }

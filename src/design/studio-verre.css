@@ -193,7 +193,7 @@
 /* (Désactivé : un contour à l'encre seconde de ce qui l'entoure — clair sur le fond, gris sur le verre ou la feuille.) */
 :root:root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):is(:disabled, [aria-disabled="true"]) { background: transparent !important; background-image: none !important; color: var(--sb-encre-2) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent) !important; opacity: .8 !important; }
 /* Un bouton secondaire est TOUJOURS une touche posée (sur le fond, un secondaire sans matière se perdait). */
-:root:root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(:disabled, [aria-disabled="true"]) { background-image: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; }
+:root:root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger):not(:disabled, [aria-disabled="true"]) { background-image: var(--sb-touche-fond) !important; box-shadow: none !important; }
 /* Ma journée au téléphone, comme la maquette : sous le chiffre du jour (blanc, sur le fond), le MOIS — ses trois
    chiffres — est le premier verre ; puis « À envoyer » et son geste. (L'ordre du DOM ne change pas.) */
 @media (max-width: 743px) {

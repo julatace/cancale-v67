@@ -20,7 +20,7 @@
 
 /* ══ 2. Ombres posées en dur, nommées par le banc (390 / 1512, avant) ══ */
 /* Messages : la plaque gravée du N° et son chiffre ; le segment choisi. */
-html body :is(.sb-plaque, .sb-plaque small, .vg-ms-vue.is-on, .vrm-seg .vrm-seg-btn) { box-shadow: none !important; text-shadow: none !important; }
+html body :is(.sb-plaque small, .vg-ms-vue.is-on) { box-shadow: none !important; text-shadow: none !important; }
 html body .sb-plaque { box-shadow: inset 0 0 0 .5px var(--ap-filet) !important; }
 /* Paramètres : « Mis à jour à 08:42 » (une pastille flottante) et la catégorie choisie du sommaire. */
 html body .vrm-neuf { box-shadow: none !important; background: transparent !important; }
@@ -41,11 +41,7 @@ html body :is(#vrm-contenu, .vrm-fs, [role="dialog"]) :is(summary, .vrm-lien-act
 html body .vrm-buy-more { min-width: 44px !important; min-height: 44px !important; }
 html body .vrm-bandeau-abo-geste { min-width: 44px !important; justify-content: center; }
 
-/* ══ 5. Publier ailleurs : UN groupe à filets décalés — écrit dans src/styles-publier-ailleurs.css (sa feuille). ══ */
-}
-
-/* ══ 6. Ventes · Leboncoin en rangées natives (20 nov., « les mêmes dispositions sur toutes les plateformes ») : le segment
-   prend la marge de la page, comme celui de Ventes · Vinted. ══ */
-@layer n-anciens {
+/* ══ 5. Publier ailleurs : écrit dans sa feuille (src/styles-publier-ailleurs-feuille.css). ══ */
+/* ══ 6. Ventes · Leboncoin en rangées natives : le segment prend la marge de la page, comme celui de Ventes · Vinted. ══ */
 html body [data-lbc-colis-natif] > .n-segmente { margin: 0 var(--n-marge, 16px) 16px; }
 }

@@ -92,8 +92,7 @@
 
   /* Ombres — deux niveaux. */
   --d-ombre-carte: 0 0 0 .5px rgba(0,0,0,.035), 0 1px 3px rgba(0,0,0,.05);
-  --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16);
-  --d-ombre-levee: none;
+  --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16); 
 
   /* Mouvement — 150 / 200 / 250 ms, une sortie franche. */
   --d-sortie: cubic-bezier(.23,1,.32,1);
@@ -128,8 +127,7 @@
   --p-r-vignette: var(--d-r-case); --p-r-ctrl: var(--d-r-pilule); --p-r-carte: var(--d-r-carte); --p-r-sombre: var(--d-r-carte);
   --p-fond: var(--d-fond); --p-carte: var(--d-carte); --p-case: var(--d-case); --p-remplir: var(--d-remplir);
   --p-encre: var(--d-encre); --p-gris: var(--d-gris); --p-gris-2: var(--d-gris); --p-filet: var(--d-filet);
-  --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);
-  --p-ombre: none; --p-sortie: var(--d-sortie);
+  --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);  --p-sortie: var(--d-sortie);
   /* Widgets (DA 6) */
   --w-fond: var(--d-fond); --w-carte: var(--d-carte); --w-carte-2: var(--d-case);
   --w-remplir: var(--d-remplir); --w-remplir-fort: var(--d-remplir-fort);
@@ -911,7 +909,7 @@
 
 /* ── Classes utilitaires de l'atelier (à poser par les écrans, hors couche) ── */
 /* Carte posée : sans bordure, ombre douce, rayon de carte. */
-.vrm-at-carte { background: var(--d-surface-atelier); border: 0; border-radius: var(--d-r-carte); box-shadow: var(--d-ombre-douce); }
+.vrm-at-carte { background: var(--d-surface-atelier); border: 0; border-radius: var(--d-r-carte); box-shadow: none; }
 /* Carte héros : le dégradé encre → bleu nuit, le texte clair. */
 .vrm-at-heros { background: var(--d-heros-fond); background-image: var(--d-heros-degrade); color: var(--d-heros-encre); border: 0; border-radius: var(--d-r-heros); box-shadow: var(--d-ombre-heros); padding: var(--d-e-5); overflow: hidden; position: relative; }
 .vrm-at-heros .vrm-at-libelle { color: var(--d-heros-gris); }

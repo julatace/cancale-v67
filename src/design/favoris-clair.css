@@ -20,7 +20,7 @@
 .vrm-fc-entete p { margin: 4px 0 0; font: 400 15px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-fc-ronds { display: flex; gap: 8px; flex: none; }
 .vrm-fc .vrm-fc-rond, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-rond {
-  width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important; display: grid; place-items: center; box-shadow: var(--fu-ombre) !important;
+  width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important; display: grid; place-items: center; box-shadow: none !important;
 }
 .vrm-fc-rond svg.is-tourne { animation: vrm-fc-tourne .9s linear infinite; }
 @keyframes vrm-fc-tourne { to { transform: rotate(360deg); } }

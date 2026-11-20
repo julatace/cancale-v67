@@ -20687,9 +20687,7 @@ const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: nul
 // (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
 // un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
 const SITES_COQUE = { v: ['vinted'] };
-// (20 nov., sélecteur de plateforme global) Le filtre « Site » des tableaux de travail est le sélecteur global : plus de filtre
-// local (rend une liste vide ; la fonction reste pour les écrans qui l'appellent).
-const filtreSiteTableau = () => [];
+// (20 nov., sélecteur de plateforme global) Plus de filtre « Site » dans les tableaux de travail : le sélecteur global le remplace.
 // (20 nov., sélecteur de plateforme global) Les sites RELIÉS, posés par la coque à chaque rendu (comme SITES_COQUE) : le
 // sélecteur et Aujourd'hui les lisent sans qu'on les leur passe.
 const SITES_RELIES_COQUE = { v: [] };
@@ -20697,10 +20695,10 @@ export const siteCourantCoque = (brut) => siteEffectif(brut, SITES_RELIES_COQUE.
 // Dans « Plus » (et la barre latérale), UNE rangée par plateforme reliée : sa page de réglages (comptes reliés et leur
 // lecture, connexion de l'extension sur ce site, réglages propres au site) — les panneaux de Paramètres qui les portent déjà.
 const REGLAGE_DU_SITE = { vinted: 'liens', leboncoin: 'connexions', ebay: 'ebay', vestiaire: 'connexions' };
-const groupePlateformes = (tab, setTab, taille) => {
+const groupePlateformes = (tab, setTab) => {
   const l = SITES_RELIES_COQUE.v || [];
   if (!l.length) return null;
-  return { titre: tr('site.plus.titre'), entrees: l.map((x) => ({ cle: 'site-' + x, libelle: nomPlateforme(x), icone: <span className="n-site-logo" data-taille={taille}><LogoSite site={x}/></span>,
+  return { titre: tr('site.plus.titre'), entrees: l.map((x) => ({ cle: 'site-' + x, libelle: nomPlateforme(x), icone: <span className="n-site-logo"><LogoSite site={x}/></span>,
     onChoisir: () => { DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
     attrs: { 'data-plus-site': x } })) };
 };
@@ -20726,7 +20724,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const groupes = [
     { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    groupePlateformes(tab, setTab, 20),
+    groupePlateformes(tab, setTab),
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
@@ -20763,7 +20761,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
   const groupes = plus ? [
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    groupePlateformes(tab, setTab, 22),
+    groupePlateformes(tab, setTab),
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={22}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
@@ -54398,7 +54396,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '' };
             });
             const filtresA = [
-              ...filtreSiteTableau('achats', 'vinted'),
               ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreAchatsT.compte || 'tous', onChange: (v) => setFiltreAchatsT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
                 options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((x) => ({ cle: x, libelle: x }))] }] : []),
               { cle: 'periode', libelle: tr('tableau.filtre.periode'), valeur: filtreAchatsT.periode, onChange: (v) => setFiltreAchatsT((f) => ({ ...f, periode: v })),
@@ -56038,8 +56035,6 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             <option value="maj">{tr('v2.msg.maj')}</option>
             <option value="rapides">{tr('v2.msg.rapides')}</option>
           </select>
-          {filtreSiteTableau('messages', 'vinted').map((f)=><select key={f.cle} className="n-au-choix" aria-label={f.libelle} value={f.valeur} data-msg-site="" onChange={(e)=>f.onChange(e.target.value)}>
-            {f.options.map((o)=><option key={o.cle} value={o.cle}>{o.libelle}</option>)}</select>)}
         </div> : null}
         {designV2 ? <div className="v2m-outils" data-v2-msg-outils="">{/* (17 nov., nouveau design) la recherche + « ⋯ » (filtres, mise à jour, réponses rapides) : une ligne. */}
           <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label={tr('v2.msg.chercher')} placeholder={tr('v2.msg.chercherPh')} micro data-msg-recherche=""/>

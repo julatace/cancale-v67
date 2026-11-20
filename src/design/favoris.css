@@ -99,7 +99,7 @@
 .vrm-fa-barre .vrm-fa-seg > button { text-overflow: clip !important; }
 .vrm-fa .vrm-fa-rond, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-rond {
   flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important;
-  display: grid; place-items: center; box-shadow: var(--fu-ombre) !important;
+  display: grid; place-items: center; box-shadow: none !important;
 }
 .vrm-fa-rond svg.is-tourne { animation: vrm-fa-tourne .9s linear infinite; }
 @keyframes vrm-fa-tourne { to { transform: rotate(360deg); } }
@@ -149,7 +149,7 @@
 @media (hover: hover) { .vrm-fa .vrm-fa-envoyer:hover:not(:disabled) { opacity: .88; } }
 
 .vrm-fa .vrm-fa-plus, .vrm-app-shell .vrm-main .vrm-fa .vrm-fa-plus {
-  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 999px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: var(--fu-ombre) !important;
+  align-self: center; min-height: 44px; padding: 0 18px; border-radius: 999px !important; background: var(--fu-carte) !important; color: var(--vrm-accent-texte) !important; font: 600 15px/1 var(--vrm-police) !important; box-shadow: none !important;
 }
 .vrm-fa-ligne { margin: 4px 2px; font: 600 15px/1.4 var(--vrm-police); color: var(--fu-gris); }
 .vrm-fa-ligne.is-geste { color: var(--fu-ambre-txt); }

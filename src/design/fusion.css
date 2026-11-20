@@ -159,7 +159,7 @@ button.vrm-fu-case:focus-visible { outline: 2px solid var(--fu-bleu); outline-of
 @media (prefers-reduced-motion: reduce) { .vrm-fu-seg > i { transition: none; } }
 
 /* ── 3. LES CARTES BLANCHES, PUCES, VIGNETTES ─────────────────────────────── */
-.vrm-fu-blanc { background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important; }
+.vrm-fu-blanc { background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: none !important; }
 .vrm-fu-num {
   display: inline-block; padding: 1px 7px; border-radius: 6px; background: var(--fu-encre); color: var(--fu-carte);
   font: 700 12px/1.45 var(--vrm-police); font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -255,7 +255,7 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran :is(.vrm-day-task-list) {
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task-list > .vrm-day-task {
   display: flex !important; align-items: center !important; gap: 14px !important; width: 100% !important; box-sizing: border-box !important;
   min-height: 72px !important; padding: 14px 14px !important; margin: 0 !important;
-  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: none !important;
   text-align: left !important; color: var(--fu-encre) !important;
 }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task-list > .vrm-day-task + .vrm-day-task { border-top: 0 !important; }
@@ -293,26 +293,26 @@ html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-task-list > butto
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran :is(.vrm-day-section, .vrm-day-titre-section) { font: 700 22px/1.2 var(--vrm-police) !important; letter-spacing: -.02em !important; color: var(--fu-encre) !important; margin: 4px 2px 12px !important; }
 /* Les cartes de chiffres de Ma journée deviennent des cartes blanches. */
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran :is(.vrm-day-card, .vrm-day-money, .vrm-day-week, .vrm-day-wallet, .vrm-day-stock, .vrm-day-tendances) {
-  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: none !important;
 }
 /* Les cases du jour (À envoyer, À retirer, Messages, Prix à baisser) : une carte
    blanche chacune, le chiffre en 800, plus de filets. */
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar { gap: 10px !important; border: 0 !important; background: transparent !important; overflow: visible !important; border-radius: 0 !important; }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case { border: 0 !important; background: var(--fu-carte) !important; border-radius: 20px !important; box-shadow: var(--fu-ombre) !important; overflow: hidden; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case { border: 0 !important; background: var(--fu-carte) !important; border-radius: 20px !important; box-shadow: none !important; overflow: hidden; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case > button[data-tuile] { padding: 14px 16px !important; min-height: 72px !important; flex-direction: column !important; gap: 4px !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-ic { display: none !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-n { font-family: var(--vrm-police) !important; font-weight: 700 !important; font-size: 28px !important; letter-spacing: -.03em !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar .vrm-day-bar-l { font-size: 13px !important; color: var(--fu-gris) !important; }
 html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-case-geste { margin: 0 12px 12px 12px !important; max-width: calc(100% - 24px) !important; box-sizing: border-box !important; white-space: normal !important; text-align: left !important; padding: 6px 14px !important; height: auto !important; border-radius: 999px !important; background: var(--fu-case) !important; border: 0 !important; color: var(--fu-encre) !important; }
 @media (hover: hover) and (pointer: fine) { html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-day-bar > .vrm-day-case > button[data-tuile]:hover { background: transparent !important; } }
-html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-carrousel > button { background: var(--fu-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--fu-ombre) !important; }
+html body .vrm-app-shell .vrm-day-layout.vrm-fu-ecran .vrm-carrousel > button { background: var(--fu-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: none !important; }
 
 /* ── 5. VENTES ────────────────────────────────────────────────────────────── */
 /* Chaque vente devient une carte blanche ; la frise sous l'en-tête de la ligne. */
 html body .vrm-app-shell .vrm-ventes-liste[data-fu-liste] { display: flex; flex-direction: column; gap: 10px; background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; overflow: visible !important; }
 html body .vrm-app-shell .vrm-ventes-liste[data-fu-liste] .vrm-sale-row[data-fu-ligne] {
   border: 0 !important; border-top: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important;
-  box-shadow: var(--fu-ombre) !important; padding: 14px !important; gap: 12px !important; margin: 0 !important;
+  box-shadow: none !important; padding: 14px !important; gap: 12px !important; margin: 0 !important;
 }
 .vrm-fu-ligne-frise { padding: 0 2px; }
 .vrm-fu-ligne-bas { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
@@ -340,7 +340,7 @@ html body .vrm-app-shell .vrm-fu-ecran .vrm-ventes-groupe-titre, html body .vrm-
 html body .vrm-app-shell .vrm-main .vrm-colis-carte > .vrm-colis-frise { margin: 14px 0 2px !important; position: relative; }
 /* Les cartes de colis : blanches, rayon 20, ombre très douce, la frise sous l'en-tête. */
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] {
-  border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: var(--fu-ombre) !important; padding: 14px !important;
+  border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: none !important; padding: 14px !important;
 }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: 10px !important; }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo { width: 60px !important; height: 60px !important; border-radius: var(--fu-r-photo) !important; border: 0 !important; background: var(--fu-case) !important; }
@@ -354,7 +354,7 @@ html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-sectio
 
 /* ── 7. COMPTA ────────────────────────────────────────────────────────────── */
 .vrm-fu-compta { display: flex; flex-direction: column; gap: 14px; margin: 0 0 18px; }
-.vrm-fu-panneau { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre); padding: 18px; color: var(--fu-encre); min-width: 0; }
+.vrm-fu-panneau { background: var(--fu-carte); border-radius: var(--fu-r-carte); box-shadow: none; padding: 18px; color: var(--fu-encre); min-width: 0; }
 .vrm-fu-panneau-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 14px; }
 .vrm-fu-panneau-tete h3 { margin: 0; font: 700 17px/1.25 var(--vrm-police); letter-spacing: -.01em; }
 .vrm-fu-panneau-tete span { font: 400 13px/1.2 var(--vrm-police); color: var(--fu-gris2); }
@@ -414,7 +414,7 @@ html body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-ligne] > button.vrm-led
 .vrm-fu-barre-v { font: 700 11px/1 var(--vrm-police); color: var(--fu-gris2); text-align: center; font-variant-numeric: tabular-nums; }
 .vrm-fu-barre[data-courant] .vrm-fu-barre-v { color: var(--fu-encre); }
 .vrm-fu-barre[data-courant] .vrm-fu-barre-piste > i { background: var(--fu-encre); }
-.vrm-fu-declaration.is-calme { background: var(--fu-carte); color: var(--fu-encre); box-shadow: var(--fu-ombre); }
+.vrm-fu-declaration.is-calme { background: var(--fu-carte); color: var(--fu-encre); box-shadow: none; }
 .vrm-fu-declaration.is-calme span { color: var(--fu-gris); }
 .vrm-fu-compta .vrm-fu-carte { margin: 0; }
 
@@ -518,7 +518,7 @@ html body .vrm-recap .vrm-recap-principal.vrm-rangee-bord button { min-height: 4
    des cartes blanches. Un nombre, une fois : rien n'est ajouté, seulement habillé. */
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-carte,
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-replis {
-  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: none !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-question { font-size: 22px !important; font-weight: 700 !important; letter-spacing: -.02em !important; }
 html body .vrm-app-shell .vrm-main .vrm-finance-page.vrm-fu-ecran .vrm-compta-q-n { border: 0 !important; background: var(--fu-encre) !important; color: var(--fu-carte) !important; font-weight: 700 !important; }
@@ -1032,7 +1032,7 @@ html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-sectio
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord > .vrm-lib-long { display: none !important; }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord > .vrm-colis-sans-bord svg { width: 20px !important; height: 20px !important; }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo :is(img, picture) { width: 100% !important; height: 100% !important; object-fit: cover !important; }
-html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye { border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: var(--fu-ombre) !important; padding: 14px !important; }
+html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye { border: 0 !important; border-radius: var(--fu-r-carte) !important; background: var(--fu-carte) !important; box-shadow: none !important; padding: 14px !important; }
 :root[data-theme="dark"] body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye { background: #1c1c1e !important; }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--fu-encre) !important; }
 html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise { margin: 12px 0 0 !important; }
@@ -1056,7 +1056,7 @@ html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-sectio
 .vrm-rpf-carte .vrm-relais-fond { border-radius: var(--fu-r-carte, 20px) !important; }
 .vrm-rpf-attrib { position: absolute; right: 8px; bottom: 6px; z-index: 2; font: 400 11px/1.2 var(--vrm-police, system-ui); color: #3a3a3c; background: rgba(255,255,255,.75); padding: 2px 5px; border-radius: 6px; pointer-events: none; }
 .vrm-rpf-carte .maplibregl-ctrl-attrib { display: none !important; }
-.vrm-rpf-point { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 4px 14px 6px; }
+.vrm-rpf-point { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: none; padding: 4px 14px 6px; }
 :root[data-theme="dark"] .vrm-rpf-point { background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
 .vrm-rpf-point.is-choisi { box-shadow: 0 0 0 2px var(--fu-bleu); }
 .vrm-rpf-point.is-inconnu { background: var(--fu-case, #f2f2f7); box-shadow: none; }
@@ -1102,16 +1102,16 @@ html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-sectio
 @media (max-width: 420px) { .vrm-rpf-detail { padding-left: 0; } }
 /* Les puces du haut de Colis (« N en route », « N comptes à relire ») et la liste en route. */
 .vrm-colis-puces { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
-:root body .vrm-app-shell .vrm-main .vrm-colis-pill { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: var(--fu-ombre);
+:root body .vrm-app-shell .vrm-main .vrm-colis-pill { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--fu-carte, #fff); color: var(--fu-encre, #1d1d1f); box-shadow: none;
   font: 600 13px/1 var(--vrm-police, system-ui); cursor: pointer; position: relative; }
 :root body .vrm-app-shell .vrm-main .vrm-colis-pill::after { content: ''; position: absolute; inset: -4px 0; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-colis-pill { background: #1c1c1e; color: #f5f5f7; }
 :root body .vrm-app-shell .vrm-main .vrm-colis-pill.is-ambre { background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); box-shadow: none; }
-.vrm-colis-en-route-liste { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 8px 0 0; }
+.vrm-colis-en-route-liste { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: none; padding: 0 14px; margin: 8px 0 0; }
 :root[data-theme="dark"] .vrm-colis-en-route-liste { background: #1c1c1e; }
 .vrm-colis-en-route-liste > .vrm-rpf-ligne:first-child { border-top: 0; }
 .vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: .5px solid rgba(0,0,0,.18); }
-.vrm-repartis-courts { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 0 14px; margin: 12px 0 0; }
+.vrm-repartis-courts { background: var(--fu-carte, #fff); border-radius: var(--fu-r-carte, 20px); box-shadow: none; padding: 0 14px; margin: 12px 0 0; }
 :root[data-theme="dark"] .vrm-repartis-courts { background: #1c1c1e; }
 .vrm-repartis-courts > .vrm-rpf-ligne:first-child { border-top: 0; }
 /* (3 nov., Julien : « beaucoup trop brouillon ») Sous Colis → À retirer, plus de bandeaux de texte : l'état du
@@ -1239,7 +1239,7 @@ html body .vrm-app-shell :is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-sectio
 :root[data-theme="dark"] .vrm-rpf-point > .vrm-rpf-tete { background: rgba(255,255,255,.04); border-bottom-color: rgba(0,0,0,.5); }
 .vrm-rpf-point > .vrm-rpf-liste { padding: 0 14px; }
 .vrm-rpf-point > .vrm-rpf-liste > .vrm-rpf-ligne:first-child { border-top: 0 !important; }
-.vrm-rpf-point.is-inconnu { background: var(--fu-carte, #fff) !important; box-shadow: var(--fu-ombre) !important; }
+.vrm-rpf-point.is-inconnu { background: var(--fu-carte, #fff) !important; box-shadow: none !important; }
 :root[data-theme="dark"] .vrm-rpf-point.is-inconnu { background: #1c1c1e !important; }
 :root body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: var(--fu-case, #f2f2f7) !important; }
 :root[data-theme="dark"] body .vrm-app-shell .vrm-main .vrm-rpf-point.is-inconnu :is(.vrm-rpf-code, .vrm-rpf-retire, .vrm-rpf-vignette, .vrm-rpf-puce) { background: #2c2c2e !important; }
@@ -1306,7 +1306,7 @@ button.vrm-fu-case:active { transform: scale(.97); background: rgba(255,255,255,
    elle est repliée, un chevron de repli (fermé ›, ouvert ⌄) ; aucun filet. */
 html body .vrm-app-shell .vrm-main .vrm-day-layout .vrm-journal-semaine {
   box-sizing: border-box; margin: 0 0 4px !important; padding: 0 16px !important; min-width: 0;
-  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: var(--fu-ombre) !important;
+  background: var(--fu-carte) !important; border: 0 !important; border-radius: var(--fu-r-carte) !important; box-shadow: none !important;
 }
 html body .vrm-app-shell .vrm-main .vrm-journal-semaine > .vrm-js-bascule {
   all: unset; box-sizing: border-box; width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; cursor: pointer;
@@ -1331,7 +1331,7 @@ html body .vrm-va-feuille.vrm-bilan-sync { border: 0 !important; padding: 0 !imp
 /* Une annonce = une carte blanche : la vignette (photo, sinon `PhotoVide`), le N° et le titre,
    la raison en une phrase, puis les deux gestes sur leur rangée (le principal d'abord). */
 html body .vrm-va-feuille.vrm-bilan-sync > p { margin: 0 0 10px; font-size: 13px; line-height: 1.4; color: var(--fu-gris); opacity: 1; }
-html body .vrm-va-feuille.vrm-bilan-sync article { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; align-items: start; margin: 0 0 10px; padding: 14px; border: 0; border-radius: 20px; background: var(--fu-carte); box-shadow: var(--fu-ombre); }
+html body .vrm-va-feuille.vrm-bilan-sync article { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; align-items: start; margin: 0 0 10px; padding: 14px; border: 0; border-radius: 20px; background: var(--fu-carte); box-shadow: none; }
 html body .vrm-va-feuille.vrm-bilan-sync article > div:not(.vrm-vendu-photo) { min-width: 0; }
 html body .vrm-va-feuille.vrm-bilan-sync article strong { display: block; font: 600 15px/1.3 var(--vrm-police); color: var(--fu-encre); }
 html body .vrm-va-feuille.vrm-bilan-sync article small { font-size: 13px; color: var(--fu-gris); opacity: 1; }

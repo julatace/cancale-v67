@@ -12,7 +12,6 @@
   }
   .n-site-option { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
   .n-site-logo { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; align-items: center; justify-content: center; }
-  .n-site-logo > * { max-width: 18px; max-height: 18px; }
   .n-site-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (max-width: 599px) {
     .n-selecteur-site:is([data-n-choix="4"], [data-n-choix="5"]) .n-site-logo + .n-site-nom { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
