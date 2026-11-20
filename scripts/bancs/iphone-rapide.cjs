@@ -33,8 +33,9 @@ const base = fabriquer({ volumeReel: true, qr: true, ventes: 1500, achats: 800, 
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || (21000 + Math.floor(Math.random() * 9000)));
 const CPU = +(process.env.CPU || 4);
-const RTT = 150, DEBIT = 9e6 / 8;   // octets/s
-const RESEAU = { offline: false, latency: RTT, downloadThroughput: DEBIT, uploadThroughput: 3e6 / 8 };
+const RTT = 150, DEBIT = Number(process.env.MBIT || 9) * 1e6 / 8;   // octets/s (MBIT=1.6 : la 4G lente de Lighthouse)
+const RESEAU = { offline: false, latency: RTT, downloadThroughput: DEBIT, uploadThroughput: Math.min(3e6, DEBIT * 8 / 2) / 8 };
+let LECTURES = []; let T_NAV = 0;
 const ETAPES = String(process.env.ETAPES || 'demarrage,onglets,defilement').split(',');
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -84,7 +85,9 @@ async function preparer(ctx) {
     const h = await rq.allHeaders();
     const rep = repondre(rq.url(), h.range, base);
     const body = JSON.stringify(rep.body);
+    const debut = Date.now() - T_NAV;
     await attendre(RTT + Math.round(body.length / DEBIT * 1000));
+    LECTURES.push({ u: decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
@@ -128,7 +131,7 @@ async function ouvrirApp(ctx, quand) {
   pg.on('crash', () => console.log('  ⚠️ la page a planté (' + quand + ')'));
   if (process.env.DEBUG) { pg.on('close', () => console.log('  (page fermée : ' + quand + ')')); pg.on('framenavigated', (f) => { if (f === pg.mainFrame()) console.log('  (navigation : ' + f.url() + ')'); }); pg.on('requestfailed', (q) => { if (q.resourceType() !== 'image') console.log('  (échec ' + q.resourceType() + ' ' + q.url().slice(0, 140) + ' ' + ((q.failure() || {}).errorText || '') + ')'); }); pg.on('response', (x) => { if (x.status() >= 400) console.log('  (' + x.status() + ' ' + x.url().slice(0, 140) + ')'); }); }
   const cdp = await cdpDe(pg);
-  servis = [];
+  servis = []; LECTURES = []; T_NAV = Date.now();
   const profiler = process.env.PROFIL && quand === process.env.PROFIL_QUAND;
   if (profiler) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   const t0 = Date.now();
@@ -156,7 +159,11 @@ async function ouvrirApp(ctx, quand) {
     longuesMsAvantUtile: J.longues.filter(([t]) => J.utile == null || t < J.utile).reduce((a, [, d]) => a + d, 0),
     plusLongue: J.longues.reduce((m, [, d]) => Math.max(m, d), 0),
     controlee: sw, erreurs: errs.slice(0, 3), memoire: await memoire(cdp),
+    base: { lectures: LECTURES.length, ko: Math.round(LECTURES.reduce((a, x) => a + x.o, 0) / 1024), avantPret: LECTURES.filter((x) => J.utile == null || x.d < J.utile).length,
+      koAvantPret: Math.round(LECTURES.filter((x) => J.utile == null || x.d < J.utile).reduce((a, x) => a + x.o, 0) / 1024),
+      doublons: LECTURES.length - new Set(LECTURES.map((x) => x.u)).size, lourdes: LECTURES.slice().sort((a, b) => b.o - a.o).slice(0, 8).map((x) => `${Math.round(x.o / 1024)} Ko ${x.d}→${x.f} ms ${x.u}`) },
   };
+  if (process.env.LECTURES) { console.log(`  (base ${quand} : ${r.base.lectures} lectures, ${r.base.ko} Ko ; avant « prêt » ${r.base.avantPret} / ${r.base.koAvantPret} Ko ; ${r.base.doublons} en double)`); for (const x of r.base.lourdes) console.log('     ' + x); }
   return { pg, cdp, r };
 }
 
@@ -295,7 +302,7 @@ async function defiler(pg, cdp, id) {
     const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1', serviceWorkers: 'allow' });
     await preparer(ctx);
-    console.log(`iPhone 390 × 844 @3 · CPU ×${CPU} · 4G (150 ms, 9 Mbit/s) · ${path.relative(process.cwd(), DIST) || DIST}`);
+    console.log(`iPhone 390 × 844 @3 · CPU ×${CPU} · 4G (150 ms, ${DEBIT * 8 / 1e6} Mbit/s) · ${path.relative(process.cwd(), DIST) || DIST}`);
     // 1) à froid
     const froid = await ouvrirApp(ctx, 'froid');
     const dire = (r) => console.log(`  ${r.quand.padEnd(9)} 1re peinture ${r.fcp} ms · coque ${r.coque} ms · écran utile ${r.utile} ms · chiffres ${r.chiffres} ms · JS+CSS ${r.jsKo} Ko (${r.fichiers}) · ${r.longuesAvantUtile} tâches longues avant l'écran utile (${r.longuesMsAvantUtile} ms, max ${r.plusLongue}) · tas ${r.memoire.tasMo} Mo · ${r.memoire.noeuds} nœuds${r.erreurs.length ? ' · ERREURS ' + r.erreurs.join(' | ') : ''}`);
