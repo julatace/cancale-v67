@@ -112,6 +112,22 @@ synchronisé). `useSiteCourant` est ré-exporté par SelecteurSite.jsx ; « tous
 passent `siteCourantCoque(site)` à `valeurChiffre` (« Tous » = les chiffres de toujours). Statistiques, Déclarer et
 Factures n'ont pas de règle par site (la déclaration URSSAF porte sur toutes les ventes) : elles restent sur tous les sites.
 
+## 2 quinquies. Un site choisi filtre TOUT (relecture du coordinateur sur les planches)
+
+- Aujourd'hui : colis à envoyer (par la plateforme de chaque ligne), plein « Imprimer » (Vinted seul), alerte, dernières
+  ventes ; « À retirer » (des achats Vinted et des e-mails) se tait sous un autre site.
+- « À régler » : chaque ligne porte son site (`siteDeLigne`, src/siteCourant.js) ; une ligne de TOUS les sites (URSSAF,
+  numéros, Compléter…) n'apparaît que sous « Tous ».
+- Argent : Statistiques, Déclarer, Factures n'ont pas de règle par site ⇒ sélecteur grisé sur « Tous » + « Cette page porte
+  sur tous les sites. » ; Mois suit le site.
+- Annonces : « N annonces à relier › » UNE fois en tête du groupe (ouvre le parcours), plus de proposition sous chaque rangée
+  (le balayage garde « Relier N° ») ; banc liaison-sites R au téléphone réécrit à cette règle (270 verts).
+- Achats Leboncoin / Vestiaire : `src/achats/AchatsSite.jsx` (à la demande), groupes natifs En route · Reçus · Annulés, un
+  état vide unique ; eBay : les achats gagnés sous « En route » ; ses recherches et alertes dans « Plus › eBay » (page
+  poussée, `vrm:ebay-recherches`). Plus de « ? » seul ni de diagnostic Leboncoin sous les tâches. Marge de page 16 / 20.
+- Sélecteur au téléphone : texte court « Tous · Vinted · LBC · eBay · VC ».
+- Parité `--sites` : verte sur 390 clair, 390 sombre et 1512 clair.
+
 ## 3. Les preuves (build final, avant = origin/main dd3336382)
 
 - **Relevé minimaliste** (390 et 1512 clair, base de volume, 18 écrans) : cartes décorées 20 → 0, ombres 226 → 31 (les 31
