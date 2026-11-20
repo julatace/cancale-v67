@@ -84,6 +84,7 @@ import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-au
 import ecran_deuxComptes from './fr/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_compteBloque from './fr/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './fr/favorisSites.js';   // (15 nov., lot favoris-sites)
+import ecran_lbcVcInteresses from './fr/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
 import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -2338,6 +2339,7 @@ export default {
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
   ...ecran_favorisSites,
+  ...ecran_lbcVcInteresses,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,

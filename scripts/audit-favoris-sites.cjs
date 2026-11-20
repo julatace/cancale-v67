@@ -19,7 +19,7 @@
 //       un texte libre dans le corps ⇒ pas rejouable.
 //   A4  sans recette apprise, ou pas rejouable : RIEN ne part.
 //   A5  sur SON clic : une offre par personne (son identifiant, ce prix), « faite » seulement
-//       relue ; 8–20 s au hasard entre deux ; une seule fois par personne ; 10 par toucher.
+//       relue ; 40–90 s au hasard entre deux (le rythme des favoris, 5.410) ; une seule fois par personne ; 10 par toucher.
 //   A6  l'offre ≥ le prix, ou un prix lu ≠ l'aperçu ⇒ rien ; autre compte ⇒ rien ;
 //       45 actions/h ⇒ arrêt ; un 429 ⇒ pause, la suite ne part pas.
 //   A7  l'app : capacité 5.392, l'écran Vestiaire, la règle (montant sous le prix), et
@@ -272,7 +272,7 @@ async function a2a6() {
   dit(!!e5 && e5.fin === 'fini' && e5.faites === 3 && e5.incertaines === 0, 'A5 · « 3 sur 3 » seulement parce que Vestiaire a renvoyé chaque offre', JSON.stringify(e5));
   // Les écarts tirés au hasard (jamais ronds, à la différence des délais fixes de l'extension : 8 000, 12 000…).
   const ecarts = S.delais.vus;
-  dit(ecarts.length === 3 && ecarts.every((ms) => ms >= 8000 && ms <= 20000 && ms % 1000 === 0) && ecarts.every((ms, i) => i === 0 || ms !== ecarts[i - 1]), 'A5 · après chaque offre, 8 à 20 s tirées au hasard, jamais deux fois de suite la même valeur (le tirage des favoris Vinted)', JSON.stringify(ecarts));
+  dit(ecarts.length === 3 && ecarts.every((ms) => ms >= 40000 && ms <= 90000 && ms % 1000 === 0) && ecarts.every((ms, i) => i === 0 || ms !== ecarts[i - 1]), 'A5 · après chaque offre, 40 à 90 s tirées au hasard (le rythme des favoris), jamais deux fois de suite la même valeur (le tirage des favoris Vinted)', JSON.stringify(ecarts));
   dit(S.fond.store.vrmVcAimesEcartDernier && ecarts[ecarts.length - 1] === S.fond.store.vrmVcAimesEcartDernier.s * 1000, 'A5 · la dernière valeur est gardée dans le stockage de l’extension (un worker neuf ne la répète pas)', JSON.stringify(S.fond.store.vrmVcAimesEcartDernier));
   const serieV = [];
   for (let i = 0; i < 300; i++) serieV.push(await S.fond.ctx.tirerSansRepeter('banc', 8, 20));

@@ -14,6 +14,7 @@ import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   //
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 import { tr } from '../i18n/index.js';
+import { interessesParAnnonce } from '../interessesLbc.js';   // (20 nov., 5.410) les personnes qui ont écrit, par annonce
 
 
 // ⟦← App.jsx #1⟧
@@ -287,13 +288,17 @@ function FavorisLeboncoin() {
   const lbcOuvert = useCompteLbcOuvert();
   useEffect(() => { let stop = false; (async () => {
     try {
-      const [l, jv, ja] = await Promise.all([
+      const [l, jv, ja, jf] = await Promise.all([
         lbcListingsSession(),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=v:data->ventes`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
+        // (20 nov., 5.410) Les fils en SCALAIRES (`meta`, jamais les messages) : l'annonce, combien la personne a écrit.
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.lbc_fil_*&select=conv:meta->>conv,compte:meta->>compte,annonce:meta->>annonce,deLuiN:meta->>deLuiN,premierDeLuiAt:meta->>premierDeLuiAt,dernierAt:meta->>dernierAt,dernierDeMoi:meta->>dernierDeMoi`).catch(() => null),
       ]);
       if (!l || !Array.isArray(jv) || !Array.isArray(ja)) { if (!stop) setD(null); return; }
-      if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {} });
+      // Les intéressés : `null` = pas su (lecture ratée) — jamais « 0 ».
+      const fils = Array.isArray(jf) ? jf.map((x) => ({ ...x, deLuiN: Number(x && x.deLuiN) || 0 })) : null;
+      if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {}, fils });
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, [relu]);
   if (d === undefined) return <div role="status" data-favoris-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
@@ -305,6 +310,9 @@ function FavorisLeboncoin() {
   ads.sort((a, b) => ((fav(b) == null ? -1 : fav(b)) - (fav(a) == null ? -1 : fav(a))) || String(a.subject || '').localeCompare(String(b.subject || ''), 'fr'));
   const connus = ads.filter((a) => fav(a) != null);
   const total = connus.reduce((s, a) => s + fav(a), 0);
+  const capInt = extSait('lbcinteresses');
+  const interesses = d.fils ? interessesParAnnonce(d.fils) : null;
+  const sansAnnonce = d.fils ? d.fils.filter((f) => Number(f.deLuiN) >= 1 && !/^\d{6,12}$/.test(String(f.annonce || ''))).length : 0;
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
@@ -317,6 +325,13 @@ function FavorisLeboncoin() {
           : capStats === 'retard' ? <>{tr('messages.releverChiffreFaut')} <b>{EXT_CAPACITES.lbcstats}</b> {tr('messages.metsJourDepuis')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin')}</>
           : <>{tr('messages.extensionInstalleeReleve2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin2')}</>}
       </div>
+      {/* (20 nov., lot lbc-vc-interesses) LES INTÉRESSÉS : les personnes qui ont ÉCRIT pour une annonce (identifiées par
+          leur conversation) — l'app les COMPTE ; leur écrire est un geste du panneau de l'extension sur leboncoin.fr. */}
+      <div data-interesses-lbc={interesses == null ? 'pas-su' : capInt === 'ok' ? 'lu' : capInt} style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
+        <span data-interesses-lbc-phrase="">{tr('interessesLbc.phrase')}</span>
+        {capInt !== 'ok' ? <> <span data-interesses-lbc-ext="">{tr('interessesLbc.extRetard', { v: EXT_CAPACITES.lbcinteresses })}</span></> : null}
+        {sansAnnonce > 0 ? <> <span data-interesses-lbc-sans-annonce={String(sansAnnonce)}>{tr('interessesLbc.sansAnnonce', { n: sansAnnonce })}</span></> : null}
+      </div>
       {!ads.length ? (
         <div data-favoris-lbc-vide="" style={{ fontSize: 13, color: C.muted }}>{tr('messages.aucuneAnnonceLeboncoin')}</div>
       ) : (<>
@@ -326,6 +341,7 @@ function FavorisLeboncoin() {
         </div>
         {ads.map((ad) => {
           const f = fav(ad), st = ad.stats || {};
+          const it = interesses && interesses[String(ad.id)];
           const lien = /^https:\/\/(?:www\.)?leboncoin\.fr\//i.test(String(ad.url || '')) ? ad.url : '';
           const ph = Array.isArray(ad.images) && ad.images[0];
           return (
@@ -342,6 +358,9 @@ function FavorisLeboncoin() {
                     st.au ? `relevé le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : isFinite(Date.parse(st.at || '')) ? `relevé il y a ${ilYaBr(Date.parse(st.at))}` : '',
                   ].filter(Boolean).join(' · ') : tr('messages.encoreReleve')}
                 </div>
+                {it ? <div data-interesses-lbc-annonce={String(it.n)} data-interesses-lbc-attendent={String(it.attendent)} style={{ fontSize: 12, color: it.attendent ? C.text : C.muted, fontWeight: it.attendent ? 600 : 400 }}>
+                  {[tr('interessesLbc.n', { n: it.n }), it.attendent ? tr('interessesLbc.attendent', { n: it.attendent }) : ''].filter(Boolean).join(' · ')}
+                </div> : null}
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ fontSize: 17, fontWeight: 700, color: f ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{f == null ? '—' : f}</span>

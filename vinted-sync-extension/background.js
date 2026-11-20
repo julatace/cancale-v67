@@ -28151,7 +28151,10 @@ const VC_AIMES = 'vrmVcAimes';
 const VC_AIMES_FAITS = 'vrmVcAimesFaits';
 const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
 const VC_AIMES_PAR_TOUCHER = 10;
-const VC_AIMES_ECART_S = [8, 20];   // l'écart entre deux offres, en secondes (le même que l'offre → message des favoris Vinted)
+// (20 nov., 5.410) ALIGNÉ sur le rythme des favoris Vinted du 19 nov. (« on garde toujours le temps aléatoire » :
+// 40 à 90 s au hasard entre deux messages, `delaiRythme` de api/_lib/favoris-file.js) — était 8–20 s (l'attente
+// offre → message d'UN favori, pas l'écart entre deux personnes).
+const VC_AIMES_ECART_S = [40, 90];   // l'écart entre deux offres, en secondes
 let _vcAimesChaine = Promise.resolve();
 function rangerVcAimes(m, compte) {
   const run = _vcAimesChaine.then(() => rangerVcAimesMaintenant(m, compte)).catch(() => false);
@@ -28744,7 +28747,7 @@ async function compteOngletLbc(tabId) {
 }
 // Les fils du compte (scalaires seulement, jamais les messages : §4.4).
 async function filsLbcDuCompte(compte) {
-  const rows = await sbGetTout(`app_data?id=like.lbc_fil_*&select=conv:data->>conv,compte:data->>compte,annonce:data->>annonce,deLuiN:data->>deLuiN,premierDeLuiAt:data->>premierDeLuiAt,dernierAt:data->>dernierAt,dernierDeMoi:data->>dernierDeMoi`);
+  const rows = await sbGetTout(`app_data?id=like.lbc_fil_*&select=conv:meta->>conv,compte:meta->>compte,annonce:meta->>annonce,deLuiN:meta->>deLuiN,premierDeLuiAt:meta->>premierDeLuiAt,dernierAt:meta->>dernierAt,dernierDeMoi:meta->>dernierDeMoi`);
   if (!Array.isArray(rows)) return null;
   return rows.map((r) => Object.assign({}, r, { deLuiN: r && r.deLuiN != null ? Number(r.deLuiN) : 0 })).filter((r) => idCompteLbc(r.compte || '') === compte);
 }

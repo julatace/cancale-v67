@@ -216,14 +216,21 @@ export default function BranchementAutomatisations({ accounts = [] }) {
 
   // ── 3. BAISSE PAR RÈGLE (Vinted, par compte) ─────────────────────────────────────────────────────────────────────────
   // (19 nov. soir) La MÊME règle pour un compte Leboncoin (`comptes['lbc:{compte}']`, lue par l'extension 5.409 `baisselbc` :
-  // la baisse part par `baisserPrixLbc`, recette apprise, prix relu, sécurité). Vestiaire : pas de moteur ⇒ « bientôt ».
+  // la baisse part par `baisserPrixLbc`, recette apprise, prix relu, sécurité). Vestiaire : depuis la 5.410, voir plus bas.
   const [autres] = useComptesAutresSites(true);
   const comptesLbc = Array.isArray(autres && autres.leboncoin) ? autres.leboncoin.map((c) => ({ uid: 'lbc:' + String(c.id), nom: tr('auto.site.leboncoin') + ' · ' + nomCompteLie(c) })) : [];
   const capLbc = capacite('baisselbc');
-  const comptesBaisse = [...comptes, ...(capLbc === 'absente' ? [] : comptesLbc)];
+  // (20 nov., lot lbc-vc-interesses) La MÊME règle pour un compte Vestiaire (`comptes['vc:{compte}']`, lue par l'extension
+  // 5.410 `baissevc`) : la date de mise en ligne est LUE chez Vestiaire, sinon BORNÉE par la 1re lecture (« au moins »).
+  const capVc = capacite('baissevc');
+  const comptesVc = Array.isArray(autres && autres.vestiaire) ? autres.vestiaire.filter((c) => /^\d{1,20}$/.test(String(c && c.id))).map((c) => ({ uid: 'vc:' + String(c.id), nom: tr('auto.site.vestiaire') + ' · ' + nomCompteLie(c) })) : [];
+  const comptesBaisse = [...comptes, ...(capLbc === 'absente' ? [] : comptesLbc), ...(capVc === 'absente' ? [] : comptesVc)];
   const [uidB, setUidB] = React.useState('');
   const uidBaisse = comptesBaisse.some((c) => c.uid === uidB) ? uidB : (comptesBaisse[0] ? comptesBaisse[0].uid : '');
   const baisseLbc = uidBaisse.startsWith('lbc:');
+  const baisseVc = uidBaisse.startsWith('vc:');
+  const capSite = baisseLbc ? capLbc : baisseVc ? capVc : 'ok';
+  const extSite = baisseLbc ? tr('auto.baisse.extLbc', { v: (EXT_CAPACITES && EXT_CAPACITES.baisselbc) || '' }) : baisseVc ? tr('auto.baisse.extVc', { v: (EXT_CAPACITES && EXT_CAPACITES.baissevc) || '' }) : '';
   const regle = uidBaisse ? regleDuCompte(load(REGLE_CLE, null), uidBaisse) : null;
   const [brRegle, setBrRegle] = React.useState(null);
   React.useEffect(() => { setBrRegle(regle ? { pct: regle.pct, jours: regle.jours } : null); }, [uidBaisse, tic]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -235,9 +242,10 @@ export default function BranchementAutomatisations({ accounts = [] }) {
     reinitialiser: () => setTic((t) => t + 1),
     plein: uidBaisse && brRegle ? (regle.actif
       ? { libelle: modifieRegle ? tr('auto.enregistrer') : tr('auto.arreter'), onClick: () => { if (modifieRegle) { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.enregistre')); } else { poserRegle({ actif: false }); toast(tr('auto.arrete')); } } }
-      : { libelle: tr('auto.demarrer'), indisponible: baisseLbc && capLbc !== 'ok', raison: baisseLbc && capLbc !== 'ok' ? tr('auto.baisse.extLbc', { v: (EXT_CAPACITES && EXT_CAPACITES.baisselbc) || '' }) : '', onClick: () => { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.demarre')); } }) : null,
+      : { libelle: tr('auto.demarrer'), indisponible: capSite !== 'ok', raison: capSite !== 'ok' ? extSite : '', onClick: () => { poserRegle({ ...brRegle, actif: true }); toast(tr('auto.demarre')); } }) : null,
     detail: () => (!uidBaisse || !brRegle ? <PhraseAuto ton="ambre">{tr('auto.sansCompte')}</PhraseAuto> : <>
-      {sites(capLbc === 'absente' ? ['vinted'] : ['vinted', 'leboncoin'], capLbc === 'absente' ? ['leboncoin', 'vestiaire'] : ['vestiaire'])}
+      {sites(['vinted', ...(capLbc === 'absente' ? [] : ['leboncoin']), ...(capVc === 'absente' ? [] : ['vestiaire'])], [...(capLbc === 'absente' ? ['leboncoin'] : []), ...(capVc === 'absente' ? ['vestiaire'] : [])])}
+      {baisseVc ? <PhraseAuto><span data-au-baisse-vc-date="">{tr('auto.baisse.vcDate')}</span></PhraseAuto> : null}
       <SectionAuto titre={tr('auto.ciblage')} attrs={{ 'data-au-section': 'ciblage' }}>
         <ReglageAuto libelle={tr('auto.baisse.pct')} phrase={tr('auto.baisse.pctPhrase')}><ChoixAuto libelle={tr('auto.baisse.pct')} valeur={brRegle.pct} options={PALIERS_PCT.map((p) => ({ cle: p, libelle: '−' + p + ' %' }))} onChange={(v) => setBrRegle((b) => ({ ...b, pct: Number(v) }))} attrs={{ 'data-au-baisse-pct': '' }}/></ReglageAuto>
         <ReglageAuto libelle={tr('auto.baisse.plancher')} phrase={tr('auto.baisse.plancherPhrase')}/>

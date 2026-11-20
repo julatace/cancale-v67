@@ -42,7 +42,8 @@ const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"
 import AimesVestiaire from '../AimesVestiaire.jsx';
 import { lignesAimes, etatRecetteFavori } from '../aimesVestiaire.js';
 import { photosExigeesVc } from "../photosVestiaire.js";
-import { tr } from "../i18n/index.js";
+import { tr, langueCourante } from "../i18n/index.js";
+import { dateEnLigneVc, phraseEnLigneVc } from '../dateMiseVc.js';   // (20 nov., 5.410) depuis quand l'article est en ligne
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { IconePlus } from '../plateformes/IconePlus.jsx';
 import { BarreOutils, BoutonIcone } from '../ui/index.js';
@@ -354,14 +355,18 @@ function AnnoncesVestiaire() {
           <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
-            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+            // (20 nov., 5.410) Depuis quand : la date LUE chez Vestiaire (« en ligne depuis le … »), sinon la 1re lecture
+            // par VRM, toujours dite « vue en ligne depuis au moins le … » (jamais présentée comme la date de mise en ligne).
+            const depuisVc = etat === 'en-ligne' ? phraseEnLigneVc(it, tr, langueCourante() || 'fr') : '';
+            const dVc = dateEnLigneVc(it);
+            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : '', depuisVc].filter(Boolean).join(' · ');
             // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° lié à CE produit Vestiaire) ;
             // « Relier / Délier Vinted » y est rendu dans « Actions » (`DansFiche`).
             const flVc = attrsFicheLigne({ contexte: 'annonce', site: 'vestiaire', cle: 'v' + id, nums: num ? [String(num)] : [], photo: it.photo || '', titre: it.titre || '', prix: prix !== '—' ? prix : '' });
             // (16 nov.) Au téléphone, la rangée touchée MONTE à sa place : prix et favoris lus par Vestiaire, prix d'achat de SON N°.
             const avVc = attrsAvantSite({ site: 'vestiaire', id, prix: prix !== '—' ? prix : '', favoris: typeof it.favoris === 'number' ? it.favoris : null, num });
             return (
-              <li key={id} {...flVc} {...avVc} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+              <li key={id} {...flVc} {...avVc} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-vc-depuis={dVc ? (dVc.exacte ? 'exacte' : 'au-moins') : ''} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
                 {/* (14 nov., refonte visible) Une RANGÉE (photo 52, le N° et le nom, une ligne d'état, le prix),
                     plus une carte photo de 300 px : on voit 8 annonces par écran d'iPhone. */}
                 <span className="vrm-ui-ligne-photo vrm-pf-photo-vc" aria-hidden="true"><PhotoVc src={it.photo}/></span>
