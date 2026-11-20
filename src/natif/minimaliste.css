@@ -14,9 +14,10 @@
    ════════════════════════════════════════════════════════════════════════════ */
 @layer n-anciens {
 
-/* ══ 1. Les OMBRES DE CARTE d'hier : leurs jetons valent « rien », partout où ils sont posés (une règle d'écran
-   qui redéfinit le jeton sur son bloc est battue aussi : la déclaration est sur chaque élément). ══ */
-html body :where(*) {
+/* ══ 1. Les OMBRES DE CARTE d'hier : leurs jetons valent « rien » là où ils sont DÉFINIS (la racine, et les blocs qui les
+   redéfinissent : Boîte e-mails, Avis, Communauté, Tarifs, Stock v2) — jamais sur chaque élément : un sélecteur universel
+   qui pose vingt variables restylait 2 300 éléments au retour sur un écran (banc natif-coque K8b). ══ */
+html, html body, html body :is(.vrm-boite, .vrm-boite-feuille, .vrm-boite-avis, .av, .av-tuile, .av-panneau, .av-offre-solo, .av-fin-plaque, .av-tg, .av-faq-texte, .vrm-communaute, .vt, .sr-ecran, .sr-feuille) {
   --fu-ombre: none !important; --w-ombre: none !important; --vrm-ombre-carte: none !important; --p-ombre: none !important;
   --d-ombre-douce: none !important; --d-ombre-douce-haute: none !important; --d-ombre-levee: none !important;
   --cm-ombre: none !important; --bx-ombre: none !important; --lit-ombre: none !important; --sr-ombre: none !important;

@@ -349,7 +349,68 @@ function formes(dossiers) {
   const md = l.join('\n'); fs.writeFileSync(path.join(SORTIE, 'formes.md'), md + `\n\nÉcarts : ${ecarts}\n`); console.log(md + `\n\nÉcarts : ${ecarts}`);
 }
 
-if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
+// `--selecteur` : LE sélecteur de plateforme global (décision du 20 nov.). Sur une base Vinted + Leboncoin + eBay :
+//   S1 il est en tête de Ventes, avec « Tous » et les trois sites reliés (Vestiaire, pas relié, n'y est pas) ;
+//   S2 choisir Leboncoin sur Ventes ⇒ Aujourd'hui, Annonces, Achats, Messages s'ouvrent sur Leboncoin (un seul choix) ;
+//   S3 « Tous » ⇒ les chiffres d'Aujourd'hui sont ceux d'avant (`AVANT=<json>` : relevé du build d'avant, même base) ;
+//   S4 vendeur Leboncoin seul ⇒ aucun sélecteur ; S5 plus aucun filtre de site local (FiltreSites, menu des sites).
+// `MUTATION=local` : le choix n'est plus partagé (chaque écran repart de « Tous ») ⇒ S2 rougit.
+async function selecteur() {
+  await new Promise((r) => P.srv.listen(P.PORT, r));
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 300))); };
+  const multi = () => { const b = E.baseFiches(); const l = baseSite('leboncoin'), e = baseSite('ebay'); b.rows.push(...l.rows.filter((x) => /^lbc_/.test(x.id)), ...e.rows.filter((x) => /^ebay_/.test(x.id))); return b; };
+  const lire = (pg) => pg.evaluate(() => { const s = document.querySelector('[data-selecteur-site]'); const t = document.querySelector('.vrm-tache');
+    return { sel: s ? s.getAttribute('data-site-courant') : null, choix: s ? [...s.querySelectorAll('[data-site-choix]')].map((b) => b.getAttribute('data-site-choix')) : [],
+      tache: t ? t.getAttribute('data-tache-site') : null, eg: (document.querySelector('[data-eg-ecran]') || { getAttribute: () => null }).getAttribute('data-eg-site'),
+      tuiles: [...document.querySelectorAll('.n-tuile-valeur')].map((x) => x.textContent.trim()),
+      locaux: document.querySelectorAll('[data-eg-filtre], [data-vn-plateforme], .vrm-filtre-sites, [data-filtre-sites]').length }; });
+  const aller = async (o, url) => { await o.pg.goto(`http://localhost:${P.PORT}/${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE); };
+  try {
+    for (const W of [390, 1512]) {
+      console.log(`\n── sélecteur · ${W}`);
+      const o = await P.ouvrir(nav, { W, sombre: false, b: multi(), url: '/?tab=journee', api: B.apiVolume });
+      await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} }); await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE);
+      const j0 = await lire(o.pg);
+      fs.writeFileSync(path.join(SORTIE, `tuiles-tous-${W}.json`), JSON.stringify(j0.tuiles));
+      if (process.env.AVANT) { let av = null; try { av = JSON.parse(fs.readFileSync(process.env.AVANT.replace('{W}', W), 'utf8')); } catch (_) {}
+        dit(!!av && JSON.stringify(av) === JSON.stringify(j0.tuiles), `S3 ${W} « Tous » : les chiffres d'Aujourd'hui sont ceux d'avant`, { avant: av, apres: j0.tuiles }); }
+      await aller(o, '?tab=ventes');
+      const v0 = await lire(o.pg);
+      dit(v0.sel === 'toutes' && v0.choix.join(',') === 'toutes,vinted,leboncoin,ebay', `S1 ${W} Ventes : le sélecteur, « Tous » + les sites reliés`, v0);
+      await o.pg.locator('[data-selecteur-site] [data-site-choix="leboncoin"]').first().click({ timeout: 5000 }).catch(() => {});
+      await o.pg.waitForTimeout(1500);
+      if (MUT === 'local') await o.pg.evaluate(() => { try { localStorage.removeItem('vrm_site_courant'); } catch (_) {} });
+      const v1 = await lire(o.pg);
+      dit(v1.sel === 'leboncoin' && v1.tache === 'leboncoin', `S2 ${W} Ventes suit le choix (Leboncoin)`, v1);
+      for (const [url, cle] of [['?tab=journee', 'journee'], ['?tab=annonces', 'annonces'], ['?tab=achats', 'achats'], ['?tab=messages', 'messages']]) {
+        await aller(o, url);
+        const x = await lire(o.pg);
+        const ok = x.sel === 'leboncoin' && (cle === 'journee' || (cle === 'annonces' ? x.eg === 'leboncoin' : x.tache === 'leboncoin'));
+        dit(ok, `S2 ${W} ${cle} s'ouvre sur Leboncoin`, x);
+        dit(x.locaux === 0, `S5 ${W} ${cle} : aucun filtre de site local`, x.locaux);
+        await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `selecteur-${cle}-${W}.png`) }).catch(() => {});
+      }
+      await aller(o, '?tab=ventes');
+      await o.pg.locator('[data-selecteur-site] [data-site-choix="toutes"]').first().click({ timeout: 5000 }).catch(() => {});
+      await o.pg.waitForTimeout(1200);
+      await aller(o, '?tab=journee');
+      const j1 = await lire(o.pg);
+      dit(j1.sel === 'toutes' && JSON.stringify(j1.tuiles) === JSON.stringify(j0.tuiles), `S3 ${W} revenu à « Tous » : les mêmes chiffres qu'au départ`, { j0: j0.tuiles, j1: j1.tuiles });
+      dit(!o.erreurs.length, `${W} aucune erreur de page`, o.erreurs.slice(0, 3));
+      await o.ctx.close();
+      const o2 = await P.ouvrir(nav, { W, sombre: false, b: baseSite('leboncoin'), url: '/?tab=ventes', api: B.apiVolume });
+      await o2.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} }); await o2.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o2.pg); await o2.pg.waitForTimeout(ATTENTE);
+      const l = await lire(o2.pg);
+      dit(l.sel === null, `S4 ${W} vendeur Leboncoin seul : aucun sélecteur`, l);
+      await o2.ctx.close();
+    }
+  } finally { await nav.close(); P.srv.close(); }
+  console.log(rouges ? `\n❌ sélecteur : ${rouges} rouge(s)` : '\n✅ sélecteur : tout est vert'); if (rouges) process.exitCode = 1;
+}
+
+if (require.main === module && process.argv[2] === '--selecteur') selecteur();
+else if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }
 else if (require.main === module && process.argv[2] === '--compare') compare(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--planches') planches(process.argv.slice(3));
