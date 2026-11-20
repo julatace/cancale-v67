@@ -32,6 +32,7 @@
 import React from 'react';
 import { Squelette } from './Squelette.jsx';
 import { rafraichirDrapeaux } from './drapeauxRacine.js';
+import { MUTATION_COPIE } from './copieEcran.js';
 
 export const PLAFOND_ATTENTE_MS = 2500;
 // Avec un instantané à montrer, l'écran vrai attend ses données jusqu'à ce plafond.
@@ -76,7 +77,7 @@ const VUS = new Set();
 // drapeaux de racine (src/drapeauxRacine.js) sont à jour — les règles « cet écran porte tel bloc » s'appliquent déjà.
 function DrapeauxAvantMesure() { React.useLayoutEffect(() => { rafraichirDrapeaux(); }); return null; }
 
-export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', instantane = null, plafondInstantaneMs = PLAFOND_INSTANTANE_MS, children }) {
+export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = false, plafondMs = PLAFOND_ATTENTE_MS, memoire = '', instantane = null, plafondInstantaneMs = PLAFOND_INSTANTANE_MS, garderInstantane = false, children }) {
   const recus = React.useRef({});
   const [, rafraichir] = React.useState(0);
   const [plafond, setPlafond] = React.useState(false);
@@ -95,12 +96,28 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   }, []);
   // Après la première passe (les composants montés se sont annoncés), une donnée qu'AUCUN
   // composant monté n'annonce n'est pas attendue (l'écran n'en a pas sur ce filtre).
+  // (20 nov., affichage instantané) Avec une copie à montrer et un écran jamais ouvert dans la page : la copie est
+  // PEINTE d'abord ; l'écran vrai (son premier rendu coûte jusqu'à plusieurs secondes au téléphone) n'est monté qu'à
+  // l'image suivante — le toucher d'un onglet montre tout de suite quelque chose de vrai, jamais l'ancien écran figé.
+  const [enfants, setEnfants] = React.useState(() => !(instantane && !VUS.has(cleVu)));
+  React.useEffect(() => {
+    if (enfants) return undefined;
+    let a = 0, b = 0;
+    try { a = requestAnimationFrame(() => { b = setTimeout(() => setEnfants(true), 0); }); } catch (_) {}
+    const filet = setTimeout(() => setEnfants(true), 250);   // onglet caché : pas d'image, on n'attend pas
+    return () => { try { cancelAnimationFrame(a); } catch (_) {} clearTimeout(b); clearTimeout(filet); };
+  }, [enfants]);
   const [monte, setMonte] = React.useState(false);
-  React.useLayoutEffect(() => { setMonte(true); }, []);
+  // Les composants de l'écran s'annoncent dans leurs effets de mise en page, AVANT celui-ci : après lui, ce qui n'est
+  // pas annoncé n'est pas attendu.
+  React.useLayoutEffect(() => { if (enfants) setMonte(true); }, [enfants]);
   const lu = (n) => { const m = recus.current[n]; return m && m.size > 0 ? [...m.values()].every(Boolean) : monte; };
   const la = (n) => (donnees && Object.prototype.hasOwnProperty.call(donnees, n) ? donnees[n] !== undefined : lu(n));
   const tout = attendus.every(la);
-  const visible = ouvert || tout || plafond;
+  // (20 nov., affichage instantané) Une lecture RATÉE (base injoignable, hors ligne) avec une copie à montrer : la copie
+  // RESTE (« Pas à jour · Réessayer », src/CopieEcran.jsx) au lieu d'un écran vide qui dirait sa panne.
+  const garde = !!instantane && !!garderInstantane && !ouvert && MUTATION_COPIE !== 'panne';
+  const visible = !garde && enfants && (ouvert || tout || plafond);
   // Une fois ouvert, il le reste.
   React.useLayoutEffect(() => { if (visible && !ouvert) setOuvert(true); }, [visible, ouvert]);
   // Ouvert par ses données (pas par le plafond) : la prochaine fois, il revient sans squelette.
@@ -121,11 +138,14 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : (avecInstantane ? 'instantane' : 'attente')} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined} data-attente-instantane={vuInstantane.current ? '1' : undefined}>
     <DrapeauxAvantMesure/>
     {/* L'instantané prend le cadre de l'écran prêt (`vrm-attente-pret` : mêmes marges), sans fondu. */}
-    {!visible && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
+    {/* (20 nov.) La COPIE d'un écran (src/CopieEcran.jsx, `sansCadre`) se pose APRÈS l'écran vrai caché : ses `id` copiés
+        ne passent jamais devant ceux de l'écran vrai (`getElementById` rend l'élément vrai dès qu'il est monté). */}
+    {!visible && !(avecInstantane && instantane.type && instantane.type.sansCadre) && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
     {/* Remplacé EN PLACE : après un instantané, l'écran vrai arrive sans fondu (rien ne « réapparaît »). */}
     <div className={visible ? (vuInstantane.current ? 'vrm-attente-pret vrm-attente-sans-fondu' : aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
-      <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{children}</VisibleCtx.Provider></Ctx.Provider>
+      <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{enfants ? children : null}</VisibleCtx.Provider></Ctx.Provider>
     </div>
+    {!visible && avecInstantane && instantane.type && instantane.type.sansCadre ? instantane : null}
   </div>;
 }
 export default AttenteEcran;

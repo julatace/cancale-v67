@@ -20,7 +20,8 @@
 // (le même sur tous ses appareils, par compte VRM). Règles PURES : aucune lecture.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const CLE_NOUVEAUTES_VUES = 'vrm_nouveautes_vues';
+// (20 nov., iphone-rapide) La clé vit dans src/nouveautesCle.js : la coque la lit au démarrage sans emporter la liste.
+export { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
 export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
@@ -29,10 +30,17 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (20 nov. soir, Julien : « on doit pouvoir sélectionner dans les onglets la plateforme que l'on veut, faire un bel affichage ») docs/passation/2026-11-20-selecteur-beau.md
   { id: 'selecteur-beau', date: '2026-11-20', titre: 'Choisis ta plateforme d’un toucher', phrase: 'Le logo de chaque site, en pastille, en haut de chaque onglet.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
+  { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
+  { id: 'ventes-tableau', date: '2026-11-20', titre: 'Ventes en tableau, transporteur en logo', phrase: 'À l’ordinateur : tri, statut, imprimer ; la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « tout le site doit être comme la fiche Paramètres, simple et minimaliste » ; « les mêmes dispositions sur toutes les plateformes ») docs/passation/2026-11-20-minimaliste.md
   { id: 'minimaliste', date: '2026-11-20', titre: 'Tout l’écran simple, comme Paramètres', phrase: 'Des groupes sobres ; Ventes pareil sur chaque site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « Améliore le visuel, tu n'as pas respecté ce qu'on avait dit ») docs/passation/2026-11-20-argent-natif.md
   { id: 'argent-natif', date: '2026-11-20', titre: 'Argent plus clair, en cartes sobres', phrase: 'Le mois, ta déclaration et tes statistiques, sans rien de chargé.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (20 nov., ext. 5.410.2) docs/passation/2026-11-20-extension-5412.md — panneau qui reste ouvert, bordereau et livreur.
+  { id: 'panneau-bordereau', date: '2026-11-20', titre: 'Imprime le bordereau depuis l’extension', phrase: 'Chaque vente dit son livreur, son suivi et sa date limite.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-reste-ouvert', date: '2026-11-20', titre: 'Le panneau de l’extension reste ouvert', phrase: 'Même page après une navigation : seul ton × le ferme.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « pour l'extension, tu fais pareil que Vintex ») docs/passation/2026-11-20-panneau-vintex.md
   { id: 'panneau-extension', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») docs/passation/2026-11-20-actions-extension.md.

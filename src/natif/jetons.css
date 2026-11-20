@@ -41,7 +41,8 @@
     --n-voile: rgb(0 0 0 / .40);      /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(0 0 0 / .12);   /* la feuille et le volet, rien d'autre */
     --n-flou: saturate(180%) blur(20px);      /* barre de titre et barre d'onglets, rien d'autre */
-    --n-squelette: rgb(60 60 67 / .10);
+    --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
+    --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
     --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
 
@@ -114,7 +115,8 @@
     --n-barre: rgb(22 22 24 / .86);
     --n-voile: rgb(0 0 0 / .56);
     --n-ombre: 0 8px 30px rgb(0 0 0 / .40);
-    --n-squelette: rgb(120 120 128 / .24);
+    --n-squelette: rgb(235 235 245 / .06);
+    --n-squelette-reflet: rgb(235 235 245 / .025);
     --n-curseur: #5A5A5E;
     --n-pouce: #FFFFFF;
   }
