@@ -12,6 +12,8 @@
 //   ouvrirLiaison({ vue: 'contradictions' })     // les liens qui se contredisent
 //   compteurLiaisonLu()   // null = pas su · { n, surs, contradictions, plusTard } — « N annonces à relier »
 //   etatLienLu(site, id)  // { etat: 'relie'|'aRelier'|'aVerifier'|'propre'|'passu', numero, preuve, lieLe }
+//   propositionLu(site, id) // null · { paireId, numero, photo, titre, niveau: 'sur'|'verifier', raison } — LA candidate d'une rangée
+//   relierDepuisListe({ site, id, paireId }) · queSurCeSite({ site, id })   // SON toucher sur la rangée (20 nov.)
 //   abonnerLiaison(f)     // prévenu à chaque nouveau calcul ; demanderLiaison() le lance s'il n'est pas fait
 // (ou, en React : `useLiaison()`, `<LigneLiaison/>` et `<EtatLien/>` de src/LiaisonEntree.jsx).
 // ⚠️ Ce module part au DÉMARRAGE (les rangées des sites le lisent) : il n'importe pas les règles
@@ -29,10 +31,18 @@ export const compteurLiaisonLu = () => (etat && etat.lu && etat.compteurEntree ?
 export const etatLienLu = (site, id) => { const e = etat && etat.lu && etat.parCle ? etat.parCle.get(`${site}:${id}`) : null; return e ? { etat: e.etat, numero: e.numero, preuve: e.preuve, lieLe: e.lieLe } : PAS_SU; };
 
 export const EVT_OUVRIR_LIAISON = 'vrm:liaison-ouvrir';
+// (20 nov.) Relier DEPUIS LA LISTE : la proposition d'une rangée (`propositionLu`), sur SON toucher. L'app (App.jsx,
+// `LiaisonCoque`) relit la proposition et joue le geste du parcours ; rien n'est écrit ici.
+export const EVT_RELIER_LISTE = 'vrm:liaison-relier-liste';
+export const propositionLu = (site, id) => { const p = etat && etat.lu && etat.propositions ? etat.propositions[`${site}:${id}`] : null; return p || null; };
+export function relierDepuisListe({ site, id, paireId }) { emettre(EVT_RELIER_LISTE, { quoi: 'relier', cle: `${site}:${id}`, site, id: String(id), paireId: String(paireId || '') }); }
+export function queSurCeSite({ site, id }) { emettre(EVT_RELIER_LISTE, { quoi: 'propre', cle: `${site}:${id}`, site, id: String(id) }); }
 export const EVT_CHARGER_LIAISON = 'vrm:liaison-charger';
 const emettre = (nom, detail) => { try { window.dispatchEvent(new CustomEvent(nom, { detail })); } catch (_) { /* hors navigateur */ } };
 // `article` : { id, numero } — le sens inverse (depuis la fiche d'un article : « Relier à {site} ») : cet article proposé en tête.
-export function ouvrirLiaison({ site = null, id = null, vue = null, article = null } = {}) { emettre(EVT_OUVRIR_LIAISON, { site, id: id == null ? null : String(id), vue, article: article && article.id != null ? { id: String(article.id), numero: String(article.numero || '') } : null }); }
+// `relier` : l'id d'une candidate à toucher dès l'ouverture (« Relier » d'une rangée qui a besoin d'une question) ;
+// `cles` (avec `vue: 'lot'`) : la relecture du lot limitée à ces annonces (« Relier les N sûres » d'une sélection).
+export function ouvrirLiaison({ site = null, id = null, vue = null, article = null, relier = null, cles = null } = {}) { emettre(EVT_OUVRIR_LIAISON, { site, id: id == null ? null : String(id), vue, article: article && article.id != null ? { id: String(article.id), numero: String(article.numero || '') } : null, relier: relier == null ? null : String(relier), cles: Array.isArray(cles) ? cles.map(String) : null }); }
 // Le même, sous le nom que les écrans d'annonces attendent : `ouvrirRelierAnnonces({ site, id })`.
 export const ouvrirRelierAnnonces = ouvrirLiaison;
 // Demander le calcul (au plus un toutes les 2 min côté app, sauf `force`).

@@ -10,6 +10,7 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
+import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE } from '../../articles/modele.js';
 
 const TON = { enligne: 'accent', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', brouillon: 'neutre', vendue: 'encre', retiree: 'neutre' };
@@ -17,14 +18,19 @@ const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null }) {
-  const lignes = React.useMemo(() => (Array.isArray(articles) ? articles.map(({ a, statut }) => ({
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null }) {
+  // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
+  // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
+  const [filtreLien, setFiltreLien] = React.useState('tous');
+  const lienDe = (a) => (liaison && a ? liaison.de(a) : null);
+  const classeLien = (a) => { const l = lienDe(a); if (!l) return ''; return l.etat === 'aRelier' ? 'arelier' : l.etat === 'propre' ? 'propre' : l.etat === 'relie' || l.etat === 'aVerifier' ? 'reliee' : ''; };
+  const lignes = React.useMemo(() => (Array.isArray(articles) ? articles.filter(({ a }) => filtreLien === 'tous' || classeLien(a) === filtreLien).map(({ a, statut }) => ({
     cle: a.cle, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
     sous: [a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition].filter(Boolean).join(' · '),
     texte: [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + a.numero : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + nomSite(x.site))].join(' '),
     prixGrille: a.prix != null ? euros(a.prix) : '',
     attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(',') },
-  })) : articles), [articles, euros, nomSite]);
+  })) : articles), [articles, euros, nomSite, filtreLien, liaison]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
   const modifiable = (l, cle, valeur, onModifier) => (onModifier
@@ -48,8 +54,17 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
           : (l.a.annonces.length === 1 && l.a.annonces[0].pseudo ? <span className="n-tt-cellule-sous">{l.a.annonces[0].pseudo}</span> : null)}</span> },
     { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
       rendu: (l) => (l.a.place ? (l.a.place.nom || tr('egalite.placeCase', { i: Number(l.a.place.i) + 1 })) : null) },
+    ...(liaison ? [{ cle: 'liaison', libelle: tr('liaL.col'), tri: (l) => ({ arelier: 0, propre: 2, reliee: 1 }[classeLien(l.a)] ?? 3),
+      rendu: (l) => { const x = lienDe(l.a); if (!x) return null;
+        if (x.etat === 'aRelier') return <PropositionLiaison l={x} forme="cellule" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/>;
+        if (x.etat === 'propre') return <span data-eg-lien="propre">{tr('liaL.etat.propre', { site: x.site })}</span>;
+        if (x.etat === 'relie') return <span data-eg-lien="reliee">{tr('liaL.etat.reliee', { numero: x.numero })}</span>;
+        if (x.etat === 'aVerifier') return <span className="n-eg-arelier" data-eg-lien="averifier">{tr('liaL.etat.aVerifier')}</span>;
+        return null; } }] : []),
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => STATUTS_TABLEAU.indexOf(l.statut) },
   ];
+  const filtresL = liaison ? [...filtres, { cle: 'liaison', libelle: tr('liaL.col'), valeur: filtreLien, onChange: setFiltreLien,
+    options: [{ cle: 'tous', libelle: tr('liaL.filtre.tous') }, { cle: 'arelier', libelle: tr('liaL.filtre.arelier') }, { cle: 'reliee', libelle: tr('liaL.filtre.reliee') }, { cle: 'propre', libelle: tr('liaL.filtre.propre') }] }] : filtres;
   const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s] }));
   const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, aucune: tr('tableau.actionAucuneIci'),
     pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(ls.map((l) => l.a)) : null }));
@@ -62,7 +77,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   ];
   return (
     <TableauTravail id="annonces" titre={tr('egalite.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} rafraichit={rafraichit}
-      lignes={lignes} statuts={statuts} statutsDefaut={STATUTS_EN_LIGNE} filtres={filtres} colonnes={colonnes}
+      lignes={lignes} statuts={statuts} statutsDefaut={STATUTS_EN_LIGNE} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, ls.map((l) => l.a))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)}
       unite={(n) => tr('tableau.articles', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
       outilsPlus={onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}

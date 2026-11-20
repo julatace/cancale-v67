@@ -655,3 +655,42 @@ export function compteurLiaison(res) {
   if (!res || !res.lu) return null;
   return { n: res.compteur.aRelier - res.compteur.plusTard, surs: res.compteur.surs, contradictions: res.compteur.contradictions, plusTard: res.compteur.plusTard };
 }
+
+// ── LA PROPOSITION SUR LA RANGÉE (20 nov., « relier depuis la liste ») ──────────────────────────────────────────
+// Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus, regarder la fiche ». Une annonce
+// « à relier » montre SUR SA RANGÉE (Annonces, fiche courte) LA meilleure candidate : un toucher la relie (le même `opsRelier`
+// que le parcours, toutes les gardes rejouées), « Autre… » ouvre le parcours sur elle.
+// Une proposition n'est faite que si elle est UNIQUE et APPUYÉE — jamais par défaut :
+//   · « sûr » : la candidate mise en avant par le parcours (`avant` : même photo sûre, unique, sans doute) ;
+//   · sinon « à vérifier » : la PREMIÈRE de `candidatesPour` (taille de l'annonce), si elle est seule à son rang ET à sa
+//     proximité (deux candidates à égalité ⇒ AUCUNE : 50 paires identiques ne proposent rien), si elle a un appui
+//     (même photo à vérifier, N° écrit sur l'annonce, publiée par VRM, ou même taille + 2 mots du modèle en commun), et si le jugement ne la refuse pas (taille différente, déjà prise, N° double…).
+// Rend Map(cle ⇒ { cle, paireId, numero, photo, titre, niveau: 'sur'|'verifier', raison }) ; rien relié ici.
+// Même taille (lue sur l'annonce ou dans son titre : 10, sûre des deux côtés : 20) + au moins 2 mots du modèle en commun. Une
+// annonce Leboncoin n'a souvent sa taille que dans son titre (« Adidas Spezial vert taille 39,5 ») : c'est le cas courant.
+export const PROCHE_PROPOSITION = 12;
+export function propositionsDe(res, { cle = cleDefaut, marqueDe = null, numerosDouteux = null } = {}) {
+  const out = new Map();
+  if (!res || !res.lu) return out;
+  for (const e of arr(res.file)) {
+    if (!e || e.etat !== 'aRelier' || !e.annonce) continue;
+    let choix = null, niveau = 'verifier';
+    if (e.avant) { choix = arr(e.candidats).find((c) => String(c.paire.id) === String(e.avant)) || null; niveau = 'sur'; }
+    if (!choix) {
+      niveau = 'verifier';
+      const t = tailleDe(e.annonce);
+      const l = candidatesPour(e, res.articles, { taille: t.taille, autres: res.autres || [], cle });
+      const p1 = l[0], p2 = l[1];
+      if (!p1) continue;
+      if (p2 && p2.rang === p1.rang && p2.proche === p1.proche) continue;          // à égalité : aucune présélection
+      const appui = p1.rang <= 3 || p1.proche >= PROCHE_PROPOSITION;
+      if (!appui) continue;
+      const j = jugerLien({ annonce: e.annonce, paire: p1.paire, autres: res.autres || [], numerosDouteux, cle, marqueDe });
+      if (j.refus) continue;
+      choix = { ...p1, raison: p1.raison || (p1.rang <= 3 ? 'photo' : 'proche') };
+    }
+    const p = choix.paire;
+    out.set(e.cle, { cle: e.cle, paireId: String(p.id), numero: cle(p.numero || ''), photo: p.photo || '', titre: p.titre || '', niveau, raison: niveau === 'sur' ? 'photo-sure' : (choix.raison || 'proche') });
+  }
+  return out;
+}
