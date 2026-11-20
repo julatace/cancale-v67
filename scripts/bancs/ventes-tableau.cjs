@@ -165,7 +165,7 @@ const segment = async (pg, i) => {
         }
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
         // Toucher une ligne : le détail à droite, le tableau reste.
-        const cle = r[1] ? r[1].cle : r[0].cle;
+        const cle = r[1] ? r[1].cle : r[0] ? r[0].cle : "";
         await pg.locator(`[data-tt-ligne="${cle}"] [data-tt-col="article"]`).first().click({ timeout: 8000 }).catch(() => {});
         await attendre(pg, (c) => !!document.querySelector(`[data-vn-detail="${c}"]`), 8000, cle);
         await pg.waitForTimeout(500);
