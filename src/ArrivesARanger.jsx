@@ -13,7 +13,7 @@ import { arrivesARanger } from './arriveeAchat.js';
 import { ouvrirRetrouver } from './retrouverColis.js';
 
 const lire = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return null; } };
-export const lireArrives = () => { const notes = lire('vrm_arrivees_a_numeroter') || {}; const fiches = lire('vrm_fiches_neuves'); return fiches ? arrivesARanger({ notes, fiches }) : arrivesARanger({ notes, fiches: {} }); };
+export const lireArrives = () => { const notes = lire('vrm_arrivees_a_numeroter') || {}; const fiches = lire('vrm_fiches_neuves'); return fiches ? arrivesARanger({ notes, fiches }) : []; };   // fiches pas lues ⇒ rien (pas su n'est pas « rien à ranger »)
 export const ouvrirArrivee = (entrees) => { try { window.dispatchEvent(new CustomEvent('vrm:atelier-numeroter', { detail: { entrees, prendre: () => {} } })); } catch (_) {} };
 
 export function useArrives() {
