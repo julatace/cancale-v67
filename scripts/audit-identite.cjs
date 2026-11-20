@@ -154,7 +154,13 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   {
     const i = SRC.indexOf('const bordForItem = ');
     const corps = i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n  };', i));
-    (corps && /txnItem\[/.test(corps) && !/normTitle|title/i.test(corps.replace(/\/\/[^\n]*/g, '')))
+    // (20 nov., bugs-terrain) `bordForItem` lit un INDEX (`indexBordsItem`) : la règle est jugée dans le corps ET dans l'index
+    // (transaction → annonce par `txnItem`, N° par `cleNum`), jamais un titre dans l'un ou l'autre.
+    const j = SRC.indexOf('const indexBordsItem = ');
+    const index = j < 0 ? '' : SRC.slice(j, SRC.indexOf('\n};', j));
+    const sans = (t) => t.replace(/\/\/[^\n]*/g, '');
+    const parIdentite = /txnItem\[/.test(corps) || (/indexBordsItem\(\s*\w+\s*,\s*txnItem\s*\)/.test(corps) && /cleT\[String\(bb\.transaction\)\]/.test(index) && /cleNum\(bb\.numero\)/.test(index));
+    (corps && parIdentite && !/normTitle|title/i.test(sans(corps)) && !/normTitle|title|subject/i.test(sans(index)))
       ? ok('bordereau ↔ annonce : par identité (N° ou transaction), jamais par titre')
       : nok('bordereau ↔ annonce : par identité seulement', corps ? 'un titre sert encore à décider' : 'bordForItem introuvable');
   }
