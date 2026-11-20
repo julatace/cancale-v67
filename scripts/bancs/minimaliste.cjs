@@ -56,7 +56,7 @@ const TOUS = [
   { cle: 'messages', url: '?tab=messages', principal: true },
   { cle: 'emails', url: '?tab=emails', principal: true },
   { cle: 'parametres', url: '?tab=settings', principal: true },
-  { cle: 'parametres.sous', url: '?tab=settings', clics: ['#vrm-contenu .n-rangee[data-n-fin="chevron"]|#vrm-contenu [data-reglages-entree]|#vrm-contenu .v2-pm-rangee'] },
+  { cle: 'parametres.sous', url: '?tab=settings', clics: ['#vrm-contenu .n-rangee[data-n-fin="chevron"]|#vrm-contenu [data-reglages-entree]|#vrm-contenu .v2-pm-rangee|#vrm-contenu .vrm-pm-cat-ligne'] },
   { cle: 'notifications', url: '?tab=journee', evt: ev('vrm:centre-notifs', null), principal: true },
   { cle: 'automatisations', url: '?tab=automatisations', principal: true },
   { cle: 'extension', url: '?tab=extension', principal: true },

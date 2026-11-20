@@ -35,6 +35,10 @@ html body .vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { box-
 /* Paramètres : la carte du profil (filet) ⇒ un groupe blanc uni. */
 html body .vrm-set-profil { border: 0 !important; box-shadow: none !important; background: var(--ap-carte) !important; }
 
+/* Le texte d'un bouton teinté d'hier : le bleu foncé de la teinte (≥ 4,5:1 sur la teinte posée sur blanc ; le banc
+   minimaliste mesurait 4,47:1 pour « Ajouter une photo » une fois la carte du profil remise en blanc). */
+html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { color: var(--ap-bleu-teinte) !important; }
+
 /* ══ 3. Aucun LIEN SOULIGNÉ : un « Voir plus » repliable (summary) ou un lien d'action est en texte bleu ══ */
 html body :is(#vrm-contenu, .vrm-fs, [role="dialog"]) :is(summary, .vrm-lien-action, .vrm-lien, a.vrm-lien-action) { text-decoration: none !important; }
 
