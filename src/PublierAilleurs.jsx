@@ -14,6 +14,7 @@ import { LogoSite } from './SelecteurSites.jsx';
 import { nomPlateforme } from './plateformes.js';
 import './styles-annonces-outils.css';
 import './styles-publier-ailleurs.css';
+import './styles-publier-ailleurs-feuille.css';   // (20 nov.) la feuille, à la demande (budget de démarrage)
 import { EncartPhotosAutresComptes } from './PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
 import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from './natif/icones.jsx';
