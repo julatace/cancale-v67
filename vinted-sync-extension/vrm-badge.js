@@ -950,6 +950,10 @@
   .au6-d .conf5 { margin: 12px 24px 0; }
   .conf5[data-irreversible] { display: block !important; }
   .conf5[data-irreversible] p { margin: 0 0 8px; }
+  /* (20 nov., intégration 5.410) Cadence : la question et ses deux touches sur une ligne ; « Enregistrer » se retire
+     pendant la question (un seul plein à l'écran). */
+  [data-cad-confirme] p { flex: 1 1 220px; margin: 0; }
+  [data-cad-confirme] .outils { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
   .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
   .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -973,7 +977,10 @@
     .maj6 span { display: none; }
     .compte6 { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .barre6 { padding: 10px 12px; }
+    /* (20 nov., intégration 5.410) « Choisir une action » n'est plus coupé au téléphone : action et Statut sur la 1re ligne,
+       la recherche en dessous sur toute la largeur. */
     .barre6 .act5 { min-width: 0; flex: 1 1 140px; }
+    .barre6 .cherche5 { flex: 1 1 100%; max-width: none; order: 3; }
     .table6 { margin: 0 8px; }
     .th6r { display: none !important; }
     .tr6 { grid-template-columns: 44px minmax(0, 1fr) 40px; padding: 4px 4px; }
@@ -2028,6 +2035,9 @@
     const vc = racine.querySelector('[data-ven-cherche]'); if (vc) vc.addEventListener('input', () => { venCherche = vc.value; const pos = vc.selectionStart; rendre(); const n = carte.querySelector('[data-ven-cherche]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } });
     racine.querySelectorAll('[data-ann-vue]').forEach((b) => b.addEventListener('click', () => { annVue = b.getAttribute('data-ann-vue'); garderAnn(); rendre(); }));
     const cd = racine.querySelector('[data-ann-cols]'); if (cd) cd.addEventListener('toggle', () => { annColsOuvert = cd.open; });
+    // (20 nov., intégration 5.410) Un menu Colonnes / Statut ouvert se ferme quand on touche ailleurs : resté ouvert, il
+    // couvrait la colonne Statut et la table pendant « Changer le prix » ou « Publier sur… » (planche du panneau).
+    if (!racine.__vrmMenusFerme) { racine.__vrmMenusFerme = true; racine.addEventListener('pointerdown', (e) => { racine.querySelectorAll('details.cols5[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; }); }, true); }
     racine.querySelectorAll('[data-ann-col]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-col'); if (c.checked) annCols.add(k); else annCols.delete(k); garderAnn(); rendre(); }));
     racine.querySelectorAll('[data-ann-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-sel'); if (c.checked) annSel.add(k); else annSel.delete(k); rendre(); }));
     const t = racine.querySelector('[data-ann-tout]'); if (t) t.addEventListener('change', () => { racine.querySelectorAll('[data-ann-sel]').forEach((c) => { const k = c.getAttribute('data-ann-sel'); if (t.checked) annSel.add(k); else annSel.delete(k); }); rendre(); });
@@ -2296,7 +2306,7 @@
       <p class="note5" data-cad-risque>${esc(TU('cd_risque'))}</p>
       ${cadConfirme ? `<div class="conf5" role="alertdialog" data-cad-confirme><p>${esc(TU('cd_confirme_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-cad-oui>${esc(TU('cd_oui'))}</button><button type="button" class="vu-btn" data-cad-non>${esc(TU('ra_annuler'))}</button></div></div>` : ''}
       ${cadEtat ? `<p class="note5" role="status" data-cad-etat="${cadEtat.ok ? 'ok' : 'ko'}">${esc(cadEtat.texte)}</p>` : ''}
-      <div class="outils"><button type="button" class="vu-lien" data-cad-defaut>${esc(TU('cd_defaut'))}</button><button type="button" class="vu-btn vu-plein" data-cad-enregistrer${cadEnVol || !cadBrouillon ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
+      ${cadConfirme ? '' : `<div class="outils"><button type="button" class="vu-lien" data-cad-defaut>${esc(TU('cd_defaut'))}</button><button type="button" class="vu-btn vu-plein" data-cad-enregistrer${cadEnVol || !cadBrouillon ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`}
     </section>`;
   }
   // ══ 5.409 — NOTIFICATIONS (capture « Notifications » de Vintex) : le journal capté des 7 derniers jours, en tableau
