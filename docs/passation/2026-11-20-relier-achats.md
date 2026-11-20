@@ -23,7 +23,7 @@ B. Achats en route / à retirer : le logo du transporteur et le n° de suivi sur
 **Cause des paires manquantes** : pas la pagination (les lectures sont des lignes JSONB par compte) ni une limite
 d'affichage (tranches de 60 qui se suivent). L'écran construisait ses cibles avec `fileAchat` (annonces Vinted EN LIGNE
 seulement) et `fileVendus` (ventes Vinted des 12 derniers mois — la borne de la liaison proposée). Il manquait donc les
-ventes de plus d'un an, les annonces masquées et « à confirmer », et tous les autres sites.
+ventes de plus d'un an, les annonces masquées et « pas revues récemment », et tous les autres sites.
 
 ## Ce qui change
 - `src/relierGlisser.js` : `plusRecentDabord` (sans date ⇒ à la fin, jamais devinée), `seulementRecus` (la règle de
@@ -34,7 +34,7 @@ ventes de plus d'un an, les annonces masquées et « à confirmer », et tous le
   sélecteur NATIF (un `<select>` posé sur la pastille) ; une facette à une seule valeur n'est pas montrée (les achats
   sont tous Vinted : leur pastille Plateforme n'apparaît pas).
 - `src/App.jsx` : `vendusSansAchat(borne)` (la liaison proposée garde ses 12 mois, l'écran prend tout :
-  `fileVendusTous`) ; `fileAchatHorsLigne` (masquées présentes + « à confirmer ») ; les articles des autres sites sans
+  `fileVendusTous`) ; `fileAchatHorsLigne` (masquées présentes + « pas revues récemment ») ; les articles des autres sites sans
   achat (lecture d'Annonces `lireAnnoncesEgalite` + `construireArticles`, porteur = SON annonce) ; `relierGlisseSite`
   écrit par `opsFait` (`vrm_articles_sites`, la même écriture qu'« Acheté » d'Annonces), en geste annulable ;
   `liensGlisser` compte aussi les liens posés sur une annonce d'un autre site ; « Relier à une vente / annonce » du

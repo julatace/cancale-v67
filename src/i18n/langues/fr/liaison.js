@@ -101,7 +101,7 @@ export default {
   "glisser.aucunRelie": "Aucun achat relié pour l’instant.",
   "glisser.aucuneFiltre": "Rien dans ce filtre.",
   "glisser.masquee": "masquée",
-  "glisser.aConfirmer": "à confirmer",
+  "glisser.pasRevue": "pas revue récemment",
   "glisser.pasEcrit": "Rien n’a été relié : relis l’écran et réessaie.",
   "glisser.facette.site": "Plateforme",
   "glisser.facette.site.tous": "Toutes les plateformes",

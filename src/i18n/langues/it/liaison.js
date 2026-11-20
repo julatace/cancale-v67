@@ -101,7 +101,7 @@ export default {
   "glisser.aucunRelie": "Nessun acquisto collegato per ora.",
   "glisser.aucuneFiltre": "Niente in questo filtro.",
   "glisser.masquee": "nascosto",
-  "glisser.aConfirmer": "da confermare",
+  "glisser.pasRevue": "non ricontrollato di recente",
   "glisser.pasEcrit": "Nulla è stato collegato: ricarica e riprova.",
   "glisser.facette.site": "Piattaforma",
   "glisser.facette.site.tous": "Tutte le piattaforme",

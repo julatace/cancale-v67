@@ -101,7 +101,7 @@ export default {
   "glisser.aucunRelie": "No linked purchase yet.",
   "glisser.aucuneFiltre": "Nothing in this filter.",
   "glisser.masquee": "hidden",
-  "glisser.aConfirmer": "to confirm",
+  "glisser.pasRevue": "not checked recently",
   "glisser.pasEcrit": "Nothing was linked: refresh and try again.",
   "glisser.facette.site": "Platform",
   "glisser.facette.site.tous": "All platforms",

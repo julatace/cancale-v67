@@ -45896,7 +45896,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       out.push({ key: k, genre: 'annonce', id: String(x.id), titre: (x.item && x.item.title) || '', photo: (x.item && x.item.photo) || '', num: f.numero ? String(f.numero) : '',
         taille: String((x.item && (x.item.size || x.item.size_title)) || f.size || ''), site: 'vinted', ts: x.ts || null,
         marque: String((x.item && (x.item.brand || x.item.brand_title)) || extractBrand(String((x.item && x.item.title) || '')) || ''),
-        sous: [prixTxt(x.item && x.item.price), x.item && x.item._vrmMasquee ? tr('glisser.masquee') : tr('glisser.aConfirmer')].filter(Boolean).join(' · ') }); }
+        sous: [prixTxt(x.item && x.item.price), x.item && x.item._vrmMasquee ? tr('glisser.masquee') : tr('glisser.pasRevue')].filter(Boolean).join(' · ') }); }
     for (const x of (fileVendusTous || fileVendus || [])) {
       out.push({ key: x.key, genre: 'vente', tx: String(x.o.transaction_id), idf: x.idf || null, titre: x.o.title || '', photo: (x.cible && x.cible.photo) || '', num: x.fiche && x.fiche.numero ? String(x.fiche.numero) : '',
         taille: String((x.cible && x.cible.taille) || (typeof x.o.size_title === 'string' ? x.o.size_title : '') || ''),

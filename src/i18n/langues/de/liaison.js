@@ -101,7 +101,7 @@ export default {
   "glisser.aucunRelie": "Noch kein verknüpfter Kauf.",
   "glisser.aucuneFiltre": "Nichts in diesem Filter.",
   "glisser.masquee": "ausgeblendet",
-  "glisser.aConfirmer": "zu bestätigen",
+  "glisser.pasRevue": "länger nicht geprüft",
   "glisser.pasEcrit": "Nichts wurde verknüpft: neu laden und erneut versuchen.",
   "glisser.facette.site": "Plattform",
   "glisser.facette.site.tous": "Alle Plattformen",
