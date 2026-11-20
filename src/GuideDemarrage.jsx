@@ -14,6 +14,7 @@
 import React from 'react';
 import './guide-demarrage.css';
 import { tr } from './i18n/index.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const ETAT_MOT = { fait: 'Fait', encours: 'Je vérifie…', passu: 'Pas pu vérifier', afaire: '' };
 
@@ -85,7 +86,7 @@ export function ChoixNumerotation({ choix, onChoisir, onPlusTard, mot = 'paires'
       </div>
       <div className="vrm-guide-question-pied">
         <span>Modifiable ensuite dans Paramètres → Numéros de rangement.</span>
-        {onPlusTard ? <button type="button" className="vrm-b vrm-b-discret" data-guide-numerotation-plus-tard="" onClick={onPlusTard}>Plus tard</button> : null}
+        {onPlusTard ? <BoutonBase variante="discret"  data-guide-numerotation-plus-tard="" onClick={onPlusTard}>Plus tard</BoutonBase> : null}
       </div>
     </div>
   );
@@ -98,7 +99,7 @@ export function VerificationInstallation({ verif, onGeste, lienGeste = () => '',
     <div className="vrm-verif" data-verif-installation="" data-verif-afaire={verif.aFaire} data-verif-passu={verif.passu} data-verif-ok={verif.toutVaBien ? '1' : '0'}>
       <div className="vrm-verif-tete">
         <p className="vrm-verif-titre">{verif.toutVaBien ? 'Tout est en place.' : verif.passu && !verif.aFaire ? 'Je vérifie…' : verif.aFaire === 1 ? 'Une chose à régler.' : `${verif.aFaire} choses à régler.`}</p>
-        {onFermer ? <button type="button" className="vrm-b vrm-b-discret" onClick={onFermer}>Fermer</button> : null}
+        {onFermer ? <BoutonBase variante="discret"  onClick={onFermer}>Fermer</BoutonBase> : null}
       </div>
       <ul className="vrm-verif-liste">
         {verif.lignes.map((l) => {
@@ -111,7 +112,7 @@ export function VerificationInstallation({ verif, onGeste, lienGeste = () => '',
                 <p className="vrm-verif-detail">{l.detail}</p>
                 {l.geste ? (href
                   ? <a className="vrm-b vrm-b-secondaire vrm-verif-geste" data-verif-geste={l.geste.cle} href={href} target={/^https?:/.test(href) ? '_blank' : undefined} rel="noreferrer" download={/\.zip(\?|$)/.test(href) ? '' : undefined}>{l.geste.libelle}</a>
-                  : <button type="button" className="vrm-b vrm-b-secondaire vrm-verif-geste" data-verif-geste={l.geste.cle} onClick={() => onGeste && onGeste(l.geste.cle)}>{l.geste.libelle}</button>) : null}
+                  : <BoutonBase variante="secondaire" className="vrm-verif-geste" data-verif-geste={l.geste.cle} onClick={() => onGeste && onGeste(l.geste.cle)}>{l.geste.libelle}</BoutonBase>) : null}
               </div>
             </li>
           );
@@ -156,11 +157,11 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
                     {Pop ? <Pop nom={'guide-' + e.cle} titre={e.titre} resume="Pourquoi cette étape ?" style={{ margin: '0 0 6px' }}><p className="vrm-guide-pourquoi">{e.pourquoi}</p></Pop>
                       : <p className="vrm-guide-pourquoi">{e.pourquoi}</p>}
                     {(e.cle === 'extension' || e.cle === 'vinted') && detail ? <div className="vrm-guide-detail" data-guide-detail={e.cle}>{detail}</div> : null}
-                    {e.etat === 'passu' && onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire" onClick={onVerifier}>Réessayer la vérification</button> : null}
+                    {e.etat === 'passu' && onVerifier ? <BoutonBase variante="secondaire"  onClick={onVerifier}>Réessayer la vérification</BoutonBase> : null}
                     {(geste && e.etat !== 'passu' && e.etat !== 'encours') || (onPlusTard && !e.attente) ? (
                       <div className="vrm-guide-geste">
-                        {geste && e.etat !== 'passu' && e.etat !== 'encours' ? <button type="button" className="vrm-b vrm-b-primaire" data-guide-geste={e.cle} onClick={geste.onClick}>{geste.libelle}</button> : null}
-                        {onPlusTard && !e.attente ? <button type="button" className="vrm-b vrm-b-discret" data-guide-plus-tard={e.cle} onClick={() => onPlusTard(e.cle)}>Plus tard</button> : null}
+                        {geste && e.etat !== 'passu' && e.etat !== 'encours' ? <BoutonBase variante="primaire"  data-guide-geste={e.cle} onClick={geste.onClick}>{geste.libelle}</BoutonBase> : null}
+                        {onPlusTard && !e.attente ? <BoutonBase variante="discret"  data-guide-plus-tard={e.cle} onClick={() => onPlusTard(e.cle)}>Plus tard</BoutonBase> : null}
                       </div>
                     ) : null}
                   </div>
@@ -176,12 +177,12 @@ export function GuideDemarrage({ guide, nav = '', detail = null, gestes = {}, on
           {onExemple ? (
             <div className="vrm-guide-exemple">
               <p>Pas encore prêt&nbsp;? Regarde VRM rempli de données inventées. Rien n’est enregistré.</p>
-              <button type="button" className="vrm-b vrm-b-secondaire" data-exemple-entrer="" onClick={onExemple}>Voir VRM avec des exemples</button>
+              <BoutonBase variante="secondaire"  data-exemple-entrer="" onClick={onExemple}>Voir VRM avec des exemples</BoutonBase>
             </div>
           ) : null}
           <div className="vrm-guide-pied-gestes">
-            {onOuvrirVerification ? <button type="button" className="vrm-b vrm-b-discret" data-guide-verifier="" onClick={onOuvrirVerification}>Vérifier mon installation</button> : null}
-            {onMasquer ? <button type="button" className="vrm-b vrm-b-discret" data-guide-masquer="" onClick={onMasquer}>Masquer le guide</button> : null}
+            {onOuvrirVerification ? <BoutonBase variante="discret"  data-guide-verifier="" onClick={onOuvrirVerification}>Vérifier mon installation</BoutonBase> : null}
+            {onMasquer ? <BoutonBase variante="discret"  data-guide-masquer="" onClick={onMasquer}>Masquer le guide</BoutonBase> : null}
           </div>
         </div>
       )}
@@ -212,7 +213,7 @@ export function BandeauExemple({ onBrancher, onConnexion = null, style, sansComp
         </span>
       </div>
       <div className="vrm-exemple-gestes">
-        <button type="button" className="vrm-b vrm-b-primaire" data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? tr('exemple.bandeau.creer') : tr('exemple.bandeau.vraies')}</button>
+        <BoutonBase variante="primaire"  data-exemple-brancher="" onClick={onBrancher}>{sansCompte ? tr('exemple.bandeau.creer') : tr('exemple.bandeau.vraies')}</BoutonBase>
         {sansCompte && onConnexion ? <button type="button" className="vrm-exemple-connexion" data-exemple-connexion="" onClick={onConnexion}>{tr('exemple.bandeau.connexion')}</button> : null}
       </div>
     </div>

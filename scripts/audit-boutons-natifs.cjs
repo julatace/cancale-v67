@@ -51,8 +51,8 @@ const EXCEPTIONS = [
 
 // E. Les plafonds (mesurés le 20 nov. après ce lot ; un lot qui en retire BAISSE le chiffre ici).
 const PLAFONDS = {
-  'src/App.jsx': { brut: 503, ancien: null },
-  'src/ecrans/Reglages.jsx': { brut: 84, ancien: null },
+  'src/App.jsx': { brut: 493, ancien: null },
+  'src/ecrans/Reglages.jsx': { brut: 82, ancien: null },
   'src/ecrans/Stock.jsx': { brut: 66, ancien: null },
   'src/ecrans/Compta.jsx': { brut: 61, ancien: null },
   'src/ecrans/Achats.jsx': { brut: 11, ancien: null },

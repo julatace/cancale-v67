@@ -28,6 +28,7 @@ import { reglePlanCourante, suivrePlan } from './planVentes.js';
 import { APERCU_LIGNES, bloquerGestes } from './apercu.js';
 import './plans.css';
 import { Bouton as BoutonNatif } from '../natif/Bouton.jsx';
+import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const dateLongue = (iso) => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
 const uidDe = (o) => String((o && o._acc && o._acc.vinted_user_id) || '');
@@ -164,8 +165,8 @@ export function QuelCompteVend({ plateforme = 'vinted', comptes, ventes, comptes
         </div>
         {msg && <div role="alert" className="vrm-plan-alerte">{msg}</div>}
         <div className="vrm-plan-actions">
-          <button type="button" className="vrm-b vrm-b-secondaire" onClick={onFerme}>Plus tard</button>
-          <button type="button" className="vrm-b vrm-b-primaire" data-valider-compte="" disabled={occupe || !choix || choix === actuel} onClick={valider}>{occupe ? 'Un instant…' : 'Ce compte vend'}</button>
+          <BoutonBase variante="secondaire"  onClick={onFerme}>Plus tard</BoutonBase>
+          <BoutonBase variante="primaire"  data-valider-compte="" disabled={occupe || !choix || choix === actuel} onClick={valider}>{occupe ? 'Un instant…' : 'Ce compte vend'}</BoutonBase>
         </div>
       </div>
     </div>, document.body);
@@ -227,9 +228,9 @@ export function AjouterCompteVendeur({ comptes, ventes, uidPropose, enTete, onFe
         )}
         {msg && <div role="alert" className="vrm-plan-alerte" data-sup-msg="">{msg}</div>}
         <div className="vrm-plan-actions">
-          <button type="button" className="vrm-b vrm-b-secondaire" onClick={onFerme}>Plus tard</button>
-          <button type="button" className="vrm-b vrm-b-primaire" data-valider-sup="" disabled={occupe || ferme || !inclus || !choix || (achat && !cgv)} onClick={valider}>
-            {occupe ? 'Un instant…' : ferme ? 'Bientôt' : placeLibre ? 'Ce compte vend aussi' : `Ajouter · ${prix}`}</button>
+          <BoutonBase variante="secondaire"  onClick={onFerme}>Plus tard</BoutonBase>
+          <BoutonBase variante="primaire"  data-valider-sup="" disabled={occupe || ferme || !inclus || !choix || (achat && !cgv)} onClick={valider}>
+            {occupe ? 'Un instant…' : ferme ? 'Bientôt' : placeLibre ? 'Ce compte vend aussi' : `Ajouter · ${prix}`}</BoutonBase>
         </div>
       </div>
     </div>, document.body);
@@ -305,7 +306,7 @@ export function VentesAutresHorsPlan({ lignes, onPro }) {
                 );
               })}
             </ul>
-            <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes {nomP} de {b.nom}</button>
+            <BoutonBase variante="primaire"  data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes {nomP} de {b.nom}</BoutonBase>
           </section>
         );
       })}
@@ -354,9 +355,9 @@ export function VentesHorsPlan({ ventes, comptes, aEnvoyer, prix, onPro }) {
           <div className="vrm-plan-actions" style={{ justifyContent: 'flex-start' }}>
             {/* (13 nov., lot 56) Ce compte peut vendre AUSSI, en Solo (feuille ; le serveur décide). Fermé ⇒ « bientôt ». */}
             {sx && (sx.ouvert || sx.libres > 0)
-              ? <button type="button" className="vrm-b vrm-b-secondaire" data-apercu-garde="" data-sup-ajouter={b.uid} onClick={() => ouvrirCompteSup(b.uid)}>Faire vendre ce compte · {texteSup(sx)}</button>
+              ? <BoutonBase variante="secondaire"  data-apercu-garde="" data-sup-ajouter={b.uid} onClick={() => ouvrirCompteSup(b.uid)}>Faire vendre ce compte · {texteSup(sx)}</BoutonBase>
               : sx && <span className="vrm-plan-phrase" data-sup-bientot-bloc={b.uid}>Bientôt : faire vendre ce compte en Solo, {texteSup(sx)}.</span>}
-            <button type="button" className="vrm-b vrm-b-primaire" data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</button>
+            <BoutonBase variante="primaire"  data-apercu-garde="" data-passer-pro="" onClick={onPro}>Passe à Pro pour gérer les ventes de {b.nom}</BoutonBase>
           </div>
         </section>
       ))}
@@ -380,13 +381,13 @@ export function OffresSoloPro({ x, prixSolo, prixActuel, prixProAffiche, onChois
         <div className="vrm-plan-phrase">{OFFRES.solo.phrase}</div>
         {/* (13 nov., lot 56) Plusieurs comptes Vinted dès Solo : le supplément, une ligne. */}
         <div className="vrm-plan-phrase vrm-plan-supplement" data-solo-supplement="" data-sup-ouvert={supOuvert ? '' : undefined}><b>{OFFRES.solo.supplement}</b>{!supOuvert && <span className="vrm-plan-pastille" data-sup-pastille-bientot="">Bientôt</span>}</div>
-        {plan === 'pro' && onChoisirSolo && <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={onChoisirSolo} data-passer-solo="">Revenir à Solo</button>}
+        {plan === 'pro' && onChoisirSolo && <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={onChoisirSolo} data-passer-solo="">Revenir à Solo</BoutonBase>}
       </div>
       <div className="vrm-plan-offre" data-offre="pro" data-offre-actuelle={plan === 'pro' ? '' : undefined}>
         <div className="vrm-plan-offre-nom">{OFFRES.pro.nom}{plan === 'pro' && <span className="vrm-plan-pastille">Ton offre</span>}{!pro.ouvert && <span className="vrm-plan-pastille" data-pro-bientot="">Bientôt</span>}</div>
         <div className="vrm-plan-offre-prix" data-prix-pro="">{textePro}</div>
         <div className="vrm-plan-phrase">{OFFRES.pro.phrase}</div>
-        {pro.ouvert && plan === 'solo' && onChoisirPro && <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} onClick={onChoisirPro} data-passer-pro="">{occupe === 'pro' ? 'Un instant…' : 'Passer à Pro'}</button>}
+        {pro.ouvert && plan === 'solo' && onChoisirPro && <BoutonBase variante="primaire"  disabled={!!occupe} onClick={onChoisirPro} data-passer-pro="">{occupe === 'pro' ? 'Un instant…' : 'Passer à Pro'}</BoutonBase>}
         {!pro.ouvert && <div className="vrm-plan-phrase" data-pro-ferme="">Pas encore ouvert au paiement : rien ne t'est demandé.</div>}
       </div>
     </div>

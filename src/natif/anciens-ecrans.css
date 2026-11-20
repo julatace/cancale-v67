@@ -206,22 +206,16 @@ html body .vrm-ios-valeur:not([data-ton]) { color: var(--ap-gris) !important; }
 html body .vrm-ios-chevron { color: rgb(60 60 67 / .3) !important; }
 html[data-theme="dark"] body .vrm-ios-chevron { color: rgb(235 235 245 / .3) !important; }
 html body :is(.v2l:active, button.v2-rangee:active) { background-color: var(--ap-remplir) !important; }
-html body .v2l-photo-a, html body .v2l-photo-c, html body .v2-vignette { border-radius: 10px !important; }
+html body .v2l-photo-a, html body .v2l-photo-c, html body .v2-vignette { border-radius: 10px !important; }/* ══ 6. LES BOUTONS d'iOS : plein bleu (UN par écran), teinté, simple ══════════ */
 
-/* ══ 6. LES BOUTONS d'iOS : plein bleu (UN par écran), teinté, simple ══════════ */
-html body button.v2b-principal { background: var(--ap-plein) !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
-html body button.v2b-principal:active:not([aria-disabled="true"]) { background: var(--ap-bleu-appui) !important; filter: none !important; }
-html body button.v2b-secondaire { background: var(--ap-teinte) !important; color: var(--ap-bleu) !important; }
-html body button.v2b-texte { color: var(--ap-bleu) !important; }
-html body .v2b-hote-plein .v2b-raison { color: var(--ap-gris) !important; }
 html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire { background: var(--ap-plein) !important; background-image: none !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
 html body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { background: var(--ap-teinte) !important; background-image: none !important; color: var(--ap-bleu) !important; box-shadow: none !important; border: 0 !important; border-radius: 12px !important; }
 
 /* ══ 7. LE CONTRÔLE SEGMENTÉ d'iOS : piste grise, pouce blanc et son ombre ════ */
-html body .v2-seg, html body .vrm-seg { background: var(--ap-remplir) !important; box-shadow: none !important; border-radius: 9px !important; padding: 2px !important; }
-html body button.v2-seg-btn, html body .vrm-seg .vrm-seg-btn { color: var(--ap-encre) !important; border-radius: 7px !important; font-weight: 400 !important; background: transparent !important; }
-html body button.v2-seg-btn.is-on, html body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
-html[data-theme="dark"] body button.v2-seg-btn.is-on, html[data-theme="dark"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #636366 !important; color: #FFFFFF !important; }
+html body .vrm-seg { background: var(--ap-remplir) !important; box-shadow: none !important; border-radius: 9px !important; padding: 2px !important; }
+html body .vrm-seg .vrm-seg-btn { color: var(--ap-encre) !important; border-radius: 7px !important; font-weight: 400 !important; background: transparent !important; }
+html body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme="dark"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #636366 !important; color: #FFFFFF !important; }
 
 /* ══ 8. LES INTERRUPTEURS d'iOS (51 × 31) — le bleu, le seul accent ═══════════ */
 html body .vrm-ios-switch[aria-checked="true"]::before { background: var(--ap-bleu-vif) !important; }
@@ -329,7 +323,6 @@ html[data-theme="dark"] body { --vv-seg-on: #636366 !important; }
 
 /* ══ 17. Les titres que le verre écrivait en blanc à la main, et le bleu teinté ══ */
 html body .vrm-tache > .vrm-tache-tete h1 { color: var(--ap-encre) !important; font-family: var(--ap-police) !important; font-weight: 700 !important; letter-spacing: .011em !important; }
-html body :is(button.v2b-secondaire, .vrm-app-shell .vrm-b.vrm-b-secondaire, .vrm-fs .vrm-b.vrm-b-secondaire) { color: var(--ap-bleu-teinte) !important; }
 
 /* ══ 18. Ma journée (verre-journee.css) : le plein bleu, les touches grises, la semaine en barres grises (le jour choisi en bleu) ══ */
 html body { --vj-plein: var(--ap-plein) !important; --vj-plein-t: var(--ap-sur-plein) !important; --vj-plein-ombre: none !important;
@@ -343,9 +336,8 @@ html:root { --d-r-carte: 12px !important; --d-r-tuile: 12px !important; }
 
 /* ══ 19. CE QUE LE BANC A NOMMÉ (19 nov., scripts/bancs/lisible-partout.cjs) : des encres écrites pour le verre ══ */
 /* L'invite d'un champ (placeholder) : l'encre seconde, jamais plus pâle. */
-html body :is(input, textarea)::placeholder { color: var(--ap-gris) !important; opacity: 1 !important; }
-/* Le nombre d'un segment (« Colis 429 ») : estompé à 80 %, ou BLANC sur le pouce blanc du segment choisi. */
-html body .v2-seg-n { color: var(--ap-gris) !important; opacity: 1 !important; }
+html body :is(input, textarea)::placeholder { color: var(--ap-gris) !important; opacity: 1 !important; }/* Le nombre d'un segment (« Colis 429 ») : estompé à 80 %, ou BLANC sur le pouce blanc du segment choisi. */
+
 /* Le Stock : « Cases · Places » (segmenté écrit à la main) — la piste grise, l'encre, le pouce blanc. */
 html body .sr-seg { background: var(--ap-remplir) !important; border-radius: 9px !important; box-shadow: none !important; }
 html body .sr-seg-btn { color: var(--ap-encre) !important; background: transparent !important; }
@@ -378,7 +370,6 @@ html body .v2-outils-feuille .vrm-offres-auto { background: var(--ap-remplir) !i
 /* « Qui dorment », les modes : le nombre d'un segment suit l'encre de son segment (gris sur le pouce de la nuit : 2,51:1). */
 /* Les puces de compte d'une feuille (portée hors de la coque) : 44 px au doigt (34 mesurés après la coque native). */
 @media (pointer: coarse) { html body .vrm-compte-puces .vrm-compte-puce { min-height: 44px !important; } }
-html body :is(.v2-seg-btn, .sr-seg-btn) > :is(.v2-seg-n, .sr-seg-n) { color: inherit !important; opacity: 1 !important; }
 /* E-mails, la nuit : le compte d'une ligne, un cran plus encré (la ligne est estompée : 4,49:1 sur la ligne choisie). */
 html body .vrm-boite-compte-nom { color: color-mix(in srgb, var(--n-encre-2, #98989F) 70%, var(--n-encre, #FFFFFF)) !important; }
 html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }

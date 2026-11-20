@@ -51,6 +51,15 @@ export const nomBoutonIcone = (icone, rest = {}) => {
 //   (32 à la souris, 44 au doigt) ; icône 20 ; `occupe` → chargement ; `disabled` → indisponible, sa raison = `title`
 //   (ou `data-raison`) DITE sous le bouton ; une icône seule → BoutonIcone (44, nommée) ; `href` → un <a> au dessin natif.
 const VERS_NATIF = { primaire: 'plein', secondaire: 'teinte', discret: 'texte', danger: 'texte' };
+// Un style en ligne d'avant (fond, couleur, rayon, police, hauteur…) repeindrait le bouton natif : seule la MISE EN PAGE
+// passe (largeur, marges, flex, grille, position) ; `display: none` (caché) aussi.
+const MISE_EN_PAGE = /^(width|minWidth|maxWidth|margin|margin[A-Z]\w*|flex|flex[A-Z]\w*|alignSelf|justifySelf|grid[A-Z]\w*|gridArea|order|position|top|left|right|bottom|zIndex|inset|visibility)$/;
+export const styleDeMiseEnPage = (st) => {
+  if (!st || typeof st !== 'object') return undefined;
+  const o = {};
+  for (const [k, v] of Object.entries(st)) if (MISE_EN_PAGE.test(k) || (k === 'display' && v === 'none')) o[k] = v;
+  return Object.keys(o).length ? o : undefined;
+};
 export function BoutonBase({ variante = 'secondaire', taille, icone, plein = false, occupe = false, disabled = false, className = '', children, type = 'button', href, rendreIcone = iconeParDefaut, onClick, ...rest }) {
   const v = VARIANTES_BOUTON.includes(variante) ? variante : 'secondaire';
   const vn = VERS_NATIF[v];
@@ -58,7 +67,7 @@ export function BoutonBase({ variante = 'secondaire', taille, icone, plein = fal
   const ic = icone ? rendreIcone(icone, 20) : null;
   const nomIcone = !children && icone ? nomBoutonIcone(icone, rest) : null;
   const raison = disabled ? String(rest.title || rest['data-raison'] || '') : '';
-  const attrs = { 'data-vrm-variante': v, ...rest };
+  const attrs = { 'data-vrm-variante': v, ...rest, style: styleDeMiseEnPage(rest.style) };
   if (href) {
     const bloque = occupe || disabled;
     return <a href={bloque ? undefined : href} className={'n-bouton' + (className ? ' ' + className : '')} data-n-variante={vn} data-n-ton={v === 'danger' ? 'ambre' : undefined}

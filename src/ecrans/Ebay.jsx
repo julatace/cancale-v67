@@ -3611,7 +3611,7 @@ function EbayInactives({ comptesEbay, tick, vue = '*', connected, ventes, dejaSu
           <span className="vrm-ios-chevron" aria-hidden="true"><svg width="8" height="13" viewBox="0 0 8 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m1.5 1.5 5 5-5 5"/></svg></span>
         </button>
         {url && relancer && !(infos[l.itemId] && infos[l.itemId].ton === 'ok') && (
-          <button type="button" className="vrm-b vrm-b-secondaire vrm-eb-ina-geste" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</button>
+          <Bouton variante="secondaire" className="vrm-eb-ina-geste" data-inactive-relancer={url} disabled={!!geste} onClick={() => remettre(l, n)} style={{ opacity: geste && geste !== String(l.itemId) ? 0.5 : 1 }}>{geste === String(l.itemId) ? 'eBay…' : 'Remettre en vente'}</Bouton>
         )}
         {infos[l.itemId] && infos[l.itemId].texte ? <div role="status" data-inactive-resultat={infos[l.itemId].ton} style={{ flexBasis: '100%', fontSize: 12, color: infos[l.itemId].ton === 'ko' ? E.warn : infos[l.itemId].ton === 'ok' ? E.text : E.muted, paddingLeft: 54, lineHeight: 1.45 }}>{infos[l.itemId].texte}</div> : null}
       </div>
@@ -4943,7 +4943,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
   // ⚠️ Une paire VENDUE sur eBay sort de cette liste (l'annonce est terminée) :
   //    c'est justement quand il n'en reste aucune que « retire-la de Vinted »
   //    compte le plus. Les alertes passent donc AVANT ce cas.
-  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Aucune annonce sur ce compte' : 'Aucune annonce eBay'}{connected === true ? null : <div style={{ marginTop: 8 }}><button type="button" className="vrm-b vrm-b-primaire" data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ minHeight: 44 }}>Relier eBay</button></div>}</div></>);
+  if (!itemsVue.length) return wrap(<>{head(0)}{publier}{alertes}{ligneComptesIllisibles}{lignePasSu}{ligneSansPreuve}{outilsSuite(pasSu)}<div style={{ color: E.muted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{vueSeule ? 'Aucune annonce sur ce compte' : 'Aucune annonce eBay'}{connected === true ? null : <div style={{ marginTop: 8 }}><Bouton variante="primaire"  data-vers-comptes-ebay="" onClick={allerComptesEbay} style={{ minHeight: 44 }}>Relier eBay</Bouton></div>}</div></>);
   // ── 4. L'OFFRE AUX OBSERVATEURS et les annonces pas reliées : une phrase
   //    chacune, au-dessus de la liste ; sur la carte, seulement le bouton ou la
   //    pastille, qui distinguent (§7). ─────────────────────────────────────────
@@ -5081,7 +5081,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
       <div data-regles-fenetre-ventes {...(ventesAge.etat === 'lu' ? { 'data-regles-ventes-age-h': String(ventesAge.h) } : {})} style={{ marginTop: 12, color: ventesVieilles ? E.warn : E.muted, fontSize: 13, lineHeight: 1.45 }}>
         eBay vend sans attendre VRM : VRM ne voit cette vente qu'en relisant tes ventes eBay — {ventesAge.etat === 'lu' ? `dernière lecture il y a ${ventesAge.h < 1 ? 'moins d\'une heure' : (ventesAge.h < 48 ? `${ventesAge.h} h` : `${Math.floor(ventesAge.h / 24)} jours`)}` : (ventesAge.etat === 'jamais' ? 'pas encore lues' : (ventesAge.etat === 'illisible' ? 'je n\'ai pas pu savoir quand' : 'lecture en cours'))}.
         {/* (6 nov.) Le bouton sur SA ligne, jamais au milieu d'une phrase. */}
-        <div style={{ marginTop: 8 }}><button type="button" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay} className="vrm-b vrm-b-secondaire" style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</button></div>
+        <div style={{ marginTop: 8 }}><Bouton variante="secondaire" data-regles-relire-ventes disabled={relitVentes} onClick={relireVentesEbay}  style={{ opacity: relitVentes ? 0.6 : 1 }}>{relitVentes ? 'Lecture…' : 'Relire mes ventes eBay'}</Bouton></div>
       </div>
       <div data-regles-fenetre style={{ marginTop: 12, color: E.muted, fontSize: 13, lineHeight: 1.45 }}>
         Vendu sur Vinted ? Retiré d'eBay quand tu rouvres VRM{retraitAuto ? '' : ' (retrait auto éteint : par ton clic)'}. D'ici là, une offre peut passer.

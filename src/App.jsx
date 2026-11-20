@@ -20975,9 +20975,9 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
           ? <p data-nouveau-oauth-deja={deja.email} style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>{deja.pseudo ? `« ${deja.pseudo} »` : 'Ce compte Discord'} sert de pseudo à <strong style={{ color: C.text }}>{deja.email}</strong>, pas pour te connecter. Ce nouveau compte est vide.</p>
           : <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', color: C.muted }}>Ce compte {nom} n’était relié à aucun compte VRM : VRM vient d’en créer un nouveau, vide.</p>}
         <div style={{ display: 'grid', gap: 10 }}>
-          {deja && <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</button>}
+          {deja && <Bouton variante="primaire" plein  data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>Supprimer ce compte vide et revenir au mien</Bouton>}
           <button type="button" className={`vrm-b ${deja ? 'vrm-b-discret' : 'vrm-b-primaire'} vrm-b-plein`} data-nouveau-oauth="continuer" onClick={onContinuer}>Oui, c’est un nouveau compte</button>
-          {!deja && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</button>}
+          {!deja && <Bouton variante="secondaire" plein  data-nouveau-oauth="existant" onClick={() => setEtape('confirmer')}>J’ai déjà un compte VRM</Bouton>}
         </div>
       </>}
       {etape === 'confirmer' && <>
@@ -20986,15 +20986,15 @@ function PorteNouveauOAuth({ fournisseur, email, onContinuer }) {
         <ol data-nouveau-oauth-etapes="" style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi {deja ? <>avec <strong>{deja.email}</strong></> : 'avec ton e-mail'} ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
         {err && <p role="alert" style={{ fontSize: 13, color: C.warn || C.text, margin: '0 0 12px' }}>{err}</p>}
         <div style={{ display: 'grid', gap: 10 }}>
-          <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</button>
-          <button type="button" className="vrm-b vrm-b-discret vrm-b-plein" onClick={() => setEtape('choix')} disabled={busy}>Annuler</button>
+          <Bouton variante="primaire" plein  data-nouveau-oauth="supprimer" disabled={busy} onClick={supprimer}>{busy ? 'Suppression…' : 'Supprimer ce compte vide'}</Bouton>
+          <Bouton variante="discret" plein  onClick={() => setEtape('choix')} disabled={busy}>Annuler</Bouton>
         </div>
       </>}
       {etape === 'fait' && <>
         <h1 id="vrm-nouveau-oauth-titre" style={{ fontSize: 20, margin: '0 0 10px' }}>C’est fait</h1>
         <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 6px', color: C.muted }}>Le compte vide est supprimé. Ensuite :</p>
         <ol style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px', paddingLeft: 22, color: C.muted }}><li>connecte-toi avec ton e-mail ;</li><li>ta photo de profil → Paramètres → Mon compte → « Relier {nom} ».</li></ol>
-        <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={() => authSignOut()}>Aller à la connexion</button>
+        <Bouton variante="primaire" plein  onClick={() => authSignOut()}>Aller à la connexion</Bouton>
       </>}
     </div>
   </div>;
@@ -21972,7 +21972,7 @@ function ApercuSansAbonnement({ tab, setTab }) {
     <div className="vrm-apercu-carte" role="region" aria-labelledby="vrm-apercu-titre" data-carte-apercu="" data-signe={signe || undefined} key={signe}>
       <div className="vrm-apercu-titre" id="vrm-apercu-titre" data-apercu-nouveau={e.nouveau ? '' : undefined}>{e.nouveau ? 'Bienvenue sur VRM' : e.impaye ? "Ton prélèvement n'est pas passé" : 'Ton abonnement a pris fin'}</div>
       <div className="vrm-apercu-phrase">{e.nouveau ? 'Abonne-toi pour tout voir et agir.' : <>Tes données sont là, rien n'est supprimé. {e.impaye ? 'Mets ta carte à jour' : "Reprends l'abonnement"} pour tout retrouver.</>}</div>
-      <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.nouveau ? "Voir l'offre" : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</button>
+      <Bouton variante="primaire" plein  disabled={occupe} onClick={reprendre} data-apercu-reprendre="">{occupe ? 'Ouverture…' : e.nouveau ? "Voir l'offre" : e.impaye ? 'Mettre à jour ma carte' : "Reprendre l'abonnement"}</Bouton>
     </div>, document.body);
 }
 // ── (9 nov.) UN INCIDENT OUVERT PAR LES SONDES DE /statut ─────────────────────
@@ -23459,14 +23459,14 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // (29 oct.) Une ligne : le geste, sans la liste de ce qu'il débloque (le titre
   // « Lecture seule » et la ligne « Extension » le disent déjà, §7).
   else if (code === 'telephone') geste = <span data-etat-geste="telephone">{mobileIci() === 'ios' && boutiqueOrion() ? 'Pour agir, ouvre VRM sur ton ordinateur ou dans Orion (l’extension y vit).' : 'Pour agir, ouvre VRM sur ton ordinateur.'}{rl.niveau === 'absent' ? <>{' '}<Pourquoi label="Et d'ici ?">Avec l’extension à jour sur ton ordinateur, tes demandes partiront aussi d’ici : elle les exécute pour toi.</Pourquoi></> : null}</span>;
-  else if (code === 'absente' || code === 'retard') geste = <button type="button" data-etat-geste="maj" className="vrm-b vrm-b-primaire" onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</button>;
-  else if (code === 'muette') geste = <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+  else if (code === 'absente' || code === 'retard') geste = <Bouton variante="primaire" data-etat-geste="maj"  onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{code === 'absente' ? "Installer l'extension (Réglages)" : `Mettre à jour en ${EXT_ATTENDUE} (Réglages)`}</Bouton>;
+  else if (code === 'muette') geste = <Bouton variante="primaire" data-etat-geste="recharger"  onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</Bouton>;
   // Code périmé : le geste se fait DANS CHROME (une page web ne peut pas ouvrir
   // chrome://extensions) — on le dit tel quel, puis on recharge la page.
-  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">{NAV.Dans} : {NAV.pageExt ? <>tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>ouvre la page des extensions</>}, {NAV.rechargerExt}, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'perime') geste = <span data-etat-geste="recharger-extension">{NAV.Dans} : {NAV.pageExt ? <>tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>ouvre la page des extensions</>}, {NAV.rechargerExt}, puis <Bouton variante="discret" data-etat-geste-recharger="1"  onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</Bouton></span>;
   // Deux extensions : le geste se fait dans Chrome (une page web ne peut pas
   // ouvrir chrome://extensions) — on le DIT, puis on recharge.
-  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">{NAV.pageExt ? <>Tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>Ouvre la page des extensions {NAV.de}</>}, supprime l'ancienne VRM, puis <button type="button" data-etat-geste-recharger="1" className="vrm-b vrm-b-discret" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button></span>;
+  else if (code === 'plusieurs') geste = <span data-etat-geste="extensions">{NAV.pageExt ? <>Tape <b>{NAV.pageExt}</b> dans la barre d'adresse</> : <>Ouvre la page des extensions {NAV.de}</>}, supprime l'ancienne VRM, puis <Bouton variante="discret" data-etat-geste-recharger="1"  onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</Bouton></span>;
   // Non connectée : son icône ouvre SA fenêtre de connexion (une extension
   // connectée, elle, ouvre VRM) — c'est le repli si la reconnexion automatique
   // n'aboutit pas.
@@ -23497,12 +23497,12 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // passe VRM dans sa fenêtre — ou la mettre à jour.
   else if (code === 'autre-vrm') { const voie = voieConnexionExt(); geste = __sessExtEnVol ? <span>Un instant…</span>
     : voie === 'retard'
-      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <button type="button" data-etat-geste-deconnecter="1" className="vrm-b vrm-b-discret" onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension {NAV.de}</button>, puis clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
+      ? <span data-etat-geste="deconnecter">Cette extension ({vmrExtVersion() || 'version ?'}) ne sait pas recevoir la connexion de VRM. <Bouton variante="discret" data-etat-geste-deconnecter="1"  onClick={() => { deconnecterExtensionAncienne(); }}>Déconnecter l'extension {NAV.de}</Bouton>, puis clique l'icône VRM {NAV.hautDe} et connecte-toi avec ton mot de passe VRM (<b>{monMail || 'ton e-mail VRM'}</b>) — ou mets-la à jour en {EXT_ATTENDUE} (Paramètres → État des connexions).</span>
       : voie === 'serveur'
         ? <span data-etat-geste="attendre-serveur">Le serveur n'a pas pu préparer sa connexion{__sessExtErreur.message ? ` (${__sessExtErreur.message})` : ''} : je réessaie dans {minutesAvantReessai()} min, cette page ouverte.</span>
-        : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>; }
+        : <Bouton variante="primaire" data-etat-geste="recharger"  onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</Bouton>; }
   else if (code === 'vrm-passu') geste = __sessExtEnVol ? <span>Un instant…</span>
-    : <button type="button" data-etat-geste="recharger" className="vrm-b vrm-b-primaire" onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</button>;
+    : <Bouton variante="primaire" data-etat-geste="recharger"  onClick={() => { try { window.location.reload(); } catch (_) {} }}>Recharger la page</Bouton>;
   else if (code === 'vinted' && st.relais) geste = <span data-etat-geste="vinted-ordinateur">Sur ton ordinateur, ouvre vinted.fr connecté sur le compte des colis.</span>;
   else if (code === 'vinted') geste = <a data-etat-geste="vinted" href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr et me connecter</a>;
   // 'pause' : aucun geste — la phrase du panneau dit que ça repart seul.
@@ -23946,7 +23946,7 @@ function PremiersPas({ onNav, titreNeuf, introNeuf, dansGuide = false }) {
           {installerExtensionIci().boutique
             ? <a href={installerExtensionIci().lien} target="_blank" rel="noreferrer" data-premiers-geste="maj-boutique" className="vrm-b vrm-b-primaire">Mettre à jour depuis la boutique</a>
             : <a href="/VRM-extension.zip" download data-premiers-geste="maj" className="vrm-b vrm-b-primaire">Télécharger la mise à jour ({EXT_ATTENDUE})</a>}
-          {etape === 'autrecompte' && <button type="button" className="vrm-b vrm-b-secondaire vrm-b-court" data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : `Déconnecter l’extension ${NAV.de}`}</button>}
+          {etape === 'autrecompte' && <Bouton variante="secondaire"  data-premiers-geste="deconnecter" disabled={deconnectee} onClick={deconnecter}>{deconnectee ? 'Déconnectée — connecte-la avec ton mot de passe VRM' : `Déconnecter l’extension ${NAV.de}`}</Bouton>}
         </>
     : etape === 'connectee'
       ? <a href="https://www.vinted.fr" target="_blank" rel="noreferrer" className="vrm-b vrm-b-primaire">Ouvrir vinted.fr</a>
@@ -24531,7 +24531,7 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
   return (
     <div className={seule ? 'vrm-verif-cadre' : undefined}>
       <VerificationInstallation verif={verif} lienGeste={lienGeste} onGeste={onGeste} onFermer={onFermer}/>
-      {seule ? <button type="button" className="vrm-b vrm-b-secondaire" data-verif-relancer="" onClick={() => onGeste('reessayer')}>Vérifier à nouveau</button> : null}
+      {seule ? <Bouton variante="secondaire"  data-verif-relancer="" onClick={() => onGeste('reessayer')}>Vérifier à nouveau</Bouton> : null}
     </div>
   );
 }
@@ -29378,7 +29378,7 @@ function SortisDuStock({ plan, planLu, ecrire }) {
             <b>N°{x.num}</b>{x.titre ? ` · ${x.titre}` : ''}
             <span style={{ display: 'block', color: C.muted, fontSize: 12 }}>sortie de « {x.itemName} »{x.nom ? ` · ${x.nom}` : ''} le {jour(x.at)} — {x.plateforme || 'Vinted'} : {x.statut || 'colis parti'}</span>
           </span>
-          <button className="vrm-b vrm-b-secondaire" type="button" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ minHeight: 44 }}>Remettre</button>
+          <Bouton variante="secondaire" data-stock-remettre={x.num} onClick={() => remettre(x)} style={{ minHeight: 44 }}>Remettre</Bouton>
         </div>
       ))}
     </div>
@@ -29561,8 +29561,8 @@ function FeuilleToutRanger({ plan, numeros, plusieursPieces, onValider, onClose 
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>{n > 0 ? 'Annuler' : 'Fermer'}</button>
-          {n > 0 && <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ok="" onClick={() => onValider(prop)}>Ranger les {n}</button>}
+          <Bouton variante="discret" onClick={onClose}>{n > 0 ? 'Annuler' : 'Fermer'}</Bouton>
+          {n > 0 && <Bouton variante="primaire" data-tout-ranger-ok="" onClick={() => onValider(prop)}>Ranger les {n}</Bouton>}
         </div>
       </div>
     </SheetShell>, document.body
@@ -29642,8 +29642,8 @@ function AssistantPiece({ room, vide, nbArticles, onCreer, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={onClose}>Annuler</button>
-          <button className="vrm-b vrm-b-primaire" type="button" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ opacity: prop && prop.meubles.length ? 1 : 0.5 }}>Créer cette pièce</button>
+          <Bouton variante="discret" onClick={onClose}>Annuler</Bouton>
+          <Bouton variante="primaire" data-piece-creer="" disabled={!prop || !prop.meubles.length} onClick={creer} style={{ opacity: prop && prop.meubles.length ? 1 : 0.5 }}>Créer cette pièce</Bouton>
         </div>
       </div>
     </SheetShell>, document.body
@@ -30665,12 +30665,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       <div data-stock-barre="" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Segmente label="Ce que je fais" className="vrm-seg-stock" value={edition ? 'amenager' : 'ranger'} onChange={(v) => setEdition(v === 'amenager')}
           options={[{ v: 'ranger', l: 'Ranger', icone: 'box', data: { 'data-mode-stock': 'ranger' } }, { v: 'amenager', l: 'Aménager', icone: 'pencil', data: { 'data-mode-stock': 'amenager' } }]} />
-        {edition && items.length > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Nouvelle pièce en 3 questions</button>}
+        {edition && items.length > 0 && <Bouton variante="secondaire" taille="petit" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Nouvelle pièce en 3 questions</Bouton>}
         <div style={{ flex: '1 1 200px', display: 'flex', gap: 6, minWidth: 0 }}>
           <input ref={refRecherche} data-stock-saisie="" aria-label="Numéro : Entrée pour le trouver ou le ranger" value={search} onChange={e => { setSearch(e.target.value); doSearch(e.target.value); if (rangeClavier && !rangeClavier.numero) setRangeClavier(null); }}
             onKeyDown={e => { const ch = !/^[0-9]$/.test(e.key) && chiffreTouche(e); if (ch) { e.preventDefault(); const v = search + ch; setSearch(v); doSearch(v); return; } if (e.key === 'Enter') { e.preventDefault(); entreeClavier(); } else if (e.key === 'Escape') { e.preventDefault(); if (search) { setSearch(''); setHi(null); } else if (rangeClavier && rangeClavier.numero) annulerClavier(); } }}
             placeholder={sansSourisStock ? 'Cherche un N° → le meuble + la case' : 'Tape un N° puis Entrée : trouver ou ranger'} inputMode="numeric" style={{ flex: 1, minWidth: 0, border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 12px', fontSize: 15, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' }} />
-          {search && <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }}><Icon name="close" size={15}/></button>}
+          {search && <Bouton variante="discret" className="vrm-icon-control" aria-label="Effacer la recherche de rangement" onClick={() => { setSearch(''); setHi(null); }}><Icon name="close" size={15}/></Bouton>}
         </div>
       </div>
       <GuideReglage titre={edition ? 'Aménager ton espace' : 'Retrouver et ranger tes articles'} etapes={edition ? [
@@ -30685,7 +30685,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {rangeClavier && (
         <div data-stock-clavier={rangeClavier.numero ? 'range' : 'info'} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.text, lineHeight: 1.45, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '8px 10px' }}>
           <span style={{ flex: '1 1 220px', minWidth: 0 }}>{rangeClavier.numero ? <><b>N°{rangeClavier.numero}</b> rangée : {rangeClavier.itemName} · {rangeClavier.nom}. Tape le N° suivant.</> : rangeClavier.info}</span>
-          {rangeClavier.numero && <button className="vrm-b vrm-b-discret" type="button" data-stock-clavier-annuler="" onClick={annulerClavier}>Annuler{sansSourisStock ? '' : ' (Échap)'}</button>}
+          {rangeClavier.numero && <Bouton variante="discret" data-stock-clavier-annuler="" onClick={annulerClavier}>Annuler{sansSourisStock ? '' : ' (Échap)'}</Bouton>}
         </div>
       )}
       {hi && hi.itemId && (()=>{
@@ -30705,7 +30705,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px 8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap' }}>À ranger</span>
               <span style={{ fontSize: 13, color: C.muted, flex: '1 1 160px' }}>{aRanger.length} article{aRanger.length > 1 ? 's' : ''} · touche-en un, ou glisse-le dans la pièce</span>
-              <button className="vrm-b vrm-b-primaire" type="button" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ flexShrink: 0 }}>Tout ranger</button>
+              <Bouton variante="primaire" data-tout-ranger-ouvrir={aRanger.length} onClick={() => setToutRanger(true)} style={{ flexShrink: 0 }}>Tout ranger</Bouton>
             </div>
             <div className="vrm-rangee" style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
               {aRanger.slice(0, 60).map(p => {
@@ -30725,8 +30725,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                 <span style={{ flex: '1 1 220px', minWidth: 0 }}>
                   <b>N°{pairePrete}</b> : touche une place libre dans la pièce{pp ? <> — ou range-la à la prochaine place : <b>{pp.nom}</b></> : <> — aucune place libre dans la pièce, ajoute un meuble.</>}
                 </span>
-                {pp && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)}>Ranger ici</button>}
-                <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPairePrete(null)}>Annuler</button>
+                {pp && <Bouton variante="secondaire" data-ranger-prochaine="" onClick={() => rangerPaire(pairePrete, pp.itemId, pp.cellKey)}>Ranger ici</Bouton>}
+                <Bouton variante="discret" onClick={() => setPairePrete(null)}>Annuler</Bouton>
               </div>
             )}
             <div ref={refFantome} aria-hidden="true" style={{ display: 'none', position: 'fixed', left: 0, top: 0, zIndex: 3000, pointerEvents: 'none', padding: '6px 12px', borderRadius: 999, background: C.text, color: C.card, fontSize: 13, fontWeight: 700, boxShadow: '0 6px 18px rgba(0,0,0,0.28)' }} />
@@ -30743,8 +30743,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <span className="vrm-aide" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, lineHeight: 1.45 }}>Trois questions et VRM te propose une pièce prête à ranger.</span>
           </span>
           <span data-piece-vide-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
-            <button className="vrm-b vrm-b-primaire" type="button" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Créer ma pièce en 3 questions</button>
-            <button className="vrm-b vrm-b-secondaire" type="button" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }}>Ajouter un meuble à la main</button>
+            <Bouton variante="primaire" data-piece-assistant="" onClick={() => setAssistPiece(true)}>Créer ma pièce en 3 questions</Bouton>
+            <Bouton variante="secondaire" data-piece-vide-geste="" onClick={() => { setEdition(true); const d = refAmenager.current; if (d) { d.open = true; try { setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); } catch (_) {} } }}>Ajouter un meuble à la main</Bouton>
           </span>
         </div>
       )}
@@ -30759,13 +30759,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
               {chercheLoc.length} article{chercheLoc.length > 1 ? 's' : ''} à aller chercher
               <span style={{ fontWeight: 400, color: C.muted }}> · en couleur dans la pièce</span>
             </span>
-            <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)}><Icon name="close" size={14}/></button>
+            <Bouton variante="discret" className="vrm-icon-control" aria-label="Ne plus colorer les articles à aller chercher" onClick={() => setAChercher(null)}><Icon name="close" size={14}/></Bouton>
           </div>
           {chercheLoc.map(x => (
             <div key={x.numero} data-cherche={x.numero} data-trouve={x.ou ? '1' : '0'} style={{ fontSize: 13, color: x.ou ? C.text : C.muted, lineHeight: 1.45 }}>
               <b>N°{x.numero}</b>{' '}
               {x.ou
-                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <button className="vrm-b vrm-b-discret" type="button" onClick={() => switchRoom(x.ou.roomId)}>ouvrir cette pièce</button></> : null}</>
+                ? <>→ {x.ou.itemName}{plan.rooms.length > 1 ? ` (${x.ou.roomName})` : ''} · {x.ou.nom}{x.ou.roomId !== activeRoom.id ? <> — <Bouton variante="discret" onClick={() => switchRoom(x.ou.roomId)}>ouvrir cette pièce</Bouton></> : null}</>
                 : <>— rangée nulle part dans le stock</>}
             </div>
           ))}
@@ -30800,9 +30800,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             </button>
           );
         })}
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={addRoom} title="Ajouter une pièce">＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</button>
-        <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce"><Icon name="pencil" size={15}/></button>
-        {plan.rooms.length > 1 && <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce"><Icon name="trash" size={16}/></button>}
+        <Bouton variante="secondaire" taille="petit" onClick={addRoom} title="Ajouter une pièce">＋ {plan.rooms.length > 1 ? 'Pièce' : 'Ajouter une pièce'}</Bouton>
+        <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Renommer la pièce" onClick={renameRoom} title="Renommer la pièce"><Icon name="pencil" size={15}/></Bouton>
+        {plan.rooms.length > 1 && <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Supprimer la pièce" onClick={removeRoom} title="Supprimer la pièce"><Icon name="trash" size={16}/></Bouton>}
       </div>
       {/* ⚠️ UTILISER AVANT AMÉNAGER. Julien : « mets-toi à la place d'un
           revendeur pour son rangement, ça doit être plus facile à prendre en
@@ -30838,7 +30838,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <div key={titre} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               <span title={aide} style={{ fontSize: 12, color: C.muted, fontWeight: 700, alignSelf: 'center', minWidth: 74 }}>{titre}</span>
               {liste.map(([k, t]) => (
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" key={k} onClick={() => addFurn(k)} title={aide}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</button>
+                <Bouton variante="secondaire" taille="petit" key={k} onClick={() => addFurn(k)} title={aide}>{t.emoji} {k === 'autre' ? 'Autre…' : t.label}</Bouton>
               ))}
             </div>
           ) : null);
@@ -30863,13 +30863,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
         {/* Taille de la pièce */}
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: C.muted }}>
           <span style={{ fontWeight: 700 }}>Pièce {room.w}×{room.h} :</span>
-          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(1, 0)}>largeur +</button>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)}>−</button>
-          <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setRoom(0, 1)}>profondeur +</button>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)}>−</button>
+          <Bouton variante="secondaire" taille="petit" onClick={() => setRoom(1, 0)}>largeur +</Bouton>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la largeur de la pièce" onClick={() => setRoom(-1, 0)}>−</Bouton>
+          <Bouton variante="secondaire" taille="petit" onClick={() => setRoom(0, 1)}>profondeur +</Bouton>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la profondeur de la pièce" onClick={() => setRoom(0, -1)}>−</Bouton>
           <span style={{ fontWeight: 700, marginLeft: 8 }}>Plafond :</span>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</button>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</button>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.min(6, Math.round(((r.room.wallH || 3.4) + 0.4) * 10) / 10) } }))}>+</Bouton>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la hauteur du plafond" onClick={() => patchRoom(r => ({ room: { ...r.room, wallH: Math.max(2.4, Math.round(((r.room.wallH || 3.4) - 0.4) * 10) / 10) } }))}>−</Bouton>
           <span style={{ fontWeight: 700, marginLeft: 8 }}>Murs :</span>
           {['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].map(c => (
             <button type="button" aria-label={`Couleur de mur ${['#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#E5E5EA', '#2C2C2E'].indexOf(c)+1}`} aria-pressed={(room.wallColor || '#E5E5EA')===c} key={c} onClick={() => patchRoom(r => ({ room: { ...r.room, wallColor: c } }))} title="Couleur des murs" style={{ width: 18, height: 18, borderRadius: 6, background: c, border: (room.wallColor || '#E5E5EA') === c ? `2px solid ${C.accent}` : '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', padding: 0 }} />
@@ -30893,14 +30893,14 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
       {putOnSrc && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}14` }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Touche le <b>meuble</b> (table, commode…) sur lequel poser la pile — elle se posera dessus, centrée.</span>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
+          <Bouton variante="discret" onClick={() => setPutOnSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</Bouton>
         </div>
       )}
       {/* Bandeau « empiler par toucher » actif */}
       {stackSrc && (()=>{ const s = items.find(o => o.id === stackSrc); return (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 11px', border: `1.5px solid ${C.accent}`, borderRadius: 12, background: `${C.accent}14` }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Touche la boîte sur laquelle poser <b>N°{(s && s.num) || '?'}</b> (elle montera dessus).</span>
-          <button className="vrm-b vrm-b-discret" type="button" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</button>
+          <Bouton variante="discret" onClick={() => setStackSrc(null)} style={{ marginLeft: 'auto' }}>Annuler</Bouton>
         </div>
       ); })()}
 
@@ -30943,8 +30943,8 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
                           {p.ambigu ? '⚠️ N° porté par plusieurs articles' : (p.title || '—')}
                         </span>
                       </span>
-                      <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
-                        style={{ flexShrink: 0 }}>Sortir</button>
+                      <Bouton variante="secondaire" taille="petit" onClick={() => sortirDeCase(selItem.id, p.cell, p.numero)} title="Sortir cet article du stock"
+                        style={{ flexShrink: 0 }}>Sortir</Bouton>
                     </div>
                   ))}
                 </div>
@@ -30954,9 +30954,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           {/* Boîte à empiler : empiler (par toucher), reposer au sol, changer le N° */}
           {(FURN_TYPES[selItem.type] || {}).box && (
             <div style={{ flex: '1 1 100%', display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto' }}>Poser sur une autre boîte</button>
-              {(selItem.lvl || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto' }}>Au sol</button>}
-              <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto' }}><Icon name="pencil" size={15}/>N°{selItem.num || '?'}</button>
+              <Bouton variante="secondaire" taille="petit" onClick={() => setStackSrc(selItem.id)} style={{ flex: '1 1 auto' }}>Poser sur une autre boîte</Bouton>
+              {(selItem.lvl || 0) > 0 && <Bouton variante="secondaire" taille="petit" onClick={() => boxToFloor(selItem)} style={{ flex: '0 0 auto' }}>Au sol</Bouton>}
+              <Bouton variante="secondaire" taille="petit" onClick={async ()=>{ const n = (await askText({ numeric: clavierNum() === 'numeric', desc: 'Numéro de cette boîte :', value: selItem.num || '' }) || '').trim(); if (n) updateItem(selItem.id, { num: n }); }} style={{ flex: '0 0 auto' }}><Icon name="pencil" size={15}/>N°{selItem.num || '?'}</Bouton>
             </div>
           )}
           {!edition && (()=>{
@@ -30965,10 +30965,10 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {ft.cases && <span style={{ fontSize: 13, color: C.muted, flex: '1 1 200px' }}>{p ? <>Prochaine place libre : <b style={{ color: C.text }}>{nomCase(Math.max(1, selItem.rows || 1), p.cell, modeCase(ft), selItem)}</b></> : 'Ce meuble est plein.'} Touche une place libre pour ranger, une boîte pour la changer.</span>}
-                {ft.cases && p && <button className="vrm-b vrm-b-secondaire" type="button" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger un article ici'}</button>}
+                {ft.cases && p && <Bouton variante="secondaire" data-ranger-dans-meuble="" onClick={() => { if (pairePrete) rangerPaire(pairePrete, selItem.id, p.cell); else fillCell(selItem.id, p.cell, { ghost: true }); }}>{pairePrete ? `Ranger N°${pairePrete} ici` : 'Ranger un article ici'}</Bouton>}
                 {ft.build === 'pile' && <span className="vrm-aide" style={{ fontSize: 13, color: C.muted }}>Touche une boîte pour la changer ou la retirer.</span>}
-                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</button>
+                {!ft.cases && ft.build !== 'pile' && !ft.box && !ft.deco && <Bouton variante="secondaire" taille="petit" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</Bouton>}
+                <Bouton variante="secondaire" taille="petit" onClick={() => setEdition(true)} style={{ marginLeft: 'auto' }}>Régler ce meuble</Bouton>
               </div>
             );
           })()}
@@ -30980,7 +30980,7 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             <label title="Couleur libre" style={{ width: 22, height: 22, borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.border}`, cursor: 'pointer', position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: `conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)` }}>
               <input type="color" value={colorOf(selItem)} onChange={e => updateItem(selItem.id, { color: e.target.value })} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />🎨
             </label>
-            {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji">{emojiOf(selItem)}</button>}
+            {!(FURN_TYPES[selItem.type] || {}).box && <Bouton variante="secondaire" taille="petit" onClick={async ()=>{ const e = (await askText({ desc: 'Emoji du meuble :', value: emojiOf(selItem) }) || '').trim(); if (e) updateItem(selItem.id, { emoji: e }); }} title="Changer l'emoji">{emojiOf(selItem)}</Bouton>}
             {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && !(FURN_TYPES[selItem.type] || {}).box && !(FURN_TYPES[selItem.type] || {}).cases && <>
               <span style={{ fontSize: 11, color: C.muted, fontWeight: 700, marginLeft: 6 }}>Hauteur</span>
               <Segmente label="Hauteur du meuble" value={[0.5, 1.0, 1.8].find(v => Math.abs(h3dOf(selItem) - v) < 0.01) ?? null} onChange={(v) => updateItem(selItem.id, { h3d: v })} options={[{ v: 0.5, l: 'Bas' }, { v: 1.0, l: 'Moyen' }, { v: 1.8, l: 'Haut' }]} />
@@ -30993,9 +30993,9 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             const pas = (lib, val, moins, plus, cle) => (
               <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} data-reglage={cle}>
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 600 }}>{lib}</span>
-                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</button>
+                <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label={`${lib} : moins`} onClick={moins} style={stepBtn}>−</Bouton>
                 <b style={{ fontSize: 15, minWidth: 18, textAlign: 'center' }}>{val}</b>
-                <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</button>
+                <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label={`${lib} : plus`} onClick={plus} style={stepBtn}>+</Bouton>
               </span>);
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 10 }}>
@@ -31026,13 +31026,13 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 700 }}>Grille</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</button><button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond">Jusqu'au plafond</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Taille case</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↔ Boîtes en largeur</span><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire les colonnes" onClick={() => gridCols(selItem, -1)} style={stepBtn}>−</Bouton><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.cols || 4}</b><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter les colonnes" onClick={() => gridCols(selItem, 1)} style={stepBtn}>+</Bouton></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>↕ Boîtes en hauteur</span><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire les rangées" onClick={() => gridRows(selItem, -1)} style={stepBtn}>−</Bouton><b style={{ fontSize: 13, minWidth: 16, textAlign: 'center' }}>{selItem.rows || 3}</b><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter les rangées" onClick={() => gridRows(selItem, 1)} style={stepBtn}>+</Bouton><Bouton variante="secondaire" taille="petit" onClick={() => gridToCeiling(selItem)} title="Empiler jusqu'au plafond">Jusqu'au plafond</Bouton></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Taille case</span><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la taille des cases" onClick={() => gridCell(selItem, -0.06)} style={stepBtn}>−</Bouton><b style={{ fontSize: 12, minWidth: 34, textAlign: 'center' }}>{cellCm} cm</b><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter la taille des cases" onClick={() => gridCell(selItem, 0.06)} style={stepBtn}>+</Bouton></span>
                 <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>= {(selItem.cols || 4) * (selItem.rows || 3)} places</span>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)">Ajouter une boîte</button>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant">Remplir en série</button>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => clearGrid(selItem)} title="Vider toutes les cases">Vider</button>
+                <Bouton variante="secondaire" taille="petit" onClick={() => addBoxToGrid(selItem)} title="Pose une boîte à la prochaine place libre (repère bleu)">Ajouter une boîte</Bouton>
+                <Bouton variante="secondaire" taille="petit" onClick={() => fillGridSeries(selItem)} title="Remplir toutes les places vides en croissant">Remplir en série</Bouton>
+                <Bouton variante="secondaire" taille="petit" onClick={() => clearGrid(selItem)} title="Vider toutes les cases">Vider</Bouton>
               </div>
             );
           })()}
@@ -31043,38 +31043,38 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
             return (
               <div style={{ flex: '1 1 100%', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4, padding: '7px 9px', border: `1px dashed ${C.border}`, borderRadius: 9 }}>
                 <span style={{ fontSize: 11, color: C.text, fontWeight: 700 }}>Pile</span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</button><b style={{ fontSize: 15, minWidth: 24, textAlign: 'center' }}>{total}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</button></span>
-                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</button><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</button></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Nombre de boîtes</span><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Retirer la dernière boîte de la pile" onClick={() => pileRemoveLast(selItem)} style={stepBtn}>−</Bouton><b style={{ fontSize: 15, minWidth: 24, textAlign: 'center' }}>{total}</b><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Ajouter une boîte à la pile" onClick={() => pileAdd(selItem)} style={stepBtn}>+</Bouton></span>
+                <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{cols > 1 ? 'Boîtes de haut (toutes les piles)' : 'Boîtes de haut'}</span><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la hauteur de la pile" onClick={() => pileHeight(selItem, -1)} style={stepBtn}>−</Bouton><b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{rows}</b><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter la hauteur de la pile" onClick={() => pileHeight(selItem, 1)} style={stepBtn}>+</Bouton></span>
                 {cols > 1 && <span data-pile-hauteurs style={{ flex: '1 1 100%', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Hauteur de chaque pile (depuis la gauche)</span>
                   {Array.from({ length: cols }, (_, c) => { const h = hauteurPile(rows, selItem.hauteurs, c); return (
                     <span key={c} data-pile-col={c + 1} data-pile-h={h} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>Pile {c + 1}</span>
-                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</button>
+                      <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label={`Réduire la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, -1)} style={stepBtn}>−</Bouton>
                       <b style={{ fontSize: 12, minWidth: 14, textAlign: 'center' }}>{h}</b>
-                      <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</button>
+                      <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label={`Agrandir la pile ${c + 1}`} onClick={() => pileHauteurCol(selItem, c, 1)} style={stepBtn}>+</Bouton>
                     </span>); })}
                 </span>}
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => pileRestart(selItem)}>Renuméroter</button>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)">Poser sur un meuble</button>
-                {(selItem.lift || 0) > 0 && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol">Au sol</button>}
+                <Bouton variante="secondaire" taille="petit" onClick={() => pileRestart(selItem)}>Renuméroter</Bouton>
+                <Bouton variante="secondaire" taille="petit" onClick={() => setPutOnSrc(selItem.id)} title="Poser cette pile sur un meuble (table, commode…)">Poser sur un meuble</Bouton>
+                {(selItem.lift || 0) > 0 && <Bouton variante="secondaire" taille="petit" onClick={() => updateItem(selItem.id, { lift: 0 })} title="Reposer la pile au sol">Au sol</Bouton>}
                 <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>{cols} colonne{cols > 1 ? 's' : ''} · touche une boîte pour changer son N° (ou la retirer)</span>
               </div>
             );
           })()}
-          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</button>}
-          {!(FURN_TYPES[selItem.type] || {}).box && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => stickToWall(selItem)} title="Coller au mur suivant">Coller au mur</button>}
+          {!(FURN_TYPES[selItem.type] || {}).box && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).cases && <Bouton variante="secondaire" taille="petit" onClick={() => setOpenItem(selItem.id)}>Ranger dedans ({storedCount(selItem)})</Bouton>}
+          {!(FURN_TYPES[selItem.type] || {}).box && <Bouton variante="secondaire" taille="petit" onClick={() => stickToWall(selItem)} title="Coller au mur suivant">Coller au mur</Bouton>}
           {(FURN_TYPES[selItem.type] || {}).build !== 'grille' && (FURN_TYPES[selItem.type] || {}).build !== 'pile' && !(FURN_TYPES[selItem.type] || {}).box && <>
-            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter">↻</button>
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })}>↔️+</button>
-            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })}>↔️−</button>
+            <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Pivoter" onClick={() => changerDimensions(selItem, { rot: ((selItem.rot || 0) + Math.PI / 2) % (2 * Math.PI) })} title="Pivoter">↻</Bouton>
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Élargir le meuble" onClick={() => changerDimensions(selItem, { w: Math.min(room.w, selItem.w + 0.5) })}>↔️+</Bouton>
+            <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la largeur du meuble" onClick={() => changerDimensions(selItem, { w: Math.max(0.5, selItem.w - 0.5) })}>↔️−</Bouton>
             </>}
-            {!(FURN_TYPES[selItem.type] || {}).cases && <><button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })}>↕️+</button>
-            <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })}>↕️−</button></>}
+            {!(FURN_TYPES[selItem.type] || {}).cases && <><Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Augmenter la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.min(room.h, selItem.h + 0.25) })}>↕️+</Bouton>
+            <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Réduire la profondeur du meuble" onClick={() => changerDimensions(selItem, { h: Math.max(0.3, selItem.h - 0.25) })}>↕️−</Bouton></>}
           </>}
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }}><Icon name="pencil" size={15}/></button>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer">⧉</button>
-          <button className="vrm-icon-control vrm-b vrm-b-secondaire vrm-b-petit" type="button" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto' }}><Icon name="trash" size={16}/></button>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Renommer le meuble" onClick={async ()=>{ const n = await askText({ desc: 'Nom du meuble :', value: selItem.name }); if (n != null && n.trim()) updateItem(selItem.id, { name: n.trim() }); }}><Icon name="pencil" size={15}/></Bouton>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Dupliquer" onClick={() => dupItem(selItem)} title="Dupliquer">⧉</Bouton>
+          <Bouton variante="secondaire" taille="petit" className="vrm-icon-control" aria-label="Supprimer le meuble" onClick={() => removeItem(selItem.id)} style={{ marginLeft: 'auto' }}><Icon name="trash" size={16}/></Bouton>
           </>)}
         </div>
       )}
@@ -31092,12 +31092,12 @@ function RoomPlan({ locate, onLocateConsumed, mode = '3d', onAssistant }) {
           <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 14, maxWidth: 460, width: '100%', maxHeight: '92vh', overflow: 'auto', padding: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: C.text, flex: 1 }}>{emojiOf(opened)} {opened.name}</span>
-              <button className="vrm-icon-control vrm-b vrm-b-discret vrm-b-icone" type="button" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)}><Icon name="close" size={15}/></button>
+              <Bouton variante="discret" className="vrm-icon-control" aria-label="Fermer le contenu du meuble" onClick={() => setOpenItem(null)}><Icon name="close" size={15}/></Bouton>
             </div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Vue de face — touche une case pour y ranger un N° (empilable).
               <span style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)}>+ rangée</button>
-                <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)}>+ colonne</button>
+                <Bouton variante="secondaire" taille="petit" onClick={() => setGrid(opened, opened.rows + 1, opened.cols)}>+ rangée</Bouton>
+                <Bouton variante="secondaire" taille="petit" onClick={() => setGrid(opened, opened.rows, opened.cols + 1)}>+ colonne</Bouton>
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: colorOf(opened) + '22', border: `2px solid ${colorOf(opened)}`, borderRadius: 12, padding: 8 }}>
@@ -31432,13 +31432,13 @@ function StockPhotos() {
             </div>
             <div style={{ padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: 12, color: C.text, lineHeight: 1.3, minHeight: 31, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f.title || '—'}</div>
-              {sold && <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => sortir(f)}>Sortie du stock</button>}
+              {sold && <Bouton variante="secondaire" taille="petit" onClick={() => sortir(f)}>Sortie du stock</Bouton>}
             </div>
           </div>
         );
       })}
     </div>
-    {liste.length > max && <button className="vrm-b vrm-b-discret" type="button" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</button>}
+    {liste.length > max && <Bouton variante="discret" onClick={() => setMax((m) => m + 60)} style={{ alignSelf: 'center' }}>Voir plus — {Math.min(max, liste.length)} sur {liste.length}</Bouton>}
   </>);
 }
 
@@ -31631,8 +31631,8 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
         {/* (16 nov., bancs-rouges-a) 44 px au doigt (§7) : ces deux boutons « petits » faisaient 30 px. */}
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ minHeight: 44 }}>Une à chaque rangée</button>
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-aucune="" onClick={() => setPlanches([])} style={{ minHeight: 44 }}>Aucune</button>
+        <Bouton variante="secondaire" taille="petit" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ minHeight: 44 }}>Une à chaque rangée</Bouton>
+        <Bouton variante="secondaire" taille="petit" data-planches-aucune="" onClick={() => setPlanches([])} style={{ minHeight: 44 }}>Aucune</Bouton>
       </div>}
   </>);
 }
@@ -58952,9 +58952,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               <div style={{marginBottom:14}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <span style={{fontSize:12,fontWeight:400,color:C.text}}>Mois</span>
-                  <button type="button" className="vrm-b vrm-b-secondaire vrm-b-petit" aria-expanded={moisOuvert} onClick={()=>setMoisOuvert(v=>!v)} style={{textTransform:'capitalize'}}>
+                  <Bouton variante="secondaire" taille="petit"  aria-expanded={moisOuvert} onClick={()=>setMoisOuvert(v=>!v)} style={{textTransform:'capitalize'}}>
                     {report.monthLabel} ▾
-                  </button>
+                  </Bouton>
                 </div>
                 {moisOuvert && (
                   <div style={{marginTop:8,border:`1px solid ${C.border}`,borderRadius:12,background:C.card,padding:10}}>
@@ -59582,7 +59582,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               ))}
             </div>
             <div style={{padding:'12px 18px calc(16px + env(safe-area-inset-bottom))',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,flexShrink:0,background:C.bg}}>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13,fontWeight:400,cursor:'pointer',fontFamily:'inherit'}}>Annuler</button>
+              <Bouton variante="discret" onClick={()=>setRenumOpen(false)} style={{flex:1,border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,padding:'12px',fontSize:13,fontWeight:400,cursor:'pointer',fontFamily:'inherit'}}>Annuler</Bouton>
               {moves.length>0 && <button type="button" onClick={applyRenum} style={{flex:2,border:'none',background:C.accent,color:C.onAccent||'#fff',borderRadius:12,padding:'12px',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Renuméroter {moves.length} article{moves.length>1?'s':''}</button>}
             </div>
           </div>
@@ -62164,14 +62164,14 @@ function AbonnementRequis({ info }) {
         {!paiementFerme && info && info.modeTest && <div style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>Mode test : aucune vraie carte n'est débitée.</div>}
         {!impaye && !paiementFerme && <CaseCgv cases={cases} onChange={setCases}/>}
         {!paiementFerme && (
-          <button type="button" disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir} className="vrm-b vrm-b-primaire vrm-b-plein" style={{ marginTop: 18 }} title={!impaye && !cgv ? 'Coche d’abord les conditions de vente' : undefined}>
+          <Bouton variante="primaire" plein disabled={occupe || (!impaye && !cgv)} data-sabonner="" onClick={agir}  style={{ marginTop: 18 }} title={!impaye && !cgv ? 'Coche d’abord les conditions de vente' : undefined}>
             {occupe ? 'Ouverture du paiement…' : (impaye ? 'Mettre à jour ma carte' : info && info.essaiDispo ? `Commencer l'essai gratuit de ${info.essaiJours || 7} jours` : "S'abonner")}
-          </button>
+          </Bouton>
         )}
         {msg && !paiementFerme && <div style={{ fontSize: 13, color: C.warn, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, fontSize: 13 }}>
           <a href="/legal/cgv.html" target="_blank" rel="noopener noreferrer" style={{ color: C.muted }}>Conditions de vente</a>
-          <button type="button" onClick={() => { seDeconnecter({ question: false }); }} className="vrm-b vrm-b-discret">Se déconnecter</button>
+          <Bouton variante="discret" onClick={() => { seDeconnecter({ question: false }); }}>Se déconnecter</Bouton>
         </div>
       </div>
     </div>
@@ -62927,7 +62927,7 @@ function DemandeCodeDiscord() {
             style={{ width:'100%', boxSizing:'border-box', minHeight:50, fontSize:20, letterSpacing:4, textAlign:'center', borderRadius:12, border:`1px solid ${C.border}`, background:C.bg, color:C.text, marginBottom:10 }}/>
           {e.erreur && <div data-discord-code-erreur="" style={{ fontSize:15, color:C.warn || C.text, marginBottom:10 }}>{e.erreur}</div>}
           <div style={{ display:'flex', gap:8 }}>
-            <button className="vrm-b vrm-b-discret" type="button" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</button>
+            <Bouton variante="discret" onClick={fermer} style={{ minHeight:44, flex:1, borderRadius:12, border:`1px solid ${C.border}`, background:'transparent', color:C.text }}>Annuler</Bouton>
             <button type="button" data-discord-code-valider="" disabled={chiffres.length !== 6 || envoi} onClick={valider} style={{ minHeight:44, flex:1, borderRadius:12, border:'none', background:C.accent, color:C.onAccent, fontWeight:600, opacity:(chiffres.length !== 6 || envoi) ? .5 : 1 }}>{envoi ? 'Vérification…' : 'Relier Discord'}</button>
           </div>
         </>)}

@@ -240,7 +240,10 @@ async function releve(o, nom, W, th, tel) {
 
 function resumer(r) {
   const parOrigine = {}; const parDefaut = {};
-  for (const b of r.boutons) { parOrigine[b.o] = (parOrigine[b.o] || 0) + 1; for (const d of b.d) parDefaut[d] = (parDefaut[d] || 0) + 1; }
+  // Une RANGÉE n'est pas jugée comme un bouton dessiné : seuls comptent pour elle la cible (D1), le contraste (D4), le focus
+  // (D8) et l'indisponible muet (D9) — son icône posée sur la 1re ligne, sa taille de titre, son style sont ceux d'une liste.
+  const POUR_RANGEE = new Set(['D1', 'D4', 'D8', 'D9']);
+  for (const b of r.boutons) { parOrigine[b.o] = (parOrigine[b.o] || 0) + 1; for (const d of b.d) if (!b.rangee || POUR_RANGEE.has(d)) parDefaut[d] = (parDefaut[d] || 0) + 1; }
   if (r.pleins > 1) parDefaut.D11 = r.pleins;
   // Une RANGÉE d'avant (toute la largeur de sa liste : une conversation, un réglage, un achat) est comptée à part : ce n'est
   // pas un bouton dessiné, c'est une ligne qui se touche (NATIF.md : « une rangée ENTIÈRE se touche »).
