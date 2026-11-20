@@ -234,6 +234,8 @@
     v_avant: { fr: "Avant le {d}", en: "Before {d}", es: "Antes del {d}", it: "Entro il {d}", de: "Bis {d}" },
     imp_un: { fr: "Imprimer le bordereau", en: "Print the label", es: "Imprimir la etiqueta", it: "Stampa l’etichetta", de: "Etikett drucken" },
     imp_n: { fr: "Imprimer les {n} bordereaux", en: "Print the {n} labels", es: "Imprimir las {n} etiquetas", it: "Stampa le {n} etichette", de: "Die {n} Etiketten drucken" },
+    imp_court: { fr: "Imprimer", en: "Print", es: "Imprimir", it: "Stampa", de: "Drucken" },
+    imp_pas_note: { fr: "Vinted ne l’a pas encore fourni : VRM le récupère seul à ta prochaine visite sur Vinted.", en: "Vinted hasn’t provided it yet: VRM fetches it by itself on your next visit to Vinted.", es: "Vinted aún no la ha dado: VRM la recupera sola en tu próxima visita a Vinted.", it: "Vinted non l’ha ancora fornita: VRM la recupera da solo alla tua prossima visita su Vinted.", de: "Vinted hat es noch nicht geliefert: VRM holt es beim nächsten Besuch auf Vinted selbst." },
     imp_pas: { fr: "Pas encore de bordereau", en: "No label yet", es: "Aún sin etiqueta", it: "Ancora nessuna etichetta", de: "Noch kein Etikett" },
     imp_en_cours: { fr: "Ouverture du bordereau…", en: "Opening the label…", es: "Abriendo la etiqueta…", it: "Apertura dell’etichetta…", de: "Etikett wird geöffnet…" },
     imp_ouvert: { fr: "Bordereau ouvert dans un onglet : imprime-le de là.", en: "Label opened in a tab: print it from there.", es: "Etiqueta abierta en una pestaña: imprímela desde allí.", it: "Etichetta aperta in una scheda: stampala da lì.", de: "Etikett in einem Tab geöffnet: von dort drucken." },

@@ -686,6 +686,7 @@
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); } }
   :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); }
   .carte[data-grand] .t5 { min-height: 52px; }
+  .carte.on[data-grand] ~ .btn { display: none !important; }   /* 5.410.2 : le rond VRM ne recouvre plus le coin du panneau (son × ferme) */
   .carte[data-grand] .t5 .nom { font: 700 28px/34px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; max-width: 70%; color: var(--n-encre); }
   .carte[data-grand] .fermer { position: sticky; float: right; top: 0; width: 44px; height: 44px; border-radius: 22px; background: var(--n-carte-2); color: var(--n-encre); font-size: 22px; z-index: 2; }
   .carte[data-grand] .contenu > :not(.tete):not(.fermer):not(.b):not(style) { border-radius: 12px; }
@@ -779,7 +780,7 @@
   .cols5 { position: relative; }
   .cols5 > summary { list-style: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 10px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .cols5 > summary::-webkit-details-marker { display: none; }
-  .cols5 > summary::after { content: ' ▾'; }
+  .cols5 > summary::after { content: '▾'; margin-left: 6px; font-size: 12px; opacity: .7; }
   .cols5-l { position: absolute; z-index: 3; right: 0; top: 48px; min-width: 200px; background: var(--n-carte); border-radius: 12px; box-shadow: 0 8px 30px rgb(0 0 0/.18); padding: 6px; display: grid; }
   .cols5-l label { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; color: var(--n-encre); font: 400 15px/1 -apple-system, Inter, system-ui, sans-serif; }
   .chips5 { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
@@ -885,7 +886,7 @@
   .n6-d { display: inline-flex; align-items: center; gap: 8px; }
   .n6 .vue5 { min-width: 0; }
   .n6 .vue5 button { min-width: 44px; font-size: 16px; }
-  .table6 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
+  .table6 { margin: 0 16px; border-radius: 12px; overflow: hidden; background: var(--n-carte); }   /* NATIF §1 bis : un groupe blanc, sans filet */
   .table6 .rangs { margin: 0; padding: 0; list-style: none; }
   .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
   .corps6 .table5 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; }
@@ -893,7 +894,10 @@
   .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
   .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
   .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
-  .tr6 .cels6 { display: grid; grid-template-columns: repeat(var(--n6, 4), minmax(92px, auto)); gap: 0 12px; align-items: center; }
+  .tr6 .cels6 { display: grid; grid-template-columns: var(--g6, repeat(var(--n6, 4), minmax(92px, auto))); gap: 0 12px; align-items: center; }
+  .cel6 { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .th6-fixe { cursor: default; }
+  .cel6[data-col="bordereau"] { white-space: normal; } .cel6 .pas6 { display: block; line-height: 16px; }
   .th6r { min-height: 44px; background: var(--n-carte); border-bottom: .5px solid var(--n-trait); }
   .th6 { appearance: none; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 44px; padding: 0; font: 500 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); cursor: pointer; text-align: right; }
   .th6r > .th6 { justify-content: flex-start; }
@@ -905,7 +909,8 @@
   .art6 .st6 { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cel6 { text-align: right; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .cel6 b { font-weight: 600; }
-  .cel6[data-col="statut"], .cel6[data-col="transporteur"] { text-align: left; }
+  .cel6[data-col="statut"], .cel6[data-col="transporteur"], .cel6[data-col="limite"], .cel6[data-col="bordereau"] { text-align: left; }
+  .th6r .cels6 > [data-ven-tri="statut"], .th6r .cels6 > [data-ven-tri="transporteur"], .th6r .cels6 > [data-ann-tri="statut"], .th6r .cels6 > .th6-fixe { justify-content: flex-start; }
   .tr-l6 { display: inline-flex; align-items: center; gap: 8px; }
   /* 5.410.2 : le livreur, le suivi, la date limite et le bordereau de chaque vente */
   .cel6 .tr-l6 + .suivi6, .env6 .suivi6 { display: block; margin-top: 2px; font: 400 12px/16px ui-monospace, "SF Mono", Menlo, monospace; color: var(--n-encre-2); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
@@ -955,7 +960,9 @@
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
   .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
-  .geste6 { margin: 12px 16px; padding: 12px 16px; border: .5px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
+  .geste6 { margin: 12px 16px; padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
+  .carte[data-grand] .geste6 .vu-btn:not(.vu-plein) { background: var(--n-carte-2); color: var(--n-encre); box-shadow: none; }
+  .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
   .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .prix6 { width: 110px; min-height: 44px; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
@@ -1793,6 +1800,10 @@
   const COLS5_DEFAUT = ['prix', 'date', 'vues', 'favoris', 'statut'];
   // 5.410 (comme Vintex) : le N° est la plaque devant le titre, plus une colonne ; les colonnes de Vintex d'abord.
   const COLS6 = ['prix', 'date', 'vues', 'favoris', 'statut', 'mini', 'achat', 'place'];
+  // 5.410.2 (passe de finition) : des colonnes de LARGEUR FIXE — chaque rangée était sa propre grille, les valeurs
+  // glissaient d'une ligne à l'autre et les en-têtes ne tombaient pas au-dessus de leur colonne.
+  const W6 = { prix: '76px', date: '148px', vues: '60px', favoris: '72px', statut: '150px', mini: '84px', achat: '84px', place: '140px' };
+  const W6V = { prix: '72px', date: '96px', transporteur: '156px', limite: '112px', statut: '108px', bordereau: '128px' };
   const STATUTS5 = ['en_vente', 'brouillon', 'masque', 'reserve', 'vendu', 'a_confirmer'];
   let annConfirme = null, annEnVol = false, annResultat = null, annActionPre = '';
   // ══ 5.410 — LES GESTES DU PANNEAU (l'app ne les fait plus) : prix, atelier Republier, publier, offres ══
@@ -2048,8 +2059,8 @@
       if (c === 'statut') return etiquette5(x.statut || '', libStatut5(x.statut || 'a_confirmer'), x.statut === 'brouillon' ? 'ambre' : '');   // 5.410.2 : « pas revue » est gris (rien à faire ici)
       return celluleAnn(x, c);
     };
-    const enTete = `<div class="tr6 th6r" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
-    return haut + `<div class="table6" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}" data-tri="${annTri.col}:${annTri.sens}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr6" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="art6" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}</span></button><span class="cels6">${cols.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="a:${esc(x.id)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const enTete = `<div class="tr6 th6r" style="--n6:${cols.length};--g6:${cols.map((c) => W6[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
+    return haut + `<div class="table6" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}" data-tri="${annTri.col}:${annTri.sens}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr6" style="--n6:${cols.length};--g6:${cols.map((c) => W6[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="art6" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}</span></button><span class="cels6">${cols.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="a:${esc(x.id)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   // ══ 5.410 — COMMANDES (= les ventes) EN TABLEAU, comme Vintex : article + statut DE VINTED en sous-titre, Prix, Date,
   //    Transporteur (son logo, la copie de l'app ; rien relié ⇒ « — », jamais « inconnu »), état en étiquette (« Action
@@ -2066,10 +2077,12 @@
   const imprimable = (x) => !!(x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === true && /^\d{1,20}$/.test(String(x.tx || '')));   // Leboncoin / Vestiaire : leurs bordereaux restent sur le site
   const transpHtml6 = (x, taille) => (x.transporteurCle && U.logoTransp ? `<span class="tr-l6">${U.logoTransp(x.transporteurCle, taille || 18)}<span>${esc(x.transporteur || U.nomTransp(x.transporteurCle))}</span></span>` : x.transporteur ? `<span class="tr-l6"><span>${esc(x.transporteur)}</span></span>` : '<span class="gris6">—</span>')
     + (x.suivi ? `<small class="suivi6" data-suivi="${esc(x.suivi)}">${esc(x.suivi)}</small>` : '');
-  const limiteHtml6 = (x) => (x.limite ? `<span class="lim6" data-limite>${esc(TU('v_avant', { d: x.limite }))}</span>` : '<span class="gris6">—</span>');
-  function boutonImp6(x) {
-    if (imprimable(x)) return `<button type="button" class="imp6" data-imprimer="${esc(x.tx)}"${impEnVol ? ' disabled' : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 8V3.5h10V8M7 17H4.5V9.5a1.5 1.5 0 0 1 1.5-1.5h12a1.5 1.5 0 0 1 1.5 1.5V17H17"/><path d="M7 13.5h10v7H7z"/></svg><span>${esc(TU('imp_un'))}</span></button>`;
-    if (x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false) return `<span class="pas6" data-bordereau-manque="${esc(x.tx)}">${esc(TU('imp_pas'))}</span>`;
+  // « 23/11/2026 10 h 00 » ⇒ « 23/11 · 10 h 00 » dans la colonne (l'en-tête dit « Date limite ») ; le texte lu entier en titre.
+  const limiteCourte6 = (t) => { const m = /^(\d{1,2})\/(\d{1,2})\/\d{4}\s*(.*)$/.exec(String(t || '').trim()); return m ? `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}${m[3] ? ' · ' + m[3] : ''}` : String(t || ''); };
+  const limiteHtml6 = (x, long) => (x.limite ? `<span class="lim6" data-limite title="${esc(x.limite)}">${esc(long ? TU('v_avant', { d: x.limite }) : limiteCourte6(x.limite))}</span>` : '<span class="gris6">—</span>');
+  function boutonImp6(x, court) {
+    if (imprimable(x)) return `<button type="button" class="imp6" data-imprimer="${esc(x.tx)}"${impEnVol ? ' disabled' : ''}${court ? ` aria-label="${esc(TU('imp_un'))}" title="${esc(TU('imp_un'))}"` : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 8V3.5h10V8M7 17H4.5V9.5a1.5 1.5 0 0 1 1.5-1.5h12a1.5 1.5 0 0 1 1.5 1.5V17H17"/><path d="M7 13.5h10v7H7z"/></svg><span>${esc(TU(court ? 'imp_court' : 'imp_un'))}</span></button>`;
+    if (x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false) return `<span class="pas6" data-bordereau-manque="${esc(x.tx)}" title="${esc(TU('imp_pas_note'))}">${esc(TU('imp_pas'))}</span>`;
     return '<span class="gris6">—</span>';
   }
   function pdfDepuisB64(b64) { const bin = atob(String(b64 || '')); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: 'application/pdf' }); }
@@ -2130,9 +2143,9 @@
     const outils = `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
     const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>` + (impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : '');
     if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>`;
-    const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
-    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => enTeteTri5(c, TU('c6_' + c), 'data-ven-tri')).join('')}</span><span></span></div>`;
-    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length}">${imprimable(x) ? `<label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(x.tx) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label>` : '<span></span>'}<button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x, true) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
+    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
+    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}">${imprimable(x) ? `<label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(x.tx) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label>` : '<span></span>'}<button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));
@@ -2502,7 +2515,7 @@
       </div>${j ? `<p class="note5" data-accueil-jauge>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))} · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</p>` : ''}</section>
       <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : ''}${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => { const vt = (x.s === 'ventes' || x.s === 'bordereaux') && l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.find((y) => y.tx === String(x.id || '').split(':')[0]) : null;
         // 5.410.2 : une vente captée dit son livreur, son n° de suivi, sa date limite et s'imprime d'ici.
-        return vt ? `<div class="rg6 vte6" data-accueil-capte="${esc(x.s)}" data-accueil-vente="${esc(vt.tx)}"><span><b>${esc(TU('ns_' + x.s))} · ${esc(vt.titre || '')}</b><small>${esc(depuis(x.t) || '')}${vt.limite ? ' · ' + esc(TU('v_avant', { d: vt.limite })) : ''}</small><span class="env6">${transpHtml6(vt, 16)}</span></span><span class="v6">${boutonImp6(vt)}</span></div>`
+        return vt ? `<div class="rg6 vte6" data-accueil-capte="${esc(x.s)}" data-accueil-vente="${esc(vt.tx)}"><span><b>${esc(TU('ns_' + x.s))} · ${esc(vt.titre || '')}</b><small>${esc(depuis(x.t) || '')}${vt.limite ? ' · ' + esc(TU('v_avant', { d: limiteCourte6(vt.limite) })) : ''}</small><span class="env6">${transpHtml6(vt, 16)}</span></span><span class="v6">${boutonImp6(vt)}</span></div>`
           : `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`; }).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
     </div>`;
   }
