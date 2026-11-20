@@ -30,7 +30,7 @@ const MUTATIONS = {
   boite: ["  return v == null ? { refus:", "  return v == null ? { dropOff: null, r:"],
   plancherCycle: ["      if (v < plancherC) v = plancherC;\n", ''],
   creneau: ["  if (!creneauOuvert(plan.rythme, t)) return { saute: 'creneau' };", ''],
-  dupliquer: ["confirme: true, dupliquer: true, total: 1,", "confirme: true, total: 1,"],
+  dupliquer: ["confirme: true, dupliquer: true, methode: 'directe', total: 1,", "confirme: true, methode: 'directe', total: 1,"],
   filtre: ["if (F.reecrireJours > 0 && ach && (c.parAcheteur || {})[ach]", "if (false && ach && (c.parAcheteur || {})[ach]"],
   profil: ["  if (page !== String(uid)) return { ok: true, actif: false, raison: 'autre-profil' };", ''],
 };
@@ -185,7 +185,7 @@ const avancer = async (f, tx, champ, depuis) => { const m = (await f.ctx.chrome.
     s.lignes[`harvest_${UID}_txn_1103`] = txnRow({ status: '450', status_title: 'Commande finalisée', item_id: 4343 });
     const tks = []; for (let i = 0; i < 4; i++) tks.push(await tick(s));
     const reste = (((s.lignes.vrm_reglages_auto || {}).cles || {}).vinted_bleam || {}).comptes;
-    dit(appels.length === 1 && appels[0].cmd === 'recreerVinted' && appels[0].id === '4242' && appels[0].dupliquer === true, 'stock auto : la paire vendue (identité annonce ⇒ N° 12, quantité 3) remise en ligne SANS supprimer la vendue', JSON.stringify(appels) + JSON.stringify(tks));
+    dit(appels.length === 1 && appels[0].cmd === 'recreerVinted' && appels[0].id === '4242' && appels[0].dupliquer === true && appels[0].methode === 'directe', 'stock auto : la paire vendue (identité annonce ⇒ N° 12, quantité 3) remise en ligne SANS supprimer la vendue', JSON.stringify(appels) + JSON.stringify(tks));
     dit(reste && reste[UID] && reste[UID].stockAuto.stock['12'] === 2, 'stock auto : quantité 3 ⇒ 2', JSON.stringify(reste));
     dit(!appels.some((a) => a.id === '4343'), 'stock auto : une annonce SANS N° n’est jamais remise (jamais par ressemblance)');
   } catch (e) { dit(false, 'stock auto — exception', e && e.stack); }

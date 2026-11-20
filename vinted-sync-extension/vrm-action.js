@@ -66,6 +66,7 @@
   .mini .mt { font: 500 13px/1.3 var(--vu-police); color: var(--vu-sur-2); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .dit { font: 500 13px/1.4 var(--vu-police); color: var(--vu-sur-2); }
   .gestes { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+  .gestes.seul { grid-template-columns: 1fr; }
   .gestes .vu-btn { min-height: 56px; border-radius: 16px; }
   .gestes .vu-plein { font-size: 18px; }
   .gestes .vu-sec { padding: 0 22px; font-size: 16px; }
@@ -172,7 +173,8 @@
     if (v.b !== null) remettre(document.body, v.b, v.bp);
     try { window.scrollTo(v.x, v.y); } catch (_) {}
   }
-  const plein = () => !!(action && action.actif && !reduit && !vintedParle && !(action.verification));
+  // 5.410.3 : pendant le FORMULAIRE (republication « comme Bleam »), pas de « Réduire » : Vinted reste verrouillé jusqu'à la fin ou « Tout arrêter ».
+  const plein = () => !!(action && action.actif && (!reduit || action.formulaire) && !vintedParle && !(action.verification));
   // Ce qui défile DANS l'écran (sa boîte, quand elle déborde) défile ; rien n'atteint la page.
   const dansBoite = (ev) => { try { const p = ev.composedPath(); if (!p.includes(hote)) return null; return p.find((el) => el && el.classList && el.classList.contains('boite')) || null; } catch (_) { return null; } };
   const TOUCHES_DEFIL = [' ', 'Spacebar', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -328,8 +330,8 @@
           </div>
         </div>
         <div class="suiv" data-action-suiv data-action-suivants="${(a.suivants || []).slice(0, 3).length}" data-h="${esc(sv)}"${sv ? '' : ' hidden'}>${sv}</div>
-        <div class="dit">${esc(T('a_bloque'))}</div>
-        <div class="gestes"><button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button><button class="vu-btn vu-sec" data-reduire>${esc(T('a_reduire'))}</button></div>
+        <div class="dit">${esc(T(a.formulaire ? 'a_bloque_form' : 'a_bloque'))}</div>
+        <div class="gestes${a.formulaire ? ' seul' : ''}" data-action-formulaire="${a.formulaire ? '1' : ''}"><button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button>${a.formulaire ? '' : `<button class="vu-btn vu-sec" data-reduire>${esc(T('a_reduire'))}</button>`}</div>
       </div></div>`);
     gel(true);
     try { const b = racine.querySelector('[data-arreter]'); if (b && !racine.contains(ombre.activeElement)) b.focus({ preventScroll: true }); } catch (_) {}
