@@ -921,7 +921,8 @@
   .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
-  .revue6 { padding: 8px 2px 0; }
+  .revue6 { padding: 8px 16px 0; margin: 0; }
+  .acc6 .imp-etat6 { padding: 4px 0; }
   .vte6 > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .vte6 > span:first-child b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .env6 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; color: var(--n-encre-2); } .env6 .suivi6 { margin: 0; }
   @media (prefers-reduced-motion: reduce) { .imp6 { transition: none; } }
@@ -988,7 +989,7 @@
   .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
   .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-  .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
+  .tu6 { appearance: none; border: 0; background: var(--n-carte-2); transition: background-color .16s ease; border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
   .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .tu6 b { display: block; font: 700 28px/34px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
   .tu6[data-ton="ambre"] b { color: var(--n-ambre, #8A4B00); }

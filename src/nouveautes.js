@@ -33,6 +33,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'minimaliste', date: '2026-11-20', titre: 'Tout l’écran simple, comme Paramètres', phrase: 'Des groupes sobres ; Ventes pareil sur chaque site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « Améliore le visuel, tu n'as pas respecté ce qu'on avait dit ») docs/passation/2026-11-20-argent-natif.md
   { id: 'argent-natif', date: '2026-11-20', titre: 'Argent plus clair, en cartes sobres', phrase: 'Le mois, ta déclaration et tes statistiques, sans rien de chargé.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (20 nov., ext. 5.410.2) docs/passation/2026-11-20-extension-5412.md — panneau qui reste ouvert, bordereau et livreur.
+  { id: 'panneau-bordereau', date: '2026-11-20', titre: 'Imprime le bordereau depuis l’extension', phrase: 'Chaque vente dit son livreur, son suivi et sa date limite.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-reste-ouvert', date: '2026-11-20', titre: 'Le panneau de l’extension reste ouvert', phrase: 'Même page après une navigation : seul ton × le ferme.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « pour l'extension, tu fais pareil que Vintex ») docs/passation/2026-11-20-panneau-vintex.md
   { id: 'panneau-extension', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») docs/passation/2026-11-20-actions-extension.md.
