@@ -55,7 +55,8 @@ MSG.forEach((x, i) => { if (i % 2 === 0) x.avatar = img('p' + i); });
 const CADENCE = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90, poses: [] };
 const AUTO = { cadence: CADENCE, offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', textes: ['Bonjour {pseudo}, une offre rien que pour toi.', 'Salut {pseudo} ! Je te fais un prix.', 'Hello {pseudo}, elle t’attend.'], auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
 const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
-const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' },
+const OFFRES = [{ conv: '60000', prix: 48, tx: '91000000009', oid: '777', item: '7001', titre: 'Adidas Samba OG noires 40', pseudo: 'acheteuse_0' }];
+const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' }, offres: OFFRES,
   annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN, toutes: TOUTES, nTous: TOUTES.length, statuts: { en_vente: 5, brouillon: 2, masque: 1, reserve: 1, vendu: 1, a_confirmer: 0 } }, automatisations: AUTO, notifications: NOTIFS, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, messages: { lu: T0 - 5 * MIN, liste: MSG }, autres: null };
 const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.410.0', code: '5.410.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true },
   site: { id: '111', nom: 'shop_sophie', choix: 'oui', jauge: { h: 12, maxH: 50, j: 40, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 8 }, file: null } },
@@ -77,7 +78,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
   });
   await pg.goto(url);
   await pg.evaluate(({ e, js, ui, ap, L }) => {
-    window.__envoyes = [];
+    window.__envoyes = []; window.__ouverts = []; const ouvrirVrai = window.open; window.open = (u) => { window.__ouverts.push(String(u)); return null; };
     const copie = (x) => JSON.parse(JSON.stringify(x));
     const orig = Element.prototype.attachShadow;
     Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
@@ -93,6 +94,10 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
           else if (msg.action === 'reglagesFavoris') rep = { ok: true };
+          else if (msg.action === 'prixCarte') rep = msg.confirme === true ? { ok: true, ranges: msg.items.map((x) => x.id), refus: [] } : { ok: false };
+          else if (msg.action === 'atelierLancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
+          else if (msg.action === 'offreCarte') rep = msg.quoi === 'accept' && msg.avisVu !== true ? { ok: false, code: 'avis', avis: 'VRM n’a pas pu vérifier tes autres sites : vérifie qu’elle n’y est pas vendue.' } : { ok: true };
+          else if (msg.action === 'publierCarte') rep = !msg.reponses ? { ok: false, code: 'questions', questions: [{ champ: 'categorie', choix: ['Baskets', 'Bottes'], saisie: '' }] } : msg.verifVu !== true ? { accepte: false, code: 'verification', problemes: [{ code: 'photos', texte: '1 photo seulement' }] } : { accepte: true };
           else if (msg.action === 'favorisAuto') rep = msg.actif && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, actif: msg.actif };
           else if (msg.action === 'reglageAuto') rep = msg.cle === 'vinted_cadence' && msg.valeur.actionsHeure > 50 && msg.confirme !== true ? { ok: false, code: 'confirmation' } : { ok: true, relu: true };
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
@@ -243,6 +248,53 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         const mq = a.envoyes.find((m) => m.action === 'masquerCarte');
         dit(mq && mq.confirme === true && JSON.stringify(mq.ids) === '["7001"]' && a.resultatM === 'ok', `${T} : confirmé : SA sélection part, le résultat est dit`, JSON.stringify({ mq, r: a.resultatM }));
+        // 5.410 — LES GESTES DANS LE PANNEAU (plus rien vers vrm.center).
+        const coche = async (ids) => t.pg.evaluate((ids) => { const r = document.getElementById('vrm-badge').shadowRoot; for (const c of r.querySelectorAll('[data-ann-sel]')) { const v = ids.includes(c.getAttribute('data-ann-sel')); if (c.checked !== v) { c.checked = v; c.dispatchEvent(new Event('change')); } } }, ids);
+        const action = async (k) => { await t.pg.evaluate((k) => { const s2 = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ann-action]'); s2.value = k; s2.dispatchEvent(new Event('change')); }, k); await t.pg.waitForTimeout(220); };
+        const env = async (k) => (await t.pg.evaluate(() => window.__envoyes)).filter((m) => m.action === k);
+        await coche(['7001', '7004']); await t.pg.waitForTimeout(150);
+        await action('baisser');
+        const lp = await t.pg.evaluate(() => Array.from(document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-prix-ligne]')).map((x) => x.getAttribute('data-prix-ligne') + ':' + x.innerText.replace(/\s+/g, ' ')));
+        await clic(t.pg, '[data-prix-pct="10"]');
+        await cap(t.pg, N('geste-prix'));
+        await clic(t.pg, '[data-prix-confirmer]');
+        const pe = await env('prixCarte');
+        dit(lp.length === 2 && /plancher : ton prix mini 46/.test(lp[0]) && /plancher pas su|achat/.test(lp[1]) && pe.length === 1 && pe[0].confirme === true && pe[0].items.map((x) => x.id + '=' + x.prix + '<' + x.prixVu).join(',') === '7001=54.00<60,7004=67.50<75',
+          `${T} : « Changer le prix » : prix vu, plancher dit, −10 % pour toutes, confirmé ⇒ la commande gardée`, JSON.stringify({ lp, pe }));
+        await clic(t.pg, '[data-geste-fermer]');
+        await coche(['7001', '7004', '7007']); await t.pg.waitForTimeout(150);
+        await action('republier');
+        await clic(t.pg, '[data-atelier-bas="0"]');
+        await clic(t.pg, '[data-atelier-mode="fixe"]');
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-photo="bright"]'); c.value = '1.2'; c.dispatchEvent(new Event('input')); });
+        await cap(t.pg, N('geste-atelier'));
+        await clic(t.pg, '[data-atelier-lancer]');
+        const ae = await env('atelierLancer');
+        dit(ae.length === 1 && ae[0].ids.join(',') === '7004,7001,7007' && ae[0].espacement.mode === 'fixe' && ae[0].photo.bright === 1.2 && ae[0].confirme === true, `${T} : atelier Republier : SON ordre, SON espacement, SON réglage photo, « Lancer »`, JSON.stringify(ae));
+        await coche(['7001']); await t.pg.waitForTimeout(150);
+        await action('publier');
+        await clic(t.pg, '[data-publier-envoyer]');
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-publier-rep="categorie"]'); c.value = 'Baskets'; c.dispatchEvent(new Event('change')); });
+        await clic(t.pg, '[data-publier-envoyer]');
+        await cap(t.pg, N('geste-publier'));
+        const pv = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-publier-probleme="photos"]'));
+        await clic(t.pg, '[data-publier-envoyer]');
+        const pu = await env('publierCarte');
+        dit(pu.length === 3 && !pu[0].reponses && pu[1].reponses.categorie === 'Baskets' && !pu[1].verifVu && pv && pu[2].verifVu === true, `${T} : « Publier sur… » : la question posée ici, puis la vérification dite, « Publier quand même » ⇒ verifVu`, JSON.stringify(pu));
+        await clic(t.pg, '[data-geste-fermer]');
+        await coche([]);
+        // Offres (Commandes) : accepter ⇒ confirmation ⇒ avis « pas su » ⇒ « J’ai vérifié, accepter ».
+        await clic(t.pg, '[data-onglet-b="ventes"]');
+        await clic(t.pg, '[data-offre-quoi="accept"]');
+        await clic(t.pg, '[data-offre-oui]');
+        await cap(t.pg, N('geste-offre'));
+        const av = await t.pg.evaluate(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-offre-confirme]'); return b ? b.innerText : ''; });
+        await clic(t.pg, '[data-offre-oui]');
+        const oe = await env('offreCarte');
+        dit(/vérifie/.test(av) && oe.length === 2 && !oe[0].avisVu && oe[1].avisVu === true && oe[1].tx === '91000000009' && oe[1].oid === '777', `${T} : offre : « Accepter » ⇒ « pas su » dit ⇒ SON second toucher (avisVu)`, JSON.stringify({ av, oe }));
+        const ouv = await t.pg.evaluate(() => window.__ouverts);
+        dit(!ouv.some((u) => /vrm\.center/.test(u)), `${T} : aucun de ces gestes n’ouvre vrm.center`, JSON.stringify(ouv));
+        await clic(t.pg, '[data-onglet-b="annonces"]');
         await clic(t.pg, '[data-ann-vue="grille"]');
         a = await lire(t.pg);
         await cap(t.pg, N('grille'));

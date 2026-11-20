@@ -129,12 +129,32 @@ les deux lignes gardées). L'app ne fait plus aucun geste ; dans la 5.410.0 l'ex
   `validerAutoFavoris` des deux côtés), allumer ⇒ « Oui, allumer ».
 - Audit : `scripts/audit-extension-porte-app.cjs` (vrai background.js, 26 contrôles ; `--prouve` 11 mutations).
 
-### Ce qui reste (dit honnêtement)
-- Panneau : pas encore d'écran pour ACCEPTER une offre ni pour PUBLIER une fiche (les gardes sont au point d'exécution,
-  prêtes) ; « Baisser » et « Republier » du menu Articles ouvrent encore vrm.center — or l'app renvoie maintenant au
-  panneau : il faut une saisie de prix et l'atelier Republier DANS le panneau (prochain lot, avant l'intégration).
-- Republication programmée avec réglages photo : « pas partie » (le fond ne retouche pas d'image).
+### Les gestes faits DANS le panneau (plus rien vers vrm.center)
+- **Changer le prix** (Articles → « Choisir une action » → Baisser ; une annonce ou une sélection de 20) : prix vu,
+  nouveau prix, plancher dit (prix mini, sinon achat + 10 %, sinon « pas su »), −5/−10/−15/−20 % pour toutes,
+  « Confirmer » ⇒ `changerPrixCarte` : plancher revérifié par le fond (`plancherBaisse`), une hausse refusée, chaque prix
+  devient une commande `cmd_prix_*` (`prixAttCommande`, source `panneau`) exécutée tout de suite (`prixAttenteTick`).
+- **Atelier Republier** (Vinted) : SON ordre (↑ ↓), espacement fixe ou au hasard (1–120 min), réglage photo pour toutes
+  (luminosité, contraste, saturation, zoom, rotation — appliqué par le fond, `photoReglee`), lettre ; « Lancer » range
+  la file dans `chrome.storage.local` (`vrmAtelierRepub`), `atelierRepubTick` (alarme `vrm-relais`) la déroule par
+  `recreerVinted` (coffre → brouillon → suppression → mise en ligne) ; suivi par paire dans Articles, un arrêt arrête la
+  file, « Reprendre » (`reprendreRepub`), « Arrêter ».
+- **Offres** (Commandes, Messagerie — liste et conversation) : accepter (confirmation « ça vend la paire », puis la
+  garde : vendue ailleurs ⇒ refusé, « pas su » ⇒ « J’ai vérifié, accepter » = `avisVu`), contre-offre (au-dessus de son
+  offre, jamais sous ton plancher), refuser — l'offre doit être en attente sur CE compte (`offresEnAttente`).
+- **Publier sur…** (une annonce Vinted → Leboncoin / Vestiaire) : l'agent de l'app recopié (`ficheArticle`, `planSite`,
+  `envoiPour`, `retenirReponses`), les questions posées dans le panneau, la vérification dite, « Publier quand même »
+  ⇒ `verifVu`, par `publierFicheSite`.
+- **Programmation avec réglage photo** : le fond SAIT retoucher une photo (`photoReglee`, OffscreenCanvas) — la veille
+  envoie le réglage avec chaque paire ; rien n'est donc « découvert au départ ».
+- `scripts/audit-panneau-sans-vrm.cjs` (4 mutations) : aucun geste du panneau n'ouvre vrm.center ; restent permis :
+  télécharger l'extension, se connecter, VOIR une fiche / une vente / une notification, réglages de l'app (notifications,
+  langue), poser un prix mini.
 
+### Ce qui reste
+- Les réponses aux questions de « Publier sur… » servent à CET envoi (le fond n'écrit pas `main`) : elles seront
+  reposées à la prochaine publication du même article.
+- « Changer le prix » ne monte pas un prix (hausse : refusée, dite).
 ## Preuves
 
 - Bancs : `scripts/bancs/grand-panneau.cjs` (251 contrôles : 1512 clair/sombre, 1280, 390 clair/sombre, Orion émulé,

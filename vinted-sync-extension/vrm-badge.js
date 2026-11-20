@@ -1812,7 +1812,7 @@
           : `<button type="button" class="vu-btn" data-offre-quoi="accept">${esc(TU('g6_accepter'))}</button><input type="text" inputmode="decimal" class="prix6" data-offre-contre-prix="${esc(k)}" value="${esc(offreContre[k] || '')}" placeholder="${esc(TU('g6_contre_prix'))}" aria-label="${esc(TU('g6_contre_prix'))}"><button type="button" class="vu-btn" data-offre-quoi="contre">${esc(TU('g6_contre'))}</button><button type="button" class="vu-btn" data-offre-quoi="reject">${esc(TU('g6_refuser'))}</button>`)
         + `</span></div>`; }).join('')}</section>`;
   }
-  function brancherGestes6() {
+  function brancherGestes6(racine) {
     const R = racine;
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
@@ -2370,7 +2370,7 @@
     </section>`;
   }
   function brancherListes(racine, e) {
-    try { brancherGestes6(); } catch (_) {}
+    try { brancherGestes6(racine); } catch (_) {}
     racine.querySelectorAll('[data-onglet-b]').forEach((b) => b.addEventListener('click', () => {
       ongletListe = b.getAttribute('data-onglet-b'); ranger({ vrmCarteOnglet: ongletListe });
       if (ongletListe !== 'favoris') chargerListes(false);
