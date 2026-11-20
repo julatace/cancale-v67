@@ -10,6 +10,7 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
+import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE } from '../../articles/modele.js';
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
@@ -52,6 +53,10 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     : valeur);
   const pasFourni = () => <span className="n-tt-vide-cellule" title={tr('cqm.pasFourni')} aria-label={'— · ' + tr('cqm.pasFourni')} data-eg-pasfourni="">—</span>;
   const colonnes = [
+    // (20 nov. soir, plus de sélecteur de plateforme) Une colonne « Site » ÉTROITE : le logo de chaque site où l'article est en
+    // vente, rien d'autre (le compte est l'intertitre du groupe ; le nom au survol).
+    { cle: 'site', libelle: tr('tableau.col.site'), titreCourt: true, tri: (l) => l.a.sites.join(','),
+      rendu: (l) => <span className="n-eg-logos" data-eg-logos={l.a.sites.join(',')}>{l.a.sites.map((x) => <LogoSite key={x} site={x} taille={18} nom={nomSite(x)}/>)}</span> },
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.a.numero || null,
       rendu: (l) => (l.a.numero ? <Plaque numero={l.a.numero} doublon={l.a.doublon}/> : modifiable(l, 'numero', null, onNumero ? () => onNumero(l.a) : null)) },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => l.a.prix, rendu: (l) => modifiable(l, 'prix', l.a.prix != null ? euros(l.a.prix) : null, onPrix ? () => onPrix(l.a) : null) },
@@ -65,10 +70,6 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     // cellule, jamais une phrase répétée à l'écran).
     { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
     { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
-    { cle: 'sites', libelle: tr('tableau.col.siteCompte'), defaut: sites.length > 1, tri: (l) => l.a.sites.join(','),
-      rendu: (l) => <span><span>{l.a.sites.map((s) => nomSite(s)).join(' · ')}</span>
-        {l.a.aRelier ? <span className="n-eg-arelier" data-eg-arelier="">{tr('egalite.aRelier')}</span>
-          : (l.a.annonces.length === 1 && l.a.annonces[0].pseudo ? <span className="n-tt-cellule-sous">{l.a.annonces[0].pseudo}</span> : null)}</span> },
     { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
       rendu: (l) => (l.a.place ? (l.a.place.nom || tr('egalite.placeCase', { i: Number(l.a.place.i) + 1 })) : null) },
     ...(liaison ? [{ cle: 'liaison', libelle: tr('liaL.col'), tri: (l) => ({ arelier: 0, propre: 2, reliee: 1 }[classeLien(l.a)] ?? 3),

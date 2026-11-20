@@ -14,7 +14,6 @@ import { tr } from '../i18n/index.js';
 import { Groupe, Rangee, Vignette, poserIcone, iconePosee } from '../natif/index.js';
 import { groupesDe, atelierCompleter } from './aRegler.js';
 import { useARegler } from './useARegler.js';
-import { useSiteEffectif, siteDeLigne } from '../siteCourant.js';   // (20 nov.) « À régler » suit le site choisi
 export { useARegler };
 
 const VISIBLES = 3;
@@ -23,11 +22,7 @@ export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) 
   if (Icon && !iconePosee()) poserIcone(Icon);   // les glyphes natifs (chevron) = les tracés de l'app
   const pub = useARegler();
   const source = groupes || (pub ? pub.groupes : null);
-  // (20 nov., sélecteur de plateforme) Un site choisi : seules SES lignes (`site` de la carte, ou par son identifiant) ;
-  // une ligne de tous les sites (URSSAF, numéros, Compléter) attend « Tous » — jamais un chiffre global sous un logo.
-  const siteVu = useSiteEffectif();
-  const listeTous = React.useMemo(() => (source ? groupesDe(onglet, source, { completer: atelierCompleter(), titreCompleter: (n) => (n > 0 ? tr('v2.reg.completerN', { n }) : tr('v2.reg.completer')) }) : []), [source, onglet]);
-  const liste = siteVu === 'toutes' ? listeTous : listeTous.filter((g) => (g.site || siteDeLigne(g.id, g.tab)) === siteVu);
+  const liste = React.useMemo(() => (source ? groupesDe(onglet, source, { completer: atelierCompleter(), titreCompleter: (n) => (n > 0 ? tr('v2.reg.completerN', { n }) : tr('v2.reg.completer')) }) : []), [source, onglet]);
   const presse = liste.some((g) => g.ambre);
   const [choix, setChoix] = React.useState(null);        // null = le défaut (ouvert seulement si ça presse)
   const [tout, setTout] = React.useState(false);

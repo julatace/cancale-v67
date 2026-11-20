@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme, ça ne marche pas du tout ») docs/passation/2026-11-20-sans-selecteur.md
+  { id: 'sans-selecteur', date: '2026-11-20', titre: 'Tous tes sites ensemble, sans onglets', phrase: 'Chaque ligne porte le logo de son site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
   { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)

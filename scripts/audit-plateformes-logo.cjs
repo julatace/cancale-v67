@@ -190,9 +190,12 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   dit(rangees === 0, 'D1 plus aucune rangée de sites écrite à la main : toutes passent par SelecteurSites', String(rangees));
   // (11 nov., lot DJ3) Colis n'est plus un onglet : la rangée « Colis · Leboncoin » est remplacée par le filtre de Ventes
   // (un seul filtre en haut) ; reste celle de l'écran Colis seul. Même règle : un seul composant de sélecteur.
-  // (20 nov., décision du sélecteur de plateforme global) `FiltreSites` est retiré : Annonces, Ventes, Achats, Messages et
-  // Aujourd'hui portent LE sélecteur global (`SelecteurSiteCoque` ⇒ src/natif/SelecteurSite.jsx) ; l'écran Colis seul garde SelecteurSites.
-  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 1 && /function SelecteurSiteCoque\(/.test(APP) && (APP.match(/<SelecteurSiteCoque\/>/g) || []).length >= 2 && !/function FiltreSites\(/.test(APP) && !/<select\b[^>]*data-site/.test(APP), 'D2 un seul sélecteur de plateforme (global) en tête des écrans principaux ; plus de FiltreSites');
+  // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme ») Plus AUCUN sélecteur de plateforme dans les
+  // onglets (ni FiltreSites, ni le sélecteur global) ; l'écran Colis seul garde SelecteurSites ; chaque rangée porte le logo
+  // de son site (src/natif/LogoSite.jsx), dans Ventes, Annonces et Aujourd'hui.
+  const VENTES = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Ventes.jsx'), 'utf8'), ANN = fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8');
+  dit((APP.match(/<SelecteurSites id=/g) || []).length >= 1 && !/SelecteurSiteCoque|function FiltreSites\(|data-selecteur-site/.test(APP) && !fs.existsSync(path.join(SRC, 'natif', 'SelecteurSite.jsx')) && !/<select\b[^>]*data-site/.test(APP)
+    && /<LogoSite site=\{r\.site\}/.test(VENTES) && /<LogoSite key=\{x\} site=\{x\}/.test(ANN), 'D2 aucun sélecteur de plateforme dans les onglets ; le logo du site sur chaque rangée');
   dit(/data-vente-compte=\{compte\|\|undefined\}/.test(APP) && /data-fu-compte="">· <CompteVente compte=\{compte\}/.test(APP) && /<CompteVente compte=\{compte\} plateforme=\{plateforme\} ou="ligne"\/>/.test(APP) && /Vendue sur <CompteVente compte=\{compte\}/.test(APP), 'D3 la ligne de vente porte le compte (repliée, carte Fusion, détail), écrit par UN composant (`CompteVente`)');
   dit(/sous=\{sous\} compte=\{compte\} ton=\{ton\} montant=\{(?:lbcEuro|montant)\(/.test(APP) && /compte: compteVenteLbc\(o, itemsLbc, annLbc\)/.test(APP), 'D4 Leboncoin : le compte de la transaction (ou de SON annonce), par identité');
   dit(/compte=\{compteVenteEbay\(o, comptesEbay\)\}/.test(APP) && /const ref = identiteCompteVente\('ebay', o\);/.test(APP), 'D5 eBay : le compte de la ligne de commandes (identité de src/plateformes.js)');

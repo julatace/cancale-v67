@@ -33,7 +33,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe, siteCourantCoque } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -60,7 +60,6 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
-import { useSiteCourant } from '../siteCourant.js';   // (20 nov.) le site courant : une source (src/siteCourant.js)
 import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
 import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
@@ -3747,11 +3746,8 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P, regLu, regPret } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
-  // de site d'hier) ; « tous » = les chiffres de toujours.
-  const [siteBrut] = useSiteCourant();
-  const siteCourant = siteCourantCoque(siteBrut);   // 'toutes' | un site relié (un site plus relié vaut « toutes »)
-  const sel = { site: siteCourant, compte: null, periode: null };
+  // (20 nov. soir) Plus de sélecteur de plateforme : Argent porte sur tous les sites (la sélection « toutes » de la carte).
+  const sel = { site: 'toutes', compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
@@ -3848,11 +3844,8 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
-  // de site d'hier) ; « tous » = les chiffres de toujours.
-  const [siteBrut] = useSiteCourant();
-  const siteCourant = siteCourantCoque(siteBrut);   // 'toutes' | un site relié (un site plus relié vaut « toutes »)
-  const sel = { site: siteCourant, compte: null, periode: null };
+  // (20 nov. soir) Plus de sélecteur de plateforme : Argent porte sur tous les sites (la sélection « toutes » de la carte).
+  const sel = { site: 'toutes', compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
@@ -3899,9 +3892,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [calc, ym, versements, ventesVcER]);
   const MAX = 30;
-  // Un site choisi : ses versements seulement (un filtre d'affichage sur la plateforme de chaque ligne, rien de recalculé).
-  const NOM_PF = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
-  const lignesV = livre ? [...livre.lignes].filter((l) => siteCourant === 'toutes' || String(l.plateforme || '').toLowerCase().startsWith(String(NOM_PF[siteCourant] || siteCourant).toLowerCase().slice(0, 4))).sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
   const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
   // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
   // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
@@ -3921,7 +3912,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} sansBarres={siteCourant !== 'toutes'}
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
@@ -4094,9 +4085,6 @@ function ComptaFusion({ compta, onNav }) {
 }
 // ⟦← App.jsx #35⟧
 function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansCompte = false }) {
-  // (20 nov., fusion avec argent-natif) La carte du bénéfice suit le site choisi en tête d'Argent (la sélection { site } de la
-  // carte des chiffres, sa règle d'hier) ; « Tous » = 'toutes', les chiffres de toujours.
-  const [siteArgent] = useSiteCourant();
   const [nuagePret, setNuagePret] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuagePret(true)), []);
   const [periode, setPeriode] = React.useState(() => { try { const v = localStorage.getItem('vrm_compta_periode_benef'); return PERIODES_BENEF.some(([k]) => k === v) ? v : 'mois'; } catch (_) { return 'mois'; } });
@@ -4166,7 +4154,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
           {/* (3 nov., carte réglable par page) Le grand chiffre et les trois cases de cette carte se
               choisissent (« Modifier ») ; défaut = la maquette : bénéfice (`chiffreBenefice`, CETTE
               lecture), à déclarer, URSSAF, ventes finalisées — de la période choisie au-dessus. */}
-          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: siteCourantCoque(siteArgent), compte: null, periode }} locaux={locauxCarte} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
+          <CarteStatsApp page="compta" nu ici="compta" onNav={onNav} sel={{ site: 'toutes', compte: null, periode }} locaux={locauxCarte} attrs={{ 'data-benef-titre': '', title: `${titreNet} · ${B.libelle}` }}
             attrsDe={(x) => x.place.id === 'benefice' ? { 'data-compta-chiffre': 'gagne', 'data-eur': e2(x.valeur) } : (x.place.id === 'declarer' || x.place.id === 'urssaf') ? { 'data-fu-case': x.place.id, 'data-eur': e2(x.valeur) } : null}/>
           {/* (3 nov., finitions) Aucune vente finalisée : plus de phrase sous la carte (la carte dit « — »/0). */}
           {(() => {
