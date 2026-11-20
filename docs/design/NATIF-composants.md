@@ -212,3 +212,15 @@ après la recherche** : coché seul, un statut affiche exactement son compteur (
 ```
 Un écran en tableau prend toute la largeur (`ECRANS_TABLEAU` dans src/App.jsx : pas de troisième volet) ; sa `<PagePoussee
 className="n-tt-fiche">` s'ouvre en panneau à droite. Les contrôles d'un tableau passent par le pont `src/coque-native.css`.
+
+## Ajoutés le 20 nov. (lot argent-natif)
+
+**SelecteurSite** (`src/natif/SelecteurSite.jsx`) — LE sélecteur de plateforme, le même partout : `<SelecteurSite valeur={site}
+onChange={setSite} sites={['vinted', 'leboncoin']}/>` ; `useSiteCourant()` garde le choix (`vrm_site_courant`, cet appareil) ;
+`<SelecteurSiteGarde sites={…}/>` fait les deux. Moins de deux sites reliés ⇒ rien. Présentationnel : « tous » = les chiffres de toujours.
+
+**AideArgent** (`src/natif/ecrans/AideArgent.jsx`) — « Comment c'est calculé » en « ? » de 44 dans l'en-tête d'une `<Carte>`
+(`action`), le texte dans une feuille : `<Carte titre="…" action={<AideArgent titre="Comment c'est calculé">…</AideArgent>}>`.
+
+**La barre de titre** pose `data-n-fond` dès que le contenu passe dessous (fond flou + filet) et `data-n-reduit` au passage
+du grand titre ; les éléments sont relus à chaque image (jamais gardés du montage).
