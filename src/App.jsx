@@ -42148,23 +42148,30 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const bordS = (bordsParTxn && bordsParTxn[txL]) || bordE; const suF = normaliserSuivi((bordS && bordS.suivi) || '');
     const depF = suF && vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(suF) || null) : null;
     const emF = suF ? emailDuSuivi(suF) : null;
-    const prT = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
+    // (20 nov., chasse-bugs-2) LA FICHE ET LA LISTE JUGENT PAR LA MÊME RÈGLE. Mesuré sur sa base : une vente « Bordereau envoyé
+    // au vendeur » gardée dans « À envoyer » (le départ n'est PROUVÉ que par une prise en charge lue, `ventesPartiesParPreuve`),
+    // dont la ligne du transporteur disait « en route » sans prise en charge — la fiche cochait « En route ✓ · Livrée ✓ ».
+    // Une vente que la liste garde à envoyer (`aExpedier` et pas `estParti`) : aucune étape après « Bordereau prêt » ; une
+    // preuve du transporteur ne compte que si la règle du départ l'a acceptée (`partisVinted`).
+    const enAttenteEnvoi = !horsParcours && aExpedier(o) && !estParti(o);
+    const prT0 = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
+    const prT = partisVinted.has(txL) ? prT0 : { bouge: false, livre: false, livreAt: null, source: null };
     // (18 nov.) Vinted parle à DEUX endroits : l'état de la commande (`o.status`) et le détail de la transaction lu ensuite
     // (`etatTxn(tx).ss`) — c'est CE détail que dit la phrase sous la frise (`vintedDeTx` → `dernierStatut`). La piste lit les
     // deux, pour ne jamais dire « Livré » à côté d'une piste restée à « En route ».
     const sx = String((etx && etx.ss) || '');
     const livreeVinted = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(sx);
     const fz = fusionnerPreuves({ livre: livreeVinted, bouge: livreeVinted || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s) || (sx && (COLIS_DEJA_BOUGE.test(sx) || isAtRelayStatus(sx))), valide: finalisee }, prT);
-    const livreeLue = fz.livre;
-    const bougeLu = fz.bouge;
+    const livreeLue = !enAttenteEnvoi && fz.livre;
+    const bougeLu = !enAttenteEnvoi && fz.bouge;
     const versement = versements ? (versements[txL] || null) : null;
     const etapes = horsParcours ? null : friseVente({
       vendue: { lu: true, t: o.date || null },
       bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
       // (8 nov.) + parti par une preuve sûre de la règle unique (api/_lib/depart-vente.js) : déposée, datée.
-      deposee: { lu: posteMain || bougeLu || partisVinted.has(txL), t: posteMain ? shipDone[txL] : ((partisVinted.get(txL) || {}).at || null) },
+      deposee: { lu: !enAttenteEnvoi && (posteMain || bougeLu || partisVinted.has(txL)), t: posteMain ? shipDone[txL] : ((partisVinted.get(txL) || {}).at || null) },
       livree: { lu: livreeLue, t: fz.parTransporteur ? fz.livreAt : null },
-      argent: { lu: finalisee, t: versement },
+      argent: { lu: !enAttenteEnvoi && finalisee, t: versement },
     });
     // (6 nov.) La Vérification de l'article : lue sur l'état de CETTE transaction (src/verificationArticle.js).
     const verification = !horsParcours && auCentreDeVerification(o);
