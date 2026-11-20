@@ -192,8 +192,8 @@ async function auditerFavoris() {
     const off = (f.ctx.__vrmPausesVues || []).filter((x) => x[0] === 'favori:offreBleam');
     const o = corpsDe(f, /offers$/)[0];
     dit(r && r.json && r.json.resultat === 'envoye' && seqFav(f) === 'CMO' && c.initiator === 'seller_enters_notification', 'F1 — conversation (`seller_enters_notification`) → message → offre, dans cet ordre, sans `mark_as_read` (Bleam ne le fait pas pour un favori)', `${seqFav(f)} ${JSON.stringify(c)} ${JSON.stringify(r && r.json)}`);
-    dit(off.length === 1 && off[0][1] >= 8000 && off[0][1] <= 15000, 'F2 — l’offre part 8 à 15 s après le message (dans la même conversation)', JSON.stringify(off));
-    dit(o && o.offer && o.offer.price === '45.00', 'F3 — au prix de SA règle (−10 % de 50 € = 45 €), au-dessus du prix mini (40 €)', JSON.stringify(o));
+    dit(off.length === 1 && off[0][1] >= 11000 && off[0][1] <= 18000, 'F2 — l’offre part 11 à 18 s après le message (jamais plus tôt que chez Bleam, 11,0 s) (dans la même conversation)', JSON.stringify(off));
+    dit(o && o.offer && o.offer.price === '45', 'F3 — au prix de SA règle (−10 % de 50 € = 45 €), au-dessus du prix mini (40 €)', JSON.stringify(o));
     dit(((f.store.vrmActions || {})[UID] || []).length === 3, 'F4 — 3 écritures comptées (conversation, message, offre) ; la lecture marquée ne compte pas', JSON.stringify(f.store.vrmActions)); }
   { const f = monterFav({ aimes: 2 }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const m = (corpsDe(f, /replies$/)[0] || {}).reply || {};
@@ -220,6 +220,21 @@ async function auditerFavoris() {
   { const f = monterFav({ prixFil: true }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const seq = f.j.vinted.map((v) => `${v.methode} ${String(v.chemin).replace(/\d+/g, '#')}`).join(' | ');
     dit(r.json.resultat === 'envoye' && seq === 'POST /api/v#/conversations | GET /api/v#/conversations/# | POST /api/v#/conversations/#/replies | POST /api/v#/transactions/#/offers', 'F12 — exactement les 4 requêtes de Bleam, dans son ordre (relecture du fil, ni `mark_as_read` ni transaction relue)', seq); }
+  // F15 — 5.410.5 : comme Bleam (« il ouvre un onglet tout petit, le sien, et c'est là qu'il fait ses actions ») : TOUTES les
+  //        requêtes de la séquence partent de l'ONGLET DE TRAVAIL VRM, jamais de l'onglet où il navigue (7).
+  { const f = monterFav({ prixFil: true });
+    const ex = f.ctx.chrome.scripting.executeScript;
+    f.ctx.chrome.scripting.executeScript = async (o) => { const n = f.j.vinted.length; const r = await ex(o); for (let i = n; i < f.j.vinted.length; i++) Object.defineProperty(f.j.vinted[i], 'tab', { value: o && o.target && o.target.tabId, enumerable: false }); return r; };
+    const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    const cree = (f.j.ongletsCrees || [])[0];
+    const tabs = f.j.vinted.map((v) => v.tab);
+    dit(r.json.resultat === 'envoye' && cree && cree.active === false && tabs.length === 4 && tabs.every((t) => t === cree.id) && (f.store.vrmOngletTravail || {}).tabId === cree.id, 'F15 — les 4 requêtes partent de l’onglet de travail VRM (ouvert en arrière-plan, retenu), aucune de son onglet', JSON.stringify({ cree, tabs })); }
+  // F16 — l'onglet de travail FERMÉ pendant une série (vu par Chrome) ⇒ rien ne part, dit ; la fois suivante, un neuf s'ouvre.
+  { const f = monterFav({ store: { __commeBleamDefaut: true, vrmOngletTravail: { tabId: 999, uid: UID, maj: Date.now() - 20000, fermeAt: Date.now() - 1000 } } });
+    const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    const n1 = f.j.vinted.length;
+    const r2 = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(r.json.resultat === 'refuse' && r.json.raison === 'onglet_vinted' && n1 === 0 && r2.json.resultat === 'envoye' && (f.j.ongletsCrees || []).length === 1, 'F16 — onglet de travail fermé pendant la série ⇒ arrêt dit (rien n’est parti la 1re fois), puis un onglet neuf à la suivante', JSON.stringify({ r: r.json, r2: r2.json, n: f.j.vinted.length, crees: (f.j.ongletsCrees || []).length })); }
   // F13 — LE DÉFAUT DU 20 NOV. 22:29 : une réponse NORMALE (200) qui porte `is_suspicious: false` n'est pas un contrôle anti-robot.
   { const f = monterFav(); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const f2 = monterFav({ store: { vrmCommeBleam: { favoris: false } } }); const r2 = await f2.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
@@ -242,6 +257,8 @@ const MUTATIONS = [
   ['fil-pas-relu', "  if(seqBleam||!filVerifiable(c)){", "  if(!filVerifiable(c)){"],
   ['tx-toujours-lue', "  if(seqBleam&&(prFil||!offre)){", "  if(false){"],
   ['frein-sur-200', "  if (r.ok === true || (st >= 200 && st < 400)) return '';", ''],
+  ['onglet-de-l-utilisateur', "    if (!pg.refus && travail) {", "    if (false) {"],
+  ['ferme-ignore', "    if (!t && Number(mem.fermeAt) > 0 && !mem.fermeDit", "    if (false && Number(mem.fermeAt) > 0 && !mem.fermeDit"],
   ['mot-sans-bord', "\\bsuspicious/i.test(txt)", "suspicious/i.test(txt)"],
 ];
 function lancerSur(src) { const r = cp.spawnSync(process.execPath, [__filename, '--bg', src], { env: { ...process.env, SILENCE: '1', VRM_PROUVE_ENFANT: '1' }, encoding: 'utf8', timeout: 600000 }); return r.status; }

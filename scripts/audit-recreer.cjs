@@ -220,7 +220,9 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const et = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape).map((e) => e.etape);
     const ordre = [...new Set(et)].join(',');
     dit(r.etape === 'fait' && ordre === 'lecture,photos,enregistrement,brouillon,suppression,attente,en-ligne', "les étapes (lecture, photos, enregistrement, brouillon, suppression, attente, mise en ligne) sont annoncées à l'app, dans l'ordre", ordre);
-    const ph = f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos');
+    // 5.410.5 : l'onglet de travail VRM est un second onglet dans le faux Chrome (dont `tabs.query` ne filtre pas l'adresse) : chaque
+    // annonce à l'app y est comptée deux fois — on juge les annonces DISTINCTES.
+    const ph = [...new Map(f.j.evts.filter((e) => e && e.quoi === 'repub' && e.etape === 'photos').map((e) => [JSON.stringify(e), e])).values()];
     dit(ph.length === 2 && ph[1].fait === 1 && ph[1].total === 2, "l'envoi des photos dit « photo n sur N »", JSON.stringify(ph)); }
   // G — sans modèle, avec les codes rangés de sa fiche : la recette vient d'eux.
   { const { f, r } = await run({ modele: false, codes: { catalog_id: 77, brand_id: 9, brand: 'Nike', color_ids: [3], item_attributes: [{ code: 'size', ids: [60] }], package_size_id: 2 } });

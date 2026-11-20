@@ -13191,8 +13191,10 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
         const texteRefus = texteJamaisRepete(personnaliserMessageFavori(version.texte, String(pseudo || ''), undefined, { article: String(article || ''), prix }).slice(0, 2000), String(pseudo || ''), await textesRecents(uid));   // 5.398
         if (texteRefus == null) { noterDiag('offre_auto_refus_message_repete'); return false; }
         if (!texteRefus.trim()) return false;
+        const ml = await marquerLuCommeBleam(acc, conv); if (ml && (ml.pause || ml.sansPage)) return false;   // 5.410.5 : comme Bleam
         const ec = await attendreEcriture(uid, acc, texteRefus, 'serie');
         if (!ec.ok) return false;
+        await attendreApresLu(ml && ml.ok ? ml.luAt : 0);
         const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${conv}/replies`, corpsReponseVinted(texteRefus), { timeoutMs: 12000 });
         noterDiag(rm && rm.ok ? 'offre_auto_refus_message' : `offre_auto_refus_message_ko_${rm && rm.status}`);
         if (rm && rm.ok) await noterTexteRecent(uid, texteRefus);
@@ -15265,6 +15267,7 @@ async function pageVintedPour(acc) {
 }
 const RAISON_ONGLET_VINTED = "ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché.";
 const RAISON_COMPTE_PAGE = "l'onglet vinted.fr n'est pas (ou plus) connecté sur ce compte — bascule sur ce compte dans l'onglet, puis réessaie. Rien n'est parti.";
+const RAISON_TRAVAIL_FERME = "l'onglet de travail VRM a été fermé pendant l'envoi — VRM s'est arrêté, rien de plus n'est parti. Relance quand tu veux : VRM en rouvrira un.";
 const RAISON_NAVIGATEUR_PAGE = "ce navigateur ne laisse pas VRM agir depuis la page Vinted — republie depuis Chrome sur l'ordinateur. Rien n'a été touché.";
 // `corps` : un objet (JSON) ou { photo: { b64, type, nom, temp } } (multipart).
 // ══ 5.408 — LA TRACE DE LA REPUBLICATION (pour prouver la cause des refus « photos ») ══
@@ -15320,9 +15323,17 @@ async function tracerRepub(acc, m, endpoint, body, o) {
 }
 async function vintedPage(acc, method, endpoint, body, options = {}) {
   const domain = acc.domain || 'www.vinted.fr';
+  // 5.410.5 : chaque ENVOI (et les lectures d'une séquence d'envoi, `travail: true`) part de l'onglet de travail VRM,
+  // comme chez Bleam ; les autres lectures, de SON onglet comme avant. `travail: false` force son onglet.
+  const travail = options.travail === true || (options.travail !== false && String(method || 'POST').toUpperCase() !== 'GET');
   return requeteVinted('api', async () => {
-    const pg = await pageVintedPour(acc);
-    if (pg.refus) { noterDiag('page_' + pg.refus); return { status: 0, ok: false, json: null, sansPage: pg.refus }; }
+    let pg = await pageVintedPour(acc);
+    if (!pg.refus && travail) {
+      const ot = await ongletTravailVinted(acc, acc && acc.vinted_user_id, { chemin: options.chemin });
+      pg = ot.refus ? { refus: ot.refus } : { tabId: ot.tabId };
+      if (!ot.refus && ot.cree) await new Promise((ok) => setTimeout(ok, 1500 + Math.round(Math.random() * 1500)));   // la page de Vinted finit de démarrer
+    }
+    if (pg.refus) { noterDiag('page_' + pg.refus); return { status: 0, ok: false, json: null, sansPage: pg.refus === 'travail-ferme' ? 'onglet' : pg.refus, travailFerme: pg.refus === 'travail-ferme' }; }
     try {
       const res = await executerMain(pg.tabId, async (m, chemin, corps, csrfFond, delai) => {
         const L = (typeof location !== 'undefined') ? location : null;
@@ -15386,6 +15397,7 @@ async function vintedPagePhoto(acc, blob, nom, temp) {
 // Une republication refusée faute d'onglet : la phrase dite à l'app.
 function raisonSansPage(r) {
   if (!r || !r.sansPage) return '';
+  if (r.travailFerme) return RAISON_TRAVAIL_FERME;
   return r.sansPage === 'navigateur' ? RAISON_NAVIGATEUR_PAGE : r.sansPage === 'compte' ? RAISON_COMPTE_PAGE : RAISON_ONGLET_VINTED;
 }
 // (29 oct.) Quelques paires par jour et par compte, au début (sa décision avec
@@ -16724,12 +16736,15 @@ async function recreerVinted(msg) {
 // et l'écran plein (`avecActionPlein`) sur vinted.fr pendant TOUT le travail.
 const COMME_BLEAM = 'vrmCommeBleam';
 const LOT_DEFAUT = 'Bonjour {username}, je vois que plusieurs de mes articles vous plaisent : je peux vous faire un prix sur un lot si vous voulez !';
-const OFFRE_APRES_DEFAUT = [8, 15];   // secondes entre le message et l'offre (mesuré : ~11 s)
+// 5.410.5 (Julien : « les délais aléatoires de VRM sont bien, mais […] ») : toujours tirés au hasard, mais JAMAIS plus
+// court que l'écart mesuré chez Bleam (message → offre : 11,0 s) — plancher OFFRE_APRES_MIN.
+const OFFRE_APRES_MIN = 11;
+const OFFRE_APRES_DEFAUT = [11, 18];   // secondes entre le message et l'offre (mesuré chez Bleam : 11,0 s)
 async function reglagesCommeBleam() {
   let r = null; try { r = (await chrome.storage.local.get(COMME_BLEAM))[COMME_BLEAM]; } catch (_) { r = null; }
   const o = r && typeof r === 'object' ? r : {};
   const min = Number(o.offreMin), max = Number(o.offreMax);
-  const okMin = Number.isInteger(min) && min >= 3 && min <= 120, okMax = Number.isInteger(max) && max >= 3 && max <= 120;
+  const okMin = Number.isInteger(min) && min >= OFFRE_APRES_MIN && min <= 120, okMax = Number.isInteger(max) && max > OFFRE_APRES_MIN && max <= 120;
   const lot = typeof o.messageLot === 'string' && o.messageLot.trim() && o.messageLot.length <= 2000 ? o.messageLot : LOT_DEFAUT;
   let a = okMin ? min : OFFRE_APRES_DEFAUT[0], b = okMax ? max : OFFRE_APRES_DEFAUT[1];
   if (b <= a) b = Math.min(120, a + 1);
@@ -16744,7 +16759,7 @@ async function poserReglagesCommeBleam(v) {
   if (v.messageLot != null) { const t = String(v.messageLot); if (!t.trim() || t.length > 2000) return { ok: false, raison: 'message vide ou trop long' }; if (!texteSurVinted(t).ok) return { ok: false, raison: 'Vinted refuserait ce message (lien, adresse ou numéro)' }; n.messageLot = t; }
   if (v.offreMin != null || v.offreMax != null) {
     const a = Number(v.offreMin != null ? v.offreMin : n.offreMin), b = Number(v.offreMax != null ? v.offreMax : n.offreMax);
-    if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 3 && b <= 120 && a < b)) return { ok: false, raison: 'délai entre 3 et 120 s, le plus court avant le plus long' };
+    if (!(Number.isInteger(a) && Number.isInteger(b) && a >= OFFRE_APRES_MIN && b <= 120 && a < b)) return { ok: false, raison: 'délai entre 11 et 120 s, le plus court avant le plus long' };
     n.offreMin = a; n.offreMax = b;
   }
   try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: n.methode, favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
@@ -16775,23 +16790,59 @@ async function attendreOnglet(tabId, re, ms = 45000) {
     await new Promise((r) => setTimeout(r, 300));
   }
 }
-async function ongletTravailVinted(acc, uid) {
+// ⚠️ 5.410.5 (Julien, 20 nov. : « Bleam ouvre un nouvel onglet tout petit, où Bleam dit que c'est le sien, et c'est là
+//    que Bleam fait ses actions » ; export de l'Observateur : ses requêtes partent de SES onglets vinted.fr — un pour les
+//    messages, un autre ouvert puis fermé pour la republication —, jamais de celui où il navigue). VRM fait pareil pour
+//    TOUS ses envois (favoris, offres, messages, republication) : UN onglet de travail vinted.fr, dans une petite fenêtre
+//    à part (repli : un onglet en arrière-plan), marqué « Onglet de travail VRM », réutilisé tant qu'il est ouvert.
+//    Garde-fous inchangés : SON onglet vinted.fr connecté sur CE compte d'abord (sans lui rien ne part), le compte du
+//    cookie revérifié à chaque requête (`pageVintedPour`), une requête à la fois (`requeteVinted`). L'onglet de travail
+//    FERMÉ pendant une série ⇒ arrêt propre et dit (`travail-ferme`), jamais rouvert en douce au milieu.
+const TRAVAIL_FENETRE = { width: 440, height: 680 };
+const TRAVAIL_SERIE_MS = 3 * 60000;   // utilisé il y a moins de 3 min ⇒ une série est en cours
+async function marquerOngletTravail(tabId) {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, func: () => {
+      if (window.top !== window || document.getElementById('vrm-travail')) return;
+      const h = document.createElement('div'); h.id = 'vrm-travail';
+      h.style.cssText = 'all:initial;position:fixed;left:0;right:0;bottom:0;z-index:2147483645;pointer-events:none;';
+      const o = h.attachShadow({ mode: 'closed' });
+      let t = 'Onglet de travail VRM — ne le ferme pas pendant les envois.';
+      try { if (globalThis.VRM_UI && typeof globalThis.VRM_UI.T === 'function') t = globalThis.VRM_UI.T('a_onglet_travail') || t; } catch (_) {}
+      const b = document.createElement('div'); b.textContent = t;
+      b.style.cssText = 'font:600 13px/1.3 -apple-system,system-ui,sans-serif;background:#111114;color:#fff;padding:8px 12px;text-align:center;';
+      o.appendChild(b); (document.documentElement || document.body).appendChild(h);
+      try { if (!/^VRM · /.test(document.title)) document.title = 'VRM · ' + document.title; } catch (_) {}
+    } });
+  } catch (_) {}
+}
+async function ongletTravailVinted(acc, uid, opts = {}) {
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
   const pg = await pageVintedPour(acc);   // SON onglet vinted.fr, connecté sur CE compte : sans lui, rien ne part
   if (pg.refus) return { refus: pg.refus };
   let mem = null; try { mem = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; } catch (_) { mem = null; }
   if (mem && mem.tabId != null) {
     let t = null; try { t = await chrome.tabs.get(mem.tabId); } catch (_) { t = null; }
-    if (t && ongletDuDomaine(t, domaine)) { await poserOngletTravail({ ...mem, uid: String(uid), maj: Date.now() }); return { tabId: t.id }; }
+    if (t && ongletDuDomaine(t, domaine)) { await poserOngletTravail({ ...mem, uid: String(uid), maj: Date.now() }); marquerOngletTravail(t.id); return { tabId: t.id }; }
+    if (!t && Number(mem.fermeAt) > 0 && !mem.fermeDit && Number(mem.fermeAt) - Number(mem.maj || 0) < TRAVAIL_SERIE_MS && opts.serie !== false) {
+      // Fermé (vu par Chrome) pendant une série : on s'arrête et on le dit, une fois ; la suite (SON geste) en rouvrira un.
+      await poserOngletTravail({ ...mem, fermeDit: Date.now() }); noterDiag('travail_ferme'); return { refus: 'travail-ferme' };
+    }
   }
   let fen; try { fen = (await chrome.tabs.get(pg.tabId)).windowId; } catch (_) { fen = undefined; }
-  let t = null;
-  try { t = await chrome.tabs.create({ url: `https://${domaine}/`, active: false, ...(fen != null ? { windowId: fen } : {}) }); } catch (_) { t = null; }
+  const url = `https://${domaine}${opts.chemin && /^\/[\w\-/]*$/.test(opts.chemin) ? opts.chemin : '/'}`;
+  let t = null, fenetre = null;
+  // Une petite fenêtre à part, sans prendre le focus (comme l'onglet « tout petit » de Bleam).
+  try { if (chrome.windows && typeof chrome.windows.create === 'function') { const w = await chrome.windows.create({ url, type: 'popup', focused: false, ...TRAVAIL_FENETRE }); t = w && Array.isArray(w.tabs) && w.tabs[0] ? w.tabs[0] : null; fenetre = w && w.id != null ? w.id : null; } } catch (_) { t = null; }
+  if (!t || t.id == null) { try { t = await chrome.tabs.create({ url, active: false, ...(fen != null ? { windowId: fen } : {}) }); } catch (_) { t = null; } }
   if (!t || t.id == null) return { refus: 'onglet' };
-  await poserOngletTravail({ tabId: t.id, uid: String(uid), depuis: Date.now(), maj: Date.now() });
+  await poserOngletTravail({ tabId: t.id, fenetre, uid: String(uid), depuis: Date.now(), maj: Date.now() });
   if (!(await attendreOnglet(t.id))) return { refus: 'onglet' };
+  noterDiag('travail_ouvert');
+  marquerOngletTravail(t.id);
   return { tabId: t.id, cree: true };
 }
+try { chrome.tabs.onRemoved.addListener((tabId) => { (async () => { const m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; if (m && m.tabId === tabId) await poserOngletTravail({ ...m, fermeAt: Date.now() }); })().catch(() => {}); }); } catch (_) {}
 async function poserOngletTravail(o) { try { await chrome.storage.local.set({ [ONGLET_TRAVAIL]: o }); } catch (_) {} }
 async function naviguerTravail(tabId, url, re) {
   try { await chrome.tabs.update(tabId, { url }); } catch (_) { return false; }
@@ -19417,8 +19468,11 @@ async function executerPourAppCoeur(msg) {
     // l'attente ⇒ rien ne part, sa place est rendue.
     if (methode === 'POST' && /^\/api\/v2\/conversations\/\d+\/replies$/.test(String(msg.endpoint || ''))) {
       const txt = msg.body && msg.body.reply && typeof msg.body.reply.body === 'string' ? msg.body.reply.body : '';
+      const cv = /^\/api\/v2\/conversations\/(\d+)\/replies$/.exec(String(msg.endpoint || ''));
+      const ml = cv ? await marquerLuCommeBleam(acc, cv[1]) : null;   // 5.410.5 : comme Bleam (lue, puis la réponse ≥ 6,7 s après)
       const ec = await attendreEcriture(msg.uid, acc, txt, 'clic');
       if (!ec.ok) { arret = { ok: false, code: ec.code, error: ec.error }; return null; }
+      await attendreApresLu(ml && ml.ok ? ml.luAt : 0);
     }
     // (5.342, P1) Son geste part de l'onglet vinted.fr quand il est ouvert (comme le
     // site). Sans onglet (téléphone, autre navigateur) : son clic part comme avant —
@@ -19568,6 +19622,26 @@ async function prixMiniAnnonce(itemId) {
 }
 // ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
 const INITIATEUR_BLEAM = 'seller_enters_notification';
+// 5.410.5 (« tous les envois pareils », export de l'Observateur du 20 nov.) : avant de RÉPONDRE dans une conversation où
+// l'acheteur a écrit, Bleam la marque lue (`PUT /api/v2/conversations/{id}/mark_as_read`, sans corps, depuis l'onglet),
+// ~6,7 s avant sa réponse. Même requête ici, par la page (`vintedPage`) ; une lecture d'état, hors du plafond des gestes.
+// Pas su / refusée ⇒ la réponse n'en dépend pas (la page de Vinted ne s'arrête pas non plus sur ce marquage).
+// L'écart mesuré chez Bleam entre « marquée lue » et sa réponse : 6,7 s. Le temps d'écriture de VRM (tiré au hasard)
+// s'y ajoute s'il est plus long ; jamais plus court (+ 0 à 1,5 s au hasard, jamais deux fois la même attente).
+const LU_AVANT_REPONSE_MS = 6700;
+async function attendreApresLu(t0) {
+  if (!(Number(t0) > 0)) return;
+  const reste = LU_AVANT_REPONSE_MS + Math.round(Math.random() * 1500) - (Date.now() - Number(t0));
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['bleam:luReponse', Math.max(0, reste)]); } catch (_) {}
+  if (reste > 0) await new Promise((ok) => setTimeout(ok, reste));
+}
+async function marquerLuCommeBleam(acc, conv) {
+  if (!/^[1-9]\d{0,19}$/.test(String(conv || ''))) return null;
+  const r = await vintedPage(acc, 'PUT', `/api/v2/conversations/${conv}/mark_as_read`, null, { timeoutMs: 12000 });
+  noterDiag(r && r.ok ? 'bleam_marque_lu' : 'bleam_marque_lu_ko_' + ((r && r.status) || 0));
+  if (r && typeof r === 'object') r.luAt = Date.now();
+  return r;
+}
 const LOT_ENVOYE = 'vrmLotEnvoye';
 async function lotDejaEnvoye(uid, recipientId) {
   try { const m = (await chrome.storage.local.get(LOT_ENVOYE))[LOT_ENVOYE] || {}; const t = m[String(uid)] && m[String(uid)][String(recipientId)]; return Number(t) > 0 && Date.now() - Number(t) < 30 * 864e5; } catch (_) { return false; }
@@ -19591,7 +19665,7 @@ async function plancherFavori(itemId) {
   }
   return plancherBaisse(fiche, achatParNum);
 }
-function delaiOffreBleam(cb) { const a = Number(cb && cb.offreMin) || 8, b = Number(cb && cb.offreMax) || 15; return Math.round((a + Math.random() * (b - a)) * 1000); }
+function delaiOffreBleam(cb) { const a = Math.max(OFFRE_APRES_MIN, Number(cb && cb.offreMin) || OFFRE_APRES_DEFAUT[0]), b = Math.max(a + 1, Number(cb && cb.offreMax) || OFFRE_APRES_DEFAUT[1]); return Math.round((a + Math.random() * (b - a)) * 1000); }
 let _dernierDelaiOffre = -1;
 async function sequenceFavoriBleam(x) {
   const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit } = x;
@@ -19640,7 +19714,8 @@ async function sequenceFavoriBleam(x) {
   { const ar = await arretPendantEcriture(uid, 'serie'); if (ar) { noterDiag('favori_offre_pas_partie_' + ar.code); return fini; } }
   if (await gardeStricte(uid, acc, { lecture: true })) { noterDiag('favori_offre_pas_partie_garde'); return fini; }
   etape('offre');
-  const o = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { currency: devise, price: prix } }, { timeoutMs: 12000 });
+  // 5.410.5 : le prix comme Bleam l'envoie (« 48 », pas « 48.00 ») ; les centimes restent quand il y en a.
+  const o = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { currency: devise, price: String(prix).replace(/\.00$/, '') } }, { timeoutMs: 12000 });
   if (partie(o)) compterEcrit();
   noterDiag(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0) ? 'favori_offre_ok' : 'favori_offre_refusee_' + ((o && o.status) || 'reseau'));
   return fini;
@@ -19719,7 +19794,7 @@ async function executerMessageFavori(uid,acc,body){
   etape('conversation');
   // 5.410.3 (`favorisbleam`, « tout comme Bleam ») : la conversation s'ouvre comme chez l'outil observé (`seller_enters_notification`).
   const cbF=await reglagesCommeBleam();
-  const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000});
+  const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000,chemin:'/inbox'});
   if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(creation.pause)return rep('refuse',0,'pause_vinted');
@@ -19743,7 +19818,7 @@ async function executerMessageFavori(uid,acc,body){
   etape('verification');
   // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant). Bleam : toujours relu.
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
-  if(seqBleam||!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
+  if(seqBleam||!filVerifiable(c)){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');
@@ -19768,7 +19843,7 @@ async function executerMessageFavori(uid,acc,body){
     const itF=c&&c.transaction&&c.transaction.item&&typeof c.transaction.item==='object'?c.transaction.item:null;
     {const ind=itF?annonceIndisponible(itF,null,null):'';if(ind){noterDiag('favori_annonce_fil_'+ind);return rep('ignore',lu.status,'annonce_indisponible');}}
   }else if(id(tx)){
-    const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000});
+    const t=await vintedPage(acc,'GET',`/api/v2/transactions/${tx}`,null,{timeoutMs:12000,travail:true});
     if(!frein)frein=freinFavoriAuto(t);
     if(t.sansPage)return rep('refuse',0,'onglet_vinted');
     if(frein)return rep('refuse',t.status);
@@ -20716,7 +20791,7 @@ function freinFavoriAuto(r) {
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
 // (5.372) Le temps APRÈS l'offre est désormais de 8 à 20 s (`attendreOffreMessage`) ; `offre` reste
 // la courte pause entre la transaction relue et l'offre.
-const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550], fil: [500, 1200] };   // 5.410.5 : `fil` = la relecture de la conversation chez Bleam (0,76 s mesurée)
+const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550], fil: [800, 1600] };   // 5.410.5 : `fil` = la relecture de la conversation, jamais plus tôt que chez Bleam (0,76 s mesurée)
 async function pauseFavori(quoi, uid) {
   const p = PAUSES_FAVORI[quoi] || [400, 800];
   const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));   // 5.357 : doublée en prudence

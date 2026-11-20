@@ -1042,6 +1042,7 @@
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
 <div class="capte" role="status" aria-live="polite" data-capte hidden></div>
+<button class="verif6" type="button" data-verif-pastille hidden></button>
 <button class="btn" title="VRM" aria-label="VRM"><span class="pt"></span></button>`;
 
   U.monter(ombre);   // 5.406 : la feuille commune d'abord (les règles de la carte, plus bas, la précisent)
@@ -1071,7 +1072,18 @@
   .carte, .carte.on { position: static; display: block; width: auto; max-height: none; overflow: visible; background: transparent; border: 0;
     box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-radius: 0; }
   .connexion, .carte > .connexion { margin: 0; border: 0; border-top: 0; padding: 0 0 2px; border-radius: 0; background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .carte.on { animation: none; }`;
+  .carte.on { animation: none; }
+  /* 5.410.5 — une vérification de Vinted AFFICHÉE sur la page : le panneau s'écarte en une pastille, en HAUT, petite,
+     qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
+  .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px; text-align: left; border: 0; border-radius: 14px; cursor: pointer; pointer-events: auto;
+    background: #FFF4DD; color: #3D2600; font: 600 14px/1.35 -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; box-shadow: 0 6px 20px rgb(0 0 0 / .22); }
+  .verif6[hidden] { display: none !important; }
+  .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
+  .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
+  .verif6[data-verif="faite"] .pv { background: #0068D6; }
+  @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
+  :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
     // Le cadre part (navigation, quelle qu'elle soit) : la carte le cache AVANT
@@ -1099,6 +1111,8 @@
   // téléphone » : au doigt, toucher le logo OUVRE la carte, qui porte le geste
   // du logo dans un bouton (« Ouvrir VRM »), ou le formulaire de connexion.
   let dernierPointeur = '';
+  // 5.410.5 : une vérification de Vinted est-elle VRAIMENT affichée sur cette page ? (présence seulement)
+  const verifAffichee = () => { try { return !!document.querySelector('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) { return false; } };
   let doigt = false;    // la carte est ouverte au doigt : elle porte son bouton et sa croix
   const sansSurvol = () => { try { return matchMedia('(hover: none)').matches; } catch (_) { return false; } };
   const auDoigt = () => (dernierPointeur ? dernierPointeur !== 'mouse' : sansSurvol());
@@ -1373,7 +1387,7 @@
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
         <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans"> · ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
-        ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU('a_verif_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
+        ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU(verifAffichee() ? 'a_verif_page' : 'a_refus_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
           : `${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
         <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`}
       </section>`;
@@ -2579,7 +2593,7 @@
     const g = cbEtat.reglages || {};
     const choix = (v, lib, note) => `<label class="champ6 cb6"><input type="radio" name="vrm-cb-methode" value="${v}" data-cb-methode="${v}"${g.methode === v ? ' checked' : ''}><span><b>${esc(TU(lib))}</b><span class="note5">${esc(TU(note))}</span></span></label>`;
     const lot = cbLot != null ? cbLot : (g.messageLot || '');
-    const oA = cbOffre ? cbOffre.offreMin : (Number(g.offreMin) || 8), oB = cbOffre ? cbOffre.offreMax : (Number(g.offreMax) || 15);
+    const oA = cbOffre ? cbOffre.offreMin : (Number(g.offreMin) || 11), oB = cbOffre ? cbOffre.offreMax : (Number(g.offreMax) || 18);
     return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
       ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}${choix('directe', 'cb_directe', 'cb_directe_note')}
       ${ongletTravailHtml()}
@@ -2587,7 +2601,7 @@
     <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
       <label class="champ6 cb6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><span><b>${esc(TU('cb_sequence'))}</b></span></label>
       <label class="champ6"><b>${esc(TU('cb_lot'))}</b><textarea rows="3" maxlength="2000" data-cb-lot aria-label="${esc(TU('cb_lot'))}">${esc(lot)}</textarea><span class="note5">${esc(TU('cb_lot_note'))}</span></label>
-      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: oA, b: oB }))}</b><span class="cd6-l"><input type="range" min="3" max="60" step="1" value="${oA}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="4" max="120" step="1" value="${oB}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
+      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: oA, b: oB }))}</b><span class="cd6-l"><input type="range" min="11" max="60" step="1" value="${oA}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="12" max="120" step="1" value="${oB}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
       ${cbMsg ? `<p class="note5" role="status" data-cb-etat="${cbMsg.ok ? 'ok' : 'ko'}">${esc(cbMsg.texte)}</p>` : ''}
       <div class="outils"><button type="button" class="vu-btn vu-plein" data-cb-enregistrer${cbEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
     </section>`;
@@ -4395,6 +4409,49 @@
     try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && (ch.vrmCapteLots || ch.vrmCapteReglage)) setTimeout(demanderCapte, 250); }); } catch (_) {}
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(demanderCapte, 600); });
     setTimeout(demanderCapte, 1200);
+  }
+
+  // ══ 5.410.5 — UNE VÉRIFICATION DE VINTED AFFICHÉE : LE PANNEAU S'ÉCARTE (capture de Julien, 20 nov. 22:29) ══════
+  // Quel que soit le moteur (favoris, republication, offres, baisse…), dès qu'une vérification est PRÉSENTE dans la page
+  // (iframe DataDome / captcha — la même liste que l'écran plein, vrm-action.js), le grand panneau et la carte se replient
+  // en une pastille en haut à droite, qui ne recouvre pas le centre de la vérification. La pastille rouvre le panneau (SON
+  // toucher). La vérification disparue : « Vérification faite — Reprendre ? » — rien ne repart seul, « Reprendre » reste
+  // le bouton du panneau. On ne regarde que la PRÉSENCE de l'élément, jamais son contenu ; rien n'est cliqué dedans.
+  if (!CADRE && !LISTES) {
+    const SEL_VERIF_PAGE = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
+    const pastilleV = ombre.querySelector('[data-verif-pastille]');
+    let etatV = '', ouvertMalgre = false, minuteV = null;
+    const verifPresente = () => { try { const el = document.querySelector(SEL_VERIF_PAGE); return !!(el && !hote.contains(el)); } catch (_) { return false; } };
+    const placerV = () => {
+      // La carte de l'écran plein (vrm-action.js) se met déjà en haut au centre : la pastille passe dessous si elles se croisent.
+      let bas = 0; try { const a = document.getElementById('vrm-action'); bas = a && a.style.display !== 'none' ? Number(a.getAttribute('data-cote-bas')) || 0 : 0; } catch (_) {}
+      pastilleV.style.setProperty('--verif-haut', (window.innerWidth < 900 && bas > 0 ? Math.round(bas + 8) : 12) + 'px');
+    };
+    const poserV = (e) => {
+      etatV = e;
+      if (!e) { pastilleV.hidden = true; hote.removeAttribute('data-verif-replie'); pastilleV.removeAttribute('data-verif'); return; }
+      const t = e === 'page' ? TU('a_verif_page') : TU('a_verif_faite_q');
+      pastilleV.replaceChildren(); const pv = document.createElement('span'); pv.className = 'pv'; pv.setAttribute('aria-hidden', 'true'); const tx = document.createElement('span'); tx.textContent = t; pastilleV.append(pv, tx);
+      pastilleV.setAttribute('data-verif', e); pastilleV.setAttribute('aria-label', t + ' · ' + TU('a_ouvrir_vrm'));
+      pastilleV.hidden = false; hote.setAttribute('data-verif-replie', e); placerV();
+    };
+    const regarderV = () => {
+      minuteV = null;
+      const la = verifPresente();
+      if (la) { if (!ouvertMalgre && etatV !== 'page') poserV('page'); else if (etatV === 'page') placerV(); }
+      else if (etatV === 'page') poserV('faite');                 // disparue : on le DIT, on ne relance rien
+      else if (ouvertMalgre && !la) ouvertMalgre = false;          // une prochaine vérification repliera à nouveau
+    };
+    const bientotV = () => { if (!minuteV) minuteV = setTimeout(regarderV, 200); };
+    pastilleV.addEventListener('click', () => {
+      ouvertMalgre = etatV === 'page';
+      poserV('');
+      try { doigt = true; carte.classList.add('on'); rendre(); } catch (_) {}
+    });
+    try { new MutationObserver(bientotV).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'id'] }); } catch (_) {}
+    window.addEventListener('resize', () => { if (etatV) placerV(); });
+    setTimeout(regarderV, 300);
+    globalThis.__vrmBadgeVerif = () => ({ etat: etatV, replie: hote.hasAttribute('data-verif-replie') });   // pour les bancs (lecture seule)
   }
 
   (CADRE || LISTES ? (document.body || document.documentElement) : (document.documentElement || document.body)).appendChild(hote);

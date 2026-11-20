@@ -272,15 +272,23 @@
       if (a.robot && quoi !== 'alerte') {
         const fait = Number(a.fait) || 0, total = Number(a.total) || 0, reste = Math.max(0, total - fait - (Number(a.pas) || 0));
         const faite = !vintedParle && verifFaite;
-        html = `<div class="cote carte-verif vu-coque" role="status" data-action-cote="verification" data-action-robot="${faite ? 'faite' : 'attente'}"><div class="cv-t"><span class="vu-point" data-k="geste"></span><span class="t">${esc(faite ? T('a_verif_faite') : T('a_verif_robot'))}</span></div>`
+        // 5.410.5 : « fais-la sur la page » SEULEMENT quand une vérification est VRAIMENT affichée (iframe vue). Un refus
+        // anti-robot d'une REQUÊTE (403 captcha, rien sur la page) ne demande aucun geste impossible : « le message n'est
+        // pas parti, on attend » ; « Reprendre » reste SON toucher, quand Vinted a répondu normalement depuis.
+        if (vintedParle === 'verification') iframeVue = true;
+        const sorteV = vintedParle === 'verification' ? 'page' : faite && iframeVue ? 'faite' : 'refus';
+        const phraseV = sorteV === 'page' ? T('a_verif_page') : sorteV === 'faite' ? T('a_verif_faite_q') : T('a_refus_robot');
+        html = `<div class="cote carte-verif vu-coque" role="status" data-action-cote="verification" data-action-robot="${faite ? 'faite' : 'attente'}" data-action-verif="${sorteV}"><div class="cv-t"><span class="vu-point" data-k="geste"></span><span class="t">${esc(phraseV)}</span></div>`
           + `<div class="cv-n">${esc(T('a_verif_compte', { n: fait, total, reste }))}</div>`
           + (faite ? `<div class="cv-n">${esc(T('a_doucement'))}</div><button class="vu-btn vu-plein" data-action-reprendre>${esc(T('a_reprendre'))}</button>${repriseErreur ? `<div class="cv-n">${esc(repriseErreur)}</div>` : ''}` : '') + '</div>';
       } else {
-        const phrase = quoi === 'alerte' ? T('a_vinted_dit') : T('a_verif');
+        const phrase = quoi === 'alerte' ? T('a_vinted_dit') : vintedParle === 'verification' ? T('a_verif_page') : T('a_verif');
         html = `<div class="cote vu-coque" role="status" data-action-cote="${esc(quoi)}"><span class="vu-point" data-k="geste"></span><span class="t">${esc(phrase)}</span></div>`;
       }
       if (vue !== 'cote') asideA = Date.now();
       if (vue !== 'cote' || racine.getAttribute('data-h') !== html) { vue = 'cote'; poser(html); racine.setAttribute('data-h', html); brancherReprise(); }
+      // 5.410.5 : le bas de cette carte, pour que la pastille du panneau VRM (vrm-badge.js) se pose dessous, jamais dessus.
+      try { const cc = racine.querySelector('.cote'); if (cc) hote.setAttribute('data-cote-bas', String(Math.round(cc.getBoundingClientRect().bottom))); } catch (_) {}
       if (vintedParle || a.verification) asideA = Date.now();
       else setTimeout(() => { if (vue === 'cote' && !vintedParle) rendre(); }, 3100 - (Date.now() - asideA));
       if (a.robot) suivreVerif();
@@ -340,11 +348,11 @@
   }
   // La vérification est-elle FAITE ? Plus de captcha dans la page, et une réponse normale de Vinted
   // rangée par l'extension APRÈS l'arrêt (`vrmFlux.vinted.okAt`). Lu toutes les 1,5 s ; rien ne repart seul.
-  let verifFaite = false, suiviVerif = null, repriseErreur = '';
+  let verifFaite = false, suiviVerif = null, repriseErreur = '', iframeVue = false;
   function suivreVerif() {
     if (suiviVerif) return;
     suiviVerif = setInterval(() => {
-      if (!action || !action.robot) { clearInterval(suiviVerif); suiviVerif = null; verifFaite = false; return; }
+      if (!action || !action.robot) { clearInterval(suiviVerif); suiviVerif = null; verifFaite = false; iframeVue = false; return; }
       let capte = false; try { capte = !!document.querySelector(SEL_VERIF); } catch (_) {}
       try {
         chrome.storage.local.get('vrmFlux', (g) => {
