@@ -28,7 +28,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (20 nov. soir, Julien : « on doit pouvoir sélectionner dans les onglets la plateforme que l'on veut, faire un bel affichage ») docs/passation/2026-11-20-selecteur-beau.md
-  { id: 'selecteur-beau', date: '2026-11-20', titre: 'Choisis ta plateforme d’un toucher', phrase: 'Des pastilles avec le logo de chaque site, en haut de chaque onglet.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'selecteur-beau', date: '2026-11-20', titre: 'Choisis ta plateforme d’un toucher', phrase: 'Le logo de chaque site, en pastille, en haut de chaque onglet.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « tout le site doit être comme la fiche Paramètres, simple et minimaliste » ; « les mêmes dispositions sur toutes les plateformes ») docs/passation/2026-11-20-minimaliste.md
   { id: 'minimaliste', date: '2026-11-20', titre: 'Tout l’écran simple, comme Paramètres', phrase: 'Des groupes sobres ; Ventes pareil sur chaque site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « Améliore le visuel, tu n'as pas respecté ce qu'on avait dit ») docs/passation/2026-11-20-argent-natif.md
