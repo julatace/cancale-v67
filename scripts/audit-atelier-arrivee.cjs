@@ -245,7 +245,7 @@ if (PROUVE) prouver();
     dit(/window\.addEventListener\('vrm:atelier-numeroter', f\)/.test(app.slice(app.indexOf('function AtelierArriveeCoque'), app.indexOf('function AtelierArriveeCoque') + 3000)) && /<AtelierArriveeCoque\/>/.test(app) && !/<RangerAchatCoque\/>/.test(app)
       && /const markCollected = \(t\) => \{[^\n]*apresRetraitAtelier\(entreeArriveeColis\(t\)\)/.test(app),
       'A8b · « J’ai retiré » ouvre l’atelier sur le N° de l’article, une seule feuille');
-    const bloc = app.slice(app.indexOf('function AtelierArriveeCoque'), app.indexOf('function AtelierArriveeCoque') + 4000);
+    const bloc = app.slice(app.indexOf('function AtelierArriveeCoque'), app.indexOf('function AtelierArriveeCoque') + 7000)   // (20 nov., arrivee-scan) la coque porte aussi l'écran d'arrivée : fenêtre élargie;
     dit(/ecrireAtelier\(/.test(bloc) && /const ecrireAtelier = \(texte, ops, acc = ''\) => \{ gesteVrm\(/.test(app) && !/save\(['"]vrm_fiches_neuves/.test(bloc) && !/save\(['"]vinted_buyprice_by_num/.test(bloc),
       'A8c · chaque écriture de l’atelier passe par `gesteVrm` (annulable), jamais un `save` direct');
     dit(/Note=\{\(num\) => <NotePaireCoque numero=\{num\} variante="bloc" ajout dicter\/>\}/.test(bloc) && /Note\(fiche\.numero\)/.test(ui), 'A8d · la note (et sa dictée par le navigateur) dans l’atelier');
