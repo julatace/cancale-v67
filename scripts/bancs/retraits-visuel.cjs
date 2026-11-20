@@ -138,9 +138,9 @@ async function releve(pg) {
       const code = li.querySelector('[data-rp-code-grand]'); const qrE = li.querySelector('[data-rp-qr]');
       const cb = code ? code.getBoundingClientRect() : null; const qb = qrE ? qrE.getBoundingClientRect() : null;
       const fs = code ? parseFloat(getComputedStyle(code).fontSize) : 0;
-      const ct = li.querySelector('[data-rp-contenu]'); const ph = ct ? ct.querySelector('img') : null;
+      const ct = li.querySelector('[data-rp-contenu]'); const ph = ct ? ct.querySelector('img') : null; const vg = ct ? ct.querySelector('.n-rp-vignette') : null;
       return { contenu: ct ? { etat: ct.getAttribute('data-rp-contenu'), tx: ct.getAttribute('data-rp-contenu-tx') || '', titre: ((ct.querySelector('[data-rp-titre]') || {}).textContent || '').trim(),
-          photo: ph ? ph.getAttribute('src') || '' : '', pasLu: ((ct.querySelector('[data-rp-pas-lu]') || {}).textContent || '').trim(), vignette: Math.round((ct.querySelector('.n-rp-vignette') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width),
+          photo: ph ? ph.getAttribute('src') || '' : '', photoSrc: (vg && vg.getAttribute('data-rp-photo-src')) || '', pasLu: ((ct.querySelector('[data-rp-pas-lu]') || {}).textContent || '').trim(), vignette: Math.round((ct.querySelector('.n-rp-vignette') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width),
           avantCode: (() => { const c2 = li.querySelector('[data-rp-code-grand], [data-rp-sans-code]'); return !c2 || !!(ct.compareDocumentPosition(c2) & Node.DOCUMENT_POSITION_FOLLOWING); })() } : null,
         cle: li.getAttribute('data-rp-colis'), code: li.getAttribute('data-rp-code'), verif: li.getAttribute('data-rp-verif') || '', mention: (li.querySelector('[data-rp-verif-mention]') || {}).textContent || '',
         trajet: q('[data-rp-etape]', li).map((e) => ({ cle: e.getAttribute('data-rp-etape'), lue: e.getAttribute('data-rp-etape-lue') === '1', courante: e.getAttribute('data-rp-etape-courante') === '1',
@@ -298,11 +298,12 @@ async function siteSeul(nav, { site, W, sombre }) {
   const r = await attendre(pg, (x) => x.colis.length >= 2, 40000);
   await pg.waitForTimeout(1200);
   const th = `${site} seul ${W} ${sombre ? 'sombre' : 'clair'}`;
+  if (process.env.SONDE) console.log(await pg.evaluate(() => [...document.querySelectorAll('li[data-rp-colis]')].map((li) => li.getAttribute('data-rp-colis') + ' ' + (li.querySelector('.n-rp-vignette') || {}).outerHTML).join('\n')));
   const L = SITE_SEUL[site];
   const nomAchat = (k) => site === 'leboncoin' ? `Jordan 4 du bon coin ${k + 1}` : `Samba Vestiaire ${k + 1}`;
   const par = L.map(([suivi, , code, , jl, qr], k) => ({ suivi, code, jl, qr, k, c: r.colis.find((x) => x.code === code) }));
   dit(par.every((p) => !!p.c), `S ${th} : la carte du point montre ses 2 colis, avec leur code`, r.colis.map((x) => x.code));
-  dit(par.every((p) => p.c && p.c.contenu && p.c.contenu.etat === 'autre-site' && p.c.contenu.titre === nomAchat(p.k) && p.c.contenu.photo.includes(p.suivi) && p.c.contenu.avantCode),
+  dit(par.every((p) => p.c && p.c.contenu && p.c.contenu.etat === 'autre-site' && p.c.contenu.titre === nomAchat(p.k) && p.c.contenu.photoSrc.includes(p.suivi) && p.c.contenu.avantCode),
     `S ${th} : le contenu d'abord — la photo et le titre de SON achat ${site} (relié par son n° de suivi)`, par.map((p) => p.c && p.c.contenu));
   dit(par.every((p) => p.c && p.c.trajet.length === 5 && p.c.trajet.some((e) => e.cle === 'point' && e.lue) && !p.c.trajet.find((e) => e.cle === 'paye').lue), `S ${th} : la barre du trajet (Au point lu ; Payé gris : aucune date lue)`);
   dit(par.every((p) => !p.qr || (p.c && p.c.qr && p.c.qr.gauche >= p.c.qr.codeDroite)), `S ${th} : le QR à droite du code`);
@@ -329,11 +330,14 @@ async function vide(nav, { W, sombre }) {
   await new Promise((r) => srv.listen(PORT, r));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
+    // `CAS=sites` : seulement les bases d'un seul site (Leboncoin, Vestiaire).
+    if (process.env.CAS !== 'sites') {
     for (const sombre of [false, true]) await cas(nav, { W: 390, sombre, nom: 'tel-390' });
     await cas(nav, { W: 390, H: 664, sombre: false, nom: 'safari-390x664' });
     for (const sombre of [false, true]) await cas(nav, { W: 1512, sombre, nom: 'ordi-1512' });
     await cas(nav, { W: 1280, sombre: false, nom: 'ordi-1280' });
     await vide(nav, { W: 390, sombre: false }); await vide(nav, { W: 1512, sombre: true });
+    }
     await siteSeul(nav, { site: 'leboncoin', W: 390, sombre: false }); await siteSeul(nav, { site: 'leboncoin', W: 1512, sombre: true });
     await siteSeul(nav, { site: 'vestiaire', W: 390, sombre: true }); await siteSeul(nav, { site: 'vestiaire', W: 1512, sombre: false });
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }

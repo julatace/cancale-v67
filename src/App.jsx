@@ -47570,20 +47570,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
+      // (20 nov., Julien : « les mêmes dispositions sur toutes les plateformes ») Un colis « à vérifier » d'un achat Leboncoin
+      // ou Vestiaire (relié par SON n° de suivi, `achatsAutres`) garde son site et son contenu, comme quand il était à retirer :
+      // avant, il passait « vinted » et disparaissait sous le filtre de son site à la date limite.
+      const aaX = x.kind === 'email' && !o && x.t ? (achatsAutres.get(suiviDeLigne(x.t)) || null) : null;
       // (2 nov.) Même fait que les cartes « extra » : un n° vu sans transporteur nommé.
       const suX = x.kind === 'email' ? (suiviDeLigne(x.t) || '') : (suivisAchat(x.o, indexSuivisAchats)[0] || ''); const eSX = x.kind === 'email' ? null : entreeSuiviAchat(x.o);
       const trInconnu = !!suX && !((x.kind === 'email' ? (x.t && x.t.carrier) : (relaisDe(x.o) || {}).transporteur) || (eSX && eSX.transporteur) || transporteurDeForme(suX) || colisInternational(suX));
       const lu = x.kind === 'email' ? lieuDeLigne(x.t, o) : lieuDeVinted(x.o, relaisDe(x.o));
       const scX = sourcesCarte(x.kind === 'email' ? { t: x.t, o } : { o: x.o });
       const code = codeDesSources(scX, scX && scX.code && scX.code.desaccord ? '' : (x.kind === 'email' ? codeDeLigne(x.t) : codeRetrait((relaisDe(x.o) || {}).code)));
-      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o ? o.title : (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((x.t && x.t.photo) || null), trInconnu,
+      L.push({ cle: x.kind === 'email' ? 'r:e:' + (suiviDeLigne(x.t) || (x.t && (x.t.id || x.t.cleLigne)) || colisKey(x.t) || '') : 'r:v:' + (x.o && x.o.transaction_id), groupe: 'retirer', site: aaX ? aaX.site : 'vinted', achatAutre: aaX, nom: nomAvecTaille(o ? o.title : (aaX && aaX.titre) || (x.t && nomTr(x.t.carrier) ? 'Colis ' + nomTr(x.t.carrier) : 'Colis à retirer'), o), photo: o ? photoAchat(o) : ((aaX && aaX.photo) || (x.t && x.t.photo) || null), trInconnu,
         etat: [lu.lieuNom || (x.kind === 'email' ? nomTr(x.t && x.t.carrier) : ''), 'à vérifier : délai dépassé ou incident'].filter(Boolean).join(' · '), aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, lieuType: x.kind === 'email' ? typeCasier(x.t && x.t.lieu) : '', sorte: sorteRetrait({ lieu: x.kind === 'email' ? (x.t && x.t.lieu) : (relaisDe(x.o) || {}).lieu, nom: lu.lieuNom, consigne: x.kind === 'email' ? (x.t && x.t.consigne) : (relaisDe(x.o) || {}).consigne, libelleTransp: libelleTranspDe(suX) }), transporteur: (x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur)) || '', transp: transporteurColis((x.kind === 'email' ? (x.t && x.t.carrier) : ((relaisDe(x.o) || {}).transporteur || (eSX && eSX.transporteur))) || '', suX), code, jours: null,
         ...(lu.lieuNom ? {} : { sansLieu: x.kind === 'email' ? sansLieuEmail(x.t) : sansLieuVinted(x.o) }),
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
-        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), trajet: trajetCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null), autre: aaX, site: aaX ? aaX.site : 'vinted' } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), trajet: trajetCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,

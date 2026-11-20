@@ -80,7 +80,7 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
   const details = relie ? [c.taille ? tr('retraits.c.taille', { t: c.taille }) : '', phrase].filter(Boolean) : [];
   return (
     <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
-      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={photo && (relie || autre) ? (c.photo || x.photo || undefined) : undefined} data-v2-photo-article={photo ? '' : undefined}>
+      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={(relie || autre) && (c.photo || x.photo) ? (c.photo || x.photo) : undefined} data-v2-photo-article={photo ? '' : undefined}>
         {photo || <Icon name="box" size={26}/>}
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
       </span>
