@@ -214,8 +214,10 @@ export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version
   // les freins de Vinted (captcha, activité automatisée) pour la pause de 24 h.
   if(j.auto&&!version5309)throw new RefusFavoris('Mets à jour l’extension (5.309) pour le mode automatique des favoris. Rien n’a été envoyé.');
   if(j.auto&&(g.auto?.reglages?.actif!==true||(d.pauseAutoJusqua||0)>maintenant))throw new RefusFavoris('Mode automatique éteint ou en pause : rien n’a été envoyé.');
+  // (20 nov., ext. 5.410.3 `favorisbleam`) `aimes` : combien d'articles de CE compte la personne a mis en favori dans la file
+  // (le message « lot » part à partir de 2, une fois par personne, côté extension).
   e.autorise=true;
-  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,message:j.message,...(variantesValides(j.variantes)?{variantes:j.variantes}:{}),...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,aimes:new Set(g.jobs.filter(x=>x&&x.recipientId===j.recipientId).map(x=>x.itemId)).size,message:j.message,...(variantesValides(j.variantes)?{variantes:j.variantes}:{}),...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

@@ -2413,6 +2413,47 @@
   // ══ 5.410 — LA CADENCE (Julien, 20 nov. « vas-y fais ») : SON réglage par compte, ici dans Paramètres. Défauts
   //    inchangés ; plus vite que le défaut ⇒ « Oui, aller plus vite ». Le reste (captcha, prudence, 403/429, un compte
   //    à la fois, une requête à la fois, compte de l'onglet, temps d'écriture, réserve de 5) n'est pas réglable.
+  // ══ 5.410.3 (`repubformulaire`, `favorisbleam`) — « tout comme Bleam » : la méthode de republication, le message
+  //    « lot » et le délai de l'offre, réglés ici sur SON toucher ; l'onglet qui travaille est NOMMÉ (rien de caché).
+  let cbEtat = null, cbLu = 0, cbLot = null, cbMsg = null, cbEnVol = false;
+  function lireCommeBleam(force) {
+    if (!force && Date.now() - cbLu < 4000) return;
+    cbLu = Date.now();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'commeBleamLire' }, (r) => { void chrome.runtime.lastError; if (r && r.ok) { const avant = JSON.stringify(cbEtat); cbEtat = { reglages: r.reglages, onglet: r.onglet || null }; if (JSON.stringify(cbEtat) !== avant) rendre(); } }); } catch (_) {}
+  }
+  function ongletTravailHtml() {
+    const o = cbEtat && cbEtat.onglet;
+    if (!o) return '';
+    return `<div class="ligne" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}"><div class="val">${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre'))} · <span class="gris">${esc(o.chemin || '/')}</span></div><div class="outils"><button type="button" class="lien" data-voir-onglet>${esc(TU('cb_voir'))}</button></div></div>`;
+  }
+  function commeBleamHtml() {
+    if (!cbEtat) { lireCommeBleam(false); return `<section class="grp5" data-comme-bleam="pas-su"><h3>${esc(TU('cb_titre'))}</h3><p class="note5">—</p></section>`; }
+    const g = cbEtat.reglages || {};
+    const choix = (v, lib, note) => `<label class="champ6 cb6"><input type="radio" name="vrm-cb-methode" value="${v}" data-cb-methode="${v}"${g.methode === v ? ' checked' : ''}><span><b>${esc(TU(lib))}</b><span class="note5">${esc(TU(note))}</span></span></label>`;
+    const lot = cbLot != null ? cbLot : (g.messageLot || '');
+    return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
+      ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}${choix('directe', 'cb_directe', 'cb_directe_note')}
+      ${ongletTravailHtml()}
+    </section>
+    <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
+      <label class="champ6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><b>${esc(TU('cb_sequence'))}</b></label>
+      <label class="champ6"><b>${esc(TU('cb_lot'))}</b><textarea rows="3" maxlength="2000" data-cb-lot aria-label="${esc(TU('cb_lot'))}">${esc(lot)}</textarea><span class="note5">${esc(TU('cb_lot_note'))}</span></label>
+      <label class="champ6 cd6"><b data-cb-offre-lib>${esc(TU('cb_offre', { a: g.offreMin, b: g.offreMax }))}</b><span class="cd6-l"><input type="range" min="3" max="60" step="1" value="${Number(g.offreMin) || 8}" data-cb-offre="offreMin" aria-label="min"><input type="range" min="4" max="120" step="1" value="${Number(g.offreMax) || 15}" data-cb-offre="offreMax" aria-label="max"></span><span class="note5">${esc(TU('cb_offre_note'))}</span></label>
+      ${cbMsg ? `<p class="note5" role="status" data-cb-etat="${cbMsg.ok ? 'ok' : 'ko'}">${esc(cbMsg.texte)}</p>` : ''}
+      <div class="outils"><button type="button" class="vu-btn vu-plein" data-cb-enregistrer${cbEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>
+    </section>`;
+  }
+  function poserCommeBleam(valeur) {
+    cbEnVol = true; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'commeBleamPoser', valeur }, (r) => {
+        void chrome.runtime.lastError; cbEnVol = false;
+        cbMsg = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
+        if (r && r.ok && r.reglages) { cbEtat = Object.assign({}, cbEtat, { reglages: r.reglages }); cbLot = null; }
+        rendre();
+      });
+    } catch (_) { cbEnVol = false; cbMsg = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
   let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
@@ -2595,6 +2636,18 @@
     racine.querySelectorAll('[data-notif-statut]').forEach((b) => b.addEventListener('click', () => { notifStatut = b.getAttribute('data-notif-statut'); rendre(); }));
     racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; rendre(); }));
     const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
+    // 5.410.3 : la méthode de republication (un toucher l'écrit), la séquence des favoris, le message « lot », le délai de l'offre.
+    racine.querySelectorAll('[data-cb-methode]').forEach((c) => c.addEventListener('change', () => { if (c.checked) poserCommeBleam({ methode: c.getAttribute('data-cb-methode') }); }));
+    { const l = racine.querySelector('[data-cb-lot]'); if (l) l.addEventListener('input', () => { cbLot = l.value; cbMsg = null; }); }
+    racine.querySelectorAll('[data-cb-offre]').forEach((c) => c.addEventListener('input', () => {
+      const a = racine.querySelector('[data-cb-offre="offreMin"]'), b = racine.querySelector('[data-cb-offre="offreMax"]');
+      const lib = racine.querySelector('[data-cb-offre-lib]'); if (lib && a && b) lib.textContent = TU('cb_offre', { a: a.value, b: b.value });
+    }));
+    { const e = racine.querySelector('[data-cb-enregistrer]'); if (e) e.addEventListener('click', () => {
+      const f = racine.querySelector('[data-cb-favoris]'), a = racine.querySelector('[data-cb-offre="offreMin"]'), b = racine.querySelector('[data-cb-offre="offreMax"]'), l = racine.querySelector('[data-cb-lot]');
+      poserCommeBleam({ favoris: !!(f && f.checked), ...(l ? { messageLot: l.value } : {}), ...(a && b ? { offreMin: Number(a.value), offreMax: Number(b.value) } : {}) });
+    }); }
+    { const v = racine.querySelector('[data-voir-onglet]'); if (v) v.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'voirOngletTravail' }, () => { void chrome.runtime.lastError; }); } catch (_) {} }); }
     // 5.410 : la cadence (Paramètres). Un curseur change le brouillon ; « Enregistrer » écrit (plus vite ⇒ confirmation).
     racine.querySelectorAll('[data-cad]').forEach((c) => c.addEventListener('input', () => {
       const k = c.getAttribute('data-cad'); const v = Number(c.value);
@@ -3070,6 +3123,7 @@
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
+      ${commeBleamHtml()}
       ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
@@ -3082,7 +3136,8 @@
     if (grand5) {
       // 5.410 : le panneau « comme Vintex ». Ce qui se passe maintenant (envoi en cours, version, réparation, lecture de
       // l'historique, alertes du site) reste AU-DESSUS de la page ; les listes sont la page.
-      const extras = [principal, majHtml(e.maj), Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : '', repHtml(), progression, historique, lignePerime, ligneDeCote, aRetirerLbc, diagnosticLbc, bascule].filter(Boolean).map((h) => `<div class="ext6">${h}</div>`).join('');
+      if (e.plateforme === 'vinted') lireCommeBleam(false);   // 5.410.3 : l'onglet qui travaille, nommé en haut du panneau
+      const extras = [principal, e.plateforme === 'vinted' && cbEtat && cbEtat.onglet && cbEtat.onglet.travaille ? ongletTravailHtml() : '', majHtml(e.maj), Array.isArray(e.aReparer) && e.aReparer.length && v && v.connecte !== false ? `<button class="b sec" data-reparer data-a-reparer="${esc(e.aReparer.join(' '))}">Réparer</button>` : '', repHtml(), progression, historique, lignePerime, ligneDeCote, aRetirerLbc, diagnosticLbc, bascule].filter(Boolean).map((h) => `<div class="ext6">${h}</div>`).join('');
       const liste = listesHtml(e, parametres5);
       poserHtml(contenu, vxHtml(e, `<div class="gestes">${liste}</div>`, extras));
     } else poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}
