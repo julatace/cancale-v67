@@ -73,7 +73,7 @@ const ATTRS = new Set(['class', 'style', 'role', 'width', 'height', 'alt', 'titl
 // `aria-*` qui ne désignent pas un autre élément par son identifiant.
 const ARIA_OK = /^aria-(hidden|label|current|pressed|selected|checked|expanded|busy|level|valuenow|valuemin|valuemax|valuetext|roledescription|disabled|live|atomic)$/;
 // Les `data-*` qui pilotent l'app (attente, démarrage, fiche…) : retirés, la copie ne doit jamais être prise pour l'écran vrai.
-const DATA_INTERDITS = /^data-(attente|demarrage|fiche-ligne|fiche-paire|n-onglet|ecran$|reactroot|copie)/;
+const DATA_INTERDITS = /^data-(attente|demarrage|fiche-ligne|fiche-paire|n-onglet|reactroot|copie)/;
 const URL_IMAGE = /^https:\/\/[^\s"'<>]+$/i;
 
 function srcSur(v) {
@@ -106,7 +106,7 @@ export function nettoyer(el) {
         if (garde && /^(javascript|vbscript|data):/i.test(String(a.value).trim()) && nom !== 'src') garde = false;
         if (!garde) c.removeAttribute(a.name);
       }
-      if (tag === 'img') { c.setAttribute('loading', 'lazy'); c.setAttribute('decoding', 'async'); }
+      if (tag === 'img') { c.setAttribute('loading', 'lazy'); c.setAttribute('decoding', 'async'); if (c.hasAttribute('data-n-photo')) c.setAttribute('data-n-photo', 'deja'); }
       if (tag === 'button' || tag === 'input' || tag === 'select' || tag === 'textarea') c.setAttribute('tabindex', '-1');
       pile.push(c);
     }

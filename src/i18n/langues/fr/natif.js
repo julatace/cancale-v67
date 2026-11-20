@@ -43,13 +43,5 @@ export default {
   "achats.site.gesteLbc": "Ouvre « Mes transactions » sur leboncoin.fr, avec l’extension.",
   "achats.site.gesteVc": "Ouvre « Mes commandes » sur Vestiaire, avec l’extension.",
   "ebay.recherches.titre": "Recherches et alertes eBay",
-  "ebay.recherches.compte": "Comptes eBay et réglages",
-  "natif.copie.misAJour": "Mis à jour {age}",
-  "natif.copie.instant": "à l’instant",
-  "natif.copie.minutes": {"one": "il y a {n} min", "other": "il y a {n} min"},
-  "natif.copie.heures": {"one": "il y a {n} h", "other": "il y a {n} h"},
-  "natif.copie.miseAJour": "Mise à jour…",
-  "natif.copie.pasAJour": "Pas à jour",
-  "natif.copie.reessayer": "Réessayer",
-  "natif.copie.nom": "Dernière copie de cet écran, mise à jour en cours"
+  "ebay.recherches.compte": "Comptes eBay et réglages"
 };

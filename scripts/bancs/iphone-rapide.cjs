@@ -90,7 +90,12 @@ async function preparer(ctx) {
     LECTURES.push({ u: decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
-  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+  // (20 nov., instantane) Les routes que le démarrage lit, à LEUR forme (comme le banc ouverture-instantanee) : un vendeur
+  // abonné, sa propre boutique — c'est ce qui permet à l'app de peindre avant d'être chargée (porte hors ligne).
+  await ctx.route('**/api/**', (r) => { const u = r.request().url();
+    const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
+      : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }); });
 }
 async function cdpDe(pg) {
   const cdp = await pg.context().newCDPSession(pg);
@@ -378,7 +383,9 @@ async function instantane(ctx) {
       }
       await pg.waitForFunction(() => window.__vrmContenu && window.__vrmContenu.t != null, null, { timeout: 30000, polling: 50 }).catch(() => {});
       const C = await pg.evaluate(() => window.__vrmContenu).catch(() => null);
-      const r = { theme, ecran: id, premierContenuMs: C && C.t != null ? Math.round(C.t) : null, par: C && C.par };
+      const av = await pg.evaluate(() => [window.__vrmApercuCopie, window.__vrmApercu, (performance.getEntriesByName('vrm:apercu-copie')[0] || {}).startTime, Object.keys(localStorage).filter((k) => /porte_ok|abo_dernier|equipe_cache|copie_index|journee_inst/.test(k))]).catch(() => []);
+      const r = { theme, ecran: id, premierContenuMs: C && C.t != null ? Math.round(C.t) : null, par: C && C.par, avantApp: av };
+      if (process.env.DEBUG || process.env.APERCU) console.log('     (avant l\'app : ' + JSON.stringify(av) + ')');
       out.ouverture.push(r);
       console.log(`  ${theme.padEnd(6)} ouverture ?tab=${id.padEnd(8)} premier contenu ${r.premierContenuMs == null ? '— (rien en 30 s)' : r.premierContenuMs + ' ms'} (${r.par || '—'})`);
       await cdp.detach().catch(() => {}); await pg.close();

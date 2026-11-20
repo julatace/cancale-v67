@@ -20,7 +20,7 @@
 /* UNE seule pulsation, celle du squelette entier (un seul calque animé, jamais une
    animation par barre) ; à l'arrêt tant que l'écran de démarrage le couvre. */
 body[data-vrm-d26]:not(#_) .vrm-squelette { animation: none; }
-.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 8%, transparent); }
+.vrm-sq-barre { display: block; flex: none; max-width: 100%; background: color-mix(in srgb, var(--vrm-ink, #1d1d1f) 6%, transparent); }   /* (20 nov.) ≤ 6 % */
 .vrm-sq-carte { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; box-sizing: border-box; border-radius: 20px; background: var(--vrm-surface, #fff); border: 1px solid var(--vrm-hair, rgba(0, 0, 0, .06)); }
 .vrm-sq-carte > .vrm-sq-barre { max-width: min(100%, 320px); }
 .vrm-sq-carte.is-sombre { background: var(--fu-sombre, var(--vrm-carte-sombre, #1d1d1f)); border: 0; padding: 20px 18px 18px; border-radius: 20px; }
