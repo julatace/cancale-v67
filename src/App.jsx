@@ -13660,7 +13660,10 @@ async function numeroterSites(aVinted = null) {
       const liensL = { ...(load('vrm_lbc_liens', {}) || {}) };
       const journal = load('vrm_liaison_sites', {}) || {};
       const propre = (site, id) => { const e = journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
+      // (20 nov.) Jamais un N° pour l'annonce d'un autre vendeur : compte prouvé par une vente (ou référence VRM).
+      const prouvesL = comptesLbcProuves((vr[0] && vr[0].ventes) || {}, ls.items);
       const lbc = annoncesLeboncoin(ls.items, {
+        aLui: (ad) => annonceLbcALui(ad, prouvesL),
         etatDe: (ad) => { if (!annonceLbcEnVente(ad, vendues)) return vendues.has && vendues.has(String(ad.id)) ? 'vendue' : 'retiree';
           const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() }); return e.etat === 'enligne' ? 'active' : e.etat === 'aconfirmer' ? 'aconfirmer' : 'retiree'; },
         numeroDe: (ad) => numeroLbcIdentite({ itemId: ad.id }, ls.items, liensL), propreDe: (ad) => propre('Leboncoin', ad.id) });
