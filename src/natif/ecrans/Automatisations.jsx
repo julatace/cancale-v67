@@ -54,11 +54,28 @@ export function ChoixAuto({ valeur, options, onChange, libelle, attrs = null }) 
     </select>
   );
 }
-export function ChampNombre({ valeur, onChange, libelle, unite = '', min = 0, max = 999, attrs = null }) {
+// (20 nov., chasse-bugs-2) Saisie LIBRE, validation à la SORTIE (blur, Entrée) : avant, chaque frappe était ramenée dans
+// [min, max] — vider un palier posait 1 (« 5 » devenait « 15 »), « 1 » vers « 10 » était ramené à 5. Pendant la saisie, seul
+// un nombre déjà dans les bornes part ; à la sortie, hors bornes ⇒ ramené dans les bornes, vide ⇒ « aucun » si `videPermis`,
+// sinon la valeur d'avant revient. Banc : scripts/bancs/champ-nombre.cjs.
+export function ChampNombre({ valeur, onChange, libelle, unite = '', min = 0, max = 999, attrs = null, videPermis = true }) {
+  const v0 = valeur == null ? '' : String(valeur);
+  const [texte, setTexte] = React.useState(v0);
+  const edite = React.useRef(false);
+  React.useEffect(() => { if (!edite.current) setTexte(v0); }, [v0]);
+  const dansBornes = (t) => t !== '' && Number(t) >= min && Number(t) <= max;
+  const valider = () => {
+    edite.current = false;
+    if (texte === '') { if (videPermis) { if (v0 !== '') onChange(''); } else setTexte(v0); return; }
+    const n = String(Math.min(max, Math.max(min, Number(texte))));
+    setTexte(n);
+    if (n !== v0) onChange(n);
+  };
   return (
     <span className="n-au-nombre">
-      <input type="text" inputMode="numeric" className="n-au-nombre-champ" value={valeur} aria-label={libelle}
-        onChange={(e) => { const v = e.target.value.replace(/[^\d]/g, '').slice(0, 4); onChange(v === '' ? '' : String(Math.min(max, Math.max(min, Number(v))))); }} {...(attrs || {})}/>
+      <input type="text" inputMode="numeric" className="n-au-nombre-champ" value={texte} aria-label={libelle}
+        onChange={(e) => { edite.current = true; const t = e.target.value.replace(/[^\d]/g, '').slice(0, 4); setTexte(t); if (dansBornes(t) && String(Number(t)) !== v0) onChange(String(Number(t))); }}
+        onBlur={valider} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} {...(attrs || {})}/>
       {unite ? <span className="n-au-nombre-unite">{unite}</span> : null}
     </span>
   );

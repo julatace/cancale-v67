@@ -29,9 +29,9 @@ export default {
   },
   "v2.retirer.titre": "Por recoger",
   "v2.retirer.voir": "Ver los códigos de recogida",
-  "v2.retirer.resume": {
-    "one": "{n} paquetes · {p} punto",
-    "other": "{n} paquetes · {p} puntos"
+  "v2.retirer.points": {
+    "one": "{n} punto",
+    "other": "{n} puntos"
   },
   "v2.retirer.resumeN": {
     "one": "{n} paquete",
@@ -347,7 +347,7 @@ export default {
     "other": "faltan {n} días para prever"
   },
   "v2.st.prev.rien": "nada vendido este mes",
-  "v2.st.prev.jours": "en {n} días de {m}",
+  "v2.st.prev.jours": {"one": "en {n} día de {m}", "other": "en {n} días de {m}"},
   "v2.st.marge.titre": "Margen",
   "v2.st.marge.pct": "Margen",
   "v2.st.marge.sur": "en {k} ventas con coste conocido (de {n})",

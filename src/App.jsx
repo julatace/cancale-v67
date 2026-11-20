@@ -1162,7 +1162,7 @@ const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"))
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
-import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
+import { brancherARegler, ajoutPastille, pastilleMessages } from "./designV2/aRegler.js";
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
@@ -5678,7 +5678,8 @@ function RevenirEnArriere() {
   const [fait, setFait] = React.useState(null);
   const [deplie, setDeplie] = React.useState({});
   const relire = React.useCallback(() => { listerPointsServeur().then(setRows); }, []);
-  React.useEffect(() => { relire(); _pointsAbonnes.add(relire); const off = onCloudReady(relire); return () => { _pointsAbonnes.delete(relire); if (typeof off === 'function') off(); }; }, [relire]);
+  // (20 nov., chasse-bugs-2) Nuage déjà prêt : `onCloudReady` rappelle TOUT DE SUITE — la liste partait deux fois à chaque ouverture.
+  React.useEffect(() => { if (!isCloudReady()) relire(); _pointsAbonnes.add(relire); const off = onCloudReady(relire); return () => { _pointsAbonnes.delete(relire); if (typeof off === 'function') off(); }; }, [relire]);
   const points = Array.isArray(rows) ? lirePoints(rows) : [];
   const calculer = (snap, suivant) => {
     const a = apercuRestauration({ point: snap, actuel: lireCleRestauration, plusRecent: suivant, cleNum, numerosAilleurs: numerosPortesAilleurs() });
@@ -31917,7 +31918,15 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // compte relu à 07:50 (annonces, boîte, profil) avait ses ventes figées à la
 // veille 15 h 11 — « relu il y a 2 min » cachait la vente du matin. Le panneau
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
-async function lireCapturesDetail() {
+// (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
+// parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
+let _capturesEnVol = null;
+function lireCapturesDetail() {
+  if (_capturesEnVol) return _capturesEnVol;
+  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
+  return _capturesEnVol;
+}
+async function lireCapturesDetailUne() {
   try {
     // (11 nov., ouverture-legere-2) Gardée sur l'appareil, revalidée par sa version
     // (`lireFamilleCopiee`) : ~244 Ko à chaque ouverture ⇒ le nombre et les lignes écrites depuis.
@@ -51953,7 +51962,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           //    MONTRÉS ICI : ils sont PUBLIÉS (src/designV2/aRegler.js) et se lisent en tête de LEUR onglet (« À régler »). Les
           //    mêmes cartes `jobs`, le même nombre, le MÊME geste (`avant` puis `tab`) ; `tab` et `sens` disent l'onglet.
           const groupesJ = [];
-          if (lu(xM) && xM.t.n > 0) groupesJ.push({ id: 'messages', icone: 'chat', titre: tr('v2.g.messages', { n: xM.t.n }), n: xM.t.n, tab: xM.tab, geste: { txt: tr('v2.g.repondre'), faire: () => { if (onNav) onNav(xM.tab); } } });
+          if (lu(xM) && xM.t.n > 0) groupesJ.push({ id: 'messages', ebay: Number(xM.t.ebay) > 0 ? Number(xM.t.ebay) : 0, icone: 'chat', titre: tr('v2.g.messages', { n: xM.t.n }), n: xM.t.n, tab: xM.tab, geste: { txt: tr('v2.g.repondre'), faire: () => { if (onNav) onNav(xM.tab); } } });
           if (lu(xP) && xP.t.n > 0 && visibiliteCarte('prix', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) groupesJ.push({ id: 'prix', icone: 'tag', titre: tr('v2.g.prix', { n: xP.t.n }), n: xP.t.n, tab: xP.tab, geste: { txt: VERBES.voir, faire: () => { if (onNav) onNav(xP.tab); } } });
           const dejaJ = new Set(), rangJ = {};
           for (const j of [...alertesArgent, ...(urssafJob ? [urssafJob] : []), ...jobsAFaire]) {
@@ -66952,9 +66961,11 @@ function AppCoeur() {
   // déjà (`ajoutPastille` : un colis se compte une fois). Pas de publication ⇒ rien d'ajouté (jamais un 0 inventé).
   // « N messages à lire » : le nombre de la rangée d'hier devient la pastille de Messages ; « Tout va bien ? » : un point.
   const plusRegler=(k,base)=>{ if(!designV2App||!pubRegler) return base; const a=ajoutPastille(k,pubRegler.groupes); return a>0 ? (typeof base==='number'&&base>0?base:0)+a : base; };
-  const nMsgRegler=designV2App&&pubRegler ? pubRegler.groupes.filter(g=>g&&g.id==='messages'&&Number(g.n)>0).reduce((t,g)=>t+Number(g.n),0) : 0;
+  // (20 nov., chasse-bugs-2) La part Vinted VIVANTE (`msgNonLus`, retirées écartées) + la part eBay publiée — src/designV2/aRegler.js `pastilleMessages`.
+  const vintedMsgVivant=liveStats&&Array.isArray(liveStats.unreadConvs) ? msgNonLus : null;
+  const pastilleMsg=designV2App&&pubRegler ? pastilleMessages({ groupes: pubRegler.groupes, vintedVivant: vintedMsgVivant }) : false;
   const badgesNav={ ventes: plusRegler('ventes',colisBadge), achats: plusRegler('achats',retraitsBadge), annonces: plusRegler('annonces',nAnnonces), garage: plusRegler('stock',undefined),
-    messages: nMsgRegler>0 ? nMsgRegler : msgNonLus>0, ...(designV2App&&pubRegler&&ajoutPastille('sante',pubRegler.groupes)>0 ? { settings: true } : {}) };
+    messages: pastilleMsg || msgNonLus>0, ...(designV2App&&pubRegler&&ajoutPastille('sante',pubRegler.groupes)>0 ? { settings: true } : {}) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.

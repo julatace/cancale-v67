@@ -91,6 +91,19 @@ export function ajoutPastille(onglet, groupes) {
   return groupesDe(onglet, groupes).filter((g) => !DEJA_DANS_LA_PASTILLE.has(racineId(g.id))).length;
 }
 
+// (20 nov., chasse-bugs-2) LA PASTILLE DE MESSAGES. La rangée « N messages à lire » est publiée par Aujourd'hui, montée
+// SEULE sur cet onglet : sur Messages, « Retirer » une conversation (ou la lire) ne changeait plus la pastille — le nombre
+// gardé (jusqu'à 12 h) l'emportait sur le compte vivant de la coque. Règle : la part Vinted se lit VIVANTE quand la coque la
+// connaît (`vintedVivant`, conversations retirées écartées), la part eBay (`ebay`, publiée avec la rangée) s'y ajoute ;
+// sans compte vivant, le nombre publié reste. Rend un nombre > 0, ou `false`.
+export function pastilleMessages({ groupes = [], vintedVivant = null } = {}) {
+  const gs = (groupes || []).filter((g) => g && g.id === 'messages' && Number(g.n) > 0);
+  const publie = gs.reduce((t, g) => t + Number(g.n), 0);
+  const ebay = gs.reduce((t, g) => t + (Number(g.ebay) > 0 ? Number(g.ebay) : 0), 0);
+  const n = Number.isFinite(vintedVivant) ? Math.max(0, vintedVivant) + ebay : publie;
+  return n > 0 ? n : false;
+}
+
 // ── La publication ───────────────────────────────────────────────────────────
 let etat = null;          // { at, frais: true|false, groupes: [...] } | null (jamais publié, rien de gardé)
 let branche = { naviguer: null, completer: null, uid: '' };
@@ -100,7 +113,8 @@ const cle = () => CLE_A_REGLER + (branche.uid ? ':' + branche.uid : '');
 const ecouteurs = new Set();
 const dire = () => { for (const f of [...ecouteurs]) { try { f(); } catch (_) { /* un lecteur cassé ne tait pas les autres */ } } try { if (typeof window !== 'undefined') window.dispatchEvent(new Event(EVT)); } catch (_) {} };
 const resume = (g) => ({ id: String(g.id), onglet: g.onglet || ongletDe(g), icone: g.icone || '', titre: String(g.titre || ''), detail: String(g.detail || ''), n: g.n == null ? null : Number(g.n), ambre: !!g.ambre,
-  photo: typeof g.photo === 'string' ? g.photo : null, tab: g.tab || '', gesteTxt: (g.geste && g.geste.txt) || '', sens: g.sens || undefined });
+  photo: typeof g.photo === 'string' ? g.photo : null, tab: g.tab || '', gesteTxt: (g.geste && g.geste.txt) || '', sens: g.sens || undefined,
+  ...(Number.isFinite(Number(g.ebay)) && Number(g.ebay) > 0 ? { ebay: Number(g.ebay) } : {}) });
 const signature = (l) => JSON.stringify((l || []).map(resume));
 
 // La coque dit comment ouvrir un écran (les rangées gardées d'une session précédente n'ont plus leur geste) et, quand
