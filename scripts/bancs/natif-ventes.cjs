@@ -179,7 +179,8 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       // Le titre et la ligne de la date ont de la place (le 19 nov., une valeur à droite trop large les avait réduits à « New … »).
       dit(r.every((x) => x.lTitre >= 120 && x.lSous >= 120), `titre et date limite lisibles (largeurs mini ${Math.min(...r.map((x) => x.lTitre))} / ${Math.min(...r.map((x) => x.lSous))} px)`);
       const hauts = r.map((x) => x.bas - x.haut);
-      dit(hauts.every((h) => h <= 84), `rangées compactes (≤ 84 px, la plus haute : ${Math.max(...hauts)})`);
+      // (20 nov.) Un colis SANS bordereau dit sa raison dans la méta, qui passe à la ligne plutôt que d'être coupée : ≤ 108.
+      dit(r.every((x) => x.bas - x.haut <= (x.bord === 'attente' ? 108 : 84)), `rangées compactes (≤ 84 px, ≤ 108 sans bordereau ; la plus haute : ${Math.max(...hauts)})`);
       const freq = {}; for (const x of r) for (const k of new Set(x.morceaux)) freq[k] = (freq[k] || 0) + 1;
       const partout = Object.keys(freq).filter((k) => r.length >= 3 && freq[k] === r.length);
       dit(!partout.length, 'aucune phrase redite sur toutes les rangées', partout);
