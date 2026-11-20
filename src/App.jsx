@@ -66834,7 +66834,7 @@ function AppCoeur() {
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label={L.aEnvoyer}>
         {/* (20 nov.) Le segment « À envoyer · En route » de la liste (comme Ventes · Vinted) dit où on est : plus d'intertitre.
             L'ancre de la section reste (les liens « À envoyer » y descendent). */}
-        <div className="vrm-colis-section-tete" data-colis-section="ventes" id={ID_SECTION_COLIS.ventes}/>
+        <div data-colis-section="ventes" id={ID_SECTION_COLIS.ventes}/>
         <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes} enSection onglet={ongletColis} onOnglet={choisirOngletColis} avant={<ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>}/></div>
       </section>);
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
