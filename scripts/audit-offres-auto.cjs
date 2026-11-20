@@ -86,7 +86,11 @@ essaie('moteur sous garde', () => {
   // worker souffler) ; l'aléatoire est autorisé (décision de Julien, 27 oct.).
   dit(/espaceAcceptMs\(\)|ESPACE_ACCEPT|setTimeout/.test(corps), "les acceptations sont espacées dans le temps (étalement ; le rate-limit réel = plafond 20/h + une requête à la fois)");
   dit(/OFFRES_MAX_PAR_VISITE/.test(corps), "le volume par visite est borné (OFFRES_MAX_PAR_VISITE)");
-  dit(/!reg\.actif/.test(corps), "le moteur ne tourne que si l'interrupteur est allumé (reg.actif)");
+  // (20 nov., chasse-bugs) 5.409 : le passage tourne aussi pour la négociation par paliers SEULE (son propre réglage,
+  // éteint par défaut) — mais ACCEPTER (et refuser) reste sous `reg.actif`, et c'est le seul endroit qui pose 'accept'.
+  dit((/!reg\.actif\b/.test(corps) || /!\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)/.test(corps))
+    && (corps.match(/quoi = 'accept'/g) || []).length === 1 && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(corps),
+    "le moteur ne tourne que si l'interrupteur est allumé (reg.actif) — accepter n'arrive que sous reg.actif");
   const iReg = BG.indexOf('async function offreAutoReglages');
   const finReg = BG.indexOf('async function', iReg + 20);
   const corpsReg = iReg >= 0 ? BG.slice(iReg, finReg > 0 ? finReg : iReg + 1500) : '';
@@ -132,7 +136,10 @@ essaie('app', () => {
   // L'interrupteur appelle une confirmation qui dit que VRM accepte À TA PLACE
   // et nomme le risque de blocage — sinon on allumerait un moteur en silence.
   const iBasc = APP.indexOf('const basculerOffresAuto');
-  const corpsBasc = iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '';
+  // (20 nov., chasse-bugs) La question est UNE source (`confirmerOffresAuto`, 19 nov.), posée par Annonces et Automatisations :
+  // on lit l'interrupteur ET la question qu'il pose.
+  const iConf = /await confirmerOffresAuto\(\)/.test(iBasc >= 0 ? APP.slice(iBasc, iBasc + 400) : '') ? APP.indexOf('function confirmerOffresAuto()') : -1;
+  const corpsBasc = (iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '') + (iConf >= 0 ? APP.slice(iConf, iConf + 1500) : '');
   dit(/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc),
     "l'interrupteur AVERTIT que VRM accepte à ta place et nomme le risque (honnêteté retournée : il prévient, il ne rassure pas)",
     iBasc < 0 ? 'basculerOffresAuto introuvable' : '');

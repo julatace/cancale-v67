@@ -37,8 +37,8 @@ export default function MeubleDessin({ m, info, mode = 'loin', vise = null, ici 
       const o = info ? info(i) : null;
       const k = String(m.id) + ':' + i;
       const estVise = vise === i, estIci = ici === i, estArrivee = !!(o && arrivee && o.cle === arrivee);
-      const etat = o ? (o.double ? 'double' : o.etat || '') : '';
-      const libelle = o ? tr('sm.case.prise', { num: String(o.num), r: r + 1, c: c + 1 }) + (etat === 'vendue' ? ' · ' + tr('sm.case.vendue') : etat === 'plusenligne' ? ' · ' + tr('sm.case.plusEnLigne') : etat === 'double' ? ' · ' + tr('sm.case.double') : '')
+      const etat = o ? (o.double ? 'doublon' : o.etat || '') : '';
+      const libelle = o ? tr('sm.case.prise', { num: String(o.num), r: r + 1, c: c + 1 }) + (etat === 'vendue' ? ' · ' + tr('sm.case.vendue') : etat === 'plusenligne' ? ' · ' + tr('sm.case.plusEnLigne') : etat === 'doublon' ? ' · ' + tr('sm.case.double') : '')
         : tr('sm.case.libre', { r: r + 1, c: c + 1 });
       const dedans = o ? (
         <span className="sm-boite" data-teinte={teinteCarton(reg, o.num)} data-etat={etat || undefined} data-notee={o.notee ? '' : undefined}>

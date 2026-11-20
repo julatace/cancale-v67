@@ -151,9 +151,14 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const sansCom = app.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const appels = (sansCom.match(/remettreDepuisCarte/g) || []).length;
   const rl = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'RetoursLitiges.jsx'), 'utf8'); } catch (_) { return ''; } })();
-  dit(appels === 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
+  // (20 nov., chasse-bugs) Ventes natif (19 nov.) rend la même carte « Retour reçu ? » sur SON écran (l'ancien bloc est
+  // alors éteint) : un appelant de plus, le même bouton. La règle : chaque emploi est la déclaration, un `onRemettre=`
+  // (le bouton de la carte) ou « Paire revenue » — jamais un appel au rendu.
+  const emplois = sansCom.split("\n").filter((l) => /remettreDepuisCarte/.test(l));
+  const permis = (e) => /const remettreDepuisCarte = async/.test(e) || /onRemettre=\{remettreDepuisCarte\}/.test(e) || /await remettreDepuisCarte\(retour\)/.test(e);
+  dit(emplois.every(permis) && appels >= 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
     && /onRevenue=\{async \(\) => \{ if \(retour && !retour\.remis\) await remettreDepuisCarte\(retour\)/.test(app) && /onClick=\{faireRevenue\}/.test(rl),
-    '3h rien sans tap : deux appelants, chacun un bouton (« Remettre en stock », « Paire revenue »)', String(appels));
+    '3h rien sans tap : chaque appelant est un bouton (« Remettre en stock », « Paire revenue »)', String(appels) + ' ' + emplois.filter((e) => !permis(e)).join(' | '));
   dit(/retoursStock = Array\.isArray\(rs\.articles\)/.test(app) && /for \(const a of retoursStock\) if \(a && a\.numero\) vivants\.add/.test(app) && /retoursPourStock\(retoursSuivis\)/.test(app), '3i App : les N° remis ou revenus entrent dans les paires présentes (`vinted_nums_physiques`)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-colis-trois : ${n - ko}/${n}`);

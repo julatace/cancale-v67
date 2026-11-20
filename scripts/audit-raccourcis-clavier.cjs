@@ -28,8 +28,9 @@ const purBouton = (src) => {
 };
 const ongletsLiens = () => {
   const app = lire('src/App.jsx');
-  const m = /const ONGLETS_LIENS=\[\.\.\.Object\.keys\(CHEMINS_ARGENT\),([^\]]*)\]/.exec(app);
-  return m ? new Set(m[1].split(',').map((x) => x.trim().replace(/^'|'$/g, ''))) : new Set();
+  // (20 nov., chasse-bugs) La liste peut commencer par une entrée avant `...Object.keys(CHEMINS_ARGENT)` ('extension', 19 nov.).
+  const m = /const ONGLETS_LIENS=\[([^\]]*)\]/.exec(app);
+  return m && /\.\.\.Object\.keys\(CHEMINS_ARGENT\)/.test(m[1]) ? new Set(m[1].split(',').map((x) => x.trim()).filter((x) => !x.startsWith('...')).map((x) => x.replace(/^'|'$/g, ''))) : new Set();
 };
 const champ = (tag, extra = {}) => ({ tagName: tag, isContentEditable: false, getAttribute: (k) => (extra.attrs || {})[k] || null, ...extra });
 const ev = (key, o = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, repeat: false, defaultPrevented: false, target: champ('BODY'), ...o });

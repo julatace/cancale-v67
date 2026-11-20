@@ -58,7 +58,11 @@ async function verifier({ src, dem, app }, bavard = true) {
   // (15 nov., chantier « ouverture ») Pendant le DÉMARRAGE, la barre d'état prend le haut du dégradé de l'écran
   // de démarrage « Verre dépoli » en bleu-nuit (#133460, `--sv-haut` sombre de studio-verre.css) ; l'app pose celle du Studio à la sortie de cet écran
   // (src/App.jsx, `vrm:demarrage-fin`). Le thème suivi reste le même (sombre ici) : c'est ce que juge ce contrôle.
-  dit(r0.meta === '#133460' && r0.theme === 'dark', 'la barre d’état suit le thème choisi dès le démarrage (theme-color = le haut du bleu-nuit de l’écran de démarrage, #133460)', String(r0.meta));
+  // (20 nov., chasse-bugs) Depuis « VRM natif » (19 nov., index.html : l'écran de chargement est au fond de la page,
+  // `--vrm-verre-uni-nuit` #000000), le haut de l'écran de démarrage sombre est NOIR : la barre d'état le suit.
+  const html = fs.readFileSync(path.join(racine, 'index.html'), 'utf8');
+  const nuitDemarrage = ((html.match(/--vrm-verre-uni-nuit:\s*(#[0-9A-Fa-f]{6})/) || [])[1] || '').toUpperCase();
+  dit(!!nuitDemarrage && String(r0.meta || '').toUpperCase() === nuitDemarrage && r0.theme === 'dark', `la barre d’état suit le thème choisi dès le démarrage (theme-color = le fond de nuit de l’écran de démarrage, ${nuitDemarrage || '?'})`, String(r0.meta));
   // 2. La règle.
   const S = (mode, h, sys = false, ancien = false) => A.sombreEffectif(A.apparenceDe(mode, ancien), { date: new Date(2026, 10, 8, h, 0, 0), systemeSombre: sys });
   dit(S('soir', 19) && S('soir', 23) && S('soir', 0) && S('soir', 6), '« Le soir » : sombre de 19 h à 6 h 59');

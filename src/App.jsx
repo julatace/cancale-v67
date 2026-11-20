@@ -349,6 +349,8 @@ function aLaDemandeDiscret(charger) {
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
 // (19 nov., intégration — budget de démarrage) Hors du démarrage : la feuille « Depuis ta dernière visite » (ext. 5.409),
 // les tableaux de travail de l'ordinateur et Ventes natif, chargés quand ils s'affichent.
+// (20 nov., chasse-bugs) Montée HORS des portes (à côté du cœur) : sa lecture `capte_journal_*` n'a le droit de partir qu'une fois la
+// porte de confidentialité passée (`_confidentialiteUid`) — sinon « rien pas su », relu au `onCloudReady` (banc hors-ligne-froid B–H).
 const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
@@ -42590,10 +42592,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   useEssentiel(curSub==='bordereaux' ? 'bordereaux' : null, ((labelsPrets && (emailBords !== null || emailBordsKO)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined);
   // (6 nov.) Les chiffres que CET écran publie (§11) : tant qu'il les prépare, une carte
   // qui ne les a jamais reçus dit « lecture… », jamais « pas lu » (src/preparations.js).
-  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, Array.isArray(listings.items) && !listings.loading);
-  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, Array.isArray(buys.items));
-  usePreparation('vrm_benefice_jours', accounts.length > 0, Array.isArray(sales.items));
-  usePreparation('vinted_urssaf_mois', accounts.length > 0, Array.isArray(sales.items));
+  // (20 nov., chasse-bugs) La borne part aussi d'une lecture RATÉE (`error`, liste jamais arrivée) : sinon la carte disait
+  // « lecture… » sans fin (banc etats-vides, « Bénéfice · mois : pas su, lecture… » à 1512 base en panne).
+  const repondue = (x) => !!(x && (Array.isArray(x.items) || x.error));
+  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, (Array.isArray(listings.items) && !listings.loading) || !!listings.error);
+  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, repondue(buys));
+  usePreparation('vrm_benefice_jours', accounts.length > 0, repondue(sales));
+  usePreparation('vinted_urssaf_mois', accounts.length > 0, repondue(sales));
   const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
@@ -50787,8 +50792,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
           // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
           { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
-          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
-          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
+          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null || (convs.error && !(convs.items||[]).length) },   // (20 nov., chasse-bugs) lecture ratée (`[]` + error) : « — », jamais « Aucun message non lu »
+          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null || (listings.error && !(listings.items||[]).length) },
         ];
         // ── (3 nov., Julien : « les PHOTOS en tout petit, superposées ») LES PHOTOS DE CHAQUE
         // CASE, PAR IDENTITÉ SEULEMENT (§5) : la photo que porte la vente / l'achat / la
@@ -63145,7 +63150,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}{authState.user && authState.user.id ? <FeuilleArrivee pret lire={(q)=>(MULTI_USER&&(!AUTH.user||_confidentialiteUid!==AUTH.user.id))?Promise.resolve(null):lireTout(q,{strict:true})} load={load} save={save} onCloudReady={onCloudReady} nomCompte={(p,c)=>p==='vinted'?String((load('vinted_account_labels',{})||{})[c]||''):''} exclu={(p,c)=>p==='vinted'&&!!lireComptesExclus()[c]} feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
@@ -68539,7 +68544,7 @@ function AppCoeur() {
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
         <ToastNumeros/>
-        {tab==='garage' ? <NumerosAEcrire/> : null}
+        {tab==='garage' ? <GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran> : null}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
