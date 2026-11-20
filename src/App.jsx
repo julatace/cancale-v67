@@ -3062,6 +3062,46 @@ function ligneCommandes(r) {
   return { id: r.id, updated_at: r.updated_at, cap: r.cap, data };
 }
 function idsCommandes(uids) { return (uids || []).flatMap((u) => [`harvest_${u}_orders_sold`, `harvest_${u}_orders_purchased`]); }
+// ── (20 nov., lectures-legeres) LES COMMANDES PAR LA ROUTE LÉGÈRE ──────────────
+// Mesuré au profil de Julien (4G 1,6 Mbit/s) : la lecture à froid des commandes de tous
+// ses comptes pesait 1,9 Mo (`payload` de 30 lignes, ~5 300 commandes) — plus de 9 s.
+// `GET /api/compte?mode=commandes-lire` (api/_lib/commandes-lecture.js) rend les MÊMES
+// lignes (forme `SEL_COMMANDES`), du vendeur de la SESSION (jamais un owner du navigateur),
+// chaque commande réduite aux champs que VRM lit (rien d'autre n'existe dans sa base),
+// compressées (~6×), avec un ETag (304 si rien n'a changé : le navigateur revalide seul,
+// `Cache-Control: private, no-cache`). Trois états tenus :
+//   · la route rend ses lignes ⇒ elles (filtrées des comptes supprimés, comme `lireTout`) ;
+//   · la route est absente, refuse, est en panne, ou rend autre chose ⇒ `undefined` :
+//     l'appelant fait la lecture d'AVANT (jamais un écran vide) ;
+//   · jamais `[]` inventé : une liste vide n'est rendue que si la route l'a dite (200).
+// Sans session (accès direct), hors ligne, ou plus de 200 lignes : la lecture d'avant.
+const ROUTE_COMMANDES = '/api/compte?mode=commandes-lire';
+let _routeCommandesAbsente = 0;   // jusqu'à quand ne plus essayer (route absente de ce déploiement)
+async function lireCommandesRoute(ids) {
+  try {
+    if (!MULTI_USER || !(AUTH.session && AUTH.session.access_token && AUTH.user && AUTH.user.id)) return undefined;
+    if (Date.now() < _routeCommandesAbsente || horsLigneMaintenant()) return undefined;
+    const l = Array.isArray(ids) ? [...new Set(ids.map(String))] : null;
+    if (l && (!l.length || l.length > 200 || !l.every((x) => /^harvest_\d{1,20}_orders_(sold|purchased)$/.test(x)))) return undefined;
+    const qui = AUTH.user.id;
+    const r = await fetch(`${ROUTE_COMMANDES}${l ? `&ids=${encodeURIComponent(l.sort().join(','))}` : ''}`, { headers: { Authorization: `Bearer ${AUTH.session.access_token}` } });
+    if (!r || !r.ok) { if (r && (r.status === 404 || r.status === 405)) _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    if (!/json/i.test(String((r.headers && r.headers.get && r.headers.get('content-type')) || ''))) { _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    const j = await r.json().catch(() => null);
+    // La session a changé pendant la lecture : ces lignes ne sont pas celles du vendeur d'à présent.
+    if (!AUTH.user || AUTH.user.id !== qui) return undefined;
+    if (!j || j.ok !== true || !Array.isArray(j.rows)) return undefined;
+    if (j.rows.some((x) => !x || typeof x !== 'object' || !/^harvest_\d{1,20}_orders_(sold|purchased)$/.test(String(x.id)) || (l && !l.includes(String(x.id))))) return undefined;
+    return sansComptesSupprimes(j.rows);
+  } catch (_) { return undefined; }
+}
+// Les commandes nommées (`ids`), ou toutes (`null`) : la route, sinon la lecture d'avant
+// (`lireTout`, mêmes lignes, même projection). Rend le tableau ou `null` (pas su).
+async function lireCommandesLegeres(ids) {
+  const r = await lireCommandesRoute(ids);
+  if (Array.isArray(r)) return r;
+  return lireTout(Array.isArray(ids) ? `id=in.(${ids.join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+}
 // ── LES DRESSINGS ET LES AUTRES LIGNES D'UN COMPTE : LA MÊME PROJECTION ──────
 // (6 nov., vitesse 2) Mesuré sur sa base (lecture seule, `length(data::text)`) :
 // les lignes `harvest_*_listings` pèsent ~298 Ko, dont ~46 Ko d'un compte qui
@@ -3173,20 +3213,21 @@ const prechargerDemarrage = () => {
     // Première ouverture sur l'appareil (comptes pas encore connus) : les versions par le
     // même motif nomment les lignes ; illisibles ⇒ la lecture d'avant.
     const uidCopie = AUTH.user?.id || '';
-    const lireCommandes = (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+    // (20 nov., lectures-legeres) par la route légère, sinon la lecture d'avant.
+    const lireCommandes = (l) => lireCommandesLegeres(l);
     const famille = (uidCopie
       ? (async () => {
           const versMotif = memo ? null : await lireTout(`id=like.harvest_*_orders_*d&select=${SEL_VERSION}`, { strict: true }).catch(() => null);
-          if (!memo && !Array.isArray(versMotif)) return lireTout(`id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (!memo && !Array.isArray(versMotif)) return lireCommandesLegeres(null);
           const ids = memo ? idsCommandes(memo) : versMotif.map((r) => String(r && r.id)).filter((x) => x && x !== 'undefined');
           if (!ids.length) return [];
           const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant,
             lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
             lireLignes: lireCommandes });
-          if (r.incoherent) return lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (r.incoherent) return lireCommandesLegeres(memo ? idsCommandes(memo) : null);
           return r.ok ? r.rows : null;
         })()
-      : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
+      : lireCommandesLegeres(memo ? idsCommandes(memo) : null))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
     // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
@@ -9216,6 +9257,8 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
 };
 
 const fetchHarvestOrdersBrut = async (uid) => {
+  // (20 nov., lectures-legeres) Ses deux lignes par la route légère ; indisponible ⇒ la lecture d'avant.
+  if (/^\d{1,20}$/.test(String(uid))) { const r = await lireCommandesRoute(idsCommandes([uid])); if (Array.isArray(r)) return r.map(ligneCommandes); }
   try {
     // (6 nov.) Ses ventes et ses achats seulement, projetés (voir `SEL_COMMANDES`).
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_*d&select=${SEL_COMMANDES}`, {

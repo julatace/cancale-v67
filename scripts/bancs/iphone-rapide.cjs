@@ -30,6 +30,33 @@ const RACINE = path.join(__dirname, '..', '..');
 const { chromium } = require(path.join(RACINE, 'node_modules', 'playwright'));
 const { fabriquer, repondre } = require(path.join(__dirname, '_base-volume.cjs'));
 const base = fabriquer({ volumeReel: true, qr: true, ventes: 1500, achats: 800, annonces: 1200 });
+// (20 nov., lectures-legeres) `FORME=reelle` : les commandes à la forme et au poids de SA base (`_commandes-forme` :
+// mêmes champs, mêmes longueurs, ~2 Mo — sans le `'x'.repeat` qui fausserait une compression). `SESSION=1` : l'app
+// ouvre comme lui, connectée (session, base cloisonnée), et la route `/api/compte?mode=commandes-lire` est la VRAIE
+// (api/_lib/commandes-lecture.js EXÉCUTÉE ici, loi 10), servie au même débit sur ses octets COMPRESSÉS.
+if (process.env.FORME === 'reelle') require(path.join(__dirname, '_commandes-forme.cjs')).formeReelle(base);
+const SESSION = process.env.SESSION ? { access_token: 'aaa.bbb.banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } } : null;
+let _routeCommandes = null;
+async function routeCommandesDuBanc(urlTxt, entetes) {
+  if (!_routeCommandes) _routeCommandes = (await import(require('url').pathToFileURL(path.join(RACINE, 'api', '_lib', 'commandes-lecture.js')).href)).routeCommandesLecture;
+  const avant = globalThis.fetch;
+  // Le fetch du SERVEUR : la session dit qui ; la base du banc (toutes ses lignes sont au vendeur de la session).
+  globalThis.fetch = async (url, o = {}) => {
+    const u = String(url); const h = o.headers || {};
+    if (/\/auth\/v1\/user/.test(u)) return { ok: true, status: 200, json: async () => ({ id: SESSION.user.id, email: SESSION.user.email }) };
+    const own = /[?&]owner=eq\.([^&]+)/.exec(u);
+    const rows = own && decodeURIComponent(own[1]) === SESSION.user.id ? base.rows : [];
+    const rep = repondre(u.replace(/&owner=eq\.[^&]+/, ''), h.Range, { ...base, rows });
+    return { ok: rep.status < 300, status: rep.status, json: async () => rep.body, headers: { get: (k) => (rep.headers || {})[String(k).toLowerCase()] || null } };
+  };
+  const q = Object.fromEntries(new URL(urlTxt).searchParams);
+  const res = { statusCode: 200, h: {}, corps: null, setHeader(k, v) { this.h[k.toLowerCase()] = v; }, status(c) { this.statusCode = c; return this; }, json(o) { this.corps = Buffer.from(JSON.stringify(o)); return this; }, end(b) { this.corps = b == null ? Buffer.alloc(0) : Buffer.from(b); return this; } };
+  try { await _routeCommandes({ method: 'GET', query: q, headers: entetes }, res, { env: { SUPABASE_SERVICE_KEY: 'cle-du-banc' } }); }
+  finally { globalThis.fetch = avant; }
+  const enc = res.h['content-encoding'];
+  const clair = enc === 'br' ? zlib.brotliDecompressSync(res.corps) : enc === 'gzip' ? zlib.gunzipSync(res.corps) : res.corps;
+  return { status: res.statusCode, octets: res.corps.length, clair, etag: res.h.etag || null, cache: res.h['cache-control'] || null };
+}
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || (21000 + Math.floor(Math.random() * 9000)));
 const CPU = +(process.env.CPU || 4);
@@ -75,7 +102,8 @@ function jalons() {
 }
 
 async function preparer(ctx) {
-  await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  if (SESSION) await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); } catch (_) {} }, SESSION);
+  else await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await ctx.addInitScript(jalons);
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
@@ -83,6 +111,7 @@ async function preparer(ctx) {
     const rq = route.request();
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
     const h = await rq.allHeaders();
+    if (SESSION && /select=owner\b/.test(decodeURIComponent(rq.url()))) { await attendre(RTT); return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
     const rep = repondre(rq.url(), h.range, base);
     const body = JSON.stringify(rep.body);
     const debut = Date.now() - T_NAV;
@@ -90,7 +119,22 @@ async function preparer(ctx) {
     LECTURES.push({ u: decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
-  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+  await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: SESSION && r.request().url().includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
+    : SESSION && r.request().url().includes('mode=abonnement') ? JSON.stringify({ ok: true, proprietaire: true, acces: true, statut: 'active', configure: true })
+    : SESSION && r.request().url().includes('mode=equipe') ? JSON.stringify({ ok: false, erreur: 'non-installe' }) : '{"pret":true,"devices":1}' }));
+  if (SESSION) {
+    await ctx.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(/\/auth\/v1\/user/.test(r.request().url()) ? { id: SESSION.user.id, email: SESSION.user.email, aud: 'authenticated', role: 'authenticated', email_confirmed_at: '2026-01-01T00:00:00Z', identities: [], app_metadata: { provider: 'email' }, user_metadata: {} } : /factors|aal/.test(r.request().url()) ? { currentLevel: 'aal1', nextLevel: 'aal1', all: [], totp: [] } : { access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+    // La VRAIE route des commandes (enregistrée après `**/api/**` : Playwright prend la dernière d'abord).
+    await ctx.route('**/api/compte?mode=commandes-lire*', async (route) => {
+      const rq = route.request(); const h = await rq.allHeaders();
+      const debut = Date.now() - T_NAV;
+      const rep = await routeCommandesDuBanc(rq.url(), { authorization: h.authorization, 'accept-encoding': 'br, gzip', 'if-none-match': h['if-none-match'] });
+      await attendre(RTT + Math.round(rep.octets / DEBIT * 1000));
+      LECTURES.push({ u: 'ROUTE ' + decodeURIComponent(rq.url().replace(/^.*\/api\//, '')).slice(0, 130), o: rep.octets, d: debut, f: Date.now() - T_NAV });
+      // Playwright remet le corps tel quel : on le donne DÉCOMPRESSÉ (le temps a été compté sur les octets compressés).
+      return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.etag ? { etag: rep.etag } : {}), ...(rep.cache ? { 'cache-control': rep.cache } : {}) }, body: rep.status === 304 ? '' : rep.clair });
+    });
+  }
 }
 async function cdpDe(pg) {
   const cdp = await pg.context().newCDPSession(pg);
