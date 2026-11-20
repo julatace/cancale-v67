@@ -21,7 +21,7 @@ function Liste({ site, etat, maj = null, geste = '', enRoute = [], recus = [], a
     const titre = tr('achats.site.' + (etat === 'encours' ? 'lecture' : etat === 'passu' ? 'passu' : etat === 'jamais' ? 'jamais' : 'aucun'), { site: nom });
     const sous = etat === 'lu' && maj ? tr('achats.site.lu', { quand: ilYaCourt(maj) }) : etat === 'jamais' ? geste : '';
     return <Groupe titre={tr('achats.site.enRoute')} attrs={{ 'data-achats-site': site, 'data-achats-site-vide': etat }}>
-      <Rangee icone={<Icon name="box" size={22}/>} titre={titre} sousTitre={sous} sousLignes={2}/>
+      <Rangee icone={<Icon name="box" size={22}/>} titre={titre} lignes={2} sousTitre={sous} sousLignes={2}/>
     </Groupe>;
   }
   const g = (cle, l) => (l.length ? <Groupe titre={`${tr('achats.site.' + cle)} · ${l.length}`} attrs={{ 'data-achats-groupe': cle }}>{l.map(rang)}</Groupe> : null);
