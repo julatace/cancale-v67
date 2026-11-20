@@ -74,7 +74,7 @@ export default {
   "tableau.etat.enligne": "Online",
   "tableau.etat.masquee": "Nascosta",
   "tableau.etat.pause": "In pausa",
-  "tableau.etat.aconfirmer": "Da confermare",
+  "tableau.etat.aconfirmer": "Non ricontrollato di recente",
   "tableau.etat.brouillon": "Bozza",
   "tableau.etat.vendue": "Venduta",
   "tableau.etat.retiree": "Rimossa",

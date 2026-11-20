@@ -52,13 +52,17 @@ export const LOT_IDS = 40;
 const idSur = (id) => typeof id === 'string' && /^[A-Za-z0-9_.:-]+$/.test(id);
 
 // Lit des lignes par identifiant, par lots `in.(…)` (un id pas sûr : seul).
+// (20 nov., bugs-terrain) Les lots partent TROIS à la fois (`EN_PARALLELE`), plus l'un après l'autre : au banc, 8 lots de QR
+// relus en série retardaient les suivis de ~10 s (processeur ×4). Mêmes lignes, même ordre ; un lot raté ⇒ `null` (pas su).
+export const EN_PARALLELE = 3;
 async function parIds(lire, ids, select) {
   const out = [];
   const sures = ids.filter(idSur), autres = ids.filter((x) => !idSur(x));
-  for (let i = 0; i < sures.length; i += LOT_IDS) {
-    const l = await lire(`id=in.(${sures.slice(i, i + LOT_IDS).join(',')})&select=${select}`);
-    if (!Array.isArray(l)) return null;
-    out.push(...l);
+  const lots = []; for (let i = 0; i < sures.length; i += LOT_IDS) lots.push(sures.slice(i, i + LOT_IDS));
+  for (let k = 0; k < lots.length; k += EN_PARALLELE) {
+    const r = await Promise.all(lots.slice(k, k + EN_PARALLELE).map((l) => Promise.resolve().then(() => lire(`id=in.(${l.join(',')})&select=${select}`)).catch(() => null)));
+    if (r.some((l) => !Array.isArray(l))) return null;
+    for (const l of r) out.push(...l);
   }
   for (const id of autres) {
     const l = await lire(`id=eq.${encodeURIComponent(id)}&select=${select}`);

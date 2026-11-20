@@ -267,7 +267,7 @@ function etatAnnonceVc(it, vendueParVente, capturedAt) {
   // alors que la liste a été relue ⇒ « à confirmer » (rien n'est retiré).
   const vu = Date.parse((it && it.vuAt) || ''), lu = Date.parse(capturedAt || '');
   if (etatR === 'a-confirmer' && isFinite(vu) && isFinite(lu)) {
-    return { etat: 'a-confirmer', label: `Plus vue sur Vestiaire depuis ${ageCourtVc(it.vuAt).replace(/^il y a /, '')} — à confirmer`, brut };
+    return { etat: 'a-confirmer', label: `Plus vue sur Vestiaire depuis ${ageCourtVc(it.vuAt).replace(/^il y a /, '')} — pas revue récemment`, brut };
   }
   if (etatR === 'pas-dit') return { etat: 'pas-dit', label: 'État non dit par Vestiaire', brut: '' };
   const f = VC_ANNONCE_ETATS.find(([k]) => k === etatR);
@@ -400,11 +400,11 @@ function AnnoncesVestiaire() {
             ambre si la lecture est à refaire ; la phrase d'avant, entière, dans la pop-up. */}
         <InfoPop nom="vc-fraicheur" titre="Tes annonces Vestiaire" ton={vieille || sansFiche ? 'ambre' : 'neutre'}
           attrs={{ 'data-vc-annonces-fraicheur': '' }}
-          puces={[{ texte: `${d.complet ? '' : 'Au moins '}${n} annonce${n > 1 ? 's' : ''}` }, { texte: `Lu ${ageCourtVc(d.capturedAt)}` }, vieille ? { texte: 'À confirmer', ton: 'ambre' } : null, sansFiche ? { texte: 'Fiches à venir', ton: 'ambre' } : null].filter(Boolean)}
+          puces={[{ texte: `${d.complet ? '' : 'Au moins '}${n} annonce${n > 1 ? 's' : ''}` }, { texte: `Lu ${ageCourtVc(d.capturedAt)}` }, vieille ? { texte: 'Pas revue récemment', ton: 'ambre' } : null, sansFiche ? { texte: 'Fiches à venir', ton: 'ambre' } : null].filter(Boolean)}
           phrase={vieille ? 'Ouvre « Mes articles » sur Vestiaire pour les relire.' : sansFiche ? 'Mets l’extension à jour pour voir photo, titre et prix.' : `${n} annonce${n > 1 ? 's' : ''} lue${n > 1 ? 's' : ''} sur Vestiaire.`}>
           <p data-vc-annonces-fraicheur-detail="" style={{ margin: 0 }}>
           {n} annonce{n > 1 ? 's' : ''}{d.complet ? '' : d.total != null ? ` (au moins — Vestiaire en annonce ${d.total})` : ' (au moins)'}, lue{n > 1 ? 's' : ''} sur Vestiaire {ageCourtVc(d.capturedAt)}.
-          {vieille ? <> <b style={{ color: C.warn }}>À confirmer</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
+          {vieille ? <> <b style={{ color: C.warn }}>Pas revue récemment</b> : la lecture a plus de 24 h — {geste} pour la remettre à jour (rien n'est retiré d'ici).</> : null}
           {sansFiche ? <> Photo, titre et prix arrivent avec l'extension {EXT_CAPACITES.vcfiche}{extSait('vcfiche') === 'ok' ? <> : {geste} une fois</> : <> — mets-la à jour depuis Paramètres → État des connexions, puis {geste}</>}.</> : null}
           </p>
         </InfoPop>

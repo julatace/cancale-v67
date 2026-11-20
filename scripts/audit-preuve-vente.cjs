@@ -218,6 +218,9 @@ function chargeApp(lignes, ko = () => false) {
   let src = ['PAGE_SB', 'lireTout', 'PAS_UNE_VENTE'].map((n) => extraire(APP, n)).join('\n');
   const bloc = BLOC_RE.exec(APP);
   if (bloc) src += '\n' + bloc[1];
+  // (20 nov., lectures-legeres) `lireTxnPreuves` (la famille gardée, sous les noms de la projection d'avant) : ici la
+  // MÊME projection lue par `lireTout`, la forme que cette fausse base sert. audit-memo-court tient l'équivalence.
+  src += "\nconst lireTxnPreuves = (o) => lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });";
   for (const n of ['lirePreuvesVenteVinted', 'lireVentesVintedProuvees']) { try { src += '\n' + extraire(APP, n); } catch (_) {} }
   src += '\n;this.R = { lirePreuves: typeof lirePreuvesVenteVinted === "function" ? lirePreuvesVenteVinted : null, lireVendus: typeof lireVentesVintedProuvees === "function" ? lireVentesVintedProuvees : null };';
   vm.runInContext(src, ctx);

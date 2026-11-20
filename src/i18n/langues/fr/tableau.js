@@ -74,7 +74,7 @@ export default {
   "tableau.etat.enligne": "En ligne",
   "tableau.etat.masquee": "Masquée",
   "tableau.etat.pause": "En pause",
-  "tableau.etat.aconfirmer": "À confirmer",
+  "tableau.etat.aconfirmer": "Pas revue récemment",
   "tableau.etat.brouillon": "Brouillon",
   "tableau.etat.vendue": "Vendue",
   "tableau.etat.retiree": "Retirée",

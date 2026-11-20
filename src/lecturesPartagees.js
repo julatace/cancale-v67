@@ -173,10 +173,17 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
   const cache = new Map();   // clé -> { gen, p, debut, fin }
   let gen = 0;
   const stats = { partagees: 0, parties: 0, get retenues() { return cache.size; } };
-  const invalider = () => { gen++; cache.clear(); };
+  // (20 nov., lectures-legeres) Ceux qui gardent une réponse plus longtemps (src/memoCourt.js) sont
+  // PRÉVENUS de chaque vidage — écriture vers la base ou une route, signal de l'extension. `abonner(chemin, f)` :
+  // `f()` est appelé quand une lecture de `chemin` (ce qui suit `/rest/v1/`) serait retirée du partage ; dans le
+  // doute (tout vidé), toujours.
+  const abonnes = new Set();
+  const prevenir = (touche) => { for (const a of abonnes) { try { if (!touche || touche(a.chemin)) a.f(); } catch (_) { try { a.f(); } catch (_e) {} } } };
+  const abonner = (chemin, f) => { if (typeof f !== 'function') return () => {}; const a = { chemin: String(chemin || ''), f }; abonnes.add(a); return () => abonnes.delete(a); };
+  const invalider = () => { gen++; cache.clear(); prevenir(null); };
   // Ne retire que les lectures qui peuvent porter l'une de ces lignes (une
   // lecture EN COURS retirée n'est plus resservie : `cache.get(cle) !== ent`).
-  const invaliderLignes = (ids) => { for (const k of [...cache.keys()]) if (lecturePeutPorter(k.slice(0, k.indexOf('\n')).slice(prefixe.length), ids)) cache.delete(k); };
+  const invaliderLignes = (ids) => { for (const k of [...cache.keys()]) if (lecturePeutPorter(k.slice(0, k.indexOf('\n')).slice(prefixe.length), ids)) cache.delete(k); prevenir((c) => lecturePeutPorter(c, ids)); };
   const origine = opts.origine != null ? opts.origine : (typeof location !== 'undefined' && location.origin ? location.origin : '');
   const estRouteApp = (u) => u.indexOf('/api/') === 0 || (!!origine && u.indexOf(origine + '/api/') === 0);
   const f = function (input, init) {
@@ -213,7 +220,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       // harvest_*_orders_sold repartaient une seconde après.
       const pref = versRoute ? prefixesDeclares(init) : null;
       if (pref) {
-        const viderP = () => { for (const k of [...cache.keys()]) if (lecturePeutPorterPrefixes(k.slice(0, k.indexOf('\n')).slice(prefixe.length), pref)) cache.delete(k); };
+        const viderP = () => { for (const k of [...cache.keys()]) if (lecturePeutPorterPrefixes(k.slice(0, k.indexOf('\n')).slice(prefixe.length), pref)) cache.delete(k); prevenir((c) => lecturePeutPorterPrefixes(c, pref)); };
         viderP();
         const p = fetchOrig(input, init);
         Promise.resolve(p).then(viderP, viderP);
@@ -263,7 +270,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     }, () => { if (cache.get(cle) === ent) cache.delete(cle); });
     return p.then((r) => r.clone());
   };
-  return { fetch: f, invalider, stats };
+  return { fetch: f, invalider, stats, abonner };
 }
 
 // Installe la règle sur `window.fetch`, une fois.

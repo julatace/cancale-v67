@@ -52,7 +52,7 @@ export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lec
  const nomCompte=id=>{const a=annonces.find(x=>idCompteAnn(x)===id&&x.accountName);return a?String(a.accountName):(id?`n° ${id.slice(0,8)}`:'');};
  const [recherche,setRecherche]=useState(''),[filtre,setFiltre]=useState('toutes');
  const lignes=useMemo(()=>annonces.map(ad=>({ad,num:(numeroDe&&numeroDe(ad))||'',...etatAnnonceLeboncoin(ad,ventes,sortieDe,aConfirmerDe)})),[annonces,ventes,numeroDe,sortieDe,aConfirmerDe]);
- const choix=[['toutes','Toutes'],['active','En ligne'],['aconfirmer','À confirmer'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
+ const choix=[['toutes','Toutes'],['active','En ligne'],['aconfirmer','Pas revues récemment'],['pause','En pause'],['vendue','Vendues'],['autres','Retirées et autres']];
  const CONNUS=['active','aconfirmer','pause','vendue'];
  const visibles=lignes.filter(l=>(filtre==='toutes'||(filtre==='autres'?!CONNUS.includes(l.etat):l.etat===filtre))
   && [l.ad.subject,l.ad.title,l.ad.accountName,l.num?'N°'+l.num:''].join(' ').toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr')));

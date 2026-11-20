@@ -43,7 +43,7 @@ export function fusionEntreeVente(base, ov, buyByNum) {
   return avecPrixParNum(m);
 }
 
-const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'à confirmer (lecture ancienne)', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'pas encore lue' };
+const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment (lecture ancienne)', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'pas encore lue' };
 
 // rn : le résultat de `toutSurLeNumero` · d : { fiches, saleOv, buyByNum,
 //   stats ({ [idAnnonce]: { vues, favoris } } ou null = pas lu), versements
