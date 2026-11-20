@@ -267,7 +267,7 @@ function Personnaliser({ s, m, ouverte, fermer }) {
       pied={<Bouton variante="plein" chargement={enCours} onClick={enregistrer} attrs={{ 'data-sm-perso-enregistrer': m.id }}>{tr('cqm.meuble.enregistrer')}</Bouton>}
       attrs={{ 'data-sm-perso': m.id }}>
       <div className="sm-perso-apercu" aria-hidden="true"><MeubleDessin m={apercu} info={(i) => (i < (Number(m.cols) || 1) * (Number(m.rows) || 1) ? s.caseInfo(m.id, i) : null)} mode="loin"/></div>
-      <Groupe titre={tr('cqm.meuble.nom')}>
+      <Groupe>
         <div className="sm-carte-pad"><Champ libelle={tr('cqm.meuble.nom')} valeur={nom} onChange={setNom} attrs={{ 'data-sm-perso-nom': '', maxLength: 40 }}/></div>
       </Groupe>
       <Groupe titre={tr('cqm.meuble.style')}>

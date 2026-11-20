@@ -175,7 +175,7 @@
   /* ── (20 nov., « ce qui manque ») PERSONNALISER, LA PIÈCE, GLISSER À LA SOURIS ───────────────────────── */
   .sm-pas { display: inline-flex; align-items: center; gap: 4px; }
   .sm-pas-n { min-width: 3ch; text-align: center; font: var(--n-t-corps-fort); color: var(--n-encre); }
-  .sm-perso-apercu { padding: 4px 0 16px; }
+  .sm-perso-apercu { width: min(100%, 280px); margin: 4px auto 16px; }
   @media (pointer: fine) {
     .sm-zoom .sm-case.is-prise { cursor: grab; }
   }
