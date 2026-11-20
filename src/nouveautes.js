@@ -32,7 +32,7 @@ export const NOUVEAUTES = Object.freeze([
   // (20 nov., Julien : « Améliore le visuel, tu n'as pas respecté ce qu'on avait dit ») docs/passation/2026-11-20-argent-natif.md
   { id: 'argent-natif', date: '2026-11-20', titre: 'Argent plus clair, en cartes sobres', phrase: 'Le mois, ta déclaration et tes statistiques, sans rien de chargé.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « pour l'extension, tu fais pareil que Vintex ») docs/passation/2026-11-20-panneau-vintex.md
-  { id: 'panneau-vintex', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-extension', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») docs/passation/2026-11-20-actions-extension.md.
   { id: 'gestes-extension', date: '2026-11-20', titre: 'Tes gestes se font dans l’extension', phrase: 'Baisser, republier, répondre : VRM ouvre le panneau sur le site.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., ext. 5.410) Republier copie l'annonce telle quelle et vérifie avant ; messages qui sautent ce qui serait refusé — docs/passation/2026-11-20-repub-messages-malins.md

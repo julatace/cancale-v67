@@ -823,7 +823,7 @@
   .conf5 span { flex: 1 1 200px; }
   .conf5 .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
 
-  /* ══ 5.410 — LE PANNEAU « COMME VINTEX » (Julien, 20 nov. : « tu fais pareil que Vintex ») : presque plein écran à
+  /* ══ 5.410 — LE GRAND PANNEAU (Julien, 20 nov. : « tu fais pareil que [l’outil qu’il cite] ») : presque plein écran à
      l'ordinateur, barre latérale fixe 232 px (réductible à 64), en-tête 56, la page en tableau sur fond blanc, filets fins,
      étiquettes douces neutres (ambre = à faire), accent bleu rare. Jamais de rouge, de vert vif ni de violet. */
   .carte[data-grand] { top: 12px !important; bottom: 12px !important; left: 12px !important; right: 12px !important; width: auto !important; padding: 0 !important; overflow: hidden !important; border-radius: 14px; }
