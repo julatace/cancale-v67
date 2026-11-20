@@ -34,6 +34,9 @@ export const NOUVEAUTES = Object.freeze([
   // (20 nov., ext. 5.410) Republier copie l'annonce telle quelle et vérifie avant ; messages qui sautent ce qui serait refusé — docs/passation/2026-11-20-repub-messages-malins.md
   { id: 'repub-verifie-avant', date: '2026-11-20', titre: 'Republier vérifie chaque annonce avant de lancer', phrase: 'Copie exacte de l’annonce, taille corrigée seule, le reste demandé.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'favoris-sautes-dits', date: '2026-11-20', titre: 'Favoris : ce qui serait refusé est sauté', phrase: 'Vendus, sous ton prix mini, texte refusé : sautés, et dit au bilan.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « on reçoit quand une personne est intéressée sur Leboncoin ; pour Vestiaire trouve une solution ») docs/passation/2026-11-20-lbc-vc-interesses.md
+  { id: 'lbc-interesses', date: '2026-11-20', titre: 'Leboncoin : qui t’a écrit, par annonce', phrase: 'Leur écrire depuis le panneau VRM, une personne à la fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'vc-date-baisse', date: '2026-11-20', titre: 'Vestiaire : date en ligne, baisse par règle', phrase: 'Lue chez Vestiaire, sinon « au moins » ; éteinte par défaut.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
   { id: 'stock-meubles', date: '2026-11-19', titre: 'Tes meubles dessinés, sur toute la largeur', phrase: '« Ranger » sur chaque article : il vole dans sa case.', tab: 'garage', pour: 'tous', mode: 'complet' },
   { id: 'methode-etiquetage', date: '2026-11-19', titre: 'Choisis ta méthode d’étiquetage', phrase: 'Qui numérote, lettre ou chiffres, étiquette écrite ou imprimée.', tab: 'settings', pour: 'tous', mode: 'tous' },

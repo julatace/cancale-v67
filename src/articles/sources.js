@@ -75,7 +75,10 @@ export function annoncesVestiaire(items, { etatDe, numeroDe, vintedDe = null, vi
     const e = ETAT_VC[typeof etatDe === 'function' ? str(etatDe(id, it)) : ''] || 'aconfirmer';
     const p = it.prix && typeof it.prix === 'object' ? (it.prix.vente != null ? it.prix.vente : it.prix.valeur != null ? it.prix.valeur : it.prix.amount) : it.prix;
     out.push({ site: 'vestiaire', id: String(id), compte: str(it.compte), pseudo: str(it.pseudo || it.compte), titre: str(it.titre), photo: photoDe(it.photo),
-      prix: p, taille: str(it.taille), condition: str(it.etat), depuis: it.depuis || null, favoris: nb(it.favoris), vues: null, messages: null,
+      prix: p, taille: str(it.taille), condition: str(it.etat),
+      // (20 nov., ext. 5.410) La date de mise en ligne LUE chez Vestiaire (`misEnLigne`, exacte) — jamais la borne basse
+      // `vueDepuis` (« au moins »), qui ne se présente pas comme une date de mise en ligne (src/dateMiseVc.js).
+      depuis: it.depuis || it.misEnLigne || null, favoris: nb(it.favoris), vues: null, messages: null,
       etat: e === 'enligne' && vieille ? 'aconfirmer' : e, numero: str(typeof numeroDe === 'function' ? numeroDe(id, it) : ''), vintedId: str(vintedDe ? vintedDe(id) : ''), url: str(it.url) });
   }
   return out;

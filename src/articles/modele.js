@@ -70,7 +70,7 @@ export const PARITE = {
   achat:        { vinted: 'oui', leboncoin: 'oui', ebay: 'oui', vestiaire: 'oui' },
   achatRelie:   { vinted: 'oui', leboncoin: 'oui', ebay: 'oui', vestiaire: 'oui' },
   benefice:     { vinted: 'oui', leboncoin: 'oui', ebay: 'oui', vestiaire: 'oui' },
-  depuis:       { vinted: 'lecture', leboncoin: 'lecture', ebay: 'lecture', vestiaire: 'non' },
+  depuis:       { vinted: 'lecture', leboncoin: 'lecture', ebay: 'lecture', vestiaire: 'lecture' },   // (20 nov., 5.410) `listingDate` lue
   favoris:      { vinted: 'lecture', leboncoin: 'lecture', ebay: 'lecture', vestiaire: 'lecture' },
   vues:         { vinted: 'lecture', leboncoin: 'lecture', ebay: 'lecture', vestiaire: 'non' },
   messages:     { vinted: 'lecture', leboncoin: 'lecture', ebay: 'non', vestiaire: 'non' },
@@ -86,7 +86,7 @@ export const CAPACITE_GESTE = { baisserPrix: { vinted: 'baisseprix', leboncoin: 
 export const LIMITES = {
   leboncoin: ['offreAuto'],
   ebay: ['messages'],
-  vestiaire: ['depuis', 'vues', 'messages', 'offreAuto'],
+  vestiaire: ['vues', 'messages', 'offreAuto'],
   vinted: [],
 };
 export const limitesDe = (sites) => { const out = []; for (const s of SITES) if (arr(sites).includes(s)) for (const l of LIMITES[s]) out.push({ site: s, quoi: l }); return out; };
