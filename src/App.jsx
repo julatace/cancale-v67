@@ -68284,7 +68284,7 @@ function AppCoeur() {
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
         <ToastNumeros/>
-        {tab==='garage' ? <NumerosAEcrire/> : null}
+        {tab==='garage' ? <GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran> : null}
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}

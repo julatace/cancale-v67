@@ -19,6 +19,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 import { useComptesBloques } from '../compteBloqueEtat.js';
 import React from 'react';
+import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
@@ -41,7 +42,9 @@ const ACTIONS = [
   { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
 const cleActionTr = { recreer: 'republier', main: 'main', versBrouillon: 'versBrouillon', enLigne: 'enLigne', baisser: 'baisser', partout: 'partout' };
-const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'));
+// (20 nov., chasse-bugs) `lazySur` comme partout (audit-ouverture) : un morceau qui rate après une mise en ligne est relancé,
+// puis rechargement propre ou « Mettre à jour VRM » — plus « Cet écran a un souci » sur « Publier sur… ».
+const PublierAgent = lazySur(() => import('./PublierAgent.jsx'));
 const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
