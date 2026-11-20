@@ -205,8 +205,8 @@ async function laBarre(nav, nomBase, b, taille, sombre, ecran) {
     return b; };
   const FAB = { volume: () => micro(baseVolume()), vide: () => micro(Object.assign(baseVide(), { vide: true })) };
   try {
-    for (const nomBase of BASES) for (const taille of TAILLES) for (const t of THEMES) for (const seg of SEGMENTS) await unSegment(nav, nomBase, FAB[nomBase](), taille, t === 'sombre', seg);
-    if (!process.env.SANS_BARRE) for (const taille of ['390', '390s']) for (const t of THEMES) for (const e of ECRANS_BARRE) await laBarre(nav, 'volume', FAB.volume(), taille, t === 'sombre', e);
+    if (!process.env.SEULEMENT_BARRE) for (const nomBase of BASES) for (const taille of TAILLES) for (const t of THEMES) for (const seg of SEGMENTS) await unSegment(nav, nomBase, FAB[nomBase](), taille, t === 'sombre', seg);
+    if (!process.env.SANS_BARRE) for (const taille of liste('TAILLES_BARRE', '390,390s')) for (const t of THEMES) for (const e of ECRANS_BARRE) await laBarre(nav, 'volume', FAB.volume(), taille, t === 'sombre', e);
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1200)); }
   if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(releve));
   await nav.close(); P.srv.close();

@@ -10,9 +10,3 @@
 }
 /* Les rangs et les « — » de « Ce qui rapporte le plus » étaient à 2,9:1 : le gris lisible (≥ 4,5:1) du natif. */
 :root:root:root body .vrm-app-shell .vrm-main [data-espace="argent"] :is(.vrm-cr-rang, .vrm-cr-brut[data-vide]) { color: var(--n-encre-2) !important; }
-/* Mois, à l'ordinateur : la grille « verre » d'avant (verre-ecrans.css, trois colonnes posées pour les cartes d'avant) rangeait
-   le Mois natif dans une colonne de 250 px. Le segment redevient une pile : le Mois natif (sa propre grille de cartes à deux
-   colonnes), puis le détail. */
-@media (min-width: 1024px) {
-  :root:root:root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: flex !important; flex-direction: column !important; gap: 16px !important; }
-}
