@@ -85,8 +85,14 @@ function tete() {
   const compte = document.querySelector('[data-vn="ventes"] [data-tt-compte]');
   const colle = document.querySelector('[data-vn="ventes"] [data-tt-colle], [data-vn-colle]');
   let dessus = [];
-  if (colle) { const b = R(colle).bottom; for (const x of [innerWidth * 0.35, innerWidth * 0.55, innerWidth * 0.75]) for (const y of [b - 4, Math.max(2, b - 30)]) { const h = document.elementFromPoint(x, y); if (h && h.closest('[data-tt-ligne], [data-vn-rang], [data-vn-route], [data-vr-rang]')) dessus.push(Math.round(y)); } }
-  return { seg: libre(seg), compte: compte ? libre(compte) : null, colle: !!colle, dessus };
+  if (colle) { const b = R(colle).bottom; for (const x of [innerWidth * 0.35, innerWidth * 0.55, innerWidth * 0.75]) for (const y of [b - 4, Math.max(2, b - 30), 2, 8, 13]) { const h = document.elementFromPoint(x, y); if (h && h.closest('[data-tt-ligne], [data-vn-rang], [data-vn-route], [data-vr-rang]')) dessus.push(Math.round(y)); } }
+  // Le haut de l'écran AU-DESSUS de la barre collée (la marge du défileur) : couvert par le fond de la barre (son ::after).
+  const barre = [...document.querySelectorAll('.n-barre-titre')].find((x) => x.getClientRects().length);
+  let hautNu = 0;
+  if (barre) { const t = R(barre).top; const a = getComputedStyle(barre, '::after'); const couvre = barre.hasAttribute('data-n-fond') && a.content !== 'none' && a.content !== 'normal' ? parseFloat(a.height) || 0 : 0; hautNu = Math.max(0, Math.round(t - couvre)); }
+  if (hautNu > 0) dessus = dessus.filter((y) => y >= hautNu);
+  else dessus = dessus.filter((y) => !barre || y >= R(barre).top);
+  return { seg: libre(seg), compte: compte ? libre(compte) : null, colle: !!colle, dessus, hautNu };
 }
 // Défile la liste (le conteneur qui défile vraiment) de `px`.
 async function defiler(pg, px) {
@@ -108,7 +114,7 @@ function achats() {
   const L = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-ligne]')].filter((e) => e.getClientRects().length).map((r) => {
     const c = r.querySelector('[data-tt-col="achat"]'); const b = c && c.querySelector('[data-vt-relier]');
     return { cle: r.getAttribute('data-tt-ligne'), site: r.getAttribute('data-vt-site') || 'vinted', bouton: !!b, nom: b ? (b.getAttribute('aria-label') || '') : '', relie: b ? b.getAttribute('data-vt-relier') === 'relie' : false,
-      texte: c ? c.textContent.trim() : '', taille: b ? Math.round(b.getBoundingClientRect().width) : 0, svg: !!(b && b.querySelector('svg path')) };
+      texte: c ? c.textContent.trim() : '', taille: b ? Math.round(b.getBoundingClientRect().width) : 0, svg: !!(b && b.querySelector('svg path, svg rect')) };
   });
   return { th, L };
 }
@@ -174,7 +180,7 @@ const segment = async (pg, i) => { await pg.locator('[data-vn="ventes"] .n-segme
       await pg.screenshot({ path: path.join(SHOTS, `entete-${W}-${th}-defile.png`) });
       dit(t.seg.ok, `après défilement, le segmenté reste visible et non recouvert`, t.seg);
       if (!tel) dit(t.compte && t.compte.ok, `après défilement, « Tous les comptes » reste visible et entier`, t.compte);
-      dit(t.colle && !t.dessus.length, `aucune rangée visible au-dessus du bas de l’en-tête collant`, t);
+      dit(t.colle && !t.dessus.length && !t.hautNu, `aucune rangée visible au-dessus du bas de l’en-tête collant (haut non couvert : ${t.hautNu} px)`, t);
       // A : relier.
       if (!tel) {
         await pg.evaluate(() => { for (const e of document.querySelectorAll('*')) if (e.scrollTop) e.scrollTop = 0; window.scrollTo(0, 0); });
