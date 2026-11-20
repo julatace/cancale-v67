@@ -20,7 +20,8 @@
 // (le même sur tous ses appareils, par compte VRM). Règles PURES : aucune lecture.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const CLE_NOUVEAUTES_VUES = 'vrm_nouveautes_vues';
+// (20 nov., iphone-rapide) La clé vit dans src/nouveautesCle.js : la coque la lit au démarrage sans emporter la liste.
+export { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
 export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;

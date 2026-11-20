@@ -2,6 +2,13 @@
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import { exempleActif } from './modeExemple.js';
+// (20 nov., iphone-rapide) Les dates et nombres mis en forme par un formateur gardé (src/formatsRapides.js) : le même
+// texte, sans reconstruire un formateur Intl à chaque date d'une liste.
+import { poserFormatsRapides } from './formatsRapides.js';
+poserFormatsRapides();
+// (20 nov., bugs-terrain) Les comparaisons de textes avec langue/options par un comparateur gardé (src/comparaisonsRapides.js).
+import { poserComparaisonsRapides } from './comparaisonsRapides.js';
+poserComparaisonsRapides();
 // (19 nov.) Les drapeaux de racine (à la place des `:has()` portés par html, body, la coque) : posés avant le premier rendu.
 import './drapeauxRacine.js';
 import { garderCodePartenaire } from './partenaires/lien.js';

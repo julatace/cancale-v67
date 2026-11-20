@@ -781,6 +781,7 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
@@ -938,8 +939,21 @@ import ModeRelais from "./ModeRelais.jsx";
 import ModeDepot from "./ModeDepot.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
-import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
+import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+// (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
+// ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
+// crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
+let M_NOUVEAUTES = null;
+const chargerNouveautes = () => import('./nouveautes.js').then((m) => { M_NOUVEAUTES = m; return m; });
+const nouveautesAVoir = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesAVoir(...a) : []);
+const nouveautesDuCompte = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesDuCompte(...a) : []);
+const lireVuesNouveautes = (r) => (M_NOUVEAUTES ? M_NOUVEAUTES.lireVues(r) : {});
+// (20 nov., iphone-rapide) Les composants « Quoi de neuf » à la demande avec leur liste ; leur feuille de style reste
+// importée ICI (la cascade ne bouge pas).
+import './quoi-de-neuf.css';
+const QuoiDeNeufCarte = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufCarte })));
+const QuoiDeNeufFeuille = aLaDemandeFeuille(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufFeuille })));
+const QuoiDeNeufReglage = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufReglage })));
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
@@ -3049,6 +3063,46 @@ function ligneCommandes(r) {
   return { id: r.id, updated_at: r.updated_at, cap: r.cap, data };
 }
 function idsCommandes(uids) { return (uids || []).flatMap((u) => [`harvest_${u}_orders_sold`, `harvest_${u}_orders_purchased`]); }
+// ── (20 nov., lectures-legeres) LES COMMANDES PAR LA ROUTE LÉGÈRE ──────────────
+// Mesuré au profil de Julien (4G 1,6 Mbit/s) : la lecture à froid des commandes de tous
+// ses comptes pesait 1,9 Mo (`payload` de 30 lignes, ~5 300 commandes) — plus de 9 s.
+// `GET /api/compte?mode=commandes-lire` (api/_lib/commandes-lecture.js) rend les MÊMES
+// lignes (forme `SEL_COMMANDES`), du vendeur de la SESSION (jamais un owner du navigateur),
+// chaque commande réduite aux champs que VRM lit (rien d'autre n'existe dans sa base),
+// compressées (~6×), avec un ETag (304 si rien n'a changé : le navigateur revalide seul,
+// `Cache-Control: private, no-cache`). Trois états tenus :
+//   · la route rend ses lignes ⇒ elles (filtrées des comptes supprimés, comme `lireTout`) ;
+//   · la route est absente, refuse, est en panne, ou rend autre chose ⇒ `undefined` :
+//     l'appelant fait la lecture d'AVANT (jamais un écran vide) ;
+//   · jamais `[]` inventé : une liste vide n'est rendue que si la route l'a dite (200).
+// Sans session (accès direct), hors ligne, ou plus de 200 lignes : la lecture d'avant.
+const ROUTE_COMMANDES = '/api/compte?mode=commandes-lire';
+let _routeCommandesAbsente = 0;   // jusqu'à quand ne plus essayer (route absente de ce déploiement)
+async function lireCommandesRoute(ids) {
+  try {
+    if (!MULTI_USER || !(AUTH.session && AUTH.session.access_token && AUTH.user && AUTH.user.id)) return undefined;
+    if (Date.now() < _routeCommandesAbsente || horsLigneMaintenant()) return undefined;
+    const l = Array.isArray(ids) ? [...new Set(ids.map(String))] : null;
+    if (l && (!l.length || l.length > 200 || !l.every((x) => /^harvest_\d{1,20}_orders_(sold|purchased)$/.test(x)))) return undefined;
+    const qui = AUTH.user.id;
+    const r = await fetch(`${ROUTE_COMMANDES}${l ? `&ids=${encodeURIComponent(l.sort().join(','))}` : ''}`, { headers: { Authorization: `Bearer ${AUTH.session.access_token}` } });
+    if (!r || !r.ok) { if (r && (r.status === 404 || r.status === 405)) _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    if (!/json/i.test(String((r.headers && r.headers.get && r.headers.get('content-type')) || ''))) { _routeCommandesAbsente = Date.now() + 10 * 60 * 1000; return undefined; }
+    const j = await r.json().catch(() => null);
+    // La session a changé pendant la lecture : ces lignes ne sont pas celles du vendeur d'à présent.
+    if (!AUTH.user || AUTH.user.id !== qui) return undefined;
+    if (!j || j.ok !== true || !Array.isArray(j.rows)) return undefined;
+    if (j.rows.some((x) => !x || typeof x !== 'object' || !/^harvest_\d{1,20}_orders_(sold|purchased)$/.test(String(x.id)) || (l && !l.includes(String(x.id))))) return undefined;
+    return sansComptesSupprimes(j.rows);
+  } catch (_) { return undefined; }
+}
+// Les commandes nommées (`ids`), ou toutes (`null`) : la route, sinon la lecture d'avant
+// (`lireTout`, mêmes lignes, même projection). Rend le tableau ou `null` (pas su).
+async function lireCommandesLegeres(ids) {
+  const r = await lireCommandesRoute(ids);
+  if (Array.isArray(r)) return r;
+  return lireTout(Array.isArray(ids) ? `id=in.(${ids.join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+}
 // ── LES DRESSINGS ET LES AUTRES LIGNES D'UN COMPTE : LA MÊME PROJECTION ──────
 // (6 nov., vitesse 2) Mesuré sur sa base (lecture seule, `length(data::text)`) :
 // les lignes `harvest_*_listings` pèsent ~298 Ko, dont ~46 Ko d'un compte qui
@@ -3160,21 +3214,24 @@ const prechargerDemarrage = () => {
     // Première ouverture sur l'appareil (comptes pas encore connus) : les versions par le
     // même motif nomment les lignes ; illisibles ⇒ la lecture d'avant.
     const uidCopie = AUTH.user?.id || '';
-    const lireCommandes = (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_COMMANDES}`, { strict: true }).catch(() => null);
+    // (20 nov., lectures-legeres) par la route légère, sinon la lecture d'avant.
+    const lireCommandes = (l) => lireCommandesLegeres(l);
     const famille = (uidCopie
       ? (async () => {
           const versMotif = memo ? null : await lireTout(`id=like.harvest_*_orders_*d&select=${SEL_VERSION}`, { strict: true }).catch(() => null);
-          if (!memo && !Array.isArray(versMotif)) return lireTout(`id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (!memo && !Array.isArray(versMotif)) return lireCommandesLegeres(null);
           const ids = memo ? idsCommandes(memo) : versMotif.map((r) => String(r && r.id)).filter((x) => x && x !== 'undefined');
           if (!ids.length) return [];
           const r = await lireAvecCopie({ uid: uidCopie, famille: 'commandes', ids, stockage: stockageApp(), local: localStorage, horsLigne: horsLigneMaintenant,
             lireVersions: memo ? (l) => lireTout(`id=in.(${l.join(',')})&select=${SEL_VERSION}`, { strict: true }).catch(() => null) : async () => versMotif,
             lireLignes: lireCommandes });
-          if (r.incoherent) return lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true });
+          if (r.incoherent) return lireCommandesLegeres(memo ? idsCommandes(memo) : null);
           return r.ok ? r.rows : null;
         })()
-      : lireTout(memo ? `id=in.(${idsCommandes(memo).join(',')})&select=${SEL_COMMANDES}` : `id=like.harvest_*_orders_*d&select=${SEL_COMMANDES}`, { strict: true }))
+      : lireCommandesLegeres(memo ? idsCommandes(memo) : null))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
+    // (20 nov., lectures-legeres) Les dressings attendent ces commandes (voir `poserPorteDressings`).
+    poserPorteDressings(); famille.then(ouvrirPorteDressings, ouvrirPorteDressings);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
     // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
     const couvre = (rows, uid) => Array.isArray(rows) && (!memo || (rows.length > 0 && memo.includes(String(uid))));
@@ -7425,7 +7482,7 @@ const oublierDressing = (uid) => {
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
-// et <TopProgress/> affiche une fine barre tant qu'il en reste. Résultat :
+// et (jusqu'au 20 nov.) une fine barre s'affichait tant qu'il en restait. Résultat :
 // l'utilisateur voit TOUJOURS que l'app travaille, sur n'importe quel écran,
 // sans avoir à câbler un indicateur dans chaque composant.
 let _busy = 0;
@@ -7808,8 +7865,26 @@ const lireMoissonGroupee = (id) => {
   const famille = String(id).slice(String(id).lastIndexOf('_') + 1);
   return idGroupable(id) ? _groupeMoisson.charger(id, `${auth}|${famille}`) : _lireLigneMoissonSeule(id, auth);
 };
+// ── (20 nov., lectures-legeres) LES DRESSINGS ATTENDENT LES VENTES AU DÉMARRAGE ──────────────────────────
+// Mesuré au banc iphone-rapide (SESSION=1, 4G lente 1,6 Mbit/s) : les dressings de tous les comptes (~560 Ko)
+// partaient en même temps que les ventes et se partageaient le débit — le tableau de bord, la cloche et le
+// retrait automatique eBay les demandent dès l'ouverture, alors que l'écran ouvert (Aujourd'hui) ne les montre
+// pas. La porte est posée par le préchargement (`prechargerDemarrage`) et s'ouvre quand SES commandes sont
+// réglées (lues ou en panne), au plus tard 6 s après ; l'écran Annonces / Bordereaux (qui les montre) l'ouvre
+// tout de suite ; une relecture demandée (`force`) ne l'attend jamais. Mêmes lectures, mêmes résultats :
+// seulement plus tard. Sans préchargement (aucune porte), rien n'attend.
+let _porteDressings = null;   // { p, ouvrir }
+function poserPorteDressings() {
+  if (_porteDressings) return _porteDressings;
+  let lacher = null; const p = new Promise((r) => { lacher = r; });
+  const t = setTimeout(() => lacher(), 6000);
+  _porteDressings = { p, ouvrir: () => { clearTimeout(t); lacher(); } };
+  return _porteDressings;
+}
+function ouvrirPorteDressings() { try { if (_porteDressings) _porteDressings.ouvrir(); } catch (_) {} }
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
+  if (type === 'listings' && !opts.force && _porteDressings) await _porteDressings.p;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
   return cachedRow(`h:${uid}:${type}`, () => fetchHarvestBrut(uid, type, opts));
 };
@@ -9203,6 +9278,8 @@ const fetchHarvestOrders = async (uid, side, opts = {}) => {
 };
 
 const fetchHarvestOrdersBrut = async (uid) => {
+  // (20 nov., lectures-legeres) Ses deux lignes par la route légère ; indisponible ⇒ la lecture d'avant.
+  if (/^\d{1,20}$/.test(String(uid))) { const r = await lireCommandesRoute(idsCommandes([uid])); if (Array.isArray(r)) return r.map(ligneCommandes); }
   try {
     // (6 nov.) Ses ventes et ses achats seulement, projetés (voir `SEL_COMMANDES`).
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.harvest_${uid}_orders_*d&select=${SEL_COMMANDES}`, {
@@ -9297,16 +9374,51 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // (revue colis, intégration) — `cap` (l'heure de la lecture, que le suivi des commandes exige) y est déjà, par `VERSION_META`.
 // (personne ne lit `id`, `cap`… ici). Partagée 60 s, comme `memo` ; un échec n'est pas gardé.
 const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
-const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title`;
+// (20 nov., lectures-legeres) + `ti` (l'intitulé de l'état) : les preuves de vente (`lirePreuvesVenteVinted`)
+// relisaient la MÊME famille sous une autre projection (~144 Ko à CHAQUE ouverture, la plus grosse lecture au
+// chaud) ; elles la prennent désormais ici (gardée sur l'appareil, revalidée par version). La copie change de
+// forme ⇒ elle change de nom (`txn2`) : une copie d'avant, sans `ti`, n'est jamais servie.
+const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title,ti:meta->>status_title`;
+const TXN_FAMILLE = 'txn2';
 let _txnMeta = null;
 const lireTxnMeta = () => {
   const qui = AUTH.user?.id || '';
   if (_txnMeta && _txnMeta.qui === qui && Date.now() - _txnMeta.at < ROW_TTL_MS) return _txnMeta.p;
-  const p = lireFamilleCopiee('txn', TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
+  const p = lireFamilleCopiee(TXN_FAMILLE, TXN_FILTRE, TXN_COPIE_SELECT).catch(() => null);
   const e = { qui, at: Date.now(), p };
   _txnMeta = e;
   p.then((rows) => { if (!Array.isArray(rows) && _txnMeta === e) _txnMeta = null; });
   return p;
+};
+// (20 nov., lectures-legeres) Deux lectures lourdes servies 20 s à leurs voisines (src/memoCourt.js) : les dates
+// de capture (`lireCapturesDetail`) et les transactions des preuves de vente (`lirePreuvesVenteVinted`). Oubliées à
+// toute écriture qui peut toucher leurs lignes et à tout signal de l'extension (`lecturesPartagees.abonner`), au
+// retour du réseau et à `onCloudReady` ; jamais servies à un autre vendeur ; un « pas su » n'est jamais gardé.
+const MEMO_LECTURES_MS = 20000;
+const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); };
+try {
+  const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp && typeof lp.abonner === 'function') {
+    lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
+    // (et la mémoire de 60 s des transactions, `_txnMeta` : une écriture qui peut les toucher la fait oublier)
+    lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => { _memoPreuvesTxn.oublier(); _txnMeta = null; });
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
+} catch (_) {}
+onCloudReady(oublierMemosLectures);
+// Les transactions des preuves de vente (`lirePreuvesVenteVinted`) : la MÊME famille que `lireTxnMeta` (gardée sur
+// l'appareil, revalidée par version), rendue sous les noms de l'ancienne lecture — mêmes lignes, mêmes valeurs que
+// `id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt` ;
+// servie 20 s aux voisines (`_memoPreuvesTxn`), oubliée à toute écriture qui peut la toucher ; `force` relit.
+// Rend le tableau, ou `null` (pas su).
+const lireTxnPreuves = (opts = {}) => {
+  if (opts.force) _txnMeta = null;
+  return _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', async () => {
+    const l = await lireTxnMeta();
+    return Array.isArray(l) ? l.map((r) => ({ id: r.id, tx: r.tx, it: r.item, ti: r.ti, at: r.su, cap: r.cap })) : null;
+  }, { force: !!opts.force });
 };
 // ── L'ÉTAT DE LA TRANSACTION, PLUS FRAIS QUE LA LISTE DES VENTES (17 oct.) ──
 // Plainte de Julien : « la vente nike air max 1 blanc noir et rouge nB546 est un
@@ -20484,36 +20596,6 @@ function DetailsRepliOuvert({ className, attrs, resume, children }) {
   const [ouvert, setOuvert] = React.useState(false);
   return <details className={className} {...(attrs || {})} onToggle={(e) => setOuvert(!!e.currentTarget.open)}><summary>{resume}</summary>{ouvert ? children : null}</details>;
 }
-function TopProgress() {
-  const [busy, setBusy] = React.useState(false);
-  const [pct, setPct] = React.useState(0);
-  const [show, setShow] = React.useState(false);
-  React.useEffect(() => onBusy(setBusy), []);
-  React.useEffect(() => {
-    let t;
-    if (busy) {
-      setShow(true); setPct(p => (p > 0 && p < 90 ? p : 8));
-      // Progression qui s'essouffle : jamais 100 % tant que ça charge.
-      t = setInterval(() => setPct(p => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.08))), 180);
-    } else {
-      setPct(100);
-      t = setTimeout(() => { setShow(false); setPct(0); }, 340);
-    }
-    return () => { clearInterval(t); clearTimeout(t); };
-  }, [busy]);
-  if (!show) return null;
-  return (
-    <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
-      <div style={{
-        height:'100%', width:`${pct}%`,
-        background:C.accent,
-        borderRadius:'0 999px 999px 0',
-        transition:'width .22s ease, opacity .3s ease',
-        opacity: pct>=100 ? 0 : 1,
-      }}/>
-    </div>
-  );
-}
 
 // ── LE SHELL D'ORDINATEUR ───────────────────────────────────────────────────
 // ⚠️ Julien : « le rendu est presque pareil, je veux quelque chose qui
@@ -24733,7 +24815,7 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
     setRelu(undefined);
     if (!aLaCoque) setComptesLus(undefined);
     (async () => {
-      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail()]);
+      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail({ force: !aLaCoque })]);
       if (stop) return;
       setComptesLus(Array.isArray(c) ? c : null);
       setRelu(caps && caps.by ? caps.by : null);
@@ -31835,11 +31917,11 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
 // (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
 // parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
-let _capturesEnVol = null;
-function lireCapturesDetail() {
-  if (_capturesEnVol) return _capturesEnVol;
-  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
-  return _capturesEnVol;
+// (20 nov., lectures-legeres) Et la réponse RÉUSSIE sert 20 s aux voisins (banc iphone-rapide : 3 lectures de
+// ~124 Ko en 3 s à l'ouverture) — src/memoCourt.js : même vendeur seulement, oubliée à toute écriture qui peut
+// toucher `harvest_*`, à tout signal de l'extension, à `onCloudReady` ; `{ force: true }` relit (Réessayer).
+function lireCapturesDetail(opts) {
+  return _memoCaptures.lire((AUTH.user && AUTH.user.id) || '', lireCapturesDetailUne, { force: !!(opts && opts.force) });
 }
 async function lireCapturesDetailUne() {
   try {
@@ -32280,7 +32362,8 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
+    // (20 nov., lectures-legeres) `lireTxnPreuves` : la famille gardée des transactions, sous les noms d'ici.
+    const rows = await lireTxnPreuves(opts);
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
@@ -34979,7 +35062,11 @@ const cleComptesVinted = (accs) => [...new Set((accs || []).map(a => String((a &
 // sessionStorage : il survit aux rechargements fréquents (auto-mise à jour,
 // réouverture de l'app), donc les listes s'affichent INSTANTANÉMENT après un
 // reload au lieu de re-solliciter Supabase. Purge auto par TTL (3 min).
-const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; }); return o; } }catch(_){} return {}; })();
+const CLE_ACCT_OUBLIS = 'vrm_acct_cache_oublis';
+const _acctCache = (()=>{ try{ const raw=sessionStorage.getItem('vrm_acct_cache'); if(raw){ const o=JSON.parse(raw); const now=Date.now(); Object.keys(o).forEach(k=>{ if(!o[k]||now-o[k].ts>=_CACHE_TTL) delete o[k]; });
+  // (20 nov., bugs-terrain) Les listes OUBLIÉES depuis la dernière écriture complète (voir `oublierAcct`) ne reviennent pas.
+  try { const ob = JSON.parse(sessionStorage.getItem(CLE_ACCT_OUBLIS) || 'null'); const t = ob && Array.isArray(ob.types) ? ob.types : []; if (t.includes('*')) Object.keys(o).forEach((k) => delete o[k]); else t.forEach((k) => delete o[k]); } catch (_) {}
+  return o; } }catch(_){} return {}; })();
 // (6 nov.) L'état de départ d'une liste de commandes, depuis ce cache — EXACTEMENT ce que
 // `loadOrders` poserait (même entrée : même version, moins de 3 min, mêmes comptes), sinon
 // « pas encore lu ». Rien n'est lu ni écrit ici.
@@ -35026,7 +35113,18 @@ const etatOrdersDuCache = (type, accounts) => {
 // onglet, l'iPhone qui la met de côté), ou au plus tard 20 s après, quand le navigateur est
 // libre (`requestIdleCallback`). Un effacement reste écrit tout de suite (ci-dessus).
 let _persistAcctTimer = null;
-const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); }catch(_){} };
+const _persistAcctCache = ()=>{ if(_persistAcctTimer){ try{ if(_persistAcctTimer.idle && typeof window.cancelIdleCallback==='function') window.cancelIdleCallback(_persistAcctTimer.id); else clearTimeout(_persistAcctTimer.id); }catch(_){} _persistAcctTimer=null; } try{ sessionStorage.setItem('vrm_acct_cache', JSON.stringify(_acctCache)); sessionStorage.removeItem(CLE_ACCT_OUBLIS); }catch(_){} };
+// (20 nov., bugs-terrain) OUBLIER une liste du cache de session SANS réécrire tout le cache (~1,5 Mo de JSON à son volume) :
+// chaque signal de l'extension (« ventes », « achats », « annonces », « messages ») en écrivait une copie entière, une fois
+// par moteur monté — 1,4 s de calcul à l'ouverture d'Achats (profil, 12 comptes, processeur ×4). La liste oubliée est NOTÉE
+// tout de suite (une petite clé, `CLE_ACCT_OUBLIS`) : un rechargement juste après ne la relit jamais ; le cache entier est
+// réécrit plus tard (`_persistAcctCacheBientot`), comme après un rangement. `types` vide ⇒ tout.
+const oublierAcct = (...types) => {
+  const tous = !types.length;
+  if (tous) Object.keys(_acctCache).forEach((k) => delete _acctCache[k]); else types.forEach((k) => delete _acctCache[k]);
+  try { const ob = JSON.parse(sessionStorage.getItem(CLE_ACCT_OUBLIS) || 'null'); const t = new Set(ob && Array.isArray(ob.types) ? ob.types : []); (tous ? ['*'] : types).forEach((k) => t.add(k)); sessionStorage.setItem(CLE_ACCT_OUBLIS, JSON.stringify({ types: [...t] })); } catch (_) { _persistAcctCache(); return; }
+  _persistAcctCacheBientot();
+};
 // (11 nov., états vides) RETOUR DU RÉSEAU avec des listes gardées « pas relues » (src/copieLignes.js) :
 // les caches de lecture de la session sont vidés AVANT que les écrans se remontent (cet écouteur est posé
 // au chargement du module, avant ceux des écrans) ⇒ ils relisent la base, pas la mémoire de la coupure.
@@ -35039,7 +35137,7 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
     // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
     // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
-    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail({ force: true }).catch(() => {});
   } catch (_) {}
 });
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
@@ -35181,7 +35279,10 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   const setSeuil = (v) => { const x = seuilValidePasEnLigne(v); setSeuilEtat(x); save(CLE_SEUIL_PAS_EN_LIGNE, x); };
   const [lecture, setLecture] = useState(undefined);
   const [tic, setTic] = useState(0);
+  // (20 nov., bugs-terrain) Inactif ⇒ rien à juger : les candidats ne se calculent pas (ils se calculaient dans chaque moteur
+  // monté, même ceux qui ne montrent pas « Achetés, pas en ligne »).
   const cand = useMemo(() => {
+    if (!actif) return { candidats: [], achatsSu: false };
     const numeros = load('vinted_annonce_numeros', {}) || {};
     const connus = new Set(Object.values(numeros).map((f) => (f && f.numero != null ? cleNum(f.numero) : '')).filter(Boolean));
     const venduSig = load('vrm_stock_vendus', null);
@@ -35190,7 +35291,7 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
     return candidatsPasEnLigne({ hors, masquesHors: new Set((horsMasques || []).map(String)), importes: lireStockImporte(), achats: A,
       liens: liensParAchat(numeros, load('vinted_sale_overrides', {}) || {}), connus, vendus, prixParNum: load('vinted_buyprice_by_num', {}) || {}, cle: cleNum });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [achats, hors, horsMasques, tic]);
+  }, [actif, achats, hors, horsMasques, tic]);
   const besoin = !!actif && cand.candidats.length > 0;
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean).sort().join(',');
   useEffect(() => {
@@ -35246,7 +35347,53 @@ function confirmerOffresAuto() {
       desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
 }
+// (20 nov., bugs-terrain) `useState` dont le setter, appelé hors d'un événement (réponse réseau, minuterie, promesse), passe
+// par `startTransition` : les mises à jour d'une même vague sont rendues ensemble, par tranches. Dans un geste : immédiat.
+const enGeste = () => { try { const e = typeof window !== 'undefined' ? window.event : null; return !!e && e.type !== 'message'; } catch (_) { return false; } };
+// La VAGUE : les mises à jour hors geste de TOUS les moteurs sont gardées au plus `VAGUE_MS` puis appliquées ensemble, en
+// une transition (un rendu pour la vague, pas un par lecture). Un geste applique d'abord la vague en attente (l'ordre est gardé).
+const VAGUE_MS = 80;
+const _vague = []; let _vagueMinuterie = null;
+const viderVague = () => {
+  _vagueMinuterie = null;
+  const l = _vague.splice(0);
+  if (l.length) React.startTransition(() => { for (const f of l) f(); });
+};
+function useStateVague(init) {
+  const [v, set] = React.useState(init);
+  const poser = React.useCallback((x) => {
+    if (enGeste()) { if (_vague.length) { if (_vagueMinuterie) clearTimeout(_vagueMinuterie); _vagueMinuterie = null; const l = _vague.splice(0); for (const f of l) f(); } set(x); return; }
+    _vague.push(() => set(x));
+    if (!_vagueMinuterie) _vagueMinuterie = setTimeout(viderVague, VAGUE_MS);
+  }, []);
+  return [v, poser];
+}
+// (20 nov., bugs-terrain) L'index de `bordForItem` : bordereaux par N° (`cleNum`, dans l'ordre de la liste) et premier
+// bordereau par annonce (`txnItem[transaction]`). Gardé par la liste et la table (WeakMap) : recalculé quand l'une change.
+const _indexBordsItem = new WeakMap();
+const indexBordsItem = (list, txnItem) => {
+  let parTable = _indexBordsItem.get(list); if (!parTable) { parTable = new WeakMap(); _indexBordsItem.set(list, parTable); }
+  const cleT = txnItem && typeof txnItem === 'object' ? txnItem : _indexBordsVide;
+  let ix = parTable.get(cleT);
+  if (!ix) {
+    const parNum = new Map(), parItem = new Map();
+    for (const bb of list) {
+      if (!bb) continue;
+      if (bb.numero) { const k = cleNum(bb.numero); if (k) { const l = parNum.get(k); if (l) l.push(bb); else parNum.set(k, [bb]); } }
+      if (bb.transaction) { const it = String(cleT[String(bb.transaction)] || ''); if (!parItem.has(it)) parItem.set(it, bb); }
+    }
+    ix = { parNum, parItem }; parTable.set(cleT, ix);
+  }
+  return ix;
+};
+const _indexBordsVide = {};
+const _indexBordsListeVide = [];
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
+  // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
+  // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
+  // d'une lecture, minuterie) part en transition (`useStateVague`) : React regroupe les mises à jour arrivées avant son
+  // rendu et rend par tranches (le fil n'est plus pris d'un bloc). Un geste (clic, frappe : `window.event`) reste immédiat.
+  const useState = useStateVague;
   // (20 nov., sélecteur de plateforme) Le site choisi pour toute l'app : Aujourd'hui ne montre que les colis, retraits et
   // ventes de CE site (le site de chaque ligne est connu par identité : la plateforme de sa vente).
   const [siteJourBrut] = useSiteCourant(); const siteJour = siteCourantCoque(siteJourBrut);
@@ -35960,11 +36107,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Vinted la dit (`txnItem`). ⚠️ Le repli PAR TITRE est retiré (3 octobre) :
   // mesuré, 7 couples annonce/bordereau au titre identique, 0 même article —
   // et 177 des 178 bordereaux portent leur transaction. Sans identité : rien.
+  // (20 nov., bugs-terrain) Par INDEX (`indexBordsItem`, gardé par liste de bordereaux et table des transactions — partagé par
+  // tous les moteurs) au lieu de parcourir les bordereaux pour chaque annonce : 1 000 annonces × 249 bordereaux à chaque
+  // rendu (1 s au profil d'Achats). Même résultat : le PREMIER bordereau de la liste qui convient, dans le même ordre.
   const bordForItem = (itemId, numero) => {
-    const list = emailBords || [];
-    if (cleNum(numero)) { const hit = list.find(bb => bb.numero && cleNum(bb.numero) === cleNum(numero) && numeroEmailAdmis(bb, numeros)); if (hit) return hit; }   // (11 nov.) « 07 » = « 7 » (cleNum)
+    const list = emailBords || _indexBordsListeVide;
+    const ix = indexBordsItem(list, txnItem);
+    const k = cleNum(numero);
+    if (k) { for (const bb of (ix.parNum.get(k) || [])) if (numeroEmailAdmis(bb, numeros)) return bb; }   // (11 nov.) « 07 » = « 7 » (cleNum)
     if (!itemId) return null;
-    return list.find(bb => bb.transaction && String(txnItem[String(bb.transaction)] || '') === String(itemId)) || null;
+    return ix.parItem.get(String(itemId)) || null;
   };
   // Photo de la paire d'un bordereau : par N° (annonces numérotées, fiable),
   // sinon par titre non ambigu, sinon dans les annonces/ventes chargées.
@@ -42122,7 +42274,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // dates de versement illisibles sont relues aussi. Rend la promesse : le
   // bouton reste « Lecture… » jusqu'au bout.
   const relireVentes = async () => {
-    try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+    try { oublierAcct('sold'); } catch (_) {}
     for (const u of (Array.isArray(sales.failedUids) ? sales.failedUids : [])) _rowCache.delete(`o:${u}`);
     await Promise.all([
       loadOrders('sold', setSales, false, { silencieux: true }),
@@ -42475,7 +42627,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (20 nov., lectures-legeres) Annonces et Bordereaux MONTRENT les dressings : la porte des dressings
+  // (`porteDressings`) s'ouvre tout de suite pour eux ; ailleurs ils attendent les ventes.
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) { if (curSub==='annonces'||curSub==='bordereaux') ouvrirPorteDressings(); loadListings(); } /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
@@ -42601,7 +42755,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // les ventes ont été relues (une capture a pu arriver), si sa lecture a
     // échoué, ou si sa photo a été déclarée morte. Une réponse arrivée après
     // un nouveau passage est gardée : une photo par clé, rien ne se contredit.
-    if(photosVentesLuesPour.current!==sales.items){photosVentesLuesPour.current=sales.items;photosVentesLues.current=new Set();}
+    // (20 nov., bugs-terrain) Une NOUVELLE référence des ventes ne fait plus tout relire : seules les lignes jamais lues
+    // (ou dont la lecture a échoué, ou forcées) partent. Avant, chaque relecture des commandes relançait toutes les lectures
+    // de photos (journal de sa session iPhone : 101 lectures `txn` en 2 min 30, les mêmes identifiants relus).
+    if(photosVentesLuesPour.current!==sales.items){photosVentesLuesPour.current=sales.items;}
     const aLire=(m)=>[...m.entries()].filter(([id,key])=>forces.has(key)||!photosVentesLues.current.has(id)).map(([id])=>id);
     const lues=photosVentesLues.current;
     (async()=>{
@@ -42795,7 +42952,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (!hiddenAt || Date.now() - hiddenAt < 20000 || !accounts.length) { hiddenAt = 0; return; }
       hiddenAt = 0;
       oublierLignesUneFois();                                        // vide le cache de lignes (relit la moisson fraîche)
-      try { Object.keys(_acctCache).forEach(k => delete _acctCache[k]); _persistAcctCache(); } catch (_) {}
+      try { oublierAcct(); } catch (_) {}
       if (curSub === 'ventes' || curSub === 'journee' || curSub === 'messages') loadOrders('sold', setSales, false, { silencieux: true });
       if (curSub === 'achats' || curSub === 'journee' || curSub === 'bordereaux') { loadOrders('purchased', setBuys, false, { silencieux: true }); lireSuivis(); }
       if (curSub === 'annonces' || curSub === 'journee' || curSub === 'messages') loadListings();
@@ -42838,7 +42995,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (12 nov.) Ventes monte DEUX moteurs (la liste et « À expédier ») : le second ne réoublie pas la ligne
       // que le premier vient de relire (`oublierCommandesCompte`, 4 s) — une seule relecture du compte.
       if (uid) oublierCommandesCompte(uid); else oublierLignesUneFois();
-      try { delete _acctCache.sold; _persistAcctCache(); } catch (_) {}
+      try { oublierAcct('sold'); } catch (_) {}
       // ⚠️ Hors de ces écrans, le signal était JETÉ : revenir sur Colis montrait
       //    l'ancien état jusqu'au cycle suivant. On le retient, et l'entrée sur
       //    un écran qui en dépend relit (plus bas).
@@ -42856,7 +43013,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // déjà affichés quelque part — sans squelette, sans perdre l'écran.
       else if (ev.quoi === 'achats') {
         if (ev.uid) _rowCache.delete(`o:${ev.uid}`); else oublierLignesUneFois();
-        try { delete _acctCache.purchased; _persistAcctCache(); } catch (_) {}
+        try { oublierAcct('purchased'); } catch (_) {}
         if (buysCharges.current) loadOrders('purchased', setBuys, false, { silencieux: true });
       }
       // Un code de retrait lu dans une conversation (5.155) : on relit la ligne.
@@ -42874,7 +43031,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       //    jamais le relais serveur sur un signal.
       else if (ev.quoi === 'annonces') {
         oublierDressing(ev.uid);
-        try { delete _acctCache.listings; _persistAcctCache(); } catch (_) {}
+        try { oublierAcct('listings'); } catch (_) {}
         if (['annonces', 'journee', 'bordereaux', 'messages'].includes(curSub)) signalAnnonces(ev.uid);
       }
     };
@@ -42899,7 +43056,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // autres boîtes restent servies par leur mémoire ; aucune requête Vinted (moisson seulement).
         if (q.quoi === 'messages') {
           if (q.uid) _rowCache.delete(`h:${q.uid}:inbox`);
-          try { delete _acctCache.convs; _persistAcctCache(); } catch (_) {}
+          try { oublierAcct('convs'); } catch (_) {}
           if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
           continue;
         }
@@ -44196,7 +44353,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (src/pasEnLigne.js). Les achats Vinted ne sont jugés que LUS (pas su ⇒ aucun).
   // (16 nov., lot achats-retour) Un achat en retour / litige / remboursé n'est pas « acheté, pas en ligne ».
   const buysAJuger = useMemo(() => buysBase.filter((o) => !achatHorsRelier(o, achatsHorsRelierRes)), [buysBase, achatsHorsRelierRes]);
-  const pasEnLigne = usePasEnLigne({ actif: curSub === 'journee' || curSub === 'achats', accounts, achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null, hors: offBuysTous, horsMasques });
+  // (20 nov., bugs-terrain) Pas dans le moteur des outils de retrait (`modeRetraits`) : il ne montre pas « Achetés, pas en ligne ».
+  const pasEnLigne = usePasEnLigne({ actif: (curSub === 'journee' || curSub === 'achats') && !modeRetraits, accounts, achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null, hors: offBuysTous, horsMasques });
   const pasEnLigneJ = pasEnLigne.r && pasEnLigne.r.su ? pasEnLigne.r : null;
   const [feuillePasEnLigne, setFeuillePasEnLigne] = useState(false);
   const ouvrirPasEnLigne = (c) => {
@@ -45591,7 +45749,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [sales.items, numeros, saleOv]);
   // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
   // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
-  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer';
+  // (20 nov., bugs-terrain) Pas dans le moteur des outils de retrait d'Achats (`retraitsOutils`) : il ne montre aucune proposition,
+  // et refaisait la même affectation que la liste (3,3 s de calcul au profil d'Achats, 12 comptes, processeur ×4).
+  const vueLiaison = !retraitsOutils && ((curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer');
   // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
   useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
   // Les articles par clé (Achats : « article proposé » sous un achat).
@@ -45602,6 +45762,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // gardée par adresse de photo dans src/indexCouleurs.js) : la couleur d'un côté qui n'en écrit aucune. Map url → [{ c, part }].
   const [couleursLiaison, setCouleursLiaison] = useState(null);
   const photosLiaisonTentees = useRef(new Set());
+  const gesteLiaisonRef = useRef({ refus: null, liens: null });
   useEffect(() => {
     if (!vueLiaison) return undefined;
     if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
@@ -45615,7 +45776,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         publierAffectation(r, cibles.map((c) => c.key));
         setLiaison(r);
       } catch (_) { publierAffectation(null); setLiaison(null); }
-    }, 30);
+      // (20 nov., bugs-terrain) Recalculée quand les données se sont POSÉES (0,9 s sans changement), pas à chaque arrivée :
+      // à l'ouverture, ventes, achats, annonces, suivis et couleurs arrivent l'un après l'autre et l'affectation (2 500
+      // articles × 2 700 achats) se refaisait à chacun (2,4 s de calcul au profil d'Achats, processeur ×4). La première, et
+      // celle qui suit un geste (« Ce n'est pas lui », un lien posé), partent tout de suite comme avant.
+    }, (() => { const geste = gesteLiaisonRef.current.refus !== liaisonRefus || gesteLiaisonRef.current.liens !== liensAchats; gesteLiaisonRef.current = { refus: liaisonRefus, liens: liensAchats }; return liaison === undefined || geste ? 30 : 900; })());
     return () => clearTimeout(id);
   }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison, achatsHorsRelierRes]);
   // Les photos à lire : celles des articles qui ont des candidats et de leurs achats candidats (au plus 240 par passe,
@@ -47355,7 +47520,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
-  const cartesColis = () => {
+  // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
+  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
+  let _cartesColisMemo = null;
+  const cartesColis = () => { if (_cartesColisMemo) return _cartesColisMemo; const r = cartesColisCalc(); _cartesColisMemo = r; queueMicrotask(() => { _cartesColisMemo = null; }); return r; };
+  const cartesColisCalc = () => {
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
     const lectureFinie = labelsPrets && emailBords !== null;
@@ -48697,7 +48866,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
-  const listeEnvoyes = () => {
+  // (20 nov., bugs-terrain) Calculée UNE fois par rendu (comme `expeditions`) : appelée jusqu'à 4 fois dans le même rendu
+  // (profil de Ventes au volume de sa base : ~1 à 2 s). La mémoire tombe à la fin de la tâche (microtâche) : jamais d'un rendu à l'autre.
+  let _listeEnvoyesMemo = null;
+  const listeEnvoyes = () => { if (_listeEnvoyesMemo) return _listeEnvoyesMemo; const r = listeEnvoyesCalc(); _listeEnvoyesMemo = r; queueMicrotask(() => { _listeEnvoyesMemo = null; }); return r; };
+  const listeEnvoyesCalc = () => {
     const out = [];
     try {
       if (voitSite('vinted') && Array.isArray(sales.items)) {
@@ -63217,7 +63390,10 @@ function useQuoiDeNeuf() {
     // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
     vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
-  const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
+  const [, setCharge] = React.useState(!!M_NOUVEAUTES);
+  React.useEffect(() => { if (!M_NOUVEAUTES) chargerNouveautes().then(() => setCharge(true), () => {}); }, []);
+  // « Vu » ne se marque qu'après un toucher sur la carte (donc la liste chargée) ; sinon, on attend la liste.
+  const marquer = (ids) => { const faire = (m) => { const suite = m.marquerVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); }; if (M_NOUVEAUTES) faire(M_NOUVEAUTES); else chargerNouveautes().then(faire, () => {}); };
   // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un
   // autre appareil, son statut) ⇒ rien : jamais un compte faux qui change sous ses yeux ni une carte qui clignote.
   const pret = p.uid === (AUTH.user?.id || '') && !!p.uid && isCloudReady();
@@ -64216,7 +64392,13 @@ function AppCoeur() {
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
   // sinon la page dépasse ou laisse une bande vide.
   React.useEffect(()=>{
-    const onResize=()=>applyZoom(readZoom());
+    // (20 nov., iphone-rapide) Sur l'iPhone, Safari envoie `resize` quand sa barre d'adresse se replie ou revient (à
+    // chaque changement de sens du défilement) : seule la HAUTEUR change. `applyZoom` ne dépend que de la LARGEUR (zoom,
+    // largeur rendue), du réglage de densité et du texte en grand ; le refaire forçait un recalcul de style de tout le
+    // document en plein défilement. Même largeur, même réglage ⇒ rien à refaire. Une rotation (`orientationchange`) refait
+    // toujours tout, comme avant.
+    let derniere=null;
+    const onResize=(e)=>{ const cle=(window.innerWidth||0)+'|'+readZoom()+'|'+lireTailleTexte()+'|'+(window.devicePixelRatio||1); if(e && e.type==='resize' && cle===derniere) return; derniere=cle; applyZoom(readZoom()); };
     onResize();
     window.addEventListener('resize',onResize);
     window.addEventListener('orientationchange',onResize);
@@ -67696,9 +67878,8 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
         </>}/> : null}
-      {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
-          chargement, sur n'importe quel écran. */}
-      <TopProgress/>
+      {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
+          restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
