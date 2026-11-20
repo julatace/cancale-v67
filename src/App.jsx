@@ -18159,6 +18159,8 @@ const ICON_PATHS = {
   // (16 nov.) Le zoom de l'app (Paramètres → Apparence) : une loupe « + », distincte de la grille des plateformes.
   agrandir: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path d="M10.5 7.5v6"/><path d="M7.5 10.5h6"/></>,
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
+  // (20 nov., intégration) « Bien démarrer » (Paramètres) : un fanion de départ — chaque icône de Paramètres est unique sur la page.
+  drapeau: <><path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.5 4 2.5 4H5.5"/></>,
   // (13 nov., lot 54) Le parrainage : un paquet noué, au trait.
   cadeau: <><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v7.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V12"/><path d="M12 8v12.5"/><path d="M12 8c-1.6-3.2-5.5-3.6-5.5-1.2C6.5 8 9 8 12 8Z"/><path d="M12 8c1.6-3.2 5.5-3.6 5.5-1.2C17.5 8 15 8 12 8Z"/></>,
   // (11 nov., lot traduction) La langue (Paramètres → Langue) : un globe au trait.

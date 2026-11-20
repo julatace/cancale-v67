@@ -129,7 +129,8 @@ const importer = (p) => import('file://' + path.join(R, p));
   const enCloche = lignesLF.filter((t) => /publier=\{false\}/.test(t));
   dit(lignesLF.length - enCloche.length === 1 && enCloche.length <= 1 && (!enCloche.length || /enTete=\{\(fermer\)=>!baseKO && !horsLigne \? <Suspense fallback=\{null\}><LigneFraicheurParesseuse baseKO=\{baseKO\}[^>]*publier=\{false\}/.test(app)) && /\{!baseKO (?:&& !horsLigne )?&& <Suspense[^\n]*<LigneFraicheurParesseuse baseKO=\{baseKO\}/.test(app), 'la coque rend la ligne UNE fois, jamais pendant une panne de base');
   dit(!/AlerteCaptureParesseuse|<AlerteCapture/.test(app), 'la ligne ambre « compte qui n’arrive plus » n’est plus une seconde voix');
-  dit(/data-alerte-capture=/.test(lf) && /data-alerte-voir=/.test(lf), 'la ligne garde `data-alerte-capture` / `data-alerte-voir` pour une panne');
+  // (20 nov., intégration) boutons-natifs : le geste est un BoutonNatif, l'attribut passe par `attrs` ('data-alerte-voir': …).
+  dit(/data-alerte-capture=/.test(lf) && /data-alerte-voir=|'data-alerte-voir':/.test(lf), 'la ligne garde `data-alerte-capture` / `data-alerte-voir` pour une panne');
   dit(/horsLigneActif\(\)/.test(lf) && /navigator\.onLine === false/.test(lf), 'hors ligne (mesuré ou mode froid) ⇒ la ligne se tait');
   dit(!/data-comptes-a-relire=/.test(app) && !/data-fraicheur-achats=/.test(app) && !/<VintedResume /.test(app), 'plus de puce « Relire compte », de ligne d’Achats, de tête Vinted : une voix');
   dit(/data-retirer-verifie=/.test(app), '« Suivi vérifié il y a N min » reste sur Colis → À retirer (l’âge du statut des colis de CETTE liste)');

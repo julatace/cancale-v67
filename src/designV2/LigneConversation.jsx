@@ -29,7 +29,8 @@ export function GroupeConversations({ titre, sous = '', attrs = {}, children }) 
 export function nomSecable(nom) {
   const t = String(nom == null ? '' : nom);
   if (!/[_.\-]/.test(t)) return t;
-  return t.split(/(?<=[_.\-])/).map((x, k) => (k ? <React.Fragment key={k}><wbr/>{x}</React.Fragment> : x));
+  // (20 nov., intégration) Sans lookbehind `(?<=…)` : Safari < 16.4 refuse de lire TOUT le fichier qui en contient un (audit-safari).
+  return (t.match(/[^_.\-]*[_.\-]|[^_.\-]+$/g) || [t]).map((x, k) => (k ? <React.Fragment key={k}><wbr/>{x}</React.Fragment> : x));
 }
 
 export function LigneConversation({ photo, Photo, nom, heure, quandIso, extrait, toi = '', num = '', offre = '', etat = '', nonLu = false, lectureSeule = false, actif = false, label, onClick, attrs = {}, apres = null }) {
