@@ -16,7 +16,11 @@
 // (node scripts/audit-reglages-auto.cjs --recopie) ; l'audit exécute les deux.
 // <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
 const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence'];
+// (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
+// l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
+// même règle : une question déjà répondue ne se repose plus.
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier'];
+const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
 // arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
@@ -81,6 +85,11 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_agent_publier') {
+    let n = 0; try { n = JSON.stringify(demande).length; } catch (_) { n = Infinity; }
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande) || !(n <= RA_MEMOIRE_MAX)) return { ok: false, code: 'forme', raison: 'Mémoire illisible ou trop grande.' };
+    return { ok: true, valeur: demande };
   }
   if (cle === 'vinted_cadence') {
     // { uid, favorisHeure, actionsHeure, parJour, pauseMin, pauseMax } pour UN compte ; plus vite que le défaut ⇒ `confirme`.

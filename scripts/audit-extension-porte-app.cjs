@@ -38,6 +38,9 @@ const MUTATIONS = {
   offre_liste: ["if (!off) return { ok: false, code: 'offre'", "if (false) return { ok: false, code: 'offre'"],
   contre_plancher: ["if (pl && pc < pl.c) return { ok: false, code: 'plancher'", "if (false) return { ok: false, code: 'plancher'"],
   publier_questions: ["if (plan.etat !== 'pret') return { ok: false, code: 'questions'", "if (false) return { ok: false, code: 'questions'"],
+  hausse_confirme: ["if (hausse && (msg.hausseConfirmee !== true || vouluC > avantC * 10))", "if (false)"],
+  hausse_regle: ["if (msg.hausse === true && msg.source !== 'regle')", "if (msg.hausse === true)"],
+  retenir_reponses: ["return ligneAvecReglage(d, 'vrm_agent_publier', n.valeur, 'extension', Date.now());", "return undefined;"],
   auto_confirme: ["if (v.actif && a.actif !== true && msg.confirme !== true) return", "if (false) return"],
 };
 if (args.includes('--prouve')) {
@@ -196,8 +199,8 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     dit(p0 && p0.ok === false && p0.code === 'confirmation', 'prix : sans « Confirmer », rien n’est rangé', JSON.stringify(p0));
     const p1 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5001', prix: '40', prixVu: 60 }, { id: '5002', prix: '70', prixVu: 60 }, { id: '5001', prix: '50', prixVu: 60 }] }, T2);
     const cmds = Object.entries(h.lignes).filter(([k]) => /^cmd_prix_/.test(k)).map(([, d]) => d);
-    dit(p1 && p1.ranges.length === 1 && p1.refus.some((x) => x.code === 'plancher' && x.plancher === 45) && p1.refus.some((x) => x.code === 'hausse') && cmds.length === 1 && cmds[0].source === 'panneau' && cmds[0].args.prixAvant === 60 && cmds[0].args.prix === 50 && cmds[0].confirme === true && ticks === 1,
-      'prix : sous le plancher (prix mini 45) refusé, hausse refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite', JSON.stringify({ p1, cmds }));
+    dit(p1 && p1.ranges.length === 1 && p1.refus.some((x) => x.code === 'plancher' && x.plancher === 45) && p1.refus.some((x) => x.code === 'hausse-confirmer') && cmds.length === 1 && cmds[0].source === 'panneau' && cmds[0].args.prixAvant === 60 && cmds[0].args.prix === 50 && cmds[0].confirme === true && ticks === 1,
+      'prix : sous le plancher (prix mini 45) refusé, hausse sans confirmation refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite', JSON.stringify({ p1, cmds }));
     // Atelier
     const g = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12' } } } } });
     const ex = []; let rep = { accepte: true, etape: 'fait' }; g.ctx.executerCommande = async (m) => { ex.push(m); return rep; };
@@ -242,6 +245,22 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     let pubs = 0; pf.ctx.publierFicheSite = async () => { pubs++; return { accepte: true }; };
     const q1 = await pf.envoyer({ from: 'vrm-badge', action: 'publierCarte', site: 'leboncoin', id: '5001' }, T2);
     dit(q1 && q1.code === 'questions' && q1.questions.some((x) => x.champ === 'categorie') && pubs === 0, 'publier : catégorie pas sûre ⇒ la question est posée dans le panneau, rien ne part (agent de l’app)', JSON.stringify(q1));
+    const qc = q1 && q1.questions ? q1.questions.find((x) => x.champ === 'categorie') : null;
+    const rep1 = qc && qc.choix[0];
+    const q2 = await pf.envoyer({ from: 'vrm-badge', action: 'publierCarte', site: 'leboncoin', id: '5001', reponses: { categorie: rep1 } }, T2);
+    const mem = pf.lignes.vrm_reglages_auto && pf.lignes.vrm_reglages_auto.cles && pf.lignes.vrm_reglages_auto.cles.vrm_agent_publier;
+    const q3 = await pf.envoyer({ from: 'vrm-badge', action: 'publierCarte', site: 'leboncoin', id: '5001' }, T2);
+    dit(rep1 && mem && JSON.stringify(mem).includes(rep1) && !(q3 && q3.code === 'questions' && q3.questions.some((x) => x.champ === 'categorie')), 'publier : SA réponse est RETENUE (ligne des réglages, jamais `main`) — la question ne se repose plus', JSON.stringify({ rep1, q2: q2 && q2.code, q3: q3 && (q3.code || q3.accepte) }));
+    // Hausse : sur SON clic confirmé seulement ; jamais par une règle.
+    const hh = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12', min: '45' } } } } });
+    hh.ctx.relaisSessionOwner = async () => 'owner-banc'; hh.ctx.prixAttenteTick = () => Promise.resolve({});
+    const h1 = await hh.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5001', prix: '70', prixVu: 60 }] }, T2);
+    const h2 = await hh.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, hausseConfirmee: true, items: [{ id: '5001', prix: '70', prixVu: 60 }] }, T2);
+    const ch = Object.entries(hh.lignes).filter(([k]) => /^cmd_prix_/.test(k)).map(([, d]) => d);
+    const pa = hh.ctx.prixAttCommande(ch[0] || {});
+    const reg = hh.ctx.prixAttCommande({ v: 1, site: 'vinted', args: { uid: UID, id: '5001', prix: 70, prixAvant: 60 }, confirme: true, source: 'regle', hausse: true });
+    dit(h1 && h1.refus.some((x) => x.code === 'hausse-confirmer') && h2 && h2.ranges.length === 1 && ch.length === 1 && ch[0].hausse === true && pa.msg && pa.msg.hausse === true && reg.refus === 'hausse' && hh.ctx.remisePermise({ confirme: true, hausse: true, source: 'regle' }, 6000, 7000) === false && hh.ctx.remisePermise({ confirme: true, hausse: true }, 6000, 7000) === true,
+      'prix : une HAUSSE passe sur SON clic confirmé (« Monter à… ? ») ; jamais par une règle', JSON.stringify({ h1, h2, ch, reg }));
   });
   console.log(ko ? `\n❌ audit-extension-porte-app : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ audit-extension-porte-app : ${ok} contrôles`);
   process.exit(ko ? 1 : 0);

@@ -14704,8 +14704,13 @@ const centimesBaisse = (v) => { const n = Number(v); return Number.isFinite(n) ?
 // plus de 10 fois le prix actuel. Tout le reste (compte de l'onglet, 45/h, prix lu avant, relu
 // après) est le chemin de baisse, inchangé. Rien n'est remis automatiquement : l'app n'envoie
 // `remise` que depuis le bouton « Remettre N prix ».
+// (20 nov., 5.410) Et une HAUSSE sur SON clic (« Changer le prix » du panneau, « Monter à X € ? » confirmé) : `hausse`
+// + `confirme`, jamais depuis une règle (`source: 'regle'`), au plus 10 fois le prix actuel. Les baisses par RÈGLE
+// restent des baisses (elles ne portent jamais `hausse`).
 function remisePermise(msg, avantC, vouluC) {
-  if (!msg || msg.remise !== true || msg.confirme !== true) return false;
+  if (!msg || msg.confirme !== true) return false;
+  if (msg.hausse === true && msg.source !== 'regle') return Number.isInteger(avantC) && Number.isInteger(vouluC) && avantC > 0 && vouluC > avantC && vouluC <= avantC * 10;
+  if (msg.remise !== true) return false;
   const o = centimesBaisse(msg.prixOrigine);
   return Number.isInteger(avantC) && Number.isInteger(vouluC) && avantC > 0 && vouluC > avantC && o === vouluC && vouluC <= avantC * 10;
 }
@@ -19588,13 +19593,15 @@ async function changerPrixCarte(msg, sender) {
     const id = String(x && x.id || '');
     const vouluC = centimesPoses(x && x.prix), avantC = centimesPoses(x && x.prixVu);
     if (vouluC == null || avantC == null) { refus.push({ id, code: 'prix' }); continue; }
-    if (vouluC >= avantC) { refus.push({ id, code: 'hausse' }); continue; }
+    if (vouluC === avantC) { refus.push({ id, code: 'meme' }); continue; }
+    const hausse = vouluC > avantC;
+    if (hausse && (msg.hausseConfirmee !== true || vouluC > avantC * 10)) { refus.push({ id, code: 'hausse-confirmer', prix: vouluC / 100 }); continue; }
     const fiche = site === 'vinted' ? (m.vinted_annonce_numeros || {})[id] : null;
-    const pl = fiche ? plancherBaisse(fiche, m.vinted_buyprice_by_num) : null;
+    const pl = !hausse && fiche ? plancherBaisse(fiche, m.vinted_buyprice_by_num) : null;
     if (pl && vouluC < pl.c) { refus.push({ id, code: 'plancher', plancher: pl.c / 100, de: pl.de }); continue; }
     const args = site === 'vinted' ? { uid: String(uid), id, prix: vouluC / 100, prixAvant: avantC / 100 } : { id, prix: vouluC / 100, prixAvant: avantC / 100 };
     const data = { v: 1, site, args, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS, etat: 'attente', reports: 0, cle: site + ':' + id, prix: vouluC / 100, prixAvant: avantC / 100,
-      num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t };
+      num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t, ...(hausse ? { hausse: true } : {}) };
     const c = prixAttCommande(data);
     if (c.refus) { refus.push({ id, code: c.refus }); continue; }
     const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
@@ -19762,13 +19769,30 @@ async function publierCarte(msg, sender) {
   const prix = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
   const article = { cle: 'vinted:' + id, numero: fiche0.numero || '', prix: Number.isFinite(prix) && prix > 0 ? prix : null, prixMini: Number(fiche0.min) > 0 ? Number(fiche0.min) : null,
     annonces: [{ site: 'vinted', id, etat: 'enligne', titre: String(it.title || det.titre || ''), photo: '', marque: det.marque || '', taille: det.taille || '', condition: det.etat || '' }] };
-  let memoire = m.vrm_agent_publier || null;
+  let memoire = m.vrm_agent_publier || null;   // `lireMain` superpose la ligne des réglages (SES réponses retenues)
   const fiche = GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, memoire);
-  if (msg.reponses && typeof msg.reponses === 'object') memoire = GARDES_APP.retenirReponses(memoire, fiche, msg.reponses);
+  // SES réponses : { 'site|champ': valeur } (le panneau) ⇒ la forme de l'agent [{ champ, site, valeur }].
+  const repL = msg.reponses && typeof msg.reponses === 'object' && !Array.isArray(msg.reponses) ? Object.entries(msg.reponses).filter(([, v]) => v != null && String(v).trim()).slice(0, 20).map(([k, v]) => { const [a, b] = String(k).split('|'); return b ? { site: a, champ: b, valeur: String(v).slice(0, 200) } : { site: '', champ: a, valeur: String(v).slice(0, 200) }; }) : [];
+  if (repL.length) {
+    memoire = GARDES_APP.retenirReponses(memoire, fiche, repL);
+    // (20 nov., « pratique pas chiant ») SES réponses sont RETENUES (jamais `main`) : la ligne `vrm_reglages_auto`,
+    // clé `vrm_agent_publier`, par comparer-et-échanger ; relue par l'app et le panneau par la même règle.
+    let retenue = null;
+    const r = await modifierLigneCas(REGLAGES_AUTO_ID, async (d) => {
+      let base = null; try { const mm = await sbGet(qMain(['vrm_agent_publier'])); base = mm && mm[0] ? mm[0].vrm_agent_publier || null : null; } catch (_) { base = null; }
+      const actuelle = superposerReglagesAuto({ vrm_agent_publier: base }, d).vrm_agent_publier || null;
+      const nv = GARDES_APP.retenirReponses(actuelle, GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, actuelle), repL);
+      const n = reglageAutoNormalise('vrm_agent_publier', nv, actuelle, true, Date.now());
+      if (!n.ok) return undefined;
+      retenue = n.valeur;
+      return ligneAvecReglage(d, 'vrm_agent_publier', n.valeur, 'extension', Date.now());
+    });
+    if (r === true && retenue) memoire = retenue;
+  }
   const f2 = GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, memoire);
   const plan = GARDES_APP.planSite(f2, site, memoire, { corr: m.vrm_correspondances || null, ext: { leboncoin: true, vestiaire: true } });
   if (plan.etat === 'refus') return { ok: false, code: 'refus', refus: plan.refus, raison: 'Pas publiable : ' + (plan.refus && plan.refus.code) };
-  if (plan.etat !== 'pret') return { ok: false, code: 'questions', questions: plan.questions.map((q) => ({ champ: q.champ, choix: (q.choix || []).slice(0, 60), saisie: q.saisie || '' })) };
+  if (plan.etat !== 'pret') return { ok: false, code: 'questions', questions: plan.questions.map((q) => ({ champ: q.champ, site: q.site || '', choix: (q.choix || []).slice(0, 60), saisie: q.saisie || '' })) };
   const env = GARDES_APP.envoiPour(f2, plan, {});
   if (!env || env.voie !== 'extension') return { ok: false, code: 'pas-pret', raison: 'Fiche incomplète pour ce site : rien n’est parti.' };
   return publierFicheSite(Object.assign({}, env.msg, msg.verifVu === true ? { verifVu: true } : {}));
@@ -21713,7 +21737,7 @@ async function carteListesSite(plateforme, o, sender) {
         if (c !== moi) continue;
         const st = STATUT_VC[String(x.statut || '').toLowerCase()] || 'a_confirmer';
         statuts[st]++;
-        a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: null, favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st });
+        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st }); }
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
@@ -21745,7 +21769,9 @@ async function carteListesSite(plateforme, o, sender) {
   const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
   const n = await notificationsCarte(moi).catch(() => null);
   const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations: null, notifications, autres: null, fenetre: o.fenetre };
+  // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
+  const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, autres: null, fenetre: o.fenetre };
 }
 // 5.409 — MASQUER / AFFICHER DEPUIS LE PANNEAU, sur SON clic (`confirme`), par le geste APPRIS de la règle « vendue
 // ailleurs » (`PUT /api/v2/items/{id}/is_hidden`, `masquerAppris` sur SES gestes rangés : jamais appris ⇒ rien ne part,
@@ -23015,19 +23041,21 @@ function prixAttCommande(d) {
   const vouluC = prixAttCents(a.prix), avantC = prixAttCents(a.prixAvant);
   if (!Number.isInteger(vouluC) || !Number.isInteger(avantC) || Math.abs(Number(a.prix) * 100 - vouluC) > 1e-6 || Math.abs(Number(a.prixAvant) * 100 - avantC) > 1e-6) return { refus: 'arguments' };
   if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
-  if (!(vouluC < avantC)) return { refus: 'hausse' };
+  const hausse = d.hausse === true && d.source === 'panneau' && vouluC > avantC && vouluC <= avantC * 10;
+  if (!(vouluC < avantC) && !hausse) return { refus: 'hausse' };
+  const h = hausse ? { hausse: true } : {};
   const id = String(a.id == null ? '' : a.id);
   if (site === 'vinted') {
     const uid = String(a.uid == null ? '' : a.uid);
     if (!/^\d{1,20}$/.test(uid) || !/^\d{4,15}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: { cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: Object.assign({ cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (site === 'leboncoin') {
     if (!/^\d{6,12}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: { cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (!/^\d{3,15}$/.test(id)) return { refus: 'arguments' };
-  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: { cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true } };
+  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true }, h) };
 }
 // La date après laquelle une commande ne part plus (jamais plus de 24 h après la demande).
 function prixAttFin(d) {
@@ -26586,7 +26614,11 @@ const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
 // <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
 const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence'];
+// (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
+// l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
+// même règle : une question déjà répondue ne se repose plus.
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier'];
+const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
 // arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
@@ -26651,6 +26683,11 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_agent_publier') {
+    let n = 0; try { n = JSON.stringify(demande).length; } catch (_) { n = Infinity; }
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande) || !(n <= RA_MEMOIRE_MAX)) return { ok: false, code: 'forme', raison: 'Mémoire illisible ou trop grande.' };
+    return { ok: true, valeur: demande };
   }
   if (cle === 'vinted_cadence') {
     // { uid, favorisHeure, actionsHeure, parJour, pauseMin, pauseMax } pour UN compte ; plus vite que le défaut ⇒ `confirme`.

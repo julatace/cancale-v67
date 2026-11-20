@@ -1768,7 +1768,8 @@
     if (geste6.k === 'prix') {
       const lignes = geste6.ids.map((id) => { const x = de(id); const pl = plancher6(x); const v = geste6.prix[id] != null ? geste6.prix[id] : '';
         return `<div class="rg6" data-prix-ligne="${esc(id)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b><small>${esc(TU('g6_prix_vu', { p: Number(x.prix) > 0 ? euroTxt(x.prix) : '—' }))} · ${esc(pl ? TU(pl.de === 'mini' ? 'g6_plancher_mini' : 'g6_plancher_achat', { p: euroTxt(pl.v) }) : TU('g6_plancher_pas_su'))}</small></span><input type="text" inputmode="decimal" class="prix6" data-prix-nouveau="${esc(id)}" value="${esc(v)}" aria-label="${esc(TU('g6_nouveau_prix'))}" placeholder="${esc(TU('g6_nouveau_prix'))}"></div>`; }).join('');
-      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_confirmer'))}</button></div></section>`;
+      const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_confirmer'))}</button></div></section>`;
     }
     if (geste6.k === 'atelier') {
       const g = geste6, ph = g.photo;
@@ -1787,7 +1788,7 @@
     }
     if (geste6.k === 'publier') {
       const g = geste6, x = de(g.id);
-      const q = (g.questions || []).map((qq) => `<label class="champ6"><b>${esc(TU('g6_q_' + (['categorie', 'etat', 'pointure', 'marque'].includes(qq.champ) ? qq.champ : 'autre')))}</b>${qq.choix && qq.choix.length ? `<select data-publier-rep="${esc(qq.champ)}"><option value=""></option>${qq.choix.map((c) => `<option${g.reponses[qq.champ] === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>` : `<input type="text" data-publier-rep="${esc(qq.champ)}" value="${esc(g.reponses[qq.champ] || '')}">`}</label>`).join('');
+      const q = (g.questions || []).map((qq) => `<label class="champ6"><b>${esc(TU('g6_q_' + (['categorie', 'etat', 'pointure', 'marque'].includes(qq.champ) ? qq.champ : 'autre')))}</b>${(() => { const k = (qq.site ? qq.site + '|' : '') + qq.champ; return qq.choix && qq.choix.length ? `<select data-publier-rep="${esc(k)}"><option value=""></option>${qq.choix.map((c) => `<option${g.reponses[k] === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>` : `<input type="text" data-publier-rep="${esc(k)}" value="${esc(g.reponses[k] || '')}">`; })()}</label>`).join('');
       const pb = (g.problemes || []).map((p) => `<p class="note5" data-publier-probleme="${esc(p.code)}">· ${esc(p.texte)}</p>`).join('');
       return `<section class="geste6" data-geste="publier"><h3>${esc(TU('g6_publier_titre'))} — ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || g.id)}</h3>${etat}
         <div class="rg6"><span><b>${esc(TU('g6_publier_sur'))}</b></span><div class="vu-seg vue5" role="group">${['leboncoin', 'vestiaire'].map((k) => `<button type="button" data-publier-site="${k}" aria-pressed="${g.site === k}">${k === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'}</button>`).join('')}</div></div>
@@ -1797,6 +1798,44 @@
     return '';
   }
   // L'atelier en cours (fond) : chaque paire et son étape ; « Reprendre » une paire arrêtée ; « Arrêter ».
+  // 5.410 (lot lbc-vc-interesses) — LEBONCOIN : les INTÉRESSÉS de chaque annonce (lecture : `interessesLbc`) et
+  //    « Leur écrire » (SA série, récapitulatif CONFIRMÉ : `ecrireInteressesLbc`, un message à la fois, temps au hasard).
+  let lbcInt = null, lbcIntEtat = null;
+  function interessesLbcHtml() {
+    if (!listes || listes.plateforme !== 'leboncoin') return '';
+    if (!lbcInt) { lbcInt = { charge: true }; try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'interessesLbc' }, (r) => { void chrome.runtime.lastError; lbcInt = { data: r && r.ok ? r : null, raison: r && !r.ok ? r.raison : '', coches: new Set(), textes: [''], annonce: '', etat: lbcIntEtat }; lbcIntEtat = null; rendre(); }); } catch (_) {} return ''; }
+    if (lbcInt.charge) return `<section class="geste6" data-lbc-interesses="charge"><p class="note5">${esc(TU('m_charge'))}</p></section>`;
+    const d = lbcInt.data;
+    if (!d) return lbcInt.raison ? `<section class="geste6" data-lbc-interesses="ko"><p class="note5">${esc(lbcInt.raison)}</p></section>` : '';
+    const toutes = (listes.annonces && listes.annonces.toutes) || [];
+    const titre = (id) => { const x = toutes.find((y) => String(y.id) === String(id)); return x ? x.titre : '#' + id; };
+    const etat = lbcInt.etat ? `<p class="note5" role="status" data-lbc-int-etat="${lbcInt.etat.ok ? 'ok' : 'ko'}">${esc(lbcInt.etat.texte)}</p>` : '';
+    const serie = d.serie ? `<p class="note5" data-lbc-int-serie>${esc(TU('li_serie', { n: d.serie.reste || 0 }))}</p>` : '';
+    const annonces = (d.annonces || []).map((a) => `<div class="rg6" data-lbc-int-annonce="${esc(a.annonce)}"><span><b>${esc(titre(a.annonce))}</b><small>${esc(TU('li_n', { n: a.n, a: a.attendent }))}</small></span><button type="button" class="vu-btn" data-lbc-int-voir="${esc(a.annonce)}" aria-pressed="${lbcInt.annonce === a.annonce}">${esc(TU('li_voir'))}</button></div>`).join('');
+    let detail = '';
+    if (lbcInt.annonce) {
+      const gens = (d.liste || []).filter((x) => x.annonce === lbcInt.annonce);
+      const n = [...lbcInt.coches].filter((c) => gens.some((g) => g.conv === c && !g.dejaEcrit)).length;
+      detail = `<div data-lbc-int-gens="${gens.length}">${gens.map((g) => `<label class="rg6"><span><b>${esc(TU('li_personne', { n: g.messagesDeLui }))}</b><small>${esc(depuis(Date.parse(g.dernierAt)) || '')}${g.attendTaReponse ? ' · ' + esc(TU('li_attend')) : ''}${g.dejaEcrit ? ' · ' + esc(TU('li_deja')) : ''}</small></span><input type="checkbox" data-lbc-int-conv="${esc(g.conv)}"${lbcInt.coches.has(g.conv) ? ' checked' : ''}${g.dejaEcrit ? ' disabled' : ''}></label>`).join('')}</div>`
+        + lbcInt.textes.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-lbc-int-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join('')
+        + (d.appris ? '' : `<p class="note5" data-lbc-int-pas-appris>${esc(TU('li_pas_appris'))}</p>`)
+        + (lbcInt.conf ? `<div class="conf5" role="alertdialog" data-lbc-int-confirme="${n}"><p>${esc(TU('li_conf', { n, a: d.ecartS ? d.ecartS[0] : 40, b: d.ecartS ? d.ecartS[1] : 90, m: d.parToucher || 10 }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-lbc-int-oui>${esc(TU('li_oui'))}</button><button type="button" class="vu-btn" data-lbc-int-non>${esc(TU('ra_annuler'))}</button></div></div>`
+          : `<div class="pied6"><span></span><button type="button" class="vu-btn vu-plein" data-lbc-int-ecrire${!n || !d.appris || d.serie || !lbcInt.textes.some((t) => t.trim()) ? ' disabled' : ''}>${esc(TU('li_ecrire', { n }))}</button></div>`);
+    }
+    return `<section class="geste6" data-lbc-interesses="${(d.annonces || []).length}"><h3>${esc(TU('li_titre', { n: (d.liste || []).length }))}</h3>${etat}${serie}${annonces || `<p class="note5">${esc(TU('li_aucun'))}</p>`}${detail}</section>`;
+  }
+  function brancherLbcInt(R) {
+    R.querySelectorAll('[data-lbc-int-voir]').forEach((b) => b.addEventListener('click', () => { lbcInt.annonce = b.getAttribute('data-lbc-int-voir'); lbcInt.coches = new Set((lbcInt.data.liste || []).filter((x) => x.annonce === lbcInt.annonce && !x.dejaEcrit).map((x) => x.conv)); lbcInt.conf = false; rendre(); }));
+    R.querySelectorAll('[data-lbc-int-conv]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-lbc-int-conv'); if (c.checked) lbcInt.coches.add(k); else lbcInt.coches.delete(k); rendre(); }));
+    R.querySelectorAll('[data-lbc-int-texte]').forEach((c) => c.addEventListener('input', () => { lbcInt.textes[Number(c.getAttribute('data-lbc-int-texte'))] = c.value; }));
+    R.querySelectorAll('[data-lbc-int-texte]').forEach((c) => c.addEventListener('change', () => { if (lbcInt.textes.length < 5 && lbcInt.textes[lbcInt.textes.length - 1].trim()) lbcInt.textes.push(''); rendre(); }));
+    const ec = R.querySelector('[data-lbc-int-ecrire]'); if (ec) ec.addEventListener('click', () => { lbcInt.conf = true; rendre(); });
+    const non = R.querySelector('[data-lbc-int-non]'); if (non) non.addEventListener('click', () => { lbcInt.conf = false; rendre(); });
+    const oui = R.querySelector('[data-lbc-int-oui]'); if (oui) oui.addEventListener('click', () => {
+      const gens = (lbcInt.data.liste || []).filter((x) => x.annonce === lbcInt.annonce && !x.dejaEcrit && lbcInt.coches.has(x.conv)).map((x) => x.conv);
+      envoyer6({ action: 'ecrireInteressesLbc', annonce: lbcInt.annonce, convs: gens, textes: lbcInt.textes.map((t) => t.trim()).filter(Boolean), confirme: true }, (r) => { lbcInt.conf = false; lbcInt.etat = { ok: !!(r && r.accepte), texte: r && r.accepte ? TU('li_parti') : (r && r.raison) || TU('ra_ko') }; if (r && r.accepte) { lbcIntEtat = lbcInt.etat; lbcInt = null; } });
+    });
+  }
   function atelierEtatHtml() {
     const a = listes && listes.atelier;
     if (!a || !Array.isArray(a.ids)) return '';
@@ -1827,17 +1866,24 @@
   }
   function brancherGestes6(racine) {
     const R = racine;
+    try { brancherLbcInt(R); } catch (_) {}
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
     R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
     R.querySelectorAll('[data-prix-pct]').forEach((b) => b.addEventListener('click', () => { const p = Number(b.getAttribute('data-prix-pct')); const toutes = (listes.annonces && listes.annonces.toutes) || [];
       for (const id of geste6.ids) { const x = toutes.find((y) => y.id === id); if (x && Number(x.prix) > 0) geste6.prix[id] = (Math.round(Number(x.prix) * (100 - p)) / 100).toFixed(2).replace('.', ','); } rendre(); }));
+    const hOui = R.querySelector('[data-prix-hausse-oui]'); if (hOui) hOui.addEventListener('click', () => { geste6.hausseConf = null; geste6.hausseOk = true; const b = R.querySelector('[data-prix-confirmer]'); if (b) b.click(); });
+    const hNon = R.querySelector('[data-prix-hausse-non]'); if (hNon) hNon.addEventListener('click', () => { geste6.hausseConf = null; rendre(); });
     const pc = R.querySelector('[data-prix-confirmer]'); if (pc) pc.addEventListener('click', () => {
       const toutes = (listes.annonces && listes.annonces.toutes) || [];
       const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; return { id, prix: String(geste6.prix[id] || '').replace(',', '.'), prixVu: x.prix, num: x.num || '' }; }).filter((x) => x.prix);
       if (!items.length) { geste6Etat = { ok: false, texte: TU('g6_prix_vide') }; rendre(); return; }
-      envoyer6({ action: 'prixCarte', items, confirme: true }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
-        geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse' ? TU('g6_hausse') : x.code).join(' · ') : '') };
+      // Une HAUSSE se confirme d'abord (« Monter à X € ? ») — jamais automatique.
+      const hausses = items.filter((x) => Number(x.prix) > Number(x.prixVu));
+      if (hausses.length && !geste6.hausseOk) { geste6.hausseConf = hausses; geste6.items = items; rendre(); return; }
+      geste6.hausseOk = false;
+      envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
+        geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code).join(' · ') : '') };
         if (n) chargerListes(true); });
     });
     // Atelier
@@ -1933,7 +1979,7 @@
       : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
     const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
-    const haut = outils + conf + res + atelierEtatHtml() + geste6Html() + ligneN;
+    const haut = outils + conf + res + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
     if (!vus.length) return haut + `<div class="val gris vide6" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
     if (annVue === 'grille') {
       return haut + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))} · ${etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')))}</span></button></li>`).join('')}</ul>`
@@ -1941,7 +1987,7 @@
     }
     const cellule = (x, c) => {
       if (c === 'prix') return `<b>${esc(eurosL(x.prix))}</b>`;
-      if (c === 'date') return esc(dateCourte5(x.depuis));
+      if (c === 'date') return x.depuis ? (x.depuisAuMoins ? `<span data-date-au-moins title="${esc(TU('g6_au_moins_note'))}">${esc(TU('g6_au_moins', { d: dateCourte5(x.depuis) }))}</span>` : esc(dateCourte5(x.depuis))) : '—';
       if (c === 'statut') return etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')), x.statut === 'brouillon' || x.statut === 'a_confirmer' ? 'ambre' : '');
       return celluleAnn(x, c);
     };
@@ -2170,6 +2216,8 @@
       { id: 'paliers', titre: 'au_paliers', sous: 'au6_paliers_sous', on: pa ? pa.actif : null },
       { id: 'baisse', titre: 'au_baisse', sous: 'au6_baisse_sous', on: ba ? ba.actif : null },
     ];
+    // 5.410 : sur Leboncoin / Vestiaire, la baisse par règle de CE compte seulement.
+    if (au.site === 'leboncoin' || au.site === 'vestiaire') { items.splice(0, items.length, ...items.filter((x) => x.id === 'baisse')); autoChoisie = 'baisse'; }
     if (!items.some((x) => x.id === autoChoisie)) autoChoisie = 'favoris';
     const gauche = `<ul class="au6-l" role="listbox" aria-label="${esc(TU('c_automatisations'))}">${items.map((x) => `<li><button type="button" class="au6-i" role="option" data-auto-choix="${x.id}" aria-selected="${autoChoisie === x.id}"><span class="mil"><span class="ti">${esc(TU(x.titre))}</span><span class="me">${esc(TU(x.sous))}</span></span>${pastilleEtat(x.on)}</button></li>`).join('')}</ul>`;
     const ligne = (k, v, note) => `<div class="rg6"><span><b>${esc(TU(k))}</b>${note ? `<small>${esc(TU(note))}</small>` : ''}</span><span class="v6">${v == null || v === '' ? '—' : esc(v)}</span></div>`;
@@ -2220,7 +2268,7 @@
       } else {
         const pct = Number(b0.pct || (ba && ba.pct) || 5), jours = Number(b0.jours || (ba && ba.jours) || 14);
         const seg = (k, l, v, suf) => `<div class="vu-seg vue5" role="group" data-ra-seg="${k}">${l.map((x) => `<button type="button" data-ra-${k}="${x}" aria-pressed="${x === v}">${x}${suf}</button>`).join('')}</div>`;
-        corpsR = section('au6_regle', `<div class="rg6"><span><b>${esc(TU('ra_pct'))}</b></span>${seg('pct', [5, 10, 15], pct, ' %')}</div><div class="rg6"><span><b>${esc(TU('ra_jours'))}</b></span>${seg('jours', [7, 14, 30], jours, ' j')}</div><p class="note5">${esc(TU('au_baisse_plancher'))}</p>`);
+        corpsR = section('au6_regle', `<div class="rg6"><span><b>${esc(TU('ra_pct'))}</b></span>${seg('pct', [5, 10, 15], pct, ' %')}</div><div class="rg6"><span><b>${esc(TU('ra_jours'))}</b></span>${seg('jours', [7, 14, 30], jours, ' j')}</div><p class="note5">${esc(TU('au_baisse_plancher'))}</p>${au.site === 'vestiaire' ? `<p class="note5" data-au-baisse-vc-date>${esc(TU('g6_vc_date'))}</p>` : ''}`);
       }
       droite = tete + conf + etat + `<section class="sec6">${bascule}</section>` + corpsR
         + `<div class="pied6" data-ra-pied="${esc(cleDe)}"><button type="button" class="vu-lien" data-ra-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-ra-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
@@ -2364,6 +2412,7 @@
     else if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations' && listes && listes.automatisations && listes.automatisations.baisse) panneau = `<p class="note5" data-auto-site="${esc(e.plateforme)}">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p>` + automatisationsHtml();
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations') panneau = `<div class="par5" data-auto-site="${esc(e.plateforme)}"><p class="note5">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p></div>`;
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = ventesHtml(e);
@@ -2439,7 +2488,7 @@
       const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};
       if (auto === 'offres') return { cle: 'vinted_offres_auto', valeur: actif };
       if (auto === 'paliers') { const pa = au.paliers || {}; const pcts = String(b0.paliers != null ? b0.paliers : (pa.paliers || [50, 80, 100]).join(',')).split(/[,;\s]+/).map(Number).filter((x) => x > 0 && x <= 100); const rem = Number(b0.remise != null ? b0.remise : pa.remiseMax); return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false } }; }
-      const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: listes && listes.compte && listes.compte.id, actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
+      const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: au.cle || (listes && listes.compte && listes.compte.id), actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
     };
     const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
     const raEnvoyer = (auto, cle, valeur, confirme) => {
