@@ -2,7 +2,7 @@
 @layer vrm-natif {
   .n-au-volets { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; padding: 0 var(--n-marge); align-items: start; }
   .n-au-volet-liste .n-groupe { margin-inline: 0; }
-  .n-au-volet-detail { min-width: 0; border-radius: var(--n-r-carte); background: var(--n-carte); border: .5px solid var(--n-trait); }
+  .n-au-volet-detail { min-width: 0; border-radius: var(--n-r-carte); background: var(--n-carte); }
   .n-au-detail { display: flex; flex-direction: column; min-width: 0; }
   .n-poussee .n-au-detail { padding: 0 var(--n-marge); }
   .n-au-tete { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px 12px; border-bottom: .5px solid var(--n-trait); }
@@ -26,7 +26,7 @@
   .n-au-nombre-champ { width: 72px; min-height: var(--n-cible); box-sizing: border-box; padding: 0 10px; border-radius: var(--n-r-bouton); border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); text-align: right; }
   .n-au-nombre-unite { font: var(--n-t-second); color: var(--n-encre-2); }
   .n-au-messages { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
-  .n-au-message { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--n-r-carte); border: .5px solid var(--n-trait); background: var(--n-carte); }
+  .n-au-message { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--n-r-carte); background: var(--n-carte-2); }
   .n-au-message[data-au-message-actif="0"] .n-au-message-corps { color: var(--n-encre-2); }
   .n-au-message-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .n-au-message-corps { font: var(--n-t-second); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

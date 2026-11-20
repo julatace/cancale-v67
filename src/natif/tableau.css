@@ -82,7 +82,7 @@
   .n-tt-vues .n-tt-bouton[aria-pressed="true"] { background: var(--n-carte); color: var(--n-encre); }
 
   /* Le tableau : une carte blanche, filets fins, pas d'ombre. */
-  .n-tt-cadre { position: relative; margin: 0 var(--n-marge); border-radius: var(--n-r-carte); background: var(--n-carte); border: .5px solid var(--n-trait); overflow-x: auto; }
+  .n-tt-cadre { position: relative; margin: 0 var(--n-marge); border-radius: var(--n-r-carte); background: var(--n-carte); overflow-x: auto; }
   .n-tt-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .n-tt-th { padding: 0 8px; height: 44px; text-align: left; font: var(--n-t-legende-fort); color: var(--n-encre-2); white-space: nowrap; border-bottom: .5px solid var(--n-trait); }
   .n-tt-th[data-tt-num="1"] { text-align: right; }
