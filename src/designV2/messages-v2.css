@@ -190,6 +190,13 @@ html[data-grand-texte] .v2m-extrait { overflow-wrap: normal; word-break: normal;
 html[data-grand-texte] .v2m-av.v2m-av-rond { display: none; }
 html[data-grand-texte] .v2m-vignette { width: 40px; height: 40px; border-radius: 8px; }
 html[data-grand-texte] .v2m-carte > .v2m-ligne + .v2m-ligne::before { left: 20px; }
+/* Le pseudo prend TOUTE la largeur de la rangée (au-dessus de la vignette) : la rangée devient une grille, le texte et sa
+   première ligne se « dissolvent » (`display: contents`) — l'heure, l'extrait et le N° restent à gauche de la vignette. */
+html[data-grand-texte] body button.v2-rangee.v2m-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 4px; align-items: start; }
+html[data-grand-texte] .v2m-ligne .v2m-txt, html[data-grand-texte] .v2m-ligne .v2m-l1 { display: contents; }
+html[data-grand-texte] .v2m-ligne .v2m-nom { grid-column: 1 / -1; }
+html[data-grand-texte] .v2m-ligne .v2m-heure, html[data-grand-texte] .v2m-ligne .v2m-extrait, html[data-grand-texte] .v2m-ligne .v2m-l3 { grid-column: 1; justify-self: start; max-width: 100%; }
+html[data-grand-texte] .v2m-ligne .v2m-vignette { grid-column: 2; grid-row: 2 / span 3; align-self: start; }
 html[data-grand-texte] .v2m-extrait { -webkit-line-clamp: 3; }
 html[data-grand-texte] .v2m-av { width: 40px; height: 40px; border-radius: 10px; }
 html[data-grand-texte] html body button.v2-rangee.v2m-ligne, html[data-grand-texte] body button.v2-rangee.v2m-ligne { padding-left: 20px; gap: 12px; }

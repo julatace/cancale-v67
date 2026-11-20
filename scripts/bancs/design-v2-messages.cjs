@@ -115,7 +115,7 @@ const MESURE = (sel) => {
   for (const l of document.querySelectorAll('.v2m-carte > .v2m-ligne, .v2e-carte > .v2e-q-ligne')) {
     if (!vis(l)) continue; const r = l.getBoundingClientRect(); const carte = l.parentElement.getBoundingClientRect();
     if (r.height < 63.5) out.air.push({ k: 'rangee', h: Math.round(r.height) });
-    const txt = l.querySelector('.v2m-txt, .v2e-q-txt'); if (txt) { const t = txt.getBoundingClientRect(); if (carte.right - t.right < 19.5) out.air.push({ k: 'bord-droit', d: Math.round(carte.right - t.right) }); }
+    const txt = l.querySelector('.v2m-txt, .v2e-q-txt'); if (txt) { /* (20 nov.) un texte « dissous » (display: contents, très grand texte) se mesure par ses enfants */ const t = getComputedStyle(txt).display === 'contents' ? { right: Math.max(...[...txt.querySelectorAll('*')].filter((e) => getComputedStyle(e).display !== 'contents').map((e) => e.getBoundingClientRect().right)) } : txt.getBoundingClientRect(); if (carte.right - t.right < 19.5) out.air.push({ k: 'bord-droit', d: Math.round(carte.right - t.right) }); }
     const av = l.querySelector('.v2m-av'); if (av && vis(av)) {   /* (20 nov.) en très grand texte l'avatar décoratif s'efface : pas de bord à juger */
       const a = av.getBoundingClientRect(); if (a.left - carte.left < 19.5) out.air.push({ k: 'bord-gauche', d: Math.round(a.left - carte.left) }); }
   }
