@@ -263,6 +263,15 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         const pe = await env('prixCarte');
         dit(lp.length === 2 && /plancher : ton prix mini 46/.test(lp[0]) && /plancher pas su|achat/.test(lp[1]) && pe.length === 1 && pe[0].confirme === true && pe[0].items.map((x) => x.id + '=' + x.prix + '<' + x.prixVu).join(',') === '7001=54.00<60,7004=67.50<75',
           `${T} : « Changer le prix » : prix vu, plancher dit, −10 % pour toutes, confirmé ⇒ la commande gardée`, JSON.stringify({ lp, pe }));
+        // Une HAUSSE : « Monter à X € ? » d'abord, puis seulement SON « Oui, monter ».
+        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-nouveau="7001"]'); c.value = '70'; c.dispatchEvent(new Event('input')); });
+        await clic(t.pg, '[data-prix-confirmer]');
+        const hc = await t.pg.evaluate(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-hausse]'); return b ? b.innerText : ''; });
+        const n1 = (await env('prixCarte')).length;
+        await cap(t.pg, N('geste-prix-hausse'));
+        await clic(t.pg, '[data-prix-hausse-oui]');
+        const ph = await env('prixCarte');
+        dit(/Monter à 70,00 €/.test(hc) && n1 === 1 && ph.length === 2 && ph[1].hausseConfirmee === true && ph[1].items.some((x) => x.id === '7001' && x.prix === '70'), `${T} : une hausse demande « Monter à 70,00 € ? » puis part sur SON « Oui, monter »`, JSON.stringify({ hc, ph: ph[1] }));
         await clic(t.pg, '[data-geste-fermer]');
         await coche(['7001', '7004', '7007']); await t.pg.waitForTimeout(150);
         await action('republier');
