@@ -99,7 +99,7 @@ Vestiaire sans date de mise en ligne ⇒ ni baisse auto ni moteur d'offres).
 
 ## Preuves
 - `scripts/audit-lbc-vc-interesses.cjs` : VRAI vc-inject.js + vc.js + background.js (`_fond-vm.cjs`), règle de
-  l'app importée — **49 contrôles verts** ; sur `origin/main` : **13 rouges sur 16** (fonctions absentes) ;
+  l'app importée — **53 contrôles verts** ; sur `origin/main` : **13 rouges sur 16** (fonctions absentes) ;
   `--prouve` : 28 mutations (date ignorée/future, borne avancée, borne prise pour exacte, personne dans les
   négociations, sous le plancher, plancher le plus bas, sans recette, compte prêté, N° deviné, « depuis » truqué,
   « au moins » dit exact, partenaire sorti, annonce ignorée, intéressé sans écrire, autre compte, hors liste envoyé,
@@ -108,7 +108,16 @@ Vestiaire sans date de mise en ligne ⇒ ni baisse auto ni moteur d'offres).
 - Audits verts : `audit-favoris-sites` (mis à 40–90 s), `audit-regles-auto`, `audit-vc-prix`, `audit-lbc-repondre`,
   `audit-capture-vc-lbc`, `audit-relais-lbc-kinds`, `audit-actions-gardees`, `audit-traduction`, `audit-tdz`,
   `audit-variables`, `audit-quoi-de-neuf`. `audit-coherence` : 4 rouges « manifeste 5.409.0 » (voir plus haut).
-- Banc `scripts/bancs/lbc-vc-interesses.cjs` (390 clair, 1512 sombre) — résultat dans le rapport du lot.
+- Banc `scripts/bancs/lbc-vc-interesses.cjs` (390 tactile clair, 1512 sombre) : **29 verts**, captures regardées —
+  Messages · Leboncoin · Favoris reçus (« 2 intéressés · 1 attend ta réponse », la conversation sans annonce comptée à
+  part, aucun bouton d'envoi) ; Annonces (liste unique) : la date LUE « 30/10/2026 · 20 j » dans la colonne Date, la
+  borne basse jamais montrée comme une date (« — »), la limite « Vestiaire ne donne pas la date » retirée.
+- Annonces à égalité : `PARITE.depuis.vestiaire` = « lecture », `LIMITES.vestiaire` sans « depuis » ; la source
+  (`src/articles/sources.js`) prend `misEnLigne` (exacte) seulement — `audit-parite-sites` 96 verts.
+- ⚠️ L'ancien écran Vestiaire (rangées `data-vc-annonce`) n'est plus monté sur `?tab=annonces&site=vestiaire` (la liste
+  unique l'a remplacé) : la phrase « vue en ligne depuis au moins le … » y est posée (`data-vc-depuis`) et jugée par
+  l'audit (A1) sur son module ; constat : le banc `vestiaire-plus` (étape C, même route) est sans doute rouge pour la
+  même raison (pas de ce lot).
 
 ## Ce qui reste impossible, et pourquoi
 - Écrire à quelqu'un qui a mis une annonce **Leboncoin** en favori : Leboncoin ne dit jamais qui (mesuré) ; VRM

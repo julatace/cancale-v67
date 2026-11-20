@@ -136,6 +136,11 @@ const sain = async (pg, ecran) => {
         const t = await pg.evaluate(() => document.body.innerText);
         dit(/Salomon XT-6/.test(t) && /Sac cabas/.test(t), 'A · les deux articles Vestiaire sont dans Annonces');
         dit(!/Vestiaire : le site ne donne pas la date de mise en ligne/.test(t), 'A · la limite « Vestiaire ne donne pas la date de mise en ligne » n’est plus dite (la date est lue)', (/Vestiaire :[^.]*\./.exec(t) || [''])[0]);
+        // La date LUE (30 oct.) s'affiche ; la borne basse (2 nov., « au moins ») ne se montre JAMAIS comme une date.
+        const rangees = await pg.evaluate(() => [...document.querySelectorAll('tr, li, [role="row"]')].map((e) => e.innerText.replace(/\s+/g, ' ')).filter((x) => /Salomon XT-6|Sac cabas/.test(x) && x.length < 400));
+        const sal = rangees.find((x) => /Salomon/.test(x)) || '', sac = rangees.find((x) => /Sac cabas/.test(x)) || '';
+        if (vp.width > 1000) dit(/30\/10\/2026/.test(sal), 'A · la date LUE chez Vestiaire est dans la colonne Date', sal);
+        dit(!/02\/11\/2026|2 nov/.test(sac), 'A · la borne basse (« au moins ») n’est jamais montrée comme une date de mise en ligne', sac);
         await sain(pg, 'Annonces');
         await capture(pg, 'annonces-' + nomVp);
       });
