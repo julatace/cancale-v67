@@ -20915,11 +20915,11 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     const racine = document.querySelector('.n-coque') || document.body;
     const mo = new MutationObserver(() => {
       if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); }
-      else if (titre && (titre.style.display !== 'inline-block' || !titre.hasAttribute('data-avec-pastilles'))) marquer(titre);
+      else if (titre) marquer(titre);   // ne réécrit que ce qui a changé (style du titre, place qui reste)
     });
     mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'style'] });
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (titre) marquer(titre); }) : null;
-    if (ro && titre && titre.parentElement) ro.observe(titre.parentElement);
+    if (ro) ro.observe(racine);
     return () => { mo.disconnect(); if (ro) ro.disconnect(); h.remove(); if (titre && !(titre.nextElementSibling && titre.nextElementSibling.hasAttribute('data-site-hote'))) { titre.removeAttribute('data-avec-pastilles'); titre.style.removeProperty('display'); titre.style.verticalAlign = ''; titre.style.removeProperty('width'); titre.style.removeProperty('max-width'); } };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
