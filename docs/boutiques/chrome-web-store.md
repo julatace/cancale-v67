@@ -3,11 +3,13 @@
 > Sert aussi Brave, Vivaldi, Arc et Yandex (ils installent depuis cette boutique).
 > Tableau de bord : https://chrome.google.com/webstore/devconsole
 > Vérifié le 8 nov. 2026 sur developer.chrome.com (pages « Images », « Listing »,
-> « Privacy practices ») — voir `README.md` §1.
-> Avant d'envoyer : `node scripts/paquets-boutiques.cjs` puis
-> `node scripts/audit-paquets-boutiques.cjs` (tout vert).
+> « Privacy practices ») — voir `README.md` §1. **Mis à jour le 20 nov. 2026 pour la 5.409.0**
+> (`vestiairecollective.com` devenu autorisation d'hôte, `i.ebayimg.com`, les gestes de la 5.409,
+> captures au style « VRM natif »). Le pas à pas pour Julien : `docs/chrome-web-store/README.md`.
+> Avant d'envoyer : `node scripts/zip-extension.cjs --store <dossier>/VRM-chromium.zip` (ou
+> `node scripts/paquets-boutiques.cjs`) puis `node scripts/audit-paquets-boutiques.cjs` (tout vert).
 
-**Fichier à envoyer** : `dist/boutiques/VRM-<version>-chrome.zip` (manifeste à la racine).
+**Fichier à envoyer** : `VRM-chromium.zip` de `zip-extension.cjs --store` (ou `dist/boutiques/VRM-<version>-chrome.zip`) — manifeste à la racine, version **5.409.0**.
 
 ## Onglet « Fiche Play Store » (Store listing)
 
@@ -28,8 +30,9 @@ Ce qu'elle fait pour toi
 • Elle range dans ton espace VRM ce que ces sites affichent déjà sur ta propre activité quand tu les ouvres : annonces, ventes, achats, messages, offres, soldes, bordereaux.
 • Elle récupère les bordereaux d'expédition de tes ventes, prêts à imprimer avec le numéro de rangement de la paire.
 • Elle relève les codes de retrait de tes colis et leur statut chez le transporteur.
-• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser ou remettre un prix, poser le mode vacances, créer un brouillon d’annonce Vinted, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
-• Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé (et refuser avec TON message celles sous ton seuil), et envoyer ton message aux personnes qui mettent ton annonce en favori.
+• Sur ton clic dans VRM : remplir ou publier une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser ou remettre un prix, masquer ou afficher une annonce, poser le mode vacances, créer un brouillon d’annonce Vinted, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
+• Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé (et refuser avec TON message celles sous ton seuil), répondre aux offres par paliers sans jamais descendre sous ton plancher, baisser un prix selon TA règle après quelques jours sans vente, masquer sur Vinted une annonce dont la vente est prouvée sur un autre site, et envoyer ton message aux personnes qui mettent ton annonce en favori.
+• Pendant qu’elle agit pour toi sur le site, un écran l’indique, avec « Tout arrêter ».
 
 Ses garde-fous
 • Elle n'agit qu'au nom du compte connecté dans l'onglet, jamais d'un autre.
@@ -52,8 +55,9 @@ s'affiche que dans le tableau de bord : prendre celle qui parle d'outils de trav
   dessin + 16 px de marge transparente ; l'icône actuelle remplit tout le carré. Ce n'est pas un motif de
   refus, mais la redessiner change le paquet : à faire avec une version de l'extension, pas ici.
 - Captures 1280 × 800 (1 au moins, 5 au plus) : `capture-1-journee.png`, `capture-2-ventes.png`,
-  `capture-3-achats.png`, `capture-4-annonces.png`, `capture-5-extension.png` (refaites le 15 nov.,
-  palette Studio bleu clair). Données INVENTÉES (mode exemple de l'app, bandeau « Exemple — données
+  `capture-3-compta.png`, `capture-4-annonces.png`, `capture-5-extension.png` (refaites le 20 nov.
+  pour la 5.409.0, style « VRM natif » ; l'écran Argent remplace Achats : plus aucun logo de
+  transporteur). Données INVENTÉES (mode exemple de l'app, bandeau « Exemple — données
   inventées » visible ; la carte du logo sur une page de dressing inventée, sans marque de site).
   Pas à pas complet pour Julien : `docs/chrome-web-store/README.md`.
 - Petite tuile 440 × 280 : `tuile-440x280.png`. Grande tuile 1400 × 560 (facultative) : `tuile-1400x560.png`.
@@ -75,7 +79,7 @@ Relier les propres comptes de revente de l'utilisateur (Vinted, Leboncoin, eBay,
 | `storage` | Garder l'état de l'extension entre deux réveils du service worker : session VRM, compteurs du plafond de 50 actions par heure, commandes en attente, dates des tâches. |
 | `alarms` | Relancer les tâches périodiques : relève des comptes (toutes les 10 à 20 minutes), photos en attente (chaque minute), renouvellement de la session VRM (40 minutes). |
 | `scripting` | Exécuter, dans l'onglet Vinted, Leboncoin ou Vestiaire Collective déjà ouvert par l'utilisateur, les lectures et les actions qu'il commande, depuis la page elle-même (même origine, mêmes cookies). |
-| `tabs` | Retrouver l'onglet du site ou de VRM déjà ouvert et ouvrir la page utile (VRM, dépôt d'annonce) quand l'utilisateur le demande ; l'adresse des onglets n'est ni gardée ni envoyée. |
+| `tabs` | Retrouver l'onglet du site ou de VRM déjà ouvert, ouvrir la page utile (VRM, dépôt d'annonce) quand l'utilisateur le demande, et dire à VRM quels sites de revente sont ouverts dans ce navigateur (sans leur adresse) ; l'adresse des onglets n'est ni gardée ni envoyée. |
 | `downloads` | Reconnaître le PDF d'un bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger avec la vente ; tout autre téléchargement est ignoré et l'extension n'en déclenche aucun. |
 | `contextMenus` | Ajouter au clic droit sur l'icône de l'extension deux entrées, « Connexion à VRM » et « État de l'extension », qui ouvrent la page de connexion de l'extension dans un onglet. Aucun autre menu, aucune lecture de page. |
 
@@ -90,7 +94,7 @@ en texte, une ligne par hôte) :
 | `https://*.leboncoin.fr/*` | Les comptes Leboncoin de l'utilisateur. |
 | `https://*.ebay.fr/*`, `https://*.ebay.com/*` | Les comptes eBay de l'utilisateur : remplir une annonce depuis VRM. |
 | `https://i.ebayimg.com/*` | Les photos publiques de SES annonces eBay : l'empreinte d'une photo (jamais l'image, sans cookie) pour reconnaître la même photo qu'une annonce Vinted. |
-| `https://*.vestiairecollective.com/*` (scripts de contenu) | Les comptes Vestiaire Collective de l'utilisateur. |
+| `https://*.vestiairecollective.com/*` | Les comptes Vestiaire Collective de l'utilisateur : lire son activité, publier ou relire l'annonce qu'il dépose depuis VRM (depuis la 5.409.0, une autorisation d'hôte et plus seulement des scripts de contenu). |
 | `https://www.mondialrelay.be/*`, `https://www.mondialrelay.fr/*`, `https://ws.chronopost.fr/*`, `https://carrier.vintedgo.com/*` | Lire le statut public des colis que l'utilisateur attend (n° de suivi), quand le serveur de VRM ne peut pas le lire ; 12 lectures par heure et par transporteur au plus. |
 | `https://www.chronopost.fr/tracking-no-cms/*`, `https://vintedgo.com/*` (scripts de contenu) | Sur une page de suivi ouverte par l'utilisateur, lire seulement l'adresse de la page (le n° de suivi), jamais son contenu. |
 | `https://lgonxzrzjcqthjtbdpzo.supabase.co/*` | La base de données de VRM, où l'espace de l'utilisateur est rangé. |
@@ -132,7 +136,7 @@ je n'utilise pas les données pour déterminer la solvabilité ou accorder un pr
 - [ ] `node scripts/paquets-boutiques.cjs` puis `node scripts/audit-paquets-boutiques.cjs` : tout vert.
 - [ ] Envoyer `dist/boutiques/VRM-<version>-chrome.zip` (Éléments → Importer un nouveau package).
 - [ ] Coller description, catégorie, langue ; ajouter les 5 captures, la petite tuile (et la grande).
-- [ ] Onglet confidentialité : objectif unique, 6 autorisations + le tableau des hôtes, code distant « Non »,
+- [ ] Onglet confidentialité : objectif unique, 7 autorisations + le tableau des hôtes, code distant « Non »,
       cases de données, 3 certifications, URL de la politique.
 - [ ] Distribution : « Non répertoriée ».
 - [ ] « Envoyer pour examen ». L'accès aux cookies et à de nombreux sites rallonge l'examen.
