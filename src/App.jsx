@@ -65345,9 +65345,13 @@ function AppCoeur() {
           }))
         : await Promise.all(vintedAccounts.map(async a=>{
         const actif=!skipAcc(a.vinted_user_id);
+        // (20 nov., lectures-legeres) Le dressing part QUAND les ventes sont là (lues ou en panne) : sur la 4G
+        // lente de Julien, les deux lectures se partageaient le débit et « Vendu · mois » arrivait 3 s plus tard.
+        // Mêmes lectures, même résultat ; un écran qui montre les annonces les a déjà demandées (même cache).
+        const soldP=fetchVintedOrders(a,'sold',1,'all');
         const [sold,list,conv]=await Promise.all([
-          fetchVintedOrders(a,'sold',1,'all'),
-          actif?fetchVintedListings(a,1):Promise.resolve({ok:false,items:[]}),
+          soldP,
+          actif?soldP.then(()=>fetchVintedListings(a,1),()=>fetchVintedListings(a,1)):Promise.resolve({ok:false,items:[]}),
           actif?fetchVintedConversations(a,1):Promise.resolve({ok:false,items:[]}),
         ]);
         return { a, sold, list, conv, actif };
@@ -65938,7 +65942,8 @@ function AppCoeur() {
           // (le compte qui a bougé est oublié par `relire`/la sonde) — avant, passé 60 s, les 7 comptes repartaient
           // (~1,2 Mo) pour une vente sur un seul (banc ventes-relecture-compte).
           fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }),
-          fetchHarvest(a.vinted_user_id,'listings'),
+          // (20 nov., lectures-legeres) le dressing après les ventes (même raison que le tableau de bord).
+          fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }).then(()=>fetchHarvest(a.vinted_user_id,'listings'),()=>fetchHarvest(a.vinted_user_id,'listings')),
         ])])));
       for(const a of vintedAccounts){
         if(offAcc.has(String(a.vinted_user_id))) continue;

@@ -89,7 +89,10 @@ async function preparer(ctx) {
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
-    if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
+    // (20 nov., lectures-legeres) En SESSION, un PATCH gardé (`data->>rev=eq.`, `return=representation`) rend la
+    // ligne écrite, comme Supabase quand l'échange réussit : avec `[]`, l'app se croyait devancée et relisait
+    // `main` en boucle (×35 en 40 s, 3 Mo) — une boucle du BANC, pas de l'app. Rien n'est rangé (base figée).
+    if (rq.method() !== 'GET') { await attendre(RTT); const idP = SESSION && rq.method() === 'PATCH' ? (/[?&]id=eq\.([^&]+)/.exec(rq.url()) || [])[1] : null; return route.fulfill({ status: idP ? 200 : 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: idP ? JSON.stringify([{ id: decodeURIComponent(idP) }]) : '[]' }); }
     const h = await rq.allHeaders();
     if (SESSION && /select=owner\b/.test(decodeURIComponent(rq.url()))) { await attendre(RTT); return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
     const rep = repondre(rq.url(), h.range, base);
