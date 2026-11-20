@@ -1158,7 +1158,8 @@ import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
-import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";   // (20 nov.) colis à retirer : une carte par point, « Je suis au point »
+import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";
+import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement   // (20 nov.) colis à retirer : une carte par point, « Je suis au point »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -37936,6 +37937,28 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Mondial Relay fait avancer, lui aussi, l'étape d'un suivi ajouté à la main.
   const finsSuivis = useMemo(() => finsColis(trackingRetrait, suivisEnvoyes, transp), [trackingRetrait, suivisEnvoyes, transp]);
   const transpMap = useMemo(() => transpParSuivi(transp), [transp]);
+  // (20 nov., trajet des colis à retirer) LES ÉVÈNEMENTS DU TRANSPORTEUR des seuls colis montrés « à retirer » (comptés
+  // ou à vérifier), par l'identifiant de LEUR ligne `transp_{transporteur}_{n°}` : une lecture BORNÉE (≤ 60 lignes,
+  // `id=in.(…)`), projetée sur `data->evenements` (§4.4 : jamais `select=data`), relue quand la liste change.
+  // Ratée ⇒ `null` : la barre du trajet garde grises les étapes que seuls ces évènements prouvent (« pas su »).
+  const idsTranspRetrait = useMemo(() => {
+    if (!transpMap || !pickupUnion) return '';
+    const ks = new Set();
+    for (const t of [...(pickupUnion.emailList || []), ...(pickupUnion.aVerifier || []).filter((x) => x && x.kind === 'email').map((x) => x.t)]) { const k = suiviDeLigne(t); if (k) ks.add(normaliserSuivi(k)); }
+    for (const o of [...(pickupUnion.extra || []), ...(pickupUnion.aVerifier || []).filter((x) => x && x.kind === 'vinted').map((x) => x.o)]) for (const su of suivisAchat(o, indexSuivisAchats)) ks.add(normaliserSuivi(su));
+    const ids = []; for (const k of ks) { const l = k ? transpMap.get(k) : null; if (l && l.id && /^transp_[a-z]+_[A-Z0-9]+$/.test(l.id)) ids.push(l.id); }
+    return [...new Set(ids)].sort().slice(0, 60).join(',');
+  }, [transpMap, pickupUnion, indexSuivisAchats]);
+  const [evsTransp, setEvsTransp] = useState(null);
+  useEffect(() => {
+    if (!idsTranspRetrait) { setEvsTransp(null); return; }
+    let vivant = true;
+    lireTout(`id=in.(${idsTranspRetrait.split(',').map(encodeURIComponent).join(',')})&select=id,ev:data->evenements`, { strict: true })
+      .then((rows) => { if (!vivant) return; if (!Array.isArray(rows)) { setEvsTransp(null); return; }
+        const m = new Map(); for (const r of rows) if (r && r.id) m.set(String(r.id), Array.isArray(r.ev) ? r.ev : []); setEvsTransp(m); })
+      .catch(() => { if (vivant) setEvsTransp(null); });
+    return () => { vivant = false; };
+  }, [idsTranspRetrait]);
   // (2 nov.) LE TRANSPORTEUR D'UN COLIS, LU (src/transporteursVisuels.js, une règle) :
   // la ligne lue chez le transporteur pour ce n°, ce qu'écrit la plateforme ou
   // l'e-mail du MÊME n°, sinon la forme du n° — jamais deviné ; rien ⇒ « pas lu ».
@@ -37981,6 +38004,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (15 nov., finition) Le NOM du point d'abord (« 43 Rue du Lt F… » se coupait) : l'adresse reste dans la fiche du colis.
       const clR = cleanLieu(r && r.lieu); const lieuR = nomPointRetrait(clR) || clR.nom || '';
       if (code || qr) codes.push({ code: code || '', lieu: lieuR, carrier: (r && r.transporteur) || '', suivi: '', titre: String((o && o.title) || '').slice(0, 60), qr, id: identRetraitVinted(o), compte: true });
+    }
+    // (20 nov., rétention — Julien : « le code et le QR restent tant que le colis n'est pas fini ») Un achat vu par Vinted
+    // passé « à vérifier » (date limite dépassée…) GARDE son code dans la copie hors ligne et la liste des codes, comme un
+    // e-mail « à vérifier » ci-dessus — jamais compté (`compte: false`). Avant, il disparaissait de la copie à la limite.
+    for (const x of (pickupUnion.aVerifier || [])) {
+      if (!x || x.kind !== 'vinted' || !x.o) continue;
+      const o = x.o; const r = colisRelais[String(o.transaction_id || '')] || null;
+      const code = r ? codeRetrait(r.code) : ''; const qr = !!(r && (r.qr || r.qrUrl || r.qrB64));
+      const clR = cleanLieu(r && r.lieu); const lieuR = nomPointRetrait(clR) || clR.nom || '';
+      if (code || qr) codes.push({ code: code || '', lieu: lieuR, carrier: (r && r.transporteur) || '', suivi: '', titre: String(o.title || '').slice(0, 60), qr, id: identRetraitVinted(o), compte: false });
     }
     return codes;
   };
@@ -47401,6 +47434,23 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     };
     const qrCarte = ({ t = null, o = null } = {}) => { try { if (t) return !!qrVivant(t); const r = o ? relaisDe(o) : null; return !!(r && r.qr); } catch (_) { return false; } };
     const tpmC = transpMap;
+    // (20 nov.) LE TRAJET DU COLIS (src/retraitTrajet.js) : chaque étape sur ce qui est LU pour CE colis, par identité —
+    // la date de SA commande (n° de suivi, code, conversation), les évènements du transporteur de SON n°, les e-mails
+    // « en route » du même n°, l'arrivée prouvée. Rien d'autre ; une étape sans preuve reste grise.
+    const transitParSuivi = new Map(); for (const l of (trackingRetrait || [])) { if (!l || l.status !== 'transit') continue; const k = suiviDeLigne(l); if (!k) continue; const a = l.emailAt || l.receivedAt; if (a) transitParSuivi.set(k, [...(transitParSuivi.get(k) || []), a]); }
+    const trajetCarte = ({ t = null, o = null } = {}) => {
+      try {
+        const cmd = o || (t ? commandeRetrait(t) : null);
+        const k = t ? suiviDeLigne(t) : (o ? normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '') : '');
+        const ln = k && tpmC && typeof tpmC.get === 'function' ? (tpmC.get(normaliserSuivi(k)) || null) : null;
+        const arr = [];
+        if (t) { const a = arriveeColisEmail(t); if (a && a.sur === 'oui') arr.push(a.ms); }
+        if (o) { const ev = etatColisVinted(o, maintenant, tpmC); if (ev && Number.isFinite(ev.arriveeSure)) arr.push(ev.arriveeSure); }
+        if (ln && ln.etat === 'disponible' && ln.etatAt) arr.push(ln.etatAt);
+        return etapesTrajet({ payeAt: cmd ? cmd.date : null, evenements: ln && evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln ? ln.carrier : '',
+          transitAt: k ? (transitParSuivi.get(normaliserSuivi(k)) || transitParSuivi.get(k) || []) : [], arriveesAt: arr, retireAt: ln && ln.etat === 'retire' ? ln.etatAt : null, maintenant });
+      } catch (_) { return null; }
+    };
     const dernierJour = (j) => (Number.isFinite(j) && j <= 1 ? (j <= 0 ? "dernier jour aujourd'hui" : 'dernier jour demain') : '');
     // (1er nov.) Chaque colis à retirer porte SON lieu (nom + adresse, tels que
     // la source les écrit), son code, ses jours avant la date limite et, s'il
@@ -47494,7 +47544,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, limiteAt: t.limiteAt || '', lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
+        ...lu, limiteAt: t.limiteAt || '', lieuType: typeCasier(t.lieu), sorte: sorteRetrait({ lieu: t.lieu, nom: lu.lieuNom, type: typeCasier(t.lieu), consigne: t.consigne, libelleTransp: libelleTranspDe(suiviDeLigne(t)) }), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), trajet: trajetCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47514,7 +47564,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, limiteAt: (eV && eV.limiteAt) || '', sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
+        ...lu, limiteAt: (eV && eV.limiteAt) || '', sorte: sorteRetrait({ lieu: r && r.lieu, nom: lu.lieuNom, consigne: r && r.consigne, libelleTransp: libelleTranspDe(suV) }), transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), trajet: trajetCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -47531,13 +47581,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
-        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), trajet: trajetCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         arrivee: arriveeLueRetrait({ o }),
-        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } }); }
+        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), trajet: trajetCarte({ o }), src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
       const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
@@ -57033,7 +57083,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         return { cle: 'r:rc:' + r.suivi, suivi: r.suivi, titre: '', nom: r.nom, adresse: r.adresse, code: r.code || '', codeDe: r.codeDe || '', transp: transporteurColis(r.carrier, r.suivi), jours: null, redirige: true, src: { t } }; })}/>
                   : videSite || (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null));
                   if (!(designV2 && colisDans === 'achats')) return ancienne;
-                  const avecColis = (parPoint.points || []).some((p) => (p.arrives || []).some((x) => x && !x.aVerifier && !x.horsCompte && !x.redirige));
+                  // (20 nov., rétention) Un point dont les colis sont tous « à vérifier » (date limite dépassée…) a SA carte aussi : code et QR visibles.
+                  const avecColis = (parPoint.points || []).some((p) => (p.arrives || []).some((x) => x && !x.redirige));
                   const enRouteV2 = voitSite('vinted') ? (buysBase || []).filter((o) => phaseReception(o) === 'route').map((o) => { const e = entreeSuiviAchat(o);
                     const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',

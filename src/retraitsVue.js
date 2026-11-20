@@ -48,21 +48,48 @@ export function compteARebours(lim) {
 // Le plus urgent d'abord : la limite lue la plus proche, puis le tri de l'écran (`triPoint` : la garde de son
 // transporteur), puis le plus chargé, puis le nom. Un point sans colis compté n'est pas une carte.
 export function trierPoints(points) {
-  const cle = (p) => { const l = limiteDuPoint(p); return l ? l.jours : (Number.isFinite(p.triPoint) ? p.triPoint : 99); };
+  // Un point dont aucun colis ne compte (tous « à vérifier ») passe après les autres.
+  const cle = (p) => { if (!(p.arrives || []).some(colisCompte)) return 1000; const l = limiteDuPoint(p); return l ? l.jours : (Number.isFinite(p.triPoint) ? p.triPoint : 99); };
   return [...(points || [])].sort((a, b) => cle(a) - cle(b) || (b.arrives || []).length - (a.arrives || []).length || String(a.nom || '').localeCompare(String(b.nom || ''), 'fr'));
 }
 
 // La bande en tête : { colis, points, urgents } — urgents = colis dont la limite LUE tombe aujourd'hui ou demain
 // (ou est passée) : « à retirer avant demain ».
+// + `verif` : les colis « à vérifier » montrés dans les cartes (date limite dépassée…) — dits à part, jamais comptés.
 export function resumeRetraits(points) {
-  let colis = 0, urgents = 0, n = 0;
+  let colis = 0, urgents = 0, n = 0, verif = 0;
   for (const p of points || []) {
     const l = (p.arrives || []).filter((x) => x && !x.aVerifier && !x.horsCompte);
+    verif += (p.arrives || []).filter((x) => x && !x.redirige && (x.aVerifier || x.horsCompte)).length;
     if (!l.length) continue;
     n++; colis += l.length;
     urgents += l.filter((x) => Number.isFinite(x.jours) && x.jours <= 1).length;
   }
-  return { colis, points: n, urgents };
+  return { colis, points: n, urgents, verif };
+}
+
+// ── RÉTENTION (20 nov., Julien) ─────────────────────────────────────────────
+// « Le code de retrait ET le QR restent affichés tant que le colis n'est pas FINI » : retiré (preuve) OU reparti /
+// commande annulée (statut PROUVÉ : « retour expéditeur », « non réclamé », annulation). Ces fins-là sont jugées
+// en amont, PAR IDENTITÉ (`pickupUnion`, App.jsx : `finsColis`, `finParIdentite`, `finCommandeAchat`) : un colis
+// fini n'arrive jamais ici. Tout ce qui arrive reste dans la carte de son point, avec son code et son QR ; une date
+// limite dépassée (ou une garde dépassée) n'est PAS une fin : le colis reste, « date limite dépassée · à vérifier »,
+// hors du compte (§5 : un colis caché est un colis perdu). Seul un colis RÉACHEMINÉ (`redirige`) a sa propre ligne.
+export const colisCompte = (x) => !!x && !x.aVerifier && !x.horsCompte && !x.redirige;
+export function colisDuPoint(p) {
+  const l = ((p && p.arrives) || []).filter((x) => x && !x.redirige);
+  return { comptes: l.filter(colisCompte), verif: l.filter((x) => !colisCompte(x)) };
+}
+// Pourquoi un colis montré est « à vérifier » — une clé, la phrase est écrite par l'écran (`tr`).
+export function mentionVerif(x) {
+  if (!x || colisCompte(x)) return '';
+  const r = String(x.raisonCode || '');
+  if (r === 'delai_depasse') return 'depasse';
+  if (r === 'trop_long') return 'trop-long';
+  if (r === 'sans_code') return 'sans-code';
+  if (r === 'transporteur') return 'transporteur';
+  if (r === 'doute_meme_relais') return 'doute';
+  return 'autre';
 }
 
 // « Itinéraire » : Plans sur un appareil Apple, Google Maps ailleurs (aucune clé, un lien). Le repère SÛR du point
