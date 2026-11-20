@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { BoutonExtension, FeuilleExtension } from '../BoutonExtension.jsx';   // (20 nov., décision de Julien) « … dans l'extension »
 import DansFiche from '../DansFiche.jsx';
 import { attrsFicheLigne } from '../ficheLigne.js';
 import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
@@ -37,12 +38,12 @@ import { achatDuNumeroLu, modifierCle, SheetShell, InfoPop, AUTH, BlocBarrerVc, 
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
 import ParcoursVestiaire, { LigneArgentVc, etapeEnCoursVc } from "../ParcoursVestiaire.jsx";
 import PhotosVestiaire, { textePhotosManquantes } from "../PhotosVestiaire.jsx";
-const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"));
 // (15 nov., lot favoris-sites, 5.392) « Ont aimé tes articles » : une offre aux personnes qui ont aimé, sur son clic.
 import AimesVestiaire from '../AimesVestiaire.jsx';
 import { lignesAimes, etatRecetteFavori } from '../aimesVestiaire.js';
 import { photosExigeesVc } from "../photosVestiaire.js";
-import { tr } from "../i18n/index.js";
+import { tr, langueCourante } from "../i18n/index.js";
+import { dateEnLigneVc, phraseEnLigneVc } from '../dateMiseVc.js';   // (20 nov., 5.410) depuis quand l'article est en ligne
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { IconePlus } from '../plateformes/IconePlus.jsx';
 import { BarreOutils, BoutonIcone } from '../ui/index.js';
@@ -342,10 +343,8 @@ function AnnoncesVestiaire() {
             <span className="vrm-pa-entree is-outil" data-pa-entree="vestiaire"><BoutonIcone label={tr('plateformes.publierSur', { site: 'Vestiaire' })} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: { site: 'vestiaire' } })); } catch (_) {} }}><IconePlus/></BoutonIcone></span>
           </BarreOutils>
         </div>
-        {baisseOuverte ? <BaissePrixVestiaire annonces={liste.filter((l) => l.etat === 'en-ligne').map(({ id, it, num }) => ({ id, it, num, compte: it.compte || '', titre: it.titre || '', photo: it.photo || '' }))}
-          compteOnglet={vcOuvert || null} recette={recettePrix} cap={extSait('vcprix')} Photo={PhotoBaisseVc} Retour={FermeAuRetour}
-          onBaisser={async (l) => { const r = await vmrCmd({ cmd: 'vcPrix', produit: String(l.id), avantCents: l.avant, apresCents: l.apres }, 60000); return r || { sansReponse: true }; }}
-          onFermer={() => { setBaisseOuverte(false); relire(); }}/> : null}
+        {/* (20 nov., décision de Julien) Baisser les prix Vestiaire : dans le panneau de l'extension (l'ancienne feuille est retirée). */}
+        {baisseOuverte ? <FeuilleExtension action="baisser" site="vestiaire" ids={liste.filter((l) => l.etat === 'en-ligne').map(({ id }) => String(id))} onFermer={() => setBaisseOuverte(false)}/> : null}
         {/* (2 nov., soir) « c'est beaucoup zoomé sur le produit » : la photo ENTIÈRE
             (contenue sur fond blanc, `vrm-vc-catalog`), aux proportions des fiches. */}
         <section className="vrm-pf-liste vrm-vc-catalog" aria-label="Mes annonces Vestiaire" data-pf-liste="vestiaire" style={{ margin: 0 }}>
@@ -354,14 +353,18 @@ function AnnoncesVestiaire() {
           <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
-            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
+            // (20 nov., 5.410) Depuis quand : la date LUE chez Vestiaire (« en ligne depuis le … »), sinon la 1re lecture
+            // par VRM, toujours dite « vue en ligne depuis au moins le … » (jamais présentée comme la date de mise en ligne).
+            const depuisVc = etat === 'en-ligne' ? phraseEnLigneVc(it, tr, langueCourante() || 'fr') : '';
+            const dVc = dateEnLigneVc(it);
+            const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : '', depuisVc].filter(Boolean).join(' · ');
             // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° lié à CE produit Vestiaire) ;
             // « Relier / Délier Vinted » y est rendu dans « Actions » (`DansFiche`).
             const flVc = attrsFicheLigne({ contexte: 'annonce', site: 'vestiaire', cle: 'v' + id, nums: num ? [String(num)] : [], photo: it.photo || '', titre: it.titre || '', prix: prix !== '—' ? prix : '' });
             // (16 nov.) Au téléphone, la rangée touchée MONTE à sa place : prix et favoris lus par Vestiaire, prix d'achat de SON N°.
             const avVc = attrsAvantSite({ site: 'vestiaire', id, prix: prix !== '—' ? prix : '', favoris: typeof it.favoris === 'number' ? it.favoris : null, num });
             return (
-              <li key={id} {...flVc} {...avVc} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+              <li key={id} {...flVc} {...avVc} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-vc-depuis={dVc ? (dVc.exacte ? 'exacte' : 'au-moins') : ''} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
                 {/* (14 nov., refonte visible) Une RANGÉE (photo 52, le N° et le nom, une ligne d'état, le prix),
                     plus une carte photo de 300 px : on voit 8 annonces par écran d'iPhone. */}
                 <span className="vrm-ui-ligne-photo vrm-pf-photo-vc" aria-hidden="true"><PhotoVc src={it.photo}/></span>
@@ -533,38 +536,7 @@ function PublierVestiaire({ comptes }) {
     const t = setTimeout(() => { try { const el = document.querySelector(`[data-vc-paire="${CSS.escape(id)}"]`); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('vrm-cc-cible'); el.setAttribute('data-vc-demande', ''); setTimeout(() => el.classList.remove('vrm-cc-cible'), 2400); } } catch (_) {} }, 150);
     return () => clearTimeout(t);
   }, [paires]);
-  const preparer = async (p) => {
-    if (envoi) return;
-    if (glob) { setMsg((m) => ({ ...m, [p.id]: glob.texte })); return; }
-    // (3 nov.) Vérifier avant de publier (`src/verifAnnonce.js`) ; la catégorie se choisit sur Vestiaire.
-    let achatV = null;
-    try { achatV = prixAchatDe((load('vinted_annonce_numeros', {}) || {})[String(p.id)], load('vinted_buyprice_by_num', {}) || {}); } catch (_) { achatV = null; }
-    // (11 nov., lot vestiaire-plus) Les photos que Vestiaire demande : ce que VRM SAIT manquer est dit AVANT (src/photosVestiaire.js).
-    { const rp = photosExigeesVc(photosDe(p));
-      if (rp.manque.length && !(await askConfirm({ title: tr('vcPhotos.confirme.titre', { n: rp.manque.length }), desc: textePhotosManquantes(rp), ok: tr('vcPhotos.confirme.ok'), cancel: tr('vcPhotos.confirme.annuler') }))) return; }
-    if (!(await verifierAvantPublication(problemesAnnonce({ titre: p.title || '', taille: p.taille || '', famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, marque: p.marque || '', nPhotos: (p.photos || []).length, prix: p.prix, achat: achatV , facultatifs: champsFacultatifs(vendActuel()),
-      // (11 nov.) Le N° écrit : jugé seulement si la description qui partira est sue.
-      numero: p.num || '', ...(typeof p.description === 'string' ? { description: p.description } : {}), ...optsNumeroVerif() }, 'vestiaire'), { site: 'vestiaire' }))) return;
-    setEnvoi(p.id); setMsg((m) => ({ ...m, [p.id]: '' }));
-    const t0 = Date.now();
-    const r = await vmrCmd({ cmd: 'vcPreparer', id: String(p.id), publier: auto }, 30000);
-    setEnvoi('');
-    if (!r) { setMsg((m) => ({ ...m, [p.id]: "L'extension n'a pas répondu — recharge cette page et réessaie." })); return; }
-    if (!r.accepte) { setMsg((m) => ({ ...m, [p.id]: r.raison || "Refusé par l'extension." })); return; }
-    __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier();
-    // (11 nov., lot suivi-travail) La feuille « VRM travaille » : « publiée » seulement si l'extension le dit.
-    const id = String(p.id);
-    const t = suivi.demarrer({ sorte: auto ? 'publier-vc' : 'preparer-vc', titre: auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire', articles: [{ id, num: p.num || '', titre: p.title || '' }],
-      etapes: auto ? [['depot', 'Formulaire Vestiaire ouvert'], ['accepte', 'Publiée sur Vestiaire ✓']] : [['depot', 'Formulaire Vestiaire ouvert et rempli']] });
-    if (!t) return;
-    t.etape(id, 'depot');
-    if (!auto) { t.fin(id, { etat: 'main', raison: 'formulaire ouvert et rempli par l’extension', geste: 'Relis et publie sur Vestiaire' }); t.terminer(''); return; }
-    suivreJob(t, id, { jobId: r.jobId || 'vc:' + id, lireJobs: () => __vmrJobs, depuis: t0, delaiMs: 15 * 60000 }).then(({ fin }) => {
-      if (fin === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
-      else t.fin(id, { etat: 'main', raison: fin === 'abandonne' ? 'VRM n’a pas vu la fin de la publication' : fin === 'arret' ? 'la publication continue dans l’onglet Vestiaire' : 'VRM n’a pas vu la fin en 15 min', geste: 'Regarde l’onglet Vestiaire ; si elle est en ligne, clique « Déjà publiée »' });
-      t.terminer('');
-    });
-  };
+  // (20 nov., décision de Julien) Publier sur Vestiaire : dans le panneau de l'extension (le bouton plus bas).
   const marquer = async (p) => {
     if (envoi) return;
     const ok = await askConfirm({ title: `N°${p.num} déjà publiée sur Vestiaire ?`, desc: "Elle sort de cette liste. Rien n'est envoyé à Vestiaire.", ok: 'Oui, elle est en ligne', cancel: 'Annuler' });
@@ -622,9 +594,8 @@ function PublierVestiaire({ comptes }) {
               {msg[p.id] ? <div data-vc-refus="" style={{ fontSize: 11, color: C.warn, marginTop: 2 }}>{msg[p.id]}</div> : null}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button type="button" data-vc-preparer={p.id} aria-disabled={glob ? 'true' : undefined} title={glob ? glob.texte : auto ? "L'extension ouvre Vestiaire, remplit, attache les photos et publie SANS booster dès que tout est rempli" : "L'extension ouvre Vestiaire et remplit ce qu'elle reconnaît — tu relis et tu publies"} onClick={() => preparer(p)} style={btn(true)}>
-                {envoi === p.id ? 'Envoi…' : ouvert ? 'Ouvert sur Vestiaire' : auto ? 'Publier sur Vestiaire' : 'Préparer sur Vestiaire'}
-              </button>
+              {/* (20 nov., décision de Julien) La publication Vestiaire se fait dans le panneau de l'extension, depuis CETTE annonce Vinted. */}
+              <BoutonExtension className="vrm-ao-second" action="publier" site="vestiaire" ids={[String(p.id)]} attrs={{ 'data-vc-preparer': p.id }}/>
               <button type="button" data-vc-marquer={p.id} onClick={() => marquer(p)} style={btn(false)}>Déjà publiée</button>
             </div>
           </div>
@@ -961,18 +932,7 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
   }, [relire]);
   const cap = extSait('vcrepondre');
   const peut = cap === 'ok' && envoi && envoi.appris === true;
-  const envoyer = async () => {
-    const t = texte.trim();
-    if (!t || enCours || !peut) return;
-    setEnCours(true); setRes(null);
-    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
-    let r = null; try { r = await vmrCmd({ cmd: 'vcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    const etat = etatEnvoiExtension(r);
-    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
-    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
-    setRes(etat === 'ok' ? null : etiquetteResultatVc(r));
-    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
-  };
+  const envoyer = () => {};   // (20 nov., décision de Julien) répondre : dans le panneau de l'extension
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-vc-fil="charge" style={style}>Lecture de la conversation…</div>;
@@ -997,27 +957,12 @@ function FilVestiaire({ conv, num, titre, envoi, annonce = false, offre = null, 
     dejaLu={!!(envoiFil && fil && dejaDansFil(fil.messages, envoiFil.texte, envoiFil.depuis))}/>;
   const resultat = res && <div role="status" data-vc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
   let pied;
-  if (fil && fil.messages && peut) pied = (
-    <div className="vrm-chat-foot" data-vc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
-      {resultat}
-      <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
-      <ComposeConv site="vestiaire" valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Vestiaire" libelleEnvoyer="Envoyer sur Vestiaire"
-        envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-vc-envoyer': '' }}/>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>Part de l'onglet Vestiaire {NAV.dans}, à ton nom, un à la fois.</span>
-        <a href={lien} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ color: C.muted, fontWeight: 600, display: 'inline-flex', alignItems: 'center', minHeight: 44, fontSize: 13 }}>Ouvrir sur Vestiaire ↗</a>
-      </div>
+  // (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur Vestiaire, dans CETTE conversation.
+  void peut; void envoyer; void resultat;
+  if (fil && fil.messages) pied = (
+    <div className="vrm-chat-foot" data-vc-repondre="panneau" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
+      <BoutonExtension action="repondre" site="vestiaire" ids={[String(conv)]} large/>
     </div>
-  );
-  else if (fil && fil.messages) pied = (
-    <PiedSansEnvoi attrs={{ 'data-vc-repondre': cap !== 'ok' ? 'ext-' + cap : 'pas-appris', ...(cap === 'ok' ? { 'data-vc-pas-appris': envoi && envoi.raison ? envoi.raison : '' } : {}) }} lien={lien} texteLien="Répondre sur Vestiaire ↗"
-      raison={cap === 'absente' ? <>Ouvre VRM là où est l'extension, ou réponds sur Vestiaire.</>
-        : cap !== 'ok' ? <>Pour répondre d'ici, il faut l'extension <b>{EXT_CAPACITES.vcrepondre}</b> — mets-la à jour depuis <b>Paramètres → État des connexions</b>.</>
-        : envoi && envoi.raison === 'messagerie-stream'
-          ? <span data-vc-envoi-stream="">Vestiaire passe par un service de messagerie à part : réponds sur Vestiaire.</span>
-          : <>D'abord, envoie <b>une</b> réponse toi-même sur Vestiaire, {NAV.dans} : VRM apprend.{envoi && envoi.raison ? <> (Dernier essai vu : pas encore sûr à refaire — {envoi.raison}.)</> : null}</>}>
-      {resultat}
-    </PiedSansEnvoi>
   );
   else if (fil !== undefined) pied = <PiedSansEnvoi lien={lien} texteLien="Ouvrir sur Vestiaire ↗" raison="Sans le texte de la conversation, VRM ne répond pas d'ici."/>;
   return (

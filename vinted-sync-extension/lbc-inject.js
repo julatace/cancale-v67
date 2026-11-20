@@ -59,7 +59,7 @@
   }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.409.0';
+  const CAPTEUR_VERSION='5.410.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -866,7 +866,13 @@
       }).filter((x) => x.t);
       convsVuesLbc.add(conv);
       const forme = arr.length ? cheminsDeCles(arr[0]).map((c) => sansUuid(c)).filter((c) => !SANS_PERSONNE_LBC.test(c.split(':')[0])).slice(0, 80) : [];
-      post({ kind: 'lbcfil', conv, messages, lus: arr.length, forme, moi, page: cheminPage() });
+      // 5.410 (20 nov., lot lbc-vc-interesses) — L'ANNONCE DE LA CONVERSATION. MESURÉ (lbc_recon, 22 oct.) : la
+      // réponse `…/hal/{moi}/conversations/{conv}/messages` porte `conversationContext.itemId` (l'annonce dont la
+      // personne parle) et `itemType`. Lue sous CE nom seulement, un identifiant d'annonce Leboncoin (6 à 12
+      // chiffres) ; jamais `partnerId`, `partnerName`, ni la photo de la personne (clés de personne écartées).
+      const ctxConv = obj.conversationContext && typeof obj.conversationContext === 'object' && !Array.isArray(obj.conversationContext) ? obj.conversationContext : null;
+      const annonce = ctxConv && (typeof ctxConv.itemId === 'string' || typeof ctxConv.itemId === 'number') && /^\d{6,12}$/.test(String(ctxConv.itemId)) && (ctxConv.conversationId == null || String(ctxConv.conversationId) === conv) ? String(ctxConv.itemId) : '';
+      post({ kind: 'lbcfil', conv, messages, lus: arr.length, forme, moi, page: cheminPage(), annonce });
     } catch (_) {}
   }
   // ── APPRENDRE COMMENT LA PAGE ENVOIE UN MESSAGE ──

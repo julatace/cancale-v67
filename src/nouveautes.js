@@ -27,6 +27,16 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov., Julien : « pour l'extension, tu fais pareil que Vintex ») docs/passation/2026-11-20-panneau-vintex.md
+  { id: 'panneau-vintex', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») docs/passation/2026-11-20-actions-extension.md.
+  { id: 'gestes-extension', date: '2026-11-20', titre: 'Tes gestes se font dans l’extension', phrase: 'Baisser, republier, répondre : VRM ouvre le panneau sur le site.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., ext. 5.410) Republier copie l'annonce telle quelle et vérifie avant ; messages qui sautent ce qui serait refusé — docs/passation/2026-11-20-repub-messages-malins.md
+  { id: 'repub-verifie-avant', date: '2026-11-20', titre: 'Republier vérifie chaque annonce avant de lancer', phrase: 'Copie exacte de l’annonce, taille corrigée seule, le reste demandé.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-sautes-dits', date: '2026-11-20', titre: 'Favoris : ce qui serait refusé est sauté', phrase: 'Vendus, sous ton prix mini, texte refusé : sautés, et dit au bilan.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « on reçoit quand une personne est intéressée sur Leboncoin ; pour Vestiaire trouve une solution ») docs/passation/2026-11-20-lbc-vc-interesses.md
+  { id: 'lbc-interesses', date: '2026-11-20', titre: 'Leboncoin : qui t’a écrit, par annonce', phrase: 'Leur écrire depuis le panneau VRM, une personne à la fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'vc-date-baisse', date: '2026-11-20', titre: 'Vestiaire : date en ligne, baisse par règle', phrase: 'Lue chez Vestiaire, sinon « au moins » ; éteinte par défaut.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus ») src/natif/ecrans/PropositionLiaison.jsx
   { id: 'relier-depuis-liste', date: '2026-11-20', titre: 'Relie une annonce depuis la liste', phrase: 'Sa paire proposée sur la rangée : un toucher, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « des boutons pas très beaux, pas fiables, améliore ça ») docs/passation/2026-11-20-boutons-natifs.md

@@ -108,7 +108,8 @@ async function controles(T, ok) {
     while ((m = re.exec(sansCommentaires(s)))) appels.push([f, /facultatifs/.test(m[1]) || /verifV/.test(m[1])]);
     if (/problemesAnnonce\(verifV, 'vinted'\)/.test(s)) appels.push([f, /const verifV = \{ \.\.\.\(a\.verif \|\| \{\}\), facultatifs: champsFacultatifs\(vendActuel\(\)\) \}/.test(s)]);
   }
-  ok(appels.length >= 4 && appels.every(([, o]) => o), 'C5 chaque vérification de publication de l’app passe `facultatifs`', appels.filter(([, o]) => !o).map(([f]) => f).join(', ') || `${appels.length} appels`);
+  // (20 nov.) la vérification avant « Publier sur Vestiaire » est partie avec la publication (dans l'extension) : 3 appels restent.
+  ok(appels.length >= 3 && appels.every(([, o]) => o), 'C5 chaque vérification de publication de l’app passe `facultatifs`', appels.filter(([, o]) => !o).map(([f]) => f).join(', ') || `${appels.length} appels`);
   ok(/manquesEnvoi\(sx, apercu, \{[\s\S]{0,200}?facultatifs: champsFacultatifs\(vendActuel\(\)\)/.test(app) && /facultatifs: facultatifs === true \}, SITE_VERIF\[site\]/.test(T.publier || ''), 'C6 « Publier ailleurs » (manquesEnvoi) passe `facultatifs`');
   if (P) {
     const m = P.motsArticle('autre');

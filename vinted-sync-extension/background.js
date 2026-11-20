@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.409.0';
+const CODE_VERSION = '5.410.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4015,6 +4015,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.409 : répondre depuis le volet Messages du panneau — SEULEMENT depuis la carte de l'onglet vinted.fr.
+    // 5.410 (20 nov.) : les INTÉRESSÉS d'une annonce Leboncoin (lecture, panneau sur leboncoin.fr), puis « Leur écrire »
+    // (série sur SON toucher, récapitulatif confirmé) — `interessesLbcPanneau`, `ecrireInteressesLbc`.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'interessesLbc') {
+      interessesLbcPanneau(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'ecrireInteressesLbc') {
+      ecrireInteressesLbc(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'prixCarte') { changerPrixCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifier') { atelierVerifier(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierLancer') { atelierLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierArreter') { atelierArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'offreCarte') { offreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisAuto') { favorisAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'supprimerLbcCarte') { supprimerLbcCarte(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
+    // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'reglageAuto') {
+      reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'repondreCarte') {
       repondreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -11917,9 +11942,9 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); }   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -13913,7 +13938,14 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await vintedPage(acc, 'POST', '/api/v2/item_upload/attributes', { attributes: [{ code: 'category', value: [Number(cat)] }] }, { timeoutMs: 20000 });
-  if (!r || !r.ok) { noterDiag('tailles_lecture_ratee_' + ((r && r.status) || 0)); return { raison: "Vinted n'a pas rendu la liste des tailles" }; }
+  if (!r || !r.ok) {
+    noterDiag('tailles_lecture_ratee_' + ((r && r.status) || 0));
+    // 5.410 (`repubverif`) Vinted REFUSE la catégorie elle-même (champ nommé dans son refus) : elle n'existe plus ou n'est pas
+    // une catégorie finale — dit, jamais devinée. Tout autre refus reste « liste pas lue ».
+    const errs = r && r.json && Array.isArray(r.json.errors) ? r.json.errors : [];
+    const surCat = r && (r.status === 400 || r.status === 422) && errs.some((e) => /^(category|catalog_id|catalog)$/.test(String((e && (e.field || e.name)) || '')));
+    return { raison: "Vinted n'a pas rendu la liste des tailles", status: (r && r.status) || 0, ...(surCat ? { categorieRefusee: true } : {}) };
+  }
   try { echantillonRate('tailles_reponse_forme', cat, JSON.stringify(formeJson(r.json)).slice(0, 1500)); } catch (_) {}
   const options = optionsTailleDe(r.json);
   const requis = codesRequis(r.json);
@@ -14314,6 +14346,8 @@ function appliquerBrouillonLu(d, rl, id) {
     if (Array.isArray(c.color_ids) && c.color_ids.length) d.color_ids = c.color_ids;
     if (Array.isArray(c.item_attributes) && c.item_attributes.length) d.item_attributes = c.item_attributes;
     if (f.description && f.description.length >= DESCRIPTION_MIN) d.description = f.description;
+    // 5.410 (`repubfidele`) Le brouillon tel que Vinted l'a rangé : chacun de ses champs du formulaire gagne (photos à part).
+    poserRecetteFidele(d, recetteFidele(it), true);
   }
   const ph = photosDuBrouillonLu(it);
   if (ph && ph.length) { d.assigned_photos = ph; noterDiag('brouillon_lu_photos'); }
@@ -14670,8 +14704,13 @@ const centimesBaisse = (v) => { const n = Number(v); return Number.isFinite(n) ?
 // plus de 10 fois le prix actuel. Tout le reste (compte de l'onglet, 45/h, prix lu avant, relu
 // après) est le chemin de baisse, inchangé. Rien n'est remis automatiquement : l'app n'envoie
 // `remise` que depuis le bouton « Remettre N prix ».
+// (20 nov., 5.410) Et une HAUSSE sur SON clic (« Changer le prix » du panneau, « Monter à X € ? » confirmé) : `hausse`
+// + `confirme`, jamais depuis une règle (`source: 'regle'`), au plus 10 fois le prix actuel. Les baisses par RÈGLE
+// restent des baisses (elles ne portent jamais `hausse`).
 function remisePermise(msg, avantC, vouluC) {
-  if (!msg || msg.remise !== true || msg.confirme !== true) return false;
+  if (!msg || msg.confirme !== true) return false;
+  if (msg.hausse === true && msg.source !== 'regle') return Number.isInteger(avantC) && Number.isInteger(vouluC) && avantC > 0 && vouluC > avantC && vouluC <= avantC * 10;
+  if (msg.remise !== true) return false;
   const o = centimesBaisse(msg.prixOrigine);
   return Number.isInteger(avantC) && Number.isInteger(vouluC) && avantC > 0 && vouluC > avantC && o === vouluC && vouluC <= avantC * 10;
 }
@@ -15188,7 +15227,7 @@ function formeCorpsRepub(b) {
     attrs: d && Array.isArray(d.item_attributes) ? d.item_attributes.map((a) => a && a.code).filter(Boolean).sort() : null,
     taille: !!(d && Array.isArray(d.item_attributes) && d.item_attributes.some((a) => a && a.code === 'size' && Array.isArray(a.ids) && a.ids.length)),
     couleurs: d && Array.isArray(d.color_ids) ? d.color_ids.length : null, catalogue: !!(d && Number(d.catalog_id) > 0), colis: !!(d && Number(d.package_size_id) > 0),
-    photosDe: PHOTOS_DE.get(b) || undefined };
+    photosDe: PHOTOS_DE.get(b) || undefined, fidele: FIDELE_DE.get(b) || undefined };
 }
 function formeReponseRepub(o) {
   const j = o && o.json && typeof o.json === 'object' ? o.json : null;
@@ -15340,11 +15379,65 @@ function uuidRecreer() {
   const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
+// ══ 5.410 (`repubfidele`, 20 nov.) — LA COPIE FIDÈLE ═══════════════════════════════════════════
+// Julien : « normalement, vu que c'est déjà en ligne, c'est juste du copier-coller sauf les photos ».
+// Mesuré (vraie base, lecture seule, 20 nov.) : 9 brouillons créés par VRM ; 8 bâtis SANS le corps du
+// formulaire de l'annonce d'origine (la recette « codes » : 7 champs repris, isbn, mesures, fabricant
+// forcés à null), 1 seul depuis ce corps — et celui-là était égal à l'origine champ par champ. Les 63
+// corps du formulaire « Modifier » de Vinted rangés chez lui portent toujours les mêmes clés (`imei`
+// sur 14) ; 13 sur 63 ont une matière (`material`), 34 sur 63 deux couleurs.
+// ⇒ Le brouillon recopie TEL QUEL chaque champ du formulaire que Vinted sert pour l'annonce EN LIGNE
+//   (`GET item_upload/items/{id}`, depuis l'onglet du compte : sa page « Modifier ») ; SEULES les
+//   photos sont renvoyées (depuis le coffre). Titre et prix : ceux de l'atelier (SON choix, sinon
+//   ceux de Vinted). Un champ que Vinted sert et que VRM ne connaît pas n'est jamais inventé dans le
+//   corps : son NOM est gardé (`ecartes`) dans la trace (`repub_trace_*`), pour la passe suivante.
+// <repub-fidele-regle>
+const CHAMPS_FORMULAIRE_VINTED = Object.freeze(['title', 'description', 'price', 'currency', 'catalog_id', 'brand_id', 'brand', 'color_ids', 'item_attributes', 'package_size_id', 'is_unisex', 'isbn', 'imei', 'measurement_length', 'measurement_width', 'manufacturer', 'manufacturer_labelling', 'shipment_prices', 'video_game_rating_id']);
+const CHAMPS_JAMAIS_RECOPIES = Object.freeze(['id', 'photos', 'assigned_photos', 'temp_uuid', 'upload_session_id', 'is_draft', 'push_up', 'feedback_id', 'ai_photo']);
+const CHAMPS_DE_L_ATELIER = Object.freeze(['title', 'price', 'description']);   // SON choix (titre, prix, lettre) : posés par l'atelier
+function recetteFidele(itLu) {
+  if (!itLu || typeof itLu !== 'object' || Array.isArray(itLu)) return null;
+  const scal = (v) => v === null || typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && isFinite(v));
+  const recette = {}, copies = [], ecartes = [];
+  for (const k of Object.keys(itLu)) {
+    if (!/^[a-z0-9_]{1,40}$/.test(k) || CHAMPS_JAMAIS_RECOPIES.includes(k)) continue;
+    if (!CHAMPS_FORMULAIRE_VINTED.includes(k)) { if (ecartes.length < 40) ecartes.push(k); continue; }
+    let v = itLu[k];
+    if (k === 'price' && v && typeof v === 'object') { if (v.currency_code && itLu.currency == null) { recette.currency = String(v.currency_code).slice(0, 3); copies.push('currency'); } v = v.amount != null ? String(v.amount) : null; }
+    if (k === 'item_attributes') { if (!Array.isArray(v)) continue; v = v.filter((a) => a && typeof a.code === 'string' && /^[a-z0-9_]{1,40}$/.test(a.code)).map((a) => ({ code: a.code, ids: Array.isArray(a.ids) ? a.ids.map(Number).filter((x) => Number.isSafeInteger(x) && x > 0).slice(0, 10) : [] })).slice(0, 20); }
+    else if (k === 'color_ids') v = idsCouleurVinted(itLu);
+    else if (k === 'shipment_prices') { if (!v || typeof v !== 'object' || Array.isArray(v)) continue; const o = {}; for (const kk of Object.keys(v)) if (/^[a-z_]{1,30}$/.test(kk) && scal(v[kk])) o[kk] = v[kk]; v = o; }
+    else if (!scal(v)) { if (ecartes.length < 40) ecartes.push(k); continue; }
+    recette[k] = v; if (!copies.includes(k)) copies.push(k);
+  }
+  // Forme d'avant (couleur1/couleur2, marque en objet) : rangée sous les clés du formulaire, jamais devinée.
+  if (!('color_ids' in recette)) { const c = idsCouleurVinted(itLu); if (c.length) { recette.color_ids = c; copies.push('color_ids'); } }
+  if (!(Number(recette.brand_id) > 0) && itLu.brand_dto && typeof itLu.brand_dto === 'object' && Number(itLu.brand_dto.id) > 0) { recette.brand_id = Number(itLu.brand_dto.id); if (typeof itLu.brand_dto.title === 'string') recette.brand = itLu.brand_dto.title.slice(0, 80); copies.push('brand_id'); }
+  return { recette, copies: copies.sort(), ecartes: ecartes.sort() };
+}
+// Pose la recette lue sur un corps : chaque champ du formulaire que Vinted a servi gagne, sauf ceux de l'atelier.
+// Une liste VIDE lue (couleurs, attributs) n'efface jamais une liste pleine : « rien lu » ne vaut pas « rien » (§5) ;
+// `pleinsSeuls` (relecture d'un brouillon) : un champ lu à null n'efface pas non plus un champ rempli.
+function poserRecetteFidele(item, rf, pleinsSeuls) {
+  if (!item || !rf || !rf.recette) return item;
+  const vide = (v) => v == null || (Array.isArray(v) && !v.length);
+  for (const k of Object.keys(rf.recette)) if (!CHAMPS_DE_L_ATELIER.includes(k) && !(Array.isArray(rf.recette[k]) && !rf.recette[k].length && !vide(item[k])) && !(pleinsSeuls && rf.recette[k] == null && !vide(item[k]))) item[k] = Array.isArray(rf.recette[k]) ? rf.recette[k].map((x) => (x && typeof x === 'object' ? { ...x, ids: Array.isArray(x.ids) ? x.ids.slice() : x.ids } : x)) : (rf.recette[k] && typeof rf.recette[k] === 'object' ? { ...rf.recette[k] } : rf.recette[k]);
+  return item;
+}
+// Les champs du formulaire qui DIFFÈRENT entre l'origine lue et le corps envoyé (noms seulement, pour la trace).
+function ecartsRecette(rf, item) {
+  if (!rf || !rf.recette || !item) return null;
+  return Object.keys(rf.recette).filter((k) => !CHAMPS_DE_L_ATELIER.includes(k) && !(Array.isArray(rf.recette[k]) && !rf.recette[k].length) && JSON.stringify(rf.recette[k]) !== JSON.stringify(item[k])).sort();
+}
+// </repub-fidele-regle>
+const FIDELE_DE = new WeakMap();   // corps envoyé → { copies, ecartes, differents } (noms seulement, pour la trace)
 // Le corps de création : la recette de CETTE annonce, jamais un champ deviné.
 // Rend { item } ou { manque: [...] }.
 // (2 nov., 5.310) `partiel` : rend aussi le corps INCOMPLET ({ item, manque }) —
 // `reglerAvant` le complète depuis une identité ou pose la question ; jamais envoyé tel quel.
-function itemPourRecreer({ modeleCorps, codes, vivant, titre, prix, description, brand, photoIds, temp, partiel }) {
+function itemPourRecreer({ modeleCorps, codes: codes0, vivant, recette, titre, prix, description, brand, photoIds, temp, partiel }) {
+  // 5.410 (`repubfidele`) La recette LUE sur l'annonce en ligne complète d'abord les codes (catégorie, taille, colis…).
+  const codes = recette && recette.recette ? { ...(codes0 || {}), ...Object.fromEntries(['catalog_id', 'brand_id', 'brand', 'color_ids', 'item_attributes', 'package_size_id', 'is_unisex'].filter((k) => recette.recette[k] != null && !(Array.isArray(recette.recette[k]) && !recette.recette[k].length)).map((k) => [k, recette.recette[k]])) } : codes0;
   // (29 oct.) Tout passe par un brouillon : la forme COURTE {id, orientation} — celle des brouillons du site et de Vintex (mesurée).
   const assigned = photoIds.map((id) => ({ id, orientation: 0 }));
   let base = null;
@@ -15373,8 +15466,10 @@ function itemPourRecreer({ modeleCorps, codes, vivant, titre, prix, description,
       manufacturer: null, measurement_width: null, measurement_length: null, manufacturer_labelling: null };
     if (typeof c.is_unisex === 'boolean') base.is_unisex = c.is_unisex;
   }
+  // 5.410 (`repubfidele`) Chaque champ du formulaire servi par Vinted pour l'annonce en ligne, TEL QUEL.
+  if (recette && recette.recette) poserRecetteFidele(base, recette);
   const item = { ...base, id: null, currency: base.currency || 'EUR', temp_uuid: temp, title: titre, price: String(prix), description: description || base.description || '',
-    ai_photo: false, assigned_photos: assigned, shipment_prices: { domestic: null, international: null } };
+    ai_photo: false, assigned_photos: assigned, shipment_prices: (recette && recette.recette && recette.recette.shipment_prices && typeof recette.recette.shipment_prices === 'object') ? { ...recette.recette.shipment_prices } : { domestic: null, international: null } };
   // La couleur : sans elle Vinted range le brouillon mais REFUSE la mise en ligne.
   // On ne supprime donc rien tant qu'on ne la connaît pas (le modèle, sinon les codes).
   if (!idsCouleurVinted(item).length) {
@@ -16110,7 +16205,80 @@ async function apprendreRecetteVinted(acc, uid, id) {
   }
   noterDiag('recette_lue');
   try { await enfilerFiches([{ id: String(id), src: 'modif', at: new Date().toISOString(), f }]); await viderFiches({ force: true }); } catch (_) {}
-  return f;
+  // 5.410 (`repubfidele`) Le formulaire ENTIER de l'annonce en ligne (jamais rangé en base : il ne sert qu'à CE corps).
+  const it = j && (j.item && typeof j.item === 'object' ? j.item : j);
+  const rf = recetteFidele(it);
+  if (rf && rf.ecartes.length) noterDiag('recette_champs_inconnus');
+  return rf ? { ...f, recette: rf } : f;
+}
+// ══ 5.410 (`repubverif`, 20 nov.) — LE CONTRÔLE AVANT DE LANCER ══════════════════════════════════
+// Julien : « plus d'intelligence, même dans la republication, car les catégories sont parfois mal
+// remplies et ça bloque côté Vinted ». Mesuré (compteurs de l'extension chez lui, 20 nov.) : refus de
+// Vinted nommant la taille ×10 (+ photos et taille ×1), les photos ×7, la description ×2.
+// SUR SON CLIC (l'atelier, étape « Envoi »), AVANT qu'il lance : pour chaque annonce choisie, VRM LIT
+// chez Vinted (onglet du compte, budget de LECTURE, une à la fois) le formulaire de l'annonce en ligne —
+// celui que le brouillon recopiera tel quel (`repubfidele`) — puis le juge contre ce que Vinted sert
+// (grille de la catégorie : tailles, champs obligatoires ; catégorie refusée par Vinted) :
+//   · ok          — rien à faire ;
+//   · corrige     — corrigé depuis une donnée SÛRE (taille au même libellé dans la grille de Vinted,
+//                   champ repris de CETTE annonce) : montré dans le récapitulatif, appliqué au départ ;
+//   · a-corriger  — il manque quelque chose que VRM ne peut pas déduire : UNE question (valeurs de Vinted),
+//                   sa réponse revient ici (`reponses`) ; l'atelier ne lance pas tant qu'il en reste ;
+//   · absente     — Vinted dit qu'elle n'existe plus : elle ne part pas ;
+//   · pas-verifie — lecture impossible (budget, onglet, réponse inconnue) : dite, vérifiée au départ comme avant.
+// AUCUN geste chez Vinted, aucune écriture, aucun « secours » : c'est une lecture. Le budget de lecture est
+// GARDÉ pour la republication elle-même (une lecture par annonce au départ) : au-delà, « pas vérifiée ».
+const VERIF_REPUB_MAX = 30;
+async function lecturesFaitesHeure(uid) {
+  try { const t = Date.now(); return ((((await chrome.storage.local.get('vrmLectures')).vrmLectures) || {})[String(uid)] || []).filter((x) => t - x < 3600000).length; } catch (_) { return LECTURES_MAX_HEURE; }
+}
+async function verifierRepub(msg) {
+  const uid = String((msg && msg.uid) || '');
+  const ids = Array.isArray(msg && msg.ids) ? [...new Set(msg.ids.map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, VERIF_REPUB_MAX) : [];
+  if (!/^\d+$/.test(uid) || !ids.length) return { accepte: false, code: 'invalide', raison: 'rien à vérifier' };
+  const accts = await getStoredAccounts();
+  const acc = accts.find((a) => String(a.vinted_user_id) === uid);
+  if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable' };
+  const stop0 = await gardeStricte(uid, acc, { lecture: true });
+  if (stop0) return { accepte: false, code: stop0.code, raison: stop0.error };
+  const reponses = msg.reponses && typeof msg.reponses === 'object' && !Array.isArray(msg.reponses) ? msg.reponses : {};
+  const total = Number.isInteger(msg.total) && msg.total > 0 ? Math.min(msg.total, 60) : ids.length;
+  // Une lecture par annonce GARDÉE pour le départ de chacune (au plus 10 dans l'heure).
+  let permis = Math.max(0, LECTURES_MAX_HEURE - (await lecturesFaitesHeure(uid)) - Math.min(total, 10));
+  const paires = []; let arret = '';
+  for (const id of ids) {
+    if (!arret && permis <= 0) arret = 'budget';
+    if (arret) { paires.push({ id, etat: 'pas-verifie', raison: arret === 'budget' ? 'pas vérifiée maintenant : VRM garde ses lectures de Vinted pour la republication elle-même — elle sera vérifiée à son départ (rien ne part si elle est incomplète)' : arret }); continue; }
+    let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=p:data->photos`); } catch (_) { coffre = null; }
+    const nPh = Array.isArray(coffre) ? (coffre[0] && Array.isArray(coffre[0].p) ? coffre[0].p.filter((u) => /^https:\/\/images\d*\.vinted\.net\//i.test(String(u))).length : 0) : null;
+    permis--;
+    const appris = await avecVinted(() => apprendreRecetteVinted(acc, uid, id));
+    if (appris && appris.sansPage) return { accepte: false, code: 'onglet-vinted', raison: appris.raison };
+    if (appris && (appris.status === 404 || appris.status === 410)) { paires.push({ id, etat: 'absente', raison: "Vinted dit que cette annonce n'existe plus (vendue ou supprimée) : elle ne sera pas republiée" }); continue; }
+    if (!appris || !appris.recette) {
+      const r0 = (appris && appris.raison) || "Vinted n'a pas répondu";
+      paires.push({ id, etat: 'pas-verifie', raison: `pas vérifiée : ${r0}` });
+      if (!(appris && (appris.status || appris.vu))) arret = `pas vérifiée : ${r0}`;   // garde ou budget : les suivantes non plus
+      continue;
+    }
+    const it = (itemPourRecreer({ codes: appris.codes, vivant: appris.codes, recette: appris.recette, titre: 'x', prix: 1, description: String(appris.description || ''), photoIds: [1], temp: 'x', partiel: true }) || {}).item;
+    if (!it) { paires.push({ id, etat: 'pas-verifie', raison: 'pas vérifiée : forme inconnue' }); continue; }
+    const tailleDe = (x) => JSON.stringify((Array.isArray(x.item_attributes) ? x.item_attributes : []).find((a) => a && a.code === 'size') || null);
+    const t0 = tailleDe(it);
+    const rep = reponses[id] && typeof reponses[id] === 'object' ? reponses[id] : null;
+    const rg = await reglerAvant(uid, acc, it, [id], rep, { id });
+    const g = Number(it.catalog_id) > 0 ? await grilleTailles(uid, acc, it.catalog_id, { cacheSeul: true }) : null;
+    const corrections = [];
+    if (tailleDe(it) !== t0 && !(rep && rep.size)) corrections.push({ champ: 'size', nom: 'la taille', raison: "sa taille n'est plus dans la grille de Vinted pour cette catégorie : la même taille (même libellé) de la grille d'aujourd'hui est posée" });
+    for (const c of rg.completes) corrections.push({ champ: c, nom: NOM_QUESTION[c] || c, raison: 'repris de cette même annonce' });
+    const manque = rg.manque.slice(); let question = rg.question;
+    if (g && g.categorieRefusee && !(rep && rep.catalog_id)) { manque.unshift('la catégorie (Vinted ne la propose plus)'); question = await questionRepub(uid, it, ['catalog_id'], { id }); }
+    if (nPh === 0) manque.push("les photos (aucune n'est sauvegardée : passe sur l'annonce dans Vinted une fois)");
+    const etat = manque.length ? 'a-corriger' : corrections.length ? 'corrige' : 'ok';
+    noterDiag('repub_verif_' + etat.replace('-', '_'));
+    paires.push({ id, etat, corrections, manque, question: manque.length && question ? question : null, ...(rep ? { reponses: rg.reponses } : {}), ...(appris.recette.ecartes.length ? { champsInconnus: appris.recette.ecartes.length } : {}) });
+  }
+  return { accepte: true, etape: 'fait', paires, at: Date.now() };
 }
 // (28 oct., sa demande : « une barre de progression ») Chaque étape d'une
 // recréation est annoncée à l'app (`maj · repub`) : elle dessine la barre. Une
@@ -16227,14 +16395,18 @@ async function recreerVinted(msg) {
   if (appris && (appris.status === 404 || appris.status === 410)) { noterDiag('recreer_annonce_absente'); return { accepte: true, etape: 'echec', raison: "Vinted dit que cette annonce n'existe plus (elle a peut-être été supprimée ou vendue) — VRM ne recrée rien. Regarde ton dressing." }; }
   const vivant = appris && appris.codes ? appris.codes : null;
   if (vivant) details.codes = { ...(details.codes || {}), ...vivant }; else noterDiag('recreer_sans_lecture_vivante');
-  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+  // 5.410 (`repubfidele`) Le formulaire de l'annonce EN LIGNE, recopié tel quel (seules les photos sont renvoyées) ;
+  // sa description vivante gagne sur une copie rangée plus ancienne (la lettre de l'atelier reste posée en bas).
+  const recette = appris && appris.recette && appris.recette.recette ? appris.recette : null;
+  { const dV = sansLettre(appris && appris.description); if (dV.length >= DESCRIPTION_MIN && dV !== descBase) { descBase = dV; description = lettreFin ? `${descBase}\n\n${lettreFin}` : descBase; noterDiag('recreer_description_vivante'); } }
+  let essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
   // (28 oct., « j'ai modifié, corrige et fais ça bien ») La recette manque : on la
   // LIT chez Vinted, comme le fait sa page « Modifier » (une lecture, aucun geste).
   if (essai.manque) {
     if (!appris) appris = await apprendreRecetteVinted(acc, uid, id);
     if (appris && appris.codes) {
       details.codes = { ...(details.codes || {}), ...appris.codes };
-      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
+      essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x' });
     } else if (appris && appris.raison) {
       return { accepte: false, code: 'recette-absente', raison: `VRM a demandé à Vinted la catégorie, la taille, l’état et le colis de CETTE annonce, mais ${appris.raison}. Rien n'a été touché.` };
     }
@@ -16244,7 +16416,7 @@ async function recreerVinted(msg) {
   // la question posée dans l'app). Il manque encore quelque chose ⇒ on s'arrête ICI,
   // avant toute requête, et la question part avec la réponse.
   const manqueRecette = essai.manque || null;
-  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
+  if (manqueRecette) essai = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: [1], temp: 'x', partiel: true });
   const reglages = reglagesPhotoSurs(msg.reglages);
   // (29 oct., « il ne doit pas y avoir d'erreur possible ») La TAILLE est vérifiée
   // AVANT de toucher à l'annonce : sinon Vinted la refuse APRÈS la suppression.
@@ -16336,11 +16508,13 @@ async function recreerVinted(msg) {
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
-    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
+    const built = itemPourRecreer({ modeleCorps: modele && modele.corps, codes: details.codes, vivant, recette, titre, prix, description, brand: sauve && sauve.brand, photoIds: ids, temp, partiel: !!manqueRecette });
     if (built.item && corrige) for (const k of Object.keys(corrige)) if (corrige[k] != null) built.item[k] = corrige[k];
     const corps = { item: built.item, parcel: null, push_up: false, upload_session_id: temp };
     const brouillonV = { ...built.item, id: null }; delete brouillonV.push_up;
     const corpsBV = { draft: brouillonV, feedback_id: null, parcel: null, upload_session_id: temp };
+    if (recette) FIDELE_DE.set(corpsBV, { copies: recette.copies, ecartes: recette.ecartes, differents: ecartsRecette(recette, brouillonV) });
+    else noterDiag('recreer_sans_recette_fidele');
     // L'annonce ENREGISTRÉE dans VRM avant tout geste (écriture vérifiée).
     etapeRepub(id, 'enregistrement');
     const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify(corpsBV), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid, num: msg.num ? String(msg.num).slice(0, 12) : undefined, etapes: { coffre: new Date().toISOString() } } } }], 'id'));
@@ -17839,6 +18013,23 @@ async function secuPourCarte(pf, compte) {
     return { niveau: ph.niveau, texte: secuTexte(SECU_PHRASES, ph.cle, ph.v), arrete: arret.arrete };
   } catch (_) { return null; }
 }
+// 5.410 — LA CADENCE DE SON COMPTE (Julien, 20 nov. « vas-y fais ») : `vinted_cadence` de la ligne des réglages
+// (`vrm_reglages_auto`, la même source que l'app), relue au plus une fois par minute ; lecture ratée ⇒ la dernière
+// lue, sinon les DÉFAUTS (50/h, 15 favoris/h, plafond du jour de « Discrétion », pause 40–90 s). Un compte qui n'est
+// pas Vinted garde les défauts. `poses` : ce qu'il a réellement posé (le reste suit les réglages d'avant).
+const CADENCE_CACHE = 'vrmCadenceLue';
+async function cadenceCompte(uid) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u)) return Object.assign({}, RA_CADENCE_DEFAUT, { poses: [] });
+  const t = Date.now();
+  let c = null; try { c = (await chrome.storage.local.get(CADENCE_CACHE))[CADENCE_CACHE] || null; } catch (_) { c = null; }
+  if (!c || !(t - Number(c.at) < 60000 && t >= Number(c.at))) {
+    let m = null; try { m = await lireMain(['vinted_cadence']); } catch (_) { m = null; }
+    if (m) { c = { at: t, v: m.vinted_cadence || null }; try { await chrome.storage.local.set({ [CADENCE_CACHE]: c }); } catch (_) {} }
+  }
+  const brut = c && c.v && c.v.comptes && typeof c.v.comptes === 'object' ? c.v.comptes[u] : null;
+  return Object.assign(cadenceDe(c && c.v, u), { poses: brut && typeof brut === 'object' ? Object.keys(brut).filter((k) => k !== 'at') : [] });
+}
 function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai)); }
 // (5.406) `essai` : la MÊME règle, sans rien prendre ni écrire — « une place est-elle libre, et sinon dans combien ? »
 async function compterActionUn(uid, plafond, n = 1, essai = false) {
@@ -17847,7 +18038,12 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
     const t = Date.now(), ilYaUneHeure = t - 3600000;
     const list = (cur[uid] || []).filter(x => x > ilYaUneHeure).sort((a, b) => a - b);
-    const max = Math.min(ACTIONS_MAX_HEURE, plafond);
+    // 5.410 : le plafond de l'heure est SA cadence (50 par défaut, 10 à 100) ; un geste automatique garde sa réserve
+    //    (`decal` : 5 sous le plafond, comme avant) ; ses clics prennent le plafond entier.
+    const cad = await cadenceCompte(uid);
+    const capH = /^\d{1,20}$/.test(String(uid)) ? cad.actionsHeure : ACTIONS_MAX_HEURE;
+    const decal = Math.max(0, ACTIONS_MAX_HEURE - Math.min(ACTIONS_MAX_HEURE, plafond));
+    const max = Math.max(1, capH - decal);
     // (29 oct.) `n` places d'un coup : une republication RÉSERVE ses 3 gestes avant
     // le premier (brouillon, suppression, mise en ligne) — jamais une paire arrêtée
     // entre la suppression et la mise en ligne par le plafond.
@@ -17858,11 +18054,11 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     // ⚠️ 5.362 (revue, moyenne 40) : les autres Chrome NE SONT PAS LUS (base muette)
     //    ⇒ ce Chrome ne prend que SA moitié (`ACTIONS_SANS_AUTRES`) : deux Chrome en
     //    panne de base ne font plus 50 + 50 sur le compte. Le plafond (50) ne bouge pas.
-    const maxBase = autres === null ? Math.min(max, ACTIONS_SANS_AUTRES) : max;
+    const maxBase = autres === null ? Math.min(max, Math.max(1, Math.floor(capH * ACTIONS_SANS_AUTRES / ACTIONS_MAX_HEURE))) : max;
     // 5.370 (discrétion, point 13) : Vinted a demandé une vérification (ce Chrome ou un
     //    autre du compte) ⇒ AUCUN geste automatique tant qu'il n'a pas touché « Reprendre ».
     //    Ses clics (plafond entier) passent.
-    if (max < ACTIONS_MAX_HEURE && /^\d{1,20}$/.test(String(uid))) {
+    if (decal > 0 && /^\d{1,20}$/.test(String(uid))) {
       const ta = await toutArreteDepuis(autres);
       if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, n: list.length };
       const cap = await captchaEnCours(String(uid), autres);
@@ -17880,7 +18076,7 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     const vinted = /^\d{1,20}$/.test(String(uid));
     let montee = null;
     if (vinted) { try { montee = plafondMontee(await debutMontee(String(uid), t), t); } catch (_) { montee = null; } }
-    if (montee && montee < maxP + (ACTIONS_MAX_HEURE - max)) maxP = Math.min(maxP, Math.max(1, montee - (ACTIONS_MAX_HEURE - max)));
+    if (montee && montee < maxP + decal) maxP = Math.min(maxP, Math.max(1, montee - decal));
     const tous = list.concat(autres ? autres.toutes : []).sort((a, b) => a - b);
     if (tous.length + k > maxP) return { ok: false, n: tous.length, resteMs: Math.max(0, tous[Math.max(0, tous.length + k - 1 - maxP)] + 3600000 - t), ...(enPrudence ? { prudence: prJusqua } : {}), ...(montee && maxP < maxBase ? { montee } : {}) };
     // 5.370 (discrétion, point 2) : LE PLAFOND DU JOUR, tous Chrome du compte confondus.
@@ -17888,8 +18084,8 @@ async function compterActionUn(uid, plafond, n = 1, essai = false) {
     //    pas lus ⇒ ce Chrome n'en prend que la moitié (la règle de l'heure).
     if (vinted) {
       let capJour = DISCRETION_JOUR_DEFAUT;
-      try { capJour = await plafondJourDe(String(uid), (await reglagesDiscretion()).parJour, t); } catch (_) {}
-      const capEff = Math.max(1, (autres === null ? Math.floor(capJour / 2) : capJour) - (max < ACTIONS_MAX_HEURE ? ACTIONS_MAX_HEURE - max : 0));
+      try { capJour = await plafondJourDe(String(uid), cad.parJour || (await reglagesDiscretion()).parJour, t); } catch (_) {}
+      const capEff = Math.max(1, (autres === null ? Math.floor(capJour / 2) : capJour) - decal);
       const nJour = (await actionsDuJour(String(uid), t)).length + (autres ? Number(autres.nJour) || 0 : 0);
       if (nJour + k > capEff) return { ok: false, code: 'plafond-jour', n: tous.length, nJour, maxJour: capJour, resteMs: Math.max(60000, finJourParis(t) - t) };
     }
@@ -17990,10 +18186,12 @@ const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // mêmes règles que les favoris Vinted (Tout arrêter, vérification, 15/h par sorte, ouverture du site,
 // un compte à la fois, série décalée), chacune SITE PAR SITE — un geste Vestiaire ne retient pas un
 // compte Vinted, et l'inverse. Les autres Chrome ne sont lus que pour Vinted (leur ligne n'existe que là).
-const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || ''));
-const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : 'vinted');
-const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : 'vrmVerrouCompte');
-const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : sorte);
+// (20 nov., 5.410) … et un compte LEBONCOIN (`lbc:{id}`) pour la série « Écrire aux intéressés » : mêmes règles, site
+// par site (verrou `vrmVerrouCompteLbc`, série `lbc:favori`) — un geste Leboncoin ne retient ni Vinted ni Vestiaire.
+const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || '')) || /^lbc:[0-9a-z_-]{1,64}$/i.test(String(u || ''));
+const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : /^lbc:/.test(String(u || '')) ? 'lbc' : 'vinted');
+const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : siteDiscretion(u) === 'lbc' ? 'vrmVerrouCompteLbc' : 'vrmVerrouCompte');
+const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : siteDiscretion(u) === 'lbc' ? 'lbc:' + sorte : sorte);
 // Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
 function jourParis(t) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); }
@@ -18315,7 +18513,7 @@ async function phaseRythme(uid, t) {
 // Un bordereau (une obligation d'envoi) n'attend que la vérification.
 async function porteDiscretion(uid, sorte, opts = {}) {
   const u = String(uid || '');
-  if (!cleDiscretionOk(u)) return null;                   // Leboncoin : pas cette porte (Vestiaire : `vc:{id}`, 5.392)
+  if (!cleDiscretionOk(u)) return null;                   // un compte de site inconnu : pas cette porte (Vestiaire `vc:{id}` 5.392, Leboncoin `lbc:{id}` 5.410)
   const t = Date.now();
   // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres) — Vinted seulement.
   const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) && siteDiscretion(u) === 'vinted' ? await actionsAutresNavigateurs(u) : null);
@@ -18328,12 +18526,14 @@ async function porteDiscretion(uid, sorte, opts = {}) {
   const minutes = (ms) => Math.max(1, Math.ceil(ms / 60000));
   if (SORTES_LIMITEES.includes(sorte)) {
     const reg = await reglagesDiscretion();
-    const lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
+    let lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
+    // 5.410 : SA cadence de messages aux favoris (1 à 60/h), quand il l'a posée pour CE compte.
+    if (sorte === 'favori' && /^\d{1,20}$/.test(u)) { const cad = await cadenceCompte(u); if (cad.poses.includes('favorisHeure')) lim = cad.favorisHeure; }
     const tous = (await sortesHeure(u, sorte, t)).concat(autres && autres.so && Array.isArray(autres.so[sorte]) ? autres.so[sorte] : []).sort((a, b) => a - b);
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
   const ouv = (await lireLocal('vrmOuverture'))[u];
-  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
+  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : siteDiscretion(u) === 'lbc' ? 'Leboncoin' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
   const v = await lireLocal(cleVerrouCompte(u));
   if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
   if (SORTES_SERIE.includes(sorte)) {
@@ -18661,6 +18861,11 @@ async function executerPourApp(msg, sender) {
 // (5.376) La porte commune : une commande de l'app (origine vérifiée ci-dessus) ou un
 // message aux favoris lancé par SON clic dans la carte du logo (`__carte`) — mêmes
 // gardes, même file Vinted, mêmes plafonds. Jamais appelée avec un message de page.
+async function avisAcceptationExt(msg) {
+  const item = /^\d{1,20}$/.test(String(msg && msg.item || '')) ? String(msg.item) : null;
+  let m = null; try { m = await lireMain(['vinted_offres_garde']); } catch (_) { m = null; }
+  return GARDES_APP.avisAcceptationManuelle(m ? m.vinted_offres_garde || null : null, item, Date.now());
+}
 async function executerPourAppCoeur(msg) {
   const methode = String(msg.method || 'POST').toUpperCase();
   const permis = execPermis(methode, msg.endpoint);
@@ -18671,6 +18876,15 @@ async function executerPourAppCoeur(msg) {
   //    relais du téléphone. N'importe quel message `exec` de l'app acceptait
   //    donc une offre sans elle. Exigé ici, pour toutes les voies.
   if (permis.confirmer && msg.confirme !== true) return { ok: false, code: 'confirmation', error: `ce geste vend ${motsExt().le} : il demande ta confirmation — rien n'est parti` };
+  // 5.410 — LA GARDE ANTI DOUBLE-VENTE avant d'accepter une offre (retirée de l'app avec le geste : « toute action se
+  //    fait dans l'extension »). La règle de l'app, recopiée (`GARDES_APP.avisAcceptationManuelle`) : vendue ailleurs
+  //    ⇒ refusé, toujours ; « pas su » (garde absente, périmée, annonce inconnue) ⇒ dit, et SEULEMENT son second
+  //    toucher (`avisVu`) fait partir l'acceptation.
+  if (permis.confirmer && /\/offer_requests\/\d+\/accept$/.test(String(msg.endpoint || ''))) {
+    const av = await avisAcceptationExt(msg);
+    if (av && av.bloque) return { ok: false, code: 'vendue-ailleurs', avis: av.texte, error: av.texte };
+    if (av && av.pasSu && msg.avisVu !== true) return { ok: false, code: 'avis', avis: av.texte, error: av.texte };
+  }
   // 5.371 : HORS LIGNE au départ (rien n'est parti, c'est sûr) ⇒ le geste attend le
   //    réseau (file bornée, 24 h) ; il repartira par CETTE porte, gardes comprises.
   //    Un geste qui vend la paire ne part jamais plus tard.
@@ -18739,10 +18953,132 @@ async function executerPourAppCoeur(msg) {
     if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true), v: r.json.variante }); }
     else { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
   }
-  if(permis.favori&&r.json?.resultat==='ignore')logActivity('Favori ignoré : conversation déjà commencée, aucun message envoyé.');
+  if(permis.favori&&r.json?.resultat==='ignore')logActivity(({annonce_indisponible:'Favori sauté : annonce vendue, réservée ou masquée, aucun message envoyé.',offre_sous_plancher:'Favori sauté : l’offre serait sous ton prix mini, ni offre ni message.',conversation_refusee:'Favori sauté : Vinted refuse d’ouvrir la conversation avec cette personne, rien envoyé.'})[r.json.raison]||'Favori ignoré : conversation déjà commencée, aucun message envoyé.');
   else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   return { ok: !!r.ok, status: r.status, data: r.json,
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
+}
+// ══ 5.410 (`messagesmalins`, 20 nov.) — UN MESSAGE QUE VINTED ACCEPTE, UN REFUS QUI APPREND ══════════
+// Julien : « plus d'intelligence […] pareil pour l'envoi des messages ». La règle « les mots qui font bannir
+// un compte » (src/messageSur.js, 12 nov., validée par Julien ; copie FABRIQUÉE par scripts/recopier-message-sur.cjs) :
+// téléphone, e-mail, lien, paiement, autre messagerie, vente hors plateforme, main propre ⇒ JAMAIS envoyé (ni « corrigé »).
+// Avant tout geste chez Vinted : une version sûre est tirée parmi SES versions ; aucune ⇒ rien ne part,
+// dit (`texte_interdit`). Une version refusée par Vinted (réponse 4xx au message, hors frein 403/429)
+// n'est plus jamais tirée sur ce compte : son EMPREINTE est gardée ici (`vrmVersionsRefusees`, 30 j).
+// Sauter proprement, AVANT d'écrire : annonce vendue / réservée / masquée (dressing ou transaction),
+// conversation déjà commencée, offre SOUS LE PRIX MINI posé dans VRM (jamais d'offre sous le plancher).
+// <message-sur-regle> — COPIE FABRIQUÉE de src/messageSur.js par scripts/recopier-message-sur.cjs (ne pas modifier à la main)
+const MESSAGE_SUR = (() => {
+const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', lbc: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+const nomSite = (site) => NOMS_SITES[site] || 'Vinted';
+const estLbc = (site) => site === 'leboncoin' || site === 'lbc';
+
+// Minuscule, sans accent, espaces simples ; les apostrophes typographiques ramenées à « ' ».
+const normaliser = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[‘’ʼ]/g, "'").toLowerCase().replace(/\s+/g, ' ');
+
+// Une négation dans les 30 caractères avant le mot : « je ne fais pas de main propre »,
+// « jamais de PayPal », « pas une copie », « sans WhatsApp ».
+const NEGATION = /(?:\bpas\b|\bjamais\b|\bsans\b|\bni\b|\baucun(?:e)?\b|\bn'(?:accepte|utilise|ai|est)\b|\bne\b[^.!?,;]{0,20}$)[^.!?,;]{0,22}$/;
+const nie = (t, i) => NEGATION.test(t.slice(Math.max(0, i - 30), i));
+
+// Le premier passage NON nié d'un motif (global) ; rend le passage lu, ou ''.
+function trouver(t, re, avecNegation = true) {
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(t))) {
+    if (!avecNegation || !nie(t, m.index)) return m[0].trim();
+    if (re.lastIndex === m.index) re.lastIndex++;
+  }
+  return '';
+}
+
+// ── Les motifs (sur le texte normalisé) ──────────────────────────────────────
+// Téléphone français : 06 12 34 56 78 · 06.12.34.56.78 · 0612345678 · +33 6 12 34 56 78.
+const RE_TEL = /(?:\+33|0033|\b0)\s*[1-9](?:[\s.-]?\d{2}){4}\b/g;
+// En toutes lettres (« zéro six… ») ou l'invitation à écrire/appeler en dehors.
+const RE_TEL_MOTS = /\bzero (?:six|sept)\b|\b(?:envoie|envoyez|ecris|ecrivez|appelle|appelez)[- ]?(?:moi|nous)? (?:un |par )?(?:sms|texto)\b|\bpar (?:sms|texto)\b|\bmon (?:portable|tel|06|07)\b/g;
+const RE_EMAIL_ADR = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/g;
+const RE_EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+|\b(?:gmail|hotmail|outlook|yahoo|icloud|laposte\.net|orange\.fr)\b|\barobase\b/g;
+// Un lien : http(s)://, www., ou nom.domaine connu — sauf vers le site lui-même.
+const RE_LIEN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]{2,}\.(?:com|fr|net|org|io|me|ly|co|be|shop|store|link)\b(?:\/\S*)?/g;
+const LIEN_DU_SITE = /(?:^|[/.])(?:vinted|leboncoin|vestiairecollective|ebay)\.[a-z.]+/;
+const RE_PAIEMENT = /\bpay ?pal\b|\bvirement\b|\blydia\b|\bpaylib\b|\bwero\b|\biban\b|\brib\b|\bwestern union\b|\bmandat cash\b|\bpaysafecard\b|\bcrypto\b|\bbitcoin\b/g;
+const RE_ESPECES = /\ben (?:especes|liquide|cash)\b|\bpaiement (?:en )?(?:especes|cash)\b/g;
+const RE_MESSAGERIE = /\bwhats ?app\b|\bwa\.me\b|\btelegram\b|\bsnap(?:chat)?\b|\binsta(?:gram)?\b|\bmessenger\b|\bfacebook\b/g;
+const RE_HORS = /\b(?:en dehors|hors|sans passer par|a cote) (?:de |du |d')?(?:la |l')?(?:vinted|leboncoin|le bon coin|vestiaire|ebay|plateforme|appli(?:cation)?|site)\b|\bhors plateforme\b|\b(?:payer|paie|paye|paies|payes|payez|regler|reglez)(?:[- ]moi)? (?:directement|en direct)\b|\bevit(?:er|e|es|ons|ez) les frais\b|\bsans (?:les )?frais (?:de )?(?:protection|vinted|plateforme)\b|\ben direct sans (?:vinted|leboncoin|vestiaire|ebay)\b/g;
+const RE_MAIN_PROPRE = /\b(?:en |remise en |remise |rdv en |rendez-vous en )?mains? propres?\b|\bje peux (?:passer|venir) (?:te |vous )?(?:la |le |les )?(?:deposer|donner|apporter)\b|\bon (?:se voit|peut se voir|se retrouve)\b/g;
+
+// Contrefaçon (annonces).
+const MARQUES = ['nike', 'adidas', 'jordan', 'air jordan', 'yeezy', 'new balance', 'asics', 'puma', 'vans', 'converse', 'reebok', 'salomon', 'gucci', 'louis vuitton', 'lv', 'dior', 'balenciaga', 'prada', 'chanel', 'hermes', 'off-white', 'off white', 'supreme', 'stone island', 'moncler', 'the north face', 'north face', 'lacoste', 'ralph lauren', 'burberry', 'versace', 'fendi', 'celine', 'saint laurent', 'ysl', 'bape', 'rolex', 'cartier', 'golden goose', 'alexander mcqueen', 'mcqueen', 'canada goose', 'arc\'teryx', 'arcteryx', 'trapstar', 'corteiz', 'essentials', 'fear of god'];
+const RE_MARQUE = MARQUES.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+const RE_CONTREFACON = new RegExp([
+  '\\br[e]?plica(?:s)?\\b', '\\breplique(?:s)?\\b', '\\bfake(?:s)?\\b', '\\bdupe(?:s)?\\b', '\\bimitation(?:s)?\\b', '\\bcontrefacon(?:s)?\\b',
+  '\\bcopie(?:s)?\\b(?! (?:de |du |d\'|de la )?(?:la |le )?(?:facture|ticket|preuve|recu|bon|carte|cni|piece|etiquette|boite|bordereau))',
+  '\\b1 ?[:/] ?1\\b', '\\b(?:non|pas) (?:authentique|original(?:e)?|officiel(?:le)?|d\'origine)\\b',
+  '\\binspire(?:e|es|s)? (?:de|par|d\'|du)\\b(?! (?:l\'univers|les annees|des annees|annees))',
+  '\\b(?:type|style|facon|genre|look) (?:' + RE_MARQUE + ')\\b',
+  '\\b(?:ua|top|best) ?batch\\b', '\\bqualite (?:miroir|identique a l\'original)\\b',
+].join('|'), 'g');
+
+// Les contrôles, dans un ordre fixe (le plus grave d'abord).
+const ETIQUETTES = {
+  telephone: 'Un numéro de téléphone',
+  email: 'Une adresse e-mail',
+  lien: 'Un lien vers un autre site',
+  paiement: 'Un paiement hors plateforme',
+  messagerie: 'Une autre messagerie',
+  hors: 'La vente proposée hors plateforme',
+  mainpropre: 'La main propre proposée',
+  contrefacon: 'Un mot de contrefaçon',
+};
+const CODES_RISQUE = Object.keys(ETIQUETTES);
+
+// → [{ code, mot, texte }] : `mot` = le passage lu (normalisé), `texte` = la ligne dite.
+function chercher(texte, site, famille) {
+  const t = normaliser(texte);
+  if (!t.trim()) return [];
+  const out = [];
+  const pose = (code, mot) => { if (mot && !out.some((x) => x.code === code)) out.push({ code, mot, texte: `${ETIQUETTES[code]} : « ${mot.slice(0, 32)} »` }); };
+  pose('telephone', trouver(t, RE_TEL, false) || trouver(t, RE_TEL_MOTS));
+  pose('email', trouver(t, RE_EMAIL, false));
+  // (une adresse e-mail n'est pas AUSSI un lien : « gmail.com » d'une adresse est retiré avant)
+  const tl = t.replace(RE_EMAIL_ADR, ' ');
+  RE_LIEN.lastIndex = 0; let m; let lien = '';
+  while ((m = RE_LIEN.exec(tl))) { if (!LIEN_DU_SITE.test(m[0])) { lien = m[0]; break; } }
+  pose('lien', lien);
+  pose('paiement', trouver(t, RE_PAIEMENT) || (estLbc(site) ? '' : trouver(t, RE_ESPECES)));
+  pose('messagerie', trouver(t, RE_MESSAGERIE));
+  pose('hors', trouver(t, RE_HORS));
+  if (!estLbc(site)) pose('mainpropre', trouver(t, RE_MAIN_PROPRE));
+  if (famille === 'annonce') pose('contrefacon', trouver(t, RE_CONTREFACON));
+  return out;
+}
+const risquesMessage = (texte, site = 'vinted') => chercher(texte, site, 'message');
+const risquesAnnonce = (texte, site = 'vinted') => chercher(texte, site, 'annonce');
+// Un message AUTOMATIQUE ne part que si rien n'est relevé (un texte vide n'a rien de risqué).
+const messageAutoPermis = (texte, site = 'vinted') => risquesMessage(texte, site).length === 0;
+return { risquesMessage, messageAutoPermis };
+})();
+function texteSurVinted(texte) { const r = MESSAGE_SUR.risquesMessage(texte, 'vinted'); return { ok: !r.length, motifs: r.map((x) => x.code) }; }
+// </message-sur-regle>
+const VERSIONS_REFUSEES = 'vrmVersionsRefusees';
+async function versionsRefusees(uid) {
+  try { const m = (await chrome.storage.local.get(VERSIONS_REFUSEES))[VERSIONS_REFUSEES] || {}; const t = Date.now(); return new Set((Array.isArray(m[String(uid)]) ? m[String(uid)] : []).filter((x) => x && t - Number(x.at) < 30 * 864e5).map((x) => String(x.e))); } catch (_) { return new Set(); }
+}
+async function noterVersionRefusee(uid, texte) {
+  try { const m = (await chrome.storage.local.get(VERSIONS_REFUSEES))[VERSIONS_REFUSEES] || {}; const l = Array.isArray(m[String(uid)]) ? m[String(uid)] : []; m[String(uid)] = l.filter((x) => x && x.e !== empreinteMessage(texte)).concat([{ e: empreinteMessage(texte), at: Date.now() }]).slice(-20); await chrome.storage.local.set({ [VERSIONS_REFUSEES]: m }); } catch (_) {}
+}
+// Les versions qu'on peut envoyer : sûres pour Vinted, jamais refusées sur ce compte.
+function versionsEnvoyables(versions, refusees) {
+  return (Array.isArray(versions) ? versions : []).filter((v) => v && texteSurVinted(v.texte).ok && !(refusees && refusees.has(empreinteMessage(v.texte))));
+}
+// Le prix mini posé dans VRM pour CETTE annonce (centimes), lu en scalaire (clé ENTRE GUILLEMETS, X4) ; null = pas posé ou pas su.
+async function prixMiniAnnonce(itemId) {
+  if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
+  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
+  return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
 async function executerMessageFavori(uid,acc,body){
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
@@ -18783,6 +19119,10 @@ async function executerMessageFavori(uid,acc,body){
   // ouvert sur ce compte, RIEN ne part.
   const pg=await pageVintedPour(acc);
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
+  // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
+  const refuseesIci=await versionsRefusees(uid);
+  const envoyables=versionsEnvoyables(versionsMessage(body.message,body.variantes),refuseesIci);
+  if(!envoyables.length){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
   // L'offre native de Vinted, si une réduction est choisie.
   // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
@@ -18798,7 +19138,7 @@ async function executerMessageFavori(uid,acc,body){
   // (5.398) Une PREUVE que l'annonce n'est plus disponible (dernier dressing capté de ce compte :
   // vendue, réservée, masquée, fermée ; ou supprimée dans ce navigateur) ⇒ RIEN ne part, avant
   // toute écriture chez Vinted (aucune conversation ouverte). Pas de preuve ⇒ comme avant.
-  {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('refuse',0,'annonce_indisponible');}}
+  {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
   const nA=offre?3:2;
   const recu={};
   const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
@@ -18814,6 +19154,9 @@ async function executerMessageFavori(uid,acc,body){
   if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
   if(creation.pause)return rep('refuse',0,'pause_vinted');
+  // (5.410) Vinted REFUSE d'ouvrir la conversation (400/404/422 : acheteur qui a bloqué, compte fermé, annonce
+  // retirée) — certain, rien d'écrit chez lui : ce favori est SAUTÉ, la file continue. 401/403/429 : comme avant.
+  if(!creation.ok&&[400,404,422].includes(creation.status)&&!frein){noterDiag('favori_conversation_refusee_'+creation.status);return rep('ignore',creation.status,'conversation_refusee');}
   if(!creation.ok)return rep(creation.status>=400&&creation.status<500?'refuse':'incertain',creation.status);
   const cc=creation.json?.conversation;
   const convId=String(cc?.id||'');
@@ -18853,7 +19196,7 @@ async function executerMessageFavori(uid,acc,body){
     if(t.ok&&artTx&&artTx!==body.itemId)return rep('refuse',t.status,'identite_non_confirmee');
     // (5.398) L'annonce telle que Vinted la rend DANS la transaction relue : si elle porte une
     // preuve (fermée, vendue, réservée, masquée), ni offre ni message.
-    {const ind=t.ok?annonceIndisponible(tr&&tr.item&&typeof tr.item==='object'?tr.item:null,null,null):'';if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('refuse',t.status,'annonce_indisponible');}}
+    {const ind=t.ok?annonceIndisponible(tr&&tr.item&&typeof tr.item==='object'?tr.item:null,null,null):'';if(ind){noterDiag('favori_annonce_tx_'+ind);return rep('ignore',t.status,'annonce_indisponible');}}
     const pr=prixDeTransaction(tr);if(pr){prixAnnonce=pr.montant;devise=pr.devise;}
   }else noterDiag('favori_sans_transaction');
   // Les places de la conversation, de l'offre et du message sont réservées depuis le
@@ -18868,6 +19211,8 @@ async function executerMessageFavori(uid,acc,body){
   if(offre){
     const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
     if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+    // (5.410) Jamais une offre SOUS le prix mini posé dans VRM pour cette annonce : ni offre ni message, favori sauté.
+    {const mini=await prixMiniAnnonce(body.itemId);if(mini!=null&&Math.round(Number(prix)*100)<mini){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}}
     await pauseFavori('offre', uid);
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('offre');
@@ -18882,7 +19227,7 @@ async function executerMessageFavori(uid,acc,body){
   }
   // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
   // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
-  const version=choisirVariante(versionsMessage(body.message,body.variantes),await varianteDerniere(uid,'favori'));
+  const version=choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
   if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
@@ -18897,6 +19242,8 @@ async function executerMessageFavori(uid,acc,body){
   if(texteFinal==null){noterDiag('favori_texte_repete');return rep('refuse',0,'historique_non_verifie');}
   if(texteFinal!==texteBrut)noterDiag('favori_salutation_variee');
   if(!texteFinal.trim())return rep('refuse',400);
+  // (5.410) Le texte FINAL (pseudo, titre, prix posés) relu par la même règle : jamais envoyé s'il ne l'est plus.
+  if(!texteSurVinted(texteFinal).ok){noterDiag('favori_texte_final_interdit');return rep('refuse',0,'texte_interdit');}
   // (5.372) L'offre acceptée par Vinted : 8 à 20 s au hasard AVANT d'écrire le message
   // (écrit dans chrome.storage.local, repris après un réveil du worker ; Tout arrêter,
   // captcha, pause, autre compte ou onglet fermé pendant l'attente ⇒ le message ne part pas).
@@ -18921,6 +19268,9 @@ async function executerMessageFavori(uid,acc,body){
   if(r.sansPage)return rep('refuse',0,'onglet_vinted');
   if(r.pause)return rep('refuse',0,'pause_vinted');
   if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
+  // (5.410) Vinted REFUSE le message lui-même (400/422, sans frein) : CETTE version n'est plus jamais tirée sur ce compte.
+  // La forme du refus (clés, code — jamais le texte) est notée pour la passe suivante.
+  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
 }
@@ -19040,7 +19390,10 @@ async function favorisCarte(msg, sender) {
     const avant = await lireEtatFavorisCarte();
     if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
     // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}) });
+    // 5.410 : SA pause entre deux messages (cadence du compte), toujours une PLAGE tirée au hasard par le serveur.
+    let plage = null;
+    try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && (cad.poses.includes('pauseMin') || cad.poses.includes('pauseMax'))) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
@@ -19214,6 +19567,407 @@ async function arreterDepuisEcran(sender) {
 }
 // UN tour (au plus quelques messages quand l'espacement est court) : chaque message
 // passe par toutes les gardes ; la moindre incertitude ⇒ rien ne part et c'est dit.
+// ══ 5.410 — LES GESTES DU PANNEAU (l'app ne les fait plus : « toute action se fait dans l'extension ») ══
+// Chacun passe par le chemin GARDÉ qui existait déjà ; rien n'ouvre vrm.center.
+//
+// 1. CHANGER LE PRIX (une annonce ou une sélection) : SON nouveau prix, le PRIX VU (celui qu'il a lu), le plancher
+//    (prix mini, sinon achat + 10 % — `plancherBaisse`, la règle de l'app) jamais franchi ; chaque prix devient une
+//    commande `cmd_prix_*` (`prixAttCommande` : confirmé, une baisse, prix vu) exécutée tout de suite par
+//    `prixAttenteTick` (compte de l'onglet, prix relu avant / après, 45/h, sécurité, discrétion).
+const PRIX_CARTE_MAX = 20;
+async function changerPrixCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Confirmer ».' };
+  const site = plateformeDe(o.url) === 'leboncoin' ? 'leboncoin' : plateformeDe(o.url) === 'vestiaire' ? 'vestiaire' : 'vinted';
+  const items = Array.isArray(msg.items) ? msg.items.slice(0, PRIX_CARTE_MAX) : [];
+  if (!items.length) return { ok: false, code: 'vide', raison: 'Aucune annonce choisie.' };
+  const moi = await relaisSessionOwner();
+  if (!moi) return { ok: false, code: 'session', raison: 'Connecte d’abord l’extension à VRM.' };
+  const uid = site === 'vinted' ? await compteConnecte('www.vinted.fr') : '';
+  if (site === 'vinted' && !/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
+  if (!m) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’est parti.' };
+  const t = Date.now(), refus = [], ranges = [];
+  for (const x of items) {
+    const id = String(x && x.id || '');
+    const vouluC = centimesPoses(x && x.prix), avantC = centimesPoses(x && x.prixVu);
+    if (vouluC == null || avantC == null) { refus.push({ id, code: 'prix' }); continue; }
+    if (vouluC === avantC) { refus.push({ id, code: 'meme' }); continue; }
+    const hausse = vouluC > avantC;
+    if (hausse && (msg.hausseConfirmee !== true || vouluC > avantC * 10)) { refus.push({ id, code: 'hausse-confirmer', prix: vouluC / 100 }); continue; }
+    const fiche = site === 'vinted' ? (m.vinted_annonce_numeros || {})[id] : null;
+    const pl = !hausse && fiche ? plancherBaisse(fiche, m.vinted_buyprice_by_num) : null;
+    if (pl && vouluC < pl.c) { refus.push({ id, code: 'plancher', plancher: pl.c / 100, de: pl.de }); continue; }
+    const args = site === 'vinted' ? { uid: String(uid), id, prix: vouluC / 100, prixAvant: avantC / 100 } : { id, prix: vouluC / 100, prixAvant: avantC / 100 };
+    const data = { v: 1, site, args, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS, etat: 'attente', reports: 0, cle: site + ':' + id, prix: vouluC / 100, prixAvant: avantC / 100,
+      num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t, ...(hausse ? { hausse: true } : {}) };
+    const c = prixAttCommande(data);
+    if (c.refus) { refus.push({ id, code: c.refus }); continue; }
+    const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
+    const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + (t + ranges.length).toString(36) + alea, data }], 'id');
+    if (ok === false) { refus.push({ id, code: 'ecriture' }); continue; }
+    ranges.push(id);
+  }
+  if (ranges.length) { try { Promise.resolve(prixAttenteTick('panneau')).catch(() => {}); } catch (_) {} }
+  return { ok: ranges.length > 0, ranges, refus };
+}
+// 2. L'ATELIER REPUBLIER du panneau : SA sélection, SON ordre, SON espacement (fixe ou tiré dans SA plage), SON
+//    réglage photo pour toutes (appliqué par le fond, `photoReglee`), la lettre ; « Lancer » range une FILE dans
+//    `chrome.storage.local` (un worker tué ne la perd pas, §4.9) que `atelierRepubTick` déroule une paire à la fois
+//    par `executerCommande` (`recreerVinted` : coffre → brouillon → suppression → mise en ligne, étapes datées,
+//    gardes, 50/jour). Un arrêt (captcha, frein, plafond, Tout arrêter) arrête la file, dit ; « Reprendre » une paire
+//    interrompue = `reprendreRepub` (relit chez Vinted, jamais deux en ligne).
+const ATELIER_CLE = 'vrmAtelierRepub';
+const ATELIER_ESPACE_MIN = [1, 120];       // minutes
+// 5.410 (`repubverif`, chantier repub-messages-malins) : le CONTRÔLE AVANT DE LANCER, dans l'atelier du panneau — la
+//    commande `verifierRepub` (lecture, compte de l'onglet) ; la règle de l'app recopiée (`resumeVerif`, `lancerPermis`,
+//    `partiraPas`, `reponsesDe` — src/repubVerif.js) : « Lancer » fermé tant qu'il reste une annonce à corriger ; une
+//    absente ne part jamais ; SA réponse (« Choisir la taille ») voyage avec SA paire. Gardé dans `vrmAtelierVerif`.
+const ATELIER_VERIF = 'vrmAtelierVerif';
+async function atelierVerifLue() { try { const v = (await chrome.storage.local.get(ATELIER_VERIF))[ATELIER_VERIF]; return v && v.v === 1 ? v : null; } catch (_) { return null; } }
+async function atelierVerifier(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu.' };
+  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  const tous = [...new Set((Array.isArray(msg.tous) ? msg.tous : ids).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  if (!ids.length) return { ok: false, code: 'vide', raison: 'Rien à vérifier.' };
+  const prec = await atelierVerifLue();
+  const verif = prec && prec.uid === String(uid) ? Object.assign({}, prec.paires) : {};
+  const reps = msg.reponses && typeof msg.reponses === 'object' ? msg.reponses : {};
+  const r = await verifierRepub({ uid: String(uid), ids, reponses: reps, total: tous.length });
+  if (!r || r.accepte === false || !Array.isArray(r.paires)) {
+    for (const id of ids) verif[id] = { id, etat: 'pas-verifie', corrections: [], manque: [], question: null, raison: String((r && r.raison) || 'pas vérifiée'), rep: verif[id] && verif[id].rep };
+  } else for (const x of r.paires) { const q = GARDES_APP.paireVerif(x); if (q) verif[q.id] = Object.assign({}, q, { rep: reps[q.id] || (verif[q.id] && verif[q.id].rep) }); }
+  const v = { v: 1, uid: String(uid), at: Date.now(), paires: verif };
+  try { await chrome.storage.local.set({ [ATELIER_VERIF]: v }); } catch (_) {}
+  return { ok: true, paires: verif, resume: GARDES_APP.resumeVerif(tous, verif), lancer: GARDES_APP.lancerPermis(tous, verif, false) };
+}
+async function atelierEtat() { try { const a = (await chrome.storage.local.get(ATELIER_CLE))[ATELIER_CLE]; return a && a.v === 1 ? a : null; } catch (_) { return null; } }
+async function atelierLancer(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Lancer ».' };
+  const cur = await atelierEtat();
+  if (cur && cur.etat === 'cours') return { ok: false, code: 'en-cours', raison: 'Un atelier tourne déjà : attends la fin ou arrête-le.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  let ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
+  if (!ids.length) return { ok: false, code: 'vide', raison: 'Aucune annonce choisie.' };
+  // Le contrôle avant de lancer (la règle de l'app) : rien ne part tant qu'il reste une annonce à corriger.
+  const vl = await atelierVerifLue();
+  const verif = vl && vl.uid === String(uid) ? vl.paires : {};
+  const perm = GARDES_APP.lancerPermis(ids, verif, false);
+  if (!perm.ok) return { ok: false, code: perm.raison, raison: perm.raison === 'a-corriger' ? `${perm.n} annonce(s) à corriger avant de lancer : rien n’est parti.` : 'Toutes ces annonces sont absentes chez Vinted : rien ne part.' };
+  ids = ids.filter((id) => !GARDES_APP.partiraPas(verif, id));
+  const reponses = Object.fromEntries(ids.map((id) => [id, GARDES_APP.reponsesDe(verif, id)]).filter(([, r]) => r));
+  const e = msg.espacement && typeof msg.espacement === 'object' ? msg.espacement : {};
+  const mn = Math.round(Number(e.min)), mx = Math.round(Number(e.max != null ? e.max : e.min));
+  if (!(mn >= ATELIER_ESPACE_MIN[0] && mn <= ATELIER_ESPACE_MIN[1] && mx >= mn && mx <= ATELIER_ESPACE_MIN[1])) return { ok: false, code: 'espacement', raison: 'Espacement : de 1 à 120 min.' };
+  const espacement = e.mode === 'aleatoire' && mx > mn ? { mode: 'aleatoire', min: mn, max: mx } : { mode: 'fixe', min: mn, max: mn };
+  const a = { v: 1, uid: String(uid), ids, i: 0, espacement, photo: reglagesPhotoSurs(msg.photo), lettre: msg.lettre === true, reponses, etat: 'cours', prochain: Date.now(), lanceLe: Date.now(), paires: {} };
+  try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  try { Promise.resolve(atelierRepubTick()).catch(() => {}); } catch (_) {}
+  return { ok: true, atelier: a };
+}
+async function atelierArreter() { const a = await atelierEtat(); if (!a) return { ok: true }; a.etat = 'arretee'; a.finLe = Date.now(); try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) {} return { ok: true, atelier: a }; }
+let _atelierEnVol = false;
+async function atelierRepubTick(maintenant = Date.now()) {
+  if (_atelierEnVol) return { etat: 'en-vol' };
+  _atelierEnVol = true;
+  try {
+    const a = await atelierEtat();
+    if (!a || a.etat !== 'cours') return { etat: 'rien' };
+    if (Number(a.prochain) > maintenant) return { etat: 'attente' };
+    const id = a.ids[a.i];
+    if (!id) { a.etat = 'finie'; a.finLe = maintenant; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'finie' }; }
+    let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
+    const fiche = (m && m.vinted_annonce_numeros || {})[id] || {};
+    const pl = m ? plancherBaisse(fiche, m.vinted_buyprice_by_num) : null;
+    a.paires[id] = { etape: 'cours', at: maintenant };
+    await chrome.storage.local.set({ [ATELIER_CLE]: a });
+    let r = null;
+    try { r = await executerCommande({ cmd: 'recreerVinted', uid: a.uid, id, confirme: true, total: a.ids.length, ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(pl ? { plancher: pl.c / 100 } : {}), reglages: a.photo, ...(a.reponses && a.reponses[id] ? { reponses: a.reponses[id] } : {}), ...(a.lettre ? { lettre: 'abcdefghijklmnopqrstuvwxyz'[tirerEntre(0, 25)] } : {}) }); } catch (_) { r = null; }
+    const a2 = (await atelierEtat()) || a;
+    const fait = !!(r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape));
+    a2.paires[id] = { etape: fait ? (r.etape === 'attente' ? 'planifiee' : 'fait') : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || (fait ? '' : 'sans réponse')).slice(0, 200), nouvelId: r && r.nouvelId ? String(r.nouvelId) : '' };
+    if (!fait) { a2.etat = 'arretee'; a2.finLe = Date.now(); a2.arret = { id, code: String((r && r.code) || 'sans-reponse'), raison: a2.paires[id].raison }; }
+    else {
+      a2.i += 1;
+      const e = a2.espacement;
+      const min = e.mode === 'aleatoire' ? tirerEntre(e.min, e.max) : e.min;
+      a2.prochain = Date.now() + min * 60000 + (e.mode === 'aleatoire' ? tirerEntre(0, 59) * 1000 : 0);
+      if (a2.i >= a2.ids.length) { a2.etat = 'finie'; a2.finLe = Date.now(); }
+    }
+    await chrome.storage.local.set({ [ATELIER_CLE]: a2 });
+    return { etat: a2.etat, id, fait };
+  } finally { _atelierEnVol = false; }
+}
+async function atelierReprendre(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const a = await atelierEtat();
+  const id = String(msg && msg.id || '');
+  if (!a || !a.paires[id] || a.paires[id].etape !== 'arret') return { ok: false, code: 'rien', raison: 'Rien à reprendre pour cette annonce.' };
+  let r = null; try { r = await executerCommande({ cmd: 'reprendreRepub', uid: a.uid, id, confirme: true }); } catch (_) { r = null; }
+  const a2 = (await atelierEtat()) || a;
+  const fait = !!(r && r.accepte && r.etape === 'fait');
+  a2.paires[id] = { etape: fait ? 'fait' : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || '').slice(0, 200) };
+  if (fait && a2.etat === 'arretee' && a2.ids[a2.i] === id) { a2.i += 1; a2.etat = a2.i < a2.ids.length ? 'cours' : 'finie'; a2.prochain = Date.now() + a2.espacement.min * 60000; delete a2.arret; }
+  try { await chrome.storage.local.set({ [ATELIER_CLE]: a2 }); } catch (_) {}
+  return { ok: fait, atelier: a2, raison: fait ? '' : a2.paires[id].raison };
+}
+// 3. TRANCHER UNE OFFRE (Messagerie, Commandes) : accepter (`executerPourAppCoeur` : confirmation, GARDE anti
+//    double-vente `avisVu`), refuser, contre-offre (`POST …/offers`, jamais sous SON plancher quand il est connu, et
+//    toujours au-dessus de l'offre de l'acheteur). L'offre doit être dans les conversations rangées de CE compte.
+async function offreCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  const quoi = String(msg && msg.quoi || '');
+  if (!['accept', 'reject', 'contre'].includes(quoi)) return { ok: false, code: 'action', raison: 'Geste inconnu.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
+  const offres = await offresEnAttente(String(uid));
+  const off = offres.find((x) => String(x.tx) === String(msg.tx) && String(x.oid) === String(msg.oid));
+  if (!off) return { ok: false, code: 'offre', raison: 'Cette offre n’est plus en attente sur ce compte : rien n’est parti.' };
+  if (quoi === 'contre') {
+    const pc = centimesPoses(msg.prix);
+    if (pc == null || pc <= Math.round(Number(off.prix) * 100)) return { ok: false, code: 'prix', raison: 'Une contre-offre doit être au-dessus de son offre.' };
+    let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
+    const pl = m && off.item ? plancherBaisse((m.vinted_annonce_numeros || {})[off.item] || {}, m.vinted_buyprice_by_num) : null;
+    if (pl && pc < pl.c) return { ok: false, code: 'plancher', plancher: pl.c / 100, raison: `Sous ton plancher (${(pl.c / 100).toFixed(2)} €) : rien n’est parti.` };
+    const r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${off.tx}/offers`, body: { offer: { price: (pc / 100).toFixed(2), currency: 'EUR' } } });
+    return r && r.ok ? { ok: true } : { ok: false, code: (r && r.code) || 'refus', raison: (r && r.error) || 'Vinted a refusé : rien n’est parti.' };
+  }
+  const endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
+  const r = await executerPourAppCoeur({ uid: String(uid), method: 'PUT', endpoint, confirme: true, item: off.item || undefined, ...(msg.avisVu === true ? { avisVu: true } : {}) });
+  if (r && r.ok) return { ok: true };
+  return { ok: false, code: (r && r.code) || 'refus', avis: r && r.avis, raison: (r && (r.avis || r.error)) || 'Vinted a refusé : rien n’est parti.' };
+}
+// 4. PUBLIER UNE ANNONCE VINTED SUR LEBONCOIN / VESTIAIRE (« Publier sur… ») : la fiche neutre et le plan du site par
+//    l'AGENT DE L'APP recopié (`GARDES_APP.ficheArticle`, `planSite`, `envoiPour` — src/publier/agent.js), depuis ce que
+//    VRM a lu de l'annonce (fiche, coffre) ; une question ⇒ posée dans le panneau (SES réponses servent à CET envoi) ;
+//    prêt ⇒ `publierFicheSite` (la VÉRIFICATION avant publication, `verifVu`).
+async function publierCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const site = String(msg && msg.site || '');
+  if (site !== 'leboncoin' && site !== 'vestiaire') return { ok: false, code: 'site', raison: 'Site inconnu.' };
+  const id = String(msg && msg.id || '');
+  if (!/^\d{4,15}$/.test(id)) return { ok: false, code: 'annonce', raison: 'Annonce inconnue.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vrm_agent_publier', 'vrm_correspondances']); } catch (_) { m = null; }
+  if (!m) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’est parti.' };
+  const fiche0 = (m.vinted_annonce_numeros || {})[id] || {};
+  const det = await lireFicheAnnonce(id);
+  if (det === null) return { ok: false, code: 'lecture', raison: 'La fiche de l’annonce n’a pas pu être lue : rien n’est parti.' };
+  const lu = await dressingLu(String(uid || '')).catch(() => null);
+  const it = lu && Array.isArray(lu.items) ? lu.items.find((x) => String(x.id) === id) || {} : {};
+  const prix = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
+  const article = { cle: 'vinted:' + id, numero: fiche0.numero || '', prix: Number.isFinite(prix) && prix > 0 ? prix : null, prixMini: Number(fiche0.min) > 0 ? Number(fiche0.min) : null,
+    annonces: [{ site: 'vinted', id, etat: 'enligne', titre: String(it.title || det.titre || ''), photo: '', marque: det.marque || '', taille: det.taille || '', condition: det.etat || '' }] };
+  let memoire = m.vrm_agent_publier || null;   // `lireMain` superpose la ligne des réglages (SES réponses retenues)
+  const fiche = GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, memoire);
+  // SES réponses : { 'site|champ': valeur } (le panneau) ⇒ la forme de l'agent [{ champ, site, valeur }].
+  const repL = msg.reponses && typeof msg.reponses === 'object' && !Array.isArray(msg.reponses) ? Object.entries(msg.reponses).filter(([, v]) => v != null && String(v).trim()).slice(0, 20).map(([k, v]) => { const [a, b] = String(k).split('|'); return b ? { site: a, champ: b, valeur: String(v).slice(0, 200) } : { site: '', champ: a, valeur: String(v).slice(0, 200) }; }) : [];
+  if (repL.length) {
+    memoire = GARDES_APP.retenirReponses(memoire, fiche, repL);
+    // (20 nov., « pratique pas chiant ») SES réponses sont RETENUES (jamais `main`) : la ligne `vrm_reglages_auto`,
+    // clé `vrm_agent_publier`, par comparer-et-échanger ; relue par l'app et le panneau par la même règle.
+    let retenue = null;
+    const r = await modifierLigneCas(REGLAGES_AUTO_ID, async (d) => {
+      let base = null; try { const mm = await sbGet(qMain(['vrm_agent_publier'])); base = mm && mm[0] ? mm[0].vrm_agent_publier || null : null; } catch (_) { base = null; }
+      const actuelle = superposerReglagesAuto({ vrm_agent_publier: base }, d).vrm_agent_publier || null;
+      const nv = GARDES_APP.retenirReponses(actuelle, GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, actuelle), repL);
+      const n = reglageAutoNormalise('vrm_agent_publier', nv, actuelle, true, Date.now());
+      if (!n.ok) return undefined;
+      retenue = n.valeur;
+      return ligneAvecReglage(d, 'vrm_agent_publier', n.valeur, 'extension', Date.now());
+    });
+    if (r === true && retenue) memoire = retenue;
+  }
+  const f2 = GARDES_APP.ficheArticle(article, { vinted: { [id]: det } }, memoire);
+  const plan = GARDES_APP.planSite(f2, site, memoire, { corr: m.vrm_correspondances || null, ext: { leboncoin: true, vestiaire: true } });
+  if (plan.etat === 'refus') return { ok: false, code: 'refus', refus: plan.refus, raison: 'Pas publiable : ' + (plan.refus && plan.refus.code) };
+  if (plan.etat !== 'pret') return { ok: false, code: 'questions', questions: plan.questions.map((q) => ({ champ: q.champ, site: q.site || '', choix: (q.choix || []).slice(0, 60), saisie: q.saisie || '' })) };
+  const env = GARDES_APP.envoiPour(f2, plan, {});
+  if (!env || env.voie !== 'extension') return { ok: false, code: 'pas-pret', raison: 'Fiche incomplète pour ce site : rien n’est parti.' };
+  return publierFicheSite(Object.assign({}, env.msg, msg.verifVu === true ? { verifVu: true } : {}));
+}
+// ══ 5.410 — LES RÉGLAGES DES MESSAGES AUX FAVORIS, ÉCRITS DEPUIS LE PANNEAU ══
+// Textes (message + jusqu'à 4 autres versions) et rythme : dans LEUR ligne dédiée `vrm_favoris_reglages_{uid}` —
+// celle que le serveur relit à chaque envoi et au mode auto (une seule source : jamais une copie ailleurs). La valeur
+// passe par la règle de l'app (`GARDES_APP.validerReglagesFavoris`, recopiée) ; ce qu'il n'a pas changé (offre,
+// intervalle…) est gardé. Le MODE AUTO (allumé, horaires, quotas) vit dans la file du serveur : `auto_regler`, validé
+// par `validerAutoFavoris` des deux côtés ; ALLUMER exige `confirme`. Compte de l'onglet seulement.
+async function reglagesFavorisCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  const id = `vrm_favoris_reglages_${uid}`;
+  let refus = null;
+  const r = await modifierLigneCas(id, (d) => {
+    const avant = d && d.version === 1 ? d : {};
+    const voulu = Object.assign({}, avant, { envoisActifs: false });
+    if (typeof msg.message === 'string') voulu.message = msg.message;
+    if (Array.isArray(msg.variantes)) voulu.variantes = msg.variantes.map((t) => String(t == null ? '' : t));
+    if (['normal', 'prudent', 'perso'].includes(msg.rythme)) voulu.rythme = msg.rythme;
+    if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
+    delete voulu.rev;
+    try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 300); return undefined; }
+  });
+  if (refus) return { ok: false, code: 'regle', raison: refus };
+  if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
+  try { noterJournal(String(uid), 'reglage_auto', { k: 'favoris' }); } catch (_) {}
+  return { ok: true };
+}
+async function favorisAutoCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  const g = await apiFavorisCarte(String(uid), null);
+  if (!g.ok || !g.json || !g.json.vue) return { ok: false, code: 'lecture', raison: 'VRM n’a pas répondu : rien n’a changé.' };
+  const a = g.json.vue.auto && g.json.vue.auto.reglages ? g.json.vue.auto.reglages : {};
+  const voulu = Object.assign({}, a, msg.reglages && typeof msg.reglages === 'object' ? msg.reglages : {}, { actif: msg.actif === true });
+  let v; try { v = GARDES_APP.validerAutoFavoris(voulu); } catch (e) { return { ok: false, code: 'regle', raison: String(e && e.message || 'réglages refusés').slice(0, 300) }; }
+  if (v.actif && a.actif !== true && msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Allumer ».' };
+  const w = await apiFavorisCarte(String(uid), 'auto_regler', { reglages: v, confirme: msg.confirme === true });
+  if (!w.ok) return { ok: false, code: 'serveur', raison: (w.json && w.json.message) || 'VRM a refusé : rien n’a changé.' };
+  try { const st = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; st.relu = Object.assign({}, st.relu || {}, { [String(uid)]: { actif: v.actif, at: Date.now() } }); await chrome.storage.local.set({ [PILOTE_FAV]: st }); } catch (_) {}
+  return { ok: true, actif: v.actif };
+}
+// ══ 5.410 — LE PILOTE DU MODE AUTO DES FAVORIS, DANS LE FOND ══
+// Retiré de l'app (chantier actions-extension : « toute action se fait dans l'extension »). Le même tour que
+// l'app d'avant (`tourPiloteFavoris`, src/PiloteFavorisAuto.jsx) : à un intervalle TIRÉ AU HASARD (2 à 5 min),
+// pour le compte de l'ONGLET seulement (`compteOngletPourAuto` : onglet vinted.fr, pas de pause, pas de
+// vérification anti-robot), si son mode auto est ALLUMÉ (relu chez VRM toutes les 30 min), il demande au SERVEUR
+// un tour (`auto` : identité prouvée, paire en vente, quotas, horaires, pause 24 h — c'est le serveur qui décide),
+// et fait partir le message posé comme un envoi de la carte (`suivant` → `/vrm/favoris` → `terminer`).
+// Avant de demander quoi que ce soit : les gardes (`attenteAvantFavori` : discrétion, SA cadence, plafond de l'heure
+// et du jour, réserve de 5, captcha ⇒ arrêt, Tout arrêter). Une file de la carte en cours ⇒ il attend. L'état vit
+// dans `chrome.storage.local` (§4.9).
+const PILOTE_FAV = 'vrmPiloteFavoris';
+const PILOTE_ECART_MS = [2 * 60000, 5 * 60000], PILOTE_RELECTURE_MS = 30 * 60000;
+let _piloteEnVol = false;
+async function piloteFavorisTick(maintenant = Date.now()) {
+  if (_piloteEnVol) return { etat: 'en-vol' };
+  _piloteEnVol = true;
+  try {
+    let st = {}; try { st = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; } catch (_) { return { etat: 'stockage' }; }
+    if (Number(st.prochain) > maintenant) return { etat: 'attente' };
+    st.prochain = maintenant + PILOTE_ECART_MS[0] + Math.floor(Math.random() * (PILOTE_ECART_MS[1] - PILOTE_ECART_MS[0]));
+    const fin = async (etat, extra) => { st.dernier = Object.assign({ etat, at: maintenant }, extra || {}); try { await chrome.storage.local.set({ [PILOTE_FAV]: st }); } catch (_) {} return st.dernier; };
+    if (horsLigne()) return fin('reseau');
+    const carte = await lireEtatFavorisCarte();
+    if (carte && carte.actif) return fin('occupe');
+    const uid = await compteOngletPourAuto();
+    if (!uid) return fin('onglet');
+    st.relu = st.relu && typeof st.relu === 'object' ? st.relu : {};
+    let r = st.relu[uid];
+    if (!r || !(maintenant - Number(r.at) < PILOTE_RELECTURE_MS)) {
+      const g = await apiFavorisCarte(uid, null);
+      if (g.ok && g.json && g.json.vue) { const a = g.json.vue.auto; r = { actif: !!(a && a.reglages && a.reglages.actif === true), at: maintenant }; st.relu[uid] = r; }
+      else if (!r) return fin('vrm', { uid });          // pas su : rien n'est demandé
+    }
+    if (!r.actif) return fin('eteint', { uid });
+    const av = await attenteAvantFavori(uid, 3);
+    if (av && av.stop) return fin(av.stop, { uid });     // captcha ('verification'), Tout arrêter, stockage : ARRÊT
+    if (av && av.ms > 0) return fin('garde', { uid, quoi: av.quoi });
+    const t = await apiFavorisCarte(uid, 'auto', { extension: { disponible: true } });
+    if (!t.ok || !t.json) return fin('vrm', { uid });
+    if (!t.json.ajoute) return fin(String(t.json.etat || 'rien').slice(0, 30), { uid });
+    const s2 = await apiFavorisCarte(uid, 'suivant');
+    const tr = s2.ok && s2.json && s2.json.travail;
+    if (!tr || typeof tr.jeton !== 'string') return fin('pret', { uid });
+    let x = null; try { x = await executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true }); } catch (_) { x = null; }
+    const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
+    await apiFavorisCarte(uid, 'terminer', { jeton: tr.jeton, brut });
+    return fin(x && x.ok ? 'envoye' : 'refuse', { uid });
+  } finally { _piloteEnVol = false; }
+}
+// ══ 5.410 — LA VEILLE DES REPUBLICATIONS PROGRAMMÉES, DANS LE FOND ══
+// Retirée de l'app (actions-extension). LA RÈGLE DE L'APP, recopiée (`GARDES_APP` : decision, conditionsDepart,
+// prendreDepart, marquerPasPartie, marquerFinie, pairesAuDepart, apercuRepub — src/repubProgramme.js et
+// src/republierReglages.js) : à l'heure qu'IL a écrite (fenêtre de 10 min, jamais rattrapée), sur le navigateur dont
+// l'ONGLET vinted.fr est sur le compte de la programmation, chaque condition est vérifiée (onglet, compte, frein de
+// Vinted, place dans les actions de l'heure, place dans les 50 republications du jour, aucun autre travail) ; une
+// seule manque — ou n'est pas sue — ⇒ RIEN ne part, « pas partie » avec la raison. Sinon le départ est PRIS
+// (comparer-et-échanger sur `vrm_repub_programme`) et les paires partent une par une, dans SON ordre, par le même
+// chemin que son clic (`executerCommande` : coffre → brouillon → suppression → mise en ligne, gardes comprises),
+// avec SES réglages figés (titre, prix — jamais sous l'achat —, lettre). Une paire vendue ou retirée depuis n'est
+// jamais remplacée. Réglages photo non neutres : le fond ne sait pas retoucher une photo ⇒ « pas partie », dit.
+// Un arrêt (captcha, frein, plafond, Tout arrêter) arrête la série.
+let _veilleRepubEnVol = false;
+async function veilleRepubTick(maintenant = Date.now()) {
+  if (_veilleRepubEnVol) return { etat: 'en-vol' };
+  _veilleRepubEnVol = true;
+  try {
+    // L'index léger d'abord (§4.4 : jamais `select=data` pour rien) : une programmation due, sinon rien.
+    const idx = await sbGet(`app_data?id=eq.${GARDES_APP.LIGNE_PROGRAMME}&select=a:data->attentes`);
+    if (!Array.isArray(idx)) return { etat: 'lecture' };
+    const att = idx[0] && Array.isArray(idx[0].a) ? idx[0].a : [];
+    if (!att.some((x) => Date.parse(x && x.at) <= maintenant)) return { etat: 'rien' };
+    const rows = await sbGet(`app_data?id=eq.${GARDES_APP.LIGNE_PROGRAMME}&select=data`);
+    if (!Array.isArray(rows)) return { etat: 'lecture' };
+    const progs = GARDES_APP.programmesDe(rows[0] && rows[0].data);
+    const uidOnglet = await compteConnecte('www.vinted.fr');
+    const faits = [];
+    for (const p of Object.values(progs)) {
+      const ext = { present: true, capOk: true, uidOnglet: uidOnglet ? String(uidOnglet) : '', repub: await etatDepartRepub(p.uid).catch(() => null) };
+      const d = GARDES_APP.decision(p, { ext, maintenant });
+      if (d.quoi === 'rien' || d.quoi === 'attendre') continue;
+      if (d.quoi === 'manquee') { await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(GARDES_APP.marquerPasPartie(x, p.uid, p.id, [{ cle: 'ferme' }], maintenant))); faits.push({ id: p.id, etat: 'pas-partie' }); continue; }
+      // 'verifier' : les conditions, mesurées ICI.
+      const c3 = await compterAction(String(p.uid), ACTIONS_MAX_HEURE - RESERVE_GESTES, GARDES_APP.GESTES_PAR_REPUB, true).catch(() => null);
+      const jauge = c3 == null || c3.code === 'stockage' ? null : c3.ok ? { n: 0, pourApp: GARDES_APP.GESTES_PAR_REPUB } : { n: Number(c3.n) || 0, pourApp: Number(c3.n) || 0 };
+      const jour = GARDES_APP.ACTIONS_QUOTA.includes(p.action) ? await republieesEnBase(p.uid).then((l) => (Array.isArray(l) ? l.length : null)).catch(() => null) : 0;
+      let occupe = false; try { occupe = !!(await lireEtatFavorisCarte() || {}).actif || (c3 && (c3.code === 'verification' || c3.code === 'tout-arrete')); } catch (_) { occupe = true; }
+      const manques = GARDES_APP.conditionsDepart({ prog: p, ext, jauge, jour, occupe, maintenant }).manques.slice();
+      if (manques.length) { await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(GARDES_APP.marquerPasPartie(x, p.uid, p.id, manques, Date.now()))); noterDiag('repub_prog_pas_partie'); faits.push({ id: p.id, etat: 'pas-partie', manques }); continue; }
+      const moi = await idNavigateur();
+      const pris = await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(GARDES_APP.prendreDepart(x, p.uid, p.id, moi, Date.now())));
+      if (pris !== true) { faits.push({ id: p.id, etat: 'pas-pris' }); continue; }
+      faits.push(Object.assign({ id: p.id }, await executerProgrammeRepub(p)));
+    }
+    return { etat: 'ok', faits };
+  } finally { _veilleRepubEnVol = false; }
+}
+const sansRefusRepub = (x) => (x && x.data ? Object.assign({}, x.data, GARDES_APP.indexAttentes(x.data)) : x ? Object.assign({}, x, GARDES_APP.indexAttentes(x)) : undefined);
+async function executerProgrammeRepub(p) {
+  const lu = await dressingLu(p.uid).catch(() => null);
+  const items = lu && Array.isArray(lu.items) ? lu.items : null;
+  let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
+  if (!items || !m) { await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(GARDES_APP.marquerPasPartie(x, p.uid, p.id, [{ cle: 'lecture' }], Date.now()))); return { etat: 'pas-partie', manques: [{ cle: 'lecture' }] }; }
+  const proposables = items.filter((it) => it && it.id != null && it.is_hidden !== true && it.is_closed !== true && it.is_draft !== true).map((it) => ({ id: String(it.id) }));
+  const { partent } = GARDES_APP.pairesAuDepart(p, proposables);
+  const nums = m.vinted_annonce_numeros || {}, achats = m.vinted_buyprice_by_num || {};
+  const cmd = p.action === 'modifier' ? 'republierVinted' : p.action === 'enLigne' ? 'publierBrouillon' : 'recreerVinted';
+  let n = 0, arret = null;
+  for (const id of partent) {
+    const it = items.find((x) => String(x.id) === id) || {};
+    const fiche = nums[id] || {};
+    const prixLu = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
+    const achat = Number(fiche.buyPrice != null ? fiche.buyPrice : fiche.numero != null ? achats[cleNum(fiche.numero)] : NaN);
+    const floor = Number.isFinite(achat) && achat > 0 ? achat : null;
+    const ap = GARDES_APP.apercuRepub({ titre: String(it.title || ''), prix: Number.isFinite(prixLu) && prixLu > 0 ? prixLu : null, floor }, p.reglages);
+    if (ap.invalide || ap.tropLong) continue;   // le titre réglé ne tient pas : cette paire ne part pas (jamais coupé)
+    const msg = { cmd, uid: String(p.uid), id, programme: true, total: partent.length, confirme: true,
+      ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(ap.prix != null ? { prix: ap.prix } : {}), ...(ap.titre != null ? { titre: ap.titre } : {}),
+      ...(floor != null ? { plancher: floor } : {}), ...(p.action === 'versBrouillon' ? { versBrouillon: true } : {}), ...(p.reglages && p.reglages.lettre ? { lettre: GARDES_APP.tirerLettre() } : {}), ...(p.reglages && p.reglages.photo && !GARDES_APP.photoNeutre(p.reglages.photo) ? { reglages: reglagesPhotoSurs(p.reglages.photo) } : {}),
+      ...(p.action === 'enLigne' ? { draftId: id } : {}) };
+    let r = null; try { r = await executerCommande(msg); } catch (_) { r = null; }
+    if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { n++; continue; }
+    arret = (r && (r.code || r.raison)) || 'sans-reponse';
+    break;
+  }
+  await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(n > 0 || !arret ? GARDES_APP.marquerFinie(x, p.uid, p.id, Date.now()) : GARDES_APP.marquerPasPartie(x, p.uid, p.id, [{ cle: 'arret', detail: String(arret).slice(0, 200) }], Date.now())));
+  return { etat: n > 0 || !arret ? 'finie' : 'pas-partie', parties: n, arret };
+}
 async function tickFavorisCarte() {
   if (_favorisCarteEnVol) return;
   _favorisCarteEnVol = true;
@@ -19238,7 +19992,7 @@ async function tickFavorisCarte() {
       if (g.json.carte) st.file = g.json.carte;
       if (!g.json.vue.active) {
         st.actif = false; st.attente = null; st.prochain = null;
-        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240) };
+        st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240), bilan: g.json.vue.bilan ? String(GARDES_APP.phraseBilanFavoris(g.json.vue.bilan) || '').slice(0, 300) : '' };
         await poserEtatFavorisCarte(st);
         logActivity(`💬 Messages aux favoris (carte) : ${st.file ? st.file.envoyes : 0} envoyé(s)`);
         return;
@@ -20983,7 +21737,7 @@ async function carteListesSite(plateforme, o, sender) {
         if (c !== moi) continue;
         const st = STATUT_VC[String(x.statut || '').toLowerCase()] || 'a_confirmer';
         statuts[st]++;
-        a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: null, favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st });
+        { const dp = depuisAnnonceVc(x); a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: dp ? Math.max(0, Math.floor((Date.now() - dp.t) / 864e5)) : null, depuis: dp ? dp.t : null, depuisAuMoins: !!(dp && !dp.exacte), favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st }); }
       }
       annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
     }
@@ -21015,7 +21769,9 @@ async function carteListesSite(plateforme, o, sender) {
   const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
   const n = await notificationsCarte(moi).catch(() => null);
   const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations: null, notifications, autres: null, fenetre: o.fenetre };
+  // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
+  const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, autres: null, fenetre: o.fenetre };
 }
 // 5.409 — MASQUER / AFFICHER DEPUIS LE PANNEAU, sur SON clic (`confirme`), par le geste APPRIS de la règle « vendue
 // ailleurs » (`PUT /api/v2/items/{id}/is_hidden`, `masquerAppris` sur SES gestes rangés : jamais appris ⇒ rien ne part,
@@ -21075,9 +21831,11 @@ async function automatisationsCarte(u, owner) {
   } catch (_) { auto = null; }
   const r0 = Array.isArray(rg) ? (rg[0] || null) : undefined;
   return {
-    offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus } : null,
-    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length } : null,
-    favoris: r0 === undefined ? null : { regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
+    paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false } : null,
+    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
+    cadence: await cadenceCompte(u).catch(() => null),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
   };
@@ -21208,7 +21966,7 @@ async function carteListes(msg, sender) {
       const etat = etatVenteCarte(x), it = x.item_id != null ? String(x.item_id) : '';
       const f = it && fiches[it] && typeof fiches[it] === 'object' && String(fiches[it].accountId || '') === u ? fiches[it] : null;
       return { tx: String(x.transaction_id), conv: /^[1-9]\d{0,19}$/.test(String(x.conversation_id == null ? '' : x.conversation_id)) ? String(x.conversation_id) : '', titre: String(x.title || '').slice(0, 120), prix: prixCarte(x.price), photo: photoCarte(x), date: Date.parse(x.date || '') || null, etat,
-        vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null };
+        vendue: etat === 'a_expedier' || etat === 'en_route' || etat === 'finalisee', num: f && f.numero != null ? String(f.numero) : '', bordereau: etat === 'a_expedier' ? avecPdf.has(String(x.transaction_id)) : null , statutVinted: String(x.status || '').slice(0, 90) };
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
     // 5.409 : le TRANSPORTEUR de chaque vente, par identité : le bordereau reçu par e-mail porte le n° de transaction
@@ -21223,8 +21981,9 @@ async function carteListes(msg, sender) {
         if (parSuivi.size) {
           const ts = await sbGet(`app_data?id=like.email_track_*&meta->>suivi=in.(${[...parSuivi.keys()].join(',')})&select=suivi:meta->>suivi,carrier:meta->>carrier`);
           const parTx = new Map();
-          for (const t of Array.isArray(ts) ? ts : []) { const c = String((t && t.carrier) || ''); const tx = parSuivi.get(String((t && t.suivi) || '')); if (tx && TRANSPORTEURS_CARTE[c] && !parTx.has(tx)) parTx.set(tx, TRANSPORTEURS_CARTE[c]); }
-          for (const x of lignes) if (parTx.has(x.tx)) x.transporteur = parTx.get(x.tx);
+          for (const t of Array.isArray(ts) ? ts : []) { const c = String((t && t.carrier) || ''); const tx = parSuivi.get(String((t && t.suivi) || '')); if (tx && TRANSPORTEURS_CARTE[c] && !parTx.has(tx)) parTx.set(tx, c); }
+          // 5.410 : la clé du transporteur aussi (la carte dessine SON logo, la copie de l'app).
+          for (const x of lignes) if (parTx.has(x.tx)) { x.transporteurCle = parTx.get(x.tx); x.transporteur = TRANSPORTEURS_CARTE[x.transporteurCle]; }
         }
       }
     } catch (_) {}
@@ -21237,7 +21996,7 @@ async function carteListes(msg, sender) {
     const r0 = (lm && lm[0]) || null;
     const cs = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['c' + i]).filter((x) => x && typeof x === 'object' && /^[1-9]\d{0,19}$/.test(String(x.id == null ? '' : x.id))) : [];
     const ph = (x) => { const v = String((x && Array.isArray(x.item_photos) && x.item_photos[0] && x.item_photos[0].url) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(v) ? v : ''; };
-    messages = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, liste: cs.map((x) => ({ conv: String(x.id), qui: String((x.opposite_user && x.opposite_user.login) || '').slice(0, 40), texte: String(x.description || '').slice(0, 160), at: Date.parse(x.updated_at || '') || null, nonlu: x.unread === true, photo: ph(x) })).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)) };
+    messages = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, liste: cs.map((x) => ({ conv: String(x.id), avatar: (() => { const p = x.opposite_user && x.opposite_user.photo; const u = String((p && (p.url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url))) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? u : ''; })(), qui: String((x.opposite_user && x.opposite_user.login) || '').slice(0, 40), texte: String(x.description || '').slice(0, 160), at: Date.parse(x.updated_at || '') || null, nonlu: x.unread === true, photo: ph(x) })).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)) };
   }
   // ── les autres comptes (lecture seule)
   let autres = null;
@@ -21259,7 +22018,11 @@ async function carteListes(msg, sender) {
   const automatisations = await automatisationsCarte(u, s.user_id).catch(() => null);
   // ── 5.409 : NOTIFICATIONS — le journal capté (`capte_journal_*`, toutes les lignes de ce compte VRM), 7 jours.
   const notifications = await notificationsCarte(u).catch(() => null);
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, autres, fenetre: o.fenetre };
+  // ── 5.410 : les OFFRES en attente de CE compte (lues dans ses conversations rangées), pour les trancher ici.
+  const offres = await offresEnAttente(u).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40) }))).catch(() => null);
+  // ── 5.410 : l'atelier Republier en cours (état local).
+  const atelier = await atelierEtat().catch(() => null);
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -21775,6 +22538,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await avecTemoinRepub(() => refaireBrouillon(msg)); await journalCommande(msg, r); return r; }
   // 17 nov. (5.408) : « Reprendre » une republication interrompue, sur son clic (voir `reprendreRepub`).
   if (msg && msg.cmd === 'reprendreRepub') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => reprendreRepub(msg))); await journalCommande(msg, r); return r; }
+  // 20 nov. (5.410, `repubverif`) : le contrôle AVANT de lancer (lecture seule, sur son clic, voir `verifierRepub`).
+  if (msg && msg.cmd === 'verifierRepub') return await verifierRepub(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);
   // 29 oct. : supprimer UNE annonce Leboncoin, sur son clic confirmé (voir `supprimeLbcDepuisApp`).
   if (msg && msg.cmd === 'lbcSupprime') return await supprimeLbcDepuisApp(msg);
@@ -22276,19 +23041,21 @@ function prixAttCommande(d) {
   const vouluC = prixAttCents(a.prix), avantC = prixAttCents(a.prixAvant);
   if (!Number.isInteger(vouluC) || !Number.isInteger(avantC) || Math.abs(Number(a.prix) * 100 - vouluC) > 1e-6 || Math.abs(Number(a.prixAvant) * 100 - avantC) > 1e-6) return { refus: 'arguments' };
   if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
-  if (!(vouluC < avantC)) return { refus: 'hausse' };
+  const hausse = d.hausse === true && d.source === 'panneau' && vouluC > avantC && vouluC <= avantC * 10;
+  if (!(vouluC < avantC) && !hausse) return { refus: 'hausse' };
+  const h = hausse ? { hausse: true } : {};
   const id = String(a.id == null ? '' : a.id);
   if (site === 'vinted') {
     const uid = String(a.uid == null ? '' : a.uid);
     if (!/^\d{1,20}$/.test(uid) || !/^\d{4,15}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: { cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'vinted:' + id, uid, vouluC, avantC, msg: Object.assign({ cmd: 'baisserPrixVinted', uid, id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (site === 'leboncoin') {
     if (!/^\d{6,12}$/.test(id)) return { refus: 'arguments' };
-    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: { cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true } };
+    return { site, cle: 'leboncoin:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'lbcPrix', id, prix: vouluC / 100, prixAvant: avantC / 100, confirme: true }, h) };
   }
   if (!/^\d{3,15}$/.test(id)) return { refus: 'arguments' };
-  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: { cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true } };
+  return { site, cle: 'vestiaire:' + id, uid: '', vouluC, avantC, msg: Object.assign({ cmd: 'vcPrix', produit: id, avantCents: avantC, apresCents: vouluC, confirme: true }, h) };
 }
 // La date après laquelle une commande ne part plus (jamais plus de 24 h après la demande).
 function prixAttFin(d) {
@@ -22706,8 +23473,8 @@ async function regleBaisseTickUn() {
 // + 10 % ; sans plancher ⇒ aucune baisse. « Depuis » = la mise en ligne lue (`publieeLe`) ou la dernière baisse rangée.
 // Rien ne part d'ici : une commande `cmd_prix_*` (site leboncoin) est DÉPOSÉE, exécutée par `prixAttenteTick` via
 // `baisserPrixLbc` (sa recette apprise, prix relu, sécurité du compte, 45/h), comme une baisse de la règle Vinted.
-// Vestiaire : AUCUNE date de mise en ligne n'est lue ⇒ « depuis combien de jours sans vente » n'est pas su ⇒ pas de
-// baisse automatique (dit dans l'app et le panneau), jamais une date inventée.
+// Vestiaire : depuis la 5.410 (20 nov.), la date de mise en ligne est LUE (`listingDate`) ou, à défaut, BORNÉE par la
+// 1re lecture (« au moins ») — voir `regleBaisseVcTick` plus bas. Jamais une date inventée.
 const REGLE_PROCHAIN_LBC = 'vrmRegleBaisseProchainLbc';
 let _regleLbcEnVol = null;
 function regleBaisseLbcTick(source) {
@@ -22768,6 +23535,118 @@ async function regleBaisseLbcTickUn() {
   const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + t.toString(36) + alea, data }], 'id');
   if (ok === false) { noterDiag('regle_baisse_lbc_ecriture_ratee'); return { lu: true, n: dues.length, depose: null }; }
   noterDiag('regle_baisse_lbc_rangee');
+  return { lu: true, n: dues.length, depose: x.id, prix: x.vouluC / 100 };
+}
+// ══ 5.410 (20 nov.) — LA BAISSE PAR RÈGLE SUR VESTIAIRE (même règle, mêmes planchers, ÉTEINTE par défaut) ══════════
+// Julien (20 nov.) : « pour Vestiaire trouve une solution ». Il manquait la DATE de mise en ligne. MESURÉ le 20 nov. :
+// « Mes articles » la porte (`listingDate`, lue par vc-inject `dateMiseVc`) ; sinon l'article est daté à sa 1re
+// lecture (`vueDepuis`) — une BORNE BASSE : la vraie mise en ligne est au moins aussi ancienne, donc la règle ne
+// baisse jamais plus tôt qu'avec la vraie date (`depuisAnnonceVc`).
+// La règle d'UN compte Vestiaire : `vinted_baisse_regle.comptes['vc:{compte}']` (posée dans l'app, son clic). Le
+// compte est celui que la PAGE et l'onglet ont dit à la lecture (`it.compte`) — jamais prêté. Le plancher :
+//  · les faits de l'annonce (`vrm_articles_sites['Vestiaire:{id}']` : prix mini, achat) ;
+//  · la fiche du N° de l'annonce (lien posé par SON clic `vrm_vc_liens`, puis le lien de publication
+//    `vc_listings.liens`, puis la référence « VRM-{n°} », puis le N° Vestiaire donné `vrm_vc_numeros`) — un N°
+//    porté par deux fiches ⇒ rien ;
+//  · plusieurs planchers ⇒ le PLUS HAUT (jamais sous aucun) ; aucun ⇒ AUCUNE baisse.
+// Rien ne part d'ici : une commande `cmd_prix_*` (site vestiaire) est DÉPOSÉE, exécutée par `prixAttenteTick` via
+// `baisserPrixVestiaire` (sa recette APPRISE `vc_prix_recette`, prix lu = celui de l'aperçu, compte de l'onglet,
+// 45/h, prix RELU). Sans recette apprise : rien n'est déposé (`sansRecette`, dit par l'app).
+const REGLE_PROCHAIN_VC = 'vrmRegleBaisseProchainVc';
+// Le N° d'une annonce Vestiaire, dans l'ordre de l'app (src/lienVestiaire.js, src/numerosVestiaire.js) — ou ''.
+function numeroAnnonceVc(id, it, m, liensListe) {
+  const l = m && m.vrm_vc_liens && typeof m.vrm_vc_liens === 'object' ? m.vrm_vc_liens[id] : null;
+  if (l && typeof l === 'object' && l.numero != null && String(l.numero).trim()) return String(l.numero).trim();
+  const p = liensListe && liensListe[id] != null ? String(liensListe[id]).trim() : '';
+  if (p) return p;
+  const r = /^VRM-?([A-Z]?\d{1,6})$/i.exec(String((it && it.ref) || '').trim());
+  if (r) return r[1].toUpperCase();
+  const a = m && m.vrm_vc_numeros && typeof m.vrm_vc_numeros === 'object' ? m.vrm_vc_numeros[id] : null;
+  if (a == null) return '';
+  return typeof a === 'object' ? String(a.numero == null ? '' : a.numero).trim() : String(a).trim();
+}
+// Le plancher d'une annonce Vestiaire (centimes) — le plus haut de ceux qu'on SAIT, ou null.
+function plancherAnnonceVc(id, it, m, liensListe, parNum) {
+  const cands = [];
+  const faits = m && m.vrm_articles_sites && typeof m.vrm_articles_sites === 'object' ? m.vrm_articles_sites['Vestiaire:' + id] : null;
+  const num = numeroAnnonceVc(id, it, m, liensListe);
+  if (faits && typeof faits === 'object') { const p = plancherBaisse({ min: faits.min, buyPrice: faits.buyPrice, numero: num }, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+  if (num) {
+    const f = parNum.get(cleNum(num));
+    if (f === null) return { c: null, doublon: true };            // deux fiches sous ce N° : rien n'est deviné
+    if (f) { const p = plancherBaisse(f, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+    else if (!faits) { const p = plancherBaisse({ numero: num }, m.vinted_buyprice_by_num); if (p) cands.push(p); }
+  }
+  if (!cands.length) return null;
+  return cands.reduce((a, b) => (b.c > a.c ? b : a));
+}
+let _regleVcEnVol = null;
+function regleBaisseVcTick(source) {
+  if (_regleVcEnVol) return _regleVcEnVol;
+  _regleVcEnVol = regleBaisseVcTickUn(source).catch(() => ({ erreur: true })).finally(() => { _regleVcEnVol = null; });
+  return _regleVcEnVol;
+}
+async function regleBaisseVcTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  const t = Date.now();
+  const m0 = await lireMain([REGLE_BAISSE_CLE, 'vrm_vc_liens', 'vrm_vc_numeros', 'vrm_articles_sites', 'vinted_annonce_numeros', 'vinted_buyprice_by_num']);
+  if (m0 === null) return { lu: false };
+  const regles = {};
+  const cs = m0[REGLE_BAISSE_CLE] && m0[REGLE_BAISSE_CLE].comptes && typeof m0[REGLE_BAISSE_CLE].comptes === 'object' ? m0[REGLE_BAISSE_CLE].comptes : {};
+  for (const k of Object.keys(cs)) { const mm = /^vc:(\d{1,20})$/.exec(k); if (!mm) continue; const r = regleBaisseDe(m0[REGLE_BAISSE_CLE], k); if (r) regles[mm[1]] = r; }
+  if (!Object.keys(regles).length) return { saute: 'eteinte' };                 // ÉTEINTE par défaut : rien
+  if (await pauseVc()) return { saute: 'pause' };
+  let rec = null; try { rec = (await chrome.storage.local.get(VC_RECETTE_PRIX))[VC_RECETTE_PRIX] || null; } catch (_) { return { saute: 'stockage' }; }
+  if (!(rec && rec.recette && rec.recette.rejouable === true)) return { saute: 'sansRecette' };   // la baisse ne saurait pas partir : rien n'est déposé
+  const la = await sbGet('app_data?id=eq.vc_listings&select=it:data->items,liens:data->liens');
+  if (!Array.isArray(la)) return { lu: false };
+  const cmds = await sbGet(`app_data?id=like.cmd_prix_*&select=id,cle:meta->>cle,etat:meta->>etat,demandeLe:meta->>demandeLe,source:meta->>source,uidRegle:meta->>uidRegle&order=id.desc&limit=400`);
+  if (!Array.isArray(cmds)) return { lu: false };
+  const items = (la[0] && la[0].it && typeof la[0].it === 'object') ? la[0].it : {};
+  const liensListe = (la[0] && la[0].liens && typeof la[0].liens === 'object') ? la[0].liens : {};
+  const fiches = m0.vinted_annonce_numeros && typeof m0.vinted_annonce_numeros === 'object' ? m0.vinted_annonce_numeros : {};
+  const parNum = new Map();
+  for (const f of Object.values(fiches)) { if (!f || typeof f !== 'object' || f.numero == null) continue; const k = cleNum(f.numero); parNum.set(k, parNum.has(k) ? null : f); }
+  const dues = [], raisons = {};
+  const compte = (r) => { raisons[r] = (raisons[r] || 0) + 1; };
+  for (const [compteVc, regle] of Object.entries(regles)) {
+    const cleRegle = 'vc:' + compteVc;
+    if (await secuRobotDit('vestiaire', compteVc)) { compte('securite'); continue; }
+    const p = await prochainPasse(REGLE_PROCHAIN_VC, compteVc, t);
+    if (p === null) return { saute: 'stockage' };
+    if (p > t) { compte('espace'); continue; }
+    if (cmds.filter((c) => c && c.source === 'regle' && String(c.uidRegle || '') === cleRegle && t - Number(c.demandeLe || 0) < 864e5).length >= REGLE_PAR_JOUR) { compte('jour'); continue; }
+    if (!(await poserProchain(REGLE_PROCHAIN_VC, compteVc, t + tirerEntre(25 * 60000, 55 * 60000)))) return { saute: 'stockage' };
+    for (const [id, it] of Object.entries(items)) {
+      if (!it || typeof it !== 'object' || !/^\d{3,15}$/.test(id)) continue;
+      if (String(it.compte || '') !== compteVc) { if (!it.compte) compte('sansCompte'); continue; }   // jamais prêté au compte de l'onglet
+      if (!/^published$/i.test(String(it.statut || ''))) continue;
+      const prixC = centsPrixVc(it.prix);
+      if (prixC == null) { compte('prix'); continue; }
+      const cle = 'vestiaire:' + id, lies = cmds.filter((c) => c && c.cle === cle);
+      if (lies.some((c) => c.etat === 'attente' || c.etat === 'pris')) continue;
+      const dep = depuisAnnonceVc(it);
+      if (!dep) { compte('sansDate'); continue; }
+      const derniere = lies.reduce((x, c) => Math.max(x, Number(c.demandeLe) || 0), 0);
+      const pl = plancherAnnonceVc(id, it, m0, liensListe, parNum);
+      if (pl && pl.doublon) { compte('numeroDouble'); continue; }
+      const due = baisseDue({ prixC, depuis: Math.max(dep.t, derniere), regle, plancher: pl, maintenant: t });
+      if (due.non) { compte(due.non); continue; }
+      dues.push({ id, cle, cleRegle, regle, prixC, vouluC: due.vouluC, num: numeroAnnonceVc(id, it, m0, liensListe).slice(0, 12), exacte: dep.exacte });
+    }
+  }
+  if (!dues.length) return { lu: true, n: 0, raisons };
+  const x = dues[tirerEntre(0, dues.length - 1)];
+  const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
+  const data = { v: 1, site: 'vestiaire', args: { id: x.id, prix: x.vouluC / 100, prixAvant: x.prixC / 100 }, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS,
+    etat: 'attente', reports: 0, cle: x.cle, prix: x.vouluC / 100, prixAvant: x.prixC / 100, num: x.num, source: 'regle', uidRegle: x.cleRegle, regle: { pct: x.regle.pct, jours: x.regle.jours },
+    // « depuis » : la date LUE chez Vestiaire, ou la borne basse — dit tel quel au journal (jamais « mise en ligne le » sans preuve).
+    depuisExacte: x.exacte === true, pasAvant: t + tirerEntre(2 * 60000, 40 * 60000) };
+  if (prixAttCommande(data).refus) return { lu: true, n: dues.length, saute: 'forme' };
+  const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + t.toString(36) + alea, data }], 'id');
+  if (ok === false) { noterDiag('regle_baisse_vc_ecriture_ratee'); return { lu: true, n: dues.length, depose: null }; }
+  noterDiag('regle_baisse_vc_rangee');
   return { lu: true, n: dues.length, depose: x.id, prix: x.vouluC / 100 };
 }
 // Le registre de ce que VRM a masqué : lire-fusionner-réécrire, une lecture ratée n'écrit RIEN.
@@ -25733,10 +26612,2425 @@ const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_
   'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
+// <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
+const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
+// (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
+// l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
+// même règle : une question déjà répondue ne se repose plus.
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier'];
+const RA_MEMOIRE_MAX = 200000;
+// (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
+// un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
+// arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
+// l'onglet, temps d'écriture, réserve de 5 gestes.
+const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90 };
+const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
+// La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
+function cadenceDe(regle, uid) {
+  const c = regle && typeof regle === 'object' && regle.comptes && typeof regle.comptes === 'object' ? regle.comptes[String(uid)] : null;
+  const out = Object.assign({}, RA_CADENCE_DEFAUT);
+  if (!c || typeof c !== 'object') return out;
+  for (const k of Object.keys(RA_CADENCE_BORNES)) { const v = Number(c[k]), b = RA_CADENCE_BORNES[k]; if (Number.isInteger(v) && v >= b[0] && v <= b[1]) out[k] = v; }
+  if (!(out.pauseMax > out.pauseMin)) { out.pauseMin = RA_CADENCE_DEFAUT.pauseMin; out.pauseMax = RA_CADENCE_DEFAUT.pauseMax; }
+  return out;
+}
+const RA_BAISSE_PCT = [5, 10, 15];
+const RA_BAISSE_JOURS = [7, 14, 30];
+const RA_TEXTE_MAX = 1000;
+const RA_VARIANTES_MAX = 4;
+// La valeur lue : `main` superposé de la ligne (clé présente dans la ligne ⇒ elle gagne).
+function superposerReglagesAuto(main, ligne) {
+  const out = Object.assign({}, main && typeof main === 'object' ? main : {});
+  const c = ligne && typeof ligne === 'object' && ligne.cles && typeof ligne.cles === 'object' && !Array.isArray(ligne.cles) ? ligne.cles : null;
+  if (c) for (const k of REGLAGES_AUTO_CLES) if (Object.prototype.hasOwnProperty.call(c, k)) out[k] = c[k];
+  return out;
+}
+function raTexte(v) { return typeof v === 'string' && v.trim().length <= RA_TEXTE_MAX ? v.trim() : null; }
+function raPaliers(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const pcts = (Array.isArray(o.paliers) ? o.paliers : [50, 80, 100]).map(Number).filter((x) => Number.isFinite(x) && x > 0 && x <= 100);
+  const uniques = [...new Set(pcts.map((x) => Math.round(x)))].sort((a, b) => a - b).slice(0, 6);
+  const rm = Number(o.remiseMax);
+  return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [50, 80, 100],
+    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= RA_TEXTE_MAX).slice(0, 5), arrondi: o.arrondi !== false };
+}
+// Une demande d'écriture → { ok: true, valeur } ou { ok: false, code, raison }. `actuelle` = la valeur lue avant
+// (superposée) ; `confirme` = SON toucher sur la confirmation ; `maintenant` = l'heure.
+function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
+  if (!REGLAGES_AUTO_CLES.includes(cle)) return { ok: false, code: 'cle', raison: 'Ce réglage ne se règle pas ici.' };
+  const allume = (avant, apres) => apres === true && avant !== true;
+  const refus = { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Allumer ».' };
+  if (cle === 'vinted_offres_auto') {
+    if (typeof demande !== 'boolean') return { ok: false, code: 'forme', raison: 'Oui ou non.' };
+    if (allume(actuelle, demande) && confirme !== true) return refus;
+    return { ok: true, valeur: demande };
+  }
+  if (cle === 'vinted_offre_refus_msg') {
+    const t = raTexte(demande);
+    return t == null ? { ok: false, code: 'forme', raison: `Un texte de ${RA_TEXTE_MAX} caractères au plus.` } : { ok: true, valeur: t };
+  }
+  if (cle === 'vinted_offre_refus_variantes') {
+    if (!Array.isArray(demande)) return { ok: false, code: 'forme', raison: 'Une liste de textes.' };
+    const l = demande.map(raTexte);
+    if (l.some((t) => t == null)) return { ok: false, code: 'forme', raison: `Chaque version : ${RA_TEXTE_MAX} caractères au plus.` };
+    const pleines = l.filter(Boolean);
+    if (pleines.length > RA_VARIANTES_MAX) return { ok: false, code: 'forme', raison: `${RA_VARIANTES_MAX + 1} versions au plus.` };
+    return { ok: true, valeur: pleines };
+  }
+  if (cle === 'vinted_offres_paliers') {
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande)) return { ok: false, code: 'forme', raison: 'Réglage illisible.' };
+    const v = raPaliers(demande);
+    const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
+    if (allume(avant, v.actif) && confirme !== true) return refus;
+    return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_agent_publier') {
+    let n = 0; try { n = JSON.stringify(demande).length; } catch (_) { n = Infinity; }
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande) || !(n <= RA_MEMOIRE_MAX)) return { ok: false, code: 'forme', raison: 'Mémoire illisible ou trop grande.' };
+    return { ok: true, valeur: demande };
+  }
+  if (cle === 'vinted_cadence') {
+    // { uid, favorisHeure, actionsHeure, parJour, pauseMin, pauseMax } pour UN compte ; plus vite que le défaut ⇒ `confirme`.
+    const d = demande && typeof demande === 'object' ? demande : {};
+    const uid = String(d.uid == null ? '' : d.uid);
+    if (!/^\d{1,20}$/.test(uid)) return { ok: false, code: 'forme', raison: 'Compte inconnu.' };
+    const c = {};
+    for (const k of Object.keys(RA_CADENCE_BORNES)) {
+      if (d[k] == null || d[k] === '') continue;
+      const v = Number(d[k]), b = RA_CADENCE_BORNES[k];
+      if (!Number.isInteger(v) || v < b[0] || v > b[1]) return { ok: false, code: 'bornes', raison: `Hors des bornes (${k} : ${b[0]} à ${b[1]}).` };
+      c[k] = v;
+    }
+    const pm = c.pauseMin != null ? c.pauseMin : RA_CADENCE_DEFAUT.pauseMin, px = c.pauseMax != null ? c.pauseMax : RA_CADENCE_DEFAUT.pauseMax;
+    if (!(px > pm)) return { ok: false, code: 'bornes', raison: 'La pause doit rester une plage (au hasard) : le maximum au-dessus du minimum.' };
+    const plusVite = (c.favorisHeure || 0) > RA_CADENCE_DEFAUT.favorisHeure || (c.actionsHeure || 0) > RA_CADENCE_DEFAUT.actionsHeure || pm < RA_CADENCE_DEFAUT.pauseMin || (c.parJour != null && c.parJour > 200);
+    if (plusVite && confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme la cadence plus rapide.' };
+    const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
+    comptes[uid] = Object.assign(c, { at: Number(maintenant) || 0 });
+    return { ok: true, valeur: { v: 1, comptes } };
+  }
+  // vinted_baisse_regle : { uid, actif, pct, jours } pour UN compte ; les autres comptes ne bougent pas.
+  const d = demande && typeof demande === 'object' ? demande : {};
+  const uid = String(d.uid == null ? '' : d.uid);
+  if (!/^(\d{1,20}|lbc:[\w-]{1,40}|vc:[\w-]{1,40})$/.test(uid)) return { ok: false, code: 'forme', raison: 'Compte inconnu.' };
+  const pct = Number(d.pct), jours = Number(d.jours);
+  if (!RA_BAISSE_PCT.includes(pct) || !RA_BAISSE_JOURS.includes(jours)) return { ok: false, code: 'forme', raison: 'Choisis 5, 10 ou 15 % après 7, 14 ou 30 jours.' };
+  const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
+  const avant = comptes[uid] && comptes[uid].actif === true;
+  if (allume(avant, d.actif === true) && confirme !== true) return refus;
+  comptes[uid] = { actif: d.actif === true, pct, jours, at: Number(maintenant) || 0 };
+  return { ok: true, valeur: { v: 1, comptes } };
+}
+// La ligne à écrire après SON geste (les autres clés de la ligne ne bougent pas).
+function ligneAvecReglage(ligne, cle, valeur, par, maintenant) {
+  const cles = Object.assign({}, ligne && ligne.cles && typeof ligne.cles === 'object' ? ligne.cles : {});
+  cles[cle] = valeur;
+  return { v: 1, at: Number(maintenant) || 0, par: par === 'app' ? 'app' : 'extension', cles };
+}
+// </reglages-auto-ligne>
+// <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).
+var __gardesApp = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // <stdin>
+  var stdin_exports = {};
+  __export(stdin_exports, {
+    ACTIONS_QUOTA: () => ACTIONS_QUOTA,
+    GESTES_PAR_REPUB: () => GESTES_PAR_REPUB,
+    LIGNE_PROGRAMME: () => LIGNE_PROGRAMME,
+    apercuRepub: () => apercuRepub,
+    avisAcceptationManuelle: () => avisAcceptationManuelle,
+    conditionsDepart: () => conditionsDepart,
+    confirmationSupprimerLbc: () => confirmationSupprimerLbc,
+    decision: () => decision,
+    envoiPour: () => envoiPour,
+    ficheArticle: () => ficheArticle,
+    indexAttentes: () => indexAttentes,
+    lancerPermis: () => lancerPermis,
+    marquerFinie: () => marquerFinie,
+    marquerPasPartie: () => marquerPasPartie,
+    paireVerif: () => paireVerif,
+    pairesAuDepart: () => pairesAuDepart,
+    partiraPas: () => partiraPas,
+    photoNeutre: () => photoNeutre,
+    photosExigeesVc: () => photosExigeesVc,
+    phraseBilanFavoris: () => phraseBilanFavoris,
+    planSite: () => planSite,
+    prendreDepart: () => prendreDepart,
+    problemesAnnonce: () => problemesAnnonce,
+    programmesDe: () => programmesDe,
+    reponsesDe: () => reponsesDe,
+    resumeVerif: () => resumeVerif,
+    retenirReponses: () => retenirReponses,
+    tirerLettre: () => tirerLettre,
+    validerAutoFavoris: () => validerAutoFavoris,
+    validerReglagesFavoris: () => validerReglagesFavoris
+  });
+
+  // src/offresGarde.js
+  var GARDE_OFFRES_VERSION = 1;
+  var GARDE_OFFRES_MAX_AGE_MS = 48 * 3600 * 1e3;
+  function gardeRefuse(garde, item, maintenant = Date.now()) {
+    if (!garde || typeof garde !== "object" || garde.v !== GARDE_OFFRES_VERSION) return "garde-absente";
+    const at = Number(garde.at);
+    if (!Number.isFinite(at) || maintenant - at > GARDE_OFFRES_MAX_AGE_MS || at > maintenant + 12e4) return "garde-perimee";
+    if (garde.complet !== true) return "garde-incomplete";
+    if (!Array.isArray(garde.items)) return "garde-absente";
+    if (item == null || garde.items.includes(String(item))) return "vendue-ailleurs";
+    return null;
+  }
+  function avisAcceptationManuelle(garde, item, maintenant = Date.now()) {
+    if (item == null || item === "") return { pasSu: true, texte: "VRM ne sait pas quelle annonce c'est : vérifie qu'elle n'est pas vendue ailleurs." };
+    const connue = !!(garde && garde.v === GARDE_OFFRES_VERSION && Array.isArray(garde.items) && garde.items.includes(String(item)));
+    const r = connue ? "vendue-ailleurs" : gardeRefuse(garde, item, maintenant);
+    if (r == null) return null;
+    if (r === "vendue-ailleurs") return { bloque: true, texte: "Déjà vendue sur un autre site : je n'accepte pas. Retire l'annonce Vinted." };
+    return { pasSu: true, texte: "VRM n'a pas pu vérifier tes autres sites : vérifie qu'elle n'y est pas vendue." };
+  }
+
+  // src/numeroEcrit.js
+  var cleNumero = (v2) => {
+    let s = String(v2 == null ? "" : v2).trim().toUpperCase().replace(/[\s\-_.]/g, "");
+    if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+    return s;
+  };
+  var NUM_OK = /^([A-Z]{1,3})?\d{1,6}$/;
+  var MARQUE = /(?:^|[^0-9A-Za-zÀ-ÿ])(N\s?[°º]|No\.?(?=\s?[:#]?\s?(?:VRM[-\s]?)?[A-Za-z]{0,3}\d)|R[ée]f\.?|#)/gi;
+  var CORPS = /^\s{0,2}:?\s{0,2}(VRM[-\s]?)?([A-Za-z]{1,3})?(\d{1,6})(?![0-9A-Za-z])/i;
+  var SUITE_INTERDITE = /^\s?(?:[-/]\s?\d|[.,]\d|€|eur\b|euros?\b|%|cm\b|mm\b|kg\b|g\b|ans?\b|paires?\b|pi[eè]ces?\b|x\s?\d)/i;
+  function numerosMarques(texte) {
+    const t = String(texte == null ? "" : texte);
+    const out = [];
+    MARQUE.lastIndex = 0;
+    let m;
+    while (m = MARQUE.exec(t)) {
+      const marque = m[1];
+      const debut = m.index + m[0].length;
+      const c = CORPS.exec(t.slice(debut));
+      if (!c) continue;
+      const vrm = !!c[1], lettres = c[2] || "", chiffres = c[3];
+      const suite = t.slice(debut + c[0].length);
+      if (SUITE_INTERDITE.test(suite)) continue;
+      const estRef = /^r/i.test(marque);
+      if (lettres) {
+        if (chiffres.length > 4) continue;
+        if (estRef && !vrm && lettres.length > 1) continue;
+      } else if (chiffres.length > 5) continue;
+      const cle = cleNumero(lettres + chiffres);
+      if (!cle || !NUM_OK.test(cle) || cle === "0") continue;
+      out.push({ cle, brut: (marque + t.slice(debut, debut + c[0].length)).trim(), index: m.index });
+    }
+    return out;
+  }
+  var distinctes = (occ) => [...new Set(occ.map((o) => o.cle))];
+  var LETTRE_FIN = /\n\s*\n\s*[a-z]\s*$/i;
+  function lireNumeroTexte(texte, zone = "description") {
+    const t = String(texte == null ? "" : texte);
+    if (!t.trim()) return { etat: "rien", raison: "vide" };
+    if (zone === "ref") {
+      const v2 = t.trim();
+      const nu = /^(?:VRM[-\s]?)?([A-Za-z]{1,3})?(\d{1,6})$/i.exec(v2);
+      if (nu) {
+        if (nu[2].length > (nu[1] ? 4 : 5)) return { etat: "rien", raison: "pas un numéro de rangement" };
+        const cle = cleNumero((nu[1] || "") + nu[2]);
+        return cle && cle !== "0" && NUM_OK.test(cle) ? { etat: "lu", cle, brut: v2 } : { etat: "rien", raison: "pas un numéro de rangement" };
+      }
+      const occ2 = numerosMarques(v2);
+      if (occ2.length && occ2[0].index === 0 && v2.slice(occ2[0].brut.length).trim() === "") return { etat: "lu", cle: occ2[0].cle, brut: v2 };
+      return { etat: "rien", raison: "pas un numéro de rangement" };
+    }
+    const occ = numerosMarques(t);
+    if (!occ.length) return { etat: "rien", raison: "aucun N° écrit" };
+    const cles = distinctes(occ);
+    if (cles.length > 1) return { etat: "ambigu", cles, raison: `deux numéros écrits (${cles.join(" et ")})` };
+    if (zone === "titre") return { etat: "lu", cle: cles[0], brut: occ[0].brut };
+    const corps = t.replace(LETTRE_FIN, "").replace(/\s+$/, "");
+    const lignes = corps.split("\n");
+    let i = lignes.length - 1;
+    while (i >= 0 && !lignes[i].trim()) i--;
+    const derniere = i >= 0 ? lignes[i] : "";
+    const surFin = numerosMarques(derniere);
+    if (!surFin.length) return { etat: "rien", raison: "un N° est écrit, mais pas à la fin", ailleurs: cles[0] };
+    return { etat: "lu", cle: surFin[0].cle, brut: surFin[0].brut };
+  }
+  function compacterLecture(l) {
+    if (!l || typeof l !== "object") return null;
+    if (l.etat === "lu" && typeof l.cle === "string" && NUM_OK.test(l.cle) && l.cle !== "0") return { etat: "lu", cle: l.cle, brut: String(l.brut || "").slice(0, 24) };
+    if (l.etat === "ambigu" && Array.isArray(l.cles)) {
+      const cles = l.cles.filter((k) => typeof k === "string" && NUM_OK.test(k)).slice(0, 4);
+      return cles.length > 1 ? { etat: "ambigu", cles, raison: `deux numéros écrits (${cles.join(" et ")})` } : null;
+    }
+    if (l.etat === "rien") return { etat: "rien", raison: String(l.raison || "aucun N° écrit").slice(0, 60), ...typeof l.ailleurs === "string" && NUM_OK.test(l.ailleurs) ? { ailleurs: l.ailleurs } : {} };
+    return null;
+  }
+  var lectureRecue = (x) => compacterLecture(x);
+  var OU_NUMERO = ["description", "titre", "ref"];
+  function lireReglageNumeroEcrit(brut) {
+    const o = brut && typeof brut === "object" ? brut : {};
+    const ou = Array.isArray(o.ou) ? OU_NUMERO.filter((k) => o.ou.includes(k)) : [];
+    return { actif: o.actif === true, depuis: typeof o.depuis === "string" ? o.depuis : null, ou: ou.length ? ou : OU_NUMERO.slice() };
+  }
+
+  // src/profilVendeur.js
+  var CATEGORIES_VENDS = [
+    { v: "sneakers", titre: "Sneakers" },
+    { v: "vetements", titre: "Vêtements" },
+    { v: "luxe", titre: "Luxe & créateurs" },
+    { v: "sacs", titre: "Sacs & maroquinerie" },
+    { v: "montres", titre: "Montres & bijoux" },
+    { v: "lunettes", titre: "Lunettes" },
+    // (11 nov., lot DJ2) « il y a des personnes qui vendent des lunettes »
+    { v: "accessoires", titre: "Accessoires" },
+    { v: "vintage", titre: "Vintage" },
+    { v: "enfants", titre: "Enfants & puériculture" },
+    { v: "livres", titre: "Livres & BD" },
+    { v: "jeux", titre: "Jeux vidéo & consoles" },
+    { v: "hightech", titre: "High-tech" },
+    { v: "cartes", titre: "Cartes à collectionner" },
+    { v: "jouets", titre: "Jouets & figurines" },
+    { v: "maison", titre: "Maison & déco" },
+    { v: "sport", titre: "Sport & outdoor" },
+    { v: "beaute", titre: "Beauté" },
+    { v: "musique", titre: "Vinyles & musique" },
+    { v: "autre", titre: "Autre chose" }
+  ];
+  var IDS_CATEGORIES = CATEGORIES_VENDS.map((c) => c.v);
+  var MOTS = {
+    sneakers: {
+      nom: "paire",
+      noms: "paires",
+      un: "une paire",
+      Un: "Une paire",
+      le: "la paire",
+      Le: "La paire",
+      ce: "cette paire",
+      tes: "tes paires",
+      e: "e",
+      es: "es",
+      chaque: "Chaque paire",
+      elle: "elle",
+      Elle: "Elle",
+      une: "une",
+      // (11 nov., lot vocabulaire-article) les formes des écrans secondaires, des notifications et de l'extension.
+      Nom: "Paire",
+      Noms: "Paires",
+      sa: "sa paire",
+      la: "la",
+      La: "La",
+      de: "de la paire",
+      a: "à la paire",
+      Ce: "Cette paire",
+      aucune: "aucune paire",
+      Aucune: "Aucune paire",
+      celle: "celle",
+      celles: "celles",
+      toutes: "toutes",
+      Toutes: "Toutes",
+      laquelle: "laquelle",
+      autre: "une autre paire",
+      meme: "la même paire",
+      Meme: "La même paire",
+      lui: "elle",
+      eux: "elles",
+      deNom: "de paire",
+      deNoms: "de paires",
+      Tes: "Tes paires",
+      quelle: "quelle paire",
+      bonne: "la bonne paire",
+      AucuneDe: "Aucune de ces paires",
+      mes: "mes paires",
+      deMeme: "de la même paire",
+      quelles: "quelles paires",
+      ancienne: "ANCIENNE paire",
+      nouvelle: "la nouvelle",
+      ta: "ta paire",
+      deCe: "de cette paire",
+      deLa: "de la"
+    },
+    autre: {
+      nom: "article",
+      noms: "articles",
+      un: "un article",
+      Un: "Un article",
+      le: "l’article",
+      Le: "L’article",
+      ce: "cet article",
+      tes: "tes articles",
+      e: "",
+      es: "s",
+      chaque: "Chaque article",
+      elle: "il",
+      Elle: "Il",
+      une: "un",
+      Nom: "Article",
+      Noms: "Articles",
+      sa: "son article",
+      la: "le",
+      La: "Le",
+      de: "de l’article",
+      a: "à l’article",
+      Ce: "Cet article",
+      aucune: "aucun article",
+      Aucune: "Aucun article",
+      celle: "celui",
+      celles: "ceux",
+      toutes: "tous",
+      Toutes: "Tous",
+      laquelle: "lequel",
+      autre: "un autre article",
+      meme: "le même article",
+      Meme: "Le même article",
+      lui: "lui",
+      eux: "eux",
+      deNom: "d’article",
+      deNoms: "d’articles",
+      Tes: "Tes articles",
+      quelle: "quel article",
+      bonne: "le bon article",
+      AucuneDe: "Aucun de ces articles",
+      mes: "mes articles",
+      deMeme: "du même article",
+      quelles: "quels articles",
+      ancienne: "ANCIEN article",
+      nouvelle: "le nouvel article",
+      ta: "ton article",
+      deCe: "de cet article",
+      deLa: "du"
+    }
+  };
+  var motsArticle = (vend) => MOTS[vend === "sneakers" ? "sneakers" : "autre"];
+  var sourceVend = null;
+  var vendCourant = () => {
+    try {
+      const v2 = sourceVend ? sourceVend() : "sneakers";
+      return v2 === "sneakers" ? "sneakers" : "autre";
+    } catch (_) {
+      return "sneakers";
+    }
+  };
+  var motsVendeur = () => motsArticle(vendCourant());
+
+  // src/messageSur.js
+  var NOMS_SITES = { vinted: "Vinted", leboncoin: "Leboncoin", lbc: "Leboncoin", vestiaire: "Vestiaire", ebay: "eBay" };
+  var nomSite = (site) => NOMS_SITES[site] || "Vinted";
+  var estLbc = (site) => site === "leboncoin" || site === "lbc";
+  var normaliser = (s) => String(s == null ? "" : s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[‘’ʼ]/g, "'").toLowerCase().replace(/\s+/g, " ");
+  var NEGATION = /(?:\bpas\b|\bjamais\b|\bsans\b|\bni\b|\baucun(?:e)?\b|\bn'(?:accepte|utilise|ai|est)\b|\bne\b[^.!?,;]{0,20}$)[^.!?,;]{0,22}$/;
+  var nie = (t, i) => NEGATION.test(t.slice(Math.max(0, i - 30), i));
+  function trouver(t, re, avecNegation = true) {
+    re.lastIndex = 0;
+    let m;
+    while (m = re.exec(t)) {
+      if (!avecNegation || !nie(t, m.index)) return m[0].trim();
+      if (re.lastIndex === m.index) re.lastIndex++;
+    }
+    return "";
+  }
+  var RE_TEL = /(?:\+33|0033|\b0)\s*[1-9](?:[\s.-]?\d{2}){4}\b/g;
+  var RE_TEL_MOTS = /\bzero (?:six|sept)\b|\b(?:envoie|envoyez|ecris|ecrivez|appelle|appelez)[- ]?(?:moi|nous)? (?:un |par )?(?:sms|texto)\b|\bpar (?:sms|texto)\b|\bmon (?:portable|tel|06|07)\b/g;
+  var RE_EMAIL_ADR = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/g;
+  var RE_EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+|\b(?:gmail|hotmail|outlook|yahoo|icloud|laposte\.net|orange\.fr)\b|\barobase\b/g;
+  var RE_LIEN = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[a-z0-9-]{2,}\.(?:com|fr|net|org|io|me|ly|co|be|shop|store|link)\b(?:\/\S*)?/g;
+  var LIEN_DU_SITE = /(?:^|[/.])(?:vinted|leboncoin|vestiairecollective|ebay)\.[a-z.]+/;
+  var RE_PAIEMENT = /\bpay ?pal\b|\bvirement\b|\blydia\b|\bpaylib\b|\bwero\b|\biban\b|\brib\b|\bwestern union\b|\bmandat cash\b|\bpaysafecard\b|\bcrypto\b|\bbitcoin\b/g;
+  var RE_ESPECES = /\ben (?:especes|liquide|cash)\b|\bpaiement (?:en )?(?:especes|cash)\b/g;
+  var RE_MESSAGERIE = /\bwhats ?app\b|\bwa\.me\b|\btelegram\b|\bsnap(?:chat)?\b|\binsta(?:gram)?\b|\bmessenger\b|\bfacebook\b/g;
+  var RE_HORS = /\b(?:en dehors|hors|sans passer par|a cote) (?:de |du |d')?(?:la |l')?(?:vinted|leboncoin|le bon coin|vestiaire|ebay|plateforme|appli(?:cation)?|site)\b|\bhors plateforme\b|\b(?:payer|paie|paye|paies|payes|payez|regler|reglez)(?:[- ]moi)? (?:directement|en direct)\b|\bevit(?:er|e|es|ons|ez) les frais\b|\bsans (?:les )?frais (?:de )?(?:protection|vinted|plateforme)\b|\ben direct sans (?:vinted|leboncoin|vestiaire|ebay)\b/g;
+  var RE_MAIN_PROPRE = /\b(?:en |remise en |remise |rdv en |rendez-vous en )?mains? propres?\b|\bje peux (?:passer|venir) (?:te |vous )?(?:la |le |les )?(?:deposer|donner|apporter)\b|\bon (?:se voit|peut se voir|se retrouve)\b/g;
+  var MARQUES = ["nike", "adidas", "jordan", "air jordan", "yeezy", "new balance", "asics", "puma", "vans", "converse", "reebok", "salomon", "gucci", "louis vuitton", "lv", "dior", "balenciaga", "prada", "chanel", "hermes", "off-white", "off white", "supreme", "stone island", "moncler", "the north face", "north face", "lacoste", "ralph lauren", "burberry", "versace", "fendi", "celine", "saint laurent", "ysl", "bape", "rolex", "cartier", "golden goose", "alexander mcqueen", "mcqueen", "canada goose", "arc'teryx", "arcteryx", "trapstar", "corteiz", "essentials", "fear of god"];
+  var RE_MARQUE = MARQUES.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  var RE_CONTREFACON = new RegExp([
+    "\\br[e]?plica(?:s)?\\b",
+    "\\breplique(?:s)?\\b",
+    "\\bfake(?:s)?\\b",
+    "\\bdupe(?:s)?\\b",
+    "\\bimitation(?:s)?\\b",
+    "\\bcontrefacon(?:s)?\\b",
+    "\\bcopie(?:s)?\\b(?! (?:de |du |d'|de la )?(?:la |le )?(?:facture|ticket|preuve|recu|bon|carte|cni|piece|etiquette|boite|bordereau))",
+    "\\b1 ?[:/] ?1\\b",
+    "\\b(?:non|pas) (?:authentique|original(?:e)?|officiel(?:le)?|d'origine)\\b",
+    "\\binspire(?:e|es|s)? (?:de|par|d'|du)\\b(?! (?:l'univers|les annees|des annees|annees))",
+    "\\b(?:type|style|facon|genre|look) (?:" + RE_MARQUE + ")\\b",
+    "\\b(?:ua|top|best) ?batch\\b",
+    "\\bqualite (?:miroir|identique a l'original)\\b"
+  ].join("|"), "g");
+  var ETIQUETTES = {
+    telephone: "Un numéro de téléphone",
+    email: "Une adresse e-mail",
+    lien: "Un lien vers un autre site",
+    paiement: "Un paiement hors plateforme",
+    messagerie: "Une autre messagerie",
+    hors: "La vente proposée hors plateforme",
+    mainpropre: "La main propre proposée",
+    contrefacon: "Un mot de contrefaçon"
+  };
+  var CODES_RISQUE = Object.keys(ETIQUETTES);
+  function chercher(texte, site, famille) {
+    const t = normaliser(texte);
+    if (!t.trim()) return [];
+    const out = [];
+    const pose = (code, mot) => {
+      if (mot && !out.some((x) => x.code === code)) out.push({ code, mot, texte: `${ETIQUETTES[code]} : « ${mot.slice(0, 32)} »` });
+    };
+    pose("telephone", trouver(t, RE_TEL, false) || trouver(t, RE_TEL_MOTS));
+    pose("email", trouver(t, RE_EMAIL, false));
+    const tl = t.replace(RE_EMAIL_ADR, " ");
+    RE_LIEN.lastIndex = 0;
+    let m;
+    let lien = "";
+    while (m = RE_LIEN.exec(tl)) {
+      if (!LIEN_DU_SITE.test(m[0])) {
+        lien = m[0];
+        break;
+      }
+    }
+    pose("lien", lien);
+    pose("paiement", trouver(t, RE_PAIEMENT) || (estLbc(site) ? "" : trouver(t, RE_ESPECES)));
+    pose("messagerie", trouver(t, RE_MESSAGERIE));
+    pose("hors", trouver(t, RE_HORS));
+    if (!estLbc(site)) pose("mainpropre", trouver(t, RE_MAIN_PROPRE));
+    if (famille === "annonce") pose("contrefacon", trouver(t, RE_CONTREFACON));
+    return out;
+  }
+  var risquesMessage = (texte, site = "vinted") => chercher(texte, site, "message");
+  var risquesAnnonce = (texte, site = "vinted") => chercher(texte, site, "annonce");
+  var phraseRisqueAnnonce = (site) => `${nomSite(site)} supprime l’annonce, voire le compte, pour ça`;
+  var GESTE_ANNONCE = "Retire-le du titre ou de la description";
+  var TEXTE_AUTO_REFUSE = "Ce message ne partira jamais tout seul : retire ce mot.";
+  function erreurMessageAuto(texte, site = "vinted") {
+    const r = risquesMessage(texte, site);
+    return r.length ? `${r[0].texte}. ${TEXTE_AUTO_REFUSE}` : "";
+  }
+
+  // src/verifAnnonce.js
+  var TITRE_MAX = { lbc: 50, ebay: 80, vinted: 100 };
+  var PHOTOS_MIN = 3;
+  var SANS_TAILLE = /* @__PURE__ */ new Set(["sacs", "accessoires", "bijoux"]);
+  var vide = (v2) => v2 == null || String(v2).trim() === "";
+  var num = (v2) => {
+    if (v2 == null || v2 === "") return null;
+    const n = Number(String(v2).replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  };
+  var eur = (v2) => Number.isInteger(v2) ? `${v2} €` : `${v2.toFixed(2).replace(".", ",")} €`;
+  var GESTES = {
+    lbc: { numero: "Écris le N° à la fin de la description", enligne: "Retire l’autre annonce, ou ne publie pas", taille: "Ajoute la taille sur l’annonce Vinted", photos: "Ouvre l’annonce sur Vinted : ses photos arrivent ici", prix: "Corrige le prix dans la fiche", titre: "Raccourcis le titre dans la fiche", marque: "Ajoute la marque sur l’annonce Vinted", categorie: "Précise le titre (le type d’article)" },
+    ebay: { numero: "Écris le N° à la fin de la description", enligne: "Termine l’autre annonce eBay, ou ne publie pas", taille: "Remplis la pointure dans les caractéristiques", photos: "Ajoute des photos", prix: "Corrige le prix", titre: "Raccourcis le titre", marque: "Remplis la marque dans les caractéristiques", categorie: "Choisis la catégorie" },
+    vestiaire: { numero: "Écris le N° à la fin de la description Vinted", enligne: "Retire l’autre annonce, ou ne publie pas", taille: "Ajoute la taille sur l’annonce Vinted", photos: "Ouvre l’annonce sur Vinted : ses photos arrivent ici", prix: "Corrige le prix sur Vinted", titre: "Raccourcis le titre sur Vinted", marque: "Ajoute la marque sur l’annonce Vinted", categorie: "Choisis la catégorie sur Vestiaire" },
+    vinted: { numero: "Écris le N° à la fin de la description", get enligne() {
+      return `Une seule annonce par ${motsVendeur().nom} : vérifie l’autre`;
+    }, taille: "Ajoute la taille sur Vinted", photos: "Ajoute des photos sur Vinted", prix: "Change le prix dans Republier", titre: "Raccourcis le titre dans Republier", marque: "Ajoute la marque sur Vinted", categorie: "Choisis la catégorie sur Vinted", description: "Écris la description sur Vinted", couleur: "Choisis la couleur sur Vinted", etat: "Choisis l’état sur Vinted", titreVide: "Écris un titre sur Vinted", prixVide: "Mets un prix sur Vinted" }
+  };
+  var DESCRIPTION_MIN = 5;
+  function numeroAJuger(x) {
+    if (!x || x.numeroEcrit !== true) return "";
+    const ou = Array.isArray(x.ou) ? x.ou : null;
+    if (ou && !ou.includes("description")) return "";
+    const l = x.numeroLu !== void 0 && x.numeroLu !== null ? lectureRecue(x.numeroLu) : typeof x.description === "string" ? lireNumeroTexte(x.description, "description") : null;
+    if (!l) return "";
+    const attendu = x.numero != null && String(x.numero).trim() ? cleNumero(x.numero) : "";
+    if (attendu && x.ref != null && String(x.ref).trim()) {
+      const r = lireNumeroTexte(x.ref, "ref");
+      if (r.etat === "lu" && r.cle === attendu) return "";
+    }
+    if (attendu && ou && ou.includes("titre") && typeof x.titre === "string") {
+      const t = lireNumeroTexte(x.titre, "titre");
+      if (t.etat === "lu" && t.cle === attendu) return "";
+    }
+    if (l.etat === "lu") return attendu && l.cle !== attendu ? `La description dit N°${l.cle}, pas N°${attendu}` : "";
+    if (l.etat === "ambigu") return "Deux N° différents dans la description";
+    return attendu ? `N°${attendu} absent de la fin de la description` : "Aucun N° à la fin de la description";
+  }
+  function problemesAnnonce(a, site) {
+    const x = a || {};
+    const g = GESTES[site] || GESTES.vinted;
+    const out = [];
+    const pose = (code, texte) => out.push({ code, texte, geste: g[code] });
+    if (x.nPhotos !== void 0) {
+      const n = Number(x.nPhotos);
+      if (!Number.isFinite(n) || n < PHOTOS_MIN) pose("photos", !Number.isFinite(n) || n <= 0 ? "Aucune photo" : `${n} photo${n > 1 ? "s" : ""} seulement`);
+    }
+    const fac = x.facultatifs === true;
+    if (!fac && x.taille !== void 0 && !SANS_TAILLE.has(String(x.famille || "")) && vide(x.taille)) pose("taille", "Taille absente");
+    const p = num(x.prix), ac = num(x.achat);
+    if (p != null && ac != null && ac > 0 && p < ac) pose("prix", `Prix ${eur(p)} sous ton prix d’achat ${eur(ac)}`);
+    const max = TITRE_MAX[site];
+    if (max && x.titre !== void 0) {
+      const t = String(x.titre || "").replace(/\s+/g, " ").trim();
+      if (t.length > max) pose("titre", `Titre trop long : ${t.length}/${max}`);
+    }
+    if (!fac && x.marque !== void 0 && vide(x.marque)) pose("marque", "Marque absente");
+    if (x.categorie !== void 0 && vide(x.categorie)) pose("categorie", "Catégorie absente");
+    const nl = numeroAJuger(x);
+    if (nl) pose("numero", nl);
+    if (x.dejaEnLigne === true) pose("enligne", `Déjà en ligne ${String(x.dejaEnLigneOu || "sur ce compte")}`.slice(0, 60));
+    if (site === "vinted") {
+      if (x.titre !== void 0 && x.titre !== null && vide(x.titre)) out.unshift({ code: "titreVide", texte: "Sans titre", geste: g.titreVide });
+      if (x.prix !== void 0 && x.prix !== null && !(num(x.prix) > 0)) out.unshift({ code: "prixVide", texte: "Sans prix", geste: g.prixVide });
+      if (x.descLen !== void 0 && x.descLen !== null) {
+        const d = num(x.descLen);
+        if (d == null || d < DESCRIPTION_MIN) pose("description", !d ? "Sans description" : `Description trop courte (${d} caractère${d > 1 ? "s" : ""})`);
+      }
+      if (x.couleur !== void 0 && x.couleur !== null && vide(x.couleur)) pose("couleur", "Couleur absente");
+      if (x.etat !== void 0 && x.etat !== null && vide(x.etat)) pose("etat", "État absent");
+    }
+    const aLire = [x.titre, x.description].filter((v2) => typeof v2 === "string").join("\n");
+    const mots = aLire ? risquesAnnonce(aLire, site) : [];
+    if (mots.length) out.unshift(...mots.map((r) => ({ code: "motsRisque", sorte: r.code, texte: r.texte, geste: GESTE_ANNONCE, pourquoi: phraseRisqueAnnonce(site === "lbc" ? "leboncoin" : site), ambre: true })));
+    return out;
+  }
+
+  // src/photosVestiaire.js
+  var VUES_VC = {
+    chaussures: [
+      { k: "entiere", source: "guide", exige: false },
+      { k: "etiquetteInterieure", source: "faq", exige: true },
+      { k: "semelle", source: "faq", exige: true },
+      { k: "pointure", source: "faq", exige: true },
+      { k: "serie", source: "faq", exige: false, siPresent: true }
+    ],
+    sacs: [
+      { k: "face", source: "guide", exige: false },
+      { k: "dos", source: "guide", exige: false },
+      { k: "etiquetteInterieure", source: "guide", exige: false },
+      { k: "dessous", source: "guide", exige: false },
+      { k: "interieur", source: "guide", exige: false },
+      { k: "serie", source: "faq", exige: false, siPresent: true }
+    ]
+  };
+  var VUES_COMMUNES_VC = [
+    { k: "origine", source: "faq", exige: true },
+    { k: "defauts", source: "faq", exige: false, siPresent: true }
+  ];
+  function photosExigeesVc({ famille = "", nPhotos = 0, etiquette = "pas-choisie", photoroom = null } = {}) {
+    const f = VUES_VC[famille] ? famille : "";
+    const propres = f ? VUES_VC[f] : [];
+    const vues = [];
+    const exigees = propres.filter((v2) => v2.exige && !v2.siPresent).length;
+    const n = Number.isFinite(Number(nPhotos)) ? Math.max(0, Math.floor(Number(nPhotos))) : 0;
+    if (f) vues.push({ k: "nombre", etat: n >= Math.max(1, exigees + 1) ? "ok" : "manque", source: "faq", exige: true, n, min: exigees + 1 });
+    else vues.push({ k: "nombre", etat: n >= 1 ? "a-verifier" : "manque", source: "", exige: true, n, min: 1 });
+    vues.push({ k: "etiquette2", etat: etiquette === "choisie" ? "ok" : "manque", source: "smart", exige: true });
+    vues.push({ k: "fond", etat: photoroom === true ? "ok" : photoroom === false ? "manque" : "a-verifier", source: "guide", exige: false });
+    for (const v2 of propres) vues.push({ k: v2.k, etat: "a-verifier", source: v2.source, exige: v2.exige, siPresent: !!v2.siPresent });
+    for (const v2 of VUES_COMMUNES_VC) vues.push({ k: v2.k, etat: "a-verifier", source: v2.source, exige: v2.exige, siPresent: !!v2.siPresent });
+    const manque = vues.filter((v2) => v2.etat === "manque" && v2.exige).map((v2) => v2.k);
+    const conseille = vues.filter((v2) => v2.etat === "manque" && !v2.exige).map((v2) => v2.k);
+    return { vues, manque, conseille, famille: f, liste: f === "chaussures" ? "faq" : f === "sacs" ? "guide" : "pas-relue" };
+  }
+
+  // src/actionsExtensionGardes.js
+  function confirmationSupprimerLbc(liste) {
+    const l = (Array.isArray(liste) ? liste : []).filter((r) => r && r.id);
+    if (!l.length) return null;
+    const titre = l.length > 1 ? `Supprimer ${l.length} annonces de Leboncoin ?` : `Supprimer ${l[0].numero ? `le N°${l[0].numero}` : "cette annonce"} de Leboncoin ?`;
+    const lignes = l.map((r) => `${r.numero ? `N°${r.numero} · ` : ""}${String(r.titre || "").slice(0, 50)}${r.ou ? ` — vendu sur ${r.ou}` : ""}`.replace(/ · $/, "")).filter(Boolean);
+    return { titre, lignes, reste: "L’article reste dans ton stock, avec son N°.", sansRetour: "C’est sans retour : Leboncoin ne rend pas une annonce supprimée.", ok: "Oui, supprimer de Leboncoin", irreversible: true };
+  }
+
+  // src/repubProgramme.js
+  var LIGNE_PROGRAMME = "vrm_repub_programme";
+  var FENETRE_DEPART_MS = 10 * 6e4;
+  var ATTENTE_AUTRE_APPAREIL_MS = 9e4;
+  var AVANCE_MIN_MS = 2 * 6e4;
+  var AVANCE_MAX_MS = 7 * 864e5;
+  var MAX_PAIRES = 50;
+  var REPUB_PAR_JOUR = 50;
+  var GESTES_PAR_REPUB = 3;
+  var ACTIONS_PROGRAMMABLES = ["recreer", "versBrouillon", "modifier", "enLigne"];
+  var ACTIONS_QUOTA = ["recreer", "versBrouillon"];
+  var ETATS = ["attente", "partie", "pas-partie", "annulee", "finie"];
+  var str = (v2) => String(v2 == null ? "" : v2).trim();
+  var ms = (v2) => {
+    const t = typeof v2 === "number" ? v2 : Date.parse(v2 || "");
+    return Number.isFinite(t) ? t : null;
+  };
+  var objet = (v2) => v2 && typeof v2 === "object" && !Array.isArray(v2) ? v2 : null;
+  function normaliserProgramme(p) {
+    const o = objet(p);
+    if (!o) return null;
+    const uid = str(o.uid), id = str(o.id), action = str(o.action);
+    const at = ms(o.at);
+    const ids = Array.isArray(o.ids) ? [...new Set(o.ids.map(str).filter(Boolean))] : [];
+    if (!/^\d{1,20}$/.test(uid) || !id || !ACTIONS_PROGRAMMABLES.includes(action) || at == null || !ids.length) return null;
+    const etat = ETATS.includes(o.etat) ? o.etat : "attente";
+    return {
+      id,
+      uid,
+      compte: str(o.compte).slice(0, 80),
+      action,
+      ids: ids.slice(0, MAX_PAIRES),
+      at,
+      creeAt: ms(o.creeAt),
+      majAt: ms(o.majAt),
+      reglages: objet(o.reglages) || {},
+      etat,
+      partieAt: ms(o.partieAt),
+      appareil: str(o.appareil).slice(0, 60),
+      raisons: Array.isArray(o.raisons) ? o.raisons.filter((x) => objet(x) && str(x.cle)).slice(0, 10).map((x) => ({ cle: str(x.cle), detail: str(x.detail).slice(0, 200) })) : [],
+      vu: !!o.vu
+    };
+  }
+  function programmesDe(data) {
+    const o = objet(data) && objet(data.programmes) ? data.programmes : {};
+    const out = {};
+    for (const k of Object.keys(o)) {
+      const p = normaliserProgramme(o[k]);
+      if (p && p.uid === k) out[k] = p;
+    }
+    return out;
+  }
+  function changer(data, uid, id, depuis, patch) {
+    const progs = programmesDe(data);
+    const cur = progs[str(uid)];
+    if (!cur || cur.id !== str(id) || !depuis.includes(cur.etat)) return void 0;
+    return { ...objet(data) || {}, v: 1, programmes: { ...objet(data) && objet(data.programmes) || {}, [cur.uid]: { ...cur, ...patch } } };
+  }
+  var prendreDepart = (data, uid, id, appareil, maintenant = Date.now()) => changer(data, uid, id, ["attente"], { etat: "partie", partieAt: maintenant, appareil: str(appareil).slice(0, 60), majAt: maintenant });
+  var marquerPasPartie = (data, uid, id, raisons, maintenant = Date.now()) => changer(data, uid, id, ["attente", "partie"], { etat: "pas-partie", raisons: (raisons || []).slice(0, 10), majAt: maintenant, vu: false });
+  var marquerFinie = (data, uid, id, maintenant = Date.now()) => changer(data, uid, id, ["partie"], { etat: "finie", majAt: maintenant });
+  function momentDepart(prog, maintenant = Date.now()) {
+    if (!prog || prog.at == null) return null;
+    if (maintenant < prog.at) return "tot";
+    return maintenant - prog.at <= FENETRE_DEPART_MS ? "heure" : "passee";
+  }
+  function appareilDepart(prog, ext) {
+    const e = ext || {};
+    if (!prog) return "non";
+    if (e.uidOnglet === void 0 || e.uidOnglet === null || e.uidOnglet === "") return e.present ? "autre-compte" : "non";
+    return String(e.uidOnglet) === String(prog.uid) ? "oui" : "autre-compte";
+  }
+  function conditionsDepart({ prog, ext, jauge, jour, occupe = false, maintenant = Date.now() }) {
+    const m = [];
+    const e = ext || {};
+    if (!e.present) m.push({ cle: "extension" });
+    else if (!e.capOk) m.push({ cle: "version" });
+    const rp = e.repub;
+    if (e.present && e.capOk) {
+      if (!rp || rp.onglet == null) m.push({ cle: "onglet-passu" });
+      else if (rp.onglet !== true) m.push({ cle: "onglet" });
+    }
+    if (e.present && (e.uidOnglet === void 0 || e.uidOnglet === "")) m.push({ cle: "compte-passu" });
+    else if (e.present && String(e.uidOnglet || "") !== String(prog.uid)) m.push({ cle: "compte" });
+    if (e.present && e.capOk) {
+      if (!rp || rp.frein === void 0) m.push({ cle: "frein-passu" });
+      else if (rp.frein && Number(rp.frein.jusqua) > maintenant) m.push({ cle: rp.frein.restreint ? "frein-restreint" : "frein", detail: String(Number(rp.frein.jusqua)) });
+    }
+    if (jauge == null || !Number.isFinite(Number(jauge.n)) || !Number.isFinite(Number(jauge.pourApp))) m.push({ cle: "plafond-passu" });
+    else if (Number(jauge.pourApp) - Number(jauge.n) < GESTES_PAR_REPUB) m.push({ cle: "plafond", detail: `${Number(jauge.n)}` });
+    if (ACTIONS_QUOTA.includes(prog.action)) {
+      if (jour == null || !Number.isFinite(Number(jour))) m.push({ cle: "jour-passu" });
+      else if (Number(jour) + prog.ids.length > REPUB_PAR_JOUR) m.push({ cle: "jour", detail: `${Math.max(0, REPUB_PAR_JOUR - Number(jour))}` });
+    }
+    if (occupe) m.push({ cle: "occupe" });
+    return { ok: m.length === 0, manques: m };
+  }
+  function decision(prog, { ext, maintenant = Date.now() } = {}) {
+    if (!prog || prog.etat !== "attente") return { quoi: "rien" };
+    const mo = momentDepart(prog, maintenant);
+    if (mo === "tot") return { quoi: "attendre", dans: prog.at - maintenant };
+    if (mo === "passee") return { quoi: "manquee", cle: "ferme" };
+    const ap = appareilDepart(prog, ext);
+    if (ap === "oui") return { quoi: "verifier" };
+    if (maintenant - prog.at < ATTENTE_AUTRE_APPAREIL_MS) return { quoi: "attendre", dans: ATTENTE_AUTRE_APPAREIL_MS - (maintenant - prog.at) };
+    return ap === "autre-compte" ? { quoi: "verifier" } : { quoi: "attendre", dans: Math.max(1e3, prog.at + FENETRE_DEPART_MS - maintenant + 1e3) };
+  }
+  function pairesAuDepart(prog, proposables) {
+    const dispo = new Set((proposables || []).map((a) => str(a && a.id)));
+    const partent = prog.ids.filter((id) => dispo.has(id));
+    const absentes = prog.ids.filter((id) => !dispo.has(id));
+    return { partent, absentes };
+  }
+  function indexAttentes(data) {
+    const progs = Object.values(programmesDe(data)).filter((p) => p.etat === "attente");
+    const attentes = progs.map((p) => ({ uid: p.uid, id: p.id, at: new Date(p.at).toISOString(), compte: p.compte.slice(0, 40), n: p.ids.length }));
+    const fin = progs.length ? Math.min(...progs.map((p) => p.at + FENETRE_DEPART_MS)) : null;
+    return { attentes, prochaineFin: fin == null ? null : new Date(fin).toISOString() };
+  }
+
+  // src/etiquetteNumero.js
+  var TITRE_MAX_VINTED = 100;
+  var PLACES = [
+    { v: "aucune", ou: "nulle part", l: "Nulle part", court: "Nulle part", d: "Le texte de l’annonce ne change pas. Le N° reste là où l’article est rangé, dans VRM et sur la pastille de l’extension (dans ton navigateur seulement)." },
+    { v: "titre_fin", ou: "à la fin du titre", l: "À la fin du titre", court: "Fin du titre", d: "Visible partout où le titre s’affiche : ton dressing, tes ventes, tes messages. Les acheteurs le voient aussi. Il prend quelques caractères sur les 100 du titre." },
+    { v: "titre_debut", ou: "au début du titre", l: "Au début du titre", court: "Début du titre", d: "Le plus rapide à repérer dans une liste. Mais c’est le premier mot que lit l’acheteur, avant la marque." },
+    { v: "desc_debut", ou: "en haut de la description", l: "En haut de la description", court: "Haut de la description", d: "Le titre reste propre. Le N° est la première ligne quand tu ouvres l’annonce." },
+    { v: "desc_fin", ou: "en bas de la description", l: "En bas de la description", court: "Bas de la description", d: "Le plus discret pour l’acheteur. Tu le trouves en bas de l’annonce ouverte." }
+  ];
+  var FORMES = [
+    { v: "numero", l: "N°12", f: (n) => `N°${n}` },
+    { v: "diese", l: "#12", f: (n) => `#${n}` },
+    { v: "ref", l: "Réf 12", f: (n) => `Réf ${n}` },
+    { v: "parentheses", l: "(12)", f: (n) => `(${n})` },
+    { v: "crochets", l: "[12]", f: (n) => `[${n}]` },
+    { v: "n", l: "n12", f: (n) => `n${n}` }
+  ];
+  var REGLAGE_DEFAUT = Object.freeze({ place: "aucune", forme: "numero" });
+  function lireReglageEtiquette(brut) {
+    const o = brut && typeof brut === "object" ? brut : {};
+    const place = PLACES.some((p) => p.v === o.place) ? o.place : REGLAGE_DEFAUT.place;
+    const forme = FORMES.some((f) => f.v === o.forme) ? o.forme : REGLAGE_DEFAUT.forme;
+    return { place, forme };
+  }
+  var numTexte = (num2) => String(num2 == null ? "" : num2).trim().replace(/\s+/g, "");
+  function etiquetteDe(num2, forme) {
+    const n = numTexte(num2);
+    if (!n) return "";
+    const f = FORMES.find((x) => x.v === forme) || FORMES[0];
+    return f.f(n);
+  }
+  var esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  var MOTIFS = {
+    numero: (c) => `N\\s?°\\s?${c}`,
+    diese: (c) => `#${c}`,
+    ref: (c) => `R[ée]f\\.?\\s?${c}`,
+    parentheses: (c) => `\\(${c}\\)`,
+    crochets: (c) => `\\[${c}\\]`,
+    n: (c) => `n${c}`
+  };
+  function motifEtiquettes(num2, formes) {
+    const n = numTexte(num2);
+    if (!n) return null;
+    const m = /^([A-Za-z]{0,3})0*(\d+)$/.exec(n);
+    const corps = m ? `${esc(m[1])}0*${esc(m[2])}` : esc(n);
+    const quelles = (Array.isArray(formes) && formes.length ? formes : Object.keys(MOTIFS)).filter((f) => MOTIFS[f]);
+    if (!quelles.length) return null;
+    return `(?:${quelles.map((f) => MOTIFS[f](corps)).join("|")})(?![0-9A-Za-z])`;
+  }
+  var LETTRE_FIN2 = /\n\n([a-z])$/i;
+  function retirerEtiquette({ titre = "", description = "" } = {}, num2, formes = null, zones = ["titre", "description"]) {
+    const motif = motifEtiquettes(num2, formes);
+    let t = String(titre || ""), d = String(description || ""), retire = 0;
+    if (!motif) return { titre: t, description: d, retire };
+    const z = new Set(zones.flatMap((x) => x === "titre" ? ["titre_debut", "titre_fin"] : x === "description" ? ["desc_debut", "desc_fin"] : [x]));
+    if (z.has("titre_debut") || z.has("titre_fin")) {
+      const debutT = new RegExp(`^\\s*${motif}(?:\\s*[-·|–]\\s*|\\s+|$)`, "i");
+      const finT = new RegExp(`(?:^|\\s+(?:[-·|–]\\s*)?)${motif}\\s*$`, "i");
+      for (let tour = 0; tour < 5; tour++) {
+        let bouge = false;
+        for (const re of [z.has("titre_debut") ? debutT : null, z.has("titre_fin") ? finT : null].filter(Boolean)) {
+          const x = t.replace(re, "");
+          if (x !== t) {
+            t = x;
+            retire++;
+            bouge = true;
+          }
+        }
+        if (!bouge) break;
+      }
+      t = t.trim();
+    }
+    if (z.has("desc_debut") || z.has("desc_fin")) {
+      const ligne = new RegExp(`^\\s*${motif}\\s*$`, "i");
+      const lettre = LETTRE_FIN2.exec(d);
+      let corps = lettre ? d.slice(0, -lettre[0].length) : d;
+      const lignes = corps.split("\n");
+      for (let tour = 0; z.has("desc_debut") && tour < 5; tour++) {
+        const premiere = lignes.findIndex((l) => l.trim() !== "");
+        if (premiere >= 0 && ligne.test(lignes[premiere])) {
+          lignes.splice(premiere, 1);
+          retire++;
+        } else break;
+      }
+      for (let tour = 0; z.has("desc_fin") && tour < 5; tour++) {
+        let i = lignes.length - 1;
+        while (i >= 0 && lignes[i].trim() === "") i--;
+        if (i >= 0 && ligne.test(lignes[i])) {
+          lignes.splice(i, 1);
+          retire++;
+        } else break;
+      }
+      corps = lignes.join("\n").replace(/^\s*\n+/, "").replace(/\n{3,}/g, "\n\n").replace(/\s+$/, "");
+      d = lettre ? corps ? `${corps}
+
+${lettre[1]}` : lettre[1] : corps;
+    }
+    return { titre: t, description: d, retire };
+  }
+  function poserEtiquette({ titre = "", description = "" } = {}, num2, reglage, { ancien = null } = {}) {
+    const r = lireReglageEtiquette(reglage);
+    const etiquette = etiquetteDe(num2, r.forme);
+    const base = { titre: String(titre || ""), description: String(description || "") };
+    if (!etiquette) return { ...base, etiquette: "", place: r.place, pose: false, refus: "pas de numéro" };
+    if (r.place === "aucune") return { ...base, etiquette, place: r.place, pose: false, refus: "" };
+    let x = base;
+    const zone = r.place.startsWith("titre") ? ["titre"] : ["description"];
+    if (ancien != null && numTexte(ancien) && numTexte(ancien).toUpperCase() !== numTexte(num2).toUpperCase()) x = retirerEtiquette(x, ancien, [r.forme], zone);
+    x = retirerEtiquette(x, num2, [r.forme], [r.place]);
+    let t = x.titre.trim(), d = x.description;
+    if (r.place === "titre_fin" || r.place === "titre_debut") {
+      const nt = !t ? etiquette : r.place === "titre_fin" ? `${t} ${etiquette}` : `${etiquette} ${t}`;
+      if (nt.length > TITRE_MAX_VINTED) {
+        return { ...base, etiquette, place: r.place, pose: false, refus: `le titre dépasserait ${TITRE_MAX_VINTED} caractères (${nt.length}) : Vinted le refuserait` };
+      }
+      return { titre: nt, description: d, etiquette, place: r.place, pose: true, refus: "" };
+    }
+    const lettre = LETTRE_FIN2.exec(d);
+    const corps = (lettre ? d.slice(0, -lettre[0].length) : d).replace(/\s+$/, "");
+    let nd;
+    if (r.place === "desc_debut") nd = corps ? `${etiquette}
+
+${corps}` : etiquette;
+    else nd = corps ? `${corps}
+
+${etiquette}` : etiquette;
+    if (lettre) nd = `${nd}
+
+${lettre[1]}`;
+    return { titre: t, description: nd, etiquette, place: r.place, pose: true, refus: "" };
+  }
+  var ANNONCE_EXEMPLE = Object.freeze({
+    titre: "Nike Air Max 90 blanches taille 42",
+    description: "Portées quelques fois, très bon état.\nSemelle propre, boîte d’origine.\nEnvoi rapide et soigné.",
+    prix: "45,00 €"
+  });
+
+  // src/republierReglages.js
+  var TITRE_VINTED_MAX = 100;
+  var PHOTO_NEUTRE = Object.freeze({ rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 });
+  var CURSEURS_PHOTO = Object.freeze([
+    { cle: "rot", l: "Redresser", min: -15, max: 15, pas: 0.5 },
+    { cle: "bright", l: "Luminosité", min: 0.5, max: 1.5, pas: 0.01 },
+    { cle: "contrast", l: "Contraste", min: 0.5, max: 1.5, pas: 0.01 },
+    { cle: "sat", l: "Saturation", min: 0, max: 2, pas: 0.01 },
+    { cle: "zoom", l: "Zoom", min: 1, max: 2, pas: 0.01 }
+  ]);
+  var borne = (v2, a, b, d) => {
+    const n = Number(v2);
+    return Number.isFinite(n) ? Math.min(b, Math.max(a, n)) : d;
+  };
+  function bornerPhoto(r) {
+    const x = r && typeof r === "object" ? r : {};
+    const o = {};
+    for (const c of CURSEURS_PHOTO) o[c.cle] = borne(x[c.cle], c.min, c.max, PHOTO_NEUTRE[c.cle]);
+    return o;
+  }
+  function photoNeutre(r) {
+    const x = bornerPhoto(r);
+    return Object.keys(PHOTO_NEUTRE).every((k) => x[k] === PHOTO_NEUTRE[k]);
+  }
+  var REDUCTIONS_RAPIDES = Object.freeze(["-5", "-10", "-15", "-20"]);
+  var PRIX_NEUTRE = Object.freeze({ base: "aucun", delta: "", commun: "", arrondi: "aucun", sens: "proche", fin: "aucune" });
+  function lotAppliquePrix(base, op, floor) {
+    const flags = [];
+    let p = Number(base);
+    if (!isFinite(p)) p = 0;
+    if (op.base === "commun") {
+      const c = Number(String(op.commun).replace(",", "."));
+      if (isFinite(c)) p = c;
+    } else if (op.base === "pct") {
+      const d = Number(String(op.delta).replace(",", "."));
+      if (isFinite(d)) p = p * (1 + d / 100);
+    } else if (op.base === "fixe") {
+      const d = Number(String(op.delta).replace(",", "."));
+      if (isFinite(d)) p = p + d;
+    }
+    if (op.arrondi && op.arrondi !== "aucun") {
+      const pas = op.arrondi === "euro" ? 1 : op.arrondi === "5" ? 5 : 10;
+      const f = op.sens === "sup" ? Math.ceil : op.sens === "inf" ? Math.floor : Math.round;
+      p = f(p / pas) * pas;
+    }
+    if (op.fin && op.fin !== "aucune") {
+      const dec = op.fin === "00" ? 0 : op.fin === "50" ? 0.5 : op.fin === "90" ? 0.9 : 0.99;
+      p = Math.floor(p) + dec;
+    }
+    let sousPlancher = false;
+    if (floor != null && isFinite(floor) && p < floor) {
+      p = floor;
+      sousPlancher = true;
+      flags.push("plancher");
+    }
+    p = Math.round(p * 100) / 100;
+    if (p <= 0) flags.push("invalide");
+    return { prix: p, sousPlancher, flags };
+  }
+  var MODES_TITRE = Object.freeze([
+    { v: "aucun", l: "Ne pas changer le titre" },
+    { v: "prefixe", l: "Ajouter au début" },
+    { v: "suffixe", l: "Ajouter à la fin" },
+    { v: "remplacer", l: "Remplacer un texte" },
+    { v: "supprimer", l: "Supprimer un texte" }
+  ]);
+  var TITRE_NEUTRE = Object.freeze({ mode: "aucun", valeur: "", chercher: "", pos: "0" });
+  function lotAppliqueTitre(base, op) {
+    let t = String(base == null ? "" : base);
+    const v2 = String(op.valeur == null ? "" : op.valeur);
+    if (op.mode === "prefixe") {
+      if (v2 && !t.startsWith(v2)) t = v2 + t;
+    } else if (op.mode === "suffixe") {
+      if (v2 && !t.endsWith(v2)) t = t + v2;
+    } else if (op.mode === "remplacer") {
+      const c = String(op.chercher == null ? "" : op.chercher);
+      if (c) t = t.split(c).join(v2);
+    } else if (op.mode === "supprimer") {
+      const c = String(op.chercher == null ? "" : op.chercher);
+      if (c) t = t.split(c).join("");
+    } else if (op.mode === "inserer") {
+      const pos = Math.max(0, Math.min(t.length, Math.round(Number(op.pos)) || 0));
+      t = t.slice(0, pos) + v2 + t.slice(pos);
+    }
+    return t.replace(/\s{2,}/g, " ").trim();
+  }
+  var REGLAGES_DEFAUT = Object.freeze({ photo: PHOTO_NEUTRE, prix: PRIX_NEUTRE, titre: TITRE_NEUTRE, lettre: false });
+  var prixChange = (reg) => {
+    const p = reg && reg.prix || PRIX_NEUTRE;
+    return p.base !== "aucun" || p.arrondi !== "aucun" || p.fin !== "aucune";
+  };
+  var titreChange = (reg) => !!(reg && reg.titre && reg.titre.mode !== "aucun");
+  function apercuRepub(a, reg) {
+    const r = reg || REGLAGES_DEFAUT;
+    const changeT = titreChange(r), changeP = prixChange(r);
+    const nt = changeT ? lotAppliqueTitre(a.titre, r.titre) : a.titre;
+    const np = changeP && a.prix != null ? lotAppliquePrix(a.prix, r.prix, a.floor) : null;
+    const prix = np && np.prix > 0 && np.prix !== a.prix ? np.prix : null;
+    const titre = nt && nt !== a.titre ? nt : null;
+    return { titre, prix, plancher: !!(np && np.sousPlancher), tropLong: !!(titre && titre.length > TITRE_VINTED_MAX), invalide: !!(changeT && !nt) };
+  }
+  function tirerLettre(alea = Math.random) {
+    return "abcdefghijklmnopqrstuvwxyz"[Math.min(25, Math.floor(alea() * 26))];
+  }
+
+  // src/favorisMessage.js
+  var VARIABLES_FAVORI = ["username", "pseudo", "article", "prix"];
+  function erreurVariablesFavori(modele) {
+    const texte = String(modele || "");
+    const reste = texte.replace(/\{([^{}]*)\}/g, (tout, dedans) => {
+      if (VARIABLES_FAVORI.includes(dedans)) return "";
+      const options = dedans.split("|");
+      if (options.length >= 2 && options.every((o) => o.length <= 200)) return "";
+      return "\0" + tout + "\0";
+    });
+    const inconnue = /\u0000(\{[^{}]*\})\u0000/.exec(reste);
+    if (inconnue) return "Variable inconnue : " + inconnue[1].slice(0, 40) + ". Utilise {pseudo}, {article}, {prix} ou {a|b} (au moins deux choix séparés par |).";
+    if (/[{}]/.test(reste)) return "Une accolade n’est pas fermée. Utilise {pseudo}, {article}, {prix} ou {a|b}.";
+    return "";
+  }
+
+  // src/favorisVinted.js
+  function preparerMessageFavori(message, pourcentage = "") {
+    const base = typeof message === "string" ? message.trim() : "";
+    const brut = String(pourcentage ?? "").trim();
+    if (brut && (!/^\d{1,6}$/.test(brut) || Number(brut) < 1 || Number(brut) > 99)) return { message: "", pourcentage: null, erreur: "Saisis un pourcentage entier entre 1 et 99, ou laisse ce champ vide." };
+    const p = brut ? Number(brut) : null;
+    if (base.length > 2e3) return { message: "", pourcentage: p, erreur: "Raccourcis ton message : il doit tenir en 2 000 caractères." };
+    const ev = erreurVariablesFavori(base);
+    if (ev) return { message: "", pourcentage: p, erreur: ev };
+    const er = erreurMessageAuto(base, "vinted");
+    if (er) return { message: "", pourcentage: p, erreur: er };
+    return { message: base, pourcentage: p, erreur: "" };
+  }
+
+  // src/variantesMessage.js
+  var VARIANTES_MAX = 5;
+  function variantesARanger(autres) {
+    const l = (Array.isArray(autres) ? autres : []).filter((t) => typeof t === "string").map((t) => t.slice(0, 2e3));
+    return l.filter((t) => t.trim()).slice(0, VARIANTES_MAX - 1);
+  }
+
+  // src/reglagesFavoris.js
+  var RYTHMES_REGLAGE = Object.freeze(["normal", "prudent", "perso"]);
+  var MESSAGE_PAR_DEFAUT = "Bonjour ! Tu as mis cet article en favori : je te propose une offre dessus.";
+  var MONTANT = /^\d{1,5}(?:[.,]\d{1,2})?$/;
+  function offreFavori({ pourcentage = null, offreMode = null, offreValeur = null, arrondi = false } = {}) {
+    const mode = offreMode == null || offreMode === "" || offreMode === "aucune" ? String(pourcentage ?? "").trim() ? "pct" : null : offreMode;
+    if (mode == null) return { pourcentage: null, offreMode: null, offreValeur: null, arrondi: false };
+    if (!["pct", "euros", "prix"].includes(mode)) throw Error("Type d’offre inconnu.");
+    if (arrondi != null && typeof arrondi !== "boolean") throw Error("Arrondi invalide.");
+    if (mode === "pct") {
+      const brut2 = String(pourcentage ?? "").trim();
+      if (!/^\d{1,6}$/.test(brut2) || Number(brut2) < 1 || Number(brut2) > 99) throw Error("Saisis un pourcentage entier entre 1 et 99.");
+      return { pourcentage: Number(brut2), offreMode: "pct", offreValeur: null, arrondi: arrondi === true };
+    }
+    const brut = String(offreValeur ?? "").trim().replace(/\s|€/g, "");
+    if (!MONTANT.test(brut)) throw Error(mode === "euros" ? "Saisis le montant à retirer en euros (par exemple 5 ou 4,50)." : "Saisis le prix de l’offre en euros (par exemple 45 ou 44,90).");
+    const v2 = Math.round(Number(brut.replace(",", ".")) * 100) / 100;
+    if (mode === "euros" && !(v2 >= 0.01 && v2 <= 9999)) throw Error("Le montant à retirer doit être entre 0,01 € et 9 999 €.");
+    if (mode === "prix" && !(v2 >= 1 && v2 <= 99999)) throw Error("Le prix de l’offre doit être d’au moins 1 €.");
+    return { pourcentage: null, offreMode: mode, offreValeur: v2, arrondi: arrondi === true };
+  }
+  function validerReglagesFavoris({ message = "", variantes = [], pourcentage = null, offreMode = null, offreValeur = null, arrondi = false, intervalleMinutes, intervalleMaxMinutes = null, rythme = "normal" }) {
+    if (!RYTHMES_REGLAGE.includes(rythme)) throw Error("Choisis un rythme : au hasard (40 à 90 s), plus prudent (2 à 4 min), ou tes minutes.");
+    if (typeof message !== "string") throw Error("Le message doit être du texte.");
+    if (variantes != null && (!Array.isArray(variantes) || variantes.some((v2) => typeof v2 !== "string"))) throw Error("Les autres versions doivent être du texte.");
+    if (Array.isArray(variantes) && variantes.filter((v2) => v2.trim()).length > VARIANTES_MAX - 1) throw Error(`${VARIANTES_MAX} versions au plus.`);
+    const autres = variantesARanger(variantes);
+    for (let i = 0; i < autres.length; i++) {
+      const mv = preparerMessageFavori(autres[i], null);
+      if (mv.erreur) throw Error(`Version ${i + 2} : ${mv.erreur}`);
+    }
+    const intervalle = String(intervalleMinutes ?? "").trim();
+    if (!/^\d{1,6}$/.test(intervalle) || Number(intervalle) > 1440) throw Error("Choisis un intervalle entier entre 0 et 1 440 minutes (0 = rapide, 6 à 10 s).");
+    const maxTexte = String(intervalleMaxMinutes ?? "").trim();
+    let max = null;
+    if (maxTexte && Number(intervalle) > 0) {
+      if (!/^\d{1,6}$/.test(maxTexte) || Number(maxTexte) < 1 || Number(maxTexte) > 1440) throw Error("Choisis un maximum entier entre 1 et 1 440 minutes.");
+      if (Number(maxTexte) < Number(intervalle)) throw Error("Le maximum doit être au moins égal au minimum.");
+      if (Number(maxTexte) > Number(intervalle)) max = Number(maxTexte);
+    }
+    const o = offreFavori({ pourcentage, offreMode, offreValeur, arrondi });
+    const texte = message.trim() ? message : o.offreMode ? MESSAGE_PAR_DEFAUT : "";
+    const m = preparerMessageFavori(texte, o.pourcentage);
+    if (m.erreur) throw Error(m.erreur);
+    if (!m.message) throw Error("Écris un message, ou choisis une offre : sans l’un ni l’autre, il n’y a rien à envoyer.");
+    if (autres.length && !message.trim()) throw Error("Écris d’abord la 1re version du message.");
+    return { version: 1, message: texte.trim(), ...autres.length ? { variantes: autres.map((v2) => v2.trim()) } : {}, ...o, intervalleMinutes: Number(intervalle), intervalleMaxMinutes: max, rythme, envoisActifs: false };
+  }
+
+  // src/favorisAuto.js
+  var AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
+  var AUTO_JOUR_MS = 24 * 3600 * 1e3;
+  var AUTO_HEURE_MS = 3600 * 1e3;
+  var AUTO_PAUSE_MS = 24 * 3600 * 1e3;
+  var AUTO_FAVORI_MAX_MS = 72 * 3600 * 1e3;
+  var AUTO_RECONTACT_MS = 30 * 24 * 3600 * 1e3;
+  var AUTO_ECART_MS = [3 * 6e4, 12 * 6e4];
+  var entier = (v2, min, max, msg) => {
+    const s = String(v2 ?? "").trim();
+    if (!/^\d{1,5}$/.test(s) || Number(s) < min || Number(s) > max) throw Error(msg);
+    return Number(s);
+  };
+  function validerAutoFavoris(a = {}) {
+    if (!a || typeof a !== "object" || Array.isArray(a)) throw Error("Réglages du mode automatique invalides.");
+    const v2 = { ...AUTO_DEFAUT, ...a };
+    const attenteMin = entier(v2.attenteMin, 5, 1440, "Attente après le favori : un nombre entier de minutes, au moins 5.");
+    const attenteMax = entier(v2.attenteMax, 5, 1440, "Attente maximale : un nombre entier de minutes, 1 440 au plus.");
+    if (attenteMax < attenteMin) throw Error("L’attente maximale doit être au moins égale à l’attente minimale.");
+    const heureDebut = entier(v2.heureDebut, 0, 23, "Heure de début : entre 0 et 23.");
+    const heureFin = entier(v2.heureFin, 1, 24, "Heure de fin : entre 1 et 24.");
+    if (heureFin <= heureDebut) throw Error("L’heure de fin doit être après l’heure de début.");
+    if (!Array.isArray(v2.jours) || !v2.jours.length || v2.jours.length > 7) throw Error("Choisis au moins un jour.");
+    const jours = [...new Set(v2.jours.map((j) => entier(j, 1, 7, "Jour inconnu.")))].sort((x, y) => x - y);
+    const parJour = entier(v2.parJour, 1, 50, "Messages par 24 h : entre 1 et 50.");
+    const parHeure = entier(v2.parHeure, 1, 20, "Messages par heure : entre 1 et 20.");
+    if (parHeure > parJour) throw Error("Le nombre par heure ne peut pas dépasser le nombre par 24 h.");
+    return { version: 1, actif: v2.actif === true, attenteMin, attenteMax, heureDebut, heureFin, jours, parJour, parHeure };
+  }
+  var FMT_PARIS = (() => {
+    try {
+      return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", weekday: "short", hour: "numeric", hourCycle: "h23" });
+    } catch (_) {
+      return null;
+    }
+  })();
+  var AUTO_DRESSING_MAX_MS = 24 * 3600 * 1e3;
+
+  // src/correspondances.js
+  var str2 = (v2) => String(v2 == null ? "" : v2).trim();
+  var norm = (v2) => str2(v2).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
+  var SOURCES = Object.freeze({
+    leboncoin: "lbc_catalogue · fdata v7 (8 nov. 2026) + formulaire de dépôt catégorie 53 (15 oct. 2026)",
+    vestiaire: "vc_catalogue · deposit_catalog (27 oct. 2026), libellés relevés",
+    ebay: "API Taxonomy eBay France (get_category_suggestions), sur ton jeton, quand tu choisis",
+    vinted: "vinted_catalogue (catalog_id → chemin), vu sur tes annonces et tes ventes"
+  });
+  var LBC_RUBRIQUES = Object.freeze({
+    Mode: Object.freeze({ id: "72", sous: Object.freeze({ "Vêtements": "22", "Chaussures": "53", "Accessoires & Bagagerie": "47", "Montres & Bijoux": "42" }) }),
+    Famille: Object.freeze({ id: "79", sous: Object.freeze({ "Vêtements bébé": "54", "Vêtements enfants": "1011", "Chaussures enfants": "1013", "Montres & bijoux enfants": "1014", "Accessoires & bagagerie enfants": "1015", "Jeux & Jouets": "1016" }) }),
+    Loisirs: Object.freeze({ id: "24", sous: Object.freeze({ "Livres": "27", "Jeux & Jouets": "41", "Loisirs créatifs": "88", "Sport & Plein air": "29" }) })
+  });
+  var lbcSousCategories = () => {
+    const l = Object.entries(LBC_RUBRIQUES).flatMap(([r, x]) => Object.keys(x.sous).map((s) => ({ rubrique: r, sous: s, id: x.sous[s] })));
+    return l.map((x) => ({ ...x, cle: l.filter((y) => y.sous === x.sous).length > 1 ? `${x.rubrique} › ${x.sous}` : x.sous, ambigu: l.filter((y) => y.sous === x.sous).length > 1 }));
+  };
+  var LBC_VALEURS = Object.freeze({
+    shoe_type: Object.freeze(["Femme", "Homme", "Enfant"]),
+    shoe_category_a: Object.freeze(["Baskets & Sneakers", "Chaussures à lacets", "Chaussures à scratch", "Mocassins", "Bottines & lowboots", "Bottes", "Escarpins", "Sandales & Nu-pieds", "Chaussons & Pantoufles", "Ballerines", "Chaussures de randonnées", "Chaussures aquatiques", "Autre"]),
+    shoe_size: Object.freeze([...Array.from({ length: 34 }, (_, i) => {
+      const n = 16 + Math.floor(i / 2);
+      return i % 2 ? `${n},5` : String(n);
+    }), "33", "33,5", "34", "34,5", "35", "35,5", "36", "36,5", "37", "37,5", "38", "38,5", "39", "39,5", "40", "40,5", "41", "41,5", "42", "42,5", "43", "43,5", "44", "44,5", "45", "45,5", "46", "46,5", "47", "47,5", "48", "48,5", "49", "49,5", "50 et plus"]),
+    clothing_condition_a: Object.freeze(["Neuf avec étiquette", "Neuf sans étiquette", "Très bon état", "Bon état", "État satisfaisant"]),
+    clothing_color_a: Object.freeze(["Argenté / Acier", "Beige / Camel", "Blanc", "Bleu / Ciel", "Crème / Blanc cassé / Écru", "Doré / Bronze / Cuivre", "Gris / Anthracite", "Imprimé", "Jaune / Moutarde", "Kaki", "Lavande / Lilas", "Marine / Turquoise", "Marron", "Multicolore", "Noir", "Orange / Corail", "Rose / Fuchsia", "Rouge / Bordeaux", "Vert", "Violet / Mauve", "Autre"]),
+    clothing_type: Object.freeze(["Femme", "Maternité", "Homme", "Enfant"]),
+    clothing_tag: Object.freeze(["Robes / jupes", "Manteaux & Vestes", "Hauts / T-Shirts / Polos", "Pantalons", "Pulls / Gilets / Mailles", "Jeans", "Chemises / Chemisiers", "Costumes / Tailleurs", "Shorts / Pantacourts / Bermudas", "Sports / Danse", "Maillots de bain & vêtements de plage", "Lingerie", "Sous-vêtements & vêtements de nuit", "Déguisement", "Mariage", "Autre"]),
+    clothing_st_2: Object.freeze(["Taille unique", "30 - XXXS", "32 - XXS", "34 - XS", "36 - S", "38 - M", "40 - L", "42 - XL", "44 - XXL", "46 - XXXL", "48 - 4XL", "50 - 5XL", "52 - 6XL", "54 - 7XL", "56 - 8XL et plus"]),
+    clothing_st_3: Object.freeze(["Taille unique", "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL", "6XL", "7XL", "8XL et plus"]),
+    clothing_st_4: Object.freeze(["3 ans / 98 cm", "4 ans / 104 cm", "5 ans / 110 cm", "6 ans / 116 cm", "7 ans / 122 cm", "8 ans / 128 cm", "9 ans / 134 cm", "10 ans / 140 cm", "11 ans / 146 cm", "12 ans / 152 cm", "13 ans / 158 cm", "14 ans / 164 cm", "15 ans / 170 cm", "16 ans / 176 cm", "18 ans / 182 cm +"]),
+    accessories_univers: Object.freeze(["Femme", "Homme", "Enfant", "Mixte"]),
+    accessories_type: Object.freeze(["Accessoire pour cheveux", "Bonnet, bob, béret", "Bretelles", "Cartable", "Casquette", "Ceinture", "Châle et étole", "Chapeau", "Cravate & noeud papillon", "Echarpe & foulard", "Etui téléphone", "Gants, mitaines & moufles", "Housse de tablette & ordinateur", "Lunettes", "Mallette", "Parapluie", "Perruque", "Pochette", "Porte-cartes", "Porte-chéquier", "Porte-clés", "Porte documents, serviette", "Porte-habits", "Porte-monnaie & portefeuille", "Sac à dos", "Sac à main", "Sac de voyage", "Sac en bandoulière", "Sac weekender", "Sacoche", "Tote bag", "Trousse", "Valise cabine", "Valise moyenne et grande taille", "Autre"]),
+    // Marques : le site en sert 793 pour les chaussures ; celles de SES ventes, relevées dans la liste.
+    shoe_brand_a: Object.freeze(["Adidas", "Asics", "Converse", "Dr. Martens", "Hoka One One", "Jordan", "New Balance", "Nike", "Paraboot", "Puma", "Reebok", "Salomon", "Vans", "Veja", "Autre"])
+  });
+  var LBC_CRITERES_DE = Object.freeze({
+    "Chaussures": Object.freeze({ vu: "depot", univers: "shoe_type", type: "shoe_category_a", taille: "shoe_size", etat: "clothing_condition_a", couleur: "clothing_color_a", marque: "shoe_brand_a" }),
+    "Chaussures enfants": Object.freeze({ vu: "liste", type: "shoe_category_a", taille: "shoe_size", etat: "clothing_condition_a", couleur: "clothing_color_a", marque: "shoe_brand_a" }),
+    "Vêtements": Object.freeze({ vu: "liste", univers: "clothing_type", type: "clothing_tag", taille: "clothing_st", etat: "clothing_condition_a", couleur: "clothing_color_a" }),
+    "Vêtements enfants": Object.freeze({ vu: "liste", type: "clothing_tag", taille: "clothing_st_4", etat: "clothing_condition_a", couleur: "clothing_color_a" }),
+    "Accessoires & Bagagerie": Object.freeze({ vu: "liste", univers: "accessories_univers", type: "accessories_type", etat: "clothing_condition_a", couleur: "clothing_color_a" }),
+    "Accessoires & bagagerie enfants": Object.freeze({ vu: "liste", type: "accessories_type", etat: "clothing_condition_a", couleur: "clothing_color_a" })
+  });
+  var VC_CATALOGUE = Object.freeze({
+    "Mode femme": Object.freeze({ "Chaussures": Object.freeze(["Baskets", "Bottes", "Mocassins"]), "Sacs": Object.freeze(["Sacs à main", "Pochettes", "Sacs à dos"]), "Vêtements": Object.freeze(["Jeans", "Tops"]) }),
+    "Mode homme": Object.freeze({ "Chaussures": Object.freeze(["Baskets", "Bottes & Boots", "Mocassins"]), "Vêtements": Object.freeze(["Tee shirts", "Jeans"]) }),
+    "Mode fille": Object.freeze({ "Chaussures": Object.freeze(["Baskets"]) })
+  });
+  var T = (chemin, genre, lbc, vc, ebay) => Object.freeze({ chemin, genre, lbc: Object.freeze(lbc), vc: Object.freeze(vc), ebay: Object.freeze(ebay) });
+  var TABLE_VINTED = Object.freeze({
+    1242: T(
+      "Hommes > Chaussures > Baskets",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Baskets & Sneakers" },
+      { univers: "Mode homme", categorie: "Chaussures", sous: "Baskets", posee: true },
+      { requete: "baskets homme" }
+    ),
+    2632: T(
+      "Femmes > Chaussures > Baskets",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", type: "Baskets & Sneakers" },
+      { univers: "Mode femme", categorie: "Chaussures", sous: "Baskets", posee: true },
+      { requete: "baskets femme" }
+    ),
+    2678: T(
+      "Hommes > Chaussures > Chaussures de sport > Chaussures et bottes de randonnée",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Chaussures de randonnées" },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures randonnée homme" }
+    ),
+    2645: T(
+      "Femmes > Chaussures > Chaussures de sport > Chaussures et bottes de randonnée",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", type: "Chaussures de randonnées" },
+      { univers: "Mode femme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures randonnée femme" }
+    ),
+    1453: T(
+      "Hommes > Chaussures > Chaussures de sport > Chaussures de course",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Baskets & Sneakers" },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures running homme" }
+    ),
+    2651: T(
+      "Femmes > Chaussures > Chaussures de sport > Chaussures de course",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", type: "Baskets & Sneakers" },
+      { univers: "Mode femme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures running femme" }
+    ),
+    2686: T(
+      "Hommes > Chaussures > Chaussures de sport > Chaussures de tennis",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Baskets & Sneakers" },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures tennis homme" }
+    ),
+    2672: T(
+      "Hommes > Chaussures > Chaussures de sport > Chaussures de basket",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Baskets & Sneakers" },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures basketball homme" }
+    ),
+    2618: T(
+      "Femmes > Chaussures > Bottes > Bottines",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", type: "Bottines & lowboots" },
+      { univers: "Mode femme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "bottines femme" }
+    ),
+    1238: T(
+      "Hommes > Chaussures > Chaussures habillées",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", demande: ["type"] },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "chaussures habillées homme" }
+    ),
+    2656: T(
+      "Hommes > Chaussures > Mocassins et chaussures bateau",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", type: "Mocassins" },
+      { univers: "Mode homme", categorie: "Chaussures", sous: "Mocassins", posee: true },
+      { requete: "mocassins homme" }
+    ),
+    2954: T(
+      "Femmes > Chaussures > Mocassins et chaussures bateau",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", type: "Mocassins" },
+      { univers: "Mode femme", categorie: "Chaussures", sous: "Mocassins", posee: true },
+      { requete: "mocassins femme" }
+    ),
+    2664: T(
+      "Hommes > Chaussures > Bottes > Bottes de travail",
+      "homme",
+      { sous: "Chaussures", univers: "Homme", demande: ["type"] },
+      { univers: "Mode homme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "bottes de travail homme" }
+    ),
+    2622: T(
+      "Femmes > Chaussures > Bottes > Bottes de travail",
+      "femme",
+      { sous: "Chaussures", univers: "Femme", demande: ["type"] },
+      { univers: "Mode femme", categorie: "Chaussures", demande: ["sous"] },
+      { requete: "bottes de travail femme" }
+    ),
+    2719: T(
+      "Enfants > Vêtements pour filles > Chaussures > Baskets > Baskets à lacets",
+      "enfant",
+      { sous: "Chaussures enfants", type: "Baskets & Sneakers" },
+      { univers: "Mode fille", categorie: "Chaussures", sous: "Baskets", posee: false },
+      { requete: "baskets fille" }
+    ),
+    2752: T(
+      "Enfants > Vêtements pour garçons > Chaussures > Baskets > Baskets sans lacets",
+      "enfant",
+      { sous: "Chaussures enfants", type: "Baskets & Sneakers" },
+      { demande: ["univers", "categorie", "sous"] },
+      { requete: "baskets garçon" }
+    ),
+    1662: T(
+      "Enfants > Vêtements pour garçons > Chemises et t-shirts > T-shirts",
+      "enfant",
+      { sous: "Vêtements enfants", type: "Hauts / T-Shirts / Polos" },
+      { demande: ["univers", "categorie", "sous"] },
+      { requete: "t-shirt garçon" }
+    ),
+    1697: T(
+      "Enfants > Vêtements pour garçons > Pantalons et shorts > Jeans slim",
+      "enfant",
+      { sous: "Vêtements enfants", type: "Jeans" },
+      { demande: ["univers", "categorie", "sous"] },
+      { requete: "jean garçon" }
+    ),
+    156: T(
+      "Femmes > Sacs > Sacs à main",
+      "femme",
+      { sous: "Accessoires & Bagagerie", univers: "Femme", type: "Sac à main" },
+      { univers: "Mode femme", categorie: "Sacs", sous: "Sacs à main", posee: true },
+      { requete: "sac à main femme" }
+    ),
+    2614: T(
+      "Femmes > Vêtements > Manteaux et vestes > Vestes > Doudounes",
+      "femme",
+      { sous: "Vêtements", univers: "Femme", type: "Manteaux & Vestes" },
+      { univers: "Mode femme", categorie: "Vêtements", demande: ["sous"] },
+      { requete: "doudoune femme" }
+    ),
+    1043: T(
+      "Femmes > Vêtements > Hauts et t-shirts > Blouses",
+      "femme",
+      { sous: "Vêtements", univers: "Femme", demande: ["type"] },
+      { univers: "Mode femme", categorie: "Vêtements", sous: "Tops", posee: false },
+      { requete: "blouse femme" }
+    ),
+    5426: T(
+      "Livres et médias > Livres > Manuels scolaires et ressources pédagogiques",
+      "",
+      { sous: "Livres" },
+      { hors: true },
+      { requete: "manuel scolaire" }
+    ),
+    3317: T(
+      "Enfants > Jeux et jouets > Loisirs créatifs > Argile et pâte à modeler",
+      "enfant",
+      { demande: ["sous"] },
+      { hors: true },
+      { requete: "pâte à modeler" }
+    )
+  });
+  var CATEGORIES_VUES = Object.freeze(Object.keys(TABLE_VINTED));
+  var ETAT_VERS_LBC = Object.freeze({ "Neuf avec étiquette": "Neuf avec étiquette", "Neuf sans étiquette": "Neuf sans étiquette", "Très bon état": "Très bon état", "Bon état": "Bon état", "Satisfaisant": "État satisfaisant" });
+  var ETAT_VERS_EBAY = Object.freeze({ "Neuf avec étiquette": "1000", "Neuf sans étiquette": "1500", "Très bon état": "3000", "Bon état": "3000", "Satisfaisant": "3000" });
+  var COULEUR_VERS_LBC = Object.freeze({
+    "Noir": "Noir",
+    "Blanc": "Blanc",
+    "Gris": "Gris / Anthracite",
+    "Beige": "Beige / Camel",
+    "Camel": "Beige / Camel",
+    "Bleu": "Bleu / Ciel",
+    "Bleu clair": "Bleu / Ciel",
+    "Marine": "Marine / Turquoise",
+    "Turquoise": "Marine / Turquoise",
+    "Rouge": "Rouge / Bordeaux",
+    "Bordeaux": "Rouge / Bordeaux",
+    "Rose": "Rose / Fuchsia",
+    "Fuchsia": "Rose / Fuchsia",
+    "Violet": "Violet / Mauve",
+    "Mauve": "Violet / Mauve",
+    "Lila": "Lavande / Lilas",
+    "Lilas": "Lavande / Lilas",
+    "Lavande": "Lavande / Lilas",
+    "Vert": "Vert",
+    "Vert foncé": "Vert",
+    "Kaki": "Kaki",
+    "Jaune": "Jaune / Moutarde",
+    "Moutarde": "Jaune / Moutarde",
+    "Orange": "Orange / Corail",
+    "Corail": "Orange / Corail",
+    "Marron": "Marron",
+    "Crème": "Crème / Blanc cassé / Écru",
+    "Argenté": "Argenté / Acier",
+    "Doré": "Doré / Bronze / Cuivre",
+    "Multicolore": "Multicolore"
+  });
+  var chercheExact = (liste, v2) => {
+    const n = norm(v2);
+    return n ? (liste || []).find((x) => norm(x) === n) || null : null;
+  };
+  function etatLbc(etatVinted) {
+    return ETAT_VERS_LBC[str2(etatVinted)] || chercheExact(LBC_VALEURS.clothing_condition_a, etatVinted);
+  }
+  function etatEbayId(etatVinted) {
+    return ETAT_VERS_EBAY[str2(etatVinted)] || null;
+  }
+  function couleurLbc(couleurVinted) {
+    const c = str2(couleurVinted).split(/[,/]/)[0].trim();
+    if (!c) return null;
+    const k = Object.keys(COULEUR_VERS_LBC).find((x) => norm(x) === norm(c));
+    return k ? COULEUR_VERS_LBC[k] : chercheExact(LBC_VALEURS.clothing_color_a, c);
+  }
+  function tailleLbc(tailleVinted, { grille = "", univers = "" } = {}) {
+    const t = str2(tailleVinted).replace(/\s+/g, " ");
+    if (!t) return null;
+    if (grille === "shoe_size") {
+      const m = /^(\d{2})(?:[.,](5))?$/.exec(t);
+      if (!m) return null;
+      if (Number(m[1]) >= 50) return "50 et plus";
+      return chercheExact(LBC_VALEURS.shoe_size, m[2] ? `${m[1]},5` : m[1]);
+    }
+    const g = grille === "clothing_st" ? univers === "Femme" ? "clothing_st_2" : univers === "Homme" ? "clothing_st_3" : univers === "Enfant" ? "clothing_st_4" : "" : grille;
+    if (!g || !LBC_VALEURS[g]) return null;
+    if (/^taille unique$/i.test(t)) return chercheExact(LBC_VALEURS[g], "Taille unique");
+    if (g === "clothing_st_2") {
+      const m = /^([A-Z0-9]+)\s*\/\s*(\d{2})(?:\s*\/\s*\d+)?$/i.exec(t);
+      return m ? chercheExact(LBC_VALEURS[g], `${m[2]} - ${m[1].toUpperCase()}`) : null;
+    }
+    return chercheExact(LBC_VALEURS[g], t);
+  }
+  function marqueLbc(marque, grille) {
+    return grille && LBC_VALEURS[grille] ? chercheExact(LBC_VALEURS[grille], marque) : null;
+  }
+  var CHOIX_VC = () => ({ univers: Object.keys(VC_CATALOGUE), categorie: [...new Set(Object.values(VC_CATALOGUE).flatMap((x) => Object.keys(x)))], sous: [...new Set(Object.values(VC_CATALOGUE).flatMap((x) => Object.values(x).flat()))] });
+  function choixDe(site, champ, contexte = {}) {
+    if (site === "leboncoin") {
+      if (champ === "sous") return lbcSousCategories().map((x) => x.cle);
+      const c = LBC_CRITERES_DE[contexte.sous || ""];
+      if (!c) return [];
+      if (champ === "univers") return c.univers ? LBC_VALEURS[c.univers].slice() : [];
+      if (champ === "type") return c.type ? LBC_VALEURS[c.type].slice() : [];
+      if (champ === "marque") return c.marque ? LBC_VALEURS[c.marque].slice() : [];
+      if (champ === "couleur") return c.couleur ? LBC_VALEURS[c.couleur].slice() : [];
+      if (champ === "etat") return c.etat ? LBC_VALEURS[c.etat].slice() : [];
+      if (champ === "taille") {
+        const g = c.taille === "clothing_st" ? contexte.univers === "Femme" ? "clothing_st_2" : contexte.univers === "Homme" ? "clothing_st_3" : contexte.univers === "Enfant" ? "clothing_st_4" : "" : c.taille;
+        return g && LBC_VALEURS[g] ? LBC_VALEURS[g].slice() : [];
+      }
+      return [];
+    }
+    if (site === "vestiaire") {
+      if (champ === "univers") return Object.keys(VC_CATALOGUE);
+      if (champ === "categorie") return contexte.univers && VC_CATALOGUE[contexte.univers] ? Object.keys(VC_CATALOGUE[contexte.univers]) : CHOIX_VC().categorie;
+      if (champ === "sous") {
+        const u = VC_CATALOGUE[contexte.univers || ""];
+        return u && u[contexte.categorie || ""] ? u[contexte.categorie].slice() : CHOIX_VC().sous;
+      }
+      return [];
+    }
+    return [];
+  }
+  function lireMemoire(brut) {
+    const b = brut && typeof brut === "object" ? brut : {};
+    const out = { v: 1, cat: {}, marque: { leboncoin: {} } };
+    const cat = b.cat && typeof b.cat === "object" ? b.cat : {};
+    for (const [id, x] of Object.entries(cat)) {
+      if (!/^\d{1,7}$/.test(id) || !x || typeof x !== "object") continue;
+      const e = {};
+      const t = TABLE_VINTED[id] || null;
+      if (x.leboncoin && typeof x.leboncoin === "object") {
+        const l = {};
+        const sous = chercheExact(choixDe("leboncoin", "sous"), x.leboncoin.sous);
+        if (sous) l.sous = sous;
+        const ctxSous = sous || t && t.lbc.sous || "";
+        for (const k of ["univers", "type"]) {
+          const v2 = chercheExact(choixDe("leboncoin", k, { sous: ctxSous }), x.leboncoin[k]);
+          if (v2) l[k] = v2;
+        }
+        if (Object.keys(l).length) e.leboncoin = l;
+      }
+      if (x.vestiaire && typeof x.vestiaire === "object") {
+        const v2 = {};
+        const u = chercheExact(choixDe("vestiaire", "univers"), x.vestiaire.univers);
+        if (u) v2.univers = u;
+        const ctx = { univers: u || t && t.vc.univers || "" };
+        const c = chercheExact(choixDe("vestiaire", "categorie", ctx), x.vestiaire.categorie);
+        if (c) v2.categorie = c;
+        ctx.categorie = c || t && t.vc.categorie || "";
+        const s = chercheExact(choixDe("vestiaire", "sous", ctx), x.vestiaire.sous);
+        if (s) v2.sous = s;
+        if (Object.keys(v2).length) e.vestiaire = v2;
+      }
+      if (x.ebay && typeof x.ebay === "object" && /^\d{1,9}$/.test(str2(x.ebay.id))) e.ebay = { id: str2(x.ebay.id), nom: str2(x.ebay.nom).slice(0, 80), chemin: str2(x.ebay.chemin).slice(0, 200) };
+      if (Object.keys(e).length) out.cat[id] = e;
+    }
+    const ml = b.marque && b.marque.leboncoin && typeof b.marque.leboncoin === "object" ? b.marque.leboncoin : {};
+    for (const [m, v2] of Object.entries(ml)) {
+      const ok = chercheExact(LBC_VALEURS.shoe_brand_a, v2);
+      if (str2(m) && ok) out.marque.leboncoin[str2(m).slice(0, 40)] = ok;
+    }
+    return out;
+  }
+  function ficheSite(site, paire, memoire, reponses) {
+    const p = paire || {};
+    const rep = reponses && typeof reponses === "object" ? reponses : {};
+    const id = p.catalogId == null || p.catalogId === "" ? "" : str2(p.catalogId);
+    const t = id ? TABLE_VINTED[id] || null : null;
+    const mem = lireMemoire(memoire);
+    const mc = id && mem.cat[id] || {};
+    const out = { site, catalogId: id || null, chemin: t ? t.chemin : "", connue: !!(t || mc[site]), valeurs: {}, origine: {}, demandes: [], hors: false, raison: id ? "" : "categorie-pas-lue" };
+    const demander = (champ, choix, bloque) => {
+      if (!out.demandes.some((d) => d.champ === champ)) out.demandes.push({ champ, choix: choix || [], bloque: !!bloque });
+    };
+    const choisir = (champ, choix, candidats, bloque) => {
+      const r = choix.length ? chercheExact(choix, rep[champ]) : null;
+      if (r) {
+        out.valeurs[champ] = r;
+        out.origine[champ] = "reponse";
+        return r;
+      }
+      for (const [v2, o] of candidats) {
+        const ok = v2 != null && v2 !== "" ? choix.length ? chercheExact(choix, v2) : v2 : null;
+        if (ok) {
+          out.valeurs[champ] = ok;
+          out.origine[champ] = o;
+          return ok;
+        }
+      }
+      demander(champ, choix, bloque);
+      return null;
+    };
+    if (site === "leboncoin") {
+      const tl = t && t.lbc || {};
+      const ml = mc.leboncoin || {};
+      const sous = choisir("sous", choixDe("leboncoin", "sous"), [[ml.sous, "memoire"], [tl.sous, "table"]], true);
+      if (!sous) return out;
+      const r0 = lbcSousCategories().find((x) => x.cle === sous) || null;
+      if (r0) {
+        out.valeurs.rubrique = r0.rubrique;
+        out.valeurs.sousNom = r0.sous;
+        out.ambigu = r0.ambigu;
+      }
+      const c = LBC_CRITERES_DE[r0 ? r0.sous : sous] || null;
+      out.vu = c ? c.vu : "";
+      const tableOk = sous === tl.sous;
+      const memOk = !ml.sous || ml.sous === sous;
+      for (const k of ["univers", "type"]) {
+        if (!c || !c[k]) continue;
+        choisir(k, choixDe("leboncoin", k, { sous: r0 ? r0.sous : sous }), [[memOk ? ml[k] : null, "memoire"], [tableOk ? tl[k] : null, "table"]], true);
+      }
+      const ctx = { sous: r0 ? r0.sous : sous, univers: out.valeurs.univers || (c && c.taille === "clothing_st_4" ? "Enfant" : "") };
+      if (c && c.taille) choisir("taille", choixDe("leboncoin", "taille", ctx), [[tailleLbc(p.taille, { grille: c.taille, univers: ctx.univers }), "traduit"]], true);
+      if (c && c.etat) choisir("etat", choixDe("leboncoin", "etat", ctx), [[etatLbc(p.etat), "traduit"]], true);
+      if (c && c.couleur && str2(p.couleur)) choisir("couleur", choixDe("leboncoin", "couleur", ctx), [[couleurLbc(p.couleur), "traduit"]], false);
+      if (c && c.marque && str2(p.marque)) choisir("marque", choixDe("leboncoin", "marque", ctx), [[mem.marque.leboncoin[str2(p.marque)], "memoire"], [marqueLbc(p.marque, c.marque), "traduit"]], false);
+      return out;
+    }
+    if (site === "vestiaire") {
+      const tv = t && t.vc || {};
+      if (tv.hors) {
+        out.hors = true;
+        return out;
+      }
+      const mv = mc.vestiaire || {};
+      for (const k of ["univers", "categorie", "sous"]) {
+        choisir(k, choixDe("vestiaire", k, { univers: out.valeurs.univers, categorie: out.valeurs.categorie }), [[mv[k], "memoire"], [tv[k], "table"]], false);
+      }
+      out.posee = !!(tv.posee && !Object.values(out.origine).some((o) => o === "reponse" || o === "memoire"));
+      return out;
+    }
+    if (site === "ebay") {
+      out.requete = t && t.ebay.requete || "";
+      const r = rep.categorie && /^\d{1,9}$/.test(str2(rep.categorie.id)) ? { id: str2(rep.categorie.id), nom: str2(rep.categorie.nom), chemin: str2(rep.categorie.chemin) } : null;
+      if (r) {
+        out.valeurs.categorie = r;
+        out.origine.categorie = "reponse";
+      } else if (mc.ebay && rep.categorie !== null) {
+        out.valeurs.categorie = mc.ebay;
+        out.origine.categorie = "memoire";
+      } else demander("categorie", [], false);
+      const e = etatEbayId(p.etat);
+      if (e) {
+        out.valeurs.etat = e;
+        out.origine.etat = "traduit";
+      }
+      if (/^\d{2}(?:[.,]5)?$/.test(str2(p.taille))) {
+        out.valeurs.pointureEU = str2(p.taille).replace(".", ",");
+        out.origine.pointureEU = "traduit";
+      }
+      return out;
+    }
+    return out;
+  }
+  function criteresPourLbc(fiche) {
+    const v2 = fiche && fiche.valeurs || {};
+    const crit = {};
+    for (const k of ["univers", "type", "taille", "etat", "couleur", "marque"]) if (str2(v2[k])) crit[k] = str2(v2[k]);
+    return { categorie: fiche && fiche.ambigu ? "" : str2(v2.sousNom || v2.sous) || "", criteres: crit };
+  }
+
+  // src/annonceVinted.js
+  var str3 = (v2) => String(v2 == null ? "" : v2).trim();
+  var PHOTOS_MAX = 20;
+  function texteAnnonceVinted(fiche, { etiquette = null, numeroEcrit = null } = {}) {
+    const f = fiche || {};
+    const num2 = str3(f.numero);
+    let titre = str3(f.titre).replace(/\s+/g, " ");
+    let description = String(f.description == null ? "" : f.description).replace(/\r/g, "").trim();
+    if (!num2) return { ok: false, raison: "la fiche n’a pas de N°" };
+    const c = cleNumero(num2);
+    const autre = [...numerosMarques(titre), ...numerosMarques(description)].find((x) => x.cle !== c);
+    if (autre) return { ok: false, raison: `la fiche porte déjà un autre N° écrit (N°${autre.cle}) : corrige le texte avant de créer l’annonce` };
+    const r = poserEtiquette({ titre, description }, num2, lireReglageEtiquette(etiquette));
+    if (r.refus && r.refus !== "pas de numéro") return { ok: false, raison: r.refus };
+    titre = r.titre;
+    description = r.description;
+    const nE = lireReglageNumeroEcrit(numeroEcrit);
+    const ecritFin = nE.actif && nE.ou.includes("description");
+    if (ecritFin) {
+      const lu = lireNumeroTexte(description, "description");
+      if (!(lu && lu.etat === "lu" && lu.cle === c)) description = poserEtiquette({ titre, description }, num2, { place: "desc_fin", forme: "numero" }).description;
+    }
+    if (titre.length > TITRE_MAX_VINTED) return { ok: false, raison: `le titre dépasserait ${TITRE_MAX_VINTED} caractères (${titre.length}) : Vinted le refuserait` };
+    if (!titre) return { ok: false, raison: "le titre est vide" };
+    return { ok: true, titre, description };
+  }
+  var prixDe = (p) => {
+    const n = Number(String(p == null ? "" : typeof p === "object" ? p.amount : p).replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+  };
+  function payloadFiche(fiche, texte, photos) {
+    const f = fiche || {};
+    const BLANCHE = ["id", "numero", "marque", "taille", "etat", "couleur", "categorie"];
+    const out = {};
+    for (const k of BLANCHE) out[k] = str3(f[k]);
+    out.titre = str3(texte && texte.titre);
+    out.description = String(texte && texte.description || "");
+    out.prix = prixDe(f.prix);
+    out.photos = (Array.isArray(photos) ? photos : []).filter((u) => typeof u === "string").slice(0, PHOTOS_MAX);
+    return out;
+  }
+
+  // src/publier/listes.js
+  var LISTES_LUES = Object.freeze({
+    lbcMarques: "lbc_catalogue · fdata v7 · shoe_brand_a (19 nov. 2026)",
+    vcDepot: "vc_catalogue · deposit_catalog (28 oct. 2026)",
+    vcMarques: "vc_catalogue · deposit_brands (28 oct. 2026), vérifiée pour les marques de ton stock"
+  });
+  var LBC_MARQUES_CHAUSSURES = Object.freeze("A Bathing Ape (BAPE)|Abercrombie & Fitch|Accessoires|Accessorize|AC/DC|Acne Studios|Adidas|Aerosoles|Aigle|Aigner|Airstep|Akira|Aldi|Aldo|Alex|Alexander McQueen|Allsaints|Alma en Pena|Alohas|Alpe|Alpina|Alpinestars|Amazon|Amisu|Anaki|AND1|Andre|Animal|Anna Field|Apart|A.P.C.|Apple|Ara|Arena|Ariane|Arizona|Arket|Armani|Artengo|A.S.98|Ash|Asics|ASOS|Atlas|Atmosphere|Autre|Avenue|Azzaro|Ba&sh|Babolat|Balenciaga|Bally|Balmain|Balzac Paris|Banned|Barbie|Barbour|Barker|Bata|BCBGMAXAZRIA|Belle Women|Bellissima|Belstaff|Ben Sherman|Bench|Benetton|Bensimon|Berluti|Bershka|Bestelle|Betty Barclay|Bexley|Bianca|Bianco|Bikkembergs|Bimba y Lola|Birkenstock|Bisgaard|Björn Borg|Blauer|Blend|Blink|Bloch|Blue Motion|BMW|Bobbies|Bocage|Boden|Bodyflirt|Bogner|Bonita|Bonprix|Bons Baisers de Paname|Boohoo|Bottega Veneta|B.P.C|Brax|Bronx|Brooks|Bruno Banani|Bruno Premi|Buffalo|Bugatti|Bullboxer|Bunker|Burberry|Burton|Butterfly|By Far|C&A|Cafénoir|Calvin Klein|Camel Active|Camp David|Camper|Canda|Caprice|Carel Paris|Caroll|Carrera|Carvela|Casa|Casadei|Castaner|Caterpillar|Catwalk|Cayler & Sons|Céline|Celio|Cesare Paciotti|Champion|Chanel|Charles Jourdan|Chiara Ferragni|Chie Mihara|Chiemsee|Chloé|Christian Louboutin|Church's|Cinque|Clae|Clarks|Claudia Ghizzani|Claudie Pierlot|Clergerie|Clockhouse|Closed|CMP|Coach|Collection|Colloseum|Colmar|Columbia|Comma|Comme des garçons|Comptoir des Cotonniers|Converse|Coolway|Coq Sportif|COS|Cosmoparis|Cox|Crane|Creeks|Crivit|Crocs|Cross|Cube|Cypres|Dainese|Damart|Daniel Hechter|D.A.T.E.|Daytona|DC Shoes|Decathlon|Deerberg|Deichmann|Demonia|Depeche|Derby|Desigual|Diadora|Diamant|Dickies|Diesel|Digel|Dior|Disney|Diverse|DKNY|Dkode|Dockers|Dogo|Dolce Vita|Dolce & Gabbana|Dolomite|Donna|Donna Carolina|Donnay|Doodogs|Dorothee Schumacher|Dorothy Perkins|Dr. Scholl's|Dr. Martens|Dsquared2|Dune|Dunlop|DVS|Ecco|Ed Hardy|edc|Eddie Bauer|Eden|Ego|El Naturalista|Element|Elite|Ella|Ella Cruz|Elle|Ellesse|Eltern|EMP|Emporio Armani|EMU|Engbers|Engelbert Strauss|Eram|Ernstings Family|Escada|Esmara|Espadrilles|Esprit|Etnies|Even&Odd|Evita|Fabiani|Faguo|Faith|Fantasy|Fashion Nova|Fashy|Felmini|Fendi|FILA|Find|Finsbury|Firefly|Fischer|Fitflop|Five|Flamenco|Floris van Bommel|Fly|Fly London|Footjoy|Forever 21|Fornarina|Fratelli Rossetti|Fred|Fred de la Bretoniere|Fred Perry|Freeflex|Free Lance|French Connection|Fresh|Friis & Company|Frye|Furla|Gaastra|Gabor|Gadea|Gaimo|Galliano|Ganni|GANT|Garcia|Geox|Gerry Weber|Gianmarco Lorenzi|Gianni|Gianni Gregori|Gianvito Rossi|Giesswein|Gina|Gina Benotti|Gino Rossi|Gino Ventori|Giorgio|Gios Eppo|Giuseppe Zanotti|Givenchy|Glamorous|Globe|Goby|Gola|Golden Goose|Goodyear|Graceland|Grendha|Görtz|G-Star|Gucci|Gudrun Sjöden|Guess|Haglöfs|Hailys|Haix|Hallhuber|Hanna White|Hanwag|Harley Davidson|Havaianas|Head|Heelys|Heine|Helen Billkrantz|Helly Hansen|Hermès|Hess Natur|Högl|High Colorado|Hilfiger Denim|HIP|Hippie|Hirsch|Hispanitas|Hi-Tec|HKM|H&M|Hogan|Hoka One One|Hollister|Hotic|HUB|Hudson|Hugo|Hugo Boss|Hummel|Hunkemöller|Hunter|Hush|Hush Puppies|Icepeak|Ideal|Ikks|Ilse Jacobsen|Impressionen|Inblu|Indigo|Infinity|Inuikii|Inuovo|Ipanema|IRO|Iron Fist|Irregular Choice|Isabel Marant|Isotoner|Italia|Jack|Jack & Jones|Jack Wolfskin|Jacquemus|Jana|Jane|Jane Klain|Janet D.|Janet & Janet|JB Martin|Jeffrey Campbell|Jennifer|Jennika|Jessica|Jette Joop|Jil Sander|Jimmy Choo|J.M. Weston|Joe Sanchez|John Baner|Jonak|Joop!|Jordan|Josef Seibel|Juicy Couture|Juliet|Jumelles|Jumex|Justfab|K1X|K2|Kalenji|Kamik|Kangaroos|Kanna|Kappa|Karen Millen|Karhu|Karl Kani|Karl Lagerfeld|Karrimor|Kate Spade|Kayla|Kazar|Keds|Keen|Kempa|Kennel & Schmenger|Kenneth Cole|Kenzo|Kiabi|Kickers|Killah|Killstar|Kiomi|Kipsta|Klett|KMB|Konstantin Starke|K-Swiss|Kurt Geiger|L.A. Gear|La Martina|La Sportiva|La Strada|Lacoste|Lands' End|Lanvin|Lascana|Lasocki|L'atelier Tropezien|Laura|Laura Biagiotti|Laura Vita|Laurel|Lavorazione Artigiana|Le Coq Sportif|Lemaitre|Les Tropéziennes|Le Temps Des Cerises|Levi's|Lico|Lidl|Liebeskind|Linea|Liu Jo|Livergy|LK Bennett|Lloyd|Lodi|Loding|Lola|Lola Cruz|Lolita|Look|Lorenzo|Louis Vuitton|Lowa|Lurchi|Madeleine|Magnum|Maison Martin Margiela|Maje|Mammut|Manas|Manfield|Mango|Manguun|Manolo Blahnik|Marc Cain|Marc O´Polo|Marc Jacobs|Marco Tozzi|Maripe|Mark Adam|Marni|Massimo Dutti|Max|Max Mara|Mckinley|MCM|Meindl|Melissa|Mellow Yellow|Melrose|Melvin & Hamilton|Menbur|Mephisto|Merrell|Mexx|Michael Kors|Milano|Millet|Minelli|Minnetonka|Mint&Berry|Miss Sixty|Missoni|Miu Miu|Mizuno|Mjus|Méliné|Moda|Mode|Moncler|Monki|Monoprix|Moon|Moon Boot|More&More|Moschino|Musier|Mustang|NA-KD|Napapijri|Natura|Natural World|Naturalizer|Navy|Navyboot|Nebulus|Neosens|Nero Giardini|Never 2 Hot|New Look|New Rock|New Yorker|New Balance|Newfeel|Next|Nike|Nina|Nina Fiarucci|Nine West|Nitro|Northwave|Nubikk|Oasis|Office|O'Neill|Only|Original Vintage|Orsay|Otto|Otto Kern|Ovyé|Oxford|Oxitaly|Oxypas|Oysho|P448|Pablo|Palladium|Panama Jack|Paraboot|Parfois|Pataugas|Patrick|Paul Green|Paul Smith|Pedro Miralles|Pepe Jeans|Perlato|Peter Hahn|Peter Kaiser|Petrol|Philippe Model|Philipp Plein|Pieces|Pier One|Pierre Cardin|Pikolinos|Pimkie|Pleaser|Poelman|Pollini|Pons Quintana|Prada|Premium|Pretty Ballerinas|Primark|Pro Touch|Progetto|Project|Promod|Public Desire|Pull & Bear|Puma|Pura Lopez|Quechua|Queentina|Quicksilver|Raid|Ralph Lauren|RAS|RAW|Rebel|Red Wing|Redskins|Reebok|Reef|Refresh|Regatta|Remonte|Rene Lezard|Repetto|Replay|Reserved|Reusch|Richmond|Richter|Rick Owens|Ricosta|Rieker|River Island|Roberto Cavalli|Rocket Dog|Rockport|Roger Vivier|Rohde|Roland|Romika|Rossignol|Rouje|Route 66|Roxy|Ruby|Rundholz|Rylko|Sacha|Salamander|Salewa|Salomon|Salvatore Ferragamo|Sam|Sandro|San Marina|Santoni|Saucony|Scapa|Scholl|Scotch & Soda|Scott|Sebago|See by Chloé|Selected|Sendra|Sergio Todzi|Sergio Rossi|Sezane|Sheego|Shimano|Sixtyseven|Skechers|Sketchers|Slazenger|Snipes|Snoopy|Soccx|S.Oliver|Sorel|Sparco|Stella Mccartney|Stephane Kélian|Steve Madden|Stradivarius|Street|Street One|Strellson|Strenesse|Stuart Weitzman|Style|Super Mode|Superdry|Superfit|Superga|Superstar|Supra|Supreme|Swarovski|Tally Weijl|Tamaris|Taylor|Tbs|Tchibo|Tchibo TCM|Tecnica|Ted Baker|Teva|Tex|The Art Company|The North Face|The Kooples|Think!|Tiger|Timberland|Tod's|Tom Tailor|Tom Ford|Tommy Hilfiger|Toms|Toni Pons|Topshop|Tory Burch|Tosca Blu|Trippen|True Religion|Truffle|Trussardi|TUK|Tulipano|Ugg|Ulla Popken|Umbro|Uncle Sam|Under Armour|Undercover|Underground|Unikat|Unisa|United Nude|Unützer|Urban Classics|U.S. Polo Assn.|Uterque|Uvex|Vagabond|Valentino|Valentino Garavani|Valleverde|Vanessa Bruno|Vanessa Wu|Vans|Vanucci|Varese|Vaude|Veja|Venezia|Venice Beach|Venturini|Vera Gomma|Vera Pelle|Vero Cuoio|Vero Moda|Versace|Via|Via Milano|Via Uno|Vibram|Vic Matié|Victoria|Victoria Delef|Victory|Viking|Viktory|Vince|Vince Camuto|Vitaform|Viva|Vivobarefoot|Voltan|VTY|Walbusch|Waldläufer|Walkmaxx|Walter Steiger|Waschbär|Werner Kern|Weston|Wilson|Windsor|Wolky|Wonders|Woody|Woolrich|Wrangler|Y-3|Yeezy|Yellow Cab|Yessica|Yonex|Young Spirit|Yourturn|Yves Saint Laurent|Zadig & Voltaire|Zalando|Zanon & Zago|Zara|Zebra|Zign|Zinda|Zumba".split("|"));
+  var L = (s) => Object.freeze(s.split("|"));
+  var VC_DEPOT = Object.freeze({
+    "Mode femme": Object.freeze({
+      "Accessoires": L("Carrés|Ceintures|Chapeaux|Foulards|Gants|Lunettes|Montres|Petite maroquinerie|Portefeuilles"),
+      "Bijoux": L("Bagues|Bijoux de portable|Bijoux de sac|Bijoux de tête|Boucles d'oreilles|Bracelets|Broches|Colliers|Parures|Pendentifs|Sautoirs"),
+      "Chaussures": L("Ballerines|Baskets|Boots|Bottes|Derbies|Escarpins|Espadrilles|Mocassins|Sabots|Sandales"),
+      "Sacs": L("Pochettes|Sacs à dos|Sacs à main|Sacs de voyage"),
+      "Vêtements": L("Bain|Blousons|Combinaisons|Jeans|Jupes|Lingerie|Manteaux|Pantalons|Pulls & Gilets|Robes|Shorts|Tops|Trenchs|Vestes")
+    }),
+    "Mode fille": Object.freeze({
+      "Accessoires": L("Bijoux|Ceintures & Bretelles|Chapeaux, Bonnets & Gants|Foulards & Echarpes|Lunettes|Sacs & Trousses"),
+      "Chaussures": L("A lacets|Ballerines|Baskets|Bottes & Bottines|Chaussons|Mocassins|Premiers pas|Sandales"),
+      "Vêtements": L("Blousons & Manteaux|Jupes|Les ensembles|Pantalons|Pulls & Gilets|Pyjamas, Bodies|Robes |Shorts|Tops")
+    }),
+    "Mode garçon": Object.freeze({
+      "Accessoires": L("Bijoux|Ceintures & Bretelles|Chapeaux, Bonnets & Gants|Foulards & Echarpes|Lunettes|Sacs & Trousses"),
+      "Chaussures": L("A lacets|Ballerines|Baskets|Bottes & Bottines|Chaussons|Mocassins|Premiers pas|Sandales"),
+      "Vêtements": L("Blousons & Manteaux|Les ensembles|Pantalons|Pulls & Gilets|Pyjamas, Bodies|Shorts|Tops")
+    }),
+    "Mode homme": Object.freeze({
+      "Accessoires": L("Bijoux|Boutons de manchette|Ceintures|Chapeaux & Bonnets|Chèches & Echarpes|Cravates|Gants|Lunettes|Montres"),
+      "Chaussures": L("Baskets|Bottes & Boots|Derbies|Espadrilles|Mocassins|Sandales"),
+      "Sacs": L("Petite maroquinerie|Sacs|Sacs banane"),
+      "Vêtements": L("Bain|Chemises|Costumes|Jeans|Manteaux|Pantalons|Polos|Pulls, Gilets & Sweats|Shorts|Tee shirts|Vestes & Blousons")
+    })
+  });
+  var VC_MARQUES_RELEVEES = Object.freeze({
+    presentes: L("Adidas|Asics|Autry|Brooks|Crime London|Dr. Martens|JORDAN|LUMBERJACK|Mizuno|New Balance|Nike|Nike x Nocta|Nike x Travis Scott|Onitsuka Tiger|Paraboot|Philippe Model|Puma|Salomon|Saucony|Timberland"),
+    absentes: L("Nike SB|On Cloud|no marque|Nike x sacai x UNDERCOVER|Nike x Sacai|Nike x Patta|Nike x Sacai x Fragment Design|J.M. Weston|adidas Stan Smith")
+  });
+
+  // src/publier/tables.js
+  var str4 = (v2) => String(v2 == null ? "" : v2).trim();
+  var norm2 = (v2) => str4(v2).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
+  var chercheExact2 = (liste, v2) => {
+    const n = norm2(v2);
+    return n ? (liste || []).find((x) => norm2(x) === n) || null : null;
+  };
+  var C = (famille, type, genre, vinted) => Object.freeze({ famille, type, genre, vinted: String(vinted) });
+  var CATEGORIES_VRM = Object.freeze({
+    "chaussures/baskets/homme": C("chaussures", "baskets", "homme", 1242),
+    "chaussures/baskets/femme": C("chaussures", "baskets", "femme", 2632),
+    "chaussures/randonnee/homme": C("chaussures", "randonnee", "homme", 2678),
+    "chaussures/randonnee/femme": C("chaussures", "randonnee", "femme", 2645),
+    "chaussures/course/homme": C("chaussures", "course", "homme", 1453),
+    "chaussures/course/femme": C("chaussures", "course", "femme", 2651),
+    "chaussures/tennis/homme": C("chaussures", "tennis", "homme", 2686),
+    "chaussures/basket/homme": C("chaussures", "basket", "homme", 2672),
+    "chaussures/bottines/femme": C("chaussures", "bottines", "femme", 2618),
+    "chaussures/habillees/homme": C("chaussures", "habillees", "homme", 1238),
+    "chaussures/mocassins/homme": C("chaussures", "mocassins", "homme", 2656),
+    "chaussures/mocassins/femme": C("chaussures", "mocassins", "femme", 2954),
+    "chaussures/bottes-travail/homme": C("chaussures", "bottes-travail", "homme", 2664),
+    "chaussures/bottes-travail/femme": C("chaussures", "bottes-travail", "femme", 2622),
+    "chaussures/baskets/fille": C("chaussures", "baskets", "fille", 2719),
+    "chaussures/baskets-sans-lacets/garcon": C("chaussures", "baskets-sans-lacets", "garcon", 2752),
+    "vetements/tshirt/garcon": C("vetements", "tshirt", "garcon", 1662),
+    "vetements/jean-slim/garcon": C("vetements", "jean-slim", "garcon", 1697),
+    "sacs/sac-a-main/femme": C("sacs", "sac-a-main", "femme", 156),
+    "vetements/doudoune/femme": C("vetements", "doudoune", "femme", 2614),
+    "vetements/blouse/femme": C("vetements", "blouse", "femme", 1043),
+    "livres/manuel-scolaire/": C("livres", "manuel-scolaire", "", 5426),
+    "jouets/pate-a-modeler/": C("jouets", "pate-a-modeler", "", 3317)
+  });
+  var CLES_VRM = Object.freeze(Object.keys(CATEGORIES_VRM));
+  var FAMILLES = Object.freeze([...new Set(CLES_VRM.map((k) => CATEGORIES_VRM[k].famille))]);
+  var GENRES = Object.freeze(["homme", "femme", "fille", "garcon"]);
+  var estCleVrm = (k) => Object.prototype.hasOwnProperty.call(CATEGORIES_VRM, str4(k));
+  var VINTED_VERS_VRM = Object.freeze(Object.fromEntries(CLES_VRM.map((k) => [CATEGORIES_VRM[k].vinted, k])));
+  function depuisVinted(catalogId) {
+    const id = str4(catalogId);
+    if (!/^\d{1,7}$/.test(id)) return null;
+    return VINTED_VERS_VRM[id] ? { cle: VINTED_VERS_VRM[id] } : { inconnue: id };
+  }
+  var LBC_FAMILLE = Object.freeze({
+    "Chaussures": ["chaussures", ["homme", "femme"]],
+    "Chaussures enfants": ["chaussures", ["fille", "garcon"]],
+    "Vêtements": ["vetements", ["homme", "femme"]],
+    "Vêtements enfants": ["vetements", ["fille", "garcon"]],
+    "Accessoires & Bagagerie": ["sacs", ["homme", "femme"]],
+    "Livres": ["livres", [""]]
+  });
+  function depuisLeboncoin(categorie) {
+    const c = str4(categorie);
+    if (!c) return null;
+    const f = LBC_FAMILLE[c];
+    if (!f) return { horsTable: c };
+    const candidates = CLES_VRM.filter((k) => CATEGORIES_VRM[k].famille === f[0] && f[1].includes(CATEGORIES_VRM[k].genre));
+    return { famille: f[0], candidates };
+  }
+  var EBAY_CHEMINS_VUS = Object.freeze({
+    "Vêtements, accessoires:Homme : vêtements, accessoires:Homme : chaussures:Baskets": "chaussures/baskets/homme"
+  });
+  function depuisEbay(categoryName) {
+    const c = str4(categoryName);
+    if (!c) return null;
+    return EBAY_CHEMINS_VUS[c] ? { cle: EBAY_CHEMINS_VUS[c] } : { horsTable: c };
+  }
+  var UNIVERS_VC = Object.freeze({ homme: "Mode homme", femme: "Mode femme", fille: "Mode fille", garcon: "Mode garçon" });
+  var CAT_VC = Object.freeze({ chaussures: "Chaussures", vetements: "Vêtements", sacs: "Sacs" });
+  var SOUS_VC = Object.freeze({ "baskets": "Baskets", "baskets-sans-lacets": "Baskets", "mocassins": "Mocassins", "sac-a-main": "Sacs à main", "blouse": "Tops", "tshirt": "Tops" });
+  var VC_HORS = Object.freeze(["livres", "jouets"]);
+  function choixVc(champ, ctx = {}) {
+    if (champ === "univers") return Object.keys(VC_DEPOT);
+    if (champ === "categorie") {
+      const u = VC_DEPOT[ctx.univers || ""];
+      return u ? Object.keys(u) : [];
+    }
+    if (champ === "sous") {
+      const u = VC_DEPOT[ctx.univers || ""];
+      return u && u[ctx.categorie || ""] ? u[ctx.categorie].slice() : [];
+    }
+    return [];
+  }
+  function vcDepuisVrm(cle) {
+    const c = CATEGORIES_VRM[str4(cle)];
+    if (!c) return { valeurs: {}, demandes: ["univers", "categorie", "sous"] };
+    if (VC_HORS.includes(c.famille)) return { hors: true };
+    const v2 = {};
+    const d = [];
+    const u = UNIVERS_VC[c.genre];
+    if (u && VC_DEPOT[u]) v2.univers = u;
+    else d.push("univers");
+    const cat = CAT_VC[c.famille];
+    if (v2.univers && cat && VC_DEPOT[v2.univers][cat]) v2.categorie = cat;
+    else d.push("categorie");
+    const s = SOUS_VC[c.type];
+    if (v2.categorie && s && chercheExact2(VC_DEPOT[v2.univers][v2.categorie], s)) v2.sous = chercheExact2(VC_DEPOT[v2.univers][v2.categorie], s);
+    else d.push("sous");
+    return { valeurs: v2, demandes: d };
+  }
+  var ETATS2 = Object.freeze(["Neuf avec étiquette", "Neuf sans étiquette", "Très bon état", "Bon état", "Satisfaisant"]);
+  var etatNeutre = (v2) => chercheExact2(ETATS2, v2);
+  var EBAY_ETAT_LU = Object.freeze({ "Occasion - Très bon état": "Très bon état", "Neuf avec étiquettes": "Neuf avec étiquette", "Neuf sans étiquette": "Neuf sans étiquette" });
+  var etatDepuisEbay = (t) => EBAY_ETAT_LU[str4(t)] || null;
+  var etatVersLbc = (e) => ETAT_VERS_LBC[str4(e)] || null;
+  var etatVersEbay = (e) => ETAT_VERS_EBAY[str4(e)] || null;
+  function pointureEU(v2) {
+    const t = str4(v2).replace(/\s+/g, "");
+    const m = /^(\d{2})(?:[.,](5))?$/.exec(t);
+    return m ? m[2] ? `${m[1]},5` : m[1] : null;
+  }
+  function marqueVersLbc(marque, famille) {
+    if (!str4(marque)) return { etat: "pas-lue" };
+    if (famille !== "chaussures") return { etat: "a-lire", valeur: str4(marque) };
+    const m = chercheExact2(LBC_MARQUES_CHAUSSURES, marque);
+    return m ? { etat: "sure", valeur: m } : { etat: "hors-liste" };
+  }
+  function marqueVersVc(marque) {
+    if (!str4(marque)) return { etat: "pas-lue" };
+    const p = chercheExact2(VC_MARQUES_RELEVEES.presentes, marque);
+    if (p) return { etat: "sure", valeur: p };
+    if (chercheExact2(VC_MARQUES_RELEVEES.absentes, marque)) return { etat: "hors-liste" };
+    return { etat: "a-lire", valeur: str4(marque) };
+  }
+  var marquesVcPermises = () => VC_MARQUES_RELEVEES.presentes.slice();
+  var marquesLbcPermises = () => LBC_MARQUES_CHAUSSURES.slice();
+  var cheminVinted = (cle) => {
+    const c = CATEGORIES_VRM[str4(cle)];
+    return c && TABLE_VINTED[c.vinted] ? TABLE_VINTED[c.vinted].chemin : "";
+  };
+
+  // src/publier/agent.js
+  var str5 = (v2) => String(v2 == null ? "" : v2).trim();
+  var arr = (a) => Array.isArray(a) ? a : [];
+  var obj = (v2) => v2 && typeof v2 === "object" && !Array.isArray(v2) ? v2 : null;
+  var SITES_AGENT = Object.freeze(["vinted", "leboncoin", "vestiaire", "ebay"]);
+  var TITRE_MAX2 = Object.freeze({ leboncoin: 50, vestiaire: 80, ebay: 80 });
+  var PHOTOS_MAX2 = 10;
+  var NUM_OK2 = /^[A-Z]{0,3}\d{1,6}$/;
+  var cleNumero2 = (v2) => {
+    let s = str5(v2).toUpperCase().replace(/[\s\-_.]/g, "");
+    if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+    return s;
+  };
+  var CHAMPS_VINTED = Object.freeze(["size", "condition", "color", "brand"]);
+  var idVinted = (v2) => /^\d{1,12}$/.test(str5(v2));
+  var cleArt = (k) => /^[\w:#.-]{1,80}$/.test(str5(k)) ? str5(k) : "";
+  function lireMemoireAgent(brut) {
+    const b = obj(brut) || {};
+    const out = { v: 1, articles: {}, cat: {}, marque: { leboncoin: {}, vestiaire: {} }, envois: {} };
+    for (const [k, x] of Object.entries(obj(b.articles) || {})) {
+      const c = cleArt(k);
+      const a = obj(x);
+      if (!c || !a) continue;
+      const e = {};
+      if (estCleVrm(a.categorie)) e.categorie = str5(a.categorie);
+      if (etatNeutre(a.etat)) e.etat = etatNeutre(a.etat);
+      if (pointureEU(a.pointure)) e.pointure = pointureEU(a.pointure);
+      if (str5(a.marque) && str5(a.marque).length <= 40 && !/[<>]/.test(a.marque)) e.marque = str5(a.marque);
+      const sl = obj(a.sites) && obj(a.sites.leboncoin);
+      if (sl) {
+        const l = {};
+        for (const ch of ["taille", "etat", "couleur", "marque"]) if (str5(sl[ch]) && str5(sl[ch]).length <= 60) l[ch] = str5(sl[ch]);
+        if (Object.keys(l).length) e.sites = { leboncoin: l };
+      }
+      const sv = obj(a.sites) && obj(a.sites.vinted);
+      if (sv) {
+        const l = {};
+        for (const ch of CHAMPS_VINTED) if (idVinted(sv[ch])) l[ch] = str5(sv[ch]);
+        if (Object.keys(l).length) e.sites = { ...e.sites || {}, vinted: l };
+      }
+      if (Object.keys(e).length) out.articles[c] = e;
+    }
+    for (const [k, x] of Object.entries(obj(b.cat) || {})) {
+      if (!estCleVrm(k) || !obj(x)) continue;
+      const e = {};
+      const vc = obj(x.vestiaire);
+      if (vc) {
+        const v2 = {};
+        const u = chercheExact2(choixVc("univers"), vc.univers);
+        if (u) v2.univers = u;
+        const ca = chercheExact2(choixVc("categorie", { univers: u || vcDepuisVrm(k).valeurs?.univers }), vc.categorie);
+        if (ca) v2.categorie = ca;
+        const s = chercheExact2(choixVc("sous", { univers: u || (vcDepuisVrm(k).valeurs || {}).univers, categorie: ca || (vcDepuisVrm(k).valeurs || {}).categorie }), vc.sous);
+        if (s) v2.sous = s;
+        if (Object.keys(v2).length) e.vestiaire = v2;
+      }
+      const lb = obj(x.leboncoin);
+      if (lb) {
+        const l = {};
+        const so = chercheExact2(choixDe("leboncoin", "sous"), lb.sous);
+        if (so) l.sous = so;
+        const ctx = so || ((TABLE_VINTED[CATEGORIES_VRM[k].vinted] || {}).lbc || {}).sous || "";
+        for (const ch of ["univers", "type"]) {
+          const v2 = chercheExact2(choixDe("leboncoin", ch, { sous: ctx.split(" › ").pop() }), lb[ch]);
+          if (v2) l[ch] = v2;
+        }
+        if (Object.keys(l).length) e.leboncoin = l;
+      }
+      const eb = obj(x.ebay);
+      if (eb && /^\d{1,9}$/.test(str5(eb.id))) e.ebay = { id: str5(eb.id), nom: str5(eb.nom).slice(0, 80), chemin: str5(eb.chemin).slice(0, 200) };
+      if (Object.keys(e).length) out.cat[k] = e;
+    }
+    const mq = obj(b.marque) || {};
+    for (const [m, v2] of Object.entries(obj(mq.leboncoin) || {})) {
+      const ok = chercheExact2(marquesLbcPermises(), v2);
+      if (norm2(m) && ok) out.marque.leboncoin[norm2(m).slice(0, 40)] = ok;
+    }
+    for (const [m, v2] of Object.entries(obj(mq.vestiaire) || {})) {
+      const ok = chercheExact2(marquesVcPermises(), v2);
+      if (norm2(m) && ok) out.marque.vestiaire[norm2(m).slice(0, 40)] = ok;
+    }
+    for (const [k, x] of Object.entries(obj(b.envois) || {})) {
+      const e = obj(x);
+      if (!e || !SITES_AGENT.includes(e.site) || !NUM_OK2.test(cleNumero2(e.numero)) || k !== `${e.site}:${cleNumero2(e.numero)}`) continue;
+      const relu = obj(e.relu) && ["univers", "categorie", "sous"].every((c) => typeof e.relu[c] === "string" && e.relu[c].length <= 80) ? { univers: e.relu.univers, categorie: e.relu.categorie, sous: e.relu.sous } : null;
+      out.envois[k] = { site: e.site, numero: cleNumero2(e.numero), voulu: obj(e.voulu) || {}, at: Number(e.at) || 0, ...relu ? { relu } : {} };
+    }
+    return out;
+  }
+  var CHAMPS_FICHE = Object.freeze(["categorie", "genre", "marque", "pointure", "etat", "couleurs", "matieres", "dimensions", "titre", "description", "photos", "prix", "prixMini"]);
+  var ORDRE_SITES = ["vinted", "ebay", "leboncoin", "vestiaire"];
+  function accorder(cands, egal2 = (a, b) => norm2(a) === norm2(b)) {
+    const l = cands.filter((c) => c && c.v != null && c.v !== "" && !(Array.isArray(c.v) && !c.v.length));
+    if (!l.length) return null;
+    const autres = l.filter((c) => !egal2(c.v, l[0].v));
+    return autres.length ? { v: null, conflit: l.map((c) => ({ v: c.v, de: c.de })) } : { v: l[0].v, de: l[0].de };
+  }
+  function ficheArticle(article, lectures = {}, memoire = null) {
+    const a = obj(article) || {};
+    const mem = lireMemoireAgent(memoire);
+    const rep = mem.articles[cleArt(a.cle)] || {};
+    const L2 = { vinted: obj(lectures.vinted) || {}, ebay: obj(lectures.ebay) || {}, leboncoin: obj(lectures.leboncoin) || {} };
+    const ann = arr(a.annonces).slice().sort((x, y) => ORDRE_SITES.indexOf(x.site) - ORDRE_SITES.indexOf(y.site));
+    const lu = { categorie: [], partielle: [], marque: [], pointure: [], taille: [], etat: [], couleurs: [], matieres: [], titre: [], description: [], photos: [] };
+    const inconnues = [];
+    for (const x of ann) {
+      const s = x.site;
+      const d = s === "vinted" ? obj(L2.vinted[String(x.id)]) : s === "ebay" ? obj(L2.ebay[String(x.id)]) : s === "leboncoin" ? obj(L2.leboncoin[String(x.id)]) : null;
+      if (s === "vinted") {
+        const codes = d && obj(d.codes);
+        const r = codes ? depuisVinted(codes.catalog_id) : null;
+        if (r && r.cle) lu.categorie.push({ v: r.cle, de: s });
+        else if (r && r.inconnue) inconnues.push(s + ":" + r.inconnue);
+        if (d && str5(d.couleur)) lu.couleurs.push({ v: str5(d.couleur).split(/\s*[/,]\s*/).filter(Boolean), de: s });
+        else if (codes && Array.isArray(codes.color_ids) && codes.color_ids.length && obj(lectures.couleursVinted)) {
+          const noms = codes.color_ids.map((id) => str5(lectures.couleursVinted[String(id)]));
+          if (noms.every(Boolean)) lu.couleurs.push({ v: noms, de: s });
+        }
+        if (d && str5(d.description)) lu.description.push({ v: str5(d.description), de: s });
+        if (d && arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map((p) => typeof p === "string" ? p : p && p.url).filter((u) => /^https:\/\//.test(str5(u))), de: s });
+      }
+      if (s === "ebay" && d) {
+        const r = depuisEbay(d.categoryName);
+        if (r && r.cle) lu.categorie.push({ v: r.cle, de: s });
+        else if (r && r.horsTable) inconnues.push("ebay:" + r.horsTable.slice(0, 60));
+        const sp = obj(d.specifics) || {};
+        const premier = (k) => {
+          const v2 = sp[k];
+          return str5(Array.isArray(v2) ? v2[0] : v2);
+        };
+        if (premier("Marque")) lu.marque.push({ v: premier("Marque"), de: s });
+        if (pointureEU(premier("Pointure EU"))) lu.pointure.push({ v: pointureEU(premier("Pointure EU")), de: s });
+        if (premier("Couleur")) lu.couleurs.push({ v: [premier("Couleur")], de: s });
+        const mat = premier("Matière") || premier("Matière extérieure") || premier("Matière de la tige");
+        if (mat) lu.matieres.push({ v: [mat], de: s });
+        if (etatDepuisEbay(d.condition)) lu.etat.push({ v: etatDepuisEbay(d.condition), de: s });
+        if (str5(d.description)) lu.description.push({ v: str5(d.description), de: s });
+        if (arr(d.photos).length) lu.photos.push({ v: arr(d.photos).map(str5).filter((u) => /^https:\/\//.test(u)), de: s });
+      }
+      if (s === "leboncoin" && d) {
+        const r = depuisLeboncoin(d.category);
+        if (r && r.candidates) lu.partielle.push({ famille: r.famille, candidates: r.candidates, de: s });
+        if (str5(d.body)) lu.description.push({ v: str5(d.body), de: s });
+        const im = arr(d.images).map((p) => typeof p === "string" ? p : p && p.url).filter((u) => /^https:\/\//.test(str5(u)));
+        if (im.length) lu.photos.push({ v: im, de: s });
+      }
+      if (str5(x.marque)) lu.marque.push({ v: str5(x.marque), de: s });
+      const pt = pointureEU(x.taille);
+      if (pt) lu.pointure.push({ v: pt, de: s });
+      else if (str5(x.taille)) lu.taille.push({ v: str5(x.taille), de: s });
+      if (etatNeutre(x.condition)) lu.etat.push({ v: etatNeutre(x.condition), de: s });
+      if (str5(x.titre)) lu.titre.push({ v: str5(x.titre), de: s });
+      if (str5(x.photo)) lu.photos.push({ v: [str5(x.photo)], de: s + "-vignette" });
+    }
+    const champs = {};
+    const conflits = {};
+    const poser = (k, r) => {
+      if (!r) {
+        champs[k] = null;
+        return;
+      }
+      if (r.conflit) {
+        champs[k] = null;
+        conflits[k] = r.conflit;
+        return;
+      }
+      champs[k] = { v: r.v, de: r.de };
+    };
+    let cat = accorder(lu.categorie, (x, y) => x === y);
+    if (cat && cat.v && lu.partielle.some((p) => !p.candidates.includes(cat.v))) cat = { v: null, conflit: [{ v: cat.v, de: cat.de }, ...lu.partielle.map((p) => ({ v: p.famille, de: p.de }))] };
+    if (estCleVrm(rep.categorie)) cat = { v: rep.categorie, de: "reponse" };
+    poser("categorie", cat);
+    const C2 = champs.categorie ? CATEGORIES_VRM[champs.categorie.v] : null;
+    champs.genre = C2 ? { v: C2.genre, de: champs.categorie.de } : null;
+    poser("marque", rep.marque ? { v: rep.marque, de: "reponse" } : accorder(lu.marque));
+    poser("pointure", rep.pointure ? { v: rep.pointure, de: "reponse" } : accorder(lu.pointure, (x, y) => x === y));
+    if (!champs.pointure && lu.taille.length) {
+      const t = accorder(lu.taille);
+      if (t && t.v) champs.taille = { v: t.v, de: t.de };
+    }
+    poser("etat", rep.etat ? { v: rep.etat, de: "reponse" } : accorder(lu.etat, (x, y) => x === y));
+    poser("couleurs", lu.couleurs[0] ? { v: lu.couleurs[0].v, de: lu.couleurs[0].de } : null);
+    poser("matieres", lu.matieres[0] ? { v: lu.matieres[0].v, de: lu.matieres[0].de } : null);
+    champs.dimensions = null;
+    poser("titre", lu.titre[0] ? { v: lu.titre[0].v, de: lu.titre[0].de } : null);
+    poser("description", lu.description[0] ? { v: lu.description[0].v, de: lu.description[0].de } : null);
+    const ph = lu.photos.find((p) => p.v.length) || null;
+    poser("photos", ph ? { v: [...new Set(ph.v)].slice(0, PHOTOS_MAX2), de: ph.de } : null);
+    const prix = typeof a.prix === "number" && a.prix > 0 ? a.prix : null;
+    champs.prix = prix != null ? { v: prix, de: "annonce" } : null;
+    champs.prixMini = typeof a.prixMini === "number" && a.prixMini > 0 ? { v: a.prixMini, de: "vrm" } : null;
+    const manques = CHAMPS_FICHE.filter((k) => !champs[k]);
+    return {
+      cle: str5(a.cle),
+      numero: cleNumero2(a.numero) && NUM_OK2.test(cleNumero2(a.numero)) ? cleNumero2(a.numero) : "",
+      sites: [...new Set(ann.map((x) => x.site))],
+      enLigne: Object.fromEntries(ann.filter((x) => x.etat === "enligne").map((x) => [x.site, String(x.id)])),
+      vintedId: (ann.find((x) => x.site === "vinted") || {}).id || "",
+      champs,
+      conflits,
+      manques,
+      inconnues,
+      candidates: lu.partielle.length ? [...new Set(lu.partielle.flatMap((p) => p.candidates))] : []
+    };
+  }
+  var v = (f, k) => f && f.champs && f.champs[k] ? f.champs[k].v : null;
+  var Q = (champ, choix, { site = "", bloque = true, saisie = "", candidates = null, libelles = null } = {}) => ({ champ, site, choix: choix || [], bloque: !!bloque, saisie, ...candidates ? { candidates } : {}, ...libelles ? { libelles } : {} });
+  function questionsFiche(f, besoins) {
+    const q = [];
+    if (besoins.includes("categorie") && !v(f, "categorie")) {
+      const cands2 = f.conflits.categorie ? [...new Set(f.conflits.categorie.map((c) => c.v).filter(estCleVrm))] : f.candidates;
+      q.push(Q("categorie", cands2 && cands2.length ? cands2 : CLES_VRM.slice(), { candidates: cands2 && cands2.length ? cands2 : null }));
+    }
+    if (besoins.includes("etat") && !v(f, "etat")) q.push(Q("etat", ETATS2.slice()));
+    const cands = v(f, "categorie") ? [v(f, "categorie")] : arr(f.candidates);
+    const chaussure = cands.length > 0 && cands.every((k) => CATEGORIES_VRM[k] && CATEGORIES_VRM[k].famille === "chaussures");
+    if (besoins.includes("pointure") && chaussure && !v(f, "pointure")) q.push(Q("pointure", [], { saisie: "pointure" }));
+    if (besoins.includes("marque") && !v(f, "marque")) q.push(Q("marque", [], { saisie: "texte" }));
+    return q;
+  }
+  function planSite(fiche, site, memoire, ctx = {}) {
+    const f = fiche || { champs: {}, conflits: {}, manques: CHAMPS_FICHE.slice() };
+    const mem = lireMemoireAgent(memoire);
+    const out = { site, etat: "pret", valeurs: {}, origine: {}, questions: [], refus: null, chemin: "" };
+    const refuser = (code, extra = {}) => {
+      out.etat = "refus";
+      out.refus = { code, ...extra };
+      out.questions = [];
+      return out;
+    };
+    if (ctx.deja && ctx.deja[site] === true) {
+      out.etat = "deja";
+      return out;
+    }
+    if (!f.numero) return refuser("sans-numero");
+    if (ctx.ext && ctx.ext[site] === false) return refuser("extension");
+    if (!v(f, "prix")) return refuser("prix-pas-lu");
+    if (!arr(v(f, "photos")).length) return refuser("sans-photo");
+    if (!v(f, "titre")) return refuser("sans-titre");
+    if (site === "vinted" && !ctx.compteVinted) return refuser("vinted-onglet");
+    const besoins = site === "ebay" ? ["categorie", "etat"] : site === "vestiaire" ? ["categorie", "etat", "pointure", "marque"] : ["categorie", "etat", "pointure"];
+    out.questions.push(...questionsFiche(f, besoins));
+    const cle = v(f, "categorie");
+    const C2 = cle ? CATEGORIES_VRM[cle] : null;
+    const repA = mem.articles[cleArt(f.cle)] || {};
+    if (site === "leboncoin" && C2) {
+      const corr = lireMemoire(ctx.corr);
+      const mc = mem.cat[cle] && mem.cat[cle].leboncoin;
+      if (mc) corr.cat[C2.vinted] = { ...corr.cat[C2.vinted] || {}, leboncoin: { ...(corr.cat[C2.vinted] || {}).leboncoin || {}, ...mc } };
+      const r = ficheSite(
+        "leboncoin",
+        { catalogId: C2.vinted, taille: v(f, "pointure") || f.champs.taille && f.champs.taille.v || "", etat: v(f, "etat") || "", couleur: arr(v(f, "couleurs"))[0] || "", marque: "" },
+        corr,
+        repA.sites && repA.sites.leboncoin || {}
+      );
+      out.chemin = cheminVinted(cle);
+      Object.assign(out.valeurs, r.valeurs);
+      Object.assign(out.origine, r.origine);
+      for (const d of r.demandes) if (!(d.champ === "etat" && !v(f, "etat")) && !(d.champ === "taille" && !v(f, "pointure") && C2.famille === "chaussures")) out.questions.push(Q(d.champ, d.choix, { site, bloque: d.bloque }));
+      const m = v(f, "marque");
+      if (m) {
+        const mm = marqueVersLbc(m, C2.famille);
+        const memM = mem.marque.leboncoin[norm2(m)];
+        if (mm.etat === "sure") {
+          out.valeurs.marque = mm.valeur;
+          out.origine.marque = "table";
+        } else if (memM) {
+          out.valeurs.marque = memM;
+          out.origine.marque = "memoire";
+        } else if (mm.etat === "a-lire") {
+          out.valeurs.marque = mm.valeur;
+          out.origine.marque = "lu-site";
+        } else out.questions.push(Q("marque", marquesLbcPermises(), { site, bloque: false }));
+      }
+    }
+    if (site === "vestiaire" && C2) {
+      const t = vcDepuisVrm(cle);
+      if (t.hors) return refuser("hors-site");
+      const mv = mem.cat[cle] && mem.cat[cle].vestiaire || {};
+      const val = {};
+      for (const ch of ["univers", "categorie", "sous"]) {
+        const choix = choixVc(ch, val);
+        const deTable = t.valeurs[ch] && chercheExact2(choix, t.valeurs[ch]);
+        const deMem = mv[ch] && chercheExact2(choix, mv[ch]);
+        if (deTable && !(deMem && deMem !== deTable)) {
+          val[ch] = deTable;
+          out.origine[ch] = "table";
+        } else if (deMem) {
+          val[ch] = deMem;
+          out.origine[ch] = "memoire";
+        } else {
+          out.questions.push(Q(ch, choix, { site }));
+          break;
+        }
+      }
+      Object.assign(out.valeurs, val);
+      out.chemin = cheminVinted(cle);
+      const m = v(f, "marque");
+      if (m) {
+        const mm = marqueVersVc(m);
+        const memM = mem.marque.vestiaire[norm2(m)];
+        if (mm.etat === "sure") {
+          out.valeurs.marque = mm.valeur;
+          out.origine.marque = "table";
+        } else if (memM) {
+          out.valeurs.marque = memM;
+          out.origine.marque = "memoire";
+        } else if (mm.etat === "a-lire") {
+          out.valeurs.marque = mm.valeur;
+          out.origine.marque = "lu-site";
+        } else {
+          out.questions.push(Q("marque", marquesVcPermises(), { site, bloque: true }));
+          out.refus = { code: "marque-hors-liste", marque: m };
+        }
+      }
+      if (v(f, "etat")) {
+        out.valeurs.etat = v(f, "etat");
+        out.origine.etat = "fiche";
+      }
+      if (v(f, "pointure")) {
+        out.valeurs.taille = v(f, "pointure");
+        out.origine.taille = "fiche";
+      }
+    }
+    if (site === "leboncoin" && C2 && out.valeurs.sousNom) appliquerFormulaireLbc(out, ctx.formulairesLbc, Q, marquesLbcPermises);
+    if (site === "vinted" && C2) {
+      out.chemin = cheminVinted(cle);
+      out.valeurs.catalog_id = C2.vinted;
+      out.origine.catalog_id = "table";
+      for (const [k, x] of [["etat", v(f, "etat")], ["taille", v(f, "pointure") || f.champs.taille && f.champs.taille.v], ["marque", v(f, "marque")], ["couleur", arr(v(f, "couleurs"))[0]]]) if (x) {
+        out.valeurs[k] = x;
+        out.origine[k] = "fiche";
+      }
+      out.reponses = { ...repA.sites && repA.sites.vinted || {}, catalog_id: C2.vinted };
+      const qv = ctx.questionsVinted && ctx.questionsVinted[f.cle];
+      if (qv && CHAMPS_VINTED.includes(qv.champ) && !out.reponses[qv.champ]) out.questions.push(Q(qv.champ, arr(qv.options).map((o) => str5(o[0])), { site, libelles: Object.fromEntries(arr(qv.options).map((o) => [str5(o[0]), str5(o[1])])) }));
+    }
+    if (site === "ebay" && C2) {
+      const corr = lireMemoire(ctx.corr);
+      const me = mem.cat[cle] && mem.cat[cle].ebay || corr.cat[C2.vinted] && corr.cat[C2.vinted].ebay || null;
+      if (me) {
+        out.valeurs.categorie = me;
+        out.origine.categorie = "memoire";
+      } else out.questions.push(Q("categorieEbay", [], { site, saisie: "ebay", bloque: true, candidates: null }));
+      out.requete = TABLE_VINTED[C2.vinted] && TABLE_VINTED[C2.vinted].ebay.requete || "";
+      out.chemin = cheminVinted(cle);
+      if (v(f, "etat") && etatVersEbay(v(f, "etat"))) {
+        out.valeurs.etat = etatVersEbay(v(f, "etat"));
+        out.origine.etat = "table";
+      }
+      if (v(f, "pointure")) {
+        out.valeurs.pointureEU = v(f, "pointure");
+        out.origine.pointureEU = "fiche";
+      }
+    }
+    if (out.questions.some((q) => q.bloque)) {
+      out.etat = out.refus ? "refus" : "question";
+    }
+    return out;
+  }
+  function retenirReponses(memoire, fiche, reponses) {
+    const m = lireMemoireAgent(memoire);
+    const ca = cleArt(fiche && fiche.cle);
+    const art = { ...m.articles[ca] || {} };
+    let cle = v(fiche, "categorie");
+    for (const r of arr(reponses)) {
+      const val = r && r.valeur;
+      const site = str5(r && r.site);
+      const ch = str5(r && r.champ);
+      if (!ch) continue;
+      if (!site) {
+        if (ch === "categorie" && estCleVrm(val)) {
+          art.categorie = str5(val);
+          cle = str5(val);
+        } else if (ch === "etat" && etatNeutre(val)) art.etat = etatNeutre(val);
+        else if (ch === "pointure" && pointureEU(val)) art.pointure = pointureEU(val);
+        else if (ch === "marque" && str5(val) && str5(val).length <= 40 && !/[<>]/.test(val)) art.marque = str5(val);
+        continue;
+      }
+      if (ch === "marque" && (site === "leboncoin" || site === "vestiaire")) {
+        const src = v(fiche, "marque") || art.marque;
+        const liste = site === "leboncoin" ? marquesLbcPermises() : marquesVcPermises();
+        const ok = chercheExact2(liste, val);
+        if (src && ok) m.marque[site] = { ...m.marque[site], [norm2(src).slice(0, 40)]: ok };
+        continue;
+      }
+      if (site === "vinted" && CHAMPS_VINTED.includes(ch) && idVinted(val)) {
+        art.sites = { ...art.sites || {}, vinted: { ...art.sites && art.sites.vinted || {}, [ch]: str5(val) } };
+        continue;
+      }
+      if (!cle) continue;
+      const e = { ...m.cat[cle] || {} };
+      if (site === "vestiaire" && ["univers", "categorie", "sous"].includes(ch)) e.vestiaire = { ...e.vestiaire || {}, [ch]: str5(val) };
+      else if (site === "leboncoin" && ["sous", "univers", "type"].includes(ch)) {
+        e.leboncoin = { ...e.leboncoin || {}, [ch]: str5(val) };
+        if (ch === "sous") {
+          delete e.leboncoin.univers;
+          delete e.leboncoin.type;
+        }
+      } else if (site === "leboncoin" && ["taille", "etat", "couleur"].includes(ch)) {
+        art.sites = { ...art.sites || {}, leboncoin: { ...art.sites && art.sites.leboncoin || {}, [ch]: str5(val) } };
+        continue;
+      } else if (site === "ebay" && ch === "categorieEbay" && obj(val) && /^\d{1,9}$/.test(str5(val.id))) e.ebay = { id: str5(val.id), nom: str5(val.nom), chemin: str5(val.chemin) };
+      else continue;
+      m.cat[cle] = e;
+    }
+    if (ca && Object.keys(art).length) m.articles[ca] = art;
+    return lireMemoireAgent(m);
+  }
+  function titrePour(site, t) {
+    const max = TITRE_MAX2[site] || 80;
+    const s = str5(t).replace(/\s+/g, " ");
+    if (s.length <= max) return s;
+    const c = s.slice(0, max + 1);
+    const i = c.lastIndexOf(" ");
+    return (i > 20 ? c.slice(0, i) : s.slice(0, max)).trim();
+  }
+  var refVrm = (n) => `Réf. VRM-${n}`;
+  function envoiPour(fiche, plan, ctx = {}) {
+    if (!fiche || !plan || plan.etat !== "pret") return null;
+    const n = fiche.numero;
+    if (!n) return null;
+    const desc0 = str5(v(fiche, "description"));
+    const description = new RegExp("VRM-" + n + "(?!\\d)").test(desc0) ? desc0 : (desc0 ? desc0 + "\n\n" : "") + refVrm(n);
+    const base = {
+      cle: fiche.cle,
+      numero: n,
+      titre: titrePour(plan.site, v(fiche, "titre")),
+      description,
+      prix: v(fiche, "prix"),
+      photos: arr(v(fiche, "photos")).slice(0, PHOTOS_MAX2),
+      ...fiche.vintedId ? { vintedId: String(fiche.vintedId) } : {}
+    };
+    if (plan.site === "vinted") {
+      const uid = str5(ctx.compteVinted && ctx.compteVinted.uid);
+      if (!/^\d+$/.test(uid) || !plan.valeurs.catalog_id) return null;
+      const t = texteAnnonceVinted({ numero: n, titre: v(fiche, "titre"), description: str5(v(fiche, "description")) }, ctx.reglagesVinted || {});
+      if (!t || t.ok === false) return null;
+      const fv = { id: "agent-" + n.replace(/[^\w-]/g, ""), numero: n, marque: plan.valeurs.marque || "", taille: plan.valeurs.taille || "", etat: plan.valeurs.etat || "", couleur: plan.valeurs.couleur || "", categorie: "", prix: v(fiche, "prix") };
+      return { voie: "vinted", msg: { cmd: "creerVintedFiche", uid, confirme: true, fiche: payloadFiche(fv, t, base.photos), reponses: { ...plan.reponses } } };
+    }
+    if (plan.site === "leboncoin") {
+      const c = criteresPourLbc({ site: "leboncoin", valeurs: plan.valeurs, ambigu: false });
+      if (!c.categorie) return null;
+      return { voie: "extension", msg: { cmd: "publierFiche", site: "leboncoin", fiche: { ...base, etat: etatVersLbc(v(fiche, "etat")) || "", categorie: c.categorie, criteres: c.criteres } } };
+    }
+    if (plan.site === "vestiaire") {
+      const x = plan.valeurs;
+      if (!x.univers || !x.categorie || !x.sous || !x.marque) return null;
+      return { voie: "extension", msg: { cmd: "publierFiche", site: "vestiaire", fiche: {
+        ...base,
+        etat: x.etat || "",
+        taille: x.taille || "",
+        marque: x.marque,
+        marqueAVerifier: plan.origine.marque === "lu-site",
+        categorie: { univers: x.univers, categorie: x.categorie, sous: x.sous }
+      } } };
+    }
+    if (plan.site === "ebay") {
+      if (!plan.valeurs.categorie) return null;
+      return {
+        voie: "ebay-brouillon",
+        categorie: plan.valeurs.categorie,
+        p: {
+          id: fiche.cle,
+          num: n,
+          title: base.titre,
+          marque: v(fiche, "marque") || "",
+          taille: v(fiche, "pointure") || "",
+          tailleVinted: v(fiche, "pointure") || "",
+          couleur: arr(v(fiche, "couleurs"))[0] || "",
+          etat: v(fiche, "etat") || "",
+          desc: description,
+          photos: base.photos,
+          catalogId: CATEGORIES_VRM[v(fiche, "categorie")].vinted
+        }
+      };
+    }
+    return null;
+  }
+  var CHAMP_DE_LIBELLE = [["univers", /^univers/i], ["type", /^type/i], ["taille", /^(taille|pointure)/i], ["etat", /^[ée]tat/i], ["couleur", /^couleur/i], ["marque", /^marque/i]];
+  function champsFormulaireLbc(form) {
+    const out = {};
+    const autres = [];
+    for (const c of arr(form && form.champs)) {
+      const k = (CHAMP_DE_LIBELLE.find(([, re]) => re.test(str5(c.libelle))) || [])[0];
+      if (k && !out[k]) out[k] = { choix: arr(c.choix).map(str5).filter(Boolean), obligatoire: !!c.obligatoire, libelle: str5(c.libelle) };
+      else if (!k && c.obligatoire) autres.push(str5(c.libelle));
+    }
+    return { champs: out, autres };
+  }
+  var idCategorieLbc = (sousNom) => {
+    for (const r of Object.values(LBC_RUBRIQUES)) if (r.sous[str5(sousNom)]) return r.sous[str5(sousNom)];
+    return "";
+  };
+  function appliquerFormulaireLbc(out, formulaires, Qf, marques) {
+    const id = idCategorieLbc(out.valeurs.sousNom);
+    const form = id && obj(formulaires) ? obj(formulaires[id]) : null;
+    if (!form) return;
+    const { champs, autres } = champsFormulaireLbc(form);
+    out.formulaire = "appris";
+    out.questions = out.questions.filter((q) => !(q.site === "leboncoin" && ["univers", "type", "taille", "etat", "couleur", "marque"].includes(q.champ)));
+    for (const k of ["univers", "type", "taille", "etat", "couleur", "marque"]) {
+      const c = champs[k];
+      if (!c) {
+        if (k in out.valeurs) {
+          delete out.valeurs[k];
+          delete out.origine[k];
+        }
+        continue;
+      }
+      const val = out.valeurs[k];
+      const ok = val != null && c.choix.some((x) => norm2(x) === norm2(val));
+      if (ok) {
+        out.valeurs[k] = c.choix.find((x) => norm2(x) === norm2(val));
+        out.origine[k] = out.origine[k] === "memoire" || out.origine[k] === "reponse" ? out.origine[k] : "formulaire";
+        continue;
+      }
+      if (val != null) {
+        delete out.valeurs[k];
+        delete out.origine[k];
+      }
+      if (c.choix.length) out.questions.push(Qf(k, c.choix.slice(), { site: "leboncoin", bloque: c.obligatoire && k !== "marque" && k !== "couleur" }));
+    }
+    if (autres.length) {
+      out.refus = { code: "lbc-champ-obligatoire", champ: autres[0] };
+      out.etat = "refus";
+    }
+  }
+
+  // src/repubVerif.js
+  var ETATS_VERIF = Object.freeze(["ok", "corrige", "a-corriger", "absente", "pas-verifie"]);
+  var str6 = (v2) => String(v2 == null ? "" : v2);
+  var champOk = (c) => /^[a-z_]{1,40}$/.test(str6(c));
+  function paireVerif(p) {
+    if (!p || typeof p !== "object" || !/^\d{4,15}$/.test(str6(p.id)) || !ETATS_VERIF.includes(p.etat)) return null;
+    const corrections = Array.isArray(p.corrections) ? p.corrections.filter((c) => c && champOk(c.champ)).slice(0, 10).map((c) => ({ champ: c.champ, nom: str6(c.nom).slice(0, 60), raison: str6(c.raison).slice(0, 300) })) : [];
+    const manque = Array.isArray(p.manque) ? p.manque.map((x) => str6(x).slice(0, 200)).filter(Boolean).slice(0, 10) : [];
+    const q = p.question && typeof p.question === "object" && champOk(p.question.champ) ? p.question : null;
+    return { id: str6(p.id), etat: p.etat, corrections, manque, question: q, raison: str6(p.raison).slice(0, 400) };
+  }
+  function resumeVerif(ids, verif) {
+    const v2 = verif && typeof verif === "object" ? verif : {};
+    const r = { total: 0, ok: 0, corrige: 0, aCorriger: 0, absente: 0, pasVerifie: 0, aCorrigerIds: [], absentes: [] };
+    for (const id0 of Array.isArray(ids) ? ids : []) {
+      const id = str6(id0);
+      r.total++;
+      const p = v2[id];
+      if (!p || p.etat === "pas-verifie") {
+        r.pasVerifie++;
+        continue;
+      }
+      if (p.etat === "ok") r.ok++;
+      else if (p.etat === "corrige") r.corrige++;
+      else if (p.etat === "a-corriger") {
+        r.aCorriger++;
+        r.aCorrigerIds.push(id);
+      } else if (p.etat === "absente") {
+        r.absente++;
+        r.absentes.push(id);
+      }
+    }
+    r.verifiees = r.ok + r.corrige + r.aCorriger + r.absente;
+    r.bloque = r.aCorriger > 0;
+    return r;
+  }
+  function lancerPermis(ids, verif, enCours) {
+    if (enCours) return { ok: false, raison: "verification" };
+    const r = resumeVerif(ids, verif);
+    if (r.bloque) return { ok: false, raison: "a-corriger", n: r.aCorriger };
+    if (r.total && r.absente === r.total) return { ok: false, raison: "toutes-absentes" };
+    return { ok: true };
+  }
+  function partiraPas(verif, id) {
+    const p = verif && verif[str6(id)];
+    return !!(p && p.etat === "absente");
+  }
+  function reponsesDe(verif, id) {
+    const p = verif && verif[str6(id)];
+    const r = p && p.rep && typeof p.rep === "object" && !Array.isArray(p.rep) ? p.rep : null;
+    if (!r) return void 0;
+    const o = {};
+    for (const k of Object.keys(r)) if (champOk(k) && /^\d{1,12}$/.test(str6(r[k]))) o[k] = str6(r[k]);
+    return Object.keys(o).length ? o : void 0;
+  }
+
+  // src/favorisProgression.js
+  var RAISONS_SAUT = Object.freeze(["annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
+  var MOTS_SAUT = Object.freeze({ annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
+  var MOTS_REFUS = Object.freeze({ texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
+  function phraseBilanFavoris(b, mot) {
+    if (!b) return "";
+    const m = (c, f) => typeof mot === "function" && mot(c, f) || (f === "saut" ? MOTS_SAUT : MOTS_REFUS)[c] || c;
+    const liste = (o, f) => {
+      const e = Object.entries(o);
+      return e.map(([c, n]) => e.length > 1 ? `${n} ${m(c, f)}` : m(c, f)).join(", ");
+    };
+    const p = [`${b.envoyes} envoyé${b.envoyes > 1 ? "s" : ""}`];
+    if (b.sautes) p.push(`${b.sautes} sauté${b.sautes > 1 ? "s" : ""} (${liste(b.parSaut, "saut")})`);
+    if (b.refuses) p.push(`${b.refuses} refusé${b.refuses > 1 ? "s" : ""} : ${liste(b.parRefus, "refus")}`);
+    if (b.incertains) p.push(`${b.incertains} à vérifier sur Vinted`);
+    return p.join(" · ");
+  }
+  return __toCommonJS(stdin_exports);
+})();
+const GARDES_APP = __gardesApp;
+// </gardes-app>
+// 5.410 — LA LECTURE DE `main` PASSE PAR LA LIGNE DES RÉGLAGES quand elle en demande un (une seule règle :
+// `superposerReglagesAuto`, la même que l'app). Ligne illisible ⇒ null : le moteur ne fait rien (« pas su »).
 async function lireMain(cles) {
   const rows = await sbGet(qMain(cles));
   if (rows === null) return null;
-  return (rows && rows[0]) || {};
+  const m = (rows && rows[0]) || {};
+  if (!cles.some((k) => REGLAGES_AUTO_CLES.includes(k))) return m;
+  const l = await sbGet(`app_data?id=eq.${REGLAGES_AUTO_ID}&select=cles:data->cles`);
+  if (l === null) return null;
+  return superposerReglagesAuto(m, l && l[0] ? { cles: l[0].cles } : null);
+}
+// 5.410 — ÉCRIRE UN RÉGLAGE D'AUTOMATISATION DEPUIS LE PANNEAU (Julien, 20 nov. : « toute action doit être faite dans
+// l'extension »). Sur SON toucher (`confirme` pour allumer), dans la ligne dédiée `vrm_reglages_auto` — JAMAIS `main` —
+// par comparer-et-échanger (`modifierLigneCas`) ; relue après l'écriture et rendue telle que les moteurs la liront.
+// Aucune requête vers Vinted, aucun plafond touché ; noté au journal du compte de l'onglet.
+async function reglageAutoCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const cle = String(msg && msg.cle || '');
+  if (!REGLAGES_AUTO_CLES.includes(cle)) return { ok: false, code: 'cle', raison: 'Ce réglage ne se règle pas ici.' };
+  const avant = await lireMain([cle]);
+  if (avant === null) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’a changé.' };
+  const n = reglageAutoNormalise(cle, msg.valeur, avant[cle], msg.confirme === true, Date.now());
+  if (!n.ok) return n;
+  const r = await modifierLigneCas(REGLAGES_AUTO_ID, (d) => ligneAvecReglage(d, cle, n.valeur, 'extension', Date.now()));
+  if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
+  const apres = await lireMain([cle]);
+  const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
+  try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
+  return { ok: true, relu: relu === true, valeur: n.valeur };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -27014,6 +30308,17 @@ async function compteUniqueOnglets(site) {
   if (vus.size > 1) return { ok: false, code: 'deux-comptes', raison: 'deux comptes Vestiaire sont ouverts dans ce Chrome : garde seulement celui où publier — rien n’est parti' };
   return { ok: true, compte: [...vus][0] };
 }
+function verifAvantPublier(fiche, site) {
+  const f = fiche && typeof fiche === 'object' ? fiche : {};
+  const a = { nPhotos: Array.isArray(f.photos) ? f.photos.length : 0, titre: f.titre };
+  for (const k of ['taille', 'prix', 'achat', 'marque', 'categorie', 'famille', 'facultatifs', 'description', 'numero', 'numeroEcrit', 'dejaEnLigne']) if (f[k] !== undefined) a[k] = f[k];
+  const out = GARDES_APP.problemesAnnonce(a, site === 'leboncoin' ? 'lbc' : site).map((x) => ({ code: x.code, texte: x.texte }));
+  if (site === 'vestiaire') {
+    const ph = GARDES_APP.photosExigeesVc({ famille: f.famille || '', nPhotos: a.nPhotos, etiquette: f.etiquette || 'pas-choisie', photoroom: f.photoroom === true ? true : f.photoroom === false ? false : null });
+    for (const k of ph.manque) out.push({ code: 'photos-vc', texte: 'Vestiaire : photo « ' + k + ' » manquante' });
+  }
+  return out;
+}
 async function publierFicheSite(msg) {
   const site = String((msg && msg.site) || '');
   if (site !== 'leboncoin' && site !== 'vestiaire') return { accepte: false, code: 'site', raison: 'site inconnu — rien n’est parti' };
@@ -27025,6 +30330,11 @@ async function publierFicheSite(msg) {
     if (site === 'vestiaire') await chargerCataloguesPlateformes();
     const v = ficheAgentValide(msg.fiche, site, _catVc);
     if (!v.ok) return { accepte: false, code: v.code, raison: v.raison };
+    // 5.410 — LA VÉRIFICATION AVANT PUBLICATION (retirée de l'app avec le geste) : la règle de l'app recopiée
+    //    (`problemesAnnonce`, et `photosExigeesVc` pour Vestiaire). Un problème ⇒ dit, et seul SON second toucher
+    //    (`verifVu`) publie quand même.
+    const verif = verifAvantPublier(msg.fiche, site);
+    if (verif.length && msg.verifVu !== true) return { accepte: false, code: 'verification', problemes: verif, raison: 'À vérifier avant de publier : ' + verif.map((x) => x.texte).join(' · ') };
     const ad = v.ad;
     const cle = site === 'leboncoin' ? 'vrmPendingAd' : 'vrmPendingVc';
     let pend = null; try { pend = (await chrome.storage.local.get(cle))[cle]; } catch (_) { return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
@@ -27358,7 +30668,34 @@ function ficheVcAnnonce(x, prev, compte, maintenant) {
     photo: (/^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String(x.photo || '')) ? String(x.photo).slice(0, 400) : '') || prev.photo || '',
     prix: prix || prev.prix || null,
     statut: String(x.statut || '').slice(0, 40) || prev.statut || '',
-    compte: compte || prev.compte || '' };
+    compte: compte || prev.compte || '',
+    // 5.410 (20 nov.) — DEPUIS QUAND L'ARTICLE EST EN LIGNE (`dateMiseVc`) :
+    //  · `misEnLigne` : la date LUE chez Vestiaire (`listingDate` de « Mes articles », mesurée le 20 nov.) — EXACTE ;
+    //  · `vueDepuis`  : la PREMIÈRE lecture de l'article par l'extension, jamais avancée ensuite — une BORNE BASSE
+    //    (« vue en ligne depuis au moins le … »), jamais présentée comme la date de mise en ligne.
+    ...dateMiseVcFiche(x, prev, maintenant),
+    negos: negosVcFiche(x.negos) || prev.negos || null };
+}
+// La date d'un article Vestiaire : exacte si Vestiaire la dit, sinon « au moins » depuis la 1re lecture.
+function dateMiseVcFiche(x, prev, maintenant) {
+  const lue = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String((x && x.misEnLigne) || '')) && Number.isFinite(Date.parse(x.misEnLigne)) && Date.parse(x.misEnLigne) <= Date.now() + 864e5 ? String(x.misEnLigne).slice(0, 30) : '';
+  const avant = /^\d{4}-\d{2}-\d{2}T/.test(String((prev && prev.vueDepuis) || '')) ? String(prev.vueDepuis) : '';
+  return { misEnLigne: lue || (prev && prev.misEnLigne) || '', vueDepuis: avant && avant < maintenant ? avant : maintenant };
+}
+function negosVcFiche(n) {
+  if (!n || typeof n !== 'object') return null;
+  const e = (v) => (Number.isInteger(v) && v >= 0 && v < 100000 ? v : null);
+  const r = { total: e(n.total), enCours: e(n.enCours), aToi: e(n.aToi) };
+  return r.total == null && r.enCours == null && r.aToi == null ? null : r;
+}
+// Le « depuis » d'une baisse par règle : la date EXACTE si Vestiaire l'a dite, sinon la BORNE BASSE (1re lecture) —
+// l'article est en ligne depuis AU MOINS cette date : la règle ne baisse jamais plus tôt qu'elle ne le ferait en
+// connaissant la vraie date. Rien de lu ⇒ null (aucune baisse).
+function depuisAnnonceVc(it) {
+  const m = Date.parse(String((it && it.misEnLigne) || ''));
+  if (Number.isFinite(m) && m > 0) return { t: m, exacte: true };
+  const v = Date.parse(String((it && it.vueDepuis) || ''));
+  return Number.isFinite(v) && v > 0 ? { t: v, exacte: false } : null;
 }
 // ── 5.315 — « TOUT VESTIAIRE, GARDÉ TEL QUEL » : RETIRÉ EN 5.323 ─────────────
 // `rangerVcBrut` / `rangerVcPdf` rangeaient la réponse entière de chaque appel
@@ -28000,7 +31337,10 @@ const VC_AIMES = 'vrmVcAimes';
 const VC_AIMES_FAITS = 'vrmVcAimesFaits';
 const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
 const VC_AIMES_PAR_TOUCHER = 10;
-const VC_AIMES_ECART_S = [8, 20];   // l'écart entre deux offres, en secondes (le même que l'offre → message des favoris Vinted)
+// (20 nov., 5.410) ALIGNÉ sur le rythme des favoris Vinted du 19 nov. (« on garde toujours le temps aléatoire » :
+// 40 à 90 s au hasard entre deux messages, `delaiRythme` de api/_lib/favoris-file.js) — était 8–20 s (l'attente
+// offre → message d'UN favori, pas l'écart entre deux personnes).
+const VC_AIMES_ECART_S = [40, 90];   // l'écart entre deux offres, en secondes
 let _vcAimesChaine = Promise.resolve();
 function rangerVcAimes(m, compte) {
   const run = _vcAimesChaine.then(() => rangerVcAimesMaintenant(m, compte)).catch(() => false);
@@ -28406,11 +31746,19 @@ async function rangerLbcFilMaintenant(m, compte, deVrm) {
     ...(deVrm === true ? { envoyeParVrm: true } : {}) })).filter((x) => x.t);
   const { liste, change } = fusionMessagesVc(cur && cur.messages, neufs);
   const compteFil = (cur && cur.compte) || compte || '';
-  if (cur && !change && (cur.compte || '') === compteFil) return true;
   const garde = liste.slice(-LBC_FIL_MAX);
   const dernier = garde[garde.length - 1] || null;
   const now = new Date().toISOString();
+  // 5.410 (20 nov.) — LES INTÉRESSÉS : l'annonce dont la conversation parle (`conversationContext.itemId`, lue par la
+  // page ; un fil ne change jamais d'annonce) et ce que la PERSONNE a écrit (combien, la 1re fois) — jamais qui.
+  const annonceLue = /^\d{6,12}$/.test(String((m && m.annonce) || '')) ? String(m.annonce) : '';
+  const annonceFil = (cur && /^\d{6,12}$/.test(String(cur.annonce || '')) ? String(cur.annonce) : '') || annonceLue;
+  const deLui = garde.filter((x) => x.deMoi === false);
+  const premierDeLui = deLui.map((x) => x.at).filter(Boolean).sort()[0] || '';
+  const changeAnnonce = !!(annonceLue && !(cur && cur.annonce));
+  if (cur && !change && !changeAnnonce && (cur.compte || '') === compteFil) return true;
   const data = { v: 1, conv, compte: compteFil, messages: garde, n: garde.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? coupeVc(dernier.t, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
+    annonce: annonceFil, deLuiN: deLui.length, premierDeLuiAt: premierDeLui,
     page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
@@ -28461,7 +31809,10 @@ async function pauseLbcMsg() {
 async function poserPauseLbcMsg(statut) {
   try { await chrome.storage.local.set({ [LBC_PAUSE_MSG]: { jusqua: Date.now() + LBC_PAUSE_MSG_MS, statut: Number(statut) || 0, depuis: Date.now() } }); } catch (_) {}
 }
-async function repondreLeboncoin(msg) {
+async function repondreLeboncoin(msg, opts = {}) {
+  // 5.410 : `opts.serie` — un message d'une SÉRIE « Écrire aux intéressés » (son toucher l'a lancée) : la sécurité du
+  // compte en mode série (sorte « favori »), et la réserve de 5 gestes gardée à ses clics (45/h), comme les favoris.
+  const serie = !!(opts && opts.serie);
   const conv = String((msg && msg.conv) || '');
   const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
   if (!ID_CONV_LBC.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
@@ -28489,11 +31840,13 @@ async function repondreLeboncoin(msg) {
     // 19 nov. (5.409, audit-actions-gardees) : la réponse Leboncoin passait le plafond (50/h) mais PAS la
     // sécurité du compte (anti-robot, « Tout arrêter », repos, plafonds du jour) — comme Vestiaire, désormais.
     { const rbR = await secuRobotDit('leboncoin', compte); if (rbR) return { accepte: false, code: rbR.code, raison: rbR.error }; }
-    const secuR = await secuGeste('leboncoin', compte, 'reponse', 'clic');
+    if (serie && opts.compte && idCompteLbc(opts.compte) !== compte) return { accepte: false, code: 'autre-compte', raison: "cette conversation n'est pas sur le compte de la série — rien n'est parti" };
+    const secuR = await secuGeste('leboncoin', compte, serie ? 'favori' : 'reponse', serie ? 'serie' : 'clic');
     if (secuR) return { accepte: false, code: secuR.code, raison: secuR.error };
-    const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
+    const plafondR = serie ? ACTIONS_MAX_HEURE - RESERVE_GESTES : ACTIONS_MAX_HEURE;
+    const cpt = await compterAction('lbc:' + compte, plafondR);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
-    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
+    if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${plafondR} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
     let rep = null;
     try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcRepondre', conv, texte, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
@@ -28520,6 +31873,203 @@ async function repondreLeboncoin(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a répondu ${statut} — le message n'est pas parti` };
   } finally { LBC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LEBONCOIN : LES INTÉRESSÉS D'UNE ANNONCE, ET LEUR ÉCRIRE (20 nov., 5.410, lot lbc-vc-interesses)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien (20 nov.) : « regarde tout ce que tu peux faire, parce qu'on reçoit quand une personne est intéressée sur
+// Leboncoin ». MESURÉ (lecture seule, 20 nov., sa base) :
+//  · AUCUN e-mail Leboncoin « X est intéressé » n'arrive dans VRM (7 e-mails Leboncoin en tout, tous du 21 oct. :
+//    suppression, nouvel appareil, « boostez », « N annonces ont besoin de vous ») ;
+//  · Leboncoin ne dit QUI a mis une annonce en favori nulle part (statistiques = des NOMBRES ; `myfavorites` = SES
+//    favoris d'acheteur ; `followme` = ses abonnés, pas les favoris) — VRM n'écrit donc à AUCUN « favori » ;
+//  · la personne qui ÉCRIT est identifiée : la conversation (`…/hal/{moi}/conversations/{conv}/messages`) porte
+//    `conversationContext.itemId` (l'annonce) — lue depuis la 5.410 (`annonce` du fil, lbc-inject.js).
+// « Intéressé » = une conversation de CE compte, sur CETTE annonce, où la PERSONNE a écrit au moins une fois
+// (`deLuiN ≥ 1`). Une conversation où personne d'autre n'a écrit n'en est pas une ; une personne qui n'a jamais pris
+// contact n'est jamais contactée (elle n'est même pas identifiable). Jamais un nom : le fil ne garde que des textes.
+// Le bloc <interesses-lbc-regle> est le MÊME ici et dans src/interessesLbc.js (audit-lbc-vc-interesses).
+// <interesses-lbc-regle>
+const INTERESSES_PAR_TOUCHER = 10;
+const INTERESSES_ECART_S = [40, 90];       // l'écart entre deux messages : le rythme des favoris (19 nov., « on garde toujours le temps aléatoire »)
+const INTERESSES_TEXTES_MAX = 5;
+// Les intéressés d'une annonce (ou de toutes) d'UN compte : une ligne par conversation où la personne a écrit, la
+// plus récente d'abord. `fils` : [{ conv, compte, annonce, deLuiN, premierDeLuiAt, dernierAt, dernierDeMoi }].
+function interessesLbcDe(fils, { compte = '', annonce = '' } = {}) {
+  const out = [];
+  for (const f of Array.isArray(fils) ? fils : []) {
+    if (!f || typeof f !== 'object') continue;
+    const conv = String(f.conv == null ? '' : f.conv);
+    const a = String(f.annonce == null ? '' : f.annonce);
+    if (!/^[\w-]{3,64}$/.test(conv) || !/^\d{6,12}$/.test(a)) continue;          // l'annonce pas lue : pas un intéressé de CETTE annonce
+    if (compte && String(f.compte || '') !== String(compte)) continue;           // jamais un autre compte
+    if (annonce && a !== String(annonce)) continue;
+    const n = Number(f.deLuiN);
+    if (!(Number.isInteger(n) && n >= 1)) continue;                              // la personne n'a jamais écrit : pas un intéressé
+    const dm = f.dernierDeMoi === true || f.dernierDeMoi === 'true' ? true : f.dernierDeMoi === false || f.dernierDeMoi === 'false' ? false : null;
+    out.push({ conv, annonce: a, compte: String(f.compte || ''), messagesDeLui: n, depuis: String(f.premierDeLuiAt || ''), dernierAt: String(f.dernierAt || ''), attendTaReponse: dm === false, canal: 'message' });
+  }
+  return out.sort((x, y) => (y.dernierAt || '').localeCompare(x.dernierAt || ''));
+}
+// Les textes d'une série : 1 à 5, non vides, 2 000 caractères au plus — sinon null (rien ne part).
+function textesInteresses(textes) {
+  const l = (Array.isArray(textes) ? textes : []).map((t) => (typeof t === 'string' ? t.replace(/\r\n?/g, '\n').trim() : '')).filter(Boolean);
+  if (!l.length || l.length > INTERESSES_TEXTES_MAX || l.some((t) => t.length > 2000)) return null;
+  return l;
+}
+// </interesses-lbc-regle>
+const LBC_INTERESSES_FILE = 'vrmLbcInteressesFile';
+const LBC_INTERESSES_FAITS = 'vrmLbcInteressesFaits';
+const LBC_INTERESSES_ECART_DERNIER = 'vrmLbcInteressesEcartDernier';
+let _lbcInteressesIci = false;
+const attendreLbc = (ms) => new Promise((r) => setTimeout(r, ms));
+async function lireFileInteressesLbc() { try { const v = (await chrome.storage.local.get(LBC_INTERESSES_FILE))[LBC_INTERESSES_FILE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return undefined; } }
+async function poserFileInteressesLbc(f) { try { if (f) await chrome.storage.local.set({ [LBC_INTERESSES_FILE]: f }); else await chrome.storage.local.remove(LBC_INTERESSES_FILE); return true; } catch (_) { return false; } }
+// Le compte Leboncoin de l'onglet du panneau (identité privée de CET onglet) — ou ''.
+async function compteOngletLbc(tabId) {
+  if (tabId == null) return '';
+  try { const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tabId]; return c && c.source === 'prive' && !c.ambigue && c.compte ? idCompteLbc(c.compte) : ''; } catch (_) { return ''; }
+}
+// Les fils du compte (scalaires seulement, jamais les messages : §4.4).
+async function filsLbcDuCompte(compte) {
+  const rows = await sbGetTout(`app_data?id=like.lbc_fil_*&select=conv:meta->>conv,compte:meta->>compte,annonce:meta->>annonce,deLuiN:meta->>deLuiN,premierDeLuiAt:meta->>premierDeLuiAt,dernierAt:meta->>dernierAt,dernierDeMoi:meta->>dernierDeMoi`);
+  if (!Array.isArray(rows)) return null;
+  return rows.map((r) => Object.assign({}, r, { deLuiN: r && r.deLuiN != null ? Number(r.deLuiN) : 0 })).filter((r) => idCompteLbc(r.compte || '') === compte);
+}
+// LECTURE pour le panneau (aucune requête vers Leboncoin, rien dans le plafond) : les intéressés du compte de
+// l'onglet, par annonce, avec ce que VRM leur a déjà écrit, la série en cours, et si l'envoi est appris.
+async function interessesLbcPanneau(msg, sender) {
+  let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+  if (!/(^|\.)leboncoin\.fr$/i.test(dom)) return { ok: false, code: 'site', raison: 'ouvre leboncoin.fr' };
+  const compte = await compteOngletLbc(sender.tab.id);
+  if (!compte) return { ok: false, code: 'compte', raison: "connecte-toi sur Leboncoin dans cet onglet : VRM ne sait pas sur quel compte tu es" };
+  const fils = await filsLbcDuCompte(compte);
+  if (fils === null) return { ok: false, code: 'lecture', raison: "la base VRM n'a pas répondu" };
+  let faits = {}, rec = null, file = null;
+  try { const o = await chrome.storage.local.get([LBC_INTERESSES_FAITS, LBC_RECETTE, LBC_INTERESSES_FILE]); faits = o[LBC_INTERESSES_FAITS] || {}; rec = o[LBC_RECETTE] || null; file = o[LBC_INTERESSES_FILE] || null; } catch (_) {}
+  const liste = interessesLbcDe(fils, { compte, annonce: /^\d{6,12}$/.test(String((msg && msg.annonce) || '')) ? String(msg.annonce) : '' })
+    .map((x) => Object.assign(x, { dejaEcrit: !!faits[x.annonce + '|' + x.conv] }));
+  const parAnnonce = {};
+  for (const x of liste) { const e = parAnnonce[x.annonce] = parAnnonce[x.annonce] || { annonce: x.annonce, n: 0, aEcrire: 0, attendent: 0, dernierAt: '' }; e.n++; if (!x.dejaEcrit) e.aEcrire++; if (x.attendTaReponse) e.attendent++; if (x.dernierAt > e.dernierAt) e.dernierAt = x.dernierAt; }
+  const sansAnnonce = fils.filter((f) => Number(f.deLuiN) >= 1 && !/^\d{6,12}$/.test(String(f.annonce || ''))).length;
+  return { ok: true, compte, liste, annonces: Object.values(parAnnonce), sansAnnonce, appris: !!(rec && rec.recette && rec.recette.rejouable === true),
+    serie: file && file.suivi ? Object.assign({}, file.suivi, { reste: Array.isArray(file.reste) ? file.reste.length : 0 }) : null, parToucher: INTERESSES_PAR_TOUCHER, ecartS: INTERESSES_ECART_S.slice() };
+}
+// Un « non » avant un message de la série : la raison dite, sinon ''.
+async function arretAvantMessageLbc(compte) {
+  try { if ((await toutArreteDepuis(null)) > 0) return phraseArret('tout'); } catch (_) {}
+  try { const sa = await secuLire(); if (sa && secuArretEffectif(sa.evts).arrete) return phraseArret('tout'); } catch (_) {}
+  const rb = await secuRobotDit('leboncoin', compte); if (rb) return rb.error;
+  const pz = await pauseLbcMsg(); if (pz) return `Leboncoin a demandé de ralentir (${pz.statut || 'refus'}) — rien n'est parti`;
+  const o = await ongletLbcDuCompte(compte);
+  if (!o.ok) return o.raison || (o.autres && o.autres.length ? "Leboncoin est passé sur un autre compte dans ce Chrome — la suite n'est pas partie" : "l'onglet leboncoin.fr de ce compte est fermé — la suite n'est pas partie");
+  return '';
+}
+async function tenirAttenteLbc(compte, jusqua) {
+  for (;;) {
+    const non = await arretAvantMessageLbc(compte);
+    if (non) return { ok: false, raison: non };
+    const r = Number(jusqua) - Date.now();
+    if (!(r > 0)) return { ok: true };
+    await attendreLbc(Math.min(FAVORI_ATTENTE_TRANCHE_MS, r));
+  }
+}
+// ÉCRIRE AUX INTÉRESSÉS, SUR SON TOUCHER (panneau de l'extension, onglet leboncoin.fr, récapitulatif confirmé) :
+// `{ annonce, convs: [conv…], textes: [1 à 5 variantes], confirme: true }`. Chaque conversation doit être un
+// intéressé de CETTE annonce, sur le compte de CET onglet (sinon RIEN ne part, dit) ; une personne n'est écrite
+// qu'UNE fois par annonce (posé avant l'envoi) ; 10 par toucher ; puis une à la fois : Tout arrêter, anti-robot,
+// pause 429/403, onglet du compte, porte des favoris (`lbc:{id}`, 15/h, un compte à la fois, série), sécurité du
+// compte (série), 45/h ; 40 à 90 s au hasard entre deux, jamais deux fois de suite le même ; un texte jamais
+// deux fois de suite le même (`texteJamaisRepete`). Un refus arrête tout.
+async function ecrireInteressesLbc(msg, sender) {
+  let dom = ''; try { dom = new URL(sender && sender.tab && sender.tab.url).hostname; } catch (_) {}
+  if (!/(^|\.)leboncoin\.fr$/i.test(dom) || (sender && sender.frameId > 0)) return { accepte: false, code: 'site', raison: 'depuis le panneau de VRM sur leboncoin.fr seulement' };
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'confirme le récapitulatif d’abord — rien n’est parti' };
+  const annonce = String(msg.annonce || '');
+  if (!/^\d{6,12}$/.test(annonce)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
+  const textes = textesInteresses(msg.textes);
+  if (!textes) return { accepte: false, code: 'invalide', raison: `1 à ${INTERESSES_TEXTES_MAX} messages, 2 000 caractères au plus chacun` };
+  const voulues = [...new Set((Array.isArray(msg.convs) ? msg.convs : []).map(String))];
+  if (!voulues.length) return { accepte: false, code: 'invalide', raison: 'choisis au moins une personne' };
+  if (_lbcInteressesIci || LBC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'un autre message Leboncoin part en ce moment — un à la fois' };
+  const enFile = await lireFileInteressesLbc();
+  if (enFile && Array.isArray(enFile.reste) && enFile.reste.length) return { accepte: false, code: 'en-cours', raison: 'une série de messages Leboncoin est déjà en cours — une à la fois' };
+  if (await sansSessionPourEcrire()) return { accepte: false, code: 'sans-session', raison: 'Connecte d’abord l’extension à VRM.' };
+  const compte = await compteOngletLbc(sender.tab.id);
+  if (!compte) return { accepte: false, code: 'compte', raison: "connecte-toi sur Leboncoin dans cet onglet : VRM ne sait pas sur quel compte tu es — rien n'est parti" };
+  const pause = await pauseLbcMsg();
+  if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti` };
+  let rec = null, faits = {};
+  try { const o = await chrome.storage.local.get([LBC_RECETTE, LBC_INTERESSES_FAITS]); rec = o[LBC_RECETTE] || null; faits = o[LBC_INTERESSES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: RAISON_STOCKAGE }; }
+  if (!(rec && rec.recette)) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin envoie un message — réponds UNE fois toi-même à une conversation sur leboncoin.fr, dans ce Chrome : VRM apprendra" };
+  if (rec.recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin envoie un message n'est pas encore sûre à refaire (${rec.recette.raison || 'forme inconnue'}) — rien n'est parti` };
+  const fils = await filsLbcDuCompte(compte);
+  if (fils === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+  const eligibles = new Set(interessesLbcDe(fils, { compte, annonce }).map((x) => x.conv));
+  const horsListe = voulues.filter((c) => !eligibles.has(c));
+  // ⚠️ Jamais une personne qui n'a pas pris contact sur CETTE annonce, ni une conversation d'un autre compte.
+  if (horsListe.length) return { accepte: false, code: 'pas-interesse', n: horsListe.length, raison: `${horsListe.length === 1 ? 'une personne choisie n’a' : horsListe.length + ' personnes choisies n’ont'} pas écrit pour cette annonce sur ce compte — VRM n’écrit qu’aux personnes qui t’ont écrit ; rien n’est parti` };
+  const aEcrire = voulues.filter((c) => !faits[annonce + '|' + c]);
+  if (!aEcrire.length) return { accepte: false, code: 'personne', raison: "VRM a déjà écrit à ces personnes pour cette annonce — rien n'est reparti" };
+  { const p = await porteDiscretion('lbc:' + compte, 'favori'); if (p) return { accepte: false, code: p.code, raison: p.error, attendreMs: p.attendreMs || 0 }; }
+  const o = await ongletLbcDuCompte(compte);
+  if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "l'onglet leboncoin.fr de ce compte n'est plus là — rien n'est parti" };
+  const lot = aEcrire.slice(0, INTERESSES_PAR_TOUCHER);
+  const suivi = { annonce, at: new Date().toISOString(), n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
+  if (!(await poserFileInteressesLbc({ annonce, compte, textes, reste: lot, prochain: Date.now(), recents: [], suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+  deroulerInteressesLbc().catch(() => {});
+  return { accepte: true, etape: 'encours', n: lot.length, reste: aEcrire.length - lot.length };
+}
+async function deroulerInteressesLbc() {
+  if (_lbcInteressesIci) return 0;
+  _lbcInteressesIci = true;
+  let f = null, n = 0;
+  const finir = async (fin, raison) => { if (!f) return; f.suivi.fin = fin; if (raison) f.suivi.raison = String(raison).slice(0, 300); f.reste = []; await poserFileInteressesLbc(Object.assign({}, f, { fini: Date.now() })); };
+  try {
+    for (;;) {
+      f = await lireFileInteressesLbc();
+      if (!f || !Array.isArray(f.reste) || !f.suivi || !/^\d{6,12}$/.test(String(f.annonce || '')) || !/^[0-9a-z_-]{1,64}$/i.test(String(f.compte || ''))) { f = null; break; }
+      if (!f.reste.length) { if (!f.suivi.fin) await finir('fini', ''); break; }
+      if (Date.now() > Number(f.prochain) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('arret', "l'extension s'était arrêtée trop longtemps — la suite n'est pas partie"); break; }
+      const compte = String(f.compte), annonce = String(f.annonce), conv = String(f.reste[0]);
+      const att = await tenirAttenteLbc(compte, f.prochain);
+      if (!att.ok) { await finir('arret', att.raison); break; }
+      // Revérifié AVANT chaque message : toujours un intéressé de cette annonce, sur ce compte.
+      const fils = await filsLbcDuCompte(compte);
+      if (fils === null) { await finir('arret', "la base VRM n'a pas répondu — la suite n'est pas partie"); break; }
+      if (!interessesLbcDe(fils, { compte, annonce }).some((x) => x.conv === conv)) { f.reste = f.reste.slice(1); await poserFileInteressesLbc(f); continue; }
+      const p = await porteDiscretion('lbc:' + compte, 'favori');
+      if (p) { await finir('arret', p.error); break; }
+      // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas).
+      const noter = async (etat) => { try { const o = await chrome.storage.local.get(LBC_INTERESSES_FAITS); const fa = o[LBC_INTERESSES_FAITS] || {}; if (etat) fa[annonce + '|' + conv] = { at: new Date().toISOString(), etat }; else delete fa[annonce + '|' + conv]; const cles = Object.keys(fa); if (cles.length > 2000) for (const k of cles.sort((a, b) => String(fa[a].at).localeCompare(String(fa[b].at))).slice(0, cles.length - 2000)) delete fa[k]; await chrome.storage.local.set({ [LBC_INTERESSES_FAITS]: fa }); return true; } catch (_) { return false; } };
+      if (!(await noter('envoi'))) { await finir('arret', RAISON_STOCKAGE); break; }
+      // Le texte : la variante suivante, jamais deux fois de suite le même mot pour mot.
+      const brut = f.textes[(Number(f.suivi.faites) + Number(f.suivi.incertaines)) % f.textes.length];
+      const texte = texteJamaisRepete(brut, '', f.recents || []) || null;
+      if (!texte) { await noter(null); await finir('arret', "toutes les variantes ont déjà servi juste avant — ajoute un autre message"); break; }
+      f.reste = f.reste.slice(1);
+      const s = await tirerSansRepeter(LBC_INTERESSES_ECART_DERNIER, INTERESSES_ECART_S[0], INTERESSES_ECART_S[1]);
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['lbcinteresses:ecart', s * 1000]); } catch (_) {}
+      f.prochain = Date.now() + s * 1000;
+      f.recents = [...(f.recents || []), empreinteMessage(texte)].slice(-3);
+      await poserFileInteressesLbc(f);
+      const r = await repondreLeboncoin({ conv, texte }, { serie: true, compte });
+      if (r && r.accepte === true && r.etape === 'fait') { await noter('faite'); f.suivi.faites++; n++; await noterGesteAuto('lbc:' + compte, 'favori'); await noterJournal('lbc:' + compte, 'favori', {}); }
+      else if (r && r.accepte === true && r.etape === 'incertain') { await noter('incertaine'); f.suivi.incertaines++; await finir('arret', r.raison || 'je ne sais pas si le message est parti — regarde la conversation sur Leboncoin'); break; }
+      else { await noter(r && r.accepte === true ? 'refusee' : null); await finir('arret', (r && r.raison) || 'refusé'); break; }
+      await poserFileInteressesLbc(f);
+    }
+  } catch (_) { try { await finir('arret', 'interrompu'); } catch (_e) {} }
+  finally { _lbcInteressesIci = false; }
+  return n;
+}
+// Le réveil `vrm-offres` (1 min) : une série que personne ne tient plus (worker endormi puis réveillé).
+async function reprendreInteressesLbc() {
+  if (_lbcInteressesIci || LBC_REPONSE_EN_VOL) return 0;
+  const f = await lireFileInteressesLbc();
+  if (!f || !Array.isArray(f.reste) || !f.reste.length) return 0;
+  return deroulerInteressesLbc();
 }
 
 async function buildLbcData() {
@@ -29400,10 +32950,21 @@ async function noterSuppressionLbc(id, statut) {
     } catch (_) { return false; }
   });
 }
+// 5.410 : « Supprimer » depuis le tableau Articles du panneau sur leboncoin.fr — UNE annonce, sur SON toucher, après
+// la confirmation « sans retour » (`sansRetour`) ; le même chemin que l'app d'avant (`supprimeLbcDepuisApp`).
+async function supprimerLbcCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'leboncoin') return { accepte: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet leboncoin.fr.' };
+  return supprimeLbcDepuisApp({ id: String(msg && msg.id || ''), numero: msg && msg.numero, titre: msg && msg.titre, confirme: msg && msg.confirme === true, sansRetour: msg && msg.sansRetour === true });
+}
 async function supprimeLbcDepuisApp(msg) {
   const id = String((msg && msg.id) || '');
   if (!/^\d{6,12}$/.test(id)) return { accepte: false, code: 'invalide', raison: 'annonce inconnue' };
   if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: "la suppression n'a pas été confirmée — rien n'est parti" };
+  // 5.410 — LA CONFIRMATION « SANS RETOUR » (retirée de l'app avec le geste) : la même phrase que l'app
+  //    (`GARDES_APP.confirmationSupprimerLbc`, recopiée) ; sans `sansRetour` (son toucher sur « Oui, supprimer de
+  //    Leboncoin » après l'avoir lue), rien ne part.
+  if (msg.sansRetour !== true) return { accepte: false, code: 'sans-retour', confirmation: GARDES_APP.confirmationSupprimerLbc([{ id, numero: msg.numero || '', titre: msg.titre || '' }]), raison: 'Supprimer de Leboncoin est sans retour : confirme d’abord — rien n’est parti.' };
   if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre action sur Leboncoin est en cours — une à la fois' };
   PAUSE_LBC_EN_VOL = true;
   let ouvert = null;

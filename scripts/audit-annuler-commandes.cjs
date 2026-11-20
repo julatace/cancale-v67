@@ -78,7 +78,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   // D. Gardées : extérieures ou irréversibles
   const ebay = sans(lire('src/ecrans/Ebay.jsx')), rep = sans(lire('src/ecrans/Republier.jsx'));
   const gardees = [
-    ['Supprimer de Leboncoin', /title: l\.length > 1 \? `Supprimer \$\{l\.length\} annonces de Leboncoin \?`/.test(A)],
+    // (20 nov., décision de Julien) Supprimer de Leboncoin et accepter une offre se font dans le PANNEAU de l'extension, qui
+    // demande sa confirmation : l'app n'ouvre que le lien (audit-actions-app : elle n'envoie rien).
+    ['Supprimer de Leboncoin (dans l’extension)', /ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids, action: 'supprimer' \}\)/.test(A)],
     // (11 nov., Julien : « inadmissible », 087bcf86) plus de confirmation « N sur M contrôlés » à chaque impression ;
     // reste la confirmation de tamponner un bordereau DÉJÀ téléchargé (un carton tamponné ne se défait pas).
     ['Tamponner un bordereau téléchargé', /askConfirm\(\{ title: `Tamponner le bordereau téléchargé il y a \$\{mins\} min \?`/.test(A)],
@@ -87,7 +89,7 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
     // (14 nov., impression-simple) « Imprimer » : un PDF préparé ne sert que si sa signature (N°, état, compte de chaque
     // bordereau) est LA MÊME au toucher ; après une attente, chaque ligne est recomparée — sinon rien ne s'ouvre.
     ['Lot changé refusé avant impression', /const sigImpr = \(lignes, format, tampons\) =>/.test(A) && /const maintenant = new Map\(lignesLot(?:Tous|Impression)\(\)\.map\(\(l\) => \[l\.cle, sigLigneLot\(l\)\]\)\);\s*if \(choisies\.some\(\(l\) => maintenant\.get\(l\.cle\) !== sigLigneLot\(l\)\)\) throw new Error\([^;]*\);/.test(A) && !/askConfirm\(\{title:'Vérifier les articles avant impression'/.test(A)],
-    ['Accepter une offre Vinted', /askConfirm\(\{ title: `Accepter \$\{fmtE\(off\.prix\)\} \?`/.test(A)],
+    ['Accepter une offre Vinted (dans l’extension)', /<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres"/.test(A)],
     ['Acceptation auto des offres', /askConfirm\(\{ title: 'Accepter les offres tout seul sur Vinted \?'/.test(A)],
     ['Supprimer une annonce eBay', /askConfirm\(\{title:'Supprimer cette annonce d’eBay \?'/.test(ebay)],
     ['Mettre un brouillon en ligne (Vinted)', /askConfirm\(\{ title: 'Mettre ce brouillon en ligne \?'/.test(rep)],

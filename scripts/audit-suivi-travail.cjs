@@ -166,14 +166,11 @@ async function principal() {
 
   // ── B (branchements, commentaires retirés)
   const sansCom = (t0) => t0.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  // (20 nov., décision de Julien) Republier / publier sur Leboncoin, publier sur Vestiaire, baisse en série et mode vacances se font
+  // dans le PANNEAU de l'extension (qui suit son travail) : leurs feuilles de suivi de l'app sont retirées avec les ateliers.
   const BR = [
     ['src/ecrans/Republier.jsx', /suivi\.demarrer\(\{ sorte: `republier-/],
-    ['src/ecrans/Leboncoin.jsx', /suivi\.demarrer\(\{ sorte: 'republier-lbc'/],
-    ['src/ecrans/Leboncoin.jsx', /suivrePublicationSite\(\{ sorte: 'publier-lbc'/],
     ['src/ecrans/Ebay.jsx', /suivi\.demarrer\(\{ sorte: 'publier-ebay'/],
-    ['src/ecrans/Vestiaire.jsx', /suivi\.demarrer\(\{ sorte: auto \? 'publier-vc'/],
-    ['src/BaissePrixSerie.jsx', /suivi\.demarrer\(\{ sorte: 'baisse-prix'/],
-    ['src/ModeVacances.jsx', /suivi\.demarrer\(\{ sorte: 'vacances'/],
     // (15 nov.) Le retrait ailleurs a sa sorte propre (« retirer-annonces », src/ARetirerAilleurs +
     // journalRA) : l'ancienne « retirer-ailleurs » ouvrait la feuille du geste colis.retire (« Colis
     // noté retiré », faux). L'impression simple (version studio) suit par l'accompagnement du geste
@@ -221,7 +218,7 @@ function prouver() {
   let rouges = 0;
   for (const [nom, f, avant, apres] of MUT) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'suivi-mut-'));
-    for (const g of ['src/composants/SelectionSerie.jsx', 'src/suiviTravail.js', 'src/ecrans/Republier.jsx', 'src/ecrans/Leboncoin.jsx', 'src/ecrans/Ebay.jsx', 'src/ecrans/Vestiaire.jsx', 'src/BaissePrixSerie.jsx', 'src/ModeVacances.jsx', 'src/App.jsx', 'src/composants/SuiviTravail.jsx']) {
+    for (const g of ['src/composants/SelectionSerie.jsx', 'src/suiviTravail.js', 'src/ecrans/Republier.jsx', 'src/ecrans/Leboncoin.jsx', 'src/ecrans/Ebay.jsx', 'src/ecrans/Vestiaire.jsx', 'src/App.jsx', 'src/composants/SuiviTravail.jsx']) {
       fs.mkdirSync(path.dirname(path.join(d, g)), { recursive: true }); fs.copyFileSync(path.join(base, g), path.join(d, g));
     }
     fs.writeFileSync(path.join(d, 'package.json'), '{"type":"module"}');

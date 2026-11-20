@@ -33,6 +33,7 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 
 // Les écrans migrés : [fichier, fonctions (ou constantes) dont le texte passe par tr()].
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
+// (20 nov.) BaissePrixVestiaire, FavorisEtapes, FavorisSansVente retirés : leurs gestes se font dans l'extension (audit-actions-app).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/RelierMaBoite.jsx', ['*']],   // (19 nov., emails-mail) « Relier ma boîte » accompagné
@@ -68,7 +69,6 @@ const MIGRES = [
   // (11 nov., lot vestiaire-plus) Vestiaire : le parcours, les photos exigées, la baisse de prix, les offres.
   ['src/ParcoursVestiaire.jsx', ['*']],
   ['src/PhotosVestiaire.jsx', ['*']],
-  ['src/BaissePrixVestiaire.jsx', ['*']],
   ['src/OffresVestiaire.jsx', ['*']],
   ['src/composants/SuiviTravail.jsx', ['*']],   // (11 nov., lot suivi-travail)
   ['src/MainsLibres.jsx', ['*']],   // (14 nov., lot colis-plus 100) mains libres
@@ -77,8 +77,6 @@ const MIGRES = [
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
   ['src/AtelierArrivee.jsx', ['*']],   // (15 nov.) l'atelier « achat arrivé → en ligne »
-  ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
-  ['src/FavorisSansVente.jsx', ['*']],   // (13 nov., lot 31) très aimées, pas vendues
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».
   ['src/OffresAuto.jsx', ['*']],
   ['src/PrixMiniManquants.jsx', ['*']],
