@@ -372,6 +372,10 @@
     border-bottom: .5px solid var(--n-trait); opacity: 0; transition: opacity var(--n-duree) ease-out;
   }
   .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
+  /* (20 nov., capture de Julien : des rangées visibles au-dessus et derrière l'en-tête) Dès que du contenu passe dessous, la barre
+     est OPAQUE et son fond monte jusqu'au bord haut de l'écran (une marge du défileur laissait voir les rangées au-dessus). */
+  .n-barre-titre[data-n-fond]::before { background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .n-barre-titre[data-n-fond]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 64px; background: var(--n-fond); pointer-events: none; }
   .n-barre-gauche { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }
   .n-barre-droite { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
   .n-barre-centre {

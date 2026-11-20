@@ -127,7 +127,9 @@ function useTitreReduit(refBarre, refTitre) {
       const marge = cible && !cible.classList.contains('n-grand-titre') ? 48 : 0;
       const reduit = !!cible && cible.getBoundingClientRect().bottom <= bas - marge;
       const defileur = barre.closest('.n-coque-ecran, .n-poussee, .n-feuille-corps');
-      const haut = defileur && defileur.scrollHeight > defileur.clientHeight + 1 ? defileur.scrollTop : (window.scrollY || 0);
+      // (20 nov.) À l'ordinateur, c'est parfois un ancêtre plus haut qui défile (`.vrm-main`) : le premier ancêtre défilé compte.
+      let haut = defileur && defileur.scrollHeight > defileur.clientHeight + 1 ? defileur.scrollTop : (window.scrollY || 0);
+      if (!haut) { for (let e = barre.parentElement; e && e !== document.body; e = e.parentElement) if (e.scrollTop > 0) { haut = e.scrollTop; break; } }
       const fond = reduit || haut > 0 || (!!cible && cible.getBoundingClientRect().top < bas - 1);
       if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
       if (fond) barre.setAttribute('data-n-fond', ''); else barre.removeAttribute('data-n-fond');
