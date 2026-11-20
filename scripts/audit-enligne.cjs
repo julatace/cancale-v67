@@ -268,9 +268,15 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     if (u === '222') return Array.from({ length: 150 }, (_, i) => art(500000 + i, i === 3 ? { is_closed: true, item_closing_action: 'sold' } : {}));
     return [art(Number(u) * 100 + 7, { title: 'Republiée ' + u })];
   };
+  // (20 nov., chasse-bugs) 5.409 : le suivi des achats (`suivi`, ≤ 3) est devenu un lecteur PRIORITAIRE ; « pas su » ⇒ sa
+  // réserve entière, et la relecture n'avait plus que 4 lectures sur 20 : un dressing de 150 (3 lectures) après deux
+  // petits ne passait plus — et les contrôles « rien n'est rangé » (D3…) passaient À VIDE, faute de budget. Le décor
+  // dit donc ce que la visite a noté : aucun achat à suivre (`suivi` reste 0). Le budget épuisé reste jugé (B2, store
+  // à lui), et la réserve du suivi « pas su » l'est en B1b.
+  const duesSuiviNul = () => ({ vrmLecturesDues: { '111': { suivi: { reste: 0, at: Date.now() } } } });
   const monter = (o = {}) => {
     const lignes = o.lignes || baseLignes();
-    const f = faireFond({ src: BG, lignes, connecte: '111', comptes: COMPTES, store: o.store || {}, lectureKO: o.lectureKO,
+    const f = faireFond({ src: BG, lignes, connecte: '111', comptes: COMPTES, store: o.store || duesSuiviNul(), lectureKO: o.lectureKO,
       vinted: (r) => {
         const w = /\/api\/v2\/wardrobe\/(\d+)\/items\?page=(\d+)&per_page=(\d+)/.exec(r.chemin);
         if (!w) return o.autre ? o.autre(r) : { status: 404, body: {} };
@@ -312,6 +318,14 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
     // Les lectures prioritaires (argent, colis) ne sont pas affamées.
     const g = await f.ctx.gardeLecture('111', COMPTES[0], 'argent');
     dit(g === null, 'après la lecture, l\'argent et les colis ont toujours du budget', JSON.stringify(g));
+  });
+
+  await essaie('B1b suivi pas su', async () => {
+    // Le suivi des achats n'a rien noté : sa réserve reste entière, la relecture s'arrête avant (jamais à sa place).
+    const f = monter({ store: {} });
+    await f.ctx.relireAnnoncesAutresComptes('111');
+    const lec = (f.store.vrmLectures || {})['111'] || [];
+    dit(lec.length <= 20 - 16, 'suivi « pas su » : la relecture laisse la réserve entière (argent, colis, suivi)', `${lec.length} lectures`);
   });
 
   await essaie('B2 budget', async () => {
@@ -498,7 +512,7 @@ console.log('── A. La règle « en ligne » : la même dans l\'app et dans l
   // L'onglet quitte Vinted pendant la relecture (il clique vers Leboncoin dans cet onglet).
   const ongletQuiPart = (o = {}) => {
     const onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }];
-    const f = faireFond({ src: BG, lignes: baseLignes(), connecte: '111', comptes: COMPTES, store: {}, onglets,
+    const f = faireFond({ src: BG, lignes: baseLignes(), connecte: '111', comptes: COMPTES, store: duesSuiviNul(), onglets,
       vinted: (r) => {
         const w = /\/api\/v2\/wardrobe\/(\d+)\/items\?page=(\d+)&per_page=(\d+)/.exec(r.chemin);
         if (!w) return { status: 404, body: {} };
