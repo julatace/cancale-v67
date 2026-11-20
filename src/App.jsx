@@ -20905,8 +20905,11 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     setHote(h.isConnected ? h : null);
     // Le titre peut arriver après (écran encore en lecture) : on attend qu'il soit là, puis on reste à côté de lui.
     const racine = document.querySelector('.n-coque') || document.body;
-    const mo = new MutationObserver(() => { if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); } });
-    mo.observe(racine, { childList: true, subtree: true });
+    const mo = new MutationObserver(() => {
+      if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); }
+      else if (titre && !titre.hasAttribute('data-avec-pastilles') && getComputedStyle(titre.parentElement).display.indexOf('flex') < 0) titre.setAttribute('data-avec-pastilles', '');
+    });
+    mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'class'] });
     return () => { mo.disconnect(); h.remove(); if (titre) titre.removeAttribute('data-avec-pastilles'); };
   }, [ordi]);
   const noeud = <Natif.SelecteurSite indisponible={indisponible} raison={raison} sites={relies} valeur={siteEffectif(brut, relies)} onChange={poser} nom={nomPlateforme}
