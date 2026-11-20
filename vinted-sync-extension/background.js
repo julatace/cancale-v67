@@ -12897,15 +12897,18 @@ function seuilOffreLu(v) {
   return isFinite(n) && n > 0 ? n : null;
 }
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde', 'vinted_offres_paliers']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde', 'vinted_offres_paliers', 'vinted_buyprice_by_num']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
   const nums = m.vinted_annonce_numeros || {};
-  const mins = {}, refuses = {};
+  const mins = {}, refuses = {}, achats = {};
   for (const k in nums) {
     // (5.342, P4) « 45,5 » (clavier français) se lit 45,5 comme à l'écran — avant : NaN, mini ignoré sans un mot.
     const n = seuilOffreLu(nums[k] && nums[k].min); if (n != null) mins[String(k)] = n;
     const rf = seuilOffreLu(nums[k] && nums[k].refuse); if (rf != null) refuses[String(k)] = rf;   // seuil de refus posé par LUI
+    // 5.410.4 : l'achat de CETTE fiche (posé sur la fiche, sinon sous SON N°) — pour le plancher absolu achat + 10 %.
+    const f0 = nums[k] || {}; const ac = seuilOffreLu(f0.buyPrice != null && String(f0.buyPrice).trim() !== '' ? f0.buyPrice : (f0.numero != null && m.vinted_buyprice_by_num ? m.vinted_buyprice_by_num[cleNum(f0.numero)] : null));
+    if (ac != null) achats[String(k)] = ac;
   }
   // Le message de refus est SON texte (jamais inventé) ; vide ⇒ on refuse sans écrire.
   const msgRefus = String(m.vinted_offre_refus_msg || '').trim();
@@ -12916,7 +12919,8 @@ async function offreAutoReglages() {
   // 5.409 : la négociation par paliers (son réglage, éteint par défaut ; les messages passent la même garde de mots).
   const paliers = reglagesPaliersExt(m.vinted_offres_paliers);
   paliers.messages = paliers.messages.filter((t) => !erreurMessageAutoExt(t));
-  return { actif, mins, refuses, msgRefus, refusVersions, garde, paliers };
+  for (const k of ['msgAccepte', 'msgContre', 'msgFinale']) paliers[k] = paliers[k].filter((t) => !erreurMessageAutoExt(t));
+  return { actif, mins, refuses, achats, msgRefus, refusVersions, garde, paliers };
 }
 // ══ 5.409 (19 nov.) — LA NÉGOCIATION PAR PALIERS, sans IA (copie de src/negociationPaliers.js ; l'audit
 //    scripts/audit-negociation-paliers.cjs exige les mêmes réponses sur la même table de cas) ═══════════════════
@@ -12926,45 +12930,75 @@ async function offreAutoReglages() {
 // aléatoire 3–20 min, offre RELUE avant le geste, sécurité du compte, garde (compte de l'onglet, 15/h offres, 50/h,
 // réserve, pause 429/403, captcha), une à la fois ; journal « contre_offre ». Éteinte par défaut.
 const PALIERS_DEFAUT_EXT = { paliers: [50, 80, 100] };
+// 5.410.4 : tranches, bonus de lot, pas d'arrondi (1 € / 0,50 €), « rester flexible », étape finale, plancher ABSOLU
+// (prix mini, sinon achat + 10 %) — copie de src/negociationPaliers.js (audit-negociation-paliers : mêmes réponses).
 function reglagesPaliersExt(v) {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   const pcts = (Array.isArray(o.paliers) ? o.paliers : PALIERS_DEFAUT_EXT.paliers).map(Number).filter((x) => Number.isFinite(x) && x > 0 && x <= 100);
   const uniques = [...new Set(pcts.map((x) => Math.round(x)))].sort((a, b) => a - b).slice(0, 6);
   const rm = Number(o.remiseMax);
+  const tranches = (Array.isArray(o.tranches) ? o.tranches : []).map((x) => ({ de: Number(x && x.de), a: Number(x && x.a), baisse: Number(x && x.baisse) }))
+    .filter((x) => Number.isFinite(x.de) && Number.isFinite(x.a) && Number.isFinite(x.baisse) && x.de >= 0 && x.a > x.de && x.baisse > 0 && x.baisse < x.a).sort((a, b) => a.de - b.de).slice(0, 8);
+  const bl = Number(o.bonusLot);
+  const fx = o.flexible && typeof o.flexible === 'object' && o.flexible.actif === true ? Number(o.flexible.ecart) : NaN;
+  const vers = (k) => (Array.isArray(o[k]) ? o[k] : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5);
+  const d = o.delais && typeof o.delais === 'object' ? o.delais : null;
   return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
-    messages: (Array.isArray(o.messages) ? o.messages : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5), arrondi: o.arrondi !== false };
+    messages: vers('messages'), arrondi: o.arrondi !== false, pas: Number(o.pas) === 0.5 ? 0.5 : 1, tranches, bonusLot: Number.isInteger(bl) && bl > 0 && bl <= 50 ? bl : 0,
+    flexible: typeof o.flexible === 'number' ? (o.flexible > 0 && o.flexible <= 10 ? o.flexible : 0) : Number.isFinite(fx) ? (fx > 0 && fx <= 10 ? fx : 2) : (o.flexible && o.flexible.actif === true ? 2 : 0),   // déjà normalisé : un nombre
+    msgAccepte: vers('msgAccepte'), msgContre: vers('msgContre'), msgFinale: vers('msgFinale'),
+    delais: d && Number.isInteger(Number(d.min)) && Number.isInteger(Number(d.max)) && Number(d.min) >= 1 && Number(d.max) > Number(d.min) && Number(d.max) <= 240 ? { min: Number(d.min), max: Number(d.max) } : null };
 }
-function plancherPalier(prix, mini, remiseMax) {
-  const p = Number(prix); if (!(p > 0)) return null;
-  const m = Number(mini); if (Number.isFinite(m) && m > 0) return m < p ? m : null;
-  const r = Number(remiseMax); if (Number.isFinite(r) && r > 0 && r < 90) return Math.ceil(Math.round(p * (1 - r / 100) * 100)) / 100;
+function plancherAbsoluPalier(mini, achat) {
+  const m = Number(mini); if (Number.isFinite(m) && m > 0) return m;
+  const a = Number(achat); if (Number.isFinite(a) && a > 0) return Math.ceil(Math.round(a * 100) * 110 / 100) / 100;
   return null;
+}
+function plancherPalier(prix, mini, remiseMax, opts = {}) {
+  const p = Number(prix); if (!(p > 0)) return null;
+  const abs = plancherAbsoluPalier(mini, opts.achat);
+  const lot = Number(opts.nArticles) > 1 && Number(opts.bonusLot) > 0 ? 1 + Number(opts.bonusLot) / 100 : 1;
+  const tr = (Array.isArray(opts.tranches) ? opts.tranches : []).find((x) => p >= x.de && p <= x.a);
+  let f;
+  if (tr) f = Math.ceil(Math.round((p - tr.baisse * lot) * 100)) / 100;
+  else {
+    const m = Number(mini); if (Number.isFinite(m) && m > 0) return m < p ? m : null;
+    const r = Number(remiseMax) > 0 ? Number(remiseMax) * lot : NaN;
+    if (Number.isFinite(r) && r > 0 && r < 90) f = Math.ceil(Math.round(p * (1 - r / 100) * 100)) / 100;
+    else f = abs;
+  }
+  if (f == null) return null;
+  if (abs != null && f < abs) f = abs;
+  return f < p ? f : null;
 }
 function prixPaliersExt(prix, plancher, R) {
   const p = Number(prix), f = Number(plancher);
   if (!(p > 0) || !(f > 0) || !(f < p)) return [];
   const out = [];
+  const pas = R.pas === 0.5 ? 0.5 : 1;
   for (const pct of R.paliers) {
     let v = p - (p - f) * pct / 100;
-    v = R.arrondi ? Math.round(v) : Math.round(v * 100) / 100;
+    v = R.arrondi ? Math.round(v / pas) * pas : Math.round(v * 100) / 100;
+    v = Math.round(v * 100) / 100;
     if (v < f) v = f;
     if (v >= p) continue;
     if (!out.length || v < out[out.length - 1]) out.push(v);
   }
   return out;
 }
-function palierContreOffre({ prix, mini, offre, joues = [], reglages }) {
+function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages }) {
   const R = reglagesPaliersExt(reglages);
   if (!R.actif) return null;
-  const f = plancherPalier(prix, mini, R.remiseMax);
+  const f = plancherPalier(prix, mini, R.remiseMax, { achat, nArticles, tranches: R.tranches, bonusLot: R.bonusLot });
   if (f == null) return null;
   const l = prixPaliersExt(prix, f, R);
   const deja = new Set((Array.isArray(joues) ? joues : []).map(Number));
   for (let i = 0; i < l.length; i++) {
     if (deja.has(i)) continue;
+    if (R.flexible > 0 && Number(offre) >= f && Number(offre) < l[i] && l[i] - Number(offre) <= R.flexible + 1e-9) return { i, accepter: true, prix: Number(offre), plancher: f };
     if (!(l[i] > Number(offre))) return null;
     if (l[i] < f) return null;
-    return { i, prix: l[i], plancher: f };
+    return { i, prix: l[i], plancher: f, finale: i === l.length - 1 };
   }
   return null;
 }
@@ -12985,14 +13019,14 @@ async function contreOffreAuto({ uid, acc, o, prix, messages }) {
       const versions = messages.map((t, i) => ({ n: i + 1, texte: t }));
       const v = choisirVariante(versions, await varianteDerniere(uid, 'contre'));
       if (v && v.texte) {
-        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${o.conv}/replies`, corpsReponseVinted(remplirVariablesOffre(v.texte, o)), { timeoutMs: 12000 });
+        const rm = await vintedPage(acc, 'POST', `/api/v2/conversations/${o.conv}/replies`, corpsReponseVinted(remplirVariablesOffre(v.texte, Object.assign({}, o, { prixPropose: prix }))), { timeoutMs: 12000 });
         if (rm && rm.ok) { variante = v.n; await noterVarianteDerniere(uid, 'contre', v.n); }
       }
     }
   }
   return { ok: true, variante };
 }
-function remplirVariablesOffre(t, o) { return String(t).replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
+function remplirVariablesOffre(t, o) { return String(t).replace(/\{price\}|\{prix\}/g, o && Number(o.prixPropose) > 0 ? String(o.prixPropose).replace('.', ',') + ' €' : '').replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
 // `offreEnAttenteDe` de l'app (§11), bornée par identité d'offre.
@@ -13119,10 +13153,12 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   // (5.369) `msg` : ses versions [{n, texte}] (ou l'ancien texte seul). Une version
   // tirée au hasard, jamais celle du refus précédent ; puis le temps d'écriture.
   const versionsRefus = Array.isArray(msg) ? msg : (typeof msg === 'string' ? versionsMessage(msg, []) : []);
-  if (quoi === 'reject' && r && r.ok && conv && versionsRefus.length) {
+  // 5.410.4 : aussi après une acceptation, SON message d'acceptation (versions au hasard, {price} = le prix accepté).
+  const sorteMsg = quoi === 'accept' ? 'accepte' : 'refus';
+  if ((quoi === 'reject' || quoi === 'accept') && r && r.ok && conv && versionsRefus.length) {
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
-    const version = choisirVariante(versionsRefus, await varianteDerniere(uid, 'refus'));
+    const version = choisirVariante(versionsRefus, await varianteDerniere(uid, sorteMsg));
     // ⚠️ 5.361 (revue de robustesse, haute 21) : le corps est la forme RELEVÉE sur
     //    ses vraies requêtes (`docs/automatisation-vinted.md` §3, la même que
     //    `executerMessageFavori` et l'app) — `corpsReponseVinted`. Avant : `{ message }`,
@@ -13147,7 +13183,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
       });
     } catch (_) {}
     if (!parti) { if (c2.at) await rendreActions(String(uid), c2.at, 1); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
-    await noterVarianteDerniere(uid, 'refus', version.n);
+    await noterVarianteDerniere(uid, sorteMsg, version.n);
     return { ok: true, status: r.status, code: r.code, error: '', variante: version.n };
   }
   return { ok: !!r.ok, status: r.status, code: r.code, error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
@@ -13232,8 +13268,10 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const it = d && d.parId && d.parId[String(o.item)];
         const prixAnn = it ? prixCarte(it.price) : null;
         const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
-        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
-        if (palier) quoi = 'contre';
+        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
+        // 5.410.4 « rester flexible » : l'offre est à ≤ N € du palier et au-dessus du plancher ⇒ ACCEPTÉE (mêmes gardes que l'acceptation).
+        if (palier && palier.accepter) quoi = 'accept';
+        else if (palier) quoi = 'contre';
       }
       if (!quoi) continue;
       // (5.308) Jamais une acceptation sur une paire vendue ailleurs, ni sur une
@@ -13256,7 +13294,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         }
       }
       // Délai aléatoire depuis la PREMIÈRE fois où VRM voit l'offre.
-      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + delaiOffreMs() * (await facteurPrudence(uid)), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
+      if (!pv[o.oid]) { pv[o.oid] = { at: Date.now() + (palier && reg.paliers.delais ? tirerEntre(reg.paliers.delais.min * 60000, reg.paliers.delais.max * 60000) : delaiOffreMs()) * (await facteurPrudence(uid)), uid: String(uid), quoi }; pvChange = true; await chrome.storage.local.set({ vrmOffresPrevues: pv }); noterDiag('offre_auto_prevue'); continue; }
       if (pv[o.oid].at > Date.now()) continue;
       if (faites > 0) await new Promise((r) => setTimeout(r, espaceAcceptMs() * fPrud));   // étalement aléatoire entre deux gestes
       await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
@@ -13306,7 +13344,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         for (const k in jt) if (!jt[k] || jt[k].at < Date.now() - 30 * 86400000) delete jt[k];
         st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
         await chrome.storage.local.set({ vrmContreOffres: jt, vrmOffresFaites: st, vrmOffresPrevues: pv });
-        const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: reg.paliers.messages });
+        const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: palier.finale && reg.paliers.msgFinale.length ? reg.paliers.msgFinale : reg.paliers.msgContre.length ? reg.paliers.msgContre : reg.paliers.messages });
         if (rc && rc.ok) {
           faites += 1;
           await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante });
@@ -13319,7 +13357,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const st2 = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {}; delete st2[o.oid]; delete st[o.oid]; await chrome.storage.local.set({ vrmOffresFaites: st2 });
         break;
       }
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -26797,7 +26835,7 @@ function bleamSection(nom, v) {
   if (nom === 'eval5') return { actif, textes: bleamTextes(o.textes) };
   if (nom === 'stockAuto') {
     const st = {}; const s0 = o.stock && typeof o.stock === 'object' ? o.stock : {};
-    for (const k of Object.keys(s0).slice(0, 500)) { const n = bleamEnt(s0[k], 2, 99, null); const c = String(k).toUpperCase().replace(/\s+/g, '').replace(/^([A-Z]*)0+(\d)/, '$1$2'); if (n != null && /^[A-Z]{0,3}\d{1,6}$/.test(c)) st[c] = n; }
+    for (const k of Object.keys(s0).slice(0, 500)) { const n = bleamEnt(s0[k], 2, 99, null); let c = String(k).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(c)) c = String(parseInt(c, 10)); /* = cleNum (app et extension) */ if (n != null && /^[A-Z]{0,3}\d{1,6}$/.test(c)) st[c] = n; }
     return { actif, stock: st };
   }
   if (nom === 'cycle') {

@@ -108,7 +108,7 @@ function bleamSection(nom, v) {
   if (nom === 'eval5') return { actif, textes: bleamTextes(o.textes) };
   if (nom === 'stockAuto') {
     const st = {}; const s0 = o.stock && typeof o.stock === 'object' ? o.stock : {};
-    for (const k of Object.keys(s0).slice(0, 500)) { const n = bleamEnt(s0[k], 2, 99, null); const c = String(k).toUpperCase().replace(/\s+/g, '').replace(/^([A-Z]*)0+(\d)/, '$1$2'); if (n != null && /^[A-Z]{0,3}\d{1,6}$/.test(c)) st[c] = n; }
+    for (const k of Object.keys(s0).slice(0, 500)) { const n = bleamEnt(s0[k], 2, 99, null); let c = String(k).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(c)) c = String(parseInt(c, 10)); /* = cleNum (app et extension) */ if (n != null && /^[A-Z]{0,3}\d{1,6}$/.test(c)) st[c] = n; }
     return { actif, stock: st };
   }
   if (nom === 'cycle') {
