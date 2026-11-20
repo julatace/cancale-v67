@@ -3230,6 +3230,8 @@ const prechargerDemarrage = () => {
         })()
       : lireCommandesLegeres(memo ? idsCommandes(memo) : null))
       .then((rows) => (Array.isArray(rows) ? rows.map(ligneCommandes) : null)).catch(() => null);
+    // (20 nov., lectures-legeres) Les dressings attendent ces commandes (voir `poserPorteDressings`).
+    poserPorteDressings(); famille.then(ouvrirPorteDressings, ouvrirPorteDressings);
     // Les comptes que la lecture commune couvre. ⚠️ §4.1 : une liste VIDE n'est
     // pas une réponse — aucune ligne pour les comptes retenus ⇒ chacun est relu à part.
     const couvre = (rows, uid) => Array.isArray(rows) && (!memo || (rows.length > 0 && memo.includes(String(uid))));
@@ -7863,8 +7865,26 @@ const lireMoissonGroupee = (id) => {
   const famille = String(id).slice(String(id).lastIndexOf('_') + 1);
   return idGroupable(id) ? _groupeMoisson.charger(id, `${auth}|${famille}`) : _lireLigneMoissonSeule(id, auth);
 };
+// ── (20 nov., lectures-legeres) LES DRESSINGS ATTENDENT LES VENTES AU DÉMARRAGE ──────────────────────────
+// Mesuré au banc iphone-rapide (SESSION=1, 4G lente 1,6 Mbit/s) : les dressings de tous les comptes (~560 Ko)
+// partaient en même temps que les ventes et se partageaient le débit — le tableau de bord, la cloche et le
+// retrait automatique eBay les demandent dès l'ouverture, alors que l'écran ouvert (Aujourd'hui) ne les montre
+// pas. La porte est posée par le préchargement (`prechargerDemarrage`) et s'ouvre quand SES commandes sont
+// réglées (lues ou en panne), au plus tard 6 s après ; l'écran Annonces / Bordereaux (qui les montre) l'ouvre
+// tout de suite ; une relecture demandée (`force`) ne l'attend jamais. Mêmes lectures, mêmes résultats :
+// seulement plus tard. Sans préchargement (aucune porte), rien n'attend.
+let _porteDressings = null;   // { p, ouvrir }
+function poserPorteDressings() {
+  if (_porteDressings) return _porteDressings;
+  let lacher = null; const p = new Promise((r) => { lacher = r; });
+  const t = setTimeout(() => lacher(), 6000);
+  _porteDressings = { p, ouvrir: () => { clearTimeout(t); lacher(); } };
+  return _porteDressings;
+}
+function ouvrirPorteDressings() { try { if (_porteDressings) _porteDressings.ouvrir(); } catch (_) {} }
 const fetchHarvest = async (uid, type, opts = {}) => {
   if (!uid) return null;
+  if (type === 'listings' && !opts.force && _porteDressings) await _porteDressings.p;
   if (opts.force) _rowCache.delete(`h:${uid}:${type}`);
   return cachedRow(`h:${uid}:${type}`, () => fetchHarvestBrut(uid, type, opts));
 };
@@ -42533,14 +42553,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  // (20 nov., lectures-legeres) Aujourd'hui et Messages ne MONTRENT pas les dressings (~560 Ko au banc) : ils
-  // partent APRÈS les ventes de l'écran ouvert (lues ou en panne), au plus tard 6 s après l'ouverture —
-  // sur la 4G lente de Julien, les deux lectures se partageaient le débit et les ventes arrivaient 3 s plus
-  // tard. Annonces et Bordereaux (le détecteur de doublons) en ont besoin : tout de suite, comme avant.
-  const ventesReglees = !sales.loading && (Array.isArray(sales.items) || !!sales.error);
-  const [dressingsPermis, setDressingsPermis] = useState(false);
-  useEffect(() => { if (dressingsPermis) return; if (ventesReglees) { setDressingsPermis(true); return; } const t = setTimeout(() => setDressingsPermis(true), 6000); return () => clearTimeout(t); }, [ventesReglees, dressingsPermis]);
-  useEffect(() => { const attend = (curSub==='journee'||curSub==='messages') && !dressingsPermis; if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && !attend && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes, dressingsPermis]);
+  // (20 nov., lectures-legeres) Annonces et Bordereaux MONTRENT les dressings : la porte des dressings
+  // (`porteDressings`) s'ouvre tout de suite pour eux ; ailleurs ils attendent les ventes.
+  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) { if (curSub==='annonces'||curSub==='bordereaux') ouvrirPorteDressings(); loadListings(); } /* eslint-disable-next-line */ }, [sub, cleComptes]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
@@ -65363,13 +65378,9 @@ function AppCoeur() {
           }))
         : await Promise.all(vintedAccounts.map(async a=>{
         const actif=!skipAcc(a.vinted_user_id);
-        // (20 nov., lectures-legeres) Le dressing part QUAND les ventes sont là (lues ou en panne) : sur la 4G
-        // lente de Julien, les deux lectures se partageaient le débit et « Vendu · mois » arrivait 3 s plus tard.
-        // Mêmes lectures, même résultat ; un écran qui montre les annonces les a déjà demandées (même cache).
-        const soldP=fetchVintedOrders(a,'sold',1,'all');
         const [sold,list,conv]=await Promise.all([
-          soldP,
-          actif?soldP.then(()=>fetchVintedListings(a,1),()=>fetchVintedListings(a,1)):Promise.resolve({ok:false,items:[]}),
+          fetchVintedOrders(a,'sold',1,'all'),
+          actif?fetchVintedListings(a,1):Promise.resolve({ok:false,items:[]}),
           actif?fetchVintedConversations(a,1):Promise.resolve({ok:false,items:[]}),
         ]);
         return { a, sold, list, conv, actif };
@@ -65960,8 +65971,7 @@ function AppCoeur() {
           // (le compte qui a bougé est oublié par `relire`/la sonde) — avant, passé 60 s, les 7 comptes repartaient
           // (~1,2 Mo) pour une vente sur un seul (banc ventes-relecture-compte).
           fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }),
-          // (20 nov., lectures-legeres) le dressing après les ventes (même raison que le tableau de bord).
-          fetchHarvestOrders(a.vinted_user_id,'sold',{ ttl: 10 * 60 * 1000 }).then(()=>fetchHarvest(a.vinted_user_id,'listings'),()=>fetchHarvest(a.vinted_user_id,'listings')),
+          fetchHarvest(a.vinted_user_id,'listings'),
         ])])));
       for(const a of vintedAccounts){
         if(offAcc.has(String(a.vinted_user_id))) continue;
