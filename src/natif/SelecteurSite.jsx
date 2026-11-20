@@ -43,4 +43,10 @@ export function SelecteurSite({ valeur = 'tous', onChange, sites = [] }) {
   );
 }
 
+// Le sélecteur qui garde lui-même le choix (`vrm_site_courant`) : ce qu'un écran pose quand il n'a rien à en faire de plus.
+export function SelecteurSiteGarde({ sites = [] }) {
+  const [site, setSite] = useSiteCourant();
+  return <SelecteurSite valeur={site} onChange={setSite} sites={sites}/>;
+}
+
 export default SelecteurSite;

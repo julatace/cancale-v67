@@ -24842,9 +24842,12 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
 // (même écran ⇒ seule la section change).
 // Le sélecteur de plateforme d'Argent : les sites RELIÉS (ceux des filtres de la coque, `SITES_COQUE`).
+// Hors du démarrage (budget) : il arrive avec Argent ; sa place est gardée pendant le chargement (rien ne saute).
+const SelecteurSiteParesseux = lazySur(() => import('./natif/SelecteurSite.jsx').then((m) => ({ default: m.SelecteurSiteGarde })));
 function SelecteurSiteArgent() {
-  const [site, setSite] = useSiteCourant();
-  return <SelecteurSite valeur={site} onChange={setSite} sites={(SITES_COQUE.v || []).filter((x) => x !== 'toutes')}/>;
+  const sites = (SITES_COQUE.v || []).filter((x) => x !== 'toutes');
+  if (sites.length < 2) return null;
+  return <Suspense fallback={<div aria-hidden="true" style={{ minHeight: 44 }}/>}><SelecteurSiteParesseux sites={sites}/></Suspense>;
 }
 function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
   // (17 nov., nouveau design · Argent) Allumé : UNE ligne « Toutes les plateformes · N comptes › » (les comptes qui entrent

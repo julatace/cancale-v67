@@ -84,11 +84,6 @@
   .n-arg-aide-texte { padding: 0 var(--n-marge) 16px; font: var(--n-t-second); color: var(--n-encre); }
   .n-arg-aide-texte p, .n-arg-aide-texte ul { margin: 0 0 8px; }
   .n-arg-aide-texte ul { padding-inline-start: 18px; }
-  /* Santé des comptes : la rangée du compte, puis ses indicateurs dépliés sur un fond à peine gris. */
-  .n-arg-sc + .n-arg-sc { border-top: 1px solid var(--n-trait); }
-  .n-arg-sc-inds { background: var(--n-carte-2); }
-  .n-arg-sc-inds .n-rangee { background: var(--n-carte-2); }
-  .n-arg-sc-geste { display: flex; justify-content: flex-end; padding: 0 8px; }
   @media (min-width: 1024px) {
     /* À l'ordinateur : une grille de cartes (le chiffre et les tuiles à gauche, les versements à droite). */
     .n-arg-mois { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }

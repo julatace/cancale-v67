@@ -21,8 +21,7 @@ import { carnetDuCompte } from './discretion.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
-import { Carte, Rangee, Pastille, Bouton } from './natif/index.js';
-import './natif/ecrans/argent.css';
+import { Carte, Rangee, Pastille, Bouton } from './natif/index.js';   // (les styles .n-arg-sc* : styles-sante-comptes.css — ce composant part au démarrage)
 
 // ── LES LECTURES (une fois pour les trois places, relues quand l'extension écrit) ──
 // La même projection que « Notes reçues » de Statistiques (petites lignes, jamais `select=data`).
