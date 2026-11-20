@@ -111,7 +111,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null }) {
+  // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
+  // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
+  // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
+  // d'office là où le bordereau est prêt) — le tableau ne tient alors aucune sélection à lui et ne montre pas sa barre de sélection.
+  // `avantOutils` (20 nov., Ventes en tableau) : un nœud posé entre la barre de titre et la barre d'outils (le segmenté de Ventes).
+  // `ligneChoisie` : la clé de la ligne dont le détail est ouvert à côté (teintée, `aria-current`).
   // `groupe(l)` (20 nov., « divise par comptes ») ⇒ { cle, titre } : sans tri choisi, un INTERTITRE à chaque nouveau groupe
   // (les lignes arrivent déjà rangées par groupe). Un tri par colonne mélange les groupes : plus d'intertitre.
   const ordinateur = useOrdinateur();
@@ -124,7 +130,9 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     return new Set(colonnes.filter((c) => c.defaut === false).map((c) => c.cle));
   });
   const [vue, setVue] = React.useState(() => (grille && memo0.vue === 'grille' ? 'grille' : 'liste'));
-  const [sel, setSel] = React.useState(() => new Set());
+  const [selPropre, setSel] = React.useState(() => new Set());
+  const pilote = !!(coches && onCocher);
+  const sel = pilote ? coches : selPropre;
   const [action, setAction] = React.useState(null);
   const [menu, setMenu] = React.useState('');            // 'action' · 'statut' · 'colonnes' · 'filtre:<cle>' · 'ligne:<cle>'
   const [max, setMax] = React.useState(PAR_PAGE);
@@ -160,13 +168,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
 
   // La sélection : seulement ce que l'action choisie accepte (une ligne grisée ne se coche pas).
   const A = action ? actions.find((x) => x.cle === action) || null : null;
-  const cochable = (l) => !l.grise && (!A || !A.pour || A.pour(l));
+  const cochable = (l) => !l.grise && !l.nonCochable && (!A || !A.pour || A.pour(l));
   const choisies = liste.filter((l) => sel.has(l.cle) && cochable(l));
   const jugement = A ? (A.juger ? A.juger(choisies) : { ok: choisies.length > 0, raison: '' }) : { ok: false, raison: '' };
-  const basculer = (l) => { if (!cochable(l)) return; setSel((s) => { const n = new Set(s); if (n.has(l.cle)) n.delete(l.cle); else n.add(l.cle); return n; }); };
+  const basculer = (l) => { if (!cochable(l)) return; if (pilote) { onCocher([l.cle], !sel.has(l.cle)); return; } setSel((s) => { const n = new Set(s); if (n.has(l.cle)) n.delete(l.cle); else n.add(l.cle); return n; }); };
   const cochables = affichees.filter(cochable);
   const toutCoche = cochables.length > 0 && cochables.every((l) => sel.has(l.cle));
-  const toutBasculer = () => setSel(toutCoche ? new Set() : new Set(cochables.map((l) => l.cle)));
+  const toutBasculer = () => { if (pilote) { onCocher(cochables.filter((l) => sel.has(l.cle) === toutCoche).map((l) => l.cle), !toutCoche); return; } setSel(toutCoche ? new Set() : new Set(cochables.map((l) => l.cle))); };
   const quitter = () => { setSel(new Set()); setAction(null); };
   const lancer = () => { if (!A || !jugement.ok || !onAction) return; const c = choisies; quitter(); onAction(A.cle, c); };
   const choisirAction = (cle) => { setAction(cle); setMenu(''); const X = actions.find((x) => x.cle === cle); if (X && X.pour) setSel((s) => new Set([...s].filter((k) => { const l = liste.find((y) => y.cle === k); return l && !l.grise && X.pour(l); }))); };
@@ -295,10 +303,11 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     <div className="n-tt-cadre" data-tt-tableau="">
       <table className="n-tt-table">
         <thead><tr>
-          <th scope="col" className="n-tt-th n-tt-th-case"><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={toutCoche} aria-label={tr('tableau.toutCocher')} data-tt-tout="" onChange={toutBasculer} disabled={!cochables.length}/></label></th>
+          {cases ? <th scope="col" className="n-tt-th n-tt-th-case"><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={toutCoche} aria-label={tr('tableau.toutCocher')} data-tt-tout="" onChange={toutBasculer} disabled={!cochables.length}/></label></th> : null}
           <th scope="col" className="n-tt-th n-tt-th-article" data-tt-th="article">{tr('tableau.colArticle')}</th>
-          {colsVues.filter((c) => c.cle !== 'statut').map(enTete)}
+          {colsVues.filter((c) => c.cle !== 'statut' && !c.apresStatut).map(enTete)}
           {colonnes.some((c) => c.cle === 'statut') && !cachees.has('statut') ? enTete(colonnes.find((c) => c.cle === 'statut')) : null}
+          {colsVues.filter((c) => c.apresStatut).map(enTete)}
           {menuLigne ? <th scope="col" className="n-tt-th n-tt-th-menu"><span className="n-tt-sr">{tr('tableau.plusDActions')}</span></th> : null}
         </tr></thead>
         <tbody>
@@ -306,23 +315,24 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
             const g = groupe && !colTri ? groupe(l) : null;
             const gAvant = g && i > 0 ? groupe(visibles[i - 1]) : null;
             const inter = g && (!gAvant || gAvant.cle !== g.cle) ? <tr key={'g:' + g.cle} className="n-tt-intertitre" data-tt-groupe={g.cle}>
-              <th scope="colgroup" colSpan={2 + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{g.titre}</th></tr> : null;
+              <th scope="colgroup" colSpan={(cases ? 2 : 1) + colsVues.length + (menuLigne ? 1 : 0)} className="n-tt-intertitre-th">{g.titre}</th></tr> : null;
             const coche = sel.has(l.cle); const grise = !cochable(l) && (A || l.grise); const m = menuDe(l); const st = statutDe(l);
             return (<React.Fragment key={l.cle}>{inter}
-              <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
-                aria-selected={coche ? 'true' : 'false'} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)} {...(l.attrs || {})}>
-                <td className="n-tt-td n-tt-td-case" onClick={(e) => e.stopPropagation()}><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={coche} disabled={!cochable(l)} aria-label={tr('tableau.cocher', { titre: l.titre || '' })} onChange={() => basculer(l)}/></label></td>
+              <tr className="n-tt-tr" tabIndex={0} data-tt-ligne={l.cle} data-tt-statut-ligne={l.statut || ''} data-tt-coche={coche && !pilote ? '1' : undefined} data-tt-grise={grise ? '1' : undefined}
+                aria-selected={coche ? 'true' : 'false'} aria-current={ligneChoisie && ligneChoisie === l.cle ? 'true' : undefined} data-tt-choisie={ligneChoisie && ligneChoisie === l.cle ? '1' : undefined} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)} {...(l.attrs || {})}>
+                {cases ? <td className="n-tt-td n-tt-td-case" onClick={(e) => e.stopPropagation()}><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={coche} disabled={!cochable(l)} aria-label={tr('tableau.cocher', { titre: l.titre || '' })} onChange={() => basculer(l)}/></label></td> : null}
                 <td className="n-tt-td n-tt-td-article" data-tt-col="article">
                   <span className="n-tt-article">
-                    {l.icone ? <span className="n-tt-avatar" aria-hidden="true">{l.icone}</span> : <Vignette src={l.photo || ''} alt="" taille={48}/>}
+                    {l.icone ? <span className="n-tt-avatar" aria-hidden="true">{l.icone}</span> : <Vignette src={l.photo || ''} alt="" taille={48} image={l.image || null}/>}
                     <span className="n-tt-article-texte">
                       <span className="n-tt-article-titre" title={l.titre || ''}>{l.titre || tr('tableau.sansTitre')}</span>
                       {l.sous ? <span className="n-tt-article-sous" title={typeof l.sous === 'string' ? l.sous : undefined}>{l.sous}</span> : null}
                     </span>
                   </span>
                 </td>
-                {colsVues.filter((c) => c.cle !== 'statut').map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
+                {colsVues.filter((c) => c.cle !== 'statut' && !c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
                 {colonnes.some((c) => c.cle === 'statut') && !cachees.has('statut') ? <td className="n-tt-td" data-tt-col="statut"><Etiquette ton={st ? st.ton : 'neutre'}>{l.statutLibelle || (st ? st.libelle : '')}</Etiquette></td> : null}
+                {colsVues.filter((c) => c.apresStatut).map((c) => <td key={c.cle} className="n-tt-td" data-tt-col={c.cle} data-tt-num={c.num ? '1' : undefined}>{celluleVal(c, l)}</td>)}
                 {menuLigne ? <td className="n-tt-td n-tt-td-menu" onClick={(e) => e.stopPropagation()}>
                   {m.length ? <span className="n-tt-ancre" data-tt-ancre="">
                     <button type="button" className="n-tt-bouton n-tt-bouton-icone n-tt-plus" aria-label={tr('tableau.actionsDe', { titre: l.titre || '' })} aria-haspopup="true" aria-expanded={menu === 'ligne:' + l.cle ? 'true' : 'false'}
@@ -357,7 +367,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const listeTel = (
     <Groupe attrs={{ 'data-tt-liste': '' }}>
       {visibles.map((l) => { const t = ligneTel ? ligneTel(l) : {}; const st = statutDe(l); const coche = sel.has(l.cle);
-        return <Rangee key={l.cle} vignette={l.icone ? null : <Vignette src={l.photo || ''} alt=""/>} icone={l.icone || null} titre={l.titre || tr('tableau.sansTitre')} lignes={2}
+        return <Rangee key={l.cle} vignette={l.icone ? null : <Vignette src={l.photo || ''} alt="" image={l.image || null}/>} icone={l.icone || null} titre={l.titre || tr('tableau.sansTitre')} lignes={2}
           plaque={t.plaque || null} sousTitre={t.sousTitre != null ? t.sousTitre : (typeof l.sous === 'string' ? l.sous : '')} ton={t.ton || (st && st.ton === 'ambre' ? 'ambre' : 'neutre')}
           valeur={t.valeur != null ? t.valeur : null} valeurForte detailValeur={t.detailValeur != null ? t.detailValeur : (l.statutLibelle || (st ? st.libelle : ''))}
           fin={A ? (coche ? 'coche' : <span className="n-tt-rond" aria-hidden="true"/>) : (onOuvrir ? 'chevron' : null)} selectionnee={A ? coche : false}
@@ -368,7 +378,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
 
   // ── la barre de sélection : « N sélectionnés · {Action} » (LE plein de l'écran tant qu'elle est là) ──────────────
   const nSel = choisies.length;
-  const barreSel = (nSel > 0 || A) ? (
+  const barreSel = !pilote && (nSel > 0 || A) ? (
     <div className="n-tt-barre-sel" data-tt-barre-sel={String(nSel)} role="region" aria-label={tr('tableau.selection', { n: nSel })}>
       <span className="n-tt-barre-texte" data-tt-n-sel={String(nSel)}>{tr('tableau.selection', { n: nSel })}</span>
       <button type="button" className="n-tt-lien" data-tt-deselect="" onClick={quitter}>{tr('tableau.deselect')}</button>
@@ -381,8 +391,8 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   ) : null;
 
   const corps = lignes === undefined ? <Attente forme="rangees" n={6} vignette={ordinateur ? 0 : 56} titre/>
-    : lignes === null ? <Vide icone={ic('alert', 40)} phrase={pasSu || tr('tableau.pasSu')}/>
-    : !affichees.length ? <Vide icone={ic('search', 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
+    : lignes === null ? <Vide icone={ic('cloudOff', 40)} phrase={pasSu || tr('tableau.pasSu')} action={actionPasSu}/>
+    : !affichees.length ? <Vide icone={ic(q || nStatuts ? 'search' : iconeVide, 40)} phrase={q || nStatuts ? (videRecherche || tr('tableau.videRecherche')) : (vide || tr('tableau.vide'))}
         action={q || nStatuts ? <Bouton variante="texte" onClick={() => { setQ(''); setStatutsSel(new Set()); }} attrs={{ 'data-tt-effacer': '' }}>{tr('tableau.effacerFiltres')}</Bouton> : null}/>
     : !ordinateur ? listeTel : vue === 'grille' ? grilleVue : tableau;
 
@@ -391,6 +401,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     <div className={cx('n-tt', ordinateur ? 'n-tt-ordi' : 'n-tt-tel')} ref={refRacine} data-tt={id} data-tt-vue={ordinateur ? vue : 'tel'} data-tt-etat={lignes === undefined ? 'lecture' : lignes === null ? 'passu' : 'lu'} {...(attrs || {})}>
       <Page titre={titre} plein={barreSel || plein}>
         {tete}
+        {avantOutils}
         {outils}
         {haut}
         {Array.isArray(lignes) ? nombre : null}

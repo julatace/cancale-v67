@@ -102,6 +102,8 @@
   .n-tt-tr:hover > .n-tt-td { background: var(--n-carte-2); }
   .n-tt-tr:focus-visible > .n-tt-td { background: var(--n-carte-2); box-shadow: inset 0 2px 0 var(--n-accent), inset 0 -2px 0 var(--n-accent); }
   .n-tt-tr[data-tt-coche="1"] > .n-tt-td { background: var(--n-teinte); }
+  .n-tt-tr[data-tt-choisie="1"] > .n-tt-td { background: var(--n-carte-2); }
+  .n-tt-tr[data-tt-choisie="1"] > .n-tt-td-case { box-shadow: inset 3px 0 0 var(--n-accent); }
   .n-tt-tr[data-tt-grise="1"] { cursor: default; }
   .n-tt-tr[data-tt-grise="1"] .n-tt-article-titre { color: var(--n-encre-2); }
   .n-tt-td { height: 68px; padding: 0 8px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); white-space: nowrap; }
@@ -189,4 +191,43 @@
 @layer vrm-natif {
   .n-fil-vignette { flex: 0 0 auto; display: inline-flex; width: 44px; height: 44px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); align-self: center; }
   .n-fil-vignette img { width: 100%; height: 100%; object-fit: cover; }
+}
+
+/* (20 nov.) VENTES À L'ORDINATEUR EN TABLEAU (src/natif/ecrans/Ventes.jsx, VentesBureau) : le tableau pleine largeur ; le détail
+   d'une vente touchée se pose à DROITE (jamais un volet vide permanent) ; le transporteur en logo ; la date limite proche en ambre. */
+@layer vrm-natif {
+  .n-vt { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; min-width: 0; }
+  .n-vt[data-vt-detail="1"] { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
+  .n-vt-volet { position: sticky; top: 0; box-sizing: border-box; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+    border-left: .5px solid var(--n-trait); background: var(--n-fond); padding-bottom: 24px; }
+  .n-vt-volet-tete { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 4px 8px 4px var(--n-marge);
+    background: var(--n-fond); border-bottom: .5px solid var(--n-trait); }
+  .n-vt-volet-titre { flex: 1 1 auto; min-width: 0; font: var(--n-t-corps-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-vt-volet-corps { padding-top: 12px; }
+  .n-vt-segment { padding: 0 var(--n-marge) 8px; max-width: 560px; }
+  .n-vt-segment-seul { display: flex; align-items: center; gap: 12px; max-width: none; padding-top: 8px; }
+  .n-vt-segment-seul .n-segmente { flex: 0 1 520px; }
+  .n-vt-segment-tel { max-width: none; padding: 8px 0 4px; }
+  .n-vt-limite { white-space: nowrap; color: var(--n-encre-2); }
+  .n-vt-limite[data-vt-ambre="1"] { color: var(--n-ambre); font-weight: 600; }
+  /* La barre d'outils de Ventes : « Imprimer N bordereaux » à la taille des outils (jamais une barre pleine largeur). */
+  .n-vt .n-tt-outils .n-bouton-bloc, .n-vt .n-tt-outils .n-bouton-bloc-large { display: inline-flex; width: auto; }
+  .n-vt .n-tt-outils .n-bouton[data-n-variante="plein"] { min-height: 36px; border-radius: var(--n-r-bouton); padding: 0 14px; font: var(--n-t-second-fort); }
+  /* Le détail ouvert : le tableau garde ses colonnes utiles (la date et le nom du transporteur se replient, le logo reste). */
+  .n-vt[data-vt-detail="1"] [data-tt-col="date"], .n-vt[data-vt-detail="1"] [data-tt-th="date"] { display: none; }
+  .n-vt[data-vt-detail="1"] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .n-vt-valeur { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .n-vt-valeur .n-pastille { height: 20px; padding: 0 6px; font: var(--n-t-legende-fort); }
+  /* Écran d'ordinateur plus étroit (< 1440) : le tableau ne tiendrait pas à côté ⇒ le détail se POSE par-dessus, au bord droit
+     (comme la fiche d'Annonces), le tableau garde toutes ses colonnes dessous ; ✕ ou Échap le referme. */
+  @media (max-width: 1439px) {
+    .n-vt[data-vt-detail="1"] { grid-template-columns: minmax(0, 1fr); }
+    .n-vt[data-vt-detail="1"] [data-tt-col="date"], .n-vt[data-vt-detail="1"] [data-tt-th="date"] { display: revert; }
+    .n-vt[data-vt-detail="1"] .n-tt-transporteur > span:last-child { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+    .n-vt-volet { position: fixed; top: 0; right: 0; bottom: 0; z-index: 30; width: min(400px, 42vw); max-height: none; box-shadow: var(--n-ombre); }
+  }
+  /* (20 nov.) Un colis sans bordereau : pas de rond (ni pointillé ni vide) — la place reste, la raison est sous le prix. */
+  .n-vt-sans-case .n-case-dessin { visibility: hidden; }
+  .n-vt-morceau { white-space: nowrap; }
+  .n-vt-logo { display: inline-flex; align-items: center; flex: 0 0 auto; margin-left: 6px; }
 }

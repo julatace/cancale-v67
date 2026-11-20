@@ -470,6 +470,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Ventes en tableau de travail (ventes-tableau)** : à l'ordinateur, À envoyer / En route = `TableauTravail` (transporteur en logo, statut en étiquette, cases = le lot, « Imprimer N » dans la barre, détail au toucher seulement) ; téléphone : logo + étiquette ; Terminées garde le segmenté. `2026-11-20-ventes-tableau.md`. Geste : aucun.
 - **20 nov. · 2ᵉ train du 20 nov. (ext. 5.410.0, branche `claude/integration-5410`)** : panneau-vintex (avec actions-extension, repub-messages-malins, lbc-vc-interesses) + minimaliste (avec argent-natif) ; écrans de gestes retirés gardés retirés, style minimaliste sur ce qui reste ; « Relier » d'Annonces · eBay laissé au bandeau (sa réponse attendue) ; paquets 5.410.0. `2026-11-20-panneau-vintex.md`, `2026-11-20-minimaliste.md`. Geste : installer la 5.410.0 dans CHAQUE Chrome.
 - **20 nov. · Annonces divisées par compte + téléphone revu + Argent fusionné (minimaliste)** : un groupe par compte, rangée courte, manque dit une fois, plein détaché des onglets ; `claude/argent-natif` fusionné, UN sélecteur. `2026-11-20-minimaliste.md` §2 ter-quater. Geste : aucun.
 - **20 nov. · Sélecteur de plateforme global (décision)** : onglets par fonction + UN segmenté « Tous · sites reliés » (`src/siteCourant.js`, `vrm_site_courant`, `src/natif/SelecteurSite.jsx`) qui remplace les filtres de site locaux ; Argent à brancher (`claude/argent-natif`). `2026-11-20-minimaliste.md` §2 bis. Geste : aucun.
