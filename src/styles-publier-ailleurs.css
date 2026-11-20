@@ -6,7 +6,7 @@
 .vrm-pa-feuille { max-width: 600px; }
 .vrm-pa-article, .vrm-pa-paires button {
   display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; text-align: left;
-  background: var(--fu-carte, #fff); border-radius: 20px; padding: 10px 12px; box-shadow: var(--fu-ombre); color: inherit;
+  background: var(--fu-carte, #fff); border-radius: 12px; padding: 10px 12px; color: inherit;
 }
 .vrm-pa-article { margin-bottom: 12px; }
 .vrm-pa-paire-photo { flex: none; width: 48px; height: 60px; border-radius: 12px; overflow: hidden; background: var(--fu-case, #f2f2f7); }
@@ -18,12 +18,14 @@
 .vrm-pa-paire-prix { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-pa-cherche {
   width: 100%; box-sizing: border-box; min-height: 48px; border-radius: 12px; border: 0; padding: 0 14px; margin-bottom: 10px;
-  background: var(--fu-carte, #fff); color: inherit; font: inherit; font-size: 17px; box-shadow: var(--fu-ombre);
+  background: rgb(118 118 128 / .12); color: inherit; font: inherit; font-size: 17px;
 }
-.vrm-pa-paires { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.vrm-pa-paires button { border: 0; min-height: 64px; cursor: pointer; font: inherit; }
+.vrm-pa-paires { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; background: var(--fu-carte, #fff); }
+.vrm-pa-paires button { border: 0; border-radius: 0; min-height: 64px; cursor: pointer; font: inherit; }
+/* (20 nov., NATIF §1 bis) UN groupe : un filet décalé entre deux articles, plus de cartes empilées. */
+.vrm-pa-paires > li + li > button { box-shadow: inset 72px .5px 0 -72px var(--fu-filet, rgba(60,60,67,.18)); }
 
-.vrm-pa-site { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: var(--fu-ombre); padding: 12px 14px 14px; margin-bottom: 12px; }
+.vrm-pa-site { background: var(--fu-carte, #fff); border-radius: 12px; padding: 12px 14px 14px; margin-bottom: 12px; }
 .vrm-pa-site-tete { display: flex; align-items: center; gap: 10px; min-height: 32px; }
 .vrm-pa-site-nom { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; display: flex; align-items: center; }
 .vrm-pa-etat { flex: none; font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); }

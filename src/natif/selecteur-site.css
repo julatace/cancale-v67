@@ -1,7 +1,15 @@
 /* Le sélecteur de plateforme (src/natif/SelecteurSite.jsx) : un segmenté natif à la marge de la page ; logo 18 + nom.
    Au téléphone, à quatre ou cinq choix, le logo seul (le nom reste lu par `aria-label`). */
 @layer vrm-natif {
-  .n-selecteur-site { margin: 0 var(--n-marge) 12px; }
+  /* (20 nov., « disposition parfaite ») Sous le grand titre, pleine largeur de la colonne de lecture (marge 16 au téléphone,
+     24 à l'ordinateur), COLLANT au défilement juste sous la barre du titre réduit ; le fond de la page derrière lui (le
+     contenu ne passe jamais visible dessous). Cibles 44 au doigt, 36 à la souris. */
+  .n-selecteur-site { position: sticky; top: calc(var(--n-h-barre, 44px) + var(--n-haut-sur, 0px)); z-index: 25; box-sizing: border-box;
+    margin: 0 0 8px; padding: 4px var(--n-marge, 16px) 8px; background: var(--n-fond); }
+  @media (min-width: 1024px) {
+    .n-selecteur-site { top: 0; padding: 12px 24px; }
+    .n-selecteur-site .n-segmente { height: 36px; max-width: 560px; }
+  }
   .n-site-option { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
   .n-site-logo { display: inline-flex; flex: 0 0 auto; width: 18px; height: 18px; align-items: center; justify-content: center; }
   .n-site-logo > * { max-width: 18px; max-height: 18px; }

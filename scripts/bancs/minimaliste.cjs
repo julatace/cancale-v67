@@ -470,7 +470,99 @@ async function annoncesComptes() {
   console.log(rouges ? `\n❌ annonces par compte : ${rouges} rouge(s)` : '\n✅ annonces par compte : tout est vert'); if (rouges) process.exitCode = 1;
 }
 
-if (require.main === module && process.argv[2] === '--annonces') annoncesComptes();
+// `--sites` (20 nov., Julien : « pour toutes les plateformes tout doit être parfait » ; « même squelette, le contenu s'adapte ») :
+// une base Vinted (3 comptes) + Leboncoin + eBay + Vestiaire ; pour CHAQUE choix du sélecteur (Tous, Vinted, Leboncoin, eBay,
+// Vestiaire) × les 5 onglets (Aujourd'hui, Annonces, Ventes, Achats, Argent) × (390 clair, 390 sombre, 1512 clair) : une capture,
+// et le SQUELETTE relevé — grand titre, sélecteur (haut, bord, hauteur, site choisi), segments de la tâche (libellés, haut),
+// bord gauche des groupes et des rangées, place du plein (écart à la barre d'onglets). PARITÉ : entre les 4 sites, le squelette
+// d'un onglet est le même (tolérance 1 px) ; un écart est NOMMÉ et rougit. Planches : SORTIE/planche-sites-<fen>-<thème>.png
+// (5 lignes = onglets, 5 colonnes = choix). `VARIANTES=390:clair,1512:clair` `ONGLETS=journee,annonces`.
+const SITES_PLANCHE = ['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'];
+const ONGLETS_PLANCHE = [['journee', '?tab=journee'], ['annonces', '?tab=annonces'], ['ventes', '?tab=ventes'], ['achats', '?tab=achats'], ['argent', '?tab=dashboard']];
+function squelette() {
+  const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+  const R = (e) => { if (!vis(e)) return null; const r = e.getBoundingClientRect(); return { t: Math.round(r.top + scrollY), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; };
+  const racine = document.querySelector('#vrm-contenu, .vrm-main') || document.body;
+  const titre = [...document.querySelectorAll('.n-grand-titre, h1')].find(vis);
+  const sel = document.querySelector('[data-selecteur-site]');
+  const seg = [...racine.querySelectorAll('.n-segmente')].filter((x) => vis(x) && !x.closest('[data-selecteur-site]'))[0] || null;
+  const minL = (q) => { const l = [...racine.querySelectorAll(q)].filter(vis).map((e) => Math.round(e.getBoundingClientRect().left)); return l.length ? Math.min(...l) : null; };
+  const plein = [...document.querySelectorAll('[data-n-variante="plein"]')].find(vis);
+  const onglets = document.querySelector('.n-onglets');
+  return {
+    titre: titre ? { txt: titre.innerText.trim().slice(0, 30), ...R(titre) } : null,
+    sel: sel ? { site: sel.getAttribute('data-site-courant'), ...R(sel) } : null,
+    seg: seg ? { libelles: [...seg.querySelectorAll('.n-segmente-libelle')].map((x) => x.textContent.trim()), ...R(seg) } : null,
+    bordGroupes: minL('.n-groupe-carte, .n-carte-corps, .n-tt-cadre'), bordRangees: minL('.n-rangee, .n-tt-tr'),
+    plein: plein ? { ecartOnglets: onglets && vis(onglets) ? Math.round(onglets.getBoundingClientRect().top - plein.getBoundingClientRect().bottom) : null, l: Math.round(plein.getBoundingClientRect().left), w: Math.round(plein.getBoundingClientRect().width) } : null,
+    debord: document.documentElement.scrollWidth > innerWidth + 1,
+  };
+}
+async function sitesPlanches() {
+  await new Promise((r) => P.srv.listen(P.PORT, r));
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  const base = () => { const b = E.baseFiches(); for (const s of ['leboncoin', 'ebay', 'vestiaire']) { const x = baseSite(s); b.rows.push(...x.rows.filter((r) => /^(lbc_|ebay_|vc_)/.test(r.id))); } return b; };
+  const variantes = liste('VARIANTES', '390:clair,390:sombre,1512:clair').map((v) => v.split(':'));
+  const ongletsVoulus = liste('ONGLETS', ONGLETS_PLANCHE.map((o) => o[0]).join(','));
+  const releve = [];
+  let rouges = 0; const dit = (ok, quoi, d) => { if (!ok) rouges++; console.log((ok ? '  ✅ ' : '  ❌ ') + quoi + (ok || d === undefined ? '' : ' — ' + JSON.stringify(d).slice(0, 500))); };
+  try {
+    for (const [fen, th] of variantes) for (const site of SITES_PLANCHE) {
+      const o = await P.ouvrir(nav, { W: Number(fen), sombre: th === 'sombre', b: base(), url: '/?tab=journee', api: B.apiVolume });
+      await o.pg.evaluate((s) => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_site_courant', JSON.stringify(s)); } catch (_) {} }, site);
+      for (const [cle, url] of ONGLETS_PLANCHE.filter((x) => ongletsVoulus.includes(x[0]))) {
+        try {
+          await o.pg.goto(`http://localhost:${P.PORT}/${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); await o.pg.waitForTimeout(ATTENTE);
+          await o.pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast, .n-toast button')) t.click(); }).catch(() => {});
+          await o.pg.waitForTimeout(300);
+          const sq = await o.pg.evaluate(squelette);
+          const f = path.join(SORTIE, 'ecrans', `site-${cle}-${site}-${fen}-${th}.png`);
+          await o.pg.screenshot({ path: f }).catch(() => {});
+          releve.push({ fen, th, site, onglet: cle, sq, erreurs: o.erreurs.slice(0, 3) });
+          console.log(`· ${fen} ${th} ${site} ${cle} : titre ${sq.titre ? sq.titre.txt : '—'} · sélecteur ${sq.sel ? sq.sel.site + '@' + sq.sel.t : '—'} · segments ${sq.seg ? sq.seg.libelles.join('/') : '—'} · bords ${sq.bordGroupes}/${sq.bordRangees} · plein ${sq.plein ? sq.plein.ecartOnglets : '—'}`);
+        } catch (e) { console.log(`❌ ${fen} ${th} ${site} ${cle} : ${String(e.message || e).slice(0, 160)}`); }
+      }
+      await o.ctx.close();
+      fs.writeFileSync(path.join(SORTIE, 'sites.json'), JSON.stringify(releve, null, 1));
+    }
+    // PARITÉ du squelette entre les 4 sites (Tous a le sien : la même chose, sans sélection de site).
+    console.log('\n── Parité du squelette (Vinted · Leboncoin · eBay · Vestiaire)');
+    const t1 = (a, b) => a == null || b == null ? a === b : Math.abs(a - b) <= 1;
+    for (const [fen, th] of variantes) for (const cle of ongletsVoulus) {
+      const l = releve.filter((r) => r.fen === fen && r.th === th && r.onglet === cle && r.site !== 'toutes');
+      if (l.length < 2) continue;
+      const ref = l[0].sq; const ecarts = [];
+      for (const r of l.slice(1)) {
+        const q = r.sq, n = r.site;
+        if (!!q.titre !== !!ref.titre || (q.titre && !t1(q.titre.t, ref.titre.t))) ecarts.push(n + ' : titre');
+        if (!q.sel || !ref.sel || !t1(q.sel.t, ref.sel.t) || !t1(q.sel.l, ref.sel.l) || !t1(q.sel.h, ref.sel.h)) ecarts.push(n + ' : sélecteur');
+        if (!!q.seg !== !!ref.seg || (q.seg && (q.seg.libelles.join('/') !== ref.seg.libelles.join('/') || !t1(q.seg.t, ref.seg.t)))) ecarts.push(n + ' : segments ' + (q.seg ? q.seg.libelles.join('/') : '—') + ' ≠ ' + (ref.seg ? ref.seg.libelles.join('/') : '—'));
+        if (q.bordGroupes != null && ref.bordGroupes != null && !t1(q.bordGroupes, ref.bordGroupes)) ecarts.push(n + ` : bord des groupes ${q.bordGroupes} ≠ ${ref.bordGroupes}`);
+        if (q.bordRangees != null && ref.bordRangees != null && !t1(q.bordRangees, ref.bordRangees)) ecarts.push(n + ` : bord des rangées ${q.bordRangees} ≠ ${ref.bordRangees}`);
+        if (q.plein && ref.plein && (!t1(q.plein.l, ref.plein.l) || !t1(q.plein.w, ref.plein.w) || !t1(q.plein.ecartOnglets, ref.plein.ecartOnglets))) ecarts.push(n + ' : place du plein');
+        if (q.debord) ecarts.push(n + ' : page plus large que l\'écran');
+        if (r.erreurs.length) ecarts.push(n + ' : erreur ' + r.erreurs[0]);
+      }
+      dit(!ecarts.length, `${fen} ${th} ${cle} : même squelette sur les 4 sites (réf. ${l[0].site})`, ecarts);
+    }
+    // Planches : une par variante, 5 lignes (onglets) × 5 colonnes (choix du sélecteur).
+    for (const [fen, th] of variantes) {
+      const tel = Number(fen) < 600;
+      const img = (f) => (fs.existsSync(f) ? `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}">` : '<i>—</i>');
+      const lignes = ongletsVoulus.map((cle) => `<tr><th>${cle}</th>${SITES_PLANCHE.map((s) => `<td>${img(path.join(SORTIE, 'ecrans', `site-${cle}-${s}-${fen}-${th}.png`))}</td>`).join('')}</tr>`).join('');
+      const html = `<!doctype html><meta charset="utf-8"><style>body{margin:12px;font:14px -apple-system,system-ui,sans-serif;background:#ccc}td{padding:4px;vertical-align:top}th{writing-mode:vertical-rl;transform:rotate(180deg)}img{width:${tel ? 390 : 756}px;display:block;border:1px solid #999}</style>
+        <h1>Sélecteur × onglets · ${fen} · ${th}</h1><table><tr><th></th>${SITES_PLANCHE.map((s) => `<td><b>${s}</b></td>`).join('')}</tr>${lignes}</table>`;
+      const f = path.join(SORTIE, `planche-sites-${fen}-${th}.html`); fs.writeFileSync(f, html);
+      const ctx = await nav.newContext({ viewport: { width: tel ? 2050 : 3900, height: 1200 } }); const pg = await ctx.newPage();
+      await pg.goto('file://' + f); await pg.screenshot({ path: path.join(SORTIE, `planche-sites-${fen}-${th}.png`), fullPage: true }); await ctx.close(); fs.unlinkSync(f);
+      console.log('planche : ' + path.join(SORTIE, `planche-sites-${fen}-${th}.png`));
+    }
+  } finally { await nav.close(); P.srv.close(); }
+  console.log(rouges ? `\n❌ parité des sites : ${rouges} écart(s)` : '\n✅ parité des sites : même squelette partout'); if (rouges) process.exitCode = 1;
+}
+
+if (require.main === module && process.argv[2] === '--sites') sitesPlanches();
+else if (require.main === module && process.argv[2] === '--annonces') annoncesComptes();
 else if (require.main === module && process.argv[2] === '--selecteur') selecteur();
 else if (require.main === module && process.argv[2] === '--formes') formes(process.argv.slice(3));
 else if (require.main === module && process.argv[2] === '--fusion') { const r = lireDossiers(process.argv.slice(3)); ecrire(r); console.log(tableau(r.map(resumer))); }

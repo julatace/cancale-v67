@@ -66874,8 +66874,9 @@ function AppCoeur() {
           {t === 'ventes' && !titreDansCoque && !(designV2App && v2VentesColis && !baseKO) ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           {designV2App && t === 'achats' && !baseKO
             /* (17 nov., audit visuel A3) « Ajouter un achat » : plein COMPACT sur la ligne du titre (jamais posé sur la liste). */
-            ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
-                onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}>{tr('v2.achats.ajouterCourt')}</BoutonV2></div>
+            /* (20 nov., « téléphone bâclé ») UNE forme d'action à droite du titre : un rond 44, comme la loupe d'à côté. */
+            ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><Rond icone="plus" label={tr('v2.achats.ajouterCourt')} titre={tr('v2.achats.ajouterCourt')} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
+                onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}/></div>
             : designV2App && t === 'annonces' && !baseKO
             /* (17 nov., nouveau design) Annonces : la liste d'abord — le geste plein est COMPACT, en haut à droite de la ligne du
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */

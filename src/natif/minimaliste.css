@@ -24,6 +24,8 @@ html body :is(.sb-plaque, .sb-plaque small, .vg-ms-vue.is-on, .vrm-seg .vrm-seg-
 html body .sb-plaque { box-shadow: inset 0 0 0 .5px var(--ap-filet) !important; }
 /* Paramètres : « Mis à jour à 08:42 » (une pastille flottante) et la catégorie choisie du sommaire. */
 html body .vrm-neuf { box-shadow: none !important; background: transparent !important; }
+/* (20 nov., « téléphone bâclé ») Au téléphone, plus de « Mis à jour à 10:40 » flottant sur le contenu. */
+@media (max-width: 1023px) { html body .vrm-neuf { display: none !important; } }
 html body .vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { box-shadow: none !important; }
 /* Paramètres : la carte du profil (filet) ⇒ un groupe blanc uni. */
 html body .vrm-set-profil { border: 0 !important; box-shadow: none !important; background: var(--ap-carte) !important; }
@@ -39,13 +41,7 @@ html body :is(#vrm-contenu, .vrm-fs, [role="dialog"]) :is(summary, .vrm-lien-act
 html body .vrm-buy-more { min-width: 44px !important; min-height: 44px !important; }
 html body .vrm-bandeau-abo-geste { min-width: 44px !important; justify-content: center; }
 
-/* ══ 5. Publier ailleurs : la liste des articles est UN groupe (rangées à filet décalé), pas des cartes empilées ══ */
-html body .vrm-pa-paires { gap: 0 !important; border-radius: 12px; overflow: hidden; background: var(--ap-carte); }
-html body .vrm-pa-paires > li + li > button { background-image: linear-gradient(var(--ap-filet), var(--ap-filet)) !important; background-size: calc(100% - 72px) .5px !important; background-position: right top !important; background-repeat: no-repeat !important; }
-html body .vrm-pa-paires button { border-radius: 0 !important; box-shadow: none !important; background: var(--ap-carte) !important; }
-html body :is(.vrm-pa-article, .vrm-pa-site) { border-radius: 12px !important; box-shadow: none !important; }
-html body .vrm-pa-cherche { box-shadow: none !important; background: var(--ap-remplir) !important; }
-
+/* ══ 5. Publier ailleurs : UN groupe à filets décalés — écrit dans src/styles-publier-ailleurs.css (sa feuille). ══ */
 }
 
 /* ══ 6. Ventes · Leboncoin en rangées natives (20 nov., « les mêmes dispositions sur toutes les plateformes ») : le segment
