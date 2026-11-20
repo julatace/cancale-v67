@@ -938,8 +938,21 @@ import ModeRelais from "./ModeRelais.jsx";
 import ModeDepot from "./ModeDepot.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
-import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
+import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+// (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
+// ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
+// crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
+let M_NOUVEAUTES = null;
+const chargerNouveautes = () => import('./nouveautes.js').then((m) => { M_NOUVEAUTES = m; return m; });
+const nouveautesAVoir = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesAVoir(...a) : []);
+const nouveautesDuCompte = (...a) => (M_NOUVEAUTES ? M_NOUVEAUTES.nouveautesDuCompte(...a) : []);
+const lireVuesNouveautes = (r) => (M_NOUVEAUTES ? M_NOUVEAUTES.lireVues(r) : {});
+// (20 nov., iphone-rapide) Les composants « Quoi de neuf » à la demande avec leur liste ; leur feuille de style reste
+// importée ICI (la cascade ne bouge pas).
+import './quoi-de-neuf.css';
+const QuoiDeNeufCarte = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufCarte })));
+const QuoiDeNeufFeuille = aLaDemandeFeuille(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufFeuille })));
+const QuoiDeNeufReglage = aLaDemandeDiscret(() => import('./QuoiDeNeuf.jsx').then((m) => ({ default: m.QuoiDeNeufReglage })));
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
 import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache, poserSitesRelies, siteDeLigne } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
@@ -7425,7 +7438,7 @@ const oublierDressing = (uid) => {
 // ── ACTIVITÉ RÉSEAU (barre de chargement en haut) ───────────────────────────
 // Tous les chargements de données passent par fetchHarvest (moisson) ou
 // vintedApiCall (Vinted). On compte les requêtes en cours à cet endroit unique,
-// et <TopProgress/> affiche une fine barre tant qu'il en reste. Résultat :
+// et (jusqu'au 20 nov.) une fine barre s'affichait tant qu'il en restait. Résultat :
 // l'utilisateur voit TOUJOURS que l'app travaille, sur n'importe quel écran,
 // sans avoir à câbler un indicateur dans chaque composant.
 let _busy = 0;
@@ -20479,36 +20492,6 @@ function Toaster() {
   return dansFiche ? createPortal(pile, zoneFiche) : pile;
 }
 
-function TopProgress() {
-  const [busy, setBusy] = React.useState(false);
-  const [pct, setPct] = React.useState(0);
-  const [show, setShow] = React.useState(false);
-  React.useEffect(() => onBusy(setBusy), []);
-  React.useEffect(() => {
-    let t;
-    if (busy) {
-      setShow(true); setPct(p => (p > 0 && p < 90 ? p : 8));
-      // Progression qui s'essouffle : jamais 100 % tant que ça charge.
-      t = setInterval(() => setPct(p => (p >= 90 ? 90 : p + Math.max(0.6, (90 - p) * 0.08))), 180);
-    } else {
-      setPct(100);
-      t = setTimeout(() => { setShow(false); setPct(0); }, 340);
-    }
-    return () => { clearInterval(t); clearTimeout(t); };
-  }, [busy]);
-  if (!show) return null;
-  return (
-    <div aria-hidden="true" style={{position:'fixed',top:0,left:0,right:0,height:3,zIndex:200,pointerEvents:'none',background:'transparent'}}>
-      <div style={{
-        height:'100%', width:`${pct}%`,
-        background:C.accent,
-        borderRadius:'0 999px 999px 0',
-        transition:'width .22s ease, opacity .3s ease',
-        opacity: pct>=100 ? 0 : 1,
-      }}/>
-    </div>
-  );
-}
 
 // ── LE SHELL D'ORDINATEUR ───────────────────────────────────────────────────
 // ⚠️ Julien : « le rendu est presque pareil, je veux quelque chose qui
@@ -63194,7 +63177,10 @@ function useQuoiDeNeuf() {
     // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
     vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
-  const marquer = (ids) => { const suite = marquerNouveautesVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); };
+  const [, setCharge] = React.useState(!!M_NOUVEAUTES);
+  React.useEffect(() => { if (!M_NOUVEAUTES) chargerNouveautes().then(() => setCharge(true), () => {}); }, []);
+  // « Vu » ne se marque qu'après un toucher sur la carte (donc la liste chargée) ; sinon, on attend la liste.
+  const marquer = (ids) => { const faire = (m) => { const suite = m.marquerVues(load(CLE_NOUVEAUTES_VUES, null), ids); save(CLE_NOUVEAUTES_VUES, suite); setVues(suite); }; if (M_NOUVEAUTES) faire(M_NOUVEAUTES); else chargerNouveautes().then(faire, () => {}); };
   // Le profil (Simple/Complet, ce qu'il vend) pas encore posé par la coque, ou le nuage pas encore lu (« vu » sur un
   // autre appareil, son statut) ⇒ rien : jamais un compte faux qui change sous ses yeux ni une carte qui clignote.
   const pret = p.uid === (AUTH.user?.id || '') && !!p.uid && isCloudReady();
@@ -64193,7 +64179,13 @@ function AppCoeur() {
   // quand l'écran change de taille (rotation du téléphone, fenêtre redimensionnée),
   // sinon la page dépasse ou laisse une bande vide.
   React.useEffect(()=>{
-    const onResize=()=>applyZoom(readZoom());
+    // (20 nov., iphone-rapide) Sur l'iPhone, Safari envoie `resize` quand sa barre d'adresse se replie ou revient (à
+    // chaque changement de sens du défilement) : seule la HAUTEUR change. `applyZoom` ne dépend que de la LARGEUR (zoom,
+    // largeur rendue), du réglage de densité et du texte en grand ; le refaire forçait un recalcul de style de tout le
+    // document en plein défilement. Même largeur, même réglage ⇒ rien à refaire. Une rotation (`orientationchange`) refait
+    // toujours tout, comme avant.
+    let derniere=null;
+    const onResize=(e)=>{ const cle=(window.innerWidth||0)+'|'+readZoom()+'|'+lireTailleTexte()+'|'+(window.devicePixelRatio||1); if(e && e.type==='resize' && cle===derniere) return; derniere=cle; applyZoom(readZoom()); };
     onResize();
     window.addEventListener('resize',onResize);
     window.addEventListener('orientationchange',onResize);
@@ -67673,9 +67665,8 @@ function AppCoeur() {
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
         </>}/> : null}
-      {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
-          chargement, sur n'importe quel écran. */}
-      <TopProgress/>
+      {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
+          restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
