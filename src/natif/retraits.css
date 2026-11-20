@@ -108,7 +108,7 @@
 
 }
 @layer vrm-natif {
-  .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+  .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; min-height: 44px; display: flex; align-items: center; }   /* (20 nov., intégration) 44 au doigt (lisible-partout Z) */
   .n-rp-code-btn b { font: inherit; }
   .n-rp-code-btn:active { background: var(--n-appui); }
   .n-rp-code-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
