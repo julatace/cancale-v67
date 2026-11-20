@@ -260,6 +260,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         </Groupe> : null}
         {articles === undefined ? <Attente forme="rangees" n={6} vignette={56} titre/>
           : articles === null ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')} detail={manque}/>
+          // (20 nov., chasse-bugs) Rien d'affiché ET une lecture ratée (`manque`) : « VRM n'a pas pu lire », jamais « Aucune annonce » (§5 : rien lu ≠ rien).
+          : !liste.length && manque && !recherche ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')}/>
           : !liste.length ? <Vide icone={Icon ? <Icon name="tag" size={40}/> : null} phrase={recherche ? tr('egalite.videRecherche') : tr('egalite.vide.' + filtre.etat)}/>
           : ordinateur ? tableau
           : <Groupe attrs={{ 'data-eg-liste': '' }}>{visibles.map(rangee)}</Groupe>}

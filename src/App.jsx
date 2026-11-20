@@ -42387,10 +42387,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   useEssentiel(curSub==='bordereaux' ? 'bordereaux' : null, ((labelsPrets && (emailBords !== null || emailBordsKO)) || (accountsReady && !accounts.length) || baseKO) ? true : undefined);
   // (6 nov.) Les chiffres que CET écran publie (§11) : tant qu'il les prépare, une carte
   // qui ne les a jamais reçus dit « lecture… », jamais « pas lu » (src/preparations.js).
-  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, Array.isArray(listings.items) && !listings.loading);
-  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, Array.isArray(buys.items));
-  usePreparation('vrm_benefice_jours', accounts.length > 0, Array.isArray(sales.items));
-  usePreparation('vinted_urssaf_mois', accounts.length > 0, Array.isArray(sales.items));
+  // (20 nov., chasse-bugs) La borne part aussi d'une lecture RATÉE (`error`, liste jamais arrivée) : sinon la carte disait
+  // « lecture… » sans fin (banc etats-vides, « Bénéfice · mois : pas su, lecture… » à 1512 base en panne).
+  const repondue = (x) => !!(x && (Array.isArray(x.items) || x.error));
+  usePreparation('vrm_paires_dorment', litAnnonces && accounts.length > 0, (Array.isArray(listings.items) && !listings.loading) || !!listings.error);
+  usePreparation('vrm_colis_retirer', litAchats && accounts.length > 0, repondue(buys));
+  usePreparation('vrm_benefice_jours', accounts.length > 0, repondue(sales));
+  usePreparation('vinted_urssaf_mois', accounts.length > 0, repondue(sales));
   const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
@@ -50546,8 +50549,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // (revue du 23 oct.) E-mails de suivi pas encore lus (ou lecture ratée)
           // ⇒ « — » : un total fait des seuls colis vus par Vinted est partiel.
           { id:'retirer', ic:'box', l:'À retirer', t:tuiles.retirer, tab:'retraits', titrePasSu: trackingKO ? "E-mails de suivi pas lus — ouvre Colis pour réessayer" : null, pasSu: loading || pasLuComptes || tracking === null || (accounts.length>0 && (buys.items==null || achatsKO) && !(tuiles.retirer && tuiles.retirer.n)) },
-          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null },
-          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null },
+          { id:'messages', ic:'chat', l:'Messages', t:tuiles.messages, tab:tuiles.messages && tuiles.messages.versEbay ? 'ebay_messages' : 'cat_msg', pasSu: loading || convs.items == null || (convs.error && !(convs.items||[]).length) },   // (20 nov., chasse-bugs) lecture ratée (`[]` + error) : « — », jamais « Aucun message non lu »
+          { id:'prix', ic:'tag', l:'Prix à baisser', t:tuiles.prix, tab:'cat_annonces', pasSu: loading || listings.items == null || (listings.error && !(listings.items||[]).length) },
         ];
         // ── (3 nov., Julien : « les PHOTOS en tout petit, superposées ») LES PHOTOS DE CHAQUE
         // CASE, PAR IDENTITÉ SEULEMENT (§5) : la photo que porte la vente / l'achat / la
