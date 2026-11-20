@@ -24,4 +24,4 @@ html body .vrm-cv-periode button, html body .vrm-cv-periode [role="radio"] { min
 }
 /* (20 nov., chasse-bugs-2) Dans l'espace Argent, la règle des segments (`:root×6 … .vrm-seg .vrm-seg-btn { min-width: 0 !important }`)
    ramenait « 30 j » / « 90 j » à 40 px de large au doigt : la cible reste de 44 px (banc parcours-chasse). */
-:root:root:root:root:root:root:root body .vrm-cv-periode .vrm-seg-btn, :root:root:root:root:root:root:root body .vrm-cv-periode button { min-width: 44px !important; }
+:root:root:root:root:root:root:root:root body .vrm-cv-periode .vrm-seg-btn, :root:root:root:root:root:root:root:root body .vrm-cv-periode button { min-width: 44px !important; }

@@ -5666,7 +5666,8 @@ function RevenirEnArriere() {
   const [fait, setFait] = React.useState(null);
   const [deplie, setDeplie] = React.useState({});
   const relire = React.useCallback(() => { listerPointsServeur().then(setRows); }, []);
-  React.useEffect(() => { relire(); _pointsAbonnes.add(relire); const off = onCloudReady(relire); return () => { _pointsAbonnes.delete(relire); if (typeof off === 'function') off(); }; }, [relire]);
+  // (20 nov., chasse-bugs-2) Nuage déjà prêt : `onCloudReady` rappelle TOUT DE SUITE — la liste partait deux fois à chaque ouverture.
+  React.useEffect(() => { if (!isCloudReady()) relire(); _pointsAbonnes.add(relire); const off = onCloudReady(relire); return () => { _pointsAbonnes.delete(relire); if (typeof off === 'function') off(); }; }, [relire]);
   const points = Array.isArray(rows) ? lirePoints(rows) : [];
   const calculer = (snap, suivant) => {
     const a = apercuRestauration({ point: snap, actuel: lireCleRestauration, plusRecent: suivant, cleNum, numerosAilleurs: numerosPortesAilleurs() });

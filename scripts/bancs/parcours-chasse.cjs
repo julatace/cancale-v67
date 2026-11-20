@@ -110,7 +110,10 @@ const sonde = (pg, tactile) => pg.evaluate((tactile) => {
   for (const e of document.querySelectorAll('h1,h2,h3,button,[role="row"] span,.n-rangee-titre,.n-titre')) {
     if (!vis(e) || !e.childElementCount === false) continue;
     const s = getComputedStyle(e);
-    if (e.scrollWidth > e.clientWidth + 2 && s.overflow !== 'visible' && s.textOverflow !== 'ellipsis' && !/clamp/.test(s.webkitLineClamp || '') && s.whiteSpace !== 'normal') coupes.push((e.innerText || '').trim().slice(0, 30));
+    // La largeur du TEXTE (une plage), pas `scrollWidth` : un grand titre à approche négative débordait de 1 à 3 px sans rien couper.
+    if (e.getBoundingClientRect().width <= 2) continue;   // texte pour lecteur d'écran seul (`vrm-sr-seul`, 1 px)
+    const rg = document.createRange(); rg.selectNodeContents(e); const lt = rg.getBoundingClientRect().width;
+    if (lt > e.getBoundingClientRect().width + 2 && s.overflowX !== 'visible' && s.textOverflow !== 'ellipsis' && !/clamp/.test(s.webkitLineClamp || '') && s.whiteSpace !== 'normal') coupes.push((e.innerText || '').trim().slice(0, 30));
     if (coupes.length > 4) break;
   }
   return { texte: texte.slice(0, 160), faux, garde, souci, deborde, petites: petites.slice(0, 8), nPetites: petites.length, coupes, minuteries: window.__minuteries ? window.__minuteries() : -1 };
@@ -126,10 +129,12 @@ async function main() {
       const base = BASES[cond]();
       const { ctx, pg, J } = await ouvrir(nav, cond, W, base);
       const tactile = W < 600;
-      const minut = [];
+      const minut = [], premiere = {};
       try {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForSelector('.vrm-main, main', { timeout: 30000 }).catch(() => {});
+        // L'écran de démarrage (index.html) posé par-dessus : ce qu'il cache, personne ne le lit.
+        await pg.waitForFunction(() => { const d = document.getElementById('vrm-demarrage'); return !d || d.hasAttribute('data-sortie') || getComputedStyle(d).opacity === '0'; }, null, { timeout: 40000 }).catch(() => {});
         for (const tab of ONGLETS) {
           const T = `[${cond} ${W} ${tab}${HORS_CHANTIER.has(tab) ? ' (autre chantier)' : ''}]`;
           const avant = J.erreurs.length, l0 = J.lectures.length, t0 = Date.now();
@@ -168,14 +173,20 @@ async function main() {
             dit(!fiche.faux.length, `${T} fiche : aucun « undefined / NaN »`, fiche.faux.join(' | '));
             dit(!fiche.deborde, `${T} fiche : rien ne déborde`, fiche.deborde);
           }
+          // Une fuite : le MÊME onglet, revu, n'a pas plus de minuteries qu'à sa première visite (les singletons démarrés une fois sont permis).
+          if (premiere[tab] == null) premiere[tab] = s.minuteries;
           minut.push(`${tab}:${s.minuteries}`);
         }
-        // Une fuite de minuteries : retour sur Ma journée, le compte doit revenir près du premier.
-        await pg.evaluate(() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=journee' })); } catch (_) {} });
-        await pg.waitForTimeout(2500);
+        // Une fuite de minuteries : après le tour, les minuteries uniques (démarrées une fois par l'app) sont toutes là ; un second
+        // passage sur Ma journée, Ventes et Achats ne doit rien ajouter à ce qu'il y avait au DERNIER onglet du tour.
+        const apresTour = Number(String(minut[minut.length - 1] || ':0').split(':').pop());
+        for (const t of (cond === 'lente' ? [] : ['journee', 'ventes', 'achats']).filter((x) => ONGLETS.includes(x))) {
+          await pg.evaluate((x) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=' + x })); } catch (_) {} }, t);
+          await pg.waitForTimeout(2500);
+          const v = await pg.evaluate(() => (window.__minuteries ? window.__minuteries() : -1));
+          dit(v <= Math.max(apresTour, premiere[t] == null ? 0 : premiere[t]) + 2, `[${cond} ${W} ${t}] revu après le tour : les minuteries ne s'accumulent pas (fin du tour ${apresTour}, 1re visite ${premiere[t]} → ${v})`);
+        }
         const fin = await pg.evaluate(() => (window.__minuteries ? window.__minuteries() : -1));
-        const debut = Number(String(minut[0] || ':0').split(':')[1]);
-        dit(fin <= debut + 4, `[${cond} ${W}] les minuteries ne s'accumulent pas d'un onglet à l'autre (Ma journée ${debut} → après le tour ${fin})`, minut.join(' '));
         resume.push(`${cond} ${W} : minuteries ${minut.join(' ')} → ${fin}`);
       } catch (e) { dit(false, `[${cond} ${W}] le parcours a pu jouer`, e && e.message); }
       await ctx.close();
