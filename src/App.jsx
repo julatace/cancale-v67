@@ -45740,6 +45740,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [glisserOuvert, fileAchat, fileVendus, fileVendusTous, fileAchatHorsLigne, articlesSitesGlisser, numeros]);
   const relierGlisse = async (a, cible) => {
     if (!a || !cible) return false;
+    if (cible.article) return relierGlisseSite(a, cible);
+    const w = await ecritureRelierAchat(a); if (!w) return false;
+    // (16 nov.) Le même geste que toute liaison : le bénéfice et « Reçu » dans la pilule, annulable 5 s.
+    const o = cible.genre === 'vente' ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible.tx)) || null : null;
+    const it = cible.genre === 'annonce' ? (listings.items || []).find((x) => x && String(x.id) === String(cible.id)) || null : null;
+    return confirmerLiaison(a, { ...cible, o, item: it }, w);
+  };
+  const relierGlisseSite = async (a, cible) => {
     const w = await ecritureRelierAchat(a); if (!w) return false;
     // (20 nov.) Une annonce d'un AUTRE site : le lien sur SON annonce (`opsFait`, src/articles/modele.js — la même écriture
     // que « Acheté » d'Annonces), relue juste avant ; carte pas lue ⇒ rien. Un geste annulable, comme toute liaison.
@@ -45752,10 +45760,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       setFaitsSitesTic((t) => t + 1);
       return true;
     }
-    // (16 nov.) Le même geste que toute liaison : le bénéfice et « Reçu » dans la pilule, annulable 5 s.
-    const o = cible.genre === 'vente' ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible.tx)) || null : null;
-    const it = cible.genre === 'annonce' ? (listings.items || []).find((x) => x && String(x.id) === String(cible.id)) || null : null;
-    return confirmerLiaison(a, { ...cible, o, item: it }, w);
+    return false;
   };
   const relierAchatCle = async (key, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
