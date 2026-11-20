@@ -27,7 +27,7 @@ function NumeroSuivi({ suivi }) {
   const copier = async (e) => { e.stopPropagation(); try { await navigator.clipboard.writeText(suivi.n); setCopie(true); setTimeout(() => setCopie(false), 1500); } catch (_) {} };
   return (
     <span className="n-tt-suivi" data-achat-suivi={suivi.n}>
-      <button type="button" className="n-eg-cellule n-tt-suivi-n" data-suivi-copier={suivi.n} aria-label={tr('tableau.copierSuivi', { n: suivi.n })} title={tr('tableau.copierSuivi', { n: suivi.n })} onClick={copier}>
+      <button type="button" className="n-tt-suivi-n" data-suivi-copier={suivi.n} aria-label={tr('tableau.copierSuivi', { n: suivi.n })} title={tr('tableau.copierSuivi', { n: suivi.n })} onClick={copier}>
         {copie ? tr('tableau.copie') : suivi.n}</button>
       {suivi.lien && suivi.lien.url ? <a className="n-tt-suivi-lien" href={suivi.lien.url} target="_blank" rel="noreferrer" data-suivi-lien={suivi.lien.site ? 'transporteur' : 'recherche'}
         aria-label={tr('tableau.suivreChez')} title={tr('tableau.suivreChez')} onClick={(e) => e.stopPropagation()}>↗</a> : null}
