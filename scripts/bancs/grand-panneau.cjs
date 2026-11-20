@@ -53,7 +53,11 @@ VEN[0].transporteur = 'Chronopost'; VEN[0].transporteurCle = 'chronopost'; VEN[2
 VEN.forEach((x, i) => { x.statutVinted = ['Envoie le colis avant le 23 nov.', 'Bordereau en préparation', 'Colis en route vers l’acheteur', 'Commande finalisée', 'Commande annulée'][i]; });
 MSG.forEach((x, i) => { if (i % 2 === 0) x.avatar = img('p' + i); });
 const CADENCE = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90, poses: [] };
-const AUTO = { cadence: CADENCE, offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', textes: ['Bonjour {pseudo}, une offre rien que pour toi.', 'Salut {pseudo} ! Je te fais un prix.', 'Hello {pseudo}, elle t’attend.'], auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
+// 5.410.4 : les réglages « comme Bleam » de CE compte, tels que le fond les rend (bleamDe : chaque section, éteinte sauf le bordereau).
+const BLEAM = { bordereau: { actif: true, colissimo: 'relais' }, msgVente: { actif: false, textes: ['Merci pour ton achat, je prépare ton colis !', 'Merci beaucoup, le colis part vite.'] }, msgFinalise: { actif: false, textes: [] }, msgRelais: { actif: false, textes: [], heures: 24 }, msgEvaluation: { actif: false, textes: [], heures: 24 }, eval5: { actif: false, textes: [] },
+  stockAuto: { actif: false, stock: { 12: 3 } }, cycle: { actif: false, strategie: 'anti', etapes: [{ apres: 7, action: 'baisse', pct: 10 }, { apres: 10, action: 'republier' }], repeter: 7, plafondPct: 20, ensuite: 0, rythme: { repub: { min: 5, max: 10 }, prix: { min: 5, max: 10 }, jours: [1, 2, 3, 4, 5], heureDebut: 9, heureFin: 21 } },
+  favoris: { actif: false, noteMin: 0, parArticle: 0, periodeJours: 0, apresMin: 0, reecrireJours: 1 }, sauvegarde: { actif: false }, dressing: { actif: false, tri: 'recentes', filtre: 'toutes' } };
+const AUTO = { bleam: BLEAM, sauvegarde: { at: Date.now() - 20 * 60000, n: 42 }, cadence: CADENCE, offres: { actif: true, minis: 12, refus: true }, favoris: { regle: true, versions: 3, rythme: 'normal', textes: ['Bonjour {pseudo}, une offre rien que pour toi.', 'Salut {pseudo} ! Je te fais un prix.', 'Hello {pseudo}, elle t’attend.'], auto: { actif: false, attenteMin: 10, attenteMax: 60, parJour: 30, parHeure: 12, heureDebut: 9, heureFin: 21 } }, paliers: { actif: true, paliers: [50, 80, 100], remiseMax: null, messages: 2 }, baisse: { actif: false, pct: 5, jours: 14 } };
 const NOTIFS = { vu: T0 - 3 * H, liste: [{ p: 'vinted', c: '111', s: 'ventes', id: '91000000000', t: T0 - H }, { p: 'vinted', c: '111', s: 'codes', id: '91000000002:AB12', t: T0 - 2 * H }, { p: 'vinted', c: '111', s: 'messages', id: '60000@x', t: T0 - 5 * H }, { p: 'vinted', c: '111', s: 'refus', id: 'pause@1', q: 'pause', t: T0 - 2 * J }] };
 const OFFRES = [{ conv: '60000', prix: 48, tx: '91000000009', oid: '777', item: '7001', titre: 'Adidas Samba OG noires 40', pseudo: 'acheteuse_0' }];
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'shop_sophie' }, offres: OFFRES,
@@ -355,7 +359,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-onglet-b="automatisations"]');
         a = await lire(t.pg);
         await cap(t.pg, N('automatisations'));
-        dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
+        dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off|apresvente:on|stockauto:off|cycle:off|favfiltres:off|sauvegarde:off|dressing:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
         if (mobile) {
           // 5.410.1 : au téléphone, la LISTE seule (aucun titre en double), puis le détail en page poussée avec « ‹ Retour ».
           const lv = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).display !== 'none'); const txt = r.querySelector('.carte').innerText; return { vue: r.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'), detail: vis(r.querySelector('.au6-d')), fois: (txt.match(/Messages aux favoris/g) || []).length }; });
@@ -408,6 +412,47 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         a = await lire(t.pg);
         const ra2 = a.envoyes.filter((m) => m.action === 'reglageAuto')[1];
         dit(ra2 && ra2.cle === 'vinted_baisse_regle' && ra2.confirme === true && ra2.valeur.uid === '111' && ra2.valeur.actif === true && ra2.valeur.pct === 10 && ra2.valeur.jours === 14, `${T} : confirmé : la règle de CE compte part (10 % après 14 j)`, JSON.stringify(ra2));
+        // 5.410.4 — « comme Bleam », la suite : chaque section se règle ici, éteinte par défaut, allumer = « Oui, allumer ».
+        await clic(t.pg, '[data-auto-choix="apresvente"]');
+        a = await lire(t.pg);
+        await cap(t.pg, N('bleam-apresvente'));
+        const sec = await t.pg.evaluate(() => [...document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-bm-section]')].map((x) => x.getAttribute('data-bm-section') + ':' + x.querySelector('[data-bm-bascule]').getAttribute('aria-pressed')));
+        dit(sec.join('|') === 'bordereau:true|msgVente:false|msgFinalise:false|msgRelais:false|msgEvaluation:false|eval5:false', `${T} : Après-vente : bordereau, 4 messages, évaluation — chacun son interrupteur`, JSON.stringify(sec));
+        const nAv = a.envoyes.filter((m) => m.action === 'reglageAuto').length;
+        await clic(t.pg, '[data-bm-bascule="msgVente"]');
+        const bmConf = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-bm-confirme="msgVente"]'));
+        a = await lire(t.pg);
+        await cap(t.pg, N('bleam-confirme'));
+        dit(bmConf && a.envoyes.filter((m) => m.action === 'reglageAuto').length === nAv, `${T} : allumer un message après-vente demande « Oui, allumer » ; rien ne part avant`, JSON.stringify({ bmConf }));
+        await clic(t.pg, '[data-bm-oui]');
+        a = await lire(t.pg);
+        const bm1 = a.envoyes.filter((m) => m.action === 'reglageAuto' && m.cle === 'vinted_bleam').pop();
+        dit(bm1 && bm1.confirme === true && bm1.valeur.uid === '111' && bm1.valeur.section === 'msgVente' && bm1.valeur.valeur.actif === true && bm1.valeur.valeur.textes.length === 2, `${T} : confirmé : la section de CE compte part avec SES versions`, JSON.stringify(bm1));
+        await clic(t.pg, '[data-auto-choix="cycle"]');
+        await cap(t.pg, N('bleam-cycle'));
+        const cy = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { strat: [...r.querySelectorAll('[data-bm-choix="cycle.strategie"]')].map((b) => b.getAttribute('data-bm-v') + ':' + b.getAttribute('aria-pressed')).join(','), jours: [...r.querySelectorAll('[data-bm-jour]')].filter((b) => b.getAttribute('aria-pressed') === 'true').length }; });
+        dit(cy.strat === 'anti:true,destock:false,vierge:false' && cy.jours === 5, `${T} : Cycle de vie : stratégies prêtes, jours de la semaine`, JSON.stringify(cy));
+        await clic(t.pg, '[data-bm-choix="cycle.strategie"][data-bm-v="destock"]');
+        await clic(t.pg, '[data-bm-enregistrer]');
+        a = await lire(t.pg);
+        const bm2 = a.envoyes.filter((m) => m.action === 'reglageAuto' && m.cle === 'vinted_bleam').pop();
+        dit(bm2 && bm2.valeur.section === 'cycle' && bm2.valeur.valeur.strategie === 'destock' && bm2.valeur.valeur.actif === false && bm2.confirme === false, `${T} : changer la stratégie (éteinte) part sans confirmation, reste éteinte`, JSON.stringify(bm2));
+        let sv = '';
+        for (const id of ['stockauto', 'favfiltres', 'sauvegarde', 'dressing']) { await clic(t.pg, `[data-auto-choix="${id}"]`); await cap(t.pg, N('bleam-' + id)); if (id === 'sauvegarde') sv = await t.pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-bm-sauve-at]'); return x ? x.textContent : ''; }); }
+        await clic(t.pg, '[data-auto-choix="paliers"]');
+        await cap(t.pg, N('bleam-paliers-plus'));
+        const pp = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { plus: !!r.querySelector('[data-paliers-plus]'), plancher: !!r.querySelector('[data-pp-plancher]'), ex: (r.querySelector('[data-pp-exemple]') || {}).textContent || '' }; });
+        dit(pp.plus && pp.plancher, `${T} : négociation : tranches, flexible, arrondi, bonus de lot, messages par étape ; le plancher absolu dit`, JSON.stringify(pp));
+        await t.pg.evaluate(() => { const ta = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ra-champ="tranches"]'); ta.value = '20-40:6'; ta.dispatchEvent(new Event('input')); });
+        await clic(t.pg, '[data-pp-flexible="oui"]');
+        const ex2 = await t.pg.evaluate(() => (document.getElementById('vrm-badge').shadowRoot.querySelector('[data-pp-exemple]') || {}).textContent || '');
+        await cap(t.pg, N('bleam-tranche'));
+        await clic(t.pg, '[data-ra-enregistrer]');
+        a = await lire(t.pg);
+        const pr = a.envoyes.filter((m) => m.action === 'reglageAuto' && m.cle === 'vinted_offres_paliers').pop();
+        dit(pr && JSON.stringify(pr.valeur.tranches) === '[{"de":20,"a":40,"baisse":6}]' && pr.valeur.flexible && pr.valeur.flexible.actif === true, `${T} : la tranche « 20-40:6 » et « rester flexible » partent à « Enregistrer »`, JSON.stringify(pr && pr.valeur));
+        dit(/30\s*€\s*:\s*24\s*€/.test(ex2) || /€30: €24/.test(ex2), `${T} : l’exemple « Article à 30 € : 24 € au plus bas »`, ex2);
+        dit(/42/.test(sv), `${T} : Sauvegarde : la dernière sauvegarde dite (heure, nombre)`, sv);
         // Notifications.
         await clic(t.pg, '[data-onglet-b="notifications"]');
         a = await lire(t.pg);

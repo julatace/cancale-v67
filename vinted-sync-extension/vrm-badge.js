@@ -2342,6 +2342,11 @@
   //    par défaut ; allumer passe par « Oui, allumer » ; le fond relit et normalise (règle partagée).
   const BM_ITEMS = ['apresvente', 'stockauto', 'cycle', 'favfiltres', 'sauvegarde', 'dressing'];
   const BM_SECTIONS_DE = { apresvente: ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5'], stockauto: ['stockAuto'], cycle: ['cycle'], favfiltres: ['favoris'], sauvegarde: ['sauvegarde'], dressing: ['dressing'] };
+  // Les clés de texte écrites EN ENTIER (audit-extension-feuille L3 : chaque clé utilisée existe).
+  const BM_TITRE = { bordereau: 'bm_s_bordereau', msgVente: 'bm_s_msgVente', msgFinalise: 'bm_s_msgFinalise', msgRelais: 'bm_s_msgRelais', msgEvaluation: 'bm_s_msgEvaluation', eval5: 'bm_s_eval5', stockAuto: 'bm_s_stockAuto', cycle: 'bm_s_cycle', favoris: 'bm_s_favoris', sauvegarde: 'bm_s_sauvegarde', dressing: 'bm_s_dressing' };
+  const BM_JOUR = ['bm_j0', 'bm_j1', 'bm_j2', 'bm_j3', 'bm_j4', 'bm_j5', 'bm_j6'];
+  const BM_TRI = { recentes: 'bm_tri_recentes', anciennes: 'bm_tri_anciennes', vues_plus: 'bm_tri_vues_plus', vues_moins: 'bm_tri_vues_moins', favoris: 'bm_tri_favoris', prix_bas: 'bm_tri_prix_bas', prix_haut: 'bm_tri_prix_haut', republiees: 'bm_tri_republiees' };
+  const BM_STRAT_NOTE = { anti: 'bm_anti_note', destock: 'bm_destock_note', vierge: 'bm_vierge_note' };
   let bmBrouillon = {}, bmConfirme = null, bmEtat = null, bmEnVol = false, bmAnalyse = null;
   const bmLu = (s) => { const b = listes && listes.automatisations && listes.automatisations.bleam; return b && b[s] ? b[s] : null; };
   const bmVal = (s) => Object.assign({}, bmLu(s) || {}, bmBrouillon[s] || {});
@@ -2356,7 +2361,7 @@
   const bmSeg = (s, k, choix) => `<div class="vu-seg vue5" role="group" data-bm-seg="${s}.${k}">${choix.map(([x, l]) => `<button type="button" data-bm-choix="${s}.${k}" data-bm-v="${x}" aria-pressed="${String(bmVal(s)[k]) === String(x)}">${esc(TU(l))}</button>`).join('')}</div>`;
   function bleamDetailHtml(id) {
     if (!listes.automatisations.bleam) return `<p class="note5">${esc(TU('au_pas_su'))}</p>`;
-    const conf = bmConfirme ? `<div class="conf5" role="alertdialog" data-bm-confirme="${esc(bmConfirme.section)}"><p>${esc(TU('ra_confirme_q', { nom: TU('bm_s_' + bmConfirme.section) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    const conf = bmConfirme ? `<div class="conf5" role="alertdialog" data-bm-confirme="${esc(bmConfirme.section)}"><p>${esc(TU('ra_confirme_q', { nom: TU(BM_TITRE[bmConfirme.section] || 'bm_s_cycle') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
     const etat = bmEtat ? `<p class="note5" role="status" data-bm-etat="${bmEtat.ok ? 'ok' : 'ko'}">${esc(bmEtat.texte)}</p>` : '';
     let corps = '';
     if (id === 'apresvente') {
@@ -2375,12 +2380,12 @@
       const etTxt = bmBrouillon.cycle && bmBrouillon.cycle.etapesTexte != null ? bmBrouillon.cycle.etapesTexte : (c.etapes || []).map((e) => e.action === 'republier' ? `${e.apres} republier` : `${e.apres} baisse ${e.pct}`).join('\n');
       const jours = Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6];
       corps = bmSectionHtml('cycle', `<div class="rg6"><span><b>${esc(TU('bm_strategie'))}</b></span>${bmSeg('cycle', 'strategie', [['anti', 'bm_anti'], ['destock', 'bm_destock'], ['vierge', 'bm_vierge']])}</div>`
-        + `<p class="note5" data-bm-strategie-note>${esc(TU('bm_' + (c.strategie || 'anti') + '_note'))}</p>`
+        + `<p class="note5" data-bm-strategie-note>${esc(TU(BM_STRAT_NOTE[c.strategie] || BM_STRAT_NOTE.anti))}</p>`
         + ((c.strategie || 'anti') === 'vierge' ? `<label class="champ6"><b>${esc(TU('bm_etapes'))}</b><small>${esc(TU('bm_etapes_note'))}</small><textarea data-bm-champ="cycle.etapesTexte" rows="4">${esc(etTxt)}</textarea></label>${bmNombre('cycle', 'repeter', 'bm_repeter', 0, 90)}${bmNombre('cycle', 'plafondPct', 'bm_plafond', 1, 50)}` : '')
         + `<h3>${esc(TU('bm_rythme'))}</h3>`
         + `<label class="champ6"><b>${esc(TU('bm_repub_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.min" value="${esc((r.repub || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.max" value="${esc((r.repub || {}).max)}" aria-label="max"></span></label>`
         + `<label class="champ6"><b>${esc(TU('bm_prix_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.min" value="${esc((r.prix || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.max" value="${esc((r.prix || {}).max)}" aria-label="max"></span></label>`
-        + `<div class="rg6"><span><b>${esc(TU('bm_jours'))}</b></span><div class="vu-seg vue5" role="group">${[1, 2, 3, 4, 5, 6, 0].map((j) => `<button type="button" data-bm-jour="${j}" aria-pressed="${jours.includes(j)}">${esc(TU('bm_j' + j))}</button>`).join('')}</div></div>`
+        + `<div class="rg6"><span><b>${esc(TU('bm_jours'))}</b></span><div class="vu-seg vue5" role="group">${[1, 2, 3, 4, 5, 6, 0].map((j) => `<button type="button" data-bm-jour="${j}" aria-pressed="${jours.includes(j)}">${esc(TU(BM_JOUR[j]))}</button>`).join('')}</div></div>`
         + `<label class="champ6"><b>${esc(TU('bm_heures_plage'))}</b><span class="cd6-l"><input type="number" min="0" max="23" data-bm-champ="cycle.r.heureDebut" value="${esc(r.heureDebut)}" aria-label="début"> – <input type="number" min="1" max="24" data-bm-champ="cycle.r.heureFin" value="${esc(r.heureFin)}" aria-label="fin"></span></label>`
         + `<p class="note5">${esc(TU('bm_cycle_plancher'))}</p>`, 'bm_s_cycle');
     } else if (id === 'favfiltres') {
@@ -2393,7 +2398,7 @@
       const sv = listes.automatisations.sauvegarde;
       corps = bmSectionHtml('sauvegarde', `<p class="note5" data-bm-sauve-at="${sv && sv.at ? sv.at : ''}">${esc(sv && sv.at ? TU('bm_sauve_derniere', { quand: depuis(sv.at), n: sv.n }) : TU('bm_sauve_jamais'))}</p>`, 'bm_s_sauvegarde', 'bm_sauve_note');
     } else if (id === 'dressing') {
-      corps = bmSectionHtml('dressing', `<label class="champ6"><b>${esc(TU('bm_tri'))}</b><select class="act5" data-bm-champ="dressing.tri">${['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'].map((k) => `<option value="${k}"${bmVal('dressing').tri === k ? ' selected' : ''}>${esc(TU('bm_tri_' + k))}</option>`).join('')}</select></label><div class="rg6"><span><b>${esc(TU('bm_filtre'))}</b></span>${bmSeg('dressing', 'filtre', [['toutes', 'bm_f_toutes'], ['sauvegardees', 'bm_f_sauve'], ['non', 'bm_f_non']])}</div><p class="note5">${esc(TU('bm_dressing_note'))}</p>`, 'bm_s_dressing');
+      corps = bmSectionHtml('dressing', `<label class="champ6"><b>${esc(TU('bm_tri'))}</b><select class="act5" data-bm-champ="dressing.tri">${['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'].map((k) => `<option value="${k}"${bmVal('dressing').tri === k ? ' selected' : ''}>${esc(TU(BM_TRI[k]))}</option>`).join('')}</select></label><div class="rg6"><span><b>${esc(TU('bm_filtre'))}</b></span>${bmSeg('dressing', 'filtre', [['toutes', 'bm_f_toutes'], ['sauvegardees', 'bm_f_sauve'], ['non', 'bm_f_non']])}</div><p class="note5">${esc(TU('bm_dressing_note'))}</p>`, 'bm_s_dressing');
     }
     return conf + etat + corps + `<div class="pied6" data-bm-pied="${id}"><button type="button" class="vu-lien" data-bm-reinit>${esc(TU('ra_reinit'))}</button><button type="button" class="vu-btn vu-plein" data-bm-enregistrer${bmEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
   }
@@ -2463,7 +2468,7 @@
       + `<div class="rg6"><span><b>${esc(TU('pp_arrondi'))}</b></span><div class="vu-seg vue5" role="group">${[1, 0.5].map((k) => `<button type="button" data-pp-pas="${k}" aria-pressed="${pas === k}">${esc(k === 1 ? '1 €' : '0,50 €')}</button>`).join('')}</div></div>`
       + `<label class="champ6"><b>${esc(TU('pp_bonus'))}</b><small>${esc(TU('pp_bonus_note'))}</small><input type="number" min="0" max="50" step="1" data-ra-champ="bonusLot" value="${esc(b0.bonusLot != null ? b0.bonusLot : (pa.bonusLot || ''))}"></label>`
       + `<h3>${esc(TU('pp_messages'))}</h3><p class="note5">${esc(TU('pp_messages_note'))}</p>`
-      + ['msgAccepte', 'msgContre', 'msgFinale'].map((k) => `<label class="champ6"><b>${esc(TU('pp_' + k))}</b><textarea data-ra-champ="${k}" rows="2">${lg(k)}</textarea></label>`).join('')
+      + [['msgAccepte', 'pp_msgAccepte'], ['msgContre', 'pp_msgContre'], ['msgFinale', 'pp_msgFinale']].map(([k, l]) => `<label class="champ6"><b>${esc(TU(l))}</b><textarea data-ra-champ="${k}" rows="2">${lg(k)}</textarea></label>`).join('')
       + `<label class="champ6"><b>${esc(TU('pp_delais'))}</b><span class="cd6-l"><input type="number" min="1" max="240" data-ra-champ="delaiMin" value="${esc(b0.delaiMin != null ? b0.delaiMin : (d.min || ''))}" aria-label="min"> – <input type="number" min="2" max="240" data-ra-champ="delaiMax" value="${esc(b0.delaiMax != null ? b0.delaiMax : (d.max || ''))}" aria-label="max"></span></label>`
       + `<p class="note5" data-pp-plancher>${esc(TU('pp_plancher_absolu'))}</p></section>`;
   }
