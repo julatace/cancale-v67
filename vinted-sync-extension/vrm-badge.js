@@ -878,7 +878,8 @@
   .table6 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
   .table6 .rangs { margin: 0; padding: 0; list-style: none; }
   .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
-  .table6 .rangs > li, .corps6 .gauche5 .rangs > li, .corps6 .gauche5 .rang { background: var(--n-carte) !important; }
+  .corps6 .table5 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; }
+  .corps6 .table5 .rangs > li, .table6 .rangs > li, .corps6 .gauche5 .rangs > li, .corps6 .gauche5 .rang { background: var(--n-carte) !important; }
   .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
   .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
   .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
