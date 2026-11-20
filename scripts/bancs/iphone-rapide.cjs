@@ -36,27 +36,7 @@ const base = fabriquer({ volumeReel: true, qr: true, ventes: 1500, achats: 800, 
 // (api/_lib/commandes-lecture.js EXÉCUTÉE ici, loi 10), servie au même débit sur ses octets COMPRESSÉS.
 if (process.env.FORME === 'reelle') require(path.join(__dirname, '_commandes-forme.cjs')).formeReelle(base);
 const SESSION = process.env.SESSION ? { access_token: 'aaa.bbb.banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } } : null;
-let _routeCommandes = null;
-async function routeCommandesDuBanc(urlTxt, entetes) {
-  if (!_routeCommandes) _routeCommandes = (await import(require('url').pathToFileURL(path.join(RACINE, 'api', '_lib', 'commandes-lecture.js')).href)).routeCommandesLecture;
-  const avant = globalThis.fetch;
-  // Le fetch du SERVEUR : la session dit qui ; la base du banc (toutes ses lignes sont au vendeur de la session).
-  globalThis.fetch = async (url, o = {}) => {
-    const u = String(url); const h = o.headers || {};
-    if (/\/auth\/v1\/user/.test(u)) return { ok: true, status: 200, json: async () => ({ id: SESSION.user.id, email: SESSION.user.email }) };
-    const own = /[?&]owner=eq\.([^&]+)/.exec(u);
-    const rows = own && decodeURIComponent(own[1]) === SESSION.user.id ? base.rows : [];
-    const rep = repondre(u.replace(/&owner=eq\.[^&]+/, ''), h.Range, { ...base, rows });
-    return { ok: rep.status < 300, status: rep.status, json: async () => rep.body, headers: { get: (k) => (rep.headers || {})[String(k).toLowerCase()] || null } };
-  };
-  const q = Object.fromEntries(new URL(urlTxt).searchParams);
-  const res = { statusCode: 200, h: {}, corps: null, setHeader(k, v) { this.h[k.toLowerCase()] = v; }, status(c) { this.statusCode = c; return this; }, json(o) { this.corps = Buffer.from(JSON.stringify(o)); return this; }, end(b) { this.corps = b == null ? Buffer.alloc(0) : Buffer.from(b); return this; } };
-  try { await _routeCommandes({ method: 'GET', query: q, headers: entetes }, res, { env: { SUPABASE_SERVICE_KEY: 'cle-du-banc' } }); }
-  finally { globalThis.fetch = avant; }
-  const enc = res.h['content-encoding'];
-  const clair = enc === 'br' ? zlib.brotliDecompressSync(res.corps) : enc === 'gzip' ? zlib.gunzipSync(res.corps) : res.corps;
-  return { status: res.statusCode, octets: res.corps.length, clair, etag: res.h.etag || null, cache: res.h['cache-control'] || null };
-}
+const routeCommandesDuBanc = SESSION ? require(path.join(__dirname, '_route-commandes.cjs')).routeCommandes({ base, repondre, uid: SESSION.user.id, panne: process.env.ROUTE === 'panne' ? 'base' : null }) : null;
 const DIST = path.resolve(process.argv[2] || path.join(RACINE, 'dist'));
 const PORT = +(process.argv[3] || process.env.BANC_PORT || (21000 + Math.floor(Math.random() * 9000)));
 const CPU = +(process.env.CPU || 4);
@@ -116,7 +96,8 @@ async function preparer(ctx) {
     const body = JSON.stringify(rep.body);
     const debut = Date.now() - T_NAV;
     await attendre(RTT + Math.round(body.length / DEBIT * 1000));
-    LECTURES.push({ u: decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, '')).slice(0, 140), o: body.length, d: debut, f: Date.now() - T_NAV });
+    const plein = decodeURIComponent(rq.url().replace(/^.*\/rest\/v1\//, ''));
+    LECTURES.push({ u: plein.slice(0, 140), plein: plein + '\n' + (h.range || ''), o: body.length, d: debut, f: Date.now() - T_NAV });
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body });
   });
   await ctx.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: SESSION && r.request().url().includes('mode=confidentialite') ? JSON.stringify({ ok: true, uid: SESSION.user.id })
@@ -208,7 +189,9 @@ async function ouvrirApp(ctx, quand) {
       doublons: LECTURES.length - new Set(LECTURES.map((x) => x.u)).size, lourdes: LECTURES.slice().sort((a, b) => b.o - a.o).slice(0, 8).map((x) => `${Math.round(x.o / 1024)} Ko ${x.d}→${x.f} ms ${x.u}`) },
   };
   if (process.env.LECTURES) { console.log(`  (base ${quand} : ${r.base.lectures} lectures, ${r.base.ko} Ko ; avant « prêt » ${r.base.avantPret} / ${r.base.koAvantPret} Ko ; ${r.base.doublons} en double)`); for (const x of r.base.lourdes) console.log('     ' + x); }
-  if (process.env.LECTURES === '2') { const par = new Map(); for (const x of LECTURES) (par.get(x.u) || par.set(x.u, []).get(x.u)).push(x); for (const [u, l] of par) if (l.length > 1) console.log(`     ×${l.length} ${l.map((x) => x.d + '→' + x.f).join(' ')} ${Math.round(l[0].o / 1024)} Ko ${u.slice(0, 110)}`); }
+  if (process.env.LECTURES === '2') { const par = new Map(); for (const x of LECTURES) { const k = x.plein || x.u; (par.get(k) || par.set(k, []).get(k)).push(x); } for (const [u, l] of par) if (l.length > 1) console.log(`     ×${l.length} ${l.map((x) => x.d + '→' + x.f).join(' ')} ${l.map((x) => Math.round(x.o / 1024)).join('+')} Ko ${u.replace(/\n.*$/, '').slice(0, 110)}`);
+    // (20 nov., lectures-legeres) Les octets lus EN DOUBLE (même adresse complète, même page) : tout sauf la 1re de chaque.
+    let dbl = 0; for (const [, l] of par) for (const x of l.slice(1)) dbl += x.o; console.log(`     octets en double : ${Math.round(dbl / 1024)} Ko`); }
   return { pg, cdp, r };
 }
 

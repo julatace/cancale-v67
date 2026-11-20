@@ -781,6 +781,7 @@ import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
 import { installerLecturesPartagees } from "./lecturesPartagees.js";
+import { creerMemoCourt } from "./memoCourt.js";   // (20 nov., lectures-legeres) lectures lourdes servies 20 s aux voisines
 import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
@@ -9352,6 +9353,23 @@ const TXN_META_SELECT = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,item:me
 // les quelques transactions écrites depuis. Les champs de version s'ajoutent aux cinq
 // (revue colis, intégration) — `cap` (l'heure de la lecture, que le suivi des commandes exige) y est déjà, par `VERSION_META`.
 // (personne ne lit `id`, `cap`… ici). Partagée 60 s, comme `memo` ; un échec n'est pas gardé.
+// (20 nov., lectures-legeres) Deux lectures lourdes servies 20 s à leurs voisines (src/memoCourt.js) : les dates
+// de capture (`lireCapturesDetail`) et les transactions des preuves de vente (`lirePreuvesVenteVinted`). Oubliées à
+// toute écriture qui peut toucher leurs lignes et à tout signal de l'extension (`lecturesPartagees.abonner`), au
+// retour du réseau et à `onCloudReady` ; jamais servies à un autre vendeur ; un « pas su » n'est jamais gardé.
+const MEMO_LECTURES_MS = 20000;
+const _memoCaptures = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const _memoPreuvesTxn = creerMemoCourt({ dureeMs: MEMO_LECTURES_MS });
+const oublierMemosLectures = () => { _memoCaptures.oublier(); _memoPreuvesTxn.oublier(); };
+try {
+  const lp = typeof window !== 'undefined' ? window.__vrmLecturesPartagees : null;
+  if (lp && typeof lp.abonner === 'function') {
+    lp.abonner('app_data?id=like.harvest_*', () => _memoCaptures.oublier());
+    lp.abonner('app_data?id=like.harvest_%25_txn_%25', () => _memoPreuvesTxn.oublier());
+  }
+  if (typeof window !== 'undefined') { window.addEventListener('vrm:ext', oublierMemosLectures); window.addEventListener('online', oublierMemosLectures); }
+} catch (_) {}
+onCloudReady(oublierMemosLectures);
 const TXN_FILTRE = 'id=like.harvest_%25_txn_%25';
 const TXN_COPIE_SELECT = `${VERSION_META},tx:meta->>id,item:meta->>item_id,s:meta->>status,su:meta->>status_updated_at,ss:meta->>ship_status_title`;
 let _txnMeta = null;
@@ -24754,7 +24772,7 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
     setRelu(undefined);
     if (!aLaCoque) setComptesLus(undefined);
     (async () => {
-      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail()]);
+      const [c, caps] = await Promise.all([aLaCoque ? Promise.resolve(comptesCoque) : fetchVintedAccounts(), lireCapturesDetail({ force: !aLaCoque })]);
       if (stop) return;
       setComptesLus(Array.isArray(c) ? c : null);
       setRelu(caps && caps.by ? caps.by : null);
@@ -31856,11 +31874,11 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
 // de l'indicateur le dit (`ligneFraicheur`, src/fraicheurComptes.js).
 // (20 nov., chasse-bugs-2) Plusieurs écrans la demandent au même moment (Paramètres à l'ordinateur : 4 fois en 12 s, banc
 // parcours-chasse) : la lecture EN COURS est partagée, jamais son résultat gardé (une relecture après une écriture repart).
-let _capturesEnVol = null;
-function lireCapturesDetail() {
-  if (_capturesEnVol) return _capturesEnVol;
-  _capturesEnVol = lireCapturesDetailUne().finally(() => { _capturesEnVol = null; });
-  return _capturesEnVol;
+// (20 nov., lectures-legeres) Et la réponse RÉUSSIE sert 20 s aux voisins (banc iphone-rapide : 3 lectures de
+// ~124 Ko en 3 s à l'ouverture) — src/memoCourt.js : même vendeur seulement, oubliée à toute écriture qui peut
+// toucher `harvest_*`, à tout signal de l'extension, à `onCloudReady` ; `{ force: true }` relit (Réessayer).
+function lireCapturesDetail(opts) {
+  return _memoCaptures.lire((AUTH.user && AUTH.user.id) || '', lireCapturesDetailUne, { force: !!(opts && opts.force) });
 }
 async function lireCapturesDetailUne() {
   try {
@@ -32301,7 +32319,8 @@ function ventesParCompteDe(lignes, uids) {
 // ⟦→ ecrans/Ebay.jsx #26⟧
 const lirePreuvesVenteVinted = async (opts = {}) => {
   try {
-    const rows = await lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
+    // (20 nov., lectures-legeres) Servie 20 s aux voisines (`_memoPreuvesTxn`) : ~144 Ko lus deux fois en 3 s au banc.
+    const rows = await _memoPreuvesTxn.lire((AUTH.user && AUTH.user.id) || '', () => lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true }), { force: !!opts.force });
     if (rows === null) return null;
     // Les bordereaux (une ligne par vente, tous comptes, `_latest` écarté par
     // la règle) : deux scalaires de `meta`, jamais le PDF (§4.4).
@@ -35060,7 +35079,7 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => {
     _prechargeComptes = null; _prechargeLancePour = ''; prechargerDemarrage();
     // Les familles gardées (transactions, dates de capture — `lireFamilleCopiee`) : relues par la même
     // règle ; la mémoire de 60 s des transactions est oubliée d'abord. Lectures seules.
-    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail().catch(() => {});
+    _txnMeta = null; lireTxnMeta().catch(() => {}); lireCapturesDetail({ force: true }).catch(() => {});
   } catch (_) {}
 });
 const _persistAcctCacheBientot = ()=>{ if(_persistAcctTimer) return;
@@ -42496,7 +42515,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // donc le seul endroit où un numéro en double coûte vraiment cher. Sans les
   // annonces en ligne, on ne peut pas savoir qu'un numéro est déjà porté par une
   // paire du stock — le détecteur de conflit serait aveugle là où il sert.
-  useEffect(() => { if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
+  // (20 nov., lectures-legeres) Aujourd'hui et Messages ne MONTRENT pas les dressings (~560 Ko au banc) : ils
+  // partent APRÈS les ventes de l'écran ouvert (lues ou en panne), au plus tard 6 s après l'ouverture —
+  // sur la 4G lente de Julien, les deux lectures se partageaient le débit et les ventes arrivaient 3 s plus
+  // tard. Annonces et Bordereaux (le détecteur de doublons) en ont besoin : tout de suite, comme avant.
+  const ventesReglees = !sales.loading && (Array.isArray(sales.items) || !!sales.error);
+  const [dressingsPermis, setDressingsPermis] = useState(false);
+  useEffect(() => { if (dressingsPermis) return; if (ventesReglees) { setDressingsPermis(true); return; } const t = setTimeout(() => setDressingsPermis(true), 6000); return () => clearTimeout(t); }, [ventesReglees, dressingsPermis]);
+  useEffect(() => { const attend = (curSub==='journee'||curSub==='messages') && !dressingsPermis; if ((curSub==='annonces'||curSub==='journee'||curSub==='bordereaux'||curSub==='messages') && !attend && accounts.length && (listings.items===null || (listings.comptes && listings.comptes!==cleComptes))) loadListings(); /* eslint-disable-next-line */ }, [sub, cleComptes, dressingsPermis]);
   useEffect(() => { if ((curSub==='annonces'||curSub==='journee') && emailSales===null) fetchEmailSales().then(setEmailSales); /* eslint-disable-next-line */ }, [sub]);
   useEffect(() => { if ((curSub==='messages'||curSub==='journee') && accounts.length && (convs.items===null || (convs.comptes && convs.comptes!==cleComptes))) loadConvs(); /* eslint-disable-next-line */ }, [sub, cleComptes]);
   // (6 nov.) Ce que CET écran a lu, annoncé à son attente (src/AttenteEcran.jsx) : une liste
