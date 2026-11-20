@@ -16718,7 +16718,8 @@ async function pauseFormulaire(quoi, uid) {
   if (quoi === 'champ') _dernierePauseChamp = ms;
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['formulaire:' + quoi, ms]); } catch (_) {}
   if (_repubSuivi) { try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'repub', id: _repubSuivi, pause: 'formulaire', ms, jusqua: Date.now() + ms })).catch(() => {}); } catch (_) {} }
-  return new Promise((ok) => setTimeout(ok, ms));
+  // Par tranches de 10 s au plus, chacune suivie d'un appel à Chrome : le service worker (MV3, §4.9) reste éveillé.
+  for (let reste = ms; reste > 0; reste -= 10000) { await new Promise((ok) => setTimeout(ok, Math.min(10000, reste))); try { await chrome.storage.local.get(ONGLET_TRAVAIL); } catch (_) {} }
 }
 async function attendreOnglet(tabId, re, ms = 45000) {
   const fin = Date.now() + ms;
