@@ -102,6 +102,19 @@ Disposition d'une rangée : « titre | valeur » puis « sous-titre | détail »
 <Bouton variante="destructif" confirmation="Supprimer pour de bon" onClick={supprimer}>Supprimer l'annonce</Bouton>
 <BoutonIcone libelle="Scanner un colis" icone={<Icon name="scan" size={22}/>} onClick={scanner}/>
 ```
+Ajouts du 20 nov. (chantier « boutons natifs », `docs/passation/2026-11-20-boutons-natifs.md`) :
+- **Un geste réseau ne se double pas** : si `onClick` RENVOIE une promesse, le bouton passe « en cours » tout seul (roue,
+  `aria-busy`) et un 2e toucher ne fait rien (garde synchrone, avant le rendu) ; la promesse rend une phrase ⇒ dite sous le
+  bouton 4 s ; elle échoue ⇒ son message, en ambre. `BoutonIcone` aussi. `useGesteUnique()` pour un contrôle à soi.
+- `taille="compact"` : 32 à la souris (tableau, barre d'outils), toujours 44 au doigt, texte 15/600.
+- `ton="ambre"` : un geste qu'on regrette (Délier, Retirer) en un toucher ; `ajuste` : un plein qui garde sa largeur ;
+  `bloc="contenu"` : l'enveloppe s'efface (le bouton reste l'enfant de la mise en page d'un ancien écran).
+- `BoutonIcone` : `raison` (indisponible), `taille="compact"`.
+- Les relais d'avant DESSINENT ce bouton : `<Bouton>` / `Btn` d'App.jsx (`BoutonBase`, src/composants/Bouton.jsx), `BoutonV2`,
+  l'icône de `BarreOutils`, et `SegmenteBase` / `SegmentV2` le `Segmente` natif. `audit-boutons-natifs` le tient.
+```jsx
+<Bouton variante="plein" onClick={async () => { await imprimer(); return '3 bordereaux imprimés'; }}>Imprimer 3 bordereaux</Bouton>
+```
 
 **Segmente** — 2 à 5 choix (← → au clavier). `n` : un compte discret, pas une pastille.
 ```jsx
