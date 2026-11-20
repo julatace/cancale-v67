@@ -434,7 +434,8 @@ async function annoncesComptes() {
     const plein = document.querySelector('[data-eg-publier]'); const onglets = document.querySelector('.n-onglets');
     const ecart = plein && onglets ? Math.round(onglets.getBoundingClientRect().top - plein.getBoundingClientRect().bottom) : null;
     const inter = [...document.querySelectorAll('.n-tt-intertitre')].map((x) => x.getAttribute('data-tt-groupe'));
-    return { gs, rangees, teintes, ecart, actions: !!document.querySelector('[data-eg-actions].n-bouton-icone-seule, [data-eg-actions]'), inter };
+    const comptesVus = [...new Set([...document.querySelectorAll('tr[data-eg-compte]')].map((x) => x.getAttribute('data-eg-compte')))];
+    return { gs, rangees, teintes, ecart, actions: !!document.querySelector('[data-eg-actions].n-bouton-icone-seule, [data-eg-actions]'), inter, comptesVus };
   });
   try {
     for (const [W, th] of [[390, 'clair'], [390, 'sombre'], [1512, 'clair']]) {
@@ -466,7 +467,8 @@ async function annoncesComptes() {
           await o.pg.screenshot({ path: path.join(SORTIE, 'ecrans', `annonces-comptes-${W}-recherche.png`) }).catch(() => {});
         }
       } else {
-        dit(r.inter.length >= 4 && r.inter.some((c) => c.startsWith('leboncoin:')), `A7 ${W} : un intertitre par compte dans le tableau (${r.inter.join(', ')})`, r.inter);
+        // Le tableau montre ses 50 premières lignes : un intertitre pour CHAQUE compte qu'elles portent, dans l'ordre.
+        dit(r.inter.length >= 1 && r.inter.join('|') === r.comptesVus.join('|'), `A7 ${W} : un intertitre par compte montré dans le tableau (${r.inter.join(', ')})`, r);
       }
       dit(!o.erreurs.length, `${W} ${th} : aucune erreur de page`, o.erreurs.slice(0, 3));
       await o.ctx.close();
