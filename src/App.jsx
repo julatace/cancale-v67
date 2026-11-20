@@ -49803,7 +49803,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // (19 nov., « VRM natif ») Ventes (À envoyer, En route) : l'écran natif pose ses propres marges — ni le cadre de
     // 14–16 px d'avant, ni `data-colis-dans` (que des règles d'avant élargissaient en !important) : la liste reprend sa place.
     // (20 nov., « même bord partout ») la marge de la page : 16 px, comme chaque écran natif (elle était de 14).
-    <div style={{padding: natifVentes ? 0 : colisDans ? '16px 16px 12px' : retraitsOutils ? '0 16px' : '16px 16px 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
+    <div style={{padding: natifVentes ? 0 : colisDans ? '16px var(--n-marge, 16px) 12px' : retraitsOutils ? '0 var(--n-marge, 16px)' : '16px var(--n-marge, 16px) 40px'}} data-colis-dans={natifVentes ? undefined : (colisDans || undefined)} data-colis-natif={natifVentes ? 'ventes' : undefined}>
       <input ref={bordRef} type="file" accept="application/pdf,.pdf" onChange={onBordFile} style={{display:'none'}}/>
       {emballage && (()=>{
         // (1er nov.) Le mode emballage : un portail plein écran (§7, FermeAuRetour).
