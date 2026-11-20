@@ -133,7 +133,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const balayageOnglet = /swipeStart\.current=\{x:t\.clientX/.test(app) || /onTouchEnd=\{[^\n]*\n?[\s\S]{0,400}slideTab\(/.test(app);
     dit(!balayageOnglet || /t\.clientX<BORD_SYSTEME \|\| t\.clientX>\(window\.innerWidth\|\|0\)-BORD_SYSTEME/.test(app), 'un balayage parti du bord est laissé au système (aucun balayage d’onglet au doigt depuis le 9 nov.)');
     // (11 nov., lot DJ3) Colis n'est plus dans la barre : le nombre « à poster » est porté par Ventes SEULE, « à retirer » par Achats seul.
-    dit(/const badgesNav=\{ ventes: colisBadge, achats: retraitsBadge,/.test(app) && !/cat_bord: colisBadge/.test(app) && !/retraits: retraitsBadge/.test(app) && /const n=badgesBarre&&typeof badgesBarre\[t\.id\]==='number'&&badgesBarre\[t\.id\]>0\?badgesBarre\[t\.id\]:0;\s*return \{ cle:t\.id, [^\n]*pastille:n\|\|undefined/.test(app),'dans la barre, le nombre de colis est dit une fois (Ventes à poster, Achats à retirer) (§7)');
+    dit(/const badgesNav=\{ ventes: (?:plusRegler\('ventes',colisBadge\)|colisBadge), achats: (?:plusRegler\('achats',retraitsBadge\)|retraitsBadge),/.test(app) && !/cat_bord: colisBadge/.test(app) && !/retraits: retraitsBadge/.test(app) && /const n=badgesBarre&&typeof badgesBarre\[t\.id\]==='number'&&badgesBarre\[t\.id\]>0\?badgesBarre\[t\.id\]:0;\s*return \{ cle:t\.id, [^\n]*pastille:n\|\|undefined/.test(app),'dans la barre, le nombre de colis est dit une fois (Ventes à poster, Achats à retirer) (§7)');
     dit(/viderParcours\(sessionStorage,garder\); viderParcours\(localStorage,garder\);/.test(app), 'à la connexion d’un autre vendeur, ses reprises seules restent');
   });
   console.log(`\n${n - ko}/${n} contrôles verts.`);

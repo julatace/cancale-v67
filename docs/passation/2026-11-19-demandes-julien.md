@@ -204,3 +204,17 @@ Elles CHANGENT des règles de CLAUDE.md : à reporter dans CLAUDE.md (§2.5, §3
 - Copies `sauvegarde.app_data_20260930` et `sauvegarde.app_data_20261002` (111 Mo) SUPPRIMÉES le 19 nov. (aucune fonction, vue ni code ne les lisait).
 - Mises en ligne regroupées : 1 à 2 « trains » par jour au lieu de 8 à 10.
 - Messages aux favoris (Julien, 19 nov. soir : « 4 min c'est peut-être beaucoup, on garde toujours le temps aléatoire ») : attente aléatoire 40–90 s par défaut + temps d'écriture ; choix « Plus prudent » 2–4 min ; plafonds inchangés (15/h favoris, 50/h, jour). Livré avec l'extension 5.409 (chantier extension-utile).
+
+## DÉCISION DE JULIEN (20 nov.) : « Toute action doit être faite dans l'extension, on ne doit plus pouvoir faire d'action dans l'app »
+Lecture retenue : les ACTIONS SUR LES PLATEFORMES (Vinted, Leboncoin, Vestiaire : baisser/changer un prix, offres, messages aux favoris,
+republier, masquer/afficher, mettre en pause, supprimer, publier, répondre, contre-offre, automatisations) se font dans le PANNEAU de
+l'extension sur le site. L'app montre l'état, les chiffres et le journal, et chaque ancien bouton d'action devient « Faire dans
+l'extension » qui ouvre le site avec le panneau sur la bonne page et la bonne sélection (lien `?vrm=panneau&page=…&ids=…`).
+Restent dans l'app : ce qui n'agit pas sur une plateforme (saisir un prix d'achat / prix mini / N°, ranger, imprimer des bordereaux
+déjà reçus, relier, compta, réglages) et eBay (pas de panneau : API serveur).
+
+## DÉCISION DE JULIEN (20 nov.) : la cadence devient son réglage
+« Les autres (Vtools, Vintex, Bleam) envoient des messages autant qu'ils veulent » ⇒ « vas-y fais » : par compte, dans le panneau,
+favoris/h (15 par défaut, ≤ 60), actions/h (50 par défaut, ≤ 100), plafond/jour, pause entre messages (40–90 s par défaut, 20 s–4 min,
+aléatoire). Non réglable : arrêt captcha/refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
+l'onglet. Refusé (Claude) : déguisement du navigateur, faux clics, contournement de captcha, rotation d'IP.

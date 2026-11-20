@@ -165,7 +165,7 @@ async function lancer(mutation) {
     // le calcul de `reponseAttendue` — direct ou dans son mémo — écarte d'abord une offre close.
     dit(/const reponseAttendue=c=>(?:!derniereOffreClose\(c\)&&|\{[^\n]{0,200}?=>?[^\n]{0,80}?!derniereOffreClose\(c\)&&reponseAttendueVinted\()/.test(APP), "« À répondre » laisse une offre close de côté");
     // (1er nov.) Le point de la navigation par tâche : `badgesNav.messages`.
-    dit((/\['messages','Messages', msgNonLus > 0\]/.test(APP) || /badgesNav=\{[^}]*\bmessages: msgNonLus>0/.test(APP)) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
+    dit((/\['messages','Messages', msgNonLus > 0\]/.test(APP) || /badgesNav=\{[^}]*\bmessages: (?:nMsgRegler>0 \? nMsgRegler : |pastilleMsg \|\| )?msgNonLus>0/.test(APP)) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
     dit(!/dès qu.un nouveau message arrive/.test(APP) && (APP.match(/phraseRetour\(/g) || []).length >= 3, "l'écran dit QUAND elle revient par `phraseRetour` (titre du bouton, ligne sous la liste, recherche) — plus « dès qu'un nouveau message arrive »");
     dit(/'vrm_conversations_retirees'/.test(APP.slice(APP.indexOf('const SYNC_KEYS'), APP.indexOf('\n];', APP.indexOf('const SYNC_KEYS')))), 'le choix est synchronisé entre ses appareils (SYNC_KEYS)');
   });

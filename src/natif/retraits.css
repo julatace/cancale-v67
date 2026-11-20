@@ -1,0 +1,129 @@
+/* ── src/natif/retraits.css — Colis à retirer, une carte par point (20 nov.) ───────────────────────────────
+   Contrat : docs/design/NATIF.md (§1 jetons, §2 bis « entre Vintex et natif ») : cartes à FILET (1 px, rayon 12, aucune
+   ombre), petites capitales grises, étiquettes douces, accent rare, ambre = urgent. Jetons `--n-*` seulement, ni
+   `!important`, ni `:has()`. Cibles ≥ 44. (20 nov.) Plus de « Je suis au point » (Julien : « je ne veux plus ») : le contenu, le
+   code et le QR vivent dans la carte du point. */
+@layer vrm-natif {
+  .n-rp { container-type: inline-size; display: flex; flex-direction: column; gap: 16px; margin: 4px 0 12px; font-family: var(--n-police); color: var(--n-encre); }
+
+  /* La bande résumé + le plan des points */
+  .n-rp-resume { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); padding: 12px 16px 6px; }
+  .n-rp-resume-ligne { margin: 0 0 6px; font: var(--n-t-second); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-resume-ligne b { font: var(--n-t-corps-fort); color: var(--n-encre); }
+  .n-rp-urgent { color: var(--n-ambre); font-weight: 600; }
+  .n-rp-plan { list-style: none; margin: 0; padding: 0; }
+  .n-rp-plan > li + li { border-top: 1px solid var(--n-trait); }
+  .n-rp-plan-btn { appearance: none; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0; padding: 6px 0; border: 0; background: transparent;
+    color: var(--n-encre); font: var(--n-t-second); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rp-plan-btn:active { background: var(--n-appui); }
+  .n-rp-plan-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-rp-plan-i { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; }
+  .n-rp-plan-nom { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-plan-n { flex: none; color: var(--n-encre-2); font: var(--n-t-legende); font-variant-numeric: tabular-nums; }
+
+  /* Les cartes : une colonne au téléphone, deux dès que la place le permet (ordinateur) */
+  .n-rp-cartes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  @container (min-width: 760px) { .n-rp-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .n-rp-carte { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); overflow: hidden; scroll-margin-top: 96px; }
+  .n-rp-tete { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px 12px; }
+  .n-rp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .n-rp-transp { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .04em; }
+  .n-rp-transp > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-nom { margin: 0; font: var(--n-t-section); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-rp-etiquette { display: inline-flex; align-items: center; flex: none; min-height: 24px; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2);
+    font: var(--n-t-legende-fort); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .n-rp-etiquette[data-n-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
+  .n-rp-etiquette[data-n-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-rp-sorte { white-space: normal; }
+  .n-rp-adresse-ligne { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
+  .n-rp-adresse { flex: 1; min-width: 0; font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-itineraire { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; color: var(--n-accent); font: var(--n-t-second-fort); text-decoration: none; }
+  .n-rp-itineraire:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: 4px; }
+  .n-rp-horaires { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+
+  .n-rp-mini { position: relative; height: 120px; border-top: 1px solid var(--n-trait); background: var(--n-carte-2); }
+  .n-rp-mini-fond { position: absolute; inset: 0; }
+  .n-rp-mini-attr { position: absolute; right: 4px; bottom: 2px; font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte); padding: 0 4px; border-radius: 4px; }
+  .n-rp-mini-epingle { display: block; width: 18px; height: 18px; border-radius: 50%; background: var(--n-accent); border: 3px solid var(--n-carte); }
+
+  /* Les colis */
+  .n-rp-liste { list-style: none; margin: 0; padding: 0; }
+  .n-rp-colis { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--n-trait); }
+  .n-rp-colis.is-retire { opacity: .5; }
+  .n-rp-colis-haut { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .n-rp-vignette { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--n-r-vignette, 10px); overflow: hidden; background: var(--n-carte-2); color: var(--n-encre-3); }
+  .n-rp-vignette img { width: 100%; height: 100%; object-fit: cover; }
+  .n-rp-colis-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .n-rp-colis-titre { font: var(--n-t-corps-fort); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .n-rp-colis-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-num { font-weight: 600; color: var(--n-encre); }
+  /* Le code et son QR (20 nov.) : le code en très grand à gauche, « Copier » dessous ; le QR À DROITE, grande vignette
+     nette sur blanc (toucher = plein écran). Le code ne se coupe jamais en deux : sa taille suit la largeur de la carte. */
+  .n-rp-code-zone { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
+  .n-rp-code-zone.avec-qr { grid-template-columns: minmax(0, 1fr) auto; }
+  .n-rp-code-col { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+  .n-rp-code { display: block; max-width: 100%; font: var(--n-t-affiche); font-size: clamp(30px, 11cqi, 48px); line-height: 1.1; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+    color: var(--n-encre); white-space: nowrap; }
+  .n-rp-code.is-long { font-size: clamp(22px, 7.5cqi, 40px); letter-spacing: .02em; }
+  .avec-qr .n-rp-code { font-size: clamp(28px, 9cqi, 44px); }
+  .avec-qr .n-rp-code.is-long { font-size: clamp(20px, 6cqi, 34px); }
+  .n-rp-colis.is-nouveau .n-rp-code { color: var(--n-accent); }
+  .n-rp-sans-code { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-copier { appearance: none; flex: none; min-height: 44px; min-width: 88px; padding: 0 16px; margin: 0; border: 0; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte);
+    font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rp-copier:active { filter: brightness(.92); }
+  .n-rp-copier:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rp-qr { appearance: none; display: grid; place-items: center; width: 124px; height: 124px; margin: 0; padding: 8px; box-sizing: border-box; border: 1px solid var(--n-trait); border-radius: 12px;
+    background: #FFFFFF; cursor: zoom-in; -webkit-tap-highlight-color: transparent; }
+  .n-rp-qr img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .n-rp-qr:active { filter: brightness(.95); }
+  .n-rp-qr:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  @container (min-width: 560px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
+  @media (min-width: 1024px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
+
+  /* La barre du trajet : cinq étapes, la courante en accent, une étape non lue grise (aucune date). */
+  .n-rp-trajet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .n-rp-etape { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; text-align: center; color: var(--n-encre-2); }   /* (20 nov., intégration) plus d'encre-3 : « Payé », « Expédié »… lisibles (≥ 4,5:1, banc design-v2 C) ; la non-lue se dit par son point creux et l'absence de date */
+  .n-rp-etape::before { content: ""; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: var(--n-trait); }
+  .n-rp-etape:first-child::before { display: none; }
+  .n-rp-etape.is-lien-lu::before { background: var(--n-encre-2); }
+  .n-rp-etape-point { position: relative; z-index: 1; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--n-trait); background: var(--n-carte); }
+  .n-rp-etape.is-lue .n-rp-etape-point { border-color: var(--n-encre-2); background: var(--n-encre-2); }
+  .n-rp-etape.is-courante .n-rp-etape-point { border-color: var(--n-accent); background: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-rp-etape-nom { max-width: 100%; font: var(--n-t-legende); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-etape.is-lue .n-rp-etape-nom { color: var(--n-encre); }
+  .n-rp-etape.is-courante .n-rp-etape-nom { color: var(--n-accent); font-weight: 600; }
+  .n-rp-etape-date { min-height: 16px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* « À vérifier » : montré, jamais compté (date limite dépassée…) — code et QR gardés. */
+  .n-rp-verif { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .n-rp-verif .n-rp-etiquette { white-space: normal; }
+  .n-rp-verif-raison { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-verif-tete { margin: 0; padding: 10px 16px; border-top: 1px solid var(--n-trait); background: var(--n-carte-2); font: var(--n-t-legende); color: var(--n-encre-2); }
+
+  /* Rien à retirer */
+  .n-rp-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 16px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre-3); text-align: center; }
+  .n-rp-vide-phrase { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); }
+
+}
+@layer vrm-natif {
+  .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; min-height: 44px; display: flex; align-items: center; }   /* (20 nov., intégration) 44 au doigt (lisible-partout Z) */
+  .n-rp-code-btn b { font: inherit; }
+  .n-rp-code-btn:active { background: var(--n-appui); }
+  .n-rp-code-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rp-dedans { color: var(--n-encre-2); }
+  .n-rp-dedans.is-pas-lu { font-style: normal; }
+}
+/* (20 nov., Julien : « on doit voir ce qu'il y a à l'intérieur ») Le contenu d'abord, en grand : la photo de la paire (72 px,
+   88 px à l'ordinateur), le titre sur deux lignes, taille · prix · compte ; « pas encore lu » : vignette grise et la phrase. */
+@layer vrm-natif {
+  .n-rp-contenu { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  .n-rp-contenu .n-rp-vignette { position: relative; width: 72px; height: 72px; border-radius: 12px; }
+  .n-rp-contenu .n-rp-vignette.is-lot { box-shadow: 4px -4px 0 -1px var(--n-carte), 4px -4px 0 0 var(--n-trait); }
+  .n-rp-lot-n { position: absolute; right: 4px; bottom: 4px; min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-legende-fort); text-align: center; }
+  .n-rp-contenu .n-rp-colis-titre { font: var(--n-t-corps-fort); font-size: 17px; line-height: 22px; }
+  .n-rp-pas-lu { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-pas-lu.is-seul { font: var(--n-t-corps-fort); color: var(--n-encre-2); }
+  @media (min-width: 1024px) { .n-rp-contenu .n-rp-vignette { width: 88px; height: 88px; } }
+}

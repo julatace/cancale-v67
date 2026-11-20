@@ -122,6 +122,9 @@ const ECRANS = [
   { id: 'achats-factures', groupe: 'Achats', etapes: [{ aller: '?tab=invoices' }], preuve: '.vrm-main' },
   // ── Stock ──
   { id: 'stock', groupe: 'Stock', etapes: [{ aller: '?tab=garage' }], preuve: '.vrm-main' },
+  // (20 nov., intégration 20nov) la page Extension et « Bien démarrer » (lot demarrage-store), jugées comme le reste.
+  { id: 'extension', groupe: 'Paramètres', etapes: [{ aller: '?tab=extension' }, { pause: 900 }], preuve: '.vrm-main' },
+  { id: 'bien-demarrer', groupe: 'Paramètres', etapes: [{ aller: '?tab=journee' }, { evt: ['vrm:parcours-nouveau', 'sommaire'] }, { pause: 900 }], preuve: '[role="dialog"], .vrm-main' },
   { id: 'stock-organisation', groupe: 'Stock', etapes: [{ aller: '?tab=organisation' }], preuve: '.vrm-main' },
   // ── Messages ──
   { id: 'messages', groupe: 'Messages', etapes: [{ aller: '?tab=messages' }], preuve: '[data-fil], .vrm-msg-list' },

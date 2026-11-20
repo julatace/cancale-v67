@@ -15,6 +15,8 @@ import { suivi } from './suiviTravail.js';   // VRM figé, détail et barre pend
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
 import './styles-vestiaire-plus.css';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const cc = (x) => String(x || '').replace(/-(\w)/g, (m, c) => c.toUpperCase());
 const pauseEntre = () => {
@@ -93,7 +95,7 @@ export default function BaissePrixVestiaire({ annonces = [], compteOnglet, recet
         <header className="vrm-ao-tete">
           <h2>{tr('vcBaisse.titre')}</h2>
           <span className="vrm-ao-num">{tr('vcBaisse.nAnnonces', { n: lignes.length })}</span>
-          <button type="button" className="vrm-ao-x" aria-label={tr('commun.fermer')} data-bp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
+          <BoutonIconeNatif libelle={tr('commun.fermer')} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} indisponible={!!(enCours)} raison={tr('natif.bouton.enCours')} attrs={{ 'data-bp-fermer': "" }}/>
         </header>
         {!pret ? (
           <div className="vrm-bp-apprendre" data-vc-baisse-apprendre={rec.etat}>

@@ -26,7 +26,8 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
   const ids = (q) => M.actionsPour(q, { lireNumero }).map((a) => a.id + (a.num ? ':' + a.num : ''));
 
   // A. Les actions
-  dit(ids('').join() === 'imprimer-jour,colis-retirer,export-comptable,ma-configuration', 'A1 champ vide : 4 actions', ids('').join());
+  // (20 nov., lot arrivee-scan) « Arrivée d'un colis » est aussi proposée sur le champ vide (docs/passation/2026-11-20-arrivee-scan.md §4).
+  dit(ids('').join() === 'imprimer-jour,colis-retirer,arrivee,export-comptable,ma-configuration', 'A1 champ vide : 5 actions (dont « Arrivée d’un colis »)', ids('').join());
   dit(ids('imprimer')[0] === 'imprimer-jour' && ids('impr')[0] === 'imprimer-jour', 'A2 « imprimer », « impr » ⇒ imprimer les bordereaux du jour');
   dit(ids('colis à retirer')[0] === 'colis-retirer' && ids('retirer')[0] === 'colis-retirer', 'A3 « colis à retirer » ⇒ colis-retirer en tête', ids('colis à retirer').join());
   dit(ids('Exporter pour mon comptable')[0] === 'export-comptable' && ids('export')[0] === 'export-comptable', 'A4 export comptable');

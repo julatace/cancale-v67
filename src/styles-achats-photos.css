@@ -156,7 +156,6 @@
 /* Le prix sur la ligne du bas, calé à droite ; le « … » DANS la rangée (6 px du bord), centré. */
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-price { grid-area: prix !important; align-self: center !important; justify-self: end !important; padding: 0 !important; line-height: 22px !important; font-size: var(--d-t-15, 15px) !important; font-weight: 600 !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-act { grid-area: act !important; align-self: center !important; margin: 0 !important; justify-self: end !important; }
-:root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-more { width: 44px !important; height: 44px !important; min-width: 44px !important; margin: 0 !important; }
 /* Au téléphone, la rangée garde UN geste (« … ») : note, suivre et code sont dedans. */
 @media (max-width: 599px) {
   :root:root:root body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-quick { display: none !important; }

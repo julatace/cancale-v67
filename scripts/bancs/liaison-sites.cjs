@@ -363,6 +363,51 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           dit(errs.length === 0, `${T} aucune erreur JS`, errs.slice(0, 2).join(' | '));
           await ctx.close();
         });
+        // R · RELIER DEPUIS LA LISTE (20 nov.) : la proposition sur la rangée d'Annonces (tableau à 1512, liste à 390).
+        await essaie(`R ${T}`, async () => {
+          const { ctx, pg, errs } = await ouvrir(b, vp, scenario(F, { fine: fineP1 }), { sombre, tab: 'leboncoin', images: F });
+          await pg.waitForSelector('[data-eg-prop-annonce="Leboncoin:5001"]', { timeout: 20000 }).catch(() => {});
+          const lireProp = () => pg.evaluate(() => [...document.querySelectorAll('[data-eg-prop-annonce]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => {
+            const btn = e.querySelector('[data-eg-relier-prop]'), autre = e.querySelector('[data-eg-autre]'), propre = e.querySelector('[data-eg-propre]');
+            const h = (x) => { if (!x) return 0; const pb = getComputedStyle(x, '::before'); const ext = pb && pb.content && pb.content !== 'none' && pb.position === 'absolute' ? Math.max(0, -parseFloat(pb.top || '0')) + Math.max(0, -parseFloat(pb.bottom || '0')) : 0; return Math.round(x.getBoundingClientRect().height + ext); };
+            const tx = e.querySelector('.n-eg-prop-texte'), cont = e.closest('.n-groupe-carte, .n-tt-table, table, [data-eg-liste]') || document.body, rc = cont.getBoundingClientRect();
+            return { a: e.getAttribute('data-eg-prop-annonce'), niveau: e.getAttribute('data-eg-prop'), numero: e.getAttribute('data-eg-prop-numero'), forme: e.getAttribute('data-eg-prop-forme'), hRelier: h(btn), hAutre: h(autre), hPropre: h(propre), hBloc: Math.round(e.getBoundingClientRect().height),
+              wTexte: tx ? Math.round(tx.getBoundingClientRect().width) : null, deborde: [...e.querySelectorAll('*')].some((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.right > Math.min(innerWidth, rc.right) + 1); }),
+              qui: [...e.querySelectorAll('*')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.right > Math.min(innerWidth, rc.right) + 1); }).slice(0, 2).map((x) => String(x.className || x.tagName).slice(0, 40) + '@' + Math.round(x.getBoundingClientRect().right) + '>' + Math.round(Math.min(innerWidth, rc.right))) };
+          }));
+          let props = await lireProp();
+          const p1 = props.find((x) => x.a === 'Leboncoin:5001'), p2 = props.find((x) => x.a === 'Leboncoin:5002'), p4 = props.find((x) => x.a === 'Leboncoin:5004');
+          await pg.locator('[data-eg-prop-annonce="Leboncoin:5001"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(400);
+          await shot(pg, '11-liste');
+          dit(p1 && p1.niveau === 'sur' && p1.numero === '124' && p1.forme === (tel ? 'ligne' : 'cellule') && (!tel || p1.hBloc <= 56), `${T} R1 la rangée de l’annonce 5001 montre « N°124 ? · à relier · sûr » (${tel ? 'liste' : 'tableau'})`, JSON.stringify(props.slice(0, 4)));
+          dit(p2 && p2.niveau === 'verifier' && p2.numero === '234', `${T} R1 « Adidas Spezial vert 39,5 » : « N°234 ? · à vérifier » sur sa rangée (la capture de Julien)`, JSON.stringify(p2));
+          dit(tel ? !p4 : (p4 && p4.niveau === 'aucune' && p4.hPropre >= 44), `${T} R1 taille 45 contre 42 : aucune proposition — ${tel ? 'rien sous la rangée (le geste est au balayage)' : '« Que sur ce site » en un toucher'}`, JSON.stringify(p4));
+          dit(props.every((x) => !x.deborde && (x.wTexte == null || x.wTexte >= 70) && (x.niveau === 'aucune' || (x.hRelier >= 44 && (x.forme === 'ligne' || x.hAutre >= 44)))), `${T} R1 cibles ≥ 44 px, aucun débordement, texte jamais coupé lettre à lettre`, JSON.stringify(props));
+          dit(!((await stock(pg, 'vrm_lbc_liens')) || {})[5001], `${T} R1 montrer la proposition ne relie rien`, '');
+          let touchers = 0;
+          touchers++; await toucher(pg, tel, '[data-eg-relier-prop="Leboncoin:5001"]');
+          await pg.waitForFunction(() => { try { return (JSON.parse(localStorage.getItem('vrm_lbc_liens') || '{}') || {})['5001'] === '124'; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
+          const l = await stock(pg, 'vrm_lbc_liens'), j = await stock(pg, 'vrm_liaison_sites');
+          const parcours = await pg.locator('[data-liaison]').count();
+          await pg.waitForTimeout(300); await shot(pg, '12-relie-liste');
+          dit(touchers === 1 && l && String(l[5001]) === '124' && j && j['lien:Leboncoin:5001'] && j['lien:Leboncoin:5001'].par === 'photo-sure' && parcours === 0,
+            `${T} R2 UN toucher sur « Relier » ⇒ vrm_lbc_liens[5001] = 124, preuve « même photo, sûre », sans ouvrir le parcours`, JSON.stringify({ touchers, l: l && l[5001], j: j && j['lien:Leboncoin:5001'], parcours }));
+          // « Autre… » ouvre le parcours sur CETTE annonce.
+          if (tel) {
+            // Au téléphone, « Autre… » est au balayage de la rangée (ouvert ici par l'appui long / clic droit, la même action).
+            const rangee = await pg.evaluateHandle(() => { const x = document.querySelector('[data-eg-prop-annonce="Leboncoin:5002"]'); return x ? x.previousElementSibling : null; });
+            await pg.evaluate((el) => { if (el) { el.scrollIntoView({ block: 'center' }); (el.querySelector('.n-rangee-corps') || el).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 })); } }, rangee);
+            await pg.waitForTimeout(400); await shot(pg, '13-balayage');
+            await pg.evaluate((el) => { const b = el && el.querySelector('.n-rangee-action'); if (b) b.click(); }, rangee);
+          } else {
+            await pg.locator('[data-eg-autre="Leboncoin:5002"]').first().scrollIntoViewIfNeeded().catch(() => {});
+            await toucher(pg, tel, '[data-eg-autre="Leboncoin:5002"]');
+          }
+          const okAutre = await attendreAnnonce(pg, 'Leboncoin:5002');
+          dit(okAutre, `${T} R3 « Autre… » ouvre le parcours sur CETTE annonce`, String(okAutre));
+          dit(errs.length === 0, `${T} R aucune erreur JS`, errs.slice(0, 2).join(' | '));
+          await ctx.close();
+        });
       }
       await essaie(`C ${nomVp}`, async () => {
         const { ctx, pg, errs, ecritures } = await ouvrir(b, vp, scenario(F, { fine: fineP1, vintedKO: true }), { tab: 'leboncoin', images: F });

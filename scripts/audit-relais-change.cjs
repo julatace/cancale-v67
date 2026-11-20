@@ -177,7 +177,7 @@ const CORPS = [
     // (13 nov., Julien : « ici ça doit être dans les Mondial Relay » — « un colis = une fois ») Plus de carte à part : la
     // liste lue (`colisRelaisChange`, lignes RELUES + transporteur) est rendue ligne par ligne sous chaque nouveau point,
     // dans « En route » (src/CarteRelais.jsx, `redirige`) — banc retirer-points-changes.
-    dit(!/<AlerteRelaisChange\b/.test(app) && /redirige=\{\(colisRelaisChange\(tracking, \{ transp: transpMap \}\)/.test(app), 'les colis redirigés sont des lignes sous leur point (En route), lus sur les lignes RELUES (`tracking`) et ce que dit le transporteur — plus de carte à part (13 nov.)');
+    dit(!/<AlerteRelaisChange\b/.test(app) && /redirige=\{\((?:vinVu \? \()?colisRelaisChange\(tracking, \{ transp: transpMap \}\)/.test(app), 'les colis redirigés sont des lignes sous leur point (En route), lus sur les lignes RELUES (`tracking`) et ce que dit le transporteur — plus de carte à part (13 nov.)');
     const comp = fs.readFileSync(path.join(R, 'src/AlerteRelaisChange.jsx'), 'utf8');
     // (12 nov.) Une carte par nouveau point, NEUTRE (§7), titre ambre seulement quand le point est lu (le geste).
     dit(!/pas écrit dans l.e-mail/.test(comp.replace(/\/\/.*$/gm, '')) && /nouveau point pas encore lu/.test(comp) && /<VoirEmailColis /.test(comp), 'point pas lu ⇒ « nouveau point pas encore lu » + « Voir l’e-mail », jamais « pas écrit dans l’e-mail » sans preuve');

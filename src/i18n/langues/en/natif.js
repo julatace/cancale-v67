@@ -1,6 +1,8 @@
 // en · « VRM natif » (19 nov.) : les textes des composants de src/natif/ et de la coque (noms pour le lecteur d'écran, « Annuler », « Plus »).
 export default {
   "natif.bouton.confirmer": "Tap again to confirm",
+  "natif.bouton.echec": "That didn't work. Try again.",
+  "natif.bouton.enCours": "Wait for the current action to finish.",
   "natif.plaque.prefixe": "No.",
   "natif.plaque.numero": "Number {numero}",
   "natif.plaque.doublon": "Number {numero}, used by two items",

@@ -18,6 +18,9 @@ import { motsVendeur } from '../profilVendeur.js';
 import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
+import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
+import { Segmente } from '../natif/Segmente.jsx';
+import { Glyphe } from '../natif/icones.jsx';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -129,7 +132,7 @@ function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, 
           : <div data-fil-repondre="passu" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {fil.convs.map((e) => <Bouton key={e.cle} variante="secondaire" data-fil-repondre-choix={e.plateforme} onClick={() => onRepondre(e)}>{trj('messages.ouvrir', { x: NOM_SITE[e.plateforme] })}</Bouton>)}
             </div>}
-        {onDelier ? <button type="button" className="vrm-pied-lien" data-fil-delier="" onClick={onDelier} style={{ minHeight: 44, alignSelf: 'flex-start' }}>{tr('messages.memeFilDelier')}</button> : null}
+        {onDelier ? <BoutonNatif variante="texte" ton="ambre" onClick={onDelier} attrs={{ 'data-fil-delier': '' }}>{tr('messages.memeFilDelier')}</BoutonNatif> : null}
       </div>
     </CadreFil>
   );
@@ -179,7 +182,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   return (
     <div data-fil-ebay={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button type="button" onClick={onFerme} aria-label={tr('ebay.fil.fermer')} style={{ minHeight: 44, minWidth: 44, border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer' }}>‹</button>
+        <BoutonIcone libelle={tr('ebay.fil.fermer')} icone={<Glyphe nom="chevron" className="vrm-fil-retour-glyphe"/>} onClick={onFerme}/>
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.titre || m.subject || 'eBay'}</div><div style={{ fontSize: 12, color: C.muted }}>eBay</div></div>
       </div>
       <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
@@ -358,12 +361,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>
-              <div className="vg-ms-vues" role="group" aria-label={tr('verre2.msg.filtre')} data-msg-vues={vue}>
-                {[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => (
-                  <button key={k} type="button" className={'vg-ms-vue' + (vue === k ? ' is-on' : '')} aria-pressed={vue === k} data-msg-vue={k} onClick={() => setVue(k)}>
-                    {l}{n ? <i className={'vg-ms-n' + (k === 'offres' ? ' is-ambre' : '')}>{n}</i> : null}
-                  </button>
-                ))}
+              {/* (20 nov., chantier « boutons natifs ») Les trois vues = le Segmente natif (plus de puces faites main) ;
+                  aria-pressed reste posé à côté d'aria-checked (les bancs d'hier désignent la vue choisie par lui). */}
+              <div className="vg-ms-vues" data-msg-vues={vue}>
+                <Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
+                  options={[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => ({ cle: k, libelle: l, n: n || null, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/>
               </div>
               {!filsMontres.length ? <div data-fils-filtre-vide={vue} className="vrm-ms-rien">{tr(vue === 'offres' ? 'verre2.msg.aucuneOffre' : 'verre2.msg.aucuneNonLue')}</div> : null}
               {(() => { let reste = 80; return groupesFils.map((g) => {

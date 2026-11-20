@@ -9,6 +9,7 @@ export default {
   "prixPartout.mini": "Minimum offer price: {prix}",
   "prixPartout.ouvrir": "Open",
   "prixPartout.annulerSite": "Cancel the pending cut on {site}",
+  "prixPartout.envoiEnCours": "A change is being sent: wait for it to finish before cancelling.",
   "prixPartout.raisonPrix": "Type the new price.",
   "prixPartout.raisonSite": "Tick at least one site.",
   "prixPartout.passu": "not read",

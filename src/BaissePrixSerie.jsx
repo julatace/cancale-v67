@@ -21,6 +21,8 @@ import { tr } from './i18n/index.js';
 import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments du geste
 import { finValide, SOLDE_MAX_J, jourParis } from './soldes.js';   // (14 nov., lot argent-prix — 114) soldes temporaires
 import { date as dateLoc } from './i18n/index.js';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const ETAT = { prevue: 'Prévue', envoi: 'Envoi…', fait: 'Fait', ecart: 'Autre prix', incertain: 'Pas relu', echec: 'Refusé', refus: 'Pas envoyée', 'pas-envoye': 'Pas envoyée' };
 const pauseEntre = () => {
@@ -187,7 +189,7 @@ export default function BaissePrixSerie({ annonces = [], compteOnglet, plancherD
         <header className="vrm-ao-tete">
           <h2>Baisser le prix</h2>
           <span className="vrm-ao-num">{lignes.length} annonce{lignes.length > 1 ? 's' : ''}</span>
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-bp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
+          <BoutonIconeNatif libelle="Fermer" icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} indisponible={!!(enCours)} raison={tr('natif.bouton.enCours')} attrs={{ 'data-bp-fermer': "" }}/>
         </header>
         {cibles ? <p className="vrm-bp-note" data-bp-cibles={annonces.length}>{tr('bc.noteSerie')}</p> : <><div className="vrm-bp-reglage">
           <div className="vrm-bp-modes" role="group" aria-label="Baisse en euros ou en pourcentage">

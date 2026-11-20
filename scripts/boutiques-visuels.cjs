@@ -2,7 +2,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  LES IMAGES DES FICHES DE BOUTIQUE — Chrome Web Store, Edge, Firefox
 //  (8 nov. ; refait le 15 nov. : palette « Studio bleu clair », Inter, écran
-//  Achats au lieu de cat_bord qui rendait Ventes, et la VRAIE carte du logo)
+//  Achats au lieu de cat_bord qui rendait Ventes, et la VRAIE carte du logo ;
+//  refait le 20 nov. pour la 5.409.0 au style « VRM natif » : fond gris des Réglages
+//  #F2F2F7, encre #111114, aucune ombre (un filet), et l'écran Stock à la place
+//  d'Achats — plus aucun logo de transporteur dans les captures, risque de refus)
 //
 //  Fabrique dans `docs/boutiques/visuels/` (ou `--sortie <dossier>`) :
 //   · capture-1…4 (1280 × 800, PNG) : l'app en MODE EXEMPLE (données inventées
@@ -38,15 +41,17 @@ const INTER = fs.readdirSync(path.join(DIST, 'assets')).filter((f) => /^inter-la
 const INTER_B64 = INTER ? fs.readFileSync(path.join(DIST, 'assets', INTER)).toString('base64') : '';
 const FONTE = INTER_B64 ? `@font-face{font-family:InterV;src:url(data:font/woff2;base64,${INTER_B64}) format('woff2');font-weight:100 900}` : '';
 const POLICE = `InterV, Inter, -apple-system, system-ui, sans-serif`;
-const ENCRE = '#0C1D30', ENCRE2 = '#3F5468', DIODE = '#0060CC';
-const CIEL = 'linear-gradient(180deg,#EEF6FD 0%,#D6E8F5 55%,#C6DDF0 100%)';
+const ENCRE = '#111114', ENCRE2 = '#6C6C70', DIODE = '#0068D6';
+const CIEL = '#F2F2F7';   // (20 nov.) le fond des Réglages, « VRM natif » (src/natif/jetons.css --n-fond)
+const FILET = '0 0 0 .5px rgba(0,0,0,.14)';   // aucune ombre : un filet (NATIF.md §1 bis)
+const VERSION_EXT = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8')).version;
 
 const TEXTES = {
   fr: {
     ecrans: [
       { tab: 'journee', titre: 'Ta journée de revendeur, en un coup d’œil.', sous: 'Ventes, colis, messages : ce que l’extension relève sur tes comptes arrive ici.' },
       { tab: 'ventes', titre: 'Toutes tes ventes, de tous tes comptes.', sous: 'Vinted, Leboncoin, eBay, Vestiaire Collective — au même endroit.' },
-      { tab: 'achats', titre: 'Tes colis à retirer, avec leur code.', sous: 'Les codes de retrait et le point relais, relevés sur tes comptes.' },
+      { tab: 'garage', titre: 'Ton stock, un numéro par article.', sous: 'Chaque article a son numéro ; « Ranger » lui donne sa place.' },
       { tab: 'annonces', titre: 'Tes annonces en ligne, avec leur numéro.', sous: 'Prix d’achat, paires qui dorment, offres : rangés par compte.' },
     ],
     carteTitre: 'Sur le site,<br>une petite carte.<br>Rien de plus.',
@@ -58,7 +63,7 @@ const TEXTES = {
     ecrans: [
       { tab: 'journee', titre: 'Your reseller day, at a glance.', sous: 'Sales, parcels, messages: what the extension reads on your accounts lands here.' },
       { tab: 'ventes', titre: 'All your sales, from all your accounts.', sous: 'Vinted, Leboncoin, eBay, Vestiaire Collective — in one place.' },
-      { tab: 'achats', titre: 'Parcels to pick up, with their code.', sous: 'Pick-up codes and the relay point, read from your accounts.' },
+      { tab: 'garage', titre: 'Your stock, one number per item.', sous: 'Every item has its number; “Store” gives it its place.' },
       { tab: 'annonces', titre: 'Your live listings, each with its number.', sous: 'Purchase price, slow movers, offers: sorted by account.' },
     ],
     carteTitre: 'On the site,<br>one small card.<br>Nothing more.',
@@ -94,12 +99,12 @@ async function capturesApp(nav, langue, externes) {
 }
 
 // ── La carte de l'extension, VRAI vrm-badge.js, sur une page de dressing inventée ──
-const MIN = 60000, H = 3600000, J = 86400000, T0 = Date.UTC(2026, 10, 15, 17, 0);
+const MIN = 60000, H = 3600000, J = 86400000, T0 = Date.now();   // (20 nov.) « lu il y a 20 min », jamais « il y a 5 j » sur une capture fraîche
 const MODELES = ['Nike Air Max 90 blanches', 'Adidas Samba OG noires', 'New Balance 550 crème', 'Puma Suede bleues', 'Asics Gel-Kayano 14 argent', 'Nike Dunk Low Panda'];
 const ANN = Array.from({ length: 8 }, (_, i) => ({ id: String(7000 + i), titre: `${MODELES[i % 6]} ${39 + (i % 6)}`, prix: 55 + i * 5, photo: '', num: String(120 + i), jours: i * 3, favoris: i % 5, depuis: T0 - i * 3 * J }));
 const VEN = [['a_expedier', true], ['a_expedier', true], ['en_route', null], ['finalisee', null], ['finalisee', null]].map(([etat, b], i) => ({ tx: String(91000000000 + i), titre: `${MODELES[i]} 42`, prix: 60 + i * 10, photo: '', date: T0 - i * 30 * H, etat, vendue: true, num: String(200 + i), bordereau: b }));
 const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'boutique_exemple' }, annonces: { lu: T0 - 20 * MIN, aConfirmer: false, total: ANN.length, liste: ANN }, ventes: { lu: T0 - 10 * MIN, total: VEN.length, liste: VEN }, autres: null };
-const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.385.0', code: '5.385.0', vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', cloisonne: true },
+const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: VERSION_EXT, code: VERSION_EXT, vrm: { ok: true, connecte: true, email: 'vendeur@exemple.test', cloisonne: true },
   site: { id: '111', nom: 'boutique_exemple', choix: 'oui', jauge: { h: 6, maxH: 50, j: 18, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 0 }, file: null } },
   flux: { okAt: T0 - 3 * MIN }, liens: [], capteCoupe: false };
 
@@ -122,7 +127,7 @@ ${ANN.slice(0, 8).map((a, i) => `<div class="c"><div class="ph" style="backgroun
 </div></main></body></html>`;
 
 async function captureCarte(nav, langue) {
-  const ctx = await nav.newContext({ colorScheme: 'light', viewport: { width: 860, height: 740 }, deviceScaleFactor: 2, locale: 'fr-FR' });
+  const ctx = await nav.newContext({ colorScheme: 'light', viewport: { width: 860, height: 740 }, deviceScaleFactor: 2, locale: langue === 'en' ? 'en-GB' : 'fr-FR' });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
@@ -150,7 +155,7 @@ async function captureCarte(nav, langue) {
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
     };
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
-  }, { e: ETAT, js: fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8'), L: LISTES });
+  }, { e: ETAT, js: ['vrm-ui.js', 'vrm-mots.js', 'vrm-badge.js'].map((f) => fs.readFileSync(path.join(EXT, f), 'utf8')).join('\n;\n'), L: LISTES });   // (20 nov.) l'ordre du manifeste 5.409 : la feuille commune et les mots d'abord
   await pg.waitForTimeout(400);
   const b = await pg.evaluate(() => { const h = document.getElementById('vrm-badge'); const x = h && h.shadowRoot ? h.shadowRoot.querySelector('.btn') : null; if (!x) return null; const r = x.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
   if (!b) throw new Error('carte : le shadow root est fermé, impossible de toucher le logo');
@@ -184,17 +189,17 @@ const cadreEcran = (e) => `
     <div style="font-size:38px;font-weight:600;letter-spacing:-0.02em">${e.titre}</div>
     <div style="margin-top:10px;font-size:19px;color:${ENCRE2}">${e.sous}</div>
   </div>
-  <img src="${b64(e.png)}" style="position:absolute;left:120px;top:164px;width:1040px;height:650px;border-radius:14px 14px 0 0;box-shadow:0 0 0 .5px rgba(18,52,96,.10),0 34px 60px -26px rgba(18,52,96,.48)">`;
+  <img src="${b64(e.png)}" style="position:absolute;left:120px;top:164px;width:1040px;height:650px;border-radius:14px 14px 0 0;box-shadow:${FILET}">`;
 const cadreCarte = (t, png) => `
   <div style="position:absolute;left:72px;top:0;bottom:0;width:410px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:36px;font-weight:600;letter-spacing:-0.02em;line-height:1.15">${t.carteTitre}</div>
     <div style="margin-top:18px;font-size:18px;line-height:1.55;color:${ENCRE2}">${t.carteSous}</div>
   </div>
-  <img src="${b64(png)}" style="position:absolute;right:56px;top:${(800 - 620) / 2}px;width:${Math.round(620 * 860 / 740)}px;height:620px;border-radius:12px;box-shadow:0 0 0 .5px rgba(18,52,96,.12),0 34px 60px -26px rgba(18,52,96,.48);background:#fff">`;
+  <img src="${b64(png)}" style="position:absolute;right:56px;top:${(800 - 620) / 2}px;width:${Math.round(620 * 860 / 740)}px;height:620px;border-radius:12px;box-shadow:${FILET};background:#fff">`;
 const ICONE512 = path.join(RACINE, 'public', 'vrm-icon-v4-512.png');
 const tuile = (t, l, h, ic, ti, st) => `
   <div style="width:${l}px;height:${h}px;display:flex;align-items:center;justify-content:center;gap:${Math.round(ic * 0.25)}px">
-    <img src="data:image/png;base64,${fs.readFileSync(ICONE512).toString('base64')}" style="width:${ic}px;height:${ic}px;border-radius:${Math.round(ic * 0.23)}px;box-shadow:0 0 0 .5px rgba(18,52,96,.10),0 12px 26px -14px rgba(18,52,96,.40)">
+    <img src="data:image/png;base64,${fs.readFileSync(ICONE512).toString('base64')}" style="width:${ic}px;height:${ic}px;border-radius:${Math.round(ic * 0.23)}px;box-shadow:${FILET}">
     <div><div style="font-size:${ti}px;font-weight:600;letter-spacing:-0.02em">VRM</div>
     <div style="margin-top:${Math.round(st * 0.45)}px;font-size:${st}px;line-height:1.4;color:${ENCRE2}">${t.tuile}</div></div>
   </div>`;

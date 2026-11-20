@@ -10,7 +10,7 @@ import './jetons.css';
 import './natif.css';
 
 export { poserIcone, iconePosee, Glyphe, GLYPHES } from './icones.jsx';
-export { Bouton, BoutonIcone } from './Bouton.jsx';
+export { Bouton, BoutonIcone, useGesteUnique } from './Bouton.jsx';
 export { Pastille, comptePastille } from './Pastille.jsx';
 export { Plaque } from './Plaque.jsx';
 export { Affiche } from './Affiche.jsx';

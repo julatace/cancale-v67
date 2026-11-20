@@ -48,9 +48,13 @@ export function achatDuRetrait(t, { achats = [], index = {}, jonction = null } =
 //   { etat: 'pas-lu', raison, compte }                  rien ne relie ; `raison` = 'ouvrir-vinted' (le compte du colis
 //                                                       est su : c'est là que l'extension lira le n°) ou '' (pas su) ;
 //   { etat: 'autre-site', site, titre } · null          (rien à dire : pas un colis Vinted, ou une ligne sans n° de suivi).
-export function contenuDuColis({ ligne = null, suivi = '', achat = null, autreSite = null, site = '', redirige = false, photo = null, prix = '', compteAchat = '', compteColis = '' } = {}) {
+// (20 nov., Julien : « même quand c'est à retirer, on doit voir ce qu'il y a à l'intérieur ») + `taille` (la taille de
+// CET achat, lue) et `nb` (le nombre d'articles de SA transaction, lu : un lot) — '' / null = pas su, jamais deviné.
+export function contenuDuColis({ ligne = null, suivi = '', achat = null, autreSite = null, site = '', redirige = false, photo = null, prix = '', compteAchat = '', compteColis = '', taille = '', nb = null } = {}) {
   if (achat && achat.transaction_id != null) {
-    return { etat: 'relie', tx: String(achat.transaction_id), titre: String(achat.title || '').trim(), photo: photo || null, prix: String(prix || ''), compte: String(compteAchat || '') };
+    const n = Number(nb);
+    return { etat: 'relie', tx: String(achat.transaction_id), titre: String(achat.title || '').trim(), photo: photo || null, prix: String(prix || ''), compte: String(compteAchat || ''),
+      taille: String(taille || '').trim(), nb: Number.isInteger(n) && n > 1 ? n : null };
   }
   if (autreSite) return { etat: 'autre-site', site: String(autreSite.site || ''), titre: String(autreSite.titre || '').trim() };
   if (!ligne || redirige || (site && site !== 'vinted')) return null;

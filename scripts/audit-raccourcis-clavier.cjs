@@ -28,8 +28,9 @@ const purBouton = (src) => {
 };
 const ongletsLiens = () => {
   const app = lire('src/App.jsx');
-  const m = /const ONGLETS_LIENS=\[\.\.\.Object\.keys\(CHEMINS_ARGENT\),([^\]]*)\]/.exec(app);
-  return m ? new Set(m[1].split(',').map((x) => x.trim().replace(/^'|'$/g, ''))) : new Set();
+  // (20 nov., chasse-bugs) La liste peut commencer par une entrée avant `...Object.keys(CHEMINS_ARGENT)` ('extension', 19 nov.).
+  const m = /const ONGLETS_LIENS=\[([^\]]*)\]/.exec(app);
+  return m && /\.\.\.Object\.keys\(CHEMINS_ARGENT\)/.test(m[1]) ? new Set(m[1].split(',').map((x) => x.trim()).filter((x) => !x.startsWith('...')).map((x) => x.replace(/^'|'$/g, ''))) : new Set();
 };
 const champ = (tag, extra = {}) => ({ tagName: tag, isContentEditable: false, getAttribute: (k) => (extra.attrs || {})[k] || null, ...extra });
 const ev = (key, o = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, repeat: false, defaultPrevented: false, target: champ('BODY'), ...o });
@@ -87,7 +88,10 @@ async function audit(srcRegle, srcComposant, srcBouton, bavard) {
     dit(B.nomBoutonIcone('inconnue', {}) === 'Bouton', 'une icône sans nom connu ⇒ « Bouton » (jamais muet)');
     dit(B.nomBoutonIcone(null, {}) === null, 'un bouton sans icône : rien à ajouter');
   }
-  dit(/const occ = \{[^\n]*\.\.\.\(nomIcone \? \{ 'aria-label': nomIcone \} : \{\}\) \};/.test(sansCommentaires(srcBouton)), 'BoutonBase pose le nom lu sur le bouton');
+  // (20 nov., intégration) boutons-natifs : BoutonBase dessine le bouton natif ; le nom lu y est posé en `aria-label`
+  // (bouton texte) ET passé en `libelle` au BoutonIcone (icône seule). Les deux chemins sont exigés.
+  { const sb = sansCommentaires(srcBouton);
+    dit(/\{\.\.\.\(nomIcone \? \{ 'aria-label': nomIcone \} : \{\}\)\}/.test(sb) && /if \(nomIcone\) \{\s*return <BoutonIcone libelle=\{rest\['aria-label'\] \|\| nomIcone\}/.test(sb), 'BoutonBase pose le nom lu sur le bouton'); }
   return ko;
 }
 

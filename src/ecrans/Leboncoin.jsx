@@ -49,6 +49,7 @@ import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, apr�
 // de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
 // UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
 const texteCroitVendue = () => `Ton extension le croit encore vendu (elle ne sait pas qu'une vente remboursée fait revenir l'article) et refuserait de le publier : mets-la à jour (${EXT_ATTENDUE}).`;
+import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 // ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
 //    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
 //    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
@@ -433,7 +434,7 @@ function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> Déjà publiée à la main ? Elle partirait deux fois.</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: C.accent, color:C.onAccent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
+              <BoutonBase variante="discret" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</BoutonBase>
             </div>
           </div>
         )}

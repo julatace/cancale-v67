@@ -21,7 +21,9 @@ export function annoncesVinted(comptes) {
     if (!c || !c.ok) continue;
     const pousse = (it, etat) => { if (!it || it.id == null) return; out.push({ site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
       prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
-      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url) }); };
+      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
+      // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
+      lu: Number.isFinite(c.lu) ? c.lu : null }); };
     arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
     arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
     arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
@@ -36,16 +38,26 @@ export function annoncesVinted(comptes) {
 // Leboncoin) ; `numeroDe(ad)` : le N° par identité ('' = aucun) ; `vintedDe(ad)` : l'annonce Vinted reliée ('' sinon) ;
 // `pseudoDe(ad)` : le nom du compte ; `propreDe(ad)` : déclarée « pas sur Vinted » (journal de liaison).
 const ETAT_LBC = { active: 'enligne', aconfirmer: 'aconfirmer', pause: 'pause', vendue: 'vendue' };
-export function annoncesLeboncoin(items, { etatDe, numeroDe, vintedDe = null, pseudoDe = null, propreDe = null, compteDe = null } = {}) {
+// `aLui(ad)` : la règle de l'app `annonceLbcALui` (référence VRM, ou compte prouvé par une vente / une session vue).
+export function annoncesLeboncoin(items, { etatDe, numeroDe, vintedDe = null, pseudoDe = null, propreDe = null, compteDe = null, aLui = null } = {}) {
   const out = [];
   for (const ad of Object.values(items && typeof items === 'object' ? items : {})) {
     if (!ad || ad.id == null) continue;
+    // (20 nov., capture de Julien : appartements, box, cartes… dans SES annonces) Une annonce Leboncoin n'est la sienne que
+    // si elle est PROUVÉE à l'un de ses comptes (lue sous « Mes annonces » : `account`/`lbcUser`) ou reliée par identité
+    // (N°, annonce Vinted). Les annonces d'autres vendeurs relevées en naviguant (126 sur 194 mesurées) ne sont pas les siennes ;
+    // un compte présent ne suffit pas (15 nov. : 49 sur 60 avec un compte étaient d'autres) — `aLui` juge le compte.
+    const compteLu = str(compteDe ? compteDe(ad) : (ad.account || ad.lbcUser)).replace(/^lbc-account:/i, '');
+    const numLu = str(typeof numeroDe === 'function' ? numeroDe(ad) : '');
+    const vintedLu = str(vintedDe ? vintedDe(ad) : '');
+    const sien = typeof aLui === 'function' ? !!aLui(ad) : !!compteLu;
+    if (!sien && !numLu && !vintedLu) continue;
     const e = typeof etatDe === 'function' ? str(etatDe(ad)) : '';
     const s = ad.stats && typeof ad.stats === 'object' ? ad.stats : {};
     out.push({ site: 'leboncoin', id: String(ad.id), compte: str(compteDe ? compteDe(ad) : (ad.account || ad.lbcUser)).replace(/^lbc-account:/i, ''), pseudo: str(pseudoDe ? pseudoDe(ad) : ad.accountName),
       titre: str(ad.subject || ad.title), photo: photoDe(arr(ad.images)[0]), prix: ad.price, taille: str(ad.taille || ad.size), condition: str(ad.condition),
       depuis: ad.publieeLe || ad.first_publication_date || ad.indexeeLe || ad.index_date || null,
-      favoris: nb(s.favoris), vues: nb(s.vues), messages: nb(s.messages), etat: ETAT_LBC[e] || 'retiree',
+      favoris: nb(s.favoris), vues: nb(s.vues), messages: nb(s.messages), etat: ETAT_LBC[e] || 'retiree', lu: Number.isFinite(Date.parse(s.at || '')) ? Date.parse(s.at) : null,
       numero: str(typeof numeroDe === 'function' ? numeroDe(ad) : ''), vintedId: str(vintedDe ? vintedDe(ad) : ''), url: str(ad.url), propre: !!(propreDe && propreDe(ad)) });
   }
   return out;

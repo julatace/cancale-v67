@@ -6,7 +6,7 @@
  .vrm-app-shell .vrm-main textarea,.vrm-app-shell .vrm-main select{font-size:17px!important;max-width:100%;box-sizing:border-box;}
  .vrm-app-shell .vrm-main button:not([role=switch]){min-height:36px!important;}
  .vrm-app-shell .vrm-main button[aria-label]{min-width:36px;}
- .vrm-app-shell .vrm-main :is(.vrm-icon-control,.vrm-buy-more){min-width:44px;min-height:44px!important;}
+ .vrm-app-shell .vrm-main :is(.vrm-icon-control){min-width:44px;min-height:44px!important;}
  .vrm-app-shell .vrm-main :is(.ops-primaire,.vrm-pickup-collect){min-height:44px!important;}
  .vrm-app-header{min-height:52px;}
  .vrm-day-layout{padding:12px!important;}

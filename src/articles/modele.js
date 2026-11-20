@@ -177,7 +177,7 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
       annonces: g.map((a) => ({ site: a.site, id: String(a.id), compte: str(a.compte), pseudo: str(a.pseudo), prix: montantLu(a.prix), etat: a.etat,
         // (19 nov., publier-agent) ce que CETTE annonce dit d'elle-même — la fiche article neutre (src/publier/agent.js) les lit, site par site.
         titre: str(a.titre), photo: a.photo || null, taille: str(a.taille), condition: str(a.condition), marque: str(a.marque), depuis: dateLue(a.depuis), url: str(a.url),
-        favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), numero: numDe(a), relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
+        favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), lu: Number.isFinite(a.lu) ? a.lu : null, numero: numDe(a), relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
       sites: [...new Set(g.map((a) => a.site))],
       prix, prixAnnonce: { site: ref.site, id: String(ref.id) },
       prixMini: montantLu(mn.v), refuse: montantLu(rf.v),

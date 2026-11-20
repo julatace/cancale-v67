@@ -218,7 +218,7 @@ function ClePhotoroom({ cadre = true }) {
               placeholder="Ta clé Photoroom" aria-label="Clé API Photoroom"
               style={{ flex: '1 1 200px', minWidth: 0, minHeight: 44, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 17, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}/>
             <button type="submit" data-photoroom-enregistrer="" disabled={!!occupe || !val.trim()} style={{ ...bouton(true), opacity: (occupe || !val.trim()) ? 0.55 : 1 }}>{occupe === 'poser' ? 'Vérification…' : 'Vérifier et ranger'}</button>
-            {remplacer && <button className="vrm-b vrm-b-discret" type="button" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</button>}
+            {remplacer && <Bouton variante="discret" onClick={() => { setRemplacer(false); setVal(''); }} style={bouton(false)}>Annuler</Bouton>}
           </div>
         </form>
       )}

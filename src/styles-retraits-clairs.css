@@ -25,7 +25,8 @@
   position: relative; font-weight: 600; color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
 }
 /* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
-.vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }
+/* (20 nov., chasse-bugs-2) Centrée sur le mot et haute de 44 px : `inset: -12px` sur un mot de 16 px ne faisait que 40 (banc parcours-chasse). */
+.vrm-rpf-itineraire::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; transform: translateY(-50%); }
 
 /* ── (12 nov., finitions — Julien : « regarde comment rien n'est cohérent ») UNE FORME DE LIGNE ──────────
    Chaque colis à retirer a les MÊMES zones, aux MÊMES places (src/CarteRelais.jsx, `LigneRetraitF`) :

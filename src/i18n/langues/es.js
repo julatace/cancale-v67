@@ -77,13 +77,16 @@ import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_liaisonSites from './es/liaisonSites.js';   // (19 nov.) « Relier mes annonces »
 import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
 import ecran_compteBloque from './es/compteBloque.js';   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './es/stockRangement.js';
+import ecran_arrivee_scan from './es/arriveeScan.js';   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './es/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
+import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
 import ecran_natif from './es/natif.js';
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -2332,6 +2335,7 @@ export default {
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
+  ...ecran_ceQuiManque,
   ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
@@ -2358,6 +2362,8 @@ export default {
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
+  ...ecran_arrivee_scan,
+  ...ecran_demarrage,
   ...ecran_natif,
   ...ecran_extension,
 };

@@ -367,7 +367,9 @@ function pixels(nom, w = 64, h = w) {
       const appels = (appSrc.match(/\.relier\(/g) || []).length, refs = (appSrc.match(/\bACTIONS_LIAISON\b/g) || []).length;
       const charge = corps('async function chargerMemePhoto(', 4000).split('\nif (typeof window')[0].replace(/^\s*\/\/.*$/gm, '');
       const regles = (fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8')).replace(/\/\/.*$/gm, '');
-      dit(appels === 1 && refs === 2 && /actions=\{ACTIONS_LIAISON\}/.test(appSrc) && /relier: \(x\) => liaisonVrm\(\)\.then\(\(L\) => L\.relier\(x\)\)/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
+      // (20 nov.) refs = 4 : la définition, le parcours, et l'écoute de « Relier » d'une rangée (`relierProposition` / `propreDepuisListe` SEULEMENT).
+      const usagesL = appSrc.match(/ACTIONS_LIAISON\.[a-zA-Z]+\(/g) || [];
+      dit(appels === 1 && refs === 4 && usagesL.length === 2 && usagesL.every((u) => /^ACTIONS_LIAISON\.(relierProposition|propreDepuisListe)\($/.test(u)) && /actions=\{ACTIONS_LIAISON\}/.test(appSrc) && /relier: \(x\) => liaisonVrm\(\)\.then\(\(L\) => L\.relier\(x\)\)/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
         'F6 · §5 : relier n’a lieu que sur SON toucher (les actions du parcours), même « sûr » ; le calcul et les règles n’écrivent rien', JSON.stringify({ appels, refs, charge: /relier|gesteVrm/.test(charge) }));
     }
     {

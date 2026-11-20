@@ -18,16 +18,20 @@
 //  Les actions passent par l'écran Annonces Vinted d'hier (monté, caché) : `demanderActionAnnonces`.
 // ══════════════════════════════════════════════════════════════════════════
 import { useComptesBloques } from '../compteBloqueEtat.js';
+import { etatLienLu, propositionLu, relierDepuisListe, queSurCeSite, ouvrirLiaison, abonnerLiaison, demanderLiaison } from '../liaisonEtat.js';   // (20 nov.) relier depuis la liste
 import React from 'react';
+import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
+import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
+import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
-import { fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
+import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -41,7 +45,9 @@ const ACTIONS = [
   { cle: 'agent', libelle: 'agent.action', icone: 'link', etats: ['enligne'], tousSites: true },
 ];
 const cleActionTr = { recreer: 'republier', main: 'main', versBrouillon: 'versBrouillon', enLigne: 'enLigne', baisser: 'baisser', partout: 'partout' };
-const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'));
+// (20 nov., chasse-bugs) `lazySur` comme partout (audit-ouverture) : un morceau qui rate après une mise en ligne est relancé,
+// puis rechargement propre ou « Mettre à jour VRM » — plus « Cet écran a un souci » sur « Publier sur… ».
+const PublierAgent = lazySur(() => import('./PublierAgent.jsx'));
 const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
@@ -55,7 +61,7 @@ export async function lireAnnoncesEgalite(accounts) {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, ok: false };
-      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
+      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
     })),
     lbcListingsSession().catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
@@ -72,7 +78,10 @@ export async function lireAnnoncesEgalite(accounts) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
     const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
     const noms = Array.isArray(annu) ? annuaireLbc((annu[0] && annu[0].a) || {}) : null;
+    // (20 nov.) Seules SES annonces : compte prouvé par une vente ou une session vue, ou référence VRM (`annonceLbcALui`).
+    const prouves = new Set([...comptesLbcProuves((vr[0] && vr[0].ventes) || {}, ls.items), ...(Array.isArray(annu) ? comptesLbcSession((annu[0] && annu[0].a) || {}) : [])]);
     out.push(...annoncesLeboncoin(ls.items, {
+      aLui: (ad) => annonceLbcALui(ad, prouves),
       etatDe: (ad) => { if (!annonceLbcEnVente(ad, vendues)) return vendues.has(String(ad.id)) ? 'vendue' : 'retiree';
         const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() });
         return e.etat === 'enligne' ? 'active' : e.etat === 'aconfirmer' ? 'aconfirmer' : 'retiree'; },
@@ -141,6 +150,23 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lu, tic]);
   const sites = React.useMemo(() => (modele ? [...new Set(modele.articles.flatMap((a) => a.sites))] : []), [modele]);
+  // (20 nov., « ce qui manque ») CET écran est le propriétaire (§11) de deux chiffres qu'Aujourd'hui lit :
+  //   · les VUES ET FAVORIS de ses annonces en ligne (src/vuesFavoris.js) : un point daté par lecture qui change quelque
+  //     chose (`vrm_vues_lues`, synchronisé), puis les totaux et le gagné du jour, publiés (`vrm_vues_favoris`) ;
+  //   · la VALEUR DU STOCK AU PRIX AFFICHÉ (src/stockValeurAffiche.js) : une paire comptée une fois, prix Vinted sinon le
+  //     plus bas (`vrm_stock_valeur`).
+  // Lecture ratée (`lu` null) ⇒ rien n'est écrit ni publié : les derniers chiffres restent. Un site pas lu ⇒ « au moins ».
+  React.useEffect(() => {
+    if (!modele || !lectureUtile(lu) || !AUTH.user?.id) return;
+    const owner = AUTH.user.id, manque = !!(lu.manque && lu.manque.length);
+    let journal = load(CLE_VUES_LUES, null);
+    try {
+      const r = noterVuesLues(journal, modele.articles.flatMap((a) => a.annonces.filter((x) => x.etat === 'enligne')));
+      if (r.ajoutes) { save(CLE_VUES_LUES, r.journal); journal = r.journal; }
+    } catch (_) { /* journal illisible : la publication part sans le gagné du jour */ }
+    publierVuesFavoris(vuesFavorisEnLigne(modele.articles, journal, { manque }), { owner });
+    publierStockValeur(valeurStockAffiche(modele.articles, { partiel: manque }), { owner });
+  }, [modele, lu]);
   const opts = { seuil, maintenant: Date.now(), cle: cleNum };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
@@ -227,9 +253,28 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
         options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }] },
     ],
   };
+  // (20 nov.) RELIER DEPUIS LA LISTE — Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus,
+  // regarder la fiche ». L'état du lien et LA proposition de chaque annonce d'un autre site sont LUS (src/liaisonEtat.js, calculés
+  // par les règles du parcours) ; SON toucher passe par `relierDepuisListe` (la proposition relue, le geste du parcours).
+  const [, majLiaison] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { const fin = abonnerLiaison(majLiaison); demanderLiaison(false); return fin; }, []);
+  const liaison = {
+    de: (a) => {
+      const x = a && Array.isArray(a.annonces) ? a.annonces.find((y) => y.site !== 'vinted') : null;
+      if (!x) return null;
+      const site = NOM_SITE[x.site] || x.site, st = etatLienLu(site, x.id);
+      if (st.etat === 'passu') return null;
+      return { site, id: String(x.id), etat: st.etat, numero: st.numero, prop: st.etat === 'aRelier' ? propositionLu(site, x.id) : null };
+    },
+    relier: (l) => { if (l && l.prop) relierDepuisListe({ site: l.site, id: l.id, paireId: l.prop.paireId }); },
+    autre: (l) => { if (l) ouvrirLiaison({ site: l.site, id: l.id }); },
+    propre: (l) => { if (l) queSurCeSite({ site: l.site, id: l.id }); },
+    lot: (ls) => { const cles = ls.filter((l) => l && l.prop && l.prop.niveau === 'sur').map((l) => `${l.site}:${l.id}`); if (cles.length) ouvrirLiaison({ vue: 'lot', cles }); },
+    Photo: (src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>,
+  };
   return (
     <>
-    <VueAnnonces travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
+    <VueAnnonces liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
       onRelier={(a) => { const x = a.annonces.find((y) => y.site !== 'vinted'); if (x) { try { window.dispatchEvent(new CustomEvent('vrm:liaison-ouvrir', { detail: { site: NOM_SITE[x.site], id: String(x.id), vue: null } })); } catch (_) {} } }}

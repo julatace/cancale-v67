@@ -65,7 +65,7 @@ export const CATEGORIES = [
   { id: 'aide', ic: 'help', groupes: [
     { id: 'etat', items: ['toutvabien', 'sante', 'statut', 'depannage'] },
     { id: 'aide', titre: 'reglages.groupe.aide', items: ['centre-aide', 'support', 'signaler', 'mes-signalements', 'quoi-de-neuf'] },
-    { id: 'revoir', titre: 'parametres.g.revoir', items: ['visite', 'bilan-minute', 'premier-colis', 'aides-accueil', 'conseils', 'conseils-revoir'] },
+    { id: 'revoir', titre: 'parametres.g.revoir', items: ['bien-demarrer', 'visite', 'bilan-minute', 'premier-colis', 'aides-accueil', 'conseils', 'conseils-revoir'] },
     { id: 'proprietaire', titre: 'parametres.g.proprietaire', items: ['pilotage', 'nouveaux-comptes', 'paiements', 'signalements', 'demandes-aide', 'simulation-compte'] },
   ] },
   // « Sécurité des données » : le panneau expert (§5, vocabulaire technique assumé) TEL QUEL,

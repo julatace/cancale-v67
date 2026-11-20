@@ -27,8 +27,11 @@ import { tr, nombre } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
-import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
+import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente, Champ } from '../natif/index.js';
+import ArrivesARanger from '../ArrivesARanger.jsx';   // (20 nov., lot arrivee-scan) les achats arrivés, à numéroter et ranger
+import { ouvrirRetrouver } from '../retrouverColis.js';
 import MeubleDessin from './MeubleDessin.jsx';
+import { AFFICHAGES, COULEURS_MEUBLE, reglagesDe, couleurMeuble } from '../etageres/reglages.js';
 import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
 import DansFiche from '../DansFiche.jsx';
 import './stock-v2.css';
@@ -222,6 +225,7 @@ function FeuillePlus({ s, ouverte, fermer }) {
             onClick={e.faire ? geste(e.faire) : null} attrs={{ 'data-sr-etat': e.k }}/>)}
         </Groupe>) : null}
       <Groupe titre={tr('sr.menu.outils')}>
+        <Rangee icone={<Icon name="box" size={22}/>} titre={tr('arv.action')} onClick={geste(() => ouvrirRetrouver('stock', '', 'arrivee'))} attrs={{ 'data-arv-bouton': 'stock-plus' }}/>
         <Rangee icone={<Icon name="camera" size={22}/>} titre={tr('stock.trouverPhoto')} onClick={geste(s.ouvrirPhoto)} attrs={{ 'data-stock-recherche-photo': '' }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('stock.faireInventaire')} onClick={geste(s.ouvrirInventaire)} attrs={{ 'data-stock-inventaire-ouvrir': '' }}/>
         <Rangee icone={<Icon name="box" size={22}/>} titre={tr('sr.places.ajouter')} onClick={geste(s.creerMeuble)} attrs={{ 'data-creer-meuble': '' }}/>
@@ -232,11 +236,136 @@ function FeuillePlus({ s, ouverte, fermer }) {
   );
 }
 
+// ── « PERSONNALISER » UN MEUBLE (20 nov., « ce qui manque ») — une page native simple : nom, style, couleur, cases. ──
+// Rien n'est écrit avant « Enregistrer » (le plein de la feuille) ; l'écriture est celle du Stock (`s.personnaliserMeuble` →
+// `enregistrerMeuble` : `vrm_meubles` sur main, et la question quand un meuble rétréci fait sortir des paires). Aucun N°
+// n'est touché. « Plus de réglages » ouvre l'éditeur complet d'hier (couleurs de cases, piles, planches).
+function Personnaliser({ s, m, ouverte, fermer }) {
+  const { Icon } = s;
+  const [nom, setNom] = React.useState(m ? String(m.name || '') : '');
+  const [affichage, setAffichage] = React.useState(m ? reglagesDe(m).affichage : 'cartons');
+  const [couleur, setCouleur] = React.useState(m ? couleurMeuble(m) : 'ciel');
+  const [cols, setCols] = React.useState(m ? Math.max(1, Number(m.cols) || 1) : 4);
+  const [rows, setRows] = React.useState(m ? Math.max(1, Number(m.rows) || 1) : 3);
+  const [enCours, setEnCours] = React.useState(false);
+  if (!m) return null;
+  const L = s.limitesMeuble || { cols: 30, rows: 50 };
+  const pas = (quoi, v, set, max) => (
+    <span className="sm-pas">
+      <BoutonIcone libelle={tr('cqm.meuble.moins', { quoi: tr('cqm.meuble.' + quoi).toLowerCase() })} icone={<Icon name="minus" size={20}/>} indisponible={v <= 1} onClick={() => set(Math.max(1, v - 1))} attrs={{ 'data-sm-perso-moins': quoi }}/>
+      <span className="sm-pas-n" data-sm-perso-n={quoi}>{nombre(v)}</span>
+      <BoutonIcone libelle={tr('cqm.meuble.plus', { quoi: tr('cqm.meuble.' + quoi).toLowerCase() })} icone={<Icon name="plus" size={20}/>} indisponible={v >= max} onClick={() => set(Math.min(max, v + 1))} attrs={{ 'data-sm-perso-plus': quoi }}/>
+    </span>
+  );
+  const enregistrer = async () => {
+    if (enCours) return;
+    setEnCours(true);
+    let ok = false;
+    try { ok = await s.personnaliserMeuble(m.id, { name: nom, cols, rows, couleur, affichage }); } finally { setEnCours(false); }
+    if (ok !== false) fermer();
+  };
+  const apercu = { ...m, name: nom || m.name, cols, rows, couleur, reglages: { ...(m.reglages || {}), affichage } };
+  return (
+    <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('cqm.meuble.personnaliser')} detente="pleine" className="sr-feuille sm-feuille"
+      pied={<Bouton variante="plein" chargement={enCours} onClick={enregistrer} attrs={{ 'data-sm-perso-enregistrer': m.id }}>{tr('cqm.meuble.enregistrer')}</Bouton>}
+      attrs={{ 'data-sm-perso': m.id }}>
+      <div className="sm-perso-apercu" aria-hidden="true"><MeubleDessin m={apercu} info={(i) => (i < (Number(m.cols) || 1) * (Number(m.rows) || 1) ? s.caseInfo(m.id, i) : null)} mode="loin"/></div>
+      <Groupe>
+        <div className="sm-carte-pad"><Champ libelle={tr('cqm.meuble.nom')} valeur={nom} onChange={setNom} attrs={{ 'data-sm-perso-nom': '', maxLength: 40 }}/></div>
+      </Groupe>
+      <Groupe titre={tr('cqm.meuble.style')}>
+        <div className="sm-carte-pad">
+          <Segmente libelle={tr('cqm.meuble.style')} valeur={affichage} onChange={setAffichage} options={AFFICHAGES.map((a) => ({ cle: a, libelle: tr('cqm.meuble.style.' + a) }))}/>
+        </div>
+      </Groupe>
+      <Groupe titre={tr('cqm.meuble.couleur')}>
+        {COULEURS_MEUBLE.map((c) => <Rangee key={c} icone={<i className="vrm-etag-pastille" data-couleur={c} aria-hidden="true"/>} titre={tr('etag.couleur.' + c)} fin={couleur === c ? 'coche' : null}
+          onClick={() => setCouleur(c)} attrs={{ 'data-sm-perso-couleur': c, 'aria-pressed': couleur === c ? 'true' : 'false' }}/>)}
+      </Groupe>
+      <Groupe titre={tr('cqm.meuble.cases')} pied={tr('cqm.meuble.total', { n: cols * rows })}>
+        <Rangee titre={tr('cqm.meuble.colonnes')} valeur={pas('colonnes', cols, setCols, L.cols)}/>
+        <Rangee titre={tr('cqm.meuble.rangees')} valeur={pas('rangees', rows, setRows, L.rows)}/>
+      </Groupe>
+      <Groupe>
+        <Rangee titre={tr('sr.place.modifier')} fin="chevron" onClick={() => { fermer(); setTimeout(() => s.modifierMeuble(m), 60); }} attrs={{ 'data-sr-modifier-meuble': m.id }}/>
+      </Groupe>
+    </Feuille>
+  );
+}
+
+// ── « LA PIÈCE » (20 nov.) — l'ordre des meubles, une rangée chacun, Monter / Descendre (la même écriture `ordre`). ──
+function LaPiece({ s, ouverte, fermer }) {
+  const { Icon } = s;
+  const n = s.meubles.length;
+  return (
+    <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('cqm.piece.titre')} className="sr-feuille sm-feuille" attrs={{ 'data-sm-piece': n }}>
+      <Groupe titre={tr('sm.seg.meubles')}>
+        {s.meubles.map((m, k) => (
+          <Rangee key={m.id} icone={<i className="vrm-etag-pastille" data-couleur={couleurMeuble(m)} aria-hidden="true"/>} titre={m.name || '—'}
+            sousTitre={tr('cqm.meuble.total', { n: (Number(m.cols) || 1) * (Number(m.rows) || 1) })}
+            valeur={<span className="sm-pas">
+              <BoutonIcone libelle={tr('cqm.piece.monter', { nom: m.name || '' })} icone={<Icon name="chevronHaut" size={20}/>} indisponible={k === 0} onClick={() => s.placerMeubleA(m.id, k - 1)} attrs={{ 'data-sr-monter': m.id }}/>
+              <BoutonIcone libelle={tr('cqm.piece.descendre', { nom: m.name || '' })} icone={<Icon name="chevronBas" size={20}/>} indisponible={k === n - 1} onClick={() => s.placerMeubleA(m.id, k + 1)} attrs={{ 'data-sr-descendre': m.id }}/>
+            </span>}
+            attrs={{ 'data-sm-piece-meuble': m.id, 'data-sm-piece-rang': String(k) }}/>
+        ))}
+      </Groupe>
+    </Feuille>
+  );
+}
+
+// ── GLISSER-DÉPOSER À LA SOURIS (20 nov.) : une paire d'une case à l'autre, dans le meuble zoomé. ──
+// La souris seulement (au doigt, le toucher garde ses gestes : fiche, « Déplacer ») ; au-delà de 6 px le geste devient un
+// glisser, la case survolée s'allume ; au lâcher sur une AUTRE case, la pose est celle de « Déplacer » (`s.poser` : une case
+// prise DEMANDE, `vrm_slots` relu-fusionné) — jamais un N° changé. Échap ou lâcher ailleurs : rien.
+function useGlisserCase(s, m) {
+  const g = React.useRef(null);
+  const caseSous = (x, y) => { const el = document.elementFromPoint(x, y); const c = el && el.closest ? el.closest('[data-sm-case]') : null; if (!c) return null; const [mid, i] = String(c.getAttribute('data-sm-case')).split(':'); return String(mid) === String(m.id) ? { el: c, i: Number(i) } : null; };
+  const nettoyer = () => { const x = g.current; g.current = null; if (!x) return; document.removeEventListener('pointermove', x.bouge); document.removeEventListener('pointerup', x.fin); document.removeEventListener('keydown', x.touche, true);
+    if (x.fantome) x.fantome.remove(); if (x.cible) x.cible.removeAttribute('data-sm-glisse-cible'); if (x.source) x.source.removeAttribute('data-sm-glisse-source'); document.documentElement.removeAttribute('data-sm-glisse'); };
+  React.useEffect(() => nettoyer, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const onPointerDown = (e) => {
+    if (!m || e.pointerType !== 'mouse' || e.button !== 0) return;
+    const c = e.target && e.target.closest ? e.target.closest('[data-sm-case]') : null;
+    if (!c || !c.getAttribute('data-case-num')) return;
+    const i = Number(String(c.getAttribute('data-sm-case')).split(':')[1]);
+    const info = s.caseInfo(m.id, i);
+    if (!info || !info.cle || info.notee) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    const etat = { de: i, cle: info.cle, num: info.num, source: c, cible: null, vers: null, fantome: null, actif: false };
+    etat.bouge = (ev) => {
+      if (!etat.actif) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return; etat.actif = true; c.setAttribute('data-sm-glisse-source', ''); document.documentElement.setAttribute('data-sm-glisse', '');
+        const f = document.createElement('div'); f.className = 'sm-glisse-fantome'; f.setAttribute('aria-hidden', 'true'); f.textContent = String(info.num); document.body.appendChild(f); etat.fantome = f; }
+      ev.preventDefault();
+      etat.fantome.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 12}px)`;
+      const sous = caseSous(ev.clientX, ev.clientY);
+      const el = sous && sous.i !== etat.de ? sous.el : null;
+      if (el !== etat.cible) { if (etat.cible) etat.cible.removeAttribute('data-sm-glisse-cible'); if (el) el.setAttribute('data-sm-glisse-cible', ''); etat.cible = el; }
+      etat.vers = el ? sous.i : null;
+    };
+    etat.fin = () => {
+      const actif = etat.actif, vers = etat.vers;
+      nettoyer();
+      if (!actif) return;
+      // Le clic qui suit un glisser ne doit pas rejouer le toucher de la case de départ.
+      const stop = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => document.removeEventListener('click', stop, { capture: true }), 0);
+      if (vers != null) s.poser(etat.cle, String(m.id), vers);
+    };
+    etat.touche = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); etat.actif = false; nettoyer(); } };
+    g.current = etat;
+    document.addEventListener('pointermove', etat.bouge); document.addEventListener('pointerup', etat.fin); document.addEventListener('keydown', etat.touche, true);
+  };
+  return { onPointerDown };
+}
+
 // ── TOUS LES MEUBLES : la vue d'ensemble, puis un meuble zoomé ────────────────
 function Meubles({ s, zoom, setZoom, vise }) {
   const { Icon } = s;
   const m = zoom ? s.meubles.find((x) => String(x.id) === String(zoom)) : null;
-  const k = m ? s.meubles.indexOf(m) : -1;
+  const [perso, setPerso] = React.useState(null);
+  const [piece, setPiece] = React.useState(false);
+  const glisser = useGlisserCase(s, m);
   if (m) {
     const c = s.compteMeuble(m);
     return (
@@ -248,15 +377,18 @@ function Meubles({ s, zoom, setZoom, vise }) {
           <h2 className="sm-zoom-nom">{m.name}</h2>
           <p className="sm-zoom-n">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sm-tuile-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</p>
         </div>
-        <div className="sm-defile">
+        <div className="sm-defile" onPointerDown={glisser.onPointerDown} data-sm-glisser={m.id}>
           <MeubleDessin m={m} info={(i) => s.caseInfo(m.id, i)} mode="pres" vise={vise && String(vise.m) === String(m.id) ? vise.i : null} onCase={(i) => s.toucherCase(m.id, i)}/>
         </div>
         <p className="sm-aide">{tr('sm.zoom.aide')}</p>
+        {/* (20 nov., « ce qui manque ») « Personnaliser » (page native) et « La pièce » (l'ordre des meubles) remplacent
+            « Modifier » et Monter / Descendre ici ; l'éditeur complet reste derrière « Personnaliser ». */}
         <div className="sm-gestes">
-          <Bouton variante="teinte" icone={<Icon name="pencil" size={18}/>} attrs={{ 'data-sr-modifier-meuble': m.id }} onClick={() => s.modifierMeuble(m)}>{tr('sr.place.modifier')}</Bouton>
-          {s.meubles.length > 1 ? <Bouton variante="texte" indisponible={k === 0} raison={k === 0 ? tr('sm.ordre.premier') : ''} attrs={{ 'data-sr-monter': m.id }} onClick={() => s.deplacerMeuble(m.id, -1)}>{tr('sr.place.monter')}</Bouton> : null}
-          {s.meubles.length > 1 ? <Bouton variante="texte" indisponible={k === s.meubles.length - 1} raison={k === s.meubles.length - 1 ? tr('sm.ordre.dernier') : ''} attrs={{ 'data-sr-descendre': m.id }} onClick={() => s.deplacerMeuble(m.id, 1)}>{tr('sr.place.descendre')}</Bouton> : null}
+          <Bouton variante="teinte" icone={<Icon name="pencil" size={18}/>} attrs={{ 'data-sm-perso-ouvrir': m.id }} onClick={() => setPerso(String(m.id))}>{tr('cqm.meuble.personnaliser')}</Bouton>
+          {s.meubles.length > 1 ? <Bouton variante="texte" attrs={{ 'data-sm-piece-ouvrir': '' }} onClick={() => setPiece(true)}>{tr('cqm.piece.titre')}</Bouton> : null}
         </div>
+        <Personnaliser key={'p' + m.id + ':' + (perso || '')} s={s} m={m} ouverte={perso === String(m.id)} fermer={() => setPerso(null)}/>
+        <LaPiece s={s} ouverte={piece} fermer={() => setPiece(false)}/>
       </section>
     );
   }
@@ -402,6 +534,8 @@ export default function StockV2({ s }) {
         </Groupe>) : null}
 
       {chercheVide ? <>
+        {/* (20 nov., lot arrivee-scan) Les ACHATS arrivés (pas encore d'article) : leur N° et leur case, un toucher. */}
+        <ArrivesARanger Icon={s.Icon}/>
         {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
         {/* Pendant la lecture, le squelette a la FORME de « À ranger » (5 rangées) : la liste arrive à sa place, les meubles
             ne sautent pas (mesuré au banc stock-rangement : CLS 0,31 quand la liste arrivait sur une ligne de texte). */}

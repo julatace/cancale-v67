@@ -153,6 +153,7 @@ export default {
   "auto.ciblage": "Ciblage",
   "auto.delais": "Délais",
   "auto.reinitialiser": "Réinitialiser",
+  "auto.reinit.rien": "Rien à réinitialiser : les réglages sont ceux d'origine.",
   "auto.demarrer": "Démarrer",
   "auto.arreter": "Arrêter",
   "auto.enregistrer": "Enregistrer",

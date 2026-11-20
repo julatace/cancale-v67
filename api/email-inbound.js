@@ -1148,6 +1148,18 @@ export function dateDeLEmail(corpsBrut) {
   const d = Date.parse(s);
   return Number.isFinite(d) ? new Date(d).toISOString() : null;
 }
+// (20 nov., chasse-bugs) Le jour qui sert à lire une date SANS année (« RETRAIT JUSQU'AU 15/11 », « d'ici le 16 nov. ») :
+// celui de l'E-MAIL (sa date d'origine, `sourceDate`), pas celui où la route le traite. Mesuré au banc : un e-mail
+// du 10 nov. traité le 20 perdait sa date limite (hors de la fenêtre [veille, +30 j] de « maintenant ») — un rejeu
+// tardif (503 rejoué, script relancé, e-mail reclassé) rendait le colis sans échéance. Une date d'origine dans le
+// futur (horloge fausse) n'est pas crue : on garde le moment du traitement.
+export function jourPourLireDates(corpsBrut, maintenant) {
+  const e = dateDeLEmail(corpsBrut);
+  const m = Date.parse(String(maintenant || ''));
+  if (!e) return maintenant;
+  if (Number.isFinite(m) && Date.parse(e) > m + 86400000) return maintenant;
+  return e;
+}
 export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString()) {
   const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
@@ -2569,7 +2581,7 @@ export async function traiterEmail(req, res) {
     // un rejeu réécrit la même ligne), l'article n'est qu'un libellé. Avant : « aucune règle ne le
     // reconnaît ». Illisible ⇒ gardé entier « à vérifier » ; écriture ratée ⇒ 503.
     if (estDemandeRetourAchat(subject)) {
-      const lu = lireDemandeRetourAchat({ subject, text: corpsTexte, html: mail.html, recuLe: now });
+      const lu = lireDemandeRetourAchat({ subject, text: corpsTexte, html: mail.html, recuLe: jourPourLireDates(corpsBrut, now) });
       if (!lu.ok) {
         await garderInconnu(corpsBrut, mail, 'retour à renvoyer : ' + lu.raison, '');
         await repondre(res, 200, { ok: false, type: 'retour-demande', garde: true, raison: lu.raison });
@@ -2746,7 +2758,7 @@ export async function traiterEmail(req, res) {
     // bordereau (traité au point 1, prioritaire).
     const carrier = detecterTransporteur(mail);
     if (carrier) {
-      const track = parseCarrierEmail(mail, carrier, now);
+      const track = parseCarrierEmail(mail, carrier, jourPourLireDates(corpsBrut, now));
       // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
       // HTML embarqué (là où Vinted / Mondial Relay le mettent le plus souvent).
       const qr = extractPickupQr(mail, track.status);

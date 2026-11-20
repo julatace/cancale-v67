@@ -26,6 +26,7 @@ import { tr } from './i18n/index.js';
 import { trj } from './i18n/react.js';
 // (15 nov., lot fiabilite-auto) L'extension de CE navigateur en retard : la ligne le dit, le paquet à côté.
 import { useRetardIci, phraseRetardIci } from './fiabilite/Fiabilite.jsx';
+import { Bouton as BoutonNatif } from './natif/Bouton.jsx';
 
 const RELECTURE_MS = 5 * 60 * 1000;   // la ligne se revérifie toutes les 5 min, page visible
 const DEPART_MS = 1800;               // jamais pendant l'ouverture (src/AttenteEcran : ~2,5 s)
@@ -154,9 +155,9 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
               {autres > 0 ? <span className="vrm-fraicheur-autres" data-fraicheur-autres={autres} aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span> : null}
             </button>
           : <span className="vrm-bandeau-abo-texte vrm-fraicheur-texte"><span className="vrm-fraicheur-phrase">{texte}</span></span>}
-        {premier && premier.lien && autres === 0 ? <a className="vrm-lien-action vrm-bandeau-abo-geste" tabIndex={tabHors} href={premier.lien} {...(/^https?:/.test(premier.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={premier.lien}>{premier.libelleLien}</a>
-          : g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" tabIndex={tabHors} data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
-        {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" tabIndex={tabHors} data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>{tr('commun.reessayer')}</button> : null}
+        {premier && premier.lien && autres === 0 ? <a className="n-bouton vrm-bandeau-abo-geste" data-n-variante="texte" data-n-taille="compact" tabIndex={tabHors} href={premier.lien} {...(/^https?:/.test(premier.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={premier.lien}>{premier.libelleLien}</a>
+          : g && autres === 0 ? <BoutonNatif variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={g.faire} attrs={{ tabIndex: tabHors, 'data-fraicheur-geste': premier.source, 'data-alerte-voir': panne ? '' : undefined }}>{g.libelle}</BoutonNatif> : null}
+        {f.etat === 'passu' ? <BoutonNatif variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={() => { relire(); lireTransp(true); }} attrs={{ tabIndex: tabHors, 'data-fraicheur-reessayer': '' }}>{tr('commun.reessayer')}</BoutonNatif> : null}
       </div>
       {ouvert && depliable ? (
         <div className="vrm-fraicheur-detail" data-fraicheur-detail={f.retards.length}>

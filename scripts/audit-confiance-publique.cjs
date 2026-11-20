@@ -141,7 +141,7 @@ const PREUVES = {
   // ── G. Les règles elles-mêmes ──────────────────────────────────────────────
   if (!silencieux) console.log('\n── G. les règles que la page promet');
   dit(auto && auto.actif === false, 'G1 le mode auto des favoris est éteint par défaut', auto);
-  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && /if \(!reg \|\| !reg\.actif\) return 0;/.test(bg), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
+  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && (/if \(!reg \|\| !reg\.actif\) return 0;/.test(bg) || (/if \(!reg \|\| !\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)\) return 0;/.test(bg) && (bg.match(/quoi = 'accept'/g) || []).length === 1 && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(bg))), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
   dit(/load\('vrm_ebay_retrait_auto', false\) === true/.test(lire('src/ecrans/Ebay.jsx')) && /if \(v !== 'true'\) return \{ status: 403/.test(lire('api/ebay.js')), 'G3 le retrait eBay automatique : éteint par défaut, et le serveur le re-vérifie');
   dit(/return rows\.length === 1 && rows\[0\]\?\.data\?\.active === true;/.test((/async function bordereauxAutoActifs[\s\S]*?\n\}/.exec(bg) || [''])[0]), 'G4 bordereaux automatiques : éteints tant que la ligne ne dit pas « active: true »');
   // Rien n'est simulé sur Vinted : ni les scripts injectés sur Vinted, ni le service worker

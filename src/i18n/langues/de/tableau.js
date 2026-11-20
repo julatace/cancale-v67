@@ -153,6 +153,7 @@ export default {
   "auto.ciblage": "Zielgruppe",
   "auto.delais": "Zeiten",
   "auto.reinitialiser": "Zurücksetzen",
+  "auto.reinit.rien": "Nichts zurückzusetzen: Das sind die ursprünglichen Einstellungen.",
   "auto.demarrer": "Starten",
   "auto.arreter": "Stoppen",
   "auto.enregistrer": "Speichern",

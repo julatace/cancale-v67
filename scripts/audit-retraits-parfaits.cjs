@@ -171,8 +171,9 @@ const lire = (p) => { try { return fs.readFileSync(path.join(R, p), 'utf8'); } c
     dit(/if \(q\.quoi === 'colis'\) \{ if \(!deja\.has\('colis'\)[^\n]*lireSuivis\(\{ force: true \}\)/.test(app), 'F2 l’écran relit les suivis sur ce signal');
     dit(/'suivi', 'transp', 'retrait'\]\.includes\(q\.quoi\)/.test(app), 'F3 …et les codes des conversations (`retrait` ⇒ `relireColisRelais`)');
     dit(/comparerRetraits\(avantN, tous, Date\.now\(\)\)/.test(app) && /toast\(t, 'info'\)/.test(app), 'F4 la liste publiée annonce le nouveau (toast) — la même liste que « à retirer »');
-    const pr = lire('src/designV2/PassesRetrait.jsx');
-    dit(/data-v2-sorte=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) && /data-v2-nouveau=""/.test(pr), 'F5 la passe dit consigne / comptoir et marque la ligne « nouveau »');
+    // (20 nov.) Les colis à retirer sont des cartes par point (src/natif/RetraitsPoints.jsx).
+    const pr = lire('src/natif/RetraitsPoints.jsx');
+    dit(/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
     dit(/sorte: sorteRetrait\(\{ lieu: t\.lieu/.test(app), 'F6 chaque colis d’e-mail porte sa sorte (src/retraitSorte.js)');
   });
 

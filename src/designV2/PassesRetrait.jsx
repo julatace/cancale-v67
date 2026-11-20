@@ -9,6 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { Bouton } from '../natif/Bouton.jsx';
 import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './design-v2.css';
 import './achats-v2.css';
@@ -66,7 +67,7 @@ function LigneRetrait({ x, Icon, Photo, aides, nouveaux }) {
         ? <div role="button" tabIndex={0} className="v2r-haut" onClick={ouvrirVu} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ouvrirVu(); } }} data-v2-en-grand="" aria-label={tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode') + ' · ' + aides.titre(x)}>{corps}</div>
         : <div className="v2r-haut">{corps}</div>}
       <div className="v2r-gestes">
-        <button type="button" className="v2r-retire" onClick={() => setFait(true)} data-v2-retire="" data-v2b="texte">{tr('v2.passe.retire')}</button>
+        <Bouton variante="texte" taille="compact" className="v2r-retire" onClick={() => setFait(true)} attrs={{ 'data-v2-retire': '', 'data-v2b': 'texte' }}>{tr('v2.passe.retire')}</Bouton>
       </div>
     </RangeeFaite>
   );

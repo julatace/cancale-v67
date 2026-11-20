@@ -16,6 +16,8 @@ export default {
   "pn.court.historique": "Storico",
   "pn.court.journee": "La tua giornata",
   "pn.court.abonnement": "Abbonamento",
+  "pn.court.etiquetage": "Etichettatura",
+  "pn.court.pret": "Tutto pronto",
   "pn.etat.fait": "Fatto",
   "pn.etat.afaire": "Da fare",
   "pn.etat.encours": "Controllo…",
