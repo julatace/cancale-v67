@@ -45757,6 +45757,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const r = M.opsFait({ article: cible.article, champs: { buyPrice: w.buyPrice, buyFromId: w.buyFromId, buyFrom: w.buyFrom }, cartes: { fiches: lire('vinted_annonce_numeros'), faits: lire(M.CLE_ARTICLES) || {}, parNum: lire('vinted_buyprice_by_num') || {} } });
       if (!r || r.refus || !Array.isArray(r.ops) || !r.ops.length) { toast(tr('glisser.pasEcrit'), 'error'); return false; }
       gesteVrm(tr('glisser.fait', { qui: cible.num ? `N°${cible.num}` : `« ${String(cible.titre || '').slice(0, 40)} »` }), r.ops, {}, () => setFaitsSitesTic((t) => t + 1));
+      // Elle sort de la liste tout de suite (la relecture qui suit la confirme ; « Annuler » la fait revenir par la même relecture).
+      setArticlesSitesGlisser((l) => (Array.isArray(l) ? l.filter((x) => !(x.porteur && x.porteur.cle === cible.article.porteur.cle)) : l));
       setFaitsSitesTic((t) => t + 1);
       return true;
     }
