@@ -22,19 +22,25 @@ import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { nomPlateforme } from './plateformes.js';
 import { ageLecture } from './comptesLies.js';
 import { SELECT_APPAREILS, PREFIXE_APPAREIL, ACTIF_MS, lireAppareils, pannesCapture, etatVersion, versionCourte, gestesMiseAJour, LIENS_PAQUET } from '../api/_lib/garde-capture.js';
-import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession } from './App.jsx';
+import { SUPABASE_URL, sbAuth, lireTout, lireCapturesDetail, fetchVintedAccounts, useComptesAutresSites, EXT_ATTENDUE, load, DEMANDE_REGLAGE_SOUS, useEstProprietaire, enTeteSession, faitsExtensionApp, brancherExtensionApp, ouvrirPageExtension, useSansSouris, useExtVivante } from './App.jsx';
 import { lireEtatsComptes } from './etatsComptesLecture.js';
 import { AlertesProduction } from './composants/AlertesProduction.jsx';
 import { aVoirCapture } from './santeDonnees.js';
-import { LigneSante } from './SanteDonnees.jsx';
+import { LigneSante, useSanteDonnees } from './SanteDonnees.jsx';
 import { useAlertesForme, LignesForme } from './AlerteFormeVinted.jsx';   // (11 nov., ext. 5.357) Vinted a changé une page
 import { BoutonRapportExtension, RapportsExtensionProprio } from './RapportExtension.jsx';   // (12 nov., ext. 5.371)
 import './styles-tout-va-bien.css';
 // (15 nov., lot fiabilite-auto) L'extension de CE navigateur, le contrôle de cette nuit, la santé de
 // chaque compte (une feuille), le rapport de plantages du propriétaire (src/fiabilite/Fiabilite.jsx).
-import { FiabiliteToutVaBien, RapportPlantages } from './fiabilite/Fiabilite.jsx';
+import { FiabiliteToutVaBien, RapportPlantages, usePointsToutVaBien } from './fiabilite/Fiabilite.jsx';
 import { LIENS_BOUTIQUES } from './navigateursServis.js';
 import { tr } from './i18n/index.js';
+import { useLangue } from './i18n/react.js';
+import { Groupe, Rangee } from './natif/index.js';
+import { pointsEcran, gestePoint } from './toutVaBienPoints.js';   // (20 nov.) les points, dans l'ordre d'importance
+import { etatNavigateur } from './extension/peutFaire.js';
+import { CONTROLES } from './controleNuit.js';
+import { installerExtensionIci } from './navigateurExtension.js';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
 // ne publient pas leur appareil) : `panel_diag_capture`. Trois états.
@@ -158,14 +164,86 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
   );
 }
 
+// (20 nov., Julien : « Tout va bien ? qui dit exactement quoi faire ») LA PAGE : en haut, l'état en une rangée ;
+// puis « À régler » — chaque point une rangée (ce qui ne va pas, et LE geste qui le règle, la rangée entière se
+// touche), dans l'ordre d'importance (src/toutVaBienPoints.js) ; puis « Détails » : tout le technique d'avant
+// (comptes un par un, appareils, contrôle de nuit, rapports), replié.
+const LIENS_SITE_TVB = { vinted: 'https://www.vinted.fr', leboncoin: 'https://www.leboncoin.fr/compte/part/mes-annonces', vestiaire: 'https://www.vestiairecollective.com/' };
+const allerTvb = (u) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: String(u || '').replace(/^\//, '') })); } catch (_) {} };
+const allerControleTvb = (cle) => { const C = CONTROLES.find((c) => c.cle === cle); return C && C.geste ? C.geste.aller : ''; };
+function textesPoint(pt) {
+  const site = pt.plateforme ? nomPlateforme(pt.plateforme) : '';
+  if (pt.type === 'controle') return { titre: tr(`fiab.ctl.l.${pt.controle}`, { n: pt.n }), sous: tr(`fiab.ctl.d.${pt.controle}`), geste: tr(`fiab.ctl.g.${pt.controle}`) };
+  if (pt.type === 'extension') return { titre: tr('tvb.p.extension'), sous: tr(pt.phrase, pt.vars), geste: tr('tvb.g.' + (pt.geste === 'installer' ? 'installer' : pt.geste === 'mettre-a-jour' ? 'maj' : pt.geste === 'brancher' ? 'brancher' : 'voir')) };
+  if (pt.type === 'panne') return { titre: tr('tvb.p.panne', { site, compte: pt.nom || pt.id }), sous: pt.cause || pt.conseil, geste: tr('tvb.g.voir') };
+  if (pt.type === 'compte') return { titre: tr('tvb.p.compte', { site, compte: pt.nom || pt.id }), sous: pt.jamais ? tr('tvb.p.compte.jamais') : tr('tvb.p.compte.ancien', { quand: pt.age }), geste: pt.plateforme === 'ebay' ? tr('tvb.g.ebay') : tr('tvb.g.ouvrir', { site }) };
+  if (pt.type === 'appareil') return { titre: pt.inconnu ? tr('tvb.p.appareilInconnu') : tr('tvb.p.appareil', { nav: pt.nom }), sous: tr('tvb.p.appareil.sous', { v: versionCourte(pt.version) || '?', attendue: versionCourte(EXT_ATTENDUE) }), geste: tr('tvb.g.installerV', { v: versionCourte(EXT_ATTENDUE) }) };
+  if (pt.type === 'donnees') return { titre: tr('tvb.p.donnees', { n: pt.n }), sous: tr('tvb.p.donnees.sous'), geste: tr('tvb.g.voir') };
+  if (pt.type === 'passu') return { titre: tr('tvb.p.passu'), sous: tr('tvb.p.passu.sous', { quoi: pt.quoi.join(', ') }), geste: tr('tvb.g.relire') };
+  return { titre: tr('tvb.p.forme'), sous: tr('tvb.p.forme.sous'), geste: '' };
+}
 export function ToutVaBien({ onComptes }) {
+  useLangue();
   const { etat, relire } = useEtatCapture({ complet: true });
-  const [ouvert, setOuvert] = React.useState(null);
   // (11 nov., ext. 5.357) Une page de Vinted lue d'une forme inconnue : rien n'est rangé, on le dit.
   const formes = useAlertesForme();
+  const sansSouris = useSansSouris();
+  useExtVivante();
+  const fiab = usePointsToutVaBien();
+  const sante = useSanteDonnees({ capture: etat });
+  const [details, setDetails] = React.useState(false);
+  if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><Groupe><Rangee titre={tr('tvb.verif')} attrs={{ 'data-tvb-resume': '' }}/></Groupe></div>;
+  const { appareils, pannes, lignes, passu, maintenant } = etat;
+  const av = aVoirCapture(etat, { etatVersion, attendue: EXT_ATTENDUE });
+  const nav = (() => { try { return etatNavigateur(faitsExtensionApp(sansSouris)); } catch (_) { return null; } })();
+  const noms = new Map((lignes || []).map((l) => [`${l.plateforme}:${l.id}`, l.nom]));
+  const r = pointsEcran({
+    nav, pannes: (pannes || []).map((x) => ({ ...x, nom: noms.get(`${x.plateforme}:${x.id}`) || '' })), lignes, appareils: appareils || [], versionDe: (a) => etatVersion(a, EXT_ATTENDUE),
+    ancienInconnu: !!av.ancienInconnu, controle: (fiab && fiab.points ? fiab.points : []).filter((x) => x.source === 'controle'),
+    donnees: sante && Number.isFinite(sante.nAFaire) ? sante.nAFaire : null, passu, formes: formes ? formes.length : 0,
+  });
+  const inst = installerExtensionIci();
+  const faire = (g) => {
+    if (!g) return;
+    if (g.code === 'brancher') { brancherExtensionApp(); setTimeout(relire, 1500); return; }
+    if (g.code === 'page-extension') { ouvrirPageExtension(); return; }
+    if (g.code === 'aller') { allerTvb(g.aller); return; }
+    if (g.code === 'sante') { DEMANDE_REGLAGE_SOUS.id = 'sante'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} return; }
+    if (g.code === 'relire') { relire(); return; }
+    if (g.lien) { try { if (g.telecharger) { const a = document.createElement('a'); a.href = g.lien; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); } else window.open(g.lien, '_blank', 'noopener'); } catch (_) {} }
+  };
+  const ton = r.etat === 'points' ? 'geste' : r.etat === 'passu' ? 'passu' : 'ok';
+  const resume = r.n ? tr('tvb.resume.points', { n: r.n }) : r.etat === 'passu' ? tr('tvb.resume.passu') : !lignes.length ? tr('tvb.resume.aucun') : tr('tvb.resume.ok');
+  return (
+    <div className="vrm-tvb" data-tout-va-bien={ton} data-tvb-a-faire={r.n}>
+      <Groupe>
+        <Rangee titre={resume} sousTitre={tr('tvb.verifie', { quand: quandRelu(maintenant) })} valeur={tr('tvb.g.relire')} onClick={relire} className="vrm-tvb-point"
+          attrs={{ 'data-tvb-resume': '', 'data-tvb-relire': '' }}/>
+      </Groupe>
+      {r.points.length ? (
+        <Groupe titre={tr('tvb.groupe.regler')} attrs={{ 'data-tvb-points': r.points.length }}>
+          {r.points.map((pt, i) => {
+            const t = textesPoint(pt);
+            const g = gestePoint(pt, { inst, liensSite: LIENS_SITE_TVB, lienPaquet: (x) => gestesMiseAJour({ paquet: x.paquet }, EXT_ATTENDUE).lien || '', allerControle: allerControleTvb });
+            return <Rangee key={pt.cle} titre={t.titre} sousTitre={t.sous} sousLignes={2} valeur={g ? t.geste : ''} ton={pt.ton === 'geste' ? 'ambre' : 'neutre'}
+              onClick={g ? () => faire(g) : null} className={pt.ton === 'rouge' ? 'vrm-tvb-point vrm-tvb-point-doublon' : 'vrm-tvb-point'}
+              attrs={{ 'data-tvb-point': pt.cle, 'data-tvb-rang': i, 'data-tvb-type': pt.type, 'data-tvb-geste-code': g ? g.code : '' }}/>;
+          })}
+        </Groupe>
+      ) : null}
+      <Groupe>
+        <Rangee titre={tr('tvb.details')} fin={details ? <span className="vrm-tvb-replier" aria-hidden="true">{tr('tvb.replier')}</span> : 'chevron'} onClick={() => setDetails((d) => !d)}
+          attrs={{ 'data-tvb-details': details ? 'ouvert' : 'ferme', 'aria-expanded': details ? 'true' : 'false' }}/>
+      </Groupe>
+      {details ? <DetailsToutVaBien onComptes={onComptes} etat={etat} relire={relire} formes={formes}/> : null}
+    </div>
+  );
+}
+
+function DetailsToutVaBien({ onComptes, etat, relire, formes }) {
+  const [ouvert, setOuvert] = React.useState(null);
   // (11 nov.) Les alertes de production : au propriétaire seul (la route le revérifie).
   const proprio = useEstProprietaire();
-  if (etat === undefined || !etat.comptesPrets) return <div className="vrm-tvb" data-tout-va-bien="lecture"><div className="vrm-tvb-tete"><Pastille ton="passu"/><div><b className="vrm-tvb-resume">Je vérifie…</b></div></div></div>;
   const { appareils, pannes, lignes, passu, ancien, maintenant } = etat;
   const panneDe = new Map(pannes.map((p) => [`${p.plateforme}:${p.id}`, p]));
   // (11 nov., lot sante-donnees) LA règle des « choses à voir » : `aVoirCapture`
@@ -188,14 +266,14 @@ export function ToutVaBien({ onComptes }) {
   const ton = aFaire || nFormes ? 'geste' : passu.length ? 'passu' : 'ok';
   const parSite = ['vinted', 'leboncoin', 'vestiaire', 'ebay'].map((p) => [p, lignes.filter((l) => l.plateforme === p)]).filter(([, l]) => l.length);
   return (
-    <div className="vrm-tvb" data-tout-va-bien={ton} data-tvb-a-faire={aFaire}>
+    <div className="vrm-tvb-details" data-tvb-details-contenu={ton} data-tvb-detail-a-faire={aFaire}>
       <div className="vrm-tvb-tete">
         <Pastille ton={ton}/>
         <div className="vrm-tvb-tete-texte">
-          <b className="vrm-tvb-resume" data-tvb-resume="">{resume}</b>
+          <b className="vrm-tvb-resume" data-tvb-resume-detail="">{resume}</b>
           <span className="vrm-tvb-sous">{sous}</span>
         </div>
-        <button type="button" className="vrm-lien-action vrm-tvb-revoir" data-tvb-relire="" onClick={relire}>Revérifier</button>
+        <button type="button" className="vrm-lien-action vrm-tvb-revoir" data-tvb-relire-detail="" onClick={relire}>Revérifier</button>
       </div>
       <LignesForme alertes={formes} lieu="tvb"/>
       <FiabiliteToutVaBien etat={etat}/>

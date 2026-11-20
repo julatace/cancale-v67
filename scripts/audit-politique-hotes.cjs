@@ -121,9 +121,9 @@ const COUPLES = {
   'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],
   'src/CreerSurVinted.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » le brouillon créé sur vinted.fr'],
   // (15 nov., parcours nouveau) les gestes des étapes « extension » et « comptes » : le navigateur y va sur SON toucher.
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (relier ses comptes)'],
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces)'],
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire »'],
+  'src/parcoursNouveau/Demarrage.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (relier ses comptes)'],
+  'src/parcoursNouveau/Demarrage.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces)'],
+  'src/parcoursNouveau/Demarrage.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire »'],
   'src/parcoursNouveau/regle.js|apps.apple.com': ['lien', LIEN + ' — « Installer Orion » (la fiche App Store déjà citée par l’app)'],
   'src/parcoursNouveau/regle.js|www.vinted.fr': ['lien', LIEN + ' — vinted.fr (le raccourci « Ouvrir les URL »)'],
   'src/registresConformes.js|www.legifrance.gouv.fr': ['lien', LIEN + ' — les textes cités sous les registres'],

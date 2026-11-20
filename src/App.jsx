@@ -24102,7 +24102,7 @@ function GuideDemarrageApp(props) {
 // d'écriture) : la session, « Où vends-tu ? » (`vrm_plateformes_affichees`), le pont et
 // la première lecture (`useParcoursArrivee`, la même règle que la carte « Démarrer »),
 // « qui numérote » (`vrm_numero_ecrit`), l'import des 12 mois (`import_vinted_{uid}`,
-// projeté), l'abonnement LU du serveur. L'écran (ParcoursNouveau.jsx) ne fait que dessiner.
+// projeté), l'abonnement LU du serveur. L'écran (Demarrage.jsx) ne fait que dessiner.
 // Écritures : seulement sur SES gestes — la position (`vrm_parcours_nouveau`), ses sites,
 // sa numérotation — par `save`, comme partout. Dans le bac à sable du propriétaire
 // (src/modeExemple.js) le même code tourne, en mémoire : rien ne sort.
