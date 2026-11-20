@@ -28,6 +28,8 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
 import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente } from '../natif/index.js';
+import ArrivesARanger from '../ArrivesARanger.jsx';   // (20 nov., lot arrivee-scan) les achats arrivés, à numéroter et ranger
+import { ouvrirRetrouver } from '../retrouverColis.js';
 import MeubleDessin from './MeubleDessin.jsx';
 import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (19 nov., fiche directe) la fiche d'un article est LA fiche de la paire
 import DansFiche from '../DansFiche.jsx';
@@ -222,6 +224,7 @@ function FeuillePlus({ s, ouverte, fermer }) {
             onClick={e.faire ? geste(e.faire) : null} attrs={{ 'data-sr-etat': e.k }}/>)}
         </Groupe>) : null}
       <Groupe titre={tr('sr.menu.outils')}>
+        <Rangee icone={<Icon name="box" size={22}/>} titre={tr('arv.action')} onClick={geste(() => ouvrirRetrouver('stock', '', 'arrivee'))} attrs={{ 'data-arv-bouton': 'stock-plus' }}/>
         <Rangee icone={<Icon name="camera" size={22}/>} titre={tr('stock.trouverPhoto')} onClick={geste(s.ouvrirPhoto)} attrs={{ 'data-stock-recherche-photo': '' }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('stock.faireInventaire')} onClick={geste(s.ouvrirInventaire)} attrs={{ 'data-stock-inventaire-ouvrir': '' }}/>
         <Rangee icone={<Icon name="box" size={22}/>} titre={tr('sr.places.ajouter')} onClick={geste(s.creerMeuble)} attrs={{ 'data-creer-meuble': '' }}/>
@@ -402,6 +405,8 @@ export default function StockV2({ s }) {
         </Groupe>) : null}
 
       {chercheVide ? <>
+        {/* (20 nov., lot arrivee-scan) Les ACHATS arrivés (pas encore d'article) : leur N° et leur case, un toucher. */}
+        <ArrivesARanger Icon={s.Icon}/>
         {/* « À RANGER · N » : la liste d'abord, « Ranger » au bout de chaque rangée. */}
         {/* Pendant la lecture, le squelette a la FORME de « À ranger » (5 rangées) : la liste arrive à sa place, les meubles
             ne sautent pas (mesuré au banc stock-rangement : CLS 0,31 quand la liste arrivait sur une ligne de texte). */}

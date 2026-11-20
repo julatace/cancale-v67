@@ -698,6 +698,8 @@ import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MEN
 import { casesEnSerie, caseHabitude, numerosEnSerie, opsRanger, achatsARanger, numerosAReserver, CLE_FICHES as CLE_FICHES_RANGEES } from './rangementArrivee.js';   // (11 nov., lot rangement-guide)
 // (15 nov.) L'atelier « achat arrivé → en ligne » : la règle (pure) ; le dessin se charge à la demande.
 import { opsPrixAchat, opsFiche, opMarque, opsCase, caseProposee, pairesAFinir, CLE_ATELIER } from './atelierArrivee.js';
+import { lignesArrivee, opCaseNumero } from './arriveeAchat.js';   // (20 nov., lot arrivee-scan) l'écran d'arrivée : la règle pure
+import { methodeDe } from './etiquetage/methode.js';
 import './comptes-lies.css';
 import './centre-notifs.css';
 import './comptes-securite.css';
@@ -19675,6 +19677,51 @@ async function ecrireNumero(entree, lignes, { texteDe = null } = {}) {
   });
   return { ok: true, numeros: r.numeros };
 }
+// ── (20 nov., lot arrivee-scan) « RANGER ICI » DE L'ÉCRAN D'ARRIVÉE ─────────────────────────────────────────
+// UN geste (« Annuler » 10 s) : le N° (pool d'abord, append-only : il n'en ressort jamais, même après « Annuler »),
+// la fiche de l'article liée à l'achat par SON n° de transaction, sa case (relue, refusée si prise), le prix du
+// REÇU seulement (décision « 2 oui »), et — ouvert depuis le scan — le colis noté retiré (les MÊMES clés que
+// « J'ai retiré » : `vrm_colis_collected` / `vinted_pickup_done`). Hors ligne : rien n'est numéroté (les N°
+// servis ne sont pas relus) ; l'arrivée est notée et le retrait part dans la file d'envoi, dit.
+const sansFonctions = (e) => { const o = {}; for (const k of Object.keys(e || {})) if (typeof e[k] !== 'function') o[k] = e[k]; return o; };
+async function ecrireArrivee({ entree, numeros, cases, n, attribue = false, horsLigne = false, prix = null, duree = 10000 } = {}) {
+  const e = entree || {};
+  let retire = [];
+  try { retire = typeof e.opsRetire === 'function' ? (e.opsRetire() || []) : []; } catch (_) { retire = []; }
+  const relire = (k) => setTimeout(() => { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} emettreClesRelues(k); try { window.dispatchEvent(new Event('vrm:arrivees')); } catch (_) {} }, 300);
+  const clesRetire = [...new Set(retire.map((o) => o.k))];
+  if (horsLigne) {
+    if (e.tx) noterArrivees([sansFonctions(e)]);
+    if (retire.length) gesteVrm(tr('arv.geste.retire'), retire, {}, () => relire(clesRetire), 'colis.retire', null, null, duree);
+    return { ok: true, horsLigne: true, retire: retire.length > 0, numeros: [], lignes: [] };
+  }
+  if (!isCloudReady()) return { ok: false, raison: 'lecture' };
+  if (attribue) {
+    const slots = load('vrm_slots', {}) || {}, meubles = load('vrm_meubles', []) || [];
+    const ops = []; const lignes = [];
+    (numeros || []).forEach((num, k) => { const c = cases && cases[k]; const op = c ? opCaseNumero({ slots, numero: num, place: c, meubles, cleNum }) : null; if (op) ops.push(op); lignes.push({ numero: num, titre: e.titre || '', case: op ? { meubleId: op.apres.m, i: op.apres.i } : null }); });
+    if (!ops.length && !retire.length) return { ok: true, numeros, lignes };
+    gesteVrm(tr('arv.geste.case', { num: numeros[0] }), [...ops, ...retire], {}, () => relire(['vrm_slots', ...clesRetire]), 'arrivee.ranger', null, null, duree);
+    return { ok: true, numeros, lignes, retire: retire.length > 0 };
+  }
+  if (!numerotationPermise() && !(await assurerVersionNumerotation())) return { ok: false, raison: 'lecture' };
+  const pris = await numerosServisLus();
+  if (!pris) return { ok: false, raison: 'lecture' };
+  const lignes = lignesArrivee({ entree: e, numeros, cases, n, prixRecu: prix, marqueDe: (t) => extractBrand(t) || '' });
+  if (!lignes) return { ok: false, raison: 'numero' };
+  const base = 'ra' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const r = opsRanger({ lignes, achat: sansFonctions(e), fiches: load(CLE_FICHES_RANGEES, {}) || {}, slots: load('vrm_slots', {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {},
+    meubles: load('vrm_meubles', []) || [], pris: pris.cles, cleNum, ids: lignes.map((_, k) => base + '_' + k) });
+  if (!r.ok) return r;
+  const pool = (load('vinted_used_numeros', []) || []).slice(); const dans = new Set(pool.map(cleNum));
+  for (const num of r.numeros) { const ep = entreePool(num); if (ep != null && !dans.has(cleNum(ep))) { pool.push(ep); dans.add(cleNum(ep)); } }
+  save('vinted_used_numeros', pool.sort(triPool));
+  emettreClesRelues(['vinted_used_numeros']);
+  if (e.tx) noterArrivees([sansFonctions(e)]);   // l'achat noté arrivé ; la fiche qui porte SON n° de transaction l'en retire aussitôt (jamais deux fois)
+  const texte = r.numeros.length > 1 ? tr('arv.geste.rangesN', { n: r.numeros.length, num: r.numeros[0], fin: r.numeros[r.numeros.length - 1] }) : tr('arv.geste.range', { num: r.numeros[0] });
+  gesteVrm(texte, [...r.ops, ...retire], {}, () => relire([CLE_FICHES_RANGEES, 'vrm_slots', 'vinted_buyprice_by_num', ...clesRetire]), 'arrivee.ranger', null, null, duree);
+  return { ok: true, numeros: r.numeros, lignes: lignes.map((l, k) => ({ ...l, numero: r.numeros[k] })), retire: retire.length > 0 };
+}
 // Rattrapage : un N° rangé dont l'écriture du pool n'a pas abouti y entre (append-only).
 function reserverNumerosRanges() {
   if (!isCloudReady() || !numerotationPermise()) return;
@@ -19709,10 +19756,10 @@ function noterArrivees(entrees) {
   try { window.dispatchEvent(new Event('vrm:arrivees')); } catch (_) {}
 }
 // Ouvre l'atelier sur le N° (la coque l'écoute). Rend true si l'atelier l'a pris. Aucune case n'est proposée à un achat.
-function ouvrirAtelierArrivee(entrees) {
+function ouvrirAtelierArrivee(entrees, { scan = false } = {}) {
   const l = (entrees || []).filter(Boolean); if (!l.length) return false;
   let pris = false;
-  try { const ev = new CustomEvent('vrm:atelier-numeroter', { detail: { entrees: l, prendre: () => { pris = true; } } }); window.dispatchEvent(ev); } catch (_) {}
+  try { const ev = new CustomEvent('vrm:atelier-numeroter', { detail: { entrees: l, scan, prendre: () => { pris = true; } } }); window.dispatchEvent(ev); } catch (_) {}
   return pris;
 }
 // L'achat Vinted (sa commande) ⇒ l'entrée de la feuille : ce qui est LU, rien de deviné.
@@ -19723,7 +19770,9 @@ function entreeArriveeVinted(o, extra = {}) {
   return { tx: String(o.transaction_id), titre: String(o.title || '').slice(0, 160), photo: orderPhoto(o) || null, prix: pr != null && pr !== '' ? Number(pr) : null,
     taille: String(o.size_title || o.size || '').slice(0, 40), site: 'vinted', ...(l.lot || nb > 1 ? { lot: true, n: nb > 1 ? nb : l.n || null } : {}),
     // (15 nov., atelier d'arrivée) L'état et la devise LUS : un achat remboursé ou dans une autre devise ne propose aucun prix.
-    statut: String(o.status || '').slice(0, 80), devise: String((o.price && typeof o.price === 'object' && o.price.currency_code) || '').slice(0, 3), ...extra };
+    statut: String(o.status || '').slice(0, 80), devise: String((o.price && typeof o.price === 'object' && o.price.currency_code) || '').slice(0, 3),
+    // (20 nov., lot arrivee-scan) le compte de l'achat (pour lire SA transaction : ce qu'il y a dans le colis)
+    uid: String((o._acc && typeof o._acc === 'object' ? o._acc.vinted_user_id : o._acc) || '').slice(0, 20), ...extra };
 }
 // Les propositions qui attendent, pour Ma journée (relues quand elles changent).
 function useAchatsANumeroter(actif = true) {
@@ -19746,6 +19795,12 @@ function useAchatsANumeroter(actif = true) {
 // passe par `gesteVrm` (annulable 5 s) ; rien n'est écrit sans SON geste.
 // ══════════════════════════════════════════════════════════════════════════════
 const AtelierArriveeLazy = aLaDemande(() => import('./AtelierArrivee.jsx'), true);
+const ArriveeAchatLazy = aLaDemande(() => import('./ArriveeAchat.jsx'), true);   // (20 nov., lot arrivee-scan)
+// (20 nov.) Les N° déjà portés par un achat (une fiche reliée à SON n° de transaction, `buyFromId`) : relus à l'ouverture.
+const numsDeLAchat = (tx) => { const t = String(tx || ''); if (!t) return []; const f = load('vinted_annonce_numeros', {}) || {}; const out = [];
+  for (const k in f) { const e = f[k]; if (e && String(e.buyFromId || '') === t && e.numero != null && String(e.numero).trim()) out.push(String(e.numero)); } return out; };
+// L'arrivée d'un achat (20 nov.) : ce qu'il y a dedans, lu dans SA transaction (une ligne projetée).
+const detailsArrivee = (e) => { const uid = String((e && e.uid) || ''); return e && e.tx && uid ? detailsAchatScan(uid, e.tx) : Promise.resolve(null); };
 const PlanRangerLazy = lazySur(() => import('./RangerAchat.jsx').then((m) => ({ default: m.Plan })));   // jamais React.lazy nu (chargementSur.js)
 const PlanRanger = (props) => <React.Suspense fallback={null}><PlanRangerLazy {...props}/></React.Suspense>;
 const lireEtatAtelier = () => ({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, marques: load(CLE_ATELIER, {}) || {}, meubles: load('vrm_meubles', []) || [], slots: load('vrm_slots', {}) || {} });
@@ -19780,8 +19835,19 @@ const entreeDeFiche = (f) => {
 function AtelierArriveeCoque() {
   const [entrees, setEntrees] = React.useState(null);
   const [creer, setCreer] = React.useState(null);
+  // (20 nov., lot arrivee-scan, Julien : « l'app sait déjà quel article est arrivé ») LA PORTE PRINCIPALE : « J'ai retiré »
+  // (et Aujourd'hui / le Stock « Arrivés · à ranger », le scan) ouvre l'ÉCRAN D'ARRIVÉE de CET achat — N°, case, étiquette
+  // (src/ArriveeAchat.jsx) — et non plus l'atelier en six étapes ; l'atelier reste pour la suite (photos, prix, fiche :
+  // « N paires à finir », `vrm:atelier-arrivee`). Plusieurs achats retirés d'un coup ⇒ l'un après l'autre.
+  const [arrivees, setArrivees] = React.useState(null);   // { file: [entree…], k, scan }
+  const arriveeCoque = React.useMemo(() => ({
+    cleNum, preparer: preparerNumero, lireEtat: lireEtatAtelier, numsAchat: numsDeLAchat, details: detailsArrivee,
+    methode: () => methodeDe({ numeroEcrit: load(CLE_NUMERO_ECRIT, null), prefixe: load('vrm_num_prefixe', ''), etiquetage: load('vrm_etiquetage', null) }),
+    ranger: ecrireArrivee,
+    imprimer: (etq) => import('./etiquetage/impression.js').then((m) => m.imprimerEtiquettes(etq.etiquettes, { format: etq.format, titre: etq.titre, langue: langueCourante() })),
+  }), []);
   React.useEffect(() => {
-    const f = (e) => { const d = e && e.detail; if (!d || !Array.isArray(d.entrees) || !d.entrees.length) return; if (typeof d.prendre === 'function') d.prendre(); setEntrees(d.entrees); };
+    const f = (e) => { const d = e && e.detail; if (!d || !Array.isArray(d.entrees) || !d.entrees.length) return; if (typeof d.prendre === 'function') d.prendre(); setArrivees({ file: d.entrees.filter(Boolean), k: 0, scan: !!d.scan }); };
     const g = (e) => { const d = (e && e.detail) || {}; const l = Array.isArray(d.fiches) ? d.fiches : pairesAFinirIci().map((x) => x.fiche); const es = l.map(entreeDeFiche); if (es.length) setEntrees(es); };
     // (Le rattrapage du pool est porté par `RattrapageNumerosRanges`, monté à côté.)
     window.addEventListener('vrm:atelier-numeroter', f); window.addEventListener('vrm:atelier-arrivee', g);
@@ -19821,7 +19887,14 @@ function AtelierArriveeCoque() {
     creerVinted: (f) => setCreer([f]),
     publierPartout: (f) => { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [String(f.numero)] } })); } catch (_) {} },
   }), []);
+  const arrivee = arrivees && arrivees.file[arrivees.k] ? arrivees.file[arrivees.k] : null;
+  // « Scanner le suivant » : le colis suivant de la file (plusieurs retirés d'un coup), sinon — venu du scan — la caméra.
+  const suivante = arrivees && arrivees.k + 1 < arrivees.file.length ? () => setArrivees((a) => (a ? { ...a, k: a.k + 1 } : a))
+    : arrivees && arrivees.scan ? () => { setArrivees(null); setTimeout(() => ouvrirRetrouver('arrivee', '', 'arrivee'), 80); } : null;
   return <>
+    {arrivee ? <GardeEcran nom="arrivee-achat" feuille onFermer={() => setArrivees(null)}>
+      <ArriveeAchatLazy key={(arrivee.tx || arrivee.suivi || '') + ':' + arrivees.k} entree={arrivee} coque={arriveeCoque} onFermer={() => setArrivees(null)} onSuivant={suivante} suivantScan={!(arrivees.k + 1 < arrivees.file.length)} Photo={PhotoVinted}/>
+    </GardeEcran> : null}
     {entrees ? <GardeEcran nom="atelier-arrivee" feuille onFermer={() => setEntrees(null)}>
       <AtelierArriveeLazy entrees={entrees} coque={coque} onFermer={() => setEntrees(null)} Feuille={SheetShell} Bouton={Bouton} Photo={PhotoVinted} Plan={PlanRanger}
         Note={(num) => <NotePaireCoque numero={num} variante="bloc" ajout dicter/>}/>
@@ -19930,20 +20003,24 @@ async function texteEtiquetteScan(capteRow, mailRow) {
 function HoteRetrouver({ onAttendreSources, onChercher }) {
   const [ouvert, setOuvert] = useState(false);
   const [code0, setCode0] = useState('');
+  const [arrivee, setArrivee] = useState(false);   // (20 nov., lot arrivee-scan) le scanner de l'arrivée (achats seulement)
   const ref = useRef({}); ref.current = { onAttendreSources, onChercher };
   const attendre = React.useCallback(() => { try { if (ref.current.onAttendreSources) ref.current.onAttendreSources(); } catch (_) {} }, []);
   const chercher = React.useCallback((n) => { try { if (ref.current.onChercher) ref.current.onChercher(n); } catch (_) {} }, []);
   useEffect(() => {
     // (16 nov., lot scan-achat) Un code DÉJÀ lu (la douchette) : le scanner s'ouvre sur son résultat ; déjà ouvert ⇒ il le résout.
-    const o = (ev) => { const c = (ev && ev.detail && ev.detail.code) || ''; if (c && scannerRetrouverOuvert()) { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER_CODE, { detail: { code: c } })); } catch (_) {} return; } setCode0(c); setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
+    const o = (ev) => { const c = (ev && ev.detail && ev.detail.code) || ''; setArrivee(!!(ev && ev.detail && ev.detail.mode === 'arrivee')); if (c && scannerRetrouverOuvert()) { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER_CODE, { detail: { code: c } })); } catch (_) {} return; } setCode0(c); setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
     window.addEventListener(EV_RETROUVER, o); return () => window.removeEventListener(EV_RETROUVER, o);
   }, [attendre]);
   if (!ouvert) return null;
-  const fermer = () => { setOuvert(false); setCode0(''); };
+  const fermer = () => { setOuvert(false); setCode0(''); setArrivee(false); };
+  // L'achat trouvé par SON n° de suivi : le scanner se ferme, l'écran d'arrivée de CET achat s'ouvre (`e.entree`, l'achat
+  // tel que l'écran Achats le connaît : prix payé du reçu, et les opérations du retrait si le colis n'est pas noté retiré).
+  const versArrivee = (e) => { let en = null; try { en = e && typeof e.entree === 'function' ? e.entree() : null; } catch (_) { en = null; } if (!en) return; fermer(); setTimeout(() => { ouvrirAtelierArrivee([en], { scan: true }); }, 60); };
   // (19 nov., Julien redemande : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » depuis le
   // scanner : un colis inconnu se dit (transporteur, n°, « Chercher »), il ne se relie plus à la main. Le lien vient de
   // l'identité (n° de suivi lu par l'extension, conversation, code), docs/passation/2026-11-19-colis-achat-auto.md.
-  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  return <ScannerRetrouver key={arrivee ? 'arrivee' : 'retrouver'} Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} codeInitial={code0} zIndex={Z_CONFIRMATION - 2} arrivee={arrivee} onArrivee={versArrivee}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -47794,7 +47871,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         marque: extractBrand(o.title || '') || '',
         signaler: o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`,
         details: () => detailsAchatScan(uid, tx),
-        ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); } };
+        ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); },
+        // (20 nov., lot arrivee-scan) L'achat pour l'écran d'arrivée (le scanner de l'arrivée) : le même que « J'ai retiré ».
+        entree: () => entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}) };
+    };
+    // (20 nov., lot arrivee-scan) Le colis « à retirer » scanné à l'arrivée et pas encore noté retiré : les MÊMES opérations
+    // que « J'ai retiré » (`gesteCollecte` pour un e-mail, `markPickupDone` pour une commande), lues sur les valeurs du moment,
+    // écrites dans le geste de « Ranger ici » (un seul « Annuler »).
+    const opsRetraitScan = (c) => {
+      const at = new Date().toISOString();
+      if (c && c.t) { const k = colisKey(c.t); if (!k || collected.has(k)) return [];
+        return [{ k: 'vrm_colis_collected', type: 'ensemble', id: k, apres: true, avant: false }, { k: 'vrm_colis_collected_at', type: 'cle', id: k, apres: at, avant: collectedAt[k] }]; }
+      if (c && c.o && c.o.transaction_id != null) { const k = String(c.o.transaction_id); if (pickupDone[k]) return [];
+        return [{ k: 'vinted_pickup_done', type: 'cle', id: k, apres: at, avant: pickupDone[k] }]; }
+      return [];
     };
     try {
       // Ventes Vinted (avec bordereau lu : sans n°, aucun scan ne peut les désigner — sauf par le code imprimé
@@ -47826,6 +47916,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           taille: c.taille || '', compte: c.compte || '', etat: c.deja ? tr('scan.r.etat.retire') : tr('scan.r.etat.aRetirer'), aFaire: !c.deja, detail: !c.deja && limite ? tr('scan.r.etat.limite', { date: limite }) : '',
           code: c.deja ? '' : code, lieu: c.deja ? '' : lieu,
           lien: tx ? `?tab=achats&cible=${c.deja ? 'achat' : 'retrait'}&tx=${encodeURIComponent(tx)}` : `?tab=achats&cible=retrait&suivi=${encodeURIComponent(suivis[0])}` };
+        if (o && typeof x.entree === 'function' && !c.deja) { const en = x.entree; x.entree = () => { const e = en(); return e ? { ...e, opsRetire: () => opsRetraitScan(c) } : e; }; }
         if (tx) { const p = parTx.get(tx); if (p) { p.suivis = [...new Set([...p.suivis, ...suivis])]; continue; } parTx.set(tx, x); }
         E.push(x);
       }
@@ -66866,6 +66957,10 @@ function AppCoeur() {
           {(t === 'ventes' || t === 'achats') && !baseKO && !(t === 'ventes' && v2VentesColis) ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
           </span> : null}
+          {/* (20 nov., lot arrivee-scan) « Arrivée » : un colis reçu en main ⇒ le scan ⇒ l'écran d'arrivée de SON achat (N°, case, étiquette). */}
+          {t === 'achats' && !baseKO ? <span className="vrm-tache-retrouver" data-arv-hote="achats">
+            <Rond icone="box" label={tr('arv.bouton')} titre={tr('arv.boutonTitre')} onClick={() => ouvrirRetrouver('achats', '', 'arrivee')} attrs={{ 'data-arv-bouton': 'achats' }}/>
+          </span> : null}
           {t === 'ventes' && !designV2App && !baseKO ? <span className="vv-tete-place" data-vv-tete-place="ventes"/> : null}
         </header>}
         {/* (19 nov., décision de Julien) « À régler · N » : ce qui était dans « À faire » d'Aujourd'hui, en tête de SON onglet (replié s'il ne presse pas).
@@ -67102,6 +67197,7 @@ function AppCoeur() {
     if (d.feuille === 'vente-main') { ouvrirIdee('vente-main', { num: d.num || '' }); return; }   // (14 nov., 160) vente en main propre
     if (d.feuille === 'fiche') { setFicheNum(String(d.num)); return; }
     if (d.feuille === 'calculette') { setCalcOuverte(true); return; }
+    if (d.feuille === 'arrivee') { ouvrirRetrouver('loupe', '', 'arrivee'); return; }   // (20 nov., lot arrivee-scan)
     if (d.feuille === 'prix') { setPrixNum(String(d.num)); return; }
     // (14 nov., ergonomie des gestes) La feuille « Publier partout » de CE N° (l'évènement du geste de la fiche).
     if (d.feuille === 'partout') { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [String(d.num)] } })); } catch (_) {} return; }

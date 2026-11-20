@@ -83,6 +83,7 @@ import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './en/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './en/stockRangement.js';
+import ecran_arrivee_scan from './en/arriveeScan.js';   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './en/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_natif from './en/natif.js';
 import ecran_extension from './en/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
@@ -2358,6 +2359,7 @@ export default {
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
+  ...ecran_arrivee_scan,
   ...ecran_natif,
   ...ecran_extension,
 };

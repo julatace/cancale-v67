@@ -57,7 +57,9 @@ export async function chercherCodeSources(code, chercheurs) {
 // L'ouverture : le disque « + » ⇒ Scanner, et les boutons de Ventes et d'Achats.
 // (16 nov., lot scan-achat) `code` : un code DÉJÀ lu (la douchette) — le scanner s'ouvre sur son résultat.
 export const EV_RETROUVER = 'vrm:retrouver';
-export function ouvrirRetrouver(depuis = '', code = '') { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER, { detail: { depuis, code: String(code || '') } })); } catch (_) {} }
+// (20 nov., lot arrivee-scan) `mode` 'arrivee' : le scanner de l'arrivée d'un colis (achats seulement ⇒ l'écran d'arrivée).
+export function ouvrirRetrouver(depuis = '', code = '', mode = '') { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER, { detail: { depuis, code: String(code || ''), mode: mode === 'arrivee' ? 'arrivee' : '' } })); } catch (_) {} }
+export const ouvrirScanArrivee = (depuis = '') => ouvrirRetrouver(depuis, '', 'arrivee');
 // Un code lu par la douchette PENDANT que le scanner est ouvert : il le résout comme un code tapé.
 export const EV_RETROUVER_CODE = 'vrm:retrouver-code';
 export const scannerRetrouverOuvert = () => { try { return document.documentElement.hasAttribute('data-scan-retrouver'); } catch (_) { return false; } };
