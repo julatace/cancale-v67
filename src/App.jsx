@@ -68151,7 +68151,7 @@ function AppCoeur() {
         {tab==='messages'&&<GardeEcran nom="messages">{rendreTache('messages')}</GardeEcran>}
         {tab==='achats'&&<GardeEcran nom="achats">{rendreTache('achats')}</GardeEcran>}
         {ebayRecherches ? <GardeEcran nom="ebay-recherches"><Natif.PagePoussee ouverte titre={tr('ebay.recherches.titre')} onRetour={() => setEbayRecherches(false)} attrs={{ 'data-ebay-recherches': '' }}>
-          <Natif.Groupe><Natif.Rangee icone={<Icon name="settings" size={22}/>} titre={tr('ebay.recherches.compte')} fin="chevron" onClick={() => { setEbayRecherches(false); DEMANDE_REGLAGE_SOUS.id = 'ebay'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); }}/></Natif.Groupe>
+          <Natif.Groupe><Natif.Rangee icone={<Icon name="gear" size={22}/>} titre={tr('ebay.recherches.compte')} fin="chevron" onClick={() => { setEbayRecherches(false); DEMANDE_REGLAGE_SOUS.id = 'ebay'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); }}/></Natif.Groupe>
           <EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette} sansGagnes/>
         </Natif.PagePoussee></GardeEcran> : null}
         {tab==='inventory'&&<GardeEcran nom="inventory"><Inventory inventory={inventory} setInventory={setInventory} accounts={vintedAccounts} garageGrid={garageGrid} labels={accountLabels} onLocate={(numero)=>{ setGarageLocate(String(numero)); setTab('garage'); }}/></GardeEcran>}
@@ -68166,7 +68166,7 @@ function AppCoeur() {
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {/* (20 nov., précision de Julien) L'écran Automatisations de l'app est RETIRÉ : les automatisations se règlent dans le
             panneau de l'extension (Paramètres → « Automatisations · dans l'extension »). Un ancien lien `?tab=automatisations` y mène. */}
-        {tab==='automatisations' && <RedirigeAutomatisations onRetour={()=>setTab('settings')}/>}
+        {tab==='automatisations' && <GardeEcran nom="automatisations"><RedirigeAutomatisations onRetour={()=>setTab('settings')}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}

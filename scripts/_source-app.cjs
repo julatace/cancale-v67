@@ -146,7 +146,8 @@ function enFrancais(texte, racine) {
     const v = D[k];
     let rempl, a0 = debut, a1 = fin;
     // trj('k', { a: e }) — une phrase JSX : `{trj(…)}` redevient `texte {e} texte`, comme avant.
-    if (fn === 'trj' && vars && texte[debut - 1] === '{' && texte[fin] === '}' && jsxSur(v.replace(/\{\w+\}/g, ''))) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '{' + vars[n] + '}' : mm)); }
+    // (20 nov., intégration 5.410) Pas en VALEUR d'attribut (`titre={trj(…)}`) : là, un gabarit `…${e}…` (sinon `titre=Déclarer {…}`).
+    if (fn === 'trj' && vars && texte[debut - 1] === '{' && texte[debut - 2] !== '=' && texte[fin] === '}' && jsxSur(v.replace(/\{\w+\}/g, ''))) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '{' + vars[n] + '}' : mm)); }
     else if (vars) rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '${' + vars[n] + '}' : mm)) + '`';
     else {
       const av = texte.slice(Math.max(0, debut - 40), debut), ap = texte.slice(fin, fin + 1);
