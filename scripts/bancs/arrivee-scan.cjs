@@ -135,8 +135,14 @@ async function ouvrir(b, vp, sombre, lignes, { camera = false, onglet = 'achats'
     if (req.method() !== 'GET') {
       // Les écritures de l'app sont GARDÉES (une relecture du nuage rend ce qu'elle a écrit, comme la vraie base).
       if (/\/rest\/v1\/app_data/.test(u) && req.method() === 'POST') {
-        try { const bd = JSON.parse(req.postData() || '[]'); for (const r of (Array.isArray(bd) ? bd : [bd])) { if (!r || !r.id || !r.data) continue; const i = lignes.findIndex((x) => x.id === r.id);
+        try { const bd = JSON.parse(req.postData() || '[]'); for (const r of (Array.isArray(bd) ? bd : [bd])) { if (!r || !r.id || !r.data) continue; if (process.env.DEBUG_POST) console.log('     POST ' + r.id + ' slots=' + JSON.stringify(r.data.vrm_slots || null).slice(0, 160) + ' keys=' + Object.keys(r.data).slice(0, 8).join(',')); const i = lignes.findIndex((x) => x.id === r.id);
           if (i >= 0) lignes[i] = { id: r.id, data: r.id === 'main' ? { ...lignes[i].data, ...r.data } : r.data }; else lignes.push({ id: r.id, data: r.data }); } } catch (_) {}
+      }
+      // Un PATCH de `main` (comparer-et-échanger sur `rev`) : la nouvelle donnée est gardée, la ligne rendue (« écrit »).
+      if (/\/rest\/v1\/app_data/.test(u) && req.method() === 'PATCH') {
+        const eqP = /[?&]id=eq\.([^&]*)/.exec(u);
+        try { const bd = JSON.parse(req.postData() || '{}'); const i = eqP ? lignes.findIndex((x) => x.id === eqP[1]) : -1;
+          if (i >= 0 && bd && bd.data) { lignes[i] = { id: lignes[i].id, data: bd.data }; return route.fulfill({ status: 200, contentType: 'application/json', headers: H, body: JSON.stringify([{ id: lignes[i].id }]) }); } } catch (_) {}
       }
       return route.fulfill({ status: 201, contentType: 'application/json', headers: H, body: '[]' });
     }
@@ -194,6 +200,8 @@ const juger = async (pg, T, quoi, tactile) => {
 const toucher = async (pg, sel, tactile) => { const l = pg.locator(sel).first(); await l.scrollIntoViewIfNeeded().catch(() => {}); if (tactile) await l.tap(); else await l.click(); };
 const fermerArrivee = async (pg) => { await pg.keyboard.press('Escape'); await attendre(() => pg.evaluate(() => !document.querySelector('[data-arv]')), 5000); await pg.waitForTimeout(600); };
 const scannerArrivee = async (pg, tactile) => {
+  // Le scanner a pu mettre Ventes à l'écran (il y lit ses sources) : on revient à Achats.
+  if (!(await pg.locator('[data-arv-bouton="achats"]').count())) await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-arv-bouton="achats"]', { timeout: 40000 });
   await toucher(pg, '[data-arv-bouton="achats"]', tactile);
   await pg.waitForSelector('[data-scan-arrivee]', { timeout: 15000 });
