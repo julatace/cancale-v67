@@ -283,7 +283,7 @@ export default {
   "vr.g.ignorer": "Ignora (già risolto)",
   "vr.g.pasRecu": "Non ancora ricevuto",
   "vr.g.annulerRemise": "Annulla il ritorno in magazzino",
-  "vr.voirAnciens": {"one": "Vedi il vecchio", "other": "Vedi i {n} vecchi"},
+  "vr.voirAnciens": {"one": "Vedi {n} vecchio", "other": "Vedi i {n} vecchi"},
   "vr.masquerAnciens": "Nascondi i vecchi",
   "vr.note.livree": "consegnato secondo Vinted",
   "vr.note.nonReclamee": "non ritirato",

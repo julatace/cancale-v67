@@ -283,7 +283,7 @@ export default {
   "vr.g.ignorer": "Ignorieren (schon erledigt)",
   "vr.g.pasRecu": "Noch nicht erhalten",
   "vr.g.annulerRemise": "Zurück ins Lager rückgängig",
-  "vr.voirAnciens": {"one": "Den alten zeigen", "other": "Die {n} alten zeigen"},
+  "vr.voirAnciens": {"one": "{n} alten zeigen", "other": "Die {n} alten zeigen"},
   "vr.masquerAnciens": "Die alten ausblenden",
   "vr.note.livree": "laut Vinted zugestellt",
   "vr.note.nonReclamee": "nicht abgeholt",

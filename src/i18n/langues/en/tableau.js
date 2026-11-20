@@ -283,7 +283,7 @@ export default {
   "vr.g.ignorer": "Ignore (already settled)",
   "vr.g.pasRecu": "Not received yet",
   "vr.g.annulerRemise": "Undo back in stock",
-  "vr.voirAnciens": {"one": "Show the old one", "other": "Show the {n} old ones"},
+  "vr.voirAnciens": {"one": "Show {n} old one", "other": "Show the {n} old ones"},
   "vr.masquerAnciens": "Hide the old ones",
   "vr.note.livree": "delivered according to Vinted",
   "vr.note.nonReclamee": "not collected",

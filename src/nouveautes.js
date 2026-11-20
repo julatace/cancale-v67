@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov., Julien : « 4 litiges avec 2 écritures différentes » ; « fais un beau logo pour relier ») src/natif/ecrans/RetoursVentes.jsx, celluleAchat.jsx
+  { id: 'ventes-retours', date: '2026-11-20', titre: 'Retours rangés, relier en un toucher', phrase: 'Un groupe « Retours et litiges » ; les maillons relient la vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
   { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
