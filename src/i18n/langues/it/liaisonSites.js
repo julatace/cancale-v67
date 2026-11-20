@@ -19,6 +19,8 @@ export default {
   "lia.sur": "Stessa foto · sicuro",
   "lia.memePhoto": "Stessa foto · da verificare",
   "lia.publiee": "Pubblicato da VRM su {site}",
+  "liaL.surCourt": "sicuro",
+  "liaL.verifierCourt": "da verificare",
   "liaL.numero": "N° {numero}?",
   "liaL.sur": "Da collegare · sicuro",
   "liaL.verifier": "Da verificare",

@@ -203,7 +203,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       indisponible={!!grise} raison={grise ? tr('egalite.selection.pasPour', { site: nomSite(a.annonces[0].site) }) : ''} onClick={() => ouvrir(a)}
       actions={A ? null : (gestesLiaison || [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }])}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined }}/>
-      {aRelierL ? <PropositionLiaison l={l} forme="bande" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/> : null}</React.Fragment>;
+      {aRelierL && l.prop ? <PropositionLiaison l={l} forme="ligne" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/> : null}</React.Fragment>;
   };
 
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.

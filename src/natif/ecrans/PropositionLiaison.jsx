@@ -7,7 +7,9 @@
 // le geste de `relierDepuisListe` / `queSurCeSite` — rien n'est calculé ni écrit ici.
 //
 // Props : l = { site, id, etat, prop: { paireId, numero, photo, titre, niveau: 'sur'|'verifier' } | null } ;
-//   onRelier(l) · onAutre(l) · onPropre(l) ; Photo(src) (le lecteur de photos de l'app, sinon <img>) ; forme : 'cellule' | 'bande' | 'fiche'.
+//   onRelier(l) · onAutre(l) · onPropre(l) ; Photo(src) (le lecteur de photos de l'app, sinon <img>) ; forme : 'cellule' | 'ligne' | 'fiche'.
+//   'ligne' (le téléphone, 20 nov.) : UNE ligne de 48 sous le titre de la rangée — mini-photo 32 · « N°124 ? » · « sûr » / « à vérifier »
+//   · « Relier » compact à droite ; « Autre… » et « Que sur ce site » sont au balayage de la rangée. Sans proposition : rien.
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { Bouton } from '../Bouton.jsx';
@@ -18,6 +20,17 @@ const arreter = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
 export function PropositionLiaison({ l, onRelier, onAutre, onPropre, Photo = null, forme = 'cellule' }) {
   if (!l || l.etat !== 'aRelier') return null;
   const p = l.prop;
+  if (forme === 'ligne') {
+    if (!p) return null;
+    return (
+      <div className="n-eg-prop" data-eg-prop={p.niveau} data-eg-prop-forme="ligne" data-eg-prop-annonce={`${l.site}:${l.id}`} data-eg-prop-paire={p.paireId} data-eg-prop-numero={p.numero} onClick={arreter} onKeyDown={arreter}>
+        <span className="n-eg-prop-mini" aria-hidden="true">{Photo && p.photo ? Photo(p.photo) : (p.photo ? <img src={p.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer"/> : null)}</span>
+        <span className="n-eg-prop-num">{tr('liaL.numero', { numero: p.numero })}</span>
+        <span className="n-eg-prop-etiquette" data-ton={p.niveau === 'sur' ? 'ambre' : 'gris'}>{p.niveau === 'sur' ? tr('liaL.surCourt') : tr('liaL.verifierCourt')}</span>
+        <button type="button" className="n-eg-prop-relier" data-eg-relier-prop={`${l.site}:${l.id}`} aria-label={tr('liaL.relierN', { numero: p.numero })} onClick={(e) => { arreter(e); onRelier(l); }}>{tr('liaL.relier')}</button>
+      </div>
+    );
+  }
   const vignette = p ? <Vignette src={Photo ? '' : (p.photo || '')} image={Photo && p.photo ? Photo(p.photo) : null} alt="" taille={44}/> : null;
   return (
     // Un bloc À CÔTÉ de la rangée (jamais un bouton dans la rangée) : ses touchers ne l'ouvrent pas.
