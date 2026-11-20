@@ -804,6 +804,7 @@ import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js
 import { presenterCodePartenaire } from "./partenaires/presenter.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
+import { CLE_ROLES_COMPTES, comptesPersonnels } from './rolesComptes.js';   // (20 nov., lot bleam-suite) le rôle des comptes
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
 import { venteHorsPlan, venteAutreHorsPlan } from "../api/_lib/plan-regle.js";
 import { VentesHorsPlan, VentesAutresHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
@@ -3552,7 +3553,7 @@ const SYNC_KEYS = [
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
-  'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
+  'vinted_txn_link','vinted_sales_hidden','vinted_purchases_hidden','vinted_accounts_hidden','vrm_roles_comptes','vinted_autonum','vinted_urssaf_freq','vinted_urssaf_taux',
   // « J'ai déclaré ce mois » : quelles ventes il a déclarées, et dans quel mois
   // (`ventesDeclarables`). Écrit sur SON clic uniquement.
   'vrm_urssaf_declare',
@@ -36696,6 +36697,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (montrée en aperçu par `VentesHorsPlan`) ; une annonce aussi (`venteOffOf`).
   const horsPlanOf = (o) => venteHorsPlanUid(o?._acc?.vinted_user_id);
   const venteOffOf = (o) => acctOffOf(o) || horsPlanOf(o);
+  // (20 nov., lot bleam-suite) Un compte PERSONNEL (Paramètres › Comptes liés › Gérer) : hors de tout total DÉCLARÉ
+  // (CA déclaré, URSSAF, livre des recettes), comme un compte écarté — ses ventes restent dans les listes (src/rolesComptes.js).
+  const [rolesComptesV] = useLigneSynchro(CLE_ROLES_COMPTES, () => load(CLE_ROLES_COMPTES, {}));
+  const comptesPersoS = useMemo(() => comptesPersonnels(rolesComptesV), [rolesComptesV]);
+  const comptePersoOf = (o) => comptesPersoS.has(String(o?._acc?.vinted_user_id || ''));
+  const venteOffDeclareOf = (o) => venteOffOf(o) || comptePersoOf(o);
   const isHiddenCalcul = (o) => hiddenSales.has(String(o.transaction_id)) || venteOffOf(o);
   // (12 nov., vitesse-volume) LES VENTES VISIBLES, CALCULÉES UNE FOIS PAR VERSION DES DONNÉES : la réponse de
   // `isHiddenCalcul` est gardée par vente (identité de l'objet) tant que ce qu'elle lit ne change pas — les
@@ -39376,10 +39383,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (lbcLu === undefined || ebayCmd === undefined || versements === undefined || ventesVc === undefined) return undefined;
     if (versements === null) return null;
     try {
-      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: venteOffOf, excluAutre, versements, declare: declUrssaf, importees: ventesImp, main: ventesAilleursDe(ventesComptees) });
+      return ventesDeclarables({ vinted: ventesComptees, lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], masquee: (o) => hiddenSales.has(String(o.transaction_id)), exclu: venteOffDeclareOf, excluAutre, versements, declare: declUrssaf, importees: ventesImp, main: ventesAilleursDe(ventesComptees) });
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, excluAutre, ventesImp, declUrssaf, decAilleurs]);
+  }, [ventesComptees, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, datesLbc, ventesVc, excluAutre, ventesImp, declUrssaf, decAilleurs, comptesPersoS]);
   // Ce qui n'est compté dans AUCUN « reçu » parce que son argent ne se lit pas
   // (Vinted au prix pas lu, Leboncoin au prix inconnu, Vestiaire au montant pas
   // sûr) — et Vestiaire pas lu du tout. Chaque total « reçu » le dit (« au moins »).
@@ -46601,7 +46608,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     // ⚠️ Dates de versement ILLISIBLES : ses ventes Vinted ne sont pas « sans
     //    date » (on n'a pas pu les lire) — seules Leboncoin et eBay comptent ici.
     const tousADater = versements === null ? (declRapport.aDater || [])
-      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], exclu: venteOffOf, excluAutre, versements: versements || {}, declare: declUrssaf, importees: ventesImp, main: ventesAilleursDe(ventesComptees) }).aDater;
+      : ventesDeclarables({ vinted: ventesComptees || [], lbc: lbcLu ? avecDatesLbc(lbcVentes.ventes, datesLbc) : [], ebay: ebayCmd || [], vestiaire: ventesVc || [], exclu: venteOffDeclareOf, excluAutre, versements: versements || {}, declare: declUrssaf, importees: ventesImp, main: ventesAilleursDe(ventesComptees) }).aDater;
     const aDater = { n: tousADater.length, ca: tousADater.reduce((t, l) => t + l.eur, 0) };
     // Les comptes dont les ventes n'ont pas pu être lues — sauf ceux qu'il a
     // EXCLUS (leurs ventes ne comptent jamais : leur absence ne manque à rien).

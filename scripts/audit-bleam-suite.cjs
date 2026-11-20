@@ -262,6 +262,18 @@ const avancer = async (f, tx, champ, depuis) => { const m = (await f.ctx.chrome.
     dit(r3 && r3.ok === false && r3.code === 'confirmation' && ecrits(d0).length === 0, 'Supprimer sans SA confirmation ⇒ rien ne part', JSON.stringify(r3));
   } catch (e) { dit(false, 'dressing — exception', e && e.stack); }
 
+  // ── 7. RÔLE DES COMPTES (app) : un compte PERSONNEL est hors des totaux déclarés, comme un compte écarté ──
+  try {
+    const R = await import(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'rolesComptes.js')).href);
+    const h = R.comptesHorsTotaux(['111'], { 222: 'perso', 333: 'achats', x: 'perso' });
+    dit(h.has('111') && h.has('222') && !h.has('333') && h.size === 2, 'compte personnel ⇒ hors des totaux déclarés (avec les écartés) ; compte d’achats ⇒ compté', JSON.stringify([...h]));
+    dit(R.roleCompte({}, '444') === 'vente' && R.roleCompte({ 444: 'bizarre' }, '444') === 'vente', 'rôle absent ou illisible ⇒ « vente » (rien n’est retiré des totaux sans SON choix)');
+    const v = R.avecRole({ 1: 'perso' }, '2', 'achats'); const v2 = R.avecRole(v, '1', 'vente');
+    dit(v[1] === 'perso' && v[2] === 'achats' && !('1' in v2), 'SON choix ne touche que CE compte ; « vente » retire la clé');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    dit(/const venteOffDeclareOf = \(o\) => venteOffOf\(o\) \|\| comptePersoOf\(o\);/.test(app) && (app.match(/ventesDeclarables\(\{[^\n]*exclu: venteOffDeclareOf/g) || []).length === 2, 'le CA déclaré de l’app écarte les comptes personnels (les deux appels)');
+  } catch (e) { dit(false, 'rôles — exception', e && e.stack); }
+
   console.log(`\n${ko ? '❌' : '✅'} audit-bleam-suite : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();
