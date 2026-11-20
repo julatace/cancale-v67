@@ -25,6 +25,10 @@
 
   /* Le logo en couleur : la forme du fichier (masque), la couleur du site (lisible en clair ET en sombre). */
   .n-pastille-logo { display: inline-block; flex: 0 0 auto; -webkit-mask: var(--n-logo) center / contain no-repeat; mask: var(--n-logo) center / contain no-repeat; background: var(--n-encre); }
+  .n-pastille-logo[data-site="vinted"] { --n-logo: url("/brands/vinted.svg"); }
+  .n-pastille-logo[data-site="leboncoin"] { --n-logo: url("/brands/leboncoin.svg"); }
+  .n-pastille-logo[data-site="ebay"] { --n-logo: url("/brands/ebay.svg"); }
+  .n-pastille-logo[data-site="vestiaire"] { --n-logo: url("/brands/vestiaire.svg"); }
   .n-pastille-logo[data-site="vinted"] { background: #007782; }
   .n-pastille-logo[data-site="leboncoin"] { background: #EC5A13; }
   .n-pastille-logo[data-site="ebay"] { background: linear-gradient(90deg, #E53238 0 30%, #0064D2 30% 52%, #F5AF02 52% 74%, #86B817 74%); }

@@ -19,12 +19,14 @@ import { useSiteCourant } from '../siteCourant.js';
 import './selecteur-site.css';
 export { useSiteCourant, CLE_SITE_COURANT } from '../siteCourant.js';
 
-const LOGOS = { vinted: '/brands/vinted.svg', leboncoin: '/brands/leboncoin.svg', ebay: '/brands/ebay.svg', vestiaire: '/brands/vestiaire.svg' };
+const LOGOS = { vinted: 1, leboncoin: 1, ebay: 1, vestiaire: 1 };   // les sites qui ont un logo (public/brands/, posé par la feuille)
 // Le logo du site, en SA couleur (la forme est le fichier de public/brands/, la couleur est posée par la feuille selon le site).
 export function LogoCouleur({ site, taille = 20 }) {
   const src = LOGOS[site];
   if (!src) return null;
-  return <span className="n-pastille-logo" data-site={site} aria-hidden="true" style={{ '--n-logo': `url("${src}")`, width: taille, height: taille }}/>;
+  // La forme vient de la feuille (`[data-site]`), jamais d'un style en ligne : la copie instantanée (src/copieEcran.js) retire
+  // toute `url(` d'un style en ligne — le logo y deviendrait un carré de couleur.
+  return <span className="n-pastille-logo" data-site={site} aria-hidden="true" style={{ width: taille, height: taille }}/>;
 }
 const reduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 
