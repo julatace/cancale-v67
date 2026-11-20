@@ -16,7 +16,7 @@
 //   6 des données à corriger (santé des données) ;
 //   7 ce qui n'a pas pu être vérifié (« Revérifier ») ;
 //   8 Vinted a changé une page (rien à faire : dit, sans geste).
-// JS pur : scripts/audit-tout-va-bien-points.cjs l'exécute (mutations comprises).
+// JS pur : scripts/audit-demarrage.cjs l'exécute (mutations comprises).
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const RANGS = Object.freeze({ doublon: 0, extension: 1, panne: 2, compte: 3, appareil: 4, controle: 5, donnees: 6, passu: 7, forme: 8 });

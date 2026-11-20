@@ -71,3 +71,6 @@
 .vrm-tvb-point-doublon .n-rangee-sous-texte { color: var(--n-doublon); }
 .vrm-tvb-replier { color: var(--n-accent); font: var(--n-t-corps); }
 .vrm-tvb-details { margin-top: 8px; }
+/* Le résumé du haut dit déjà l'état : dans « Détails », l'ancienne tête ne se répète pas. Cibles de 44 dans le détail. */
+.vrm-tvb-details .vrm-tvb-tete { display: none; }
+.vrm-tvb-details .vrm-b { min-height: 44px; }

@@ -99,6 +99,7 @@ export default {
   "tvb.resume.aucun": "Nessun account collegato",
   "tvb.resume.ok": "Tutto bene",
   "tvb.groupe.regler": "Da sistemare",
+  "tvb.groupe.savoir": "Da sapere",
   "tvb.details": "Dettagli",
   "tvb.replier": "Chiudi",
   "tvb.p.extension": "L’estensione di questo browser",

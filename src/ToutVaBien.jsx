@@ -221,7 +221,7 @@ export function ToutVaBien({ onComptes }) {
           attrs={{ 'data-tvb-resume': '', 'data-tvb-relire': '' }}/>
       </Groupe>
       {r.points.length ? (
-        <Groupe titre={tr('tvb.groupe.regler')} attrs={{ 'data-tvb-points': r.points.length }}>
+        <Groupe titre={tr(r.n ? 'tvb.groupe.regler' : 'tvb.groupe.savoir')} attrs={{ 'data-tvb-points': r.points.length }}>
           {r.points.map((pt, i) => {
             const t = textesPoint(pt);
             const g = gestePoint(pt, { inst, liensSite: LIENS_SITE_TVB, lienPaquet: (x) => gestesMiseAJour({ paquet: x.paquet }, EXT_ATTENDUE).lien || '', allerControle: allerControleTvb });

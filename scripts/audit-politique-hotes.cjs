@@ -124,6 +124,10 @@ const COUPLES = {
   'src/parcoursNouveau/Demarrage.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (relier ses comptes)'],
   'src/parcoursNouveau/Demarrage.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces)'],
   'src/parcoursNouveau/Demarrage.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire »'],
+  // (20 nov.) « Tout va bien ? » en points : un compte pas relu ⇒ « Ouvrir Vinted / Leboncoin / Vestiaire », sur SON toucher.
+  'src/ToutVaBien.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (un compte pas relu)'],
+  'src/ToutVaBien.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (un compte pas relu)'],
+  'src/ToutVaBien.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » (un compte pas relu)'],
   'src/parcoursNouveau/regle.js|apps.apple.com': ['lien', LIEN + ' — « Installer Orion » (la fiche App Store déjà citée par l’app)'],
   'src/parcoursNouveau/regle.js|www.vinted.fr': ['lien', LIEN + ' — vinted.fr (le raccourci « Ouvrir les URL »)'],
   'src/registresConformes.js|www.legifrance.gouv.fr': ['lien', LIEN + ' — les textes cités sous les registres'],

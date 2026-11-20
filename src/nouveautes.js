@@ -27,6 +27,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (20 nov., Julien : « un parcours de 5 minutes […] une démo […] Tout va bien ? qui dit exactement quoi faire ») docs/passation/2026-11-20-demarrage-store.md
+  { id: 'bien-demarrer', date: '2026-11-20', titre: 'Bien démarrer en 5 minutes', phrase: 'Sites, extension, comptes, étiquetage, import : rouvrable depuis Paramètres.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'tout-va-bien-points', date: '2026-11-20', titre: 'Tout va bien ? dit quoi faire', phrase: 'Chaque point a son geste, le plus important d’abord.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
   { id: 'stock-meubles', date: '2026-11-19', titre: 'Tes meubles dessinés, sur toute la largeur', phrase: '« Ranger » sur chaque article : il vole dans sa case.', tab: 'garage', pour: 'tous', mode: 'complet' },
   { id: 'methode-etiquetage', date: '2026-11-19', titre: 'Choisis ta méthode d’étiquetage', phrase: 'Qui numérote, lettre ou chiffres, étiquette écrite ou imprimée.', tab: 'settings', pour: 'tous', mode: 'tous' },

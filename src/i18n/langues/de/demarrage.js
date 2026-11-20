@@ -99,6 +99,7 @@ export default {
   "tvb.resume.aucun": "Kein Konto verknüpft",
   "tvb.resume.ok": "Alles in Ordnung",
   "tvb.groupe.regler": "Zu erledigen",
+  "tvb.groupe.savoir": "Gut zu wissen",
   "tvb.details": "Details",
   "tvb.replier": "Einklappen",
   "tvb.p.extension": "Die Erweiterung dieses Browsers",
