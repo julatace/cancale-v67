@@ -365,6 +365,7 @@ const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArriv
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
+const RetoursVentes = aLaDemande(() => import('./natif/ecrans/RetoursVentes.jsx'));   // (20 nov.) Retours et litiges, une présentation
 const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
 const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
@@ -18410,6 +18411,8 @@ const ICON_PATHS = {
   mail:   <><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3.5 6.5 8.5 6 8.5-6"/></>,
   key:    <><circle cx="8" cy="15" r="4.2"/><path d="m11 12 8.5-8.5M17 6l2.5 2.5M14.5 8.5 17 11"/></>,
   door:   <><path d="M14.5 3.2H6.8a1.6 1.6 0 0 0-1.6 1.6v14.4a1.6 1.6 0 0 0 1.6 1.6h7.7"/><path d="M11 12h9.5m0 0-3-3m3 3-3 3"/></>,
+  // (20 nov., Julien : « fais un beau logo pour relier les articles ») deux maillons arrondis, enlacés sur la diagonale.
+  relier: <><rect x="4" y="12.3" width="10" height="5.4" rx="2.7" transform="rotate(-45 9 15)"/><rect x="10" y="6.3" width="10" height="5.4" rx="2.7" transform="rotate(-45 15 9)"/></>,
   link:   <><path d="M10 13.5a4.5 4.5 0 0 0 6.4.2l2.6-2.6a4.5 4.5 0 0 0-6.4-6.4l-1.5 1.5"/><path d="M14 10.5a4.5 4.5 0 0 0-6.4-.2L5 12.9a4.5 4.5 0 0 0 6.4 6.4l1.5-1.5"/></>,
   shop:   <><path d="M3.5 8h17l-1 11.3a2 2 0 0 1-2 1.8H6.5a2 2 0 0 1-2-1.8L3.5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></>,
   save:   <><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M4.5 15v3a2.5 2.5 0 0 0 2.5 2.5h10a2.5 2.5 0 0 0 2.5-2.5v-3"/></>,
@@ -29593,6 +29596,10 @@ const INVENTAIRE_FEUILLE = { ouverte: false };
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
 const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
+// (20 nov., « bouton relier ») La colonne « Achat » de Ventes · Terminées (VentesToutes, hors de Comptabilite) lit l'achat d'une
+// vente Vinted et ouvre l'atelier « Relier » par CE registre, que la section des colis de Ventes (Comptabilite) remplit à chaque
+// rendu — les MÊMES règles (`achatNatifDe` : `effEntry`, `choisirAchatVente`). `vrm:relier-ventes` : il a changé, relire.
+const RELIER_VENTES = { de: null, sig: '' };
 // (1er nov.) « Emballer » demandé d'ailleurs (Ma journée, la fiche d'une paire) :
 // l'écran Colis ouvre le mode emballage en montant, une fois.
 const DEMANDE_EMBALLAGE = { at: 0 };
@@ -48985,6 +48992,21 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `labelsCaptes`, `bordsPrinted`), la limite (`e.lim`, `echeanceCourteColis`, `avantDemainColis`), la place lue du Stock par
   // le N° (`ouDansMeubles`), le transporteur LU (`transporteurVente`), la case = SA ligne du lot (`lignesLotTous`). Les gestes
   // sont les fonctions d'avant, telles quelles. L'écran natif dessine ; il ne calcule rien.
+  // (20 nov., Julien : « il y a la place pour mettre le bouton relier ») L'ACHAT d'une vente Vinted, pour la colonne « Achat » :
+  // relié = un achat posé par SON toucher (`buyFromId`, la fiche ou la vente — `effEntry`), jamais deviné ; le toucher ouvre
+  // l'atelier « Relier » sur CETTE vente (`choisirAchatVente`, le chemin de la carte d'une vente). Rien n'est relié tout seul.
+  const achatNatifDe = (o) => {
+    let e = null; try { e = effEntry(o); } catch (_) { e = null; }
+    const relie = !!(e && e.buyFromId != null && String(e.buyFromId).trim());
+    const p = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? Number(String(e.buyPrice).replace(',', '.')) : null;
+    return { relie, prix: relie && Number.isFinite(p) ? montant(p) : '', ouvrir: () => { let idf = null; try { idf = identiteAnnonce(o); } catch (_) { idf = null; } choisirAchatVente({ o, idf }); } };
+  };
+  if (colisDans === 'ventes') {
+    const parTx = new Map((sales.items || []).map((o) => [String(o.transaction_id), o]));
+    RELIER_VENTES.de = (tx) => { const o = parTx.get(String(tx)); return o ? achatNatifDe(o) : null; };
+    const sig = (sales.items || []).length + ':' + Object.keys(saleOv || {}).length + ':' + Object.keys(numeros || {}).length + ':' + Object.values(saleOv || {}).filter((v) => v && v.buyFromId).length;
+    if (RELIER_VENTES.sig !== sig) { RELIER_VENTES.sig = sig; setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ventes')); } catch (_) {} }, 0); }
+  }
   const rangsEnvoyerNatif = (Ltous, coches) => {
     const lotPar = new Map((Ltous || []).map((l) => [String(l.cle), l]));
     return colisAEnvoyerRanges().map((e) => {
@@ -49032,6 +49054,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       return rangeeEnvoyer({ cle, site: 'vinted', tx: e.txn || '', compte: acc ? accNameOf(acc) : ((b && b.account) || ''), acheteur: pseudoAcheteur(o),
         num, numDouble: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))), titre, photo,
         taille: o && (typeof o.size_title === 'string' ? o.size_title : (typeof o.size === 'string' ? o.size : '')),
+        achat: o ? achatNatifDe(o) : null,
         prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
@@ -49069,12 +49092,56 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       return { t: np ? `Vinted ne l’a pas vu partir${depuis ? ` · coché il y a ${depuis}` : ''}${np.limiteDepassee ? ' · date limite dépassée' : ''}` : 'Coché « Colis fait »', ambre: !!np }; }
     // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
     // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
-    if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc && colisDans !== 'ventes' ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
+    if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot0 = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label;
+      // (20 nov., capture de Julien : « En route · vendue il y a 12 j » à côté de l'étiquette « Livrée ») LA MÊME RÈGLE QUE L'ÉTIQUETTE :
+      // les étapes PROUVÉES de la vente (`x.lues`, `preuvesFriseDe` : le transporteur tranche, 17 nov.) — l'état de la commande
+      // Vinted seul retarde. Une étape prouvée plus loin que « En route » remplace le mot ; un retour garde le sien.
+      const mot = retour ? mot0 : (x.lues && x.lues.valide ? 'Terminée' : x.lues && x.lues.livre && /^(En route|Au relais de l’acheteur)$/.test(mot0) ? 'Livré' : mot0); return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc && colisDans !== 'ventes' ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
     if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
     if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
     // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
     if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
     return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
+  };
+  // (20 nov.) « RETOURS ET LITIGES » : les lignes de `retoursEnCours` (src/retoursStock.js) en rangées pour RetoursVentes.jsx —
+  // aucune règle neuve : l'étape est celle de la ligne (`retourAReceptionner` : revenu, à confirmer), UNE action selon l'étape
+  // (la fonction d'avant : « Déjà reçu » = `remettreDepuisCarte`, reçu + remise en stock sous SON N° ; « Reçu » ; « Remise en
+  // stock » ; « Remettre en ligne »), le reste (le site ↗, ignorer, annuler) derrière « ⋯ ».
+  const retoursNatif = () => {
+    const res = retoursPourSite(retoursSuivis, siteColis);
+    if (!res || res.etat !== 'lu') return [];
+    const plusieurs = (accounts || []).length > 1;
+    const lienDe = (l) => l.plateforme === 'ebay'
+      ? `https://www.ebay.fr/rt/ReturnDetails?returnId=${encodeURIComponent(l.returnId)}`
+      : (l.vente && l.vente.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(l.vente.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(l.tx)}`);
+    const site = (l) => ({ cle: 'site', libelle: tr(l.plateforme === 'ebay' ? 'vr.g.surEbay' : 'vr.g.surVinted'), href: lienDe(l) });
+    const compte = (l) => (l.plateforme === 'ebay' ? 'eBay' : (plusieurs && l.compte ? accNameOf(l.compte) : ''));
+    const out = [];
+    for (const l of res.lignes) {
+      const aRecep = retourAReceptionner(l);
+      const etape = aRecep || l.etape === 'en-route' ? (l.recu ? 'recu' : 'enroute') : l.etape === 'rembourse' ? (l.recu ? 'recu' : 'rembourse') : l.recu ? 'recu' : 'initie';
+      const action = aRecep ? { cle: 'recu', libelle: tr('vr.g.recu'), onClick: () => remettreDepuisCarte(l) }
+        : l.recu && l.num ? { cle: 'stock', libelle: tr('vr.g.stock'), onClick: () => remettreEnStock(l) }
+        : !l.recu ? { cle: 'recu', libelle: tr('vr.g.recu'), onClick: () => basculerRetourRecu(l.cle) } : null;
+      const menu = [site(l), l.recu ? { cle: 'pas-recu', libelle: tr('vr.g.pasRecu'), onClick: () => basculerRetourRecu(l.cle) } : null, { cle: 'ignorer', libelle: tr('vr.g.ignorer'), onClick: () => masquerRetour(l.cle) }].filter(Boolean);
+      const sous = [pseudoAcheteur(l.vente), compte(l), l.livreeSelonVinted && !l.recu ? tr('vr.note.livree') : '', l.origine === 'non-reclamee' ? tr('vr.note.nonReclamee') : '', !l.num ? tr('vr.note.sansNum') : ''].filter(Boolean).join(' · ');
+      out.push({ cle: l.cle, num: l.num || '', titre: l.titre || '', photo: l.vente ? (orderPhoto(l.vente) || '') : '', sous, etape, ancien: !!l.ancien, action, menu,
+        attrs: { 'data-retour': l.cle, 'data-retour-etape': l.etape, 'data-retour-num': l.num || '', 'data-retour-plateforme': l.plateforme } });
+    }
+    for (const l of res.remises) {
+      const auto = !!(l.remis && l.remis.auto);
+      const num = (l.remis && l.remis.num) || '';
+      const dateR = dateCourteFr(l.retourLe || (l.remis && l.remis.at) || '');
+      const enLigne = auto ? (remettreRetourEnLigne && l.plateforme === 'vinted' && l.itemId
+          ? { cle: 'en-ligne', libelle: tr('vr.g.enLigne'), onClick: () => remettreRetourEnLigne(l) }
+          : { cle: 'en-ligne', libelle: tr('vr.g.enLigneLien'), href: 'https://www.vinted.fr/items/new' })
+        : { cle: 'republier', libelle: tr('vr.g.republier'), href: 'https://www.vinted.fr/items/new' };
+      const menu = [site(l), auto ? { cle: 'ignorer', libelle: tr('vr.g.ignorer'), onClick: () => masquerRetour(l.cle) } : { cle: 'annuler', libelle: tr('vr.g.annulerRemise'), onClick: () => annulerRemise(l.cle) }];
+      const sous = [pseudoAcheteur(l.vente), compte(l), dateR ? tr('vr.note.retourDu', { date: dateR }) : '', l.remis && l.remis.aNumeroter ? tr('vr.note.aNumeroter') : '', l.remis && l.remis.archive ? tr('vr.note.archive') : ''].filter(Boolean).join(' · ');
+      out.push({ cle: 'r:' + l.cle, num, titre: l.titre || '', photo: l.vente ? (orderPhoto(l.vente) || '') : '', sous, etape: auto ? 'averifier' : 'remis', ancien: false, action: enLigne, menu,
+        attrs: { 'data-retour': l.cle, 'data-retour-etape': 'remis', 'data-retour-num': num, 'data-retour-plateforme': l.plateforme, 'data-retour-auto': auto ? '1' : undefined } });
+    }
+    return out;
   };
   // « En route » en entier pour l'écran natif : pas lu ⇒ `lu: false` (jamais une liste vide qui dirait « aucun colis ») ; les
   // retours suivis sortent de la liste (la règle du bloc d'avant) ; le filtre par transporteur et l'ordre « le plus récent en haut ».
@@ -49093,7 +49160,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const so = sousDe ? sousDe(x) : { t: '', ambre: false };
     const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || '';
     const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
-    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
+    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' && o ? achatNatifDe(o) : null, acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
       taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: x.photo && !imgMortes.has(x.photo) ? x.photo : null,
       prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
       t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
@@ -56976,13 +57043,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   // rendues pour Ventes (leurs blocs rendent `null`) ; les feuilles (papier, impression, scanner, préparer…) restent.
                   if (VENTES_NATIF) {
                     const ficheDe = (r) => { const a = r && r.fiche; if (!a || !a['data-fiche-ligne']) return; ouvrirLigne({ cle: a['data-fiche-ligne'], contexte: a['data-fl-ctx'] || 'colis', site: a['data-fl-site'] || '', nums: String(a['data-fl-num'] || '').split(',').filter(Boolean), item: '', tx: a['data-fl-tx'] || '', suivi: '', photo: a['data-fl-photo'] || '', titre: a['data-fl-titre'] || '', prix: '', sous: '' }); };
-                    const avantRouteN = onglet === 'envoyes' && !toutesSeules ? <>
-                      <CartesRetourRecu res={retoursSuivis} site={siteColis} onRemettre={remettreDepuisCarte}/>
-                      <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise} onRemettreEnLigne={remettreRetourEnLigne}/>
-                    </> : null;
+                    // (20 nov., Julien : « 4 litiges avec 2 écritures différentes ») Les retours ne sont plus deux blocs d'avant
+                    // (`CartesRetourRecu` + `RetoursEnCoursBloc`) au-dessus de « En route » : UN groupe « Retours et litiges · N »
+                    // (src/natif/ecrans/RetoursVentes.jsx), replié sous « À régler », les mêmes lignes et les mêmes gestes.
+                    const avantRouteN = null;
+                    const retoursN = !baseKO ? <RetoursVentes rangs={retoursNatif()} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
-                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} avant={!baseKO ? <ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/> : null}/>
+                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>{retoursN}</> : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
                   }
@@ -63064,6 +63132,8 @@ function LigneSansDate({ n }) {
   return <div role="presentation" data-sans-date={n} style={{ fontSize: 12, color: C.muted, padding: '12px 2px 4px', lineHeight: 1.4 }}>{PHRASE_SANS_DATE(n)}</div>;
 }
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir, onPro }) {
+  const [, majRelier] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => { window.addEventListener('vrm:relier-ventes', majRelier); return () => window.removeEventListener('vrm:relier-ventes', majRelier); }, []);
   // (19 nov., Ventes « comme avant ») La liste d'avant pour tout le monde (les rangées A du 17 nov. sont retirées).
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
@@ -63263,7 +63333,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
-        <VentesTableau lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
+        <VentesTableau achatDe={(l) => (l && l.site === 'vinted' && l.id != null && RELIER_VENTES.de ? RELIER_VENTES.de(l.id) : null)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={20}/> : null)} Icon={Icon}
           imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}

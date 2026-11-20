@@ -231,3 +231,41 @@
   .n-vt-morceau { white-space: nowrap; }
   .n-vt-logo { display: inline-flex; align-items: center; flex: 0 0 auto; margin-left: 6px; }
 }
+
+/* (20 nov.) « Retours et litiges » (src/natif/ecrans/RetoursVentes.jsx) : le même tableau que Ventes, UNE action en texte. */
+@layer vrm-natif {
+  .n-vr { margin-bottom: 8px; }
+  .n-vr-cadre { margin: 0 var(--n-marge); }
+  .n-vr-geste { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; min-height: 36px; margin: 0; padding: 0 10px;
+    border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-accent); font: var(--n-t-second-fort); text-decoration: none;
+    white-space: nowrap; cursor: pointer; }
+  .n-vr-geste:hover, .n-vr-geste:focus-visible { background: var(--n-teinte); color: var(--n-sur-teinte); outline: none; }
+  .n-vr-td-geste { text-align: right; }
+  .n-vr-anciens { padding: 8px var(--n-marge) 0; }
+  .n-vr-passu { margin: 0; padding: 8px var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+}
+
+/* (20 nov., capture de Julien : « Tous les comptes » coupé, le segmenté caché sous l'en-tête, des rangées qui défilent DERRIÈRE et
+   AU-DESSUS de l'en-tête) La tête du tableau (compte, fraîcheur, segmenté, outils) est UN bloc collant OPAQUE, posé sous la barre de
+   titre ; son ombre de fond monte jusqu'en haut de l'écran : aucune rangée ne se voit au-dessus. */
+@layer vrm-natif {
+  .n-tt-colle { position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); z-index: 25; background: var(--n-fond);
+    box-shadow: 0 calc(-1 * (var(--n-h-barre) + var(--n-haut-sur) + 24px)) 0 0 var(--n-fond); padding-top: 4px; }
+  .n-tt-colle .n-tt-outils { margin-bottom: 0; }
+  .n-tt-colle + * { margin-top: 12px; }
+  /* Le segmenté de Ventes au téléphone : collé sous la barre, opaque. */
+  .n-vn-colle { position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); z-index: 25; background: var(--n-fond); padding: 4px var(--n-marge) 12px; }
+  .n-vn-colle > .n-segmente { margin: 0; }
+
+  /* « Achat » : les deux maillons. À relier : accent, dans un rond teinté ; reliée : gris + « acheté 30 € ». Cible 44 au doigt. */
+  .n-vt-relier { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; min-width: 36px; margin: 0; padding: 0;
+    border: 0; background: transparent; color: var(--n-accent); font: var(--n-t-legende); cursor: pointer; border-radius: var(--n-r-rond); }
+  .n-vt-relier-rond { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--n-r-rond); background: var(--n-teinte); }
+  .n-vt-relier:hover .n-vt-relier-rond, .n-vt-relier:focus-visible .n-vt-relier-rond { background: var(--n-accent); color: var(--n-sur-plein, #fff); }
+  .n-vt-relier:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-vt-relier[data-vt-relier="relie"] { color: var(--n-encre-2); }
+  .n-vt-relier[data-vt-relier="relie"] .n-vt-relier-rond { background: var(--n-carte-2); }
+  .n-vt-relier[data-vt-relier="relie"] svg { stroke-width: 2.3; }
+  .n-vt-relier-prix { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  @media (pointer: coarse) { .n-vt-relier { min-height: var(--n-cible); min-width: var(--n-cible); } }
+}

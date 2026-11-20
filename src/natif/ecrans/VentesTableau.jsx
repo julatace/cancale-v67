@@ -11,21 +11,24 @@ import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 import { CATEGORIES_VENTE, categorieVente } from '../../ventesEcran.js';
+import { celluleAchat } from './celluleAchat.jsx';
 
 const TON = { envoyer: 'ambre', route: 'accent', terminee: 'encre', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function VentesTableau({ lignes, haut = null, pied = '', majLe, onRafraichir = null, rafraichit = false, compte = '', filtres = [],
   prix = (l) => (l.prix == null ? '' : String(l.prix) + ' €'), motEtat = (e) => e, nomSite = (s) => s, logoSite = () => null, logoTransporteur = () => null,
-  onOuvrir = null, onImprimer = null, imprimable = () => false, Icon = null }) {
+  onOuvrir = null, onImprimer = null, imprimable = () => false, Icon = null, achatDe = null }) {
   const rangees = React.useMemo(() => (Array.isArray(lignes) ? lignes.map((l) => {
     const mot = l.etat ? motEtat(l.etat) : '';
     return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot,
       sous: [nomSite(l.site), l.compte].filter(Boolean).join(' · '),
       texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num + ' ' + l.num : '', l.compte, nomSite(l.site), l.tr && l.tr.nom, l.id].filter(Boolean).join(' '),
-      prixGrille: prix(l), attrs: { 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-ordre-t': l.t != null ? String(l.t) : '' } };
+      prixGrille: prix(l), attrs: { 'data-vt-site': l.site, 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-ordre-t': l.t != null ? String(l.t) : '' } };
   }) : lignes), [lignes, motEtat, nomSite, prix]);
   const colonnes = [
+    // (20 nov.) « Achat » : relier CETTE vente à son achat (son toucher), ou voir l'achat relié — src/natif/ecrans/celluleAchat.jsx.
+    ...(achatDe ? [{ cle: 'achat', libelle: tr('vt.col.achat'), tri: (l) => { const a = achatDe(l.v); return a ? (a.relie ? 1 : 0) : null; }, rendu: (l) => celluleAchat(achatDe(l.v), Icon) }] : []),
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num}/> : null) },
     { cle: 'site', libelle: tr('tableau.col.site'), defaut: false, tri: (l) => l.site, rendu: (l) => <span className="n-tt-transporteur">{logoSite(l.site)}<span>{nomSite(l.site)}</span></span> },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => l.prix, rendu: (l) => prix(l) || null },
