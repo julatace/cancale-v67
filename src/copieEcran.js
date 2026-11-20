@@ -41,6 +41,12 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 export const SCHEMA_COPIE = 1;
+// La MUTATION des bancs (scripts/bancs/copie-ecran.cjs, scripts/tests/copie-ecran.test.mjs) : `compte` affaiblit la règle
+// « une copie par compte » (clé sans owner, owner non vérifié, rien d'effacé) ; `panne` ne garde plus la copie sur une
+// lecture ratée. Vide en production (vite.config.js `define`) ; jamais lue ailleurs que dans ces deux règles.
+// eslint-disable-next-line no-undef
+export const MUTATION_COPIE = (() => { try { return typeof __VRM_COPIE_MUTATION__ !== 'undefined' ? String(__VRM_COPIE_MUTATION__ || '') : String((globalThis && globalThis.__VRM_COPIE_MUTATION_TEST__) || ''); } catch (_) { return ''; } })();
+const MUT_COMPTE = MUTATION_COPIE === 'compte';
 export const MAX_HTML = 600000;
 export const MAX_DATA_IMAGE = 40000;
 export const MAX_RANGEES = 80;
@@ -52,7 +58,7 @@ export const ECRANS_COPIE = Object.freeze(['journee', 'annonces', 'ventes', 'ach
 export const ecranCopiable = (e) => ECRANS_COPIE.includes(e) || /^fiche:[\w.:-]{1,80}$/.test(String(e || ''));
 
 const propreOwner = (o) => String(o || '').replace(/[^\w-]/g, '').slice(0, 64);
-export const cleCopie = (owner, ecran) => `vrm_copie_${propreOwner(owner)}_${ecran}`;
+export const cleCopie = (owner, ecran) => `vrm_copie_${MUT_COMPTE ? '' : propreOwner(owner)}_${ecran}`;
 
 // ── Le jour local (une copie ne se montre que le jour de sa capture) ─────────
 const jourIso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -206,7 +212,7 @@ export function capturerCopie(racine, { owner, ecran, maintenant = Date.now(), h
 // La copie brute de CET écran pour CET owner, montrable MAINTENANT (même jour, même largeur à 2 px près), ou null.
 export function copieMontrable(c, { owner, ecran, maintenant = Date.now(), largeur = 0 } = {}) {
   if (!c || typeof c !== 'object' || c.v !== SCHEMA_COPIE) return null;
-  if (!owner || String(c.owner || '') !== String(owner)) return null;
+  if (!owner || (!MUT_COMPTE && String(c.owner || '') !== String(owner))) return null;
   if (c.ecran !== ecran) return null;
   const t = Number(c.t);
   if (!Number.isFinite(t) || t > maintenant + 60000) return null;
@@ -222,8 +228,8 @@ export function stockageMemoireCopies() {
   const m = new Map();
   return {
     m,
-    async lire(owner, ecran) { const e = m.get(cleCopie(owner, ecran)); return e && e.owner === String(owner) ? JSON.parse(JSON.stringify(e)) : null; },
-    async ecrire(c) { for (const [k, e] of [...m]) if (e.owner !== c.owner) m.delete(k); m.set(cleCopie(c.owner, c.ecran), JSON.parse(JSON.stringify(c))); return true; },
+    async lire(owner, ecran) { const e = m.get(cleCopie(owner, ecran)); return e && (MUT_COMPTE || e.owner === String(owner)) ? JSON.parse(JSON.stringify(e)) : null; },
+    async ecrire(c) { for (const [k, e] of [...m]) if (!MUT_COMPTE && e.owner !== c.owner) m.delete(k); m.set(cleCopie(c.owner, c.ecran), JSON.parse(JSON.stringify(c))); return true; },
     async effacer() { m.clear(); },
   };
 }
@@ -259,14 +265,14 @@ export function stockageIdbCopies(idb = (typeof indexedDB !== 'undefined' ? inde
   return {
     async lire(owner, ecran) {
       const box = { v: null };
-      await tx('readonly', (s) => { const rq = s.get(cleCopie(owner, ecran)); rq.onsuccess = () => { const e = rq.result; box.v = e && e.owner === String(owner) ? e : null; }; return box; });
+      await tx('readonly', (s) => { const rq = s.get(cleCopie(owner, ecran)); rq.onsuccess = () => { const e = rq.result; box.v = e && (MUT_COMPTE || e.owner === String(owner)) ? e : null; }; return box; });
       return box.v;
     },
     async ecrire(c) {
       const r = await tx('readwrite', (s) => {
         // Un seul compte VRM sur l'appareil : les copies d'un autre owner partent.
         const cur = s.openCursor();
-        cur.onsuccess = () => { const x = cur.result; if (!x) return; if (!x.value || x.value.owner !== c.owner) x.delete(); x.continue(); };
+        cur.onsuccess = () => { const x = cur.result; if (!x) return; if (!MUT_COMPTE && (!x.value || x.value.owner !== c.owner)) x.delete(); x.continue(); };
         s.put({ ...c, k: cleCopie(c.owner, c.ecran) });
         return true;
       });
@@ -292,15 +298,15 @@ export function poserStockageCopies(s) { _stock = s; }
 const lsDe = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (_) { return null; } };
 export function lireIndexCopies(owner, ls = lsDe()) {
   if (!ls || !owner) return {};
-  try { const j = JSON.parse(ls.getItem(PREFIXE_INDEX + propreOwner(owner)) || 'null'); return j && typeof j === 'object' && j.owner === String(owner) ? (j.ecrans || {}) : {}; } catch (_) { return {}; }
+  try { const j = JSON.parse(ls.getItem(PREFIXE_INDEX + (MUT_COMPTE ? '' : propreOwner(owner))) || 'null'); return j && typeof j === 'object' && (MUT_COMPTE || j.owner === String(owner)) ? (j.ecrans || {}) : {}; } catch (_) { return {}; }
 }
 function noterIndex(c, ls = lsDe()) {
   if (!ls) return;
   try {
-    for (let i = ls.length - 1; i >= 0; i--) { const k = ls.key(i); if (k && k.startsWith(PREFIXE_INDEX) && k !== PREFIXE_INDEX + propreOwner(c.owner)) ls.removeItem(k); }
+    for (let i = ls.length - 1; i >= 0; i--) { const k = ls.key(i); if (k && k.startsWith(PREFIXE_INDEX) && k !== PREFIXE_INDEX + (MUT_COMPTE ? '' : propreOwner(c.owner))) ls.removeItem(k); }
     const ecrans = { ...lireIndexCopies(c.owner, ls) };
     if (!String(c.ecran).startsWith('fiche:')) ecrans[c.ecran] = { t: c.t, jour: c.jour, largeur: c.largeur, theme: c.theme, coque: !!(c.coque && c.coque.html) };
-    ls.setItem(PREFIXE_INDEX + propreOwner(c.owner), JSON.stringify({ owner: c.owner, ecrans }));
+    ls.setItem(PREFIXE_INDEX + (MUT_COMPTE ? '' : propreOwner(c.owner)), JSON.stringify({ owner: c.owner, ecrans }));
   } catch (_) {}
 }
 
@@ -325,6 +331,7 @@ export async function lireCopie(owner, ecran, { maintenant = Date.now(), largeur
 }
 // Tout effacer (déconnexion, changement de compte, aperçu sans abonnement).
 export function effacerCopiesEcrans({ ls = lsDe(), stock = null } = {}) {
+  if (MUT_COMPTE) return Promise.resolve();
   _derniere.clear();
   _memoire.clear();
   try { if (ls) for (let i = ls.length - 1; i >= 0; i--) { const k = ls.key(i); if (k && k.startsWith(PREFIXE_INDEX)) ls.removeItem(k); } } catch (_) {}
@@ -339,8 +346,8 @@ export async function prechargerCopie(owner, ecran, opts = {}) {
   if (c) _memoire.set(cleCopie(owner, ecran), c); else _memoire.delete(cleCopie(owner, ecran));
   return c;
 }
-// Toutes les copies de l'index (au démarrage de la coque : chaque onglet a la sienne prête avant le toucher).
+// Les copies de tous les onglets (au démarrage de la coque : chaque onglet a la sienne prête avant le toucher).
+// Lues dans la base elle-même (l'index ne sert qu'à la décision d'avant l'app) : six lectures courtes.
 export async function prechargerCopies(owner, opts = {}) {
-  const idx = lireIndexCopies(owner);
-  await Promise.all(Object.keys(idx).filter((e) => ECRANS_COPIE.includes(e)).map((e) => prechargerCopie(owner, e, opts)));
+  await Promise.all(ECRANS_COPIE.map((e) => prechargerCopie(owner, e, opts)));
 }

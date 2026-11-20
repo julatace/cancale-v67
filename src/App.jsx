@@ -63307,13 +63307,17 @@ function CaptureCopie({ uid, ecran }) {
     if (!complet || !uid || typeof document === 'undefined') return undefined;
     let t = null, mort = false;
     const racine = () => { try { const a = document.querySelector(`[data-attente-ecran="${ecran}"][data-attente="pret"]`); const r = a && a.lastElementChild; return r && !r.classList.contains('vrm-attente-cache') && !r.closest('[data-copie-ecran]') ? r : null; } catch (_) { return null; } };
+    // La largeur de la fenêtre quand l'écran s'est ouvert : une page qui se ferme (ou cachée) peut annoncer une fenêtre
+    // de 0 px — rien n'est alors relu (une copie mesurée dans une fenêtre fausse serait coupée n'importe où).
+    const largeur0 = window.innerWidth || 0;
     const prendre = () => {
       t = null; if (mort) return;
       const r = racine(); if (!r) return;
       // Sans abonnement (aperçu flouté) : rien n'est rangé, et ce qui l'était part.
       if (r.closest('[data-apercu]')) { effacerCopiesEcrans(); return; }
+      if (!largeur0 || Math.abs((window.innerWidth || 0) - largeur0) > 2 || (window.innerHeight || 0) < 200) return;
       const theme = document.documentElement.getAttribute('data-theme') || '';
-      const coque = r.closest('.vrm-app-shell') || r.closest('[data-n-coque]');
+      const coque = document.visibilityState === 'visible' ? (r.closest('.vrm-app-shell') || r.closest('[data-n-coque]')) : null;
       const c = capturerCopie(r, { owner: uid, ecran, maintenant: Date.now(), largeur: window.innerWidth || 0, theme, coque });
       if (c) ecrireCopie(c);
     };

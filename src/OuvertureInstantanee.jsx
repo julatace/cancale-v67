@@ -122,6 +122,7 @@ export async function peindreCopie(copie) {
     const racine = createRoot(hote);
     flushSync(() => racine.render(<CoqueCopie copie={copie}/>));
     try { performance.mark('vrm:apercu-copie'); } catch (_) {}
+    try { window.__vrmApercuEcran = { ecran: copie.ecran, t: performance.now() }; } catch (_) {}
     window.addEventListener('vrm:demarrage-fin', () => { setTimeout(() => { try { racine.unmount(); } catch (_) {} }, 400); }, { once: true });
     await new Promise((r) => {
       let fait = false; const fin = () => { if (!fait) { fait = true; r(); } };

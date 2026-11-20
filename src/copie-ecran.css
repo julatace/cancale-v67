@@ -26,3 +26,9 @@
   @keyframes vrm-copie-pouls { to { opacity: .7; } }
   .vrm-copie-mention { transition: none; }
 }
+/* La coque copiée, peinte avant l'app (src/OuvertureInstantanee.jsx) : exactement la fenêtre, comme #root. */
+#vrm-apercu > .vrm-copie.vrm-copie-coque { display: block !important; width: 100%; height: 100%; overflow: hidden; }
+#vrm-apercu > .vrm-copie-coque > .vrm-copie-contenu { display: block; width: 100%; height: 100%; }
+#vrm-apercu > .vrm-copie-coque > .vrm-copie-contenu > * { width: 100%; max-width: 100%; height: 100%; min-height: 0; }
+/* Une copie ne « rejoue » rien : aucune animation d'entrée ni transition captée avec ses classes (elle est déjà là). */
+.vrm-copie-contenu, .vrm-copie-contenu *, .vrm-copie-contenu *::before, .vrm-copie-contenu *::after { animation: none !important; transition: none !important; }

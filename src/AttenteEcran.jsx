@@ -32,6 +32,7 @@
 import React from 'react';
 import { Squelette } from './Squelette.jsx';
 import { rafraichirDrapeaux } from './drapeauxRacine.js';
+import { MUTATION_COPIE } from './copieEcran.js';
 
 export const PLAFOND_ATTENTE_MS = 2500;
 // Avec un instantané à montrer, l'écran vrai attend ses données jusqu'à ce plafond.
@@ -115,7 +116,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   const tout = attendus.every(la);
   // (20 nov., affichage instantané) Une lecture RATÉE (base injoignable, hors ligne) avec une copie à montrer : la copie
   // RESTE (« Pas à jour · Réessayer », src/CopieEcran.jsx) au lieu d'un écran vide qui dirait sa panne.
-  const garde = !!instantane && !!garderInstantane && !ouvert;
+  const garde = !!instantane && !!garderInstantane && !ouvert && MUTATION_COPIE !== 'panne';
   const visible = !garde && enfants && (ouvert || tout || plafond);
   // Une fois ouvert, il le reste.
   React.useLayoutEffect(() => { if (visible && !ouvert) setOuvert(true); }, [visible, ouvert]);
