@@ -23,7 +23,7 @@ import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
-import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris } from '../vuesFavoris.js';
+import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
 import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
@@ -150,7 +150,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   //     plus bas (`vrm_stock_valeur`).
   // Lecture ratée (`lu` null) ⇒ rien n'est écrit ni publié : les derniers chiffres restent. Un site pas lu ⇒ « au moins ».
   React.useEffect(() => {
-    if (!modele || !lu || !AUTH.user?.id) return;
+    if (!modele || !lectureUtile(lu) || !AUTH.user?.id) return;
     const owner = AUTH.user.id, manque = !!(lu.manque && lu.manque.length);
     let journal = load(CLE_VUES_LUES, null);
     try {

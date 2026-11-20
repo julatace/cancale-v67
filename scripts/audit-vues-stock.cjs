@@ -111,6 +111,11 @@ async function regles(dossier, { titre = '' } = {}) {
   const ko8 = F.publierVuesFavoris(null, { owner: 'o1' });
   const l8 = F.lireVuesFavoris('o1');
   dit(ko8 === false && l8 && l8.vues.total === 130, 'J8 une lecture ratée ne publie rien : les derniers chiffres restent', l8);
+  // J10 — une lecture qui n'apprend rien (base injoignable : tous les sites ratés, ou Vinted raté sans une annonce Vinted).
+  dit(F.lectureUtile(null) === false && F.lectureUtile({ annonces: [], manque: ['vinted', 'leboncoin', 'ebay', 'vestiaire'] }) === false
+    && F.lectureUtile({ annonces: [{ site: 'ebay' }], manque: ['vinted'] }) === false, 'J10 lecture ratée (rien, ou Vinted raté) ⇒ rien n’est noté ni publié');
+  dit(F.lectureUtile({ annonces: [{ site: 'vinted' }], manque: ['leboncoin'] }) === true && F.lectureUtile({ annonces: [], manque: [] }) === true,
+    'J11 un site manquant parmi d’autres lus ⇒ publié « au moins » ; aucun article et rien raté ⇒ 0 lu');
   // J9 — le pont des sources : l'heure de lecture du compte Vinted arrive jusqu'à l'annonce de l'article.
   const a9 = articles(R, { vinted: Object.assign([vt(77, 20, 'enligne', { views: 12, favourites: 3 })], { lu: hier }) });
   const an9 = a9[0] && a9[0].annonces[0];
@@ -126,6 +131,7 @@ const MUTATIONS = [
   { nom: 'publier sur une lecture ratée (stock)', f: 'stockValeurAffiche.js', de: "if (!v || !Number.isFinite(v.n)) return false;", vers: "if (!v) { try { localStorage.removeItem(CLE_STOCK_VALEUR); } catch (_) {} return false; }" },
   { nom: 'un « pas su » écrit par-dessus le chiffre', f: 'vuesFavoris.js', de: 'if (vues == null && fav == null) continue;', vers: '' , aussi: { de: 'if (v != null) return { v, t: p[0] };', vers: 'return v == null ? null : { v, t: p[0] };' } },
   { nom: 'le point daté par l’heure de l’écran', f: 'vuesFavoris.js', de: 'let n = [...L, [Math.round(ts), vues, fav]];', vers: 'let n = [...L, [Math.round(maintenant), vues, fav]];' },
+  { nom: 'une lecture ratée prise pour une réponse', f: 'vuesFavoris.js', de: "if (!lu || !Array.isArray(lu.annonces)) return false;", vers: 'if (lu) return true;' },
   { nom: 'publier sur une lecture ratée (vues)', f: 'vuesFavoris.js', de: 'if (!r || !Number.isFinite(r.nAnnonces)) return false;', vers: 'if (!r) { try { localStorage.removeItem(CLE_VUES_FAVORIS); } catch (_) {} return false; }' },
 ];
 

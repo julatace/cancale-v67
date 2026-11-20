@@ -105,6 +105,18 @@ export function vuesFavorisEnLigne(articles, journal, { maintenant = Date.now(),
   return { vues: fin(V), favoris: fin(F), nAnnonces, manque: !!manque };
 }
 
+// UNE LECTURE QUI APPREND QUELQUE CHOSE ? (§4.1 : « une liste vide n'est jamais une réponse »). `lu` : la lecture de
+// l'écran Annonces ({ annonces, manque: [site] }). Rien lu du tout, ou AUCUNE annonce Vinted alors que Vinted a raté (base
+// injoignable, session expirée) ⇒ false : ni le journal ni les publications ne bougent, les derniers chiffres restent.
+// Un site manquant parmi d'autres lus ⇒ true, et la publication dit « au moins ».
+export function lectureUtile(lu) {
+  if (!lu || !Array.isArray(lu.annonces)) return false;
+  const manque = Array.isArray(lu.manque) ? lu.manque : [];
+  if (!lu.annonces.length && manque.length) return false;
+  if (manque.includes('vinted') && !lu.annonces.some((a) => a && a.site === 'vinted')) return false;
+  return true;
+}
+
 // ── Publication (un propriétaire : l'écran Annonces ; un lecteur : Aujourd'hui) ─────
 export function publierVuesFavoris(r, { owner = '', maintenant = Date.now() } = {}) {
   if (!r || !Number.isFinite(r.nAnnonces)) return false;    // lecture ratée : la publication d'avant reste
