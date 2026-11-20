@@ -43,7 +43,7 @@ export default function MeubleDessin({ m, info, mode = 'loin', vise = null, ici 
       const dedans = o ? (
         <span className="sm-boite" data-teinte={teinteCarton(reg, o.num)} data-etat={etat || undefined} data-notee={o.notee ? '' : undefined}>
           {pres && vue.photo && o.photo ? <img className="sm-photo" src={o.photo} alt="" loading="lazy" decoding="async" draggable="false"/> : null}
-          {sansNum ? null : <span className="sm-etiq"><span className="sm-n">{String(o.num)}</span></span>}
+          {sansNum ? null : <span className="sm-etiq"><span className="sm-n" style={{ '--sm-len': Math.max(2, String(o.num).length) }}>{String(o.num)}</span></span>}
         </span>
       ) : <span className="sm-trou" aria-hidden="true"/>;
       const cls = 'sm-case' + (o ? ' is-prise' : ' is-libre') + (estVise ? ' is-vise' : '') + (estIci ? ' is-ici' : '') + (estArrivee ? ' is-arrive' : '');
