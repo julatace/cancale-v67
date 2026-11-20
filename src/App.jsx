@@ -123,6 +123,10 @@ import { VentesInstantanee } from './ColisVentesInstantanes.jsx';
 import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
 import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
 import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
+// (20 nov., affichage instantané) LA COPIE DE CHAQUE ÉCRAN (src/copieEcran.js) : la dernière projection rendue de
+// l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
+import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE } from './copieEcran.js';
+import { VueCopie } from './CopieEcran.jsx';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -1958,7 +1962,7 @@ const writeSession = (s) => {
   }
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch (_) {}
   // (9 nov.) Plus de session (refusée, déconnectée) : plus de laissez-passer hors ligne.
-  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} try { effacerCopies(); } catch (_) {} rangerSessionOnglets(null); }
+  if (!s) { try { effacerLaissezPasser(localStorage); } catch (_) {} try { effacerCopies(); } catch (_) {} try { effacerCopiesEcrans(); } catch (_) {} rangerSessionOnglets(null); }
   AUTH = { ...AUTH, session: s || null, user: (s && s.user) || null, ready: true };
   // Changement d'identité sur ce navigateur → on fait le ménage AVANT que
   // quoi que ce soit ne soit relu ou repoussé (voir ensureLocalOwner).
@@ -2952,6 +2956,8 @@ const wipeLocalData = () => {
   try { oublierPhotosHl(); } catch (_) {}
   // (10 nov., lot K) Et les listes gardées sur l'appareil (src/copieLignes.js).
   try { effacerCopies(); } catch (_) {}
+  // (20 nov.) Et les copies des écrans (src/copieEcran.js) : jamais la copie d'un autre compte.
+  try { effacerCopiesEcrans(); } catch (_) {}
   // (11 nov., revue de sécurité) Le cache des ventes/achats de l'onglet vit dans
   // `sessionStorage` (il survit au `reload` de la connexion) : sans ceci, le
   // vendeur suivant dans le même onglet voyait, 3 min durant, les ventes et
@@ -63291,6 +63297,38 @@ function CaptureVentes({ uid }) {
 function CaptureAnnonces({ uid }) {
   return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
 }
+// (20 nov., affichage instantané) LA COPIE D'UN ÉCRAN est prise ICI, dans l'écran vrai, seulement quand TOUTES ses
+// données essentielles sont là (`useAttenteComplete`) — jamais au plafond, jamais hors ligne ni base injoignable (le
+// montage est gardé par la coque) —, au repos du navigateur, 1,5 s après le dernier changement, et quand la page est
+// quittée ou cachée. Ce qui est rangé est ce que l'écran a RENDU (src/copieEcran.js `capturerCopie` : nettoyé, coupé).
+function CaptureCopie({ uid, ecran }) {
+  const complet = useAttenteComplete();
+  React.useEffect(() => {
+    if (!complet || !uid || typeof document === 'undefined') return undefined;
+    let t = null, mort = false;
+    const racine = () => { try { const a = document.querySelector(`[data-attente-ecran="${ecran}"][data-attente="pret"]`); const r = a && a.lastElementChild; return r && !r.classList.contains('vrm-attente-cache') && !r.closest('[data-copie-ecran]') ? r : null; } catch (_) { return null; } };
+    const prendre = () => {
+      t = null; if (mort) return;
+      const r = racine(); if (!r) return;
+      // Sans abonnement (aperçu flouté) : rien n'est rangé, et ce qui l'était part.
+      if (r.closest('[data-apercu]')) { effacerCopiesEcrans(); return; }
+      const theme = document.documentElement.getAttribute('data-theme') || '';
+      const coque = r.closest('.vrm-app-shell') || r.closest('[data-n-coque]');
+      const c = capturerCopie(r, { owner: uid, ecran, maintenant: Date.now(), largeur: window.innerWidth || 0, theme, coque });
+      if (c) ecrireCopie(c);
+    };
+    const auRepos = () => { try { (window.requestIdleCallback || ((f) => setTimeout(f, 0)))(prendre, { timeout: 2000 }); } catch (_) { prendre(); } };
+    const bientot = (ms = 1500) => { if (t) clearTimeout(t); t = setTimeout(auRepos, ms); };
+    bientot(1200);
+    let obs = null;
+    try { const r = racine(); if (r) { obs = new MutationObserver(() => bientot()); obs.observe(r, { subtree: true, childList: true, characterData: true }); } } catch (_) {}
+    const cache = () => { if (document.visibilityState === 'hidden') prendre(); };
+    window.addEventListener('pagehide', prendre); document.addEventListener('visibilitychange', cache);
+    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', prendre); document.removeEventListener('visibilitychange', cache); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complet, uid, ecran]);
+  return null;
+}
 function AppCoeur() {
   const profilNavigation = useProfilVendeur();
   // (17 nov.) Le nouveau design (essai) : un menu plateforme · compte sous le grand titre des tâches.
@@ -64362,6 +64400,12 @@ function AppCoeur() {
   //    Sans le troisième, « je n'ai pas pu lire » s'affiche comme « il n'y a
   //    rien » — et c'est le seul cas où l'app peut le tromper gravement.
   const [baseKO,setBaseKO]=useState(false);
+  // (20 nov., affichage instantané) Les copies des écrans de CE compte, lues d'IndexedDB une fois (src/copieEcran.js) :
+  // chaque onglet a la sienne prête AVANT son premier toucher. Le compteur ne sert qu'à redessiner à leur arrivée.
+  const [copiesPretes,setCopiesPretes]=useState(0);
+  useEffect(()=>{ const uid=AUTH.user&&AUTH.user.id; if(!uid) return undefined; let stop=false;
+    prechargerCopies(uid,{ largeur: window.innerWidth||0 }).then(()=>{ if(!stop) setCopiesPretes((n)=>n+1); },()=>{});
+    return ()=>{ stop=true; }; },[]);
   // Hors ligne MESURÉ (`navigator.onLine`, évènements online/offline) : la coque
   // montre la photo de Ma journée (src/journeeHorsLigne.js). Au retour du réseau,
   // si rien n'a pu être lu pendant la coupure (`baseKO`), on relit tout
@@ -66380,7 +66424,13 @@ function AppCoeur() {
   const instantanePermis = !baseKO && instantaneAuMoinsPermis;
   const snapJourneeArret = instantaneAuMoinsPermis && tab === 'journee' && snapJournee && (horsLigne || baseKO)
     ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
-  const instantaneEcranIci = !instantanePermis ? null
+  // (20 nov., affichage instantané) La COPIE de l'écran (src/copieEcran.js), lue d'IndexedDB au montage de la coque
+  // (`copiesPretes`) : montrée d'abord, inerte et datée. Base injoignable ou hors ligne : elle RESTE, « Pas à jour ·
+  // Réessayer » (jamais présentée comme fraîche). Sans abonnement : jamais (`instantaneAuMoinsPermis`).
+  const copieIci = instantaneAuMoinsPermis && copiesPretes >= 0 && ECRANS_COPIE.includes(tab) ? copieEnMemoire(uidInstantane, tab) : null;
+  const copieEnPanne = !!copieIci && (baseKO || horsLigne);
+  const instantaneEcranIci = copieIci ? <VueCopie copie={copieIci} etat={copieEnPanne ? 'pas-a-jour' : 'maj'} onReessayer={() => { try { window.location.reload(); } catch (_) {} }}/>
+    : !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
@@ -67895,7 +67945,8 @@ function AppCoeur() {
         {/* (17 nov., lot stock-rangement) Nouveau design : Stock se joint par Annonces → « ⋯ » (comme Annonces), sans la bande Annonces | Stock. */}
         {!ordi && estPaires(tab) && tab!=='annonces' && !(designV2App && tab==='garage') && <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/>}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
-        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
+        <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci} garderInstantane={copieEnPanne}>
+        {ECRANS_COPIE.includes(tab)&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-copie"><CaptureCopie uid={uidInstantane} ecran={tab}/></GardeEcran>}
         {/* (14 nov., ouverture instantanée) Jamais de capture pendant une panne ou hors ligne : un écran lu à moitié
             (« — » partout) remplacerait le dernier instantané COMPLET (§4.2). */}
         {tab==='journee'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}

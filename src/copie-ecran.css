@@ -1,0 +1,28 @@
+/* (20 nov., affichage instantané) La copie d'un écran (src/CopieEcran.jsx) : à la place de l'écran vrai, inerte, datée. */
+.vrm-copie { position: relative; }
+.vrm-copie-contenu { pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* La mention : petite, grise, posée sur une ligne qui existe déjà (en-tête de groupe, ligne du grand titre) — rien ne saute. */
+.vrm-copie-mention {
+  position: absolute; right: 16px; z-index: 2; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 6px; max-width: 70%;
+  font: 400 13px/18px var(--n-police, -apple-system, system-ui, sans-serif); color: var(--n-encre-2, #6C6C70);
+  white-space: nowrap; opacity: 0; transition: opacity .2s ease;
+}
+.vrm-copie-mention.is-pose { opacity: 1; }
+.vrm-copie-mention > span:not(.vrm-copie-roue) { overflow: hidden; text-overflow: ellipsis; }
+.vrm-copie-roue {
+  box-sizing: border-box; flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent; opacity: .7;
+  animation: vrm-copie-tourne .9s linear infinite;
+}
+@keyframes vrm-copie-tourne { to { transform: rotate(360deg); } }
+.vrm-copie-reessayer {
+  appearance: none; -webkit-appearance: none; border: 0; background: none; padding: 12px 0; margin: -12px 0;
+  font: 600 13px/18px var(--n-police, -apple-system, system-ui, sans-serif); color: var(--n-accent, #0068D6); cursor: pointer;
+  min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-copie-roue { animation: vrm-copie-pouls 1.6s ease-in-out infinite alternate; border-right-color: currentColor; opacity: .35; }
+  @keyframes vrm-copie-pouls { to { opacity: .7; } }
+  .vrm-copie-mention { transition: none; }
+}

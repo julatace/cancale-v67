@@ -216,9 +216,12 @@ const apercuPossible = (() => {
     // n'est demandé et l'app part tout de suite, exactement comme avant (aucun délai pour un « non »).
     const q = window.location.search || '';
     const tab = /[?&]tab=([^&]*)/.exec(q);
-    if (tab && tab[1] !== 'journee') return false;
     const ls = window.localStorage;
-    return !!uid && ['vrm_journee_instantane:', 'vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid));
+    if (!uid || !['vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid))) return false;
+    // (20 nov., affichage instantané) La copie d'un écran (src/copieEcran.js), quel que soit l'écran qui s'ouvre.
+    if (ls.getItem('vrm_copie_index:' + uid.replace(/[^\w-]/g, '').slice(0, 64))) return true;
+    if (tab && tab[1] !== 'journee') return false;
+    return !!ls.getItem('vrm_journee_instantane:' + uid);
   } catch (_) { return false; }
 })();
 const apercuPeint = apercuPossible

@@ -43,5 +43,13 @@ export default {
   "achats.site.gesteLbc": "Open “Mes transactions” on leboncoin.fr, with the extension.",
   "achats.site.gesteVc": "Open “My orders” on Vestiaire, with the extension.",
   "ebay.recherches.titre": "eBay searches and alerts",
-  "ebay.recherches.compte": "eBay accounts and settings"
+  "ebay.recherches.compte": "eBay accounts and settings",
+  "natif.copie.misAJour": "Updated {age}",
+  "natif.copie.instant": "just now",
+  "natif.copie.minutes": {"one": "{n} min ago", "other": "{n} min ago"},
+  "natif.copie.heures": {"one": "{n} h ago", "other": "{n} h ago"},
+  "natif.copie.miseAJour": "Updating…",
+  "natif.copie.pasAJour": "Not up to date",
+  "natif.copie.reessayer": "Try again",
+  "natif.copie.nom": "Last copy of this screen, updating"
 };
