@@ -155,6 +155,7 @@ async function v1v3() {
   const premier = it[ART2] && it[ART2].vueDepuis;
   dit(!!premier && it[ART2].misEnLigne === '' && Math.abs(Date.parse(premier) - Date.now()) < 60000, 'V2 · sans `listingDate` : aucune date « exacte », la 1re lecture pose la borne basse `vueDepuis`', it[ART2]);
   dit(it[ART3] && it[ART3].misEnLigne === '', 'V2 · une date dans le futur n’est jamais prise pour une date de mise en ligne', it[ART3]);
+  dit(!!post && post.items.find((x) => x.id === ART3).misEnLigne === '', 'V2 · … et dès la page : la date future ne sort pas du capteur', post && post.items.find((x) => x.id === ART3));
   // Une 2e lecture, plus tard : la borne basse ne bouge pas (elle ne recule jamais vers « maintenant »).
   const avant = it[ART2].vueDepuis;
   S.fond.lignes.vc_listings.items[ART2].vueDepuis = iso(Date.now() - 12 * J);
@@ -336,7 +337,7 @@ async function l2l3() {
   dit(S.envois.length === 2 && S.envois[0].texte !== S.envois[1].texte, 'L3 · jamais deux fois de suite le même texte', S.envois.map((e) => e.texte));
   const ec = S.ecarts;
   dit(ec.length === 2 && ec.every((ms) => ms >= 40000 && ms <= 90000 && ms % 1000 === 0) && ec[0] !== ec[1], 'L3 · 40 à 90 s tirées au hasard entre deux, jamais deux fois de suite la même valeur', ec);
-  dit(S.envois.length === 2 && S.envois[1].at - S.envois[0].at >= ec[0], 'L3 · le 2e message part APRÈS l’écart tiré (attente tenue)', { d: S.envois[1] && S.envois[1].at - S.envois[0].at, ec });
+  dit(S.envois.length === 2 && S.envois[1].at - S.envois[0].at >= ec[0] - 500, 'L3 · le 2e message part APRÈS l’écart tiré (attente tenue ; l’écart part de la mise en file, juste avant le 1er envoi)', { d: S.envois[1] && S.envois[1].at - S.envois[0].at, ec });
   dit(((S.f.store.vrmActions || {})['lbc:' + MOI_LBC] || []).length === 2, 'L3 · deux actions comptées sous le compte Leboncoin', S.f.store.vrmActions);
   r = await S.panneau({ action: 'ecrireInteressesLbc', annonce: AD, convs: [C1, C2], textes: t, confirme: true });
   dit(r && r.accepte === false && r.code === 'personne' && S.envois.length === 2, 'L3 · une 2e fois : personne n’est réécrit pour la même annonce', r);
