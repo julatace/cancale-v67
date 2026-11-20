@@ -87,6 +87,31 @@ UN sélecteur de plateforme global se pose en tête de chaque écran principal.
   Annonces, Achats, Messages suivent, S3 « Tous » = mêmes chiffres, S4 Leboncoin seul ⇒ aucun sélecteur, S5 aucun filtre
   local ; `MUTATION=local` rougit S2).
 
+## 2 ter. Annonces au téléphone, divisées par compte (Julien : « améliore le visuel », « divise par comptes »)
+
+- `src/natif/ecrans/annoncesComptes.js` (`groupesParCompte`) : UN groupe natif par compte (logo · pseudo, « N annonces »,
+  repliable — choix gardé sur l'appareil, `vrm_annonces_replis`) ; Vinted puis Leboncoin, eBay, Vestiaire ; dans un site,
+  le compte qui a le plus d'annonces d'abord ; une paire en ligne sur deux comptes est sous les deux ; une recherche ne
+  montre que les groupes qui ont un résultat. Le manque est dit UNE fois en tête du groupe (« 5 prix d'achat à compléter »,
+  rangée ambre qui ouvre Compléter). Au tableau (1512) : un intertitre par compte (`TableauTravail` prop `groupe`) ; une
+  action reçoit chaque article une fois.
+- La rangée : vignette 56, titre 2 lignes, plaque N° · taille (· sur N sites · acheté X € seulement s'il est su), prix à
+  droite, « mini X € » seulement s'il est su. Plus jamais « acheté — » ni « mini — » répétés (banc annonces-egalite P mis à
+  la règle).
+- « Actions » : un rond ⋯ (44) à côté de la recherche ; l'écran propre d'un site (« Tout l'écran Leboncoin ») vit dans
+  cette feuille ; sous la liste, seul le MANQUE (un site pas lu) — plus les limites techniques.
+- Téléphone : le plein est fixé en bas, 12 px au-dessus des onglets (`.n-page-contenu[data-n-avec-plein]`, posé par
+  `Page`) ; « Mis à jour à … » ne flotte plus ; Achats : « Ajouter » en rond 44 (le rond « + » dessinait un cercle vide :
+  `plus` ajouté aux traits de StudioVentes) ; le sélecteur est collant sous la barre du titre réduit.
+
+## 2 quater. Fusion de `claude/argent-natif` (10da06092)
+
+Un seul sélecteur : `src/natif/SelecteurSite.jsx` (le composant) + `src/siteCourant.js` (l'état, `vrm_site_courant`
+synchronisé). `useSiteCourant` est ré-exporté par SelecteurSite.jsx ; « tous » (l'écriture d'argent-natif) est lu
+« toutes ». Argent pose `SelecteurSiteCoque` (sites reliés) ; ses questions du mois, le Mois et la carte du bénéfice
+passent `siteCourantCoque(site)` à `valeurChiffre` (« Tous » = les chiffres de toujours). Statistiques, Déclarer et
+Factures n'ont pas de règle par site (la déclaration URSSAF porte sur toutes les ventes) : elles restent sur tous les sites.
+
 ## 3. Les preuves
 
 Voir le rapport de fin de lot (tableau avant / après, planches, bancs et audits). Fichiers de sortie hors dépôt.
