@@ -163,7 +163,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const hote = (() => { const a = APP.indexOf('function HotePublierAilleurs('); const b = APP.indexOf('\nfunction EntreePublierAilleurs(', a); return a < 0 || b < 0 ? '' : APP.slice(a, b); })();
   dit(!!hote && !/vmrCmd|appelEbay|fetch\([^)]*\/api\//.test(PAsrc + hote), 'B18 le parcours n’envoie rien : ni commande à l’extension, ni appel eBay (les moteurs existants publient)');
   dit(!/AgentEbay|agentEbay|ebay\.agent|autoPub/.test(PAsrc + hote), 'B19 l’agent eBay n’est pas réintroduit');
-  dit(/DEMANDE_LBC_FICHE\.id = id/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote) && /DEMANDE_VC_PAIRE\.id = id/.test(hote), 'B20 « Publier » ouvre le moteur existant sur CET article (fiche Leboncoin, formulaire eBay, ligne Vestiaire)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire : le panneau de l'extension sur CET article ; eBay : son formulaire.
+  dit(/if \(sx === 'leboncoin' \|\| sx === 'vestiaire'\) \{ ouvrirPanneau\(\{ site: sx, page: 'publier', ids: \[id\], action: 'publier' \}\)/.test(hote) && /DEMANDE_EBAY_PAIRE\.id = id/.test(hote), 'B20 « Publier » : Leboncoin / Vestiaire dans l’extension sur CET article, eBay dans son formulaire');
 
   // ── C. Relier un achat : les filtres ──
   const A = [

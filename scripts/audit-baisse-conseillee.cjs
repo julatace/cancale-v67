@@ -165,12 +165,13 @@ const MUTATIONS = [
   let ko = await controles(SRC, true);
   // H — l'app (lue en texte, commentaires retirés)
   const sans = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
-  const APP = sans(lire('src/App.jsx')), F = sans(lire('src/BaissesConseillees.jsx')), BPS = sans(lire('src/BaissePrixSerie.jsx'));
+  const APP = sans(lire('src/App.jsx')), F = sans(lire('src/BaissesConseillees.jsx')), BPS = '';   // (20 nov.) la feuille de baisse en série est retirée : la baisse se fait dans l'extension
   const dit = (c, m) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m); };
   dit(/baisseConseillee\(\{ conseil: c,/.test(APP) && /commeConseil\(d, tr\)/.test(APP), 'H1 la carte `conseilsPrix` (fiche, repricing, qui dorment) passe par la règle');
   dit(/cible: l\.d\.sugg/.test(APP) && /setBaisseSel\(l2\.map/.test(APP), 'H2 « Appliquer » ouvre la baisse en série EXISTANTE avec le prix conseillé');
   dit(F.length > 0 && !/vmrCmd|fetch\(|baisserPrixVinted/.test(F), 'H3 la feuille « Baisses conseillées » n\'envoie rien elle-même');
-  dit(/const cibles = annonces\.length > 0 && annonces\.every/.test(BPS) && /onBaisser\(l\)/.test(BPS), 'H4 la feuille de baisse garde SON chemin (une à la fois, son clic) avec les cibles');
+  void BPS;
+  dit(/<FeuilleAnnoncesExtension action="baisser" annonces=\{baisseSel\}/.test(APP) && /a\.cible != null \? '→ ' \+ prixLigneExt\(a\.cible\)/.test(APP), 'H4 (20 nov.) « Appliquer » montre les cibles et ouvre « Baisser dans l’extension » sur ces annonces');
   dit(/lireExtrasRepartition\(\)/.test(APP) && /indexComparables\(ventesComparablesDuReleve\(/.test(APP), 'H5 les comparables viennent de SES ventes (la lecture partagée de Statistiques)');
   let koM = 0;
   if (PROUVE && fs.existsSync(path.join(SRC, 'baisseConseillee.js'))) {

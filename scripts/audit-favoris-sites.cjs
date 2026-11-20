@@ -401,7 +401,8 @@ async function a7() {
   dit(R.lignesAimes({ aimes: null }).lu === false && R.lignesAimes({ aimes: undefined }).pret === false, 'A7 · « pas lu » et « en cours » ne sont pas « personne »');
   const ecran = fs.readFileSync(F.ecran, 'utf8').replace(/\/\/[^\n]*/g, '');
   const appels = ecran.match(/envoyer\(\{[^}]*\}/g) || [];
-  dit(appels.length === 1 && /cmd: 'vcOffreAimes'/.test(appels[0]) && /const lancer = async \(\) => \{\n\s+if \(!pret \|\| cents == null \|\| enCours\) return;/.test(ecran) && /onClick=\{lancer\}/.test(ecran), 'A7 · l’écran n’envoie que sur SON toucher (« Envoyer l’offre »), et seulement prêt (recette apprise, extension à jour, montant valable)');
+  // (20 nov., décision de Julien) L'offre aux personnes qui aiment se fait dans le PANNEAU de l'extension : l'écran n'envoie rien.
+  dit(appels.length === 0 && /<BoutonExtension className="sb-touche avc-geste" action="favoris" site="vestiaire" ids=\{\[String\(x\.produit\)\]\}/.test(ecran), 'A7 · (20 nov.) l’écran n’envoie rien : « Écrire aux favoris dans l’extension » sur CET article');
   const VC = fs.readFileSync(path.join(racine, 'src/ecrans/Vestiaire.jsx'), 'utf8');
   dit(/<AimesVestiaire etat=\{lignesAimes\(/.test(VC) && /id=eq\.vc_aimes&select=produits:data->produits,envoi:data->envoi/.test(VC), 'A7 · Messages Vestiaire montre « Ont aimé tes articles » (des nombres, projetés)');
   const lbc = fs.readFileSync(F.lbc, 'utf8');

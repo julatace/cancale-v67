@@ -11,11 +11,16 @@
 // de baisse sur la rangée, le plein qui changeait de nom après un envoi. Après un
 // envoi la feuille se FERME si tout est fait ou en attente ; elle ne reste ouverte
 // que s'il y a quelque chose à lire (refus, pas sûr, hausse).
+// ⚠️⚠️ (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») Sur Vinted, Leboncoin et
+// Vestiaire la rangée d'un site OUVRE le panneau de l'extension sur CETTE annonce (« Changer le prix dans
+// l'extension ») : l'app n'envoie plus de baisse et n'en range plus. Seul eBay (API serveur, pas de panneau) se
+// coche et part par « Appliquer ». La baisse par règle se règle dans l'extension ; la feuille en dit l'état.
 // Disposition (« VRM natif », docs/design/NATIF.md) : une feuille, un champ, un groupe
 // de rangées (nom du site · « 59 € → 58 € » sur UNE ligne · l'état dessous), UN plein.
 import React from 'react';
-import { Feuille, Groupe, Rangee, Bouton, Vide, Attente, Segmente } from './natif/index.js';
-import { PALIERS_PCT, PALIERS_JOURS } from './reglesAuto.js';
+import { Feuille, Groupe, Rangee, Bouton, Vide, Attente } from './natif/index.js';
+import { RangeeExtension } from './BoutonExtension.jsx';
+import { lienPanneau, ouvrirPanneau, extensionIci } from './ouvrirPanneau.js';
 import { prixTape, minisAuDessus, NOM_SITE, toutEstDit } from './prixPartout.js';
 import { commandeCourante } from './prixAttente.js';
 import { tr } from './i18n/index.js';
@@ -71,7 +76,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const champPrixRef = React.useRef(null);
   React.useEffect(() => { if (!focusPrix) return undefined; const t = setTimeout(() => { try { if (champPrixRef.current) champPrixRef.current.focus(); } catch (_) {} }, 120); return () => clearTimeout(t); }, [focusPrix]);
   const [prix, setPrix] = React.useState('');
-  const [coches, setCoches] = React.useState(() => new Set(sites.map((s) => s.cle)));
+  const [coches, setCoches] = React.useState(() => new Set(sites.filter((s) => s.site === 'ebay').map((s) => s.cle)));
   const [etats, setEtats] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
   const [annule, setAnnule] = React.useState(null);     // la commande qu'il annule (un toucher, pas deux)
@@ -80,7 +85,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     const neufs = sites.filter((s) => !vus.current.has(s.cle));
     if (!neufs.length) return;
     neufs.forEach((s) => vus.current.add(s.cle));
-    setCoches((c) => { const n = new Set(c); neufs.forEach((s) => n.add(s.cle)); return n; });
+    setCoches((c) => { const n = new Set(c); neufs.filter((s) => s.site === 'ebay').forEach((s) => n.add(s.cle)); return n; });
   }, [sites]);
   const p = prixTape(prix);
   const minis = minisAuDessus(sites, p);
@@ -121,9 +126,22 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   if (typeof document === 'undefined') return null;
   const fermer = () => { if (!enCours) onFermer(); };
   const aAnnuler = [];   // les baisses qui attendent : « Annuler » sous le groupe (jamais un bouton DANS une rangée)
+  const phraseExt = extensionIci() ? '' : tr('actionsExt.phrase', { site: NOM_SITE.vinted });
   const rangees = sites.map((s) => {
     const e = etatDe(s);
     const ph = phrase(e, s, compteDe);
+    if (s.site !== 'ebay') {
+      // Vinted, Leboncoin, Vestiaire : le prix lu, l'état d'une baisse rangée plus tôt (lecture), et LE lien du panneau.
+      const cible = { site: s.site, page: 'prix', ids: [s.id], action: 'changer' };
+      const url = lienPanneau(cible);
+      if (ph && ph.annuler && onAnnuler) aAnnuler.push({ s, e });
+      const sousExt = <span className="pp-etat is-calme">{[ph ? ph.texte : '', tr('actionsExt.changerPrix'), s.site === 'vinted' ? phraseExt : (extensionIci() ? '' : tr('actionsExt.phrase', { site: NOM_SITE[s.site] }))].filter(Boolean).join(' · ')}</span>;
+      return (
+        <Rangee key={s.cle} titre={<span className="pp-site">{NOM_SITE[s.site]}</span>} valeur={<span className="pp-prix" data-prix-ligne="">{eur(s.prix)}</span>} sousTitre={sousExt} sousLignes={2}
+          fin="chevron" onClick={() => ouvrirPanneau(cible)} className="pp-rangee"
+          attrs={{ 'data-prix-site': s.site, 'data-prix-cle': s.cle, 'data-prix-mode': 'extension', 'data-prix-etat': e && !e.avant ? e.etat : '', 'data-vrm-panneau': 'changerPrix', 'data-vrm-panneau-site': s.site, 'data-vrm-panneau-lien': url }}/>
+      );
+    }
     const coche = coches.has(s.cle);
     const cible = p == null ? null : (prixDe ? prixDe(s.site, p) : p);
     const change = coche && cible != null && s.prix != null && Math.round(cible * 100) !== Math.round(s.prix * 100);
@@ -143,17 +161,18 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
     );
   });
   const raison = p == null ? tr('prixPartout.raisonPrix') : !nCoches ? tr('prixPartout.raisonSite') : '';
+  const aEbay = sites.some((s) => s.site === 'ebay');
   return (
     <Feuille ouverte onFermer={fermer} titre={tr('prixPartout.aria', { num })} className="pp-feuille" attrs={{ 'data-prix-partout': num }}
-      pied={<Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquer')}</Bouton>}>
-      <label className="pp-champ">
+      pied={aEbay ? <Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquerEbay')}</Bouton> : null}>
+      {aEbay ? <label className="pp-champ">
         <span>{tr('prixPartout.nouveau')}</span>
         <span className="pp-champ-saisie">
           <input ref={champPrixRef} inputMode="decimal" autoComplete="off" autoFocus={focusPrix || undefined} enterKeyHint="done" value={prix} onChange={(e) => { setPrix(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); appliquer(); } }}
             disabled={enCours} data-prix-champ="" aria-invalid={prix !== '' && p == null ? 'true' : undefined}/>
           <b aria-hidden="true">€</b>
         </span>
-      </label>
+      </label> : null}
       {lecture && !sites.length ? <Attente forme="rangees" n={2}/> : (
         <Groupe attrs={{ 'data-prix-sites': sites.length }}>
           {rangees}
@@ -169,18 +188,13 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
       {!lecture && !sites.length && !manques.length ? <div data-prix-aucun=""><Vide phrase={tr('prixPartout.aucune')}/></div> : null}
       {/* (19 nov., décision 1 de Julien) LA BAISSE PAR RÈGLE, par compte Vinted de ce N° : éteinte par défaut ;
           l'extension l'applique seule, dans ses plafonds (src/reglesAuto.js, background.js `regleBaisseTick`). */}
-      {Array.isArray(regles) && regles.length && onRegle ? regles.map((r) => (
-        <Groupe key={'r' + r.uid} titre={tr('prixPartout.regle.titre')} pied={r.actif ? tr('prixPartout.regle.pied') : ''} attrs={{ 'data-prix-regle': r.uid, 'data-prix-regle-actif': r.actif ? '1' : '0' }}>
-          <Rangee titre={tr('prixPartout.regle.compte', { compte: r.nom || r.uid })} sousTitre={r.actif ? tr('prixPartout.regle.resume', { pct: r.pct, jours: r.jours }) : tr('prixPartout.regle.eteinte')} sousLignes={2}
-            interrupteur={{ actif: r.actif, onChange: (v) => onRegle(r.uid, { actif: !!v }), attrs: { 'data-prix-regle-interrupteur': r.uid } }}/>
-          {r.actif ? (
-            <div className="pp-regle-choix">
-              <Segmente libelle={tr('prixPartout.regle.pct')} valeur={String(r.pct)} onChange={(c) => onRegle(r.uid, { pct: Number(c) })} options={PALIERS_PCT.map((n) => ({ cle: String(n), libelle: '−' + n + '\u00a0%' }))}/>
-              <Segmente libelle={tr('prixPartout.regle.jours')} valeur={String(r.jours)} onChange={(c) => onRegle(r.uid, { jours: Number(c) })} options={PALIERS_JOURS.map((n) => ({ cle: String(n), libelle: tr('prixPartout.regle.joursOpt', { n }) }))}/>
-            </div>
-          ) : null}
+      {Array.isArray(regles) && regles.length ? (
+        <Groupe titre={tr('prixPartout.regle.titre')} attrs={{ 'data-prix-regles': regles.length }}>
+          {regles.map((r) => <Rangee key={'r' + r.uid} titre={tr('prixPartout.regle.compte', { compte: r.nom || r.uid })} sousTitre={r.actif ? tr('prixPartout.regle.resume', { pct: r.pct, jours: r.jours }) : tr('prixPartout.regle.eteinte')} sousLignes={2}
+            attrs={{ 'data-prix-regle': r.uid, 'data-prix-regle-actif': r.actif ? '1' : '0' }}/>)}
+          <RangeeExtension action="automatisations" site={String(regles[0].uid).startsWith('lbc:') ? 'leboncoin' : 'vinted'} ids={regles.map((r) => String(r.uid))}/>
         </Groupe>
-      )) : null}
+      ) : null}
       {minis.map((m) => <p key={m.cle} className="pp-mini" data-prix-mini={m.mini}>{tr('prixPartout.mini', { prix: eur(m.mini) })}</p>)}
     </Feuille>
   );

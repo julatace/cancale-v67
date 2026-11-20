@@ -305,14 +305,14 @@ function fond(seed, local0, opts = {}) {
     dit(!rc || !!rc.refus, 'le relais du téléphone ne la transporte pas (liste blanche inchangée)', JSON.stringify(rc));
   });
 
-  console.log('\n── 3. L’APP : LA CONFIRMATION « SANS RETOUR » AVANT TOUT ENVOI');
+  // (20 nov., décision de Julien) Supprimer se fait dans le PANNEAU de l'extension (qui demande la confirmation « sans retour » ;
+  // l'extension exige `confirme`, vérifié plus haut) : l'app ne fait qu'ouvrir le lien, sur l'annonce désignée par identité.
+  console.log('\n── 3. L’APP : SUPPRIMER S’OUVRE DANS L’EXTENSION, RIEN N’EST ENVOYÉ D’ICI');
   await essaie('app', async () => {
-    const i = APP.indexOf('const supprimerSurLbc = async (r) => {');
-    const corpsF = i >= 0 ? APP.slice(i, APP.indexOf('\n  };', i)) : '';
-    const iConf = corpsF.indexOf('await askConfirm('), iEnvoi = corpsF.indexOf("cmd: 'lbcSupprime'");
-    dit(iConf > 0 && iEnvoi > iConf && /if \(!ok\) return;/.test(corpsF.slice(iConf, iEnvoi)), 'la confirmation est demandée AVANT l’envoi, et « Annuler » n’envoie rien');
-    dit(/sans retour/.test(corpsF) && /danger: true/.test(corpsF), 'elle dit « sans retour », en rouge');
-    dit(/confirme: true/.test(corpsF.slice(iEnvoi)), 'l’envoi porte la confirmation (l’extension la revérifie)');
+    const i = APP.indexOf('const supprimerSurLbc = (r) =>');
+    const corpsF = i >= 0 ? APP.slice(i, APP.indexOf('\n', i)) : '';
+    dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids: \[String\(r\.id\)\], action: 'supprimer' \}\)/.test(corpsF), 'supprimer ouvre le panneau sur CETTE annonce (par son identifiant)');
+    dit(!/cmd: 'lbcSupprime'/.test(APP), 'aucune suppression n’est envoyée de l’écran Leboncoin');
   });
 
   console.log('── Une notion, deux constantes : le plafond de suppressions par heure');

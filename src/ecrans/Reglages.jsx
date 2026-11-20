@@ -79,7 +79,9 @@ import { VeilleJournee } from '../VeilleJournee.jsx';   // (15 nov., refonte-jou
 import { SanteDonnees } from '../SanteDonnees.jsx';
 import HistoriqueVinted from '../ImportDepart.jsx';
 import HistoriqueSites from '../HistoriqueSites.jsx';   // (11 nov., lot import-historique-sites) Leboncoin, Vestiaire, eBay : la même carte (ext. 5.365)   // (11 nov., lot import-depart) l'historique Vinted, compte par compte (ext. 5.344)
-import ModeVacances from '../ModeVacances.jsx';   // (10 nov., lot O) le mode vacances, compte par compte (ext. 5.338)
+import { BoutonExtension } from '../BoutonExtension.jsx';
+import { lienPanneau, ouvrirPanneau } from '../ouvrirPanneau.js';
+import { automatisationsActives } from '../automatisationsEtat.js';   // (20 nov., décision de Julien) le mode vacances : dans l'extension
 import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
 import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
 import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
@@ -2147,7 +2149,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., lot O) Tous ses comptes en vacances puis rouverts, compte par compte, sur SON clic (src/ModeVacances.jsx).
       // (11 nov., lot securite-vinted) Julien : « faire comme Vintex, pour ne pas se faire bannir » — une phrase par compte, ses réglages, « Tout arrêter » (src/SecuriteComptes.jsx).
       { id:'securite-comptes', type:'panneau', ic:'sleep', lib:tr('reglages.securite.lib'), desc:tr('reglages.securite.desc'), data:{ 'data-reglage-securite-comptes':'' }, el:<SecuriteComptes comptes={comptes||[]}/> },
-      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<ModeVacances comptes={comptes||[]}/> },
+      { id:'vacances', type:'panneau', ic:'sun', lib:tr('reglages.vacances.lib'), desc:tr('reglages.vacances.desc'), data:{ 'data-reglage-vacances':'' }, el:<div data-vacances-panneau="" style={{ padding: '8px 0' }}><BoutonExtension action="vacances" large/></div> },
       // (12 nov., ext. 5.370) La discrétion : plafond par jour, vérification demandée par Vinted, freins des 7 jours (src/Discretion.jsx).
       { id:'discretion', type:'panneau', ic:'pin', lib:tr('reglages.discretion.lib'), desc:tr('reglages.discretion.desc'), data:{ 'data-reglage-discretion':'' }, el:<PanneauDiscretion uids={(comptes||[]).map((a) => String((a && a.vinted_user_id) || '')).filter(Boolean)} nomCompte={(u) => { const a = (comptes||[]).find((x) => String(x && x.vinted_user_id) === String(u)); return (a && (a.label || a.login)) || null; }}/> },
       // (12 nov., sécurité des comptes) Un zip par compte Vinted, fait dans le navigateur, envoyé nulle part (src/CopieAnnonces.jsx).
@@ -2509,7 +2511,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   };
   // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
   // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
-  const allerAutomatisations = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=automatisations' })); } catch (_) {} };
+  const allerAutomatisations = () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' });   // (20 nov.) dans l'extension
   const rangeeCatV2 = (c) => {
     const pl = c.id === 'compte' ? (reglePlanCourante() || {}).plan : null;
     const v = c.id === 'compte' ? (pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : null) : c.id === 'securite-donnees' ? valeurCat({ ...c, id: 'donnees' }) : valeurCat(c);
@@ -2620,9 +2622,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
               <div data-categories-reglages="" data-onglets-reglages="">
                 <div className="v2-pm-liste" data-v2-pm-sections={catsV2.length}>{catsV2.map(rangeeCatV2)}</div>
-                {/* (19 nov. soir) Automatisations : l'écran des automatismes (src/automatisations/), hors des dix catégories. */}
-                <div className="v2-pm-liste" data-auto-entree=""><RangeeTouchable className="v2-pm-rangee" onClick={allerAutomatisations} attrs={{ 'data-auto-ouvrir': '' }}>
-                  <span className="v2-pm-ic" aria-hidden="true"><Icon name="spark" size={18}/></span><span className="v2-pm-lib">{tr('auto.titre')}</span><span className="v2-pm-chev" aria-hidden="true">{chevron}</span></RangeeTouchable></div>
+                {/* (20 nov., précision de Julien : « les automatisations … plutôt dans l'extension ») L'écran de l'app est retiré :
+                    UNE rangée qui ouvre le panneau de l'extension (page automatisations), l'état lu à droite. */}
+                <div className="v2-pm-liste" data-auto-entree=""><RangeeTouchable className="v2-pm-rangee" onClick={allerAutomatisations} attrs={{ 'data-auto-ouvrir': '', 'data-vrm-panneau': 'automatisations', 'data-vrm-panneau-site': 'vinted', 'data-vrm-panneau-lien': lienPanneau({ site: 'vinted', page: 'automatisations' }) }}>
+                  <span className="v2-pm-ic" aria-hidden="true"><Icon name="spark" size={18}/></span><span className="v2-pm-lib">{tr('actionsExt.autoRangee')}</span>
+                  <span className="v2-pm-val" data-auto-actives={String(automatisationsActives(load))}>{tr('actionsExt.autoActives', { n: automatisationsActives(load) })}</span><span className="v2-pm-chev" aria-hidden="true">{chevron}</span></RangeeTouchable></div>
               </div>
             </section>
             ) :

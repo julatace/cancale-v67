@@ -119,15 +119,14 @@ async function controles(fichier, parler) {
 function cablage(parler) {
   let ko = 0;
   const dit = (c, m) => { if (!c) ko++; if (parler) console.log((c ? '✅ ' : '❌ ') + m); };
-  const fv = lire('src/FavorisVinted.jsx').replace(/\/\/[^\n]*/g, '');
-  const fe = lire('src/FavorisEtapes.jsx').replace(/\/\/[^\n]*/g, '');
+  // (20 nov., décision de Julien) Les messages aux favoris (« très aimées, pas vendues » compris) se font dans le PANNEAU de
+  // l'extension : l'écran de l'app (FavorisVinted, FavorisSansVente, FavorisEtapes) est retiré ; la RÈGLE reste
+  // (src/favorisSansVente.js, jugée plus haut) pour l'extension. L'app : un bloc qui ouvre le panneau, rien n'est envoyé.
+  const fs2 = require('fs'), p2 = require('path');
   const app = lire('src/App.jsx');
-  dit(/<FavorisSansVente\b/.test(fv) && /sansVente=\{sansVente\}/.test(fv) && /\{p\.sansVente \|\| null\}\{qui\}/.test(fe), 'H1 la liste est RENDUE sur la page des favoris (avant « Qui »)');
-  const prop = (/const proposerSv=\(a,o,ids\)=>\{([\s\S]*?)\n  \};/.exec(fv) || [])[1] || '';
-  dit(prop && /setChoisis\(ids\)/.test(prop) && /setReduction\(String\(o\.pct\)\)/.test(prop) && !/lancer|moteur|envoyer\(/.test(prop), 'H2 le geste pré-remplit (favoris + −x %) et ne lance RIEN');
-  dit(/selectionnable/.test(prop), 'H3 le geste n’agit qu’au nom du compte de l’onglet');
-  dit(/sousPlancherAchat\(recapAnnonces,origines\)\.length\)return;/.test(fv) && /&& !p\.refus/.test(fe), 'H4 « Envoyer » refusé sous l’achat + 10 % pour une annonce venue d’ici');
-  dit(/jours:it\?listedAgeDays\(it\):null,achat:prixAchatDe\(fiche,buyByNum\)/.test(app), 'H5 l’app passe les jours en ligne LUS et le prix d’achat SAISI (par identité)');
+  dit(!fs2.existsSync(p2.join(__dirname, '..', 'src', 'FavorisVinted.jsx')) && !fs2.existsSync(p2.join(__dirname, '..', 'src', 'FavorisSansVente.jsx')), 'H1 (20 nov.) l’écran des favoris de l’app est retiré');
+  dit(/<FavorisDansExtension nomCompte=/.test(app) && /<RangeeExtension action="favoris"/.test(app), 'H2 (20 nov.) la zone Favoris ouvre « Écrire aux favoris dans l’extension »');
+  dit(!/endpoint:'\/vrm\/favoris'/.test(app), 'H3 (20 nov.) l’app n’envoie aucun message aux favoris');
   return ko;
 }
 
