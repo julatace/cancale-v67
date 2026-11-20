@@ -64986,7 +64986,17 @@ function AppCoeur() {
     if (s === 'toutes' || sitesRelies.includes(s)) poserSiteCourant(s);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platSub]);
-  SITES_RELIES_COQUE.v = sitesRelies; poserSitesRelies(sitesRelies);
+  // (20 nov. soir) Les sites reliés de la DERNIÈRE lecture, gardés sur l'appareil par compte VRM (`vrm_sites_relies:{uid}`, effacé
+  // avec les données locales) : les pastilles s'affichent tout de suite (copie instantanée), puis suivent la lecture vraie.
+  const reliesLus = accountsLoaded && sitesLus !== undefined;
+  const cleRelies = 'vrm_sites_relies:' + String(AUTH.user?.id || '');
+  const reliesVus = useMemo(() => {
+    if (reliesLus) return sitesRelies;
+    try { const v = JSON.parse(localStorage.getItem(cleRelies) || 'null'); if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v; } catch (_) {}
+    return sitesRelies;
+  }, [reliesLus, sitesRelies, cleRelies]);
+  React.useEffect(() => { if (!reliesLus || !AUTH.user?.id) return; try { localStorage.setItem(cleRelies, JSON.stringify(sitesRelies)); } catch (_) {} }, [reliesLus, sitesRelies, cleRelies]);
+  SITES_RELIES_COQUE.v = reliesVus; poserSitesRelies(reliesVus);
   // (20 nov.) « Plus › eBay » : ce qu'eBay a en propre — ses comptes et réglages, ses recherches et alertes (sorties d'Achats).
   const [ebayRecherches, setEbayRecherches] = useState(false);
   React.useEffect(() => { const f = () => setEbayRecherches(true); window.addEventListener('vrm:ebay-recherches', f); return () => window.removeEventListener('vrm:ebay-recherches', f); }, []);
