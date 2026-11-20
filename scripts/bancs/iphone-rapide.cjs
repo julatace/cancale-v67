@@ -268,11 +268,17 @@ async function onglets(pg, cdp) {
 
 // ── Le défilement : un balayage tactile synthétisé (CDP), images par seconde et tâches longues ──
 async function defiler(pg, cdp, id) {
-  await pg.locator(`[data-n-onglet="${CLE(id)}"]`).first().tap({ timeout: 30000 }); await attendre(3000);
+  // L'écran ouvert directement (ouverture suivante, service worker) : aucune feuille ni recherche restée d'une étape d'avant.
+  await pg.goto(`http://localhost:${PORT}/?tab=${id}`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForFunction((x) => { const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === x; }, id, { timeout: 60000 }).catch(() => {});
+  // Le CALME d'abord : plus aucune tâche longue depuis 3 s (au plus 60 s) — sinon on mesurerait la fin du chargement, pas le défilement.
+  await pg.evaluate(() => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > 3000 || performance.now() - t0 > 60000) { clearInterval(iv); ok(); } }, 250); }));
   await pg.evaluate(() => { window.__vrmImages = []; window.__vrmLongues = []; const boucle = (t) => { window.__vrmImages.push(t); window.__vrmRaf = requestAnimationFrame(boucle); }; window.__vrmRaf = requestAnimationFrame(boucle);
     try { window.__vrmObsL = new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__vrmLongues.push(Math.round(e.duration)); }); window.__vrmObsL.observe({ type: 'longtask' }); } catch (_) {} });
   const t0 = Date.now();
-  for (let i = 0; i < 6; i++) await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 600, yDistance: -1400, speed: 1600, gestureSourceType: 'touch', repeatCount: 1 });
+  // Le geste (CDP) : 6 balayages — « mouse » par défaut (le geste « touch » synthétisé ne fait pas défiler la coque native
+  // sous Chromium émulé : 0 px mesuré) ; vers le bas, 1 400 px chacun à 1 600 px/s (un pouce rapide).
+  for (let i = 0; i < 6; i++) await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 560, yDistance: -1400, speed: 1600, gestureSourceType: process.env.GESTE || 'mouse', repeatCount: 1, preventFling: false });
   const duree = Date.now() - t0;
   const r = await pg.evaluate(() => { cancelAnimationFrame(window.__vrmRaf); try { window.__vrmObsL.disconnect(); } catch (_) {} const im = window.__vrmImages; const ecarts = im.slice(1).map((t, i) => t - im[i]);
     let haut = window.scrollY; for (const e of document.querySelectorAll('*')) if (e.scrollTop > haut) haut = e.scrollTop; return { images: im.length, duree: im.length > 1 ? im[im.length - 1] - im[0] : 0, pireImage: ecarts.length ? Math.round(Math.max(...ecarts)) : 0, saccades: ecarts.filter((x) => x > 50).length, longues: window.__vrmLongues, haut: Math.round(haut), noeuds: document.getElementsByTagName('*').length }; });
@@ -303,7 +309,7 @@ async function defiler(pg, cdp, id) {
     const chaud = await ouvrirApp(ctx, 'chaud 2'); dire(chaud.r);
     sortie.demarrage = { froid: froid.r, chaud1: chaud1.r, chaud2: chaud.r };
     if (ETAPES.includes('onglets')) { console.log('Changements d\'onglet (temps de fil, CPU ×' + CPU + ')'); sortie.onglets = await onglets(chaud.pg, chaud.cdp); }
-    if (ETAPES.includes('defilement')) { console.log('Défilement'); sortie.defilement = [await defiler(chaud.pg, chaud.cdp, 'annonces'), await defiler(chaud.pg, chaud.cdp, 'ventes'), await defiler(chaud.pg, chaud.cdp, 'achats')]; }
+    if (ETAPES.includes('defilement')) { console.log('Défilement'); sortie.defilement = []; for (const id of ['annonces', 'ventes', 'achats']) { try { sortie.defilement.push(await defiler(chaud.pg, chaud.cdp, id)); } catch (e) { console.log(`  défilement ${id} : pas mesuré (${String(e.message || e).split('\n')[0].slice(0, 100)})`); } } }
     sortie.memoireFin = await memoire(chaud.cdp);
     await ctx.close();
   } finally { await nav.close(); srv.close(); }
