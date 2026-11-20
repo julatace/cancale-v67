@@ -80,6 +80,7 @@
   .n-rp-qr:active { filter: brightness(.95); }
   .n-rp-qr:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   @container (min-width: 560px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
+  @media (min-width: 1024px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
 
   /* La barre du trajet : cinq étapes, la courante en accent, une étape non lue grise (aucune date). */
   .n-rp-trajet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }

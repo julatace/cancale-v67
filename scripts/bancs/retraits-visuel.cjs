@@ -15,6 +15,14 @@ require('./_porte-banc.cjs');
 //    L  à l'ordinateur (≥ 1024) deux colonnes de cartes ;
 //    G  cibles ≥ 44, rien ne déborde, rien sous la barre d'onglets, aucun « Relier » ;
 //    V  base vide : « Rien à retirer » et son illustration.
+//  (20 nov., suite — Julien) :
+//    T  la BARRE DU TRAJET de chaque colis : Payé · Expédié · En transit · Au point · Retiré, une étape allumée
+//       seulement par SA date lue (évènements Mondial Relay du n°, e-mail « en route », date de la commande reliée,
+//       arrivée) ; la courante en accent ; une étape non lue est grise, sans date ;
+//    D  RÉTENTION : un colis à la date limite DÉPASSÉE reste dans la carte de son point (« date limite dépassée · à
+//       vérifier »), code et QR visibles, hors du compte ; un colis RETOURNÉ à l'expéditeur (e-mail « retour ») et un
+//       achat ANNULÉ (commande reliée par son n°) en sortent — par preuve seulement ;
+//    Q  le QR À DROITE du code, grande vignette nette sur fond blanc ; le toucher ouvre le QR en grand.
 //  `SHOTS=dossier` garde les captures (regarde-les). Un banc ne meurt pas, il rapporte.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -58,7 +66,14 @@ const POINTS = [
   ['87100021', 'chronopost', '801234', 'LA BOUTIQUE TEST, 1 PLACE DU TEST, 29000 QUIMPER', 9, false, false, false],
   ['87100022', 'chronopost', '802345', 'LA BOUTIQUE TEST, 1 PLACE DU TEST, 29000 QUIMPER', 9, false, false, false],
 ];
-const CODES = POINTS.map((x) => x[2]).filter(Boolean);
+// (20 nov.) Les cas de rétention, à des points déjà là : [suivi, transporteur, code, lieu, limite (jours), qr, cas]
+const RETENTION = [
+  ['87100031', 'mondialrelay', '931931', 'TABAC DE LA GARE, 3 RUE EXEMPLE, 22100 DINAN', -2, true, 'depasse'],
+  ['87100041', 'mondialrelay', '941941', 'INTERMARCHE TEST, ZA DU TEST, 11111 VILLETEST', 3, false, 'retourne'],
+  ['87100051', 'mondialrelay', '951951', 'INTERMARCHE TEST, ZA DU TEST, 11111 VILLETEST', 3, false, 'annule'],
+];
+const CODES = POINTS.filter((x) => x[2]).map((x) => x[2]);
+const CODE_DEPASSE = '931931', CODES_FINIS = ['941941', '951951'];
 function baseRV() {
   const b = base();
   const uid = b.accounts[0].vinted_user_id;
@@ -76,6 +91,28 @@ function baseRV() {
         etapes: [{ t: 'Disponible pour retrait', at: iso(-5 * 3600000), code: 'available_for_pickup' }], dernier: { t: 'Disponible pour retrait', at: iso(-5 * 3600000), code: 'available_for_pickup' } } });
     }
   }
+  // (20 nov.) LE TRAJET : le colis 87100001 (relié) a ses évènements Mondial Relay (remis, en route, disponible) ;
+  // le 87100013 (relié) un e-mail « en route » seulement ; les autres n'ont que leur arrivée.
+  b.rows.push({ id: 'transp_mondialrelay_87100001', data: { v: 1, suivi: '87100001', carrier: 'mondialrelay', etat: 'disponible', detail: null, etatAt: iso(-5 * 3600000), lu: iso(-60000), source: 'serveur', fini: false,
+    libelle: 'Colis disponible au point de retrait', lieuNom: '', lieuRue: '', lieuCp: '', lieuVille: '', limite: null, limiteSure: false,
+    evenements: [{ at: iso(-2.5 * J), code: '', libelle: 'Colis remis à Mondial Relay', lieu: '', cp: '' }, { at: iso(-1.5 * J), code: '', libelle: 'Colis en route vers le point de livraison', lieu: '', cp: '' },
+      { at: iso(-5 * 3600000), code: '', libelle: 'Colis disponible au point de retrait', lieu: '', cp: '' }] } });
+  b.rows.push({ id: 'email_track_vinted_87100013', data: { type: 'suivi', carrier: 'vinted', suivi: '87100013', status: 'transit', statusLabel: 'En route', subject: 'Ton colis 87100013 est en route', receivedAt: iso(-2 * J), emailAt: iso(-2 * J), code: null, lieu: null, account: '' } });
+  // LA RÉTENTION : dépassé (reste, code + QR) · retourné (e-mail « retour » du même n°) · annulé (commande reliée par son n°).
+  for (const [suivi, carrier, code, lieu, jl, qr, cas] of RETENTION) {
+    b.rows.push({ id: `email_track_${carrier}_${suivi}`, data: { type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: `Votre colis ${suivi} est disponible`,
+      receivedAt: iso(-6 * J), emailAt: iso(-6 * J), arriveLe: iso(-6 * J), code, code2: null, artTitle: `Paire ${suivi.slice(-3)}`, lieu, limite: jour(jl), consigne: false,
+      ...(qr ? { qrB64: pngInvente(Number(suivi.slice(-2)) || 7), qrType: 'image/png' } : {}), account: '' } });
+    if (cas === 'retourne') b.rows.push({ id: `email_track_vinted_${suivi}`, data: { type: 'suivi', carrier: 'vinted', suivi, status: 'retour', statusLabel: 'Retourné à l’expéditeur', subject: `Ton colis ${suivi} retourne chez l’expéditeur`,
+      receivedAt: iso(-3600000), emailAt: iso(-3600000), code: null, lieu: null, account: '' } });
+    if (cas === 'annule' && achats && achats.payload) {
+      const t = tx++;
+      achats.payload.my_orders.unshift({ transaction_id: t, conversation_id: 900000000 + t, title: `Paire annulée ${suivi.slice(-3)}`, price: { amount: '50.0', currency_code: 'EUR' },
+        status: 'Commande annulée', date: iso(-8 * J), photo: { url: `https://images1.vinted.net/t/r${t}/f800/p.jpeg` }, transaction_user_status: 'completed' });
+      b.rows.push({ id: `harvest_${uid}_suivi_${t}`, data: { n: 1, v: 1, tx: String(t), suivi, source: 'journey', capturedAt: iso(-60000), transporteur: carrier,
+        etapes: [{ t: 'Commande annulée', at: iso(-3600000), code: '' }], dernier: { t: 'Commande annulée', at: iso(-3600000), code: '' } } });
+    }
+  }
   return b;
 }
 function baseVide() {
@@ -91,16 +128,29 @@ async function releve(pg) {
       rebours: (c.querySelector('[data-rp-rebours]') || { getAttribute: () => '' }).getAttribute('data-rp-rebours'), codes: q('[data-rp-code-grand]', c).map((e) => e.textContent.trim()),
       qr: q('[data-rp-qr]', c).length, pasLu: q('[data-rp-sans-code]', c).length, photos: q('[data-rp-photo="1"]', c).length, prix: q('[data-rp-prix]', c).length,
       itin: !!c.querySelector('[data-rp-itineraire]'), transp: (c.querySelector('[data-rp-transp]') || { getAttribute: () => '' }).getAttribute('data-rp-transp'), copier: q('[data-rp-copier]', c).length,
-      gauche: Math.round(c.getBoundingClientRect().left) }));
+      gauche: Math.round(c.getBoundingClientRect().left), verifN: Number(c.getAttribute('data-rp-verif-n') || 0) }));
+    // (20 nov.) Chaque colis : sa mention « à vérifier », son trajet, la place du QR par rapport au code, le code sur UNE ligne.
+    const colis = q('[data-rp-colis]').map((li) => {
+      const code = li.querySelector('[data-rp-code-grand]'); const qrE = li.querySelector('[data-rp-qr]');
+      const cb = code ? code.getBoundingClientRect() : null; const qb = qrE ? qrE.getBoundingClientRect() : null;
+      const fs = code ? parseFloat(getComputedStyle(code).fontSize) : 0;
+      return { cle: li.getAttribute('data-rp-colis'), code: li.getAttribute('data-rp-code'), verif: li.getAttribute('data-rp-verif') || '', mention: (li.querySelector('[data-rp-verif-mention]') || {}).textContent || '',
+        trajet: q('[data-rp-etape]', li).map((e) => ({ cle: e.getAttribute('data-rp-etape'), lue: e.getAttribute('data-rp-etape-lue') === '1', courante: e.getAttribute('data-rp-etape-courante') === '1',
+          date: (e.querySelector('.n-rp-etape-date') || {}).textContent || '', point: getComputedStyle(e.querySelector('.n-rp-etape-point')).backgroundColor })),
+        unLigne: !cb || cb.height < fs * 1.6, deborde: !!code && code.scrollWidth > code.clientWidth + 1,
+        qr: qb ? { w: Math.round(qb.width), h: Math.round(qb.height), gauche: Math.round(qb.left), codeDroite: cb ? Math.round(cb.right) : null, fond: getComputedStyle(qrE).backgroundColor,
+          img: (() => { const im = qrE.querySelector('img'); return im ? Math.round(im.getBoundingClientRect().width) : 0; })() } : null };
+    });
     const r = document.querySelector('[data-rp-resume]');
     const resume = r ? { colis: Number((r.querySelector('[data-rp-resume-colis]') || { getAttribute: () => -1 }).getAttribute('data-rp-resume-colis')), points: Number((r.querySelector('[data-rp-resume-points]') || { getAttribute: () => -1 }).getAttribute('data-rp-resume-points')),
-      urgents: Number((r.querySelector('[data-rp-resume-urgents]') || { getAttribute: () => 0 }).getAttribute('data-rp-resume-urgents')), texte: r.querySelector('.n-rp-resume-ligne').textContent, plan: q('[data-rp-plan-point]', r).length } : null;
+      urgents: Number((r.querySelector('[data-rp-resume-urgents]') || { getAttribute: () => 0 }).getAttribute('data-rp-resume-urgents')), verif: Number((r.querySelector('[data-rp-resume-verif]') || { getAttribute: () => 0 }).getAttribute('data-rp-resume-verif')), texte: r.querySelector('.n-rp-resume-ligne').textContent, plan: q('[data-rp-plan-point]', r).length } : null;
     // Cibles et débordements, dans la vue (rien sous la barre d'onglets : jugé sur ce qui est visible).
     const W = innerWidth;
     const petits = q('.n-rp button, .n-rp a').filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.height < 43.5 || b.width < 43.5); }).map((e) => e.textContent.trim().slice(0, 20) + ':' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
     const deborde = q('.n-rp *').filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.right > W + 1 || b.left < -1); }).map((e) => e.className).slice(0, 5);
     const relier = q('.n-rp button, .n-rp a').filter((e) => /relier/i.test(e.textContent)).length;
-    return { cartes, resume, petits, deborde, relier, vide: !!document.querySelector('[data-rp-vide]') };
+    const det = document.querySelector('[data-v2-detail-retraits]');
+    return { cartes, colis, resume, petits, deborde, relier, vide: !!document.querySelector('[data-rp-vide]'), detail87100012: !!det && det.innerHTML.includes('87100012') };
   });
 }
 // L'écran d'aujourd'hui (le garde-réseau des bancs pose sinon l'échafaudage du DOM d'avant, `vrm_banc_dom_ancien`).
@@ -116,29 +166,54 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const { ctx, pg, erreurs, tel } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
   if (H || W === 1280) await pg.setViewportSize({ width: W === 1512 || W === 1280 ? W : 390, height: H || 900 });
   await allumer(pg);
-  const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 15);
+  const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 14 && x.colis.some((c) => c.verif === 'depasse'));
   await pg.waitForTimeout(1500);
+  const r2 = await releve(pg); Object.assign(r, r2);
   const th = `${nom} ${sombre ? 'sombre' : 'clair'}`;
-  const nC = r.cartes.reduce((t, c) => t + c.n, 0);
-  dit(r.cartes.length === 6 && nC === 15, `C ${th} : 6 cartes, 15 colis`, r.cartes.map((c) => c.nom + ':' + c.n));
-  dit(!!r.resume && r.resume.colis === 15 && r.resume.points === 6 && r.resume.plan === 6, `R ${th} : la bande dit 15 colis · 6 points, le plan nomme les 6`, r.resume);
-  const urg = POINTS.filter((x) => x[4] <= 1).length;
+  const nC = r.cartes.reduce((t, c) => t + c.n, 0), nV = r.cartes.reduce((t, c) => t + c.verifN, 0);
+  dit(r.cartes.length === 6 && nC === 14 && nV === 1, `C ${th} : 6 cartes, 14 colis comptés + 1 « à vérifier » gardé (la date dépassée, avec son code)`, r.cartes.map((c) => c.nom + ':' + c.n + '+' + c.verifN));
+  dit(!!r.resume && r.resume.colis === 14 && r.resume.points === 6 && r.resume.plan === 6 && r.resume.verif === 1, `R ${th} : la bande dit 14 colis · 6 points · 1 à vérifier, le plan nomme les 6`, r.resume);
+  const urg = POINTS.filter((x) => x[2] && x[4] <= 1).length;
   dit(!!r.resume && r.resume.urgents === urg, `R ${th} : « ${urg} à retirer avant demain » (limites lues ≤ demain)`, r.resume);
   const inter = r.cartes.filter((c) => /intermarche/i.test(c.nom));
   dit(inter.length === 2 && inter.some((c) => c.sorte === 'consigne' && c.n === 2) && inter.some((c) => c.sorte === 'comptoir' && c.n === 3), `C ${th} : casier et comptoir du même magasin = deux cartes (2 consigne, 3 comptoir)`, inter);
   const ordre = r.cartes.map((c) => c.rebours);
   dit(ordre[0] === 'aujourdhui' || ordre[0] === 'depasse', `C ${th} : la carte la plus urgente en tête (« aujourd'hui »)`, ordre);
   const tous = r.cartes.flatMap((c) => c.codes);
-  dit(CODES.every((c) => tous.includes(c)) && tous.every((c) => CODES.includes(c)), `K ${th} : les 14 codes lus sont dans les cartes, aucun autre`, { manque: CODES.filter((c) => !tous.includes(c)), en_trop: tous.filter((c) => !CODES.includes(c)) });
-  dit(r.cartes.reduce((t, c) => t + c.pasLu, 0) === 1, `K ${th} : le colis sans code dit « code pas encore lu »`);
-  dit(r.cartes.reduce((t, c) => t + c.qr, 0) === POINTS.filter((x) => x[6]).length, `K ${th} : QR en miniature sur les 5 colis qui en ont un, nulle part ailleurs`, r.cartes.map((c) => c.qr));
-  dit(r.cartes.reduce((t, c) => t + c.copier, 0) === 14, `K ${th} : « Copier » à côté de chacun des 14 codes`);
+  const attendus = [...CODES, CODE_DEPASSE];
+  dit(attendus.every((c) => tous.includes(c)) && tous.every((c) => attendus.includes(c)), `K ${th} : les 14 codes lus + celui à la date dépassée sont dans les cartes, aucun autre`, { manque: attendus.filter((c) => !tous.includes(c)), en_trop: tous.filter((c) => !attendus.includes(c)) });
+  // (14 nov., Julien : « je ne veux pas que tu affiches des colis sans code ») Le colis dont le code n'est pas lu n'a ni code
+  // ni QR à garder : pas dans les cartes, mais jamais perdu — dans « Tout le détail des retraits », avec sa raison.
+  dit(r.cartes.reduce((t, c) => t + c.pasLu, 0) === 0 && r.detail87100012, `K ${th} : le colis sans code n'est pas une carte, il reste dans « Tout le détail des retraits »`, { pasLu: r.cartes.map((c) => c.pasLu), detail: r.detail87100012 });
+  const nQr = POINTS.filter((x) => x[6]).length + 1;
+  dit(r.cartes.reduce((t, c) => t + c.qr, 0) === nQr, `K ${th} : un QR sur les ${nQr} colis qui en ont un (dont la date dépassée), nulle part ailleurs`, r.cartes.map((c) => c.qr));
+  dit(r.cartes.reduce((t, c) => t + c.copier, 0) === 15, `K ${th} : « Copier » à côté de chacun des 15 codes montrés`);
   dit(r.cartes.reduce((t, c) => t + c.photos, 0) >= 1 && r.cartes.reduce((t, c) => t + c.prix, 0) >= 1, `K ${th} : photo et prix payé sur les colis reliés à un achat`, r.cartes.map((c) => [c.photos, c.prix]));
   dit(r.cartes.every((c) => c.itin && c.transp), `C ${th} : chaque carte porte son transporteur et « Itinéraire »`);
+  // D — rétention
+  const dep = r.colis.find((c) => c.code === CODE_DEPASSE);
+  dit(!!dep && dep.verif === 'depasse' && /date limite dépassée/i.test(dep.mention) && !!dep.qr, `D ${th} : date limite dépassée ⇒ le colis RESTE, « date limite dépassée · à vérifier », code ET QR visibles`, dep);
+  dit(CODES_FINIS.every((c) => !r.colis.some((x) => x.code === c)), `D ${th} : retourné à l'expéditeur et achat annulé (preuves) ⇒ sortis des cartes`, r.colis.filter((x) => CODES_FINIS.includes(x.code)).map((x) => x.cle));
+  // T — le trajet
+  const traj = (suivi) => (r.colis.find((c) => String(c.cle || '').includes(suivi)) || {}).trajet || [];
+  const lues = (t) => t.filter((e) => e.lue).map((e) => e.cle).join(',');
+  const cour = (t) => (t.find((e) => e.courante) || {}).cle || '';
+  const t1 = traj('87100001'), t13 = traj('87100013'), t3 = traj('87100003');
+  dit(r.colis.every((c) => c.trajet.length === 5), `T ${th} : chaque colis porte sa barre de 5 étapes`, r.colis.filter((c) => c.trajet.length !== 5).map((c) => c.cle));
+  dit(lues(t1) === 'paye,expedie,transit,point' && cour(t1) === 'point', `T ${th} : 87100001 (évènements Mondial Relay + achat relié) : Payé · Expédié · En transit · Au point, « Retiré » gris`, t1);
+  dit(lues(t13) === 'paye,transit,point', `T ${th} : 87100013 (un e-mail « en route ») : « Expédié » reste GRIS (aucun évènement ne le date)`, t13);
+  dit(lues(t3) === 'point' && cour(t3) === 'point', `T ${th} : 87100003 (ni achat ni évènement) : seul « Au point » est allumé`, t3);
+  dit(r.colis.every((c) => c.trajet.every((e) => (e.lue ? e.date.trim().length > 0 : e.date.trim() === ''))), `T ${th} : une date sous chaque étape franchie, aucune sous une étape non lue`);
+  const pc = t1.find((e) => e.courante), pl = t1.find((e) => e.lue && !e.courante), pg0 = t1.find((e) => !e.lue);
+  dit(!!pc && !!pl && !!pg0 && pc.point !== pl.point && pc.point !== pg0.point, `T ${th} : la courante a sa couleur (accent), distincte d'une franchie et d'une grise`, { courante: pc && pc.point, franchie: pl && pl.point, grise: pg0 && pg0.point });
+  // Q — le QR à droite du code
+  const avecQr = r.colis.filter((c) => c.qr);
+  const qrMin = W >= 1024 ? 150 : 110;
+  dit(avecQr.length === nQr && avecQr.every((c) => c.qr.gauche >= c.qr.codeDroite && c.qr.w >= qrMin && c.qr.img >= qrMin - 24 && /255, 255, 255/.test(c.qr.fond)), `Q ${th} : chaque QR à DROITE de son code, ≥ ${qrMin} px, sur blanc`, avecQr.map((c) => c.qr));
+  dit(r.colis.every((c) => c.unLigne && !c.deborde), `Q ${th} : chaque code tient sur UNE ligne, sans déborder`, r.colis.filter((c) => !c.unLigne || c.deborde).map((c) => c.code));
   dit(!r.petits.length, `G ${th} : toutes les cibles ≥ 44`, r.petits);
   dit(!r.deborde.length, `G ${th} : rien ne déborde de l'écran`, r.deborde);
   dit(r.relier === 0, `G ${th} : aucun « Relier » (décision du 19 nov.)`);
-  if (W >= 1024) { const g = new Set(r.cartes.map((c) => c.gauche)); dit(g.size === 2, `L ${th} : deux colonnes de cartes`, [...g]); }
   dit(!erreurs.length, `${th} : aucune erreur de page`, erreurs);
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
   const haut = pg.locator('[data-rp]').first();
@@ -149,6 +224,23 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   await c1.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte1.png`) }).catch(() => {});
   const cv = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-qr]') }).first();
   if (await cv.count()) await cv.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-carte-qr.png`) }).catch(() => {});
+  const cd = pg.locator('[data-rp-colis]', { has: pg.locator('[data-rp-code="931931"]') }).first();
+  if (await cd.count()) { await cd.scrollIntoViewIfNeeded().catch(() => {}); await cd.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-depasse.png`) }).catch(() => {}); }
+  const ct = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="111111"]') }).first();
+  if (await ct.count()) { await ct.scrollIntoViewIfNeeded().catch(() => {}); await ct.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-trajet.png`) }).catch(() => {}); }
+  // Q — toucher le QR ⇒ le QR en grand (l'écran « code et QR » d'avant, `openQrView`).
+  const bq = pg.locator('[data-rp-colis="r:e:XW700000001TS"] [data-rp-qr], [data-rp-code="601234"] [data-rp-qr]').first();
+  if (await bq.count()) {
+    await bq.scrollIntoViewIfNeeded().catch(() => {});
+    if (tel) await bq.tap().catch(() => {}); else await bq.click().catch(() => {});
+    const vu = await pg.waitForSelector('[data-qr-plein]', { timeout: 5000 }).then(() => true).catch(() => false);
+    const img = vu ? await pg.evaluate(() => (document.querySelector('[data-qr-plein]') || { getAttribute: () => '' }).getAttribute('data-qr-plein-img')) : '';
+    dit(vu && img === '1', `Q ${th} : toucher le QR l'ouvre en grand (l'image lue)`, { vu, img });
+    await pg.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-qr-grand.png`) });
+    await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+    if (await pg.locator('[data-qr-plein]').count()) await pg.evaluate(() => { const b = document.querySelector('[data-qr-plein] button[aria-label*="ermer"], [data-qr-plein] .vrm-eg-fermer'); if (b) b.click(); }).catch(() => {});
+    await pg.waitForTimeout(400);
+  } else dit(false, `Q ${th} : le QR du colis Chronopost 601234`);
   // « Je suis au point » : la carte Chronopost (3 codes, des QR).
   const btn = pg.locator('[data-rp-point]', { has: pg.locator('[data-rp-code="601234"]') }).locator('[data-rp-au-point]').first();
   if (await btn.count()) {
@@ -158,7 +250,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
     const ap = await pg.evaluate(() => { const d = document.querySelector('[data-rp-aupoint]'); if (!d) return null; const b = d.getBoundingClientRect();
       return { plein: b.width >= innerWidth - 1 && b.height >= innerHeight - 1, codes: [...d.querySelectorAll('[data-rp-ap-code-grand]')].map((e) => e.textContent.trim()), taille: Math.max(0, ...[...d.querySelectorAll('[data-rp-ap-code-grand]')].map((e) => parseFloat(getComputedStyle(e).fontSize))),
         qr: [...d.querySelectorAll('[data-rp-ap-qr]')].map((e) => getComputedStyle(e).backgroundColor), fond: getComputedStyle(d).backgroundColor }; });
-    dit(!!ap && ap.plein && ap.codes.join(',') === '601234,602345,603456' && ap.taille >= 48, `A ${th} : « Je suis au point » plein écran, les 3 codes l'un sous l'autre, très grands`, ap);
+    dit(!!ap && ap.plein && [...ap.codes].sort().join(',') === '601234,602345,603456' && ap.taille >= 48, `A ${th} : « Je suis au point » plein écran, les 3 codes l'un sous l'autre, très grands`, ap);
     dit(!!ap && ap.qr.length === 3 && ap.qr.every((c) => /255, 255, 255/.test(c)), `A ${th} : les QR sur fond blanc`, ap && ap.qr);
     await pg.screenshot({ path: path.join(SHOTS, `${nom}-${sombre ? 'sombre' : 'clair'}-au-point.png`) });
     const tout = pg.locator('[data-rp-ap-tout]').first();

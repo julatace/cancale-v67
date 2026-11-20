@@ -49,7 +49,7 @@ export function compteARebours(lim) {
 // transporteur), puis le plus chargé, puis le nom. Un point sans colis compté n'est pas une carte.
 export function trierPoints(points) {
   // Un point dont aucun colis ne compte (tous « à vérifier ») passe après les autres.
-  const cle = (p) => { if (!(p.arrives || []).some(colisCompte)) return 1000; const l = limiteDuPoint(p); return l ? l.jours : (Number.isFinite(p.triPoint) ? p.triPoint : 99); };
+  const cle = (p) => { if (!(p.arrives || []).some((x) => colisCompte(x))) return 1000; const l = limiteDuPoint(p); return l ? l.jours : (Number.isFinite(p.triPoint) ? p.triPoint : 99); };
   return [...(points || [])].sort((a, b) => cle(a) - cle(b) || (b.arrives || []).length - (a.arrives || []).length || String(a.nom || '').localeCompare(String(b.nom || ''), 'fr'));
 }
 
@@ -60,7 +60,7 @@ export function resumeRetraits(points) {
   let colis = 0, urgents = 0, n = 0, verif = 0;
   for (const p of points || []) {
     const l = (p.arrives || []).filter((x) => x && !x.aVerifier && !x.horsCompte);
-    verif += (p.arrives || []).filter((x) => x && !x.redirige && (x.aVerifier || x.horsCompte)).length;
+    verif += (p.arrives || []).filter(colisRetenu).length;
     if (!l.length) continue;
     n++; colis += l.length;
     urgents += l.filter((x) => Number.isFinite(x.jours) && x.jours <= 1).length;
@@ -75,10 +75,14 @@ export function resumeRetraits(points) {
 // fini n'arrive jamais ici. Tout ce qui arrive reste dans la carte de son point, avec son code et son QR ; une date
 // limite dépassée (ou une garde dépassée) n'est PAS une fin : le colis reste, « date limite dépassée · à vérifier »,
 // hors du compte (§5 : un colis caché est un colis perdu). Seul un colis RÉACHEMINÉ (`redirige`) a sa propre ligne.
+// Ce que la rétention GARDE est le code et le QR : un « à vérifier » qui n'a ni code ni QR lus (un achat dont le code n'est
+// pas encore lu, un compte pas relu…) n'a rien à garder — il reste dans « Tout le détail des retraits » avec sa raison
+// (14 nov., Julien : « je ne veux pas que tu affiches des colis sans code »).
 export const colisCompte = (x) => !!x && !x.aVerifier && !x.horsCompte && !x.redirige;
+export const colisRetenu = (x) => !!x && !x.redirige && !colisCompte(x) && !!(x.code || x.qrDispo || (Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1));
 export function colisDuPoint(p) {
   const l = ((p && p.arrives) || []).filter((x) => x && !x.redirige);
-  return { comptes: l.filter(colisCompte), verif: l.filter((x) => !colisCompte(x)) };
+  return { comptes: l.filter(colisCompte), verif: l.filter(colisRetenu) };
 }
 // Pourquoi un colis montré est « à vérifier » — une clé, la phrase est écrite par l'écran (`tr`).
 export function mentionVerif(x) {

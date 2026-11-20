@@ -64,9 +64,12 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
   const garde = { cle: 'r:e:2', code: '654321', aVerifier: true, horsCompte: true, raisonCode: 'trop_long', jours: null };
   const compte = { cle: 'r:e:3', code: '111111', jours: 2 };
   const redir = { cle: 'r:rc:4', code: '999999', redirige: true };
-  const d = V.colisDuPoint({ arrives: [depasse, garde, compte, redir] });
+  const sansRien = { cle: 'r:v:5', code: '', aVerifier: true, horsCompte: true, raisonCode: 'sans_code', qrDispo: false };
+  const qrSeul = { cle: 'r:e:6', code: '', aVerifier: true, horsCompte: true, raisonCode: 'delai_depasse', qrDispo: true };
+  const d = V.colisDuPoint({ arrives: [depasse, garde, compte, redir, sansRien, qrSeul] });
+  dit(d.verif.includes(qrSeul) && !d.verif.includes(sansRien), 'rétention : un QR seul est gardé ; un « à vérifier » sans code ni QR reste dans le détail (14 nov. : pas de colis sans code)');
   dit(d.comptes.length === 1 && d.comptes[0] === compte, 'rétention : seul le colis dans les temps compte');
-  dit(d.verif.includes(depasse) && d.verif.includes(garde) && d.verif.every((x) => x.code), 'rétention : date limite (ou garde) dépassée ⇒ le colis RESTE dans sa carte, avec son code', d.verif.map((x) => x.cle).join(','));
+  dit(d.verif.includes(depasse) && d.verif.includes(garde) && d.verif.every((x) => x.code || x.qrDispo), 'rétention : date limite (ou garde) dépassée ⇒ le colis RESTE dans sa carte, avec son code ou son QR', d.verif.map((x) => x.cle).join(','));
   dit(!d.verif.includes(redir) && !d.comptes.includes(redir), 'un colis réacheminé a sa propre ligne (pas deux fois)');
   dit(V.mentionVerif(depasse) === 'depasse' && V.mentionVerif(garde) === 'trop-long' && V.mentionVerif(compte) === '', 'la mention dit pourquoi : « date limite dépassée · à vérifier »');
   const rv = V.resumeRetraits([{ arrives: [depasse, compte] }]);

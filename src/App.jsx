@@ -1158,8 +1158,9 @@ import { brancherARegler, ajoutPastille } from "./designV2/aRegler.js";
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
-import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";
-import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement   // (20 nov.) colis à retirer : une carte par point, « Je suis au point »
+import { RetraitsPoints, RienARetirer } from "./natif/RetraitsPoints.jsx";   // (20 nov.) colis à retirer : une carte par point, « Je suis au point »
+import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
+import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -57084,7 +57085,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   : videSite || (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null));
                   if (!(designV2 && colisDans === 'achats')) return ancienne;
                   // (20 nov., rétention) Un point dont les colis sont tous « à vérifier » (date limite dépassée…) a SA carte aussi : code et QR visibles.
-                  const avecColis = (parPoint.points || []).some((p) => (p.arrives || []).some((x) => x && !x.redirige));
+                  const avecColis = (parPoint.points || []).some((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; });
                   const enRouteV2 = voitSite('vinted') ? (buysBase || []).filter((o) => phaseReception(o) === 'route').map((o) => { const e = entreeSuiviAchat(o);
                     const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',

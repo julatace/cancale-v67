@@ -258,7 +258,7 @@ export function RienARetirer({ phrase = '' }) {
 }
 
 export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo }) {
-  const avec = trierPoints(points.map((p) => ({ ...p, arrives: (p.arrives || []).filter((x) => x && !x.redirige) })).filter((p) => p.arrives.length > 0));
+  const avec = trierPoints(points.map((p) => ({ ...p, arrives: (p.arrives || []).filter((x) => x && !x.redirige) })).filter((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; }));
   const [etatN, setEtatN] = React.useState(lireNouveaux);
   React.useEffect(() => { const f = () => setEtatN(lireNouveaux()); window.addEventListener('vrm:retraits-nouveaux', f); return () => window.removeEventListener('vrm:retraits-nouveaux', f); }, []);
   const nouveaux = React.useMemo(() => ({ etat: etatN, vu: (cle) => { const e = marquerVu(lireNouveaux(), cle); if (!e) return; try { localStorage.setItem(CLE_RETRAITS_VUS, JSON.stringify(e)); } catch (_) {} setEtatN(e); } }), [etatN]);
