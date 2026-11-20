@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VRM Observateur</title>
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<main>
+  <h1>VRM Observateur</h1>
+  <p class="doux">Il note ce qui se passe sur Vinted dans CE navigateur : les requêtes, les réponses, les gestes dans la page, ce que les extensions y ajoutent. Il ne bloque rien, ne modifie rien, et n'envoie rien nulle part : tout reste sur cet ordinateur jusqu'à ce que tu exportes.</p>
+
+  <section class="carte">
+    <div class="barre">
+      <label class="inter"><input type="checkbox" id="on"> <span>Enregistrer</span></label>
+      <span class="compteur" id="compteur" data-n="0">0</span><span class="doux" id="compteur-txt">événement noté</span>
+    </div>
+    <p class="doux" id="periode"></p>
+    <div class="barre">
+      <button id="export-json">Exporter (JSON)</button>
+      <button id="export-csv">Exporter (CSV, tableur)</button>
+      <button id="export-html">Exporter le résumé (page lisible)</button>
+      <button id="effacer" class="danger">Tout effacer</button>
+    </div>
+    <p class="doux">Garder au plus <input id="plafond" type="number" min="50" step="1000" value="200000" style="width:110px"> événements (au-delà, les plus anciens sortent).</p>
+  </section>
+
+  <section class="carte">
+    <label class="inter"><input type="checkbox" id="complet"> <span>Capture complète (débogueur)</span></label>
+    <p class="doux">S'attache à chaque onglet Vinted comme les outils de développement : il voit TOUT le trafic de l'onglet, iframes et WebSockets compris, et ce que les autres extensions font depuis la page. Rien n'est bloqué.</p>
+    <ul class="doux">
+      <li>Chrome affiche alors en haut un bandeau « VRM Observateur a commencé à déboguer ce navigateur ». C'est normal. Si tu cliques « Annuler » sur ce bandeau, la capture complète s'arrête.</li>
+      <li>Un seul débogueur peut s'attacher à un onglet : si les outils de développement (F12) sont ouverts sur cet onglet, l'attache échoue (c'est dit ci-dessous). Ferme-les, puis éteins et rallume.</li>
+    </ul>
+    <label class="filtres"><input type="checkbox" id="console"> Noter aussi la console de la page (<b>déconseillé</b> : les protections anti-robot de certains sites savent repérer qu'une console est écoutée)</label>
+    <div id="dbg-etat" class="doux"></div>
+  </section>
+
+  <section class="carte" id="outil-carte">
+    <h2>Ce que l'outil a fait</h2>
+    <p class="doux">Un geste « humain » vient de ta souris ou de ton clavier (Chrome le marque <code>isTrusted</code>). Un geste « simulé » a été fabriqué par un programme. Une écriture (message, offre, article…) « sans geste humain » est partie sans clic ni Entrée de ta part dans les 3 secondes avant, dans le même onglet.</p>
+    <div id="outil"></div>
+  </section>
+
+  <section class="carte" id="alertes-carte" hidden>
+    <h2>Réponses refusées par Vinted</h2>
+    <p class="doux">429 = « trop de requêtes, ralentis » · 403 = « refusé » (souvent un captcha ou un blocage) · autres 4xx = demande refusée.</p>
+    <div id="alertes"></div>
+  </section>
+
+  <section class="carte">
+    <h2>Par type d'action</h2>
+    <p class="doux">L'écart est le temps entre deux actions du même type : il montre le rythme.</p>
+    <div class="table-defile"><table id="resume"><thead><tr><th>Action</th><th>Nombre</th><th>Par heure</th><th>Écart min.</th><th>Écart moyen</th><th>Écart max.</th><th>Refusées</th><th>Sans geste humain</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Par jour et par heure</h2>
+    <div class="table-defile"><table id="jours"><thead><tr><th>Jour</th><th>Écritures</th><th>Gestes humains</th><th>Gestes simulés</th><th>Lectures</th><th>Refus</th></tr></thead><tbody></tbody></table></div>
+    <div class="table-defile"><table id="heures"><thead><tr><th>Heure</th><th>Écritures</th><th>Gestes humains</th><th>Gestes simulés</th><th>Lectures</th><th>Refus</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Extensions installées</h2>
+    <p class="doux" id="ext-lu"></p>
+    <button id="ext-relire">Relire la liste</button>
+    <div class="table-defile"><table id="extensions"><thead><tr><th>Nom</th><th>Activée</th><th>Permissions</th><th>Sites</th><th>Identifiant</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Chronologie</h2>
+    <div class="filtres">
+      <label><input type="checkbox" id="regrouper-lectures" checked> Regrouper les lectures</label>
+      <label>Source <select id="source"><option value="">Toutes</option><option value="reseau">Réseau (fond)</option><option value="cdp">Réseau (débogueur)</option><option value="page">Réseau (page)</option><option value="geste">Gestes</option><option value="dom">Page modifiée</option><option value="contexte">Onglets, comptes, extensions</option></select></label>
+      <label>Onglet <select id="onglet"><option value="">Tous</option></select></label>
+      <label>Action <select id="type"><option value="">Toutes</option></select></label>
+    </div>
+    <p class="doux" id="chrono-note"></p>
+    <div class="table-defile"><table id="chrono"><thead><tr><th>Heure</th><th>Action</th><th>Détail</th><th>Réponse</th><th>Durée</th><th>Depuis la même action</th><th>Onglet · origine</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="carte">
+    <h2>Ce qu'il voit, et ce qu'il ne voit pas</h2>
+    <ul>
+      <li><b>Il voit</b> toutes les requêtes parties d'un onglet Vinted (celles de Vinted et celles qu'une extension fait DEPUIS la page), leurs réponses (coupées à 16 Ko), les clics, saisies et envois de formulaire, les navigations, ce qui est ajouté à la page, les onglets, le compte connecté, les extensions installées.</li>
+      <li><b>Il ne voit pas</b> les requêtes qu'une autre extension envoie depuis son propre fond (son « service worker ») : aucune extension ne peut voir le trafic d'une autre, même en capture complète. Pour ça, il faut la capture de Chrome ci-dessous.</li>
+      <li><b>Il ne garde jamais</b> les cookies, l'en-tête Authorization, le jeton CSRF. Toute valeur dont le nom contient token, csrf, auth, session, password, email, phone, iban, address devient « [masqué] ». Une saisie garde la longueur, pas le texte (sauf message, description, titre, prix).</li>
+      <li>Pour voir ce qui se passe <b>dans</b> la page, il enveloppe <code>fetch</code>, <code>XMLHttpRequest</code>, <code>WebSocket</code>… de vinted.fr. Ce que la page reçoit ne change pas, mais un site très attentif pourrait remarquer l'enveloppe : désactive l'observateur (chrome://extensions) quand tu ne t'en sers pas.</li>
+    </ul>
+    <h2>Pour tout voir, même le fond des autres extensions : la capture de Chrome</h2>
+    <ol>
+      <li>Clique <button id="ouvrir-netexport">Ouvrir la capture de Chrome</button> (si rien ne s'ouvre, copie <code id="netexport-url">chrome://net-export</code> dans la barre d'adresse d'un nouvel onglet).</li>
+      <li>Coche « Include raw bytes », clique « Start Logging to Disk » et choisis où enregistrer le fichier.</li>
+      <li>Laisse cet onglet ouvert, va sur Vinted et lance l'outil à observer. Fais ce que tu veux mesurer.</li>
+      <li>Reviens sur l'onglet de capture et clique « Stop Logging ». Le fichier est prêt.</li>
+    </ol>
+    <p class="alerte badge">Ce fichier contient tes cookies et tes jetons de connexion : ne le partage JAMAIS tel quel, avec personne.</p>
+  </section>
+</main>
+<script src="regles.js"></script>
+<script src="idb.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

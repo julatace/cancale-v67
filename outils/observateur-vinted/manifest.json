@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "VRM Observateur",
+  "version": "2.0.0",
+  "description": "Note, sans rien bloquer ni modifier, ce qui se passe sur Vinted dans TON navigateur, pour voir ce qu'un outil fait sur ton compte. Rien ne sort de ton ordinateur.",
+  "minimum_chrome_version": "125",
+  "permissions": ["webRequest", "storage", "unlimitedStorage", "management", "debugger"],
+  "host_permissions": ["https://*.vinted.fr/*", "https://*.vinted.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://*.vinted.fr/*", "https://*.vinted.com/*"], "js": ["capteur-page.js"], "world": "MAIN", "run_at": "document_start", "all_frames": true },
+    { "matches": ["https://*.vinted.fr/*", "https://*.vinted.com/*"], "js": ["relais.js"], "run_at": "document_start", "all_frames": true }
+  ],
+  "action": { "default_title": "VRM Observateur", "default_popup": "popup.html" },
+  "options_page": "page.html",
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'" }
+}
