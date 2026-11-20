@@ -1,190 +1,89 @@
 // Banc : LE CONTRÔLE AVANT DE LANCER UNE REPUBLICATION (20 nov., extension 5.410 — `repubverif`).
-// Données INVENTÉES. Le vrai build (dist) ; un faux pont d'extension 5.410 qui répond à `verifierRepub`.
-//   V1. À l'étape « Envoi », la vérification part seule : « 2 vérifiées · 1 corrigée seule · 1 à corriger avant de lancer ».
-//   V2. Sous chaque ligne : la correction dite (la taille), ce qui manque + « Choisir la taille » / « Retirer de la file ».
-//   V3. Lancer est FERMÉ tant qu'il reste une annonce à corriger (data-repub-lancer-verif="a-corriger").
+// (20 nov., « toute action se fait dans l'extension ») L'atelier n'est plus dans l'app : il vit dans le PANNEAU de
+// l'extension. Ce banc monte le VRAI vrm-badge.js + vrm-ui.js sur une page vinted.fr (faux `chrome` : il répond
+// ce que dirait `atelierVerifier`, c.-à-d. la commande `verifierRepub` du fond ; le fond lui-même est jugé par
+// scripts/audit-extension-porte-app.cjs et scripts/audit-repub-verifier.cjs). Données INVENTÉES.
+//   V1. « Republier » ⇒ la vérification part seule : « 3 vérifiée(s) · 1 corrigée(s) seule(s) · 1 à corriger ».
+//   V2. Sous chaque ligne : la correction dite (la taille), ce qui manque + « Choisir : la taille » / « Retirer de la file ».
+//   V3. Lancer est FERMÉ tant qu'il reste une annonce à corriger (dit).
 //   V4. « Choisir la taille » : SA réponse revérifiée pour CETTE paire seule ; Lancer s'ouvre.
-//   V5. Au départ, la commande de CETTE paire porte SA réponse ; les autres n'en portent aucune.
-// 390 tactile et 1512 ; THEMES=clair,sombre ; SHOTS=dossier pour garder les captures.
-// §6.1 : sur un build sans le lot, `[data-repub-verif]` n'existe pas ⇒ rouge.
-require('../_source-app.cjs').brancher();
-const path = require('path');
-const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
-const { metaVersData } = require('./_meta.cjs');
-const fs = require('fs'), http = require('http');
-const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
-const EXT = process.env.BANC_EXT || path.join(__dirname, '..', '..', 'vinted-sync-extension');
-const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4437;
-const SHOTS = process.env.SHOTS || '';
-const THEMES = (process.env.THEMES || 'clair').split(',');
-const LARGEURS = (process.env.LARGEURS || '390,1512').split(',').map(Number);
-const auj = new Date();
-const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1 }, o);
-const ITEMS = [
-  ann(9102, { title: 'Baskets test cuir blanc taille 42', favourite_count: 2, created_at_ts: Math.floor(auj / 1000) - 40 * 86400 }),
-  ann(9103, { title: 'Running test bleu taille 43', created_at_ts: Math.floor(auj / 1000) - 50 * 86400 }),
-  ann(9104, { title: 'Montantes test noires taille 41', created_at_ts: Math.floor(auj / 1000) - 60 * 86400 }),
-];
-const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9104': { numero: '44' } } };
-const HEX = '0123456789abcdef';
-const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
-const VERSION = '5.410.0';   // la version qui sait `repubverif`
-const PONT = (o) => {
-  const post = (m) => window.postMessage(m, '*');
-  window.__repub = []; window.__verif = [];
-  const Q = { champ: 'size', nom: 'la taille', options: [['56', '42'], ['57', '43']], geste: '' };
-  window.addEventListener('message', (e) => {
-    const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
-    if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
-    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {}, repub: { onglet: true, frein: null } } });
-    if (d.__vmr === 'cmd' && d.cmd === 'verifierRepub') {
-      window.__verif.push({ ids: d.ids, reponses: d.reponses || {} });
-      const paires = (d.ids || []).map((id) => {
-        const rep = (d.reponses || {})[id];
-        if (id === '9102') return { id, etat: 'corrige', corrections: [{ champ: 'size', nom: 'la taille', raison: "sa taille n'est plus dans la grille de Vinted pour cette catégorie : la même taille (même libellé) de la grille d'aujourd'hui est posée" }], manque: [] };
-        if (id === '9103') return rep && rep.size ? { id, etat: 'ok', corrections: [], manque: [] } : { id, etat: 'a-corriger', corrections: [], manque: ['la taille (pas de « 44 » dans la grille de Vinted)'], question: Q };
-        return { id, etat: 'ok', corrections: [], manque: [] };
-      });
-      setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', paires, at: Date.now() } }), 500);
-      return;
-    }
-    if (d.__vmr === 'cmd' && d.cmd === 'recreerVinted') {
-      window.__repub.push({ id: d.id, reponses: d.reponses || null });
-      setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'attente', draftId: '8' + d.id, jusqua: Date.now() + 120000, nouveau: 49 } }), 300);
-      return;
-    }
-    if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
-  });
-  post({ __vmr: 'ready', version: o.version });
-};
-let ko = 0;
-const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
-const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
-const srv = http.createServer((q, r) => {
-  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
-  const p = path.join(DIST, f);
-  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
-  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
-});
-srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
-srv.listen(PORT);
-const projette = (row, sel) => {
-  if (!sel || sel === '*') return row;
-  const out = {};
-  for (const part of sel.split(',')) {
-    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
-    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
-    if (src === 'id') { out[alias] = row.id; continue; }
-    if (src === 'data') { out[alias] = row.data; continue; }
-    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
-    out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
-  }
-  return out;
-};
-const attendre = async (f, ms = 15000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await f()) return true; await new Promise((r) => setTimeout(r, 200)); } return false; };
-async function pageApp(b, vp, theme) {
-  const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}), colorScheme: theme === 'sombre' ? 'dark' : 'light' });
-  const pg = await ctx.newPage();
-  const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-  const rows = [{ id: 'main', data: MAIN }, { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length } } } }, { id: `actions_compte_111_${HEX}`, data: { ts: [], max: 50, reserve: 5 } }];
-  await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); localStorage.setItem('vrm_republier_esp', JSON.stringify({ mode: 'fixe', min: 1, max: 3, groupes: false })); } catch (_) {} }, theme === 'sombre');
-  await pg.addInitScript(PONT, { version: VERSION });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
-  await pg.route('**/rest/v1/**', async (route) => {
-    const req = route.request(); const m = req.method();
-    const u = decodeURIComponent(metaVersData(req.url()));
-    const j = (d, st = 200) => route.fulfill({ status: st, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
-    if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
-    if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
-    if (m !== 'GET' && m !== 'HEAD') return j([]);
-    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
-    const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
-    const eq = /[?&]id=eq\.([^&]*)/.exec(u);
-    if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
-    const lk = /[?&]id=like\.([^&]*)/.exec(u);
-    if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
-    return j([]);
-  });
-  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  return { ctx, pg, errs };
-}
-const shot = async (pg, nom) => { if (SHOTS) { await pg.waitForTimeout(350); await pg.screenshot({ path: path.join(SHOTS, nom) }).catch(() => {}); } };
-
+//   V5. « Retirer de la file » : la paire sort, la file est revérifiée.
+// 390 tactile et 1512, clair et sombre ; captures dans BANC_CAPTURES/repub-verifier.
+require('./_porte-banc.cjs');
+const { chromium } = require('playwright');
+const path = require('path'), fs = require('fs');
+const EXT = path.join(__dirname, '..', '..', 'vinted-sync-extension');
+const BADGE = fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8'), UI = fs.readFileSync(path.join(EXT, 'vrm-ui.js'), 'utf8');
+const LOGO = fs.readFileSync(path.join(EXT, 'logo-vrm-96.png'));
+const SORTIE = path.join(process.env.BANC_CAPTURES || path.join(__dirname, 'captures'), 'repub-verifier');
+let ok = 0, ko = 0;
+const dit = (c, m, d) => { if (c) { ok++; console.log('OK  ' + m); } else { ko++; console.log('KO  ' + m + (d ? ' — ' + String(d).slice(0, 300) : '')); } };
+const T0 = Date.now();
+const ANN = ['9102', '9103', '9104'].map((id, i) => ({ id, titre: ['Baskets test cuir blanc 42', 'Running test bleu 43', 'Montantes test noires 41'][i], prix: 49, num: String(42 + i), statut: 'en_vente', photo: '' }));
+const LISTES = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 'compte_test' }, annonces: { lu: T0, total: 3, liste: ANN, toutes: ANN, nTous: 3, statuts: { en_vente: 3 } }, ventes: { lu: T0, liste: [] }, messages: { lu: T0, liste: [] }, automatisations: null, notifications: { vu: T0, liste: [] }, offres: [], autres: null };
+const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.410.0', code: '5.410.0', vrm: { ok: true, connecte: true, email: 'test@exemple.fr' }, site: { id: '111', nom: 'compte_test', choix: 'oui' }, flux: { okAt: T0 } };
 (async () => {
-  let b;
+  fs.mkdirSync(SORTIE, { recursive: true });
+  const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   try {
-    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const theme of THEMES) for (const w of LARGEURS) {
-      const vp = { width: w, height: w < 600 ? 844 : 900 };
-      const tag = `${w}-${theme}`;
-      console.log(`── ${tag}`);
-      const { ctx, pg, errs } = await pageApp(b, vp, theme);
-      // (VRM natif, 19 nov.) Annonces → « Actions » → Republier → cocher → lancer (téléphone) ; au tableau de l'ordinateur :
-      // « Choisir une action » → Republier → cocher → lancer. Les deux mènent à l'atelier par `demanderActionAnnonces`.
-      await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
-      if (w < 900) {
-        await pg.locator('[data-eg-actions]').first().waitFor({ state: 'visible', timeout: 20000 });
-        await pg.locator('[data-eg-actions]').first().click();
-        await pg.locator('[data-eg-action="recreer"]').first().click();
-        for (const id of ['9102', '9103', '9104']) { const l = pg.locator(`[data-eg-article$="${id}"]`).first(); await l.click(); await pg.waitForTimeout(80); }
-        await pg.locator('[data-eg-lancer="recreer"]').first().click();
-      } else {
-        await pg.locator('[data-tt-ouvre="action"]').first().waitFor({ state: 'visible', timeout: 20000 });
-        await pg.locator('[data-tt-ouvre="action"]').first().click(); await pg.waitForTimeout(150);
-        await pg.locator('[data-tt-action="recreer"]').first().click(); await pg.waitForTimeout(150);
-        const boites = pg.locator('[data-tt-tableau] tbody input[type="checkbox"]:not([disabled])');
-        const nb = await boites.count(); for (let i = 0; i < nb; i++) { await boites.nth(i).click(); await pg.waitForTimeout(60); }
-        await pg.locator('[data-tt-lancer]').first().click();
-      }
-      await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 6000 });
-      for (let i = 0; i < 3; i++) { const s = pg.locator('[data-republier-suivant]'); if (await s.count() && await s.isVisible()) { await s.click(); await pg.waitForTimeout(250); } }
-      const v = pg.locator('[data-repub-verif]');
-      await v.waitFor({ timeout: 8000 }).catch(() => {});
-      await attendre(async () => (await v.getAttribute('data-repub-verif').catch(() => '')) !== 'encours', 8000);
-      const rv = await v.evaluate((e) => ({ e: e.getAttribute('data-repub-verif'), ok: e.getAttribute('data-repub-verif-ok'), c: e.getAttribute('data-repub-verif-corrige'), a: e.getAttribute('data-repub-verif-a-corriger'), t: e.textContent })).catch(() => null);
-      dit(rv && rv.e === 'bloque' && rv.ok === '1' && rv.c === '1' && rv.a === '1' && /3 vérifiées/.test(rv.t) && /1 corrigée seule/.test(rv.t) && /1 à corriger avant de lancer/.test(rv.t), `V1 ${tag} le récapitulatif : « 3 vérifiées · 1 corrigée seule · 1 à corriger avant de lancer »`, rv && rv.t);
-      const nv = await pg.evaluate(() => window.__verif.length);
-      dit(nv === 1, `V1b ${tag} UNE vérification, partie seule à l'étape « Envoi »`, String(nv));
-      const lignes = await pg.$$eval('[data-repub-verif-ligne]', (els) => els.map((e) => e.getAttribute('data-repub-verif-ligne') + ':' + e.getAttribute('data-repub-verif-etat')));
-      dit(lignes.join(',') === '9102:corrige,9103:a-corriger', `V2 ${tag} sous chaque ligne : la correction (9102) et ce qui manque (9103) ; rien sous la ligne « ok »`, lignes.join(','));
-      const hb = await pg.$$eval('[data-repub-verif-ligne] button', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
-      dit(hb.length === 2 && hb.every((h) => h >= (w < 600 ? 44 : 32)), `V2b ${tag} « Choisir la taille » et « Retirer de la file » à la bonne taille`, hb.join(','));
-      await pg.locator('[data-republier-confirme]').check();
-      const lan = pg.locator('[data-republier-lancer]').last();
-      const l1 = { verif: await lan.getAttribute('data-repub-lancer-verif'), dis: await lan.isDisabled() };
-      dit(l1.verif === 'a-corriger' && l1.dis, `V3 ${tag} Lancer reste FERMÉ tant qu'une annonce est à corriger (même « Je confirme » coché)`, JSON.stringify(l1));
-      const deborde = await pg.evaluate(() => { const r = document.querySelector('[data-repub-verif]').getBoundingClientRect(); return r.right > innerWidth + 1 || document.documentElement.scrollWidth > innerWidth + 1; });
-      dit(!deborde, `V3b ${tag} rien ne déborde de l'écran`);
-      await v.scrollIntoViewIfNeeded().catch(() => {});
-      await shot(pg, `rv1-recap-${tag}.png`);
-      await pg.evaluate(() => { const e = document.querySelector('[data-repub-verif-ligne="9103"]'); if (e) e.scrollIntoView({ block: 'center' }); });
-      await shot(pg, `rv2-lignes-${tag}.png`);
-      // (20 nov.) La liste des lignes de l'atelier avait une hauteur NULLE au téléphone (flex qui rétrécit, overflow caché) : visible ?
-      const hl = await pg.evaluate(() => { const l = document.querySelector('[data-republier-liste]'); return l ? Math.round(l.getBoundingClientRect().height) : -1; });
-      dit(hl > 100, `V2c ${tag} la liste des annonces de l'atelier est visible (hauteur ${hl} px, plus jamais écrasée à 0)`, String(hl));
-      await pg.evaluate(() => { const e = document.querySelector('[data-repub-verif-choisir="size"]'); if (e) e.scrollIntoView({ block: 'center' }); });
-      await pg.locator('[data-repub-verif-choisir="size"]').click();
-      const opt = pg.locator('[data-ask-choix] button').first();
-      if (await opt.waitFor({ timeout: 4000 }).then(() => true).catch(() => false)) { await shot(pg, `rv3-choisir-${tag}.png`); await opt.click(); }
-      await attendre(async () => (await pg.evaluate(() => window.__verif.length)) >= 2, 6000);
-      await attendre(async () => (await v.getAttribute('data-repub-verif').catch(() => '')) === 'pret', 6000);
-      const env = await pg.evaluate(() => window.__verif[1] && { ids: window.__verif[1].ids, r: window.__verif[1].reponses });
-      dit(env && env.ids.join(',') === '9103' && JSON.stringify(env.r) === '{"9103":{"size":"56"}}', `V4 ${tag} SA réponse revérifiée pour 9103 seule`, JSON.stringify(env));
-      const l2 = { verif: await lan.getAttribute('data-repub-lancer-verif'), dis: await lan.isDisabled() };
-      dit(l2.verif === 'ok' && !l2.dis, `V4b ${tag} plus rien à corriger : Lancer s'ouvre`, JSON.stringify(l2));
-      await shot(pg, `rv4-pret-${tag}.png`);
-      await pg.locator('[data-republier-esp-choix="vintex"]').click().catch(() => {});
-      await lan.click();
-      try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 1500 }); if (f) await pg.click('[data-verif-publier]'); } catch (_) {}
-      await attendre(async () => (await pg.evaluate(() => window.__repub.length)) >= 2, 45000);
-      const rp = await pg.evaluate(() => window.__repub.map((x) => x.id + ':' + JSON.stringify(x.reponses)));
-      const de9103 = rp.find((x) => x.startsWith('9103:')), autres = rp.filter((x) => !x.startsWith('9103:'));
-      dit((!de9103 || de9103 === '9103:{"size":"56"}') && autres.every((x) => /:null$/.test(x)) && rp.length >= 2, `V5 ${tag} au départ, SA réponse part avec 9103 seule ; les autres sans réponse`, rp.join(' | '));
-      dit(!errs.length, `V6 ${tag} aucune erreur de page`, errs.slice(0, 2).join(' | '));
+    for (const [w, h, mobile] of [[390, 844, true], [1512, 900, false]]) for (const scheme of ['light', 'dark']) {
+      const tag = `${w}-${scheme}`;
+      console.log('── ' + tag);
+      const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: w, height: h } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
+      const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(String(e).slice(0, 200)));
+      await pg.route('**/*', (r) => (/logo-vrm-96\.png/.test(r.request().url()) ? r.fulfill({ status: 200, contentType: 'image/png', body: LOGO }) : r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#fff">Vinted</body></html>' })));
+      await pg.goto('https://www.vinted.fr/member/items');
+      await pg.evaluate(({ e, js, ui, L }) => {
+        window.__envoyes = [];
+        const copie = (x) => JSON.parse(JSON.stringify(x));
+        const orig = Element.prototype.attachShadow; Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
+        window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
+          sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true };
+            if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null };
+            else if (msg.action === 'atelierVerifier') { const tous = msg.tous || msg.ids; const repondu = msg.reponses && msg.reponses['9103'];
+              const paires = Object.fromEntries(tous.map((id) => [id, id === '9103' && !repondu ? { id, etat: 'a-corriger', corrections: [], manque: ['la taille'], question: { champ: 'size_id', nom: 'la taille', options: [['56', '43'], ['57', '44']] } } : id === '9102' ? { id, etat: 'corrige', corrections: [{ champ: 'size_id', nom: 'Taille', raison: 'même libellé dans la grille du jour' }], manque: [] } : { id, etat: 'ok', corrections: [], manque: [] }]));
+              const a = Object.values(paires).filter((x) => x.etat === 'a-corriger').length;
+              rep = { ok: true, paires, resume: { total: tous.length, verifiees: tous.length, ok: tous.length - 1 - a, corrige: tous.includes('9102') ? 1 : 0, aCorriger: a, absente: 0, pasVerifie: 0 }, lancer: a ? { ok: false, raison: 'a-corriger', n: a } : { ok: true } }; }
+            setTimeout(() => cb && cb(rep), 0); } },
+          storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
+        const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u);
+        const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
+      }, { e: ETAT, js: BADGE, ui: UI, L: LISTES });
+      await pg.waitForTimeout(300);
+      const R = (f, a) => pg.evaluate(f, a);
+      await R(() => { const r = document.getElementById('vrm-badge').shadowRoot; r.querySelector('.btn').click(); });
+      await pg.waitForTimeout(400);
+      await R(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-onglet-b="annonces"]'); if (b) b.click(); });
+      await pg.waitForTimeout(300);
+      await R(() => { const r = document.getElementById('vrm-badge').shadowRoot; for (const c of r.querySelectorAll('[data-ann-sel]')) { c.checked = true; c.dispatchEvent(new Event('change')); } });
+      await pg.waitForTimeout(200);
+      await R(() => { const s2 = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ann-action]'); s2.value = 'republier'; s2.dispatchEvent(new Event('change')); });
+      await pg.waitForTimeout(400);
+      const v1 = await R(() => { const r = document.getElementById('vrm-badge').shadowRoot; const q = (s) => r.querySelector(s); return { recap: (q('[data-atelier-recap]') || {}).innerText || '', lignes: Array.from(r.querySelectorAll('[data-atelier-paire]')).map((x) => x.getAttribute('data-atelier-paire') + ':' + x.getAttribute('data-verif') + ':' + x.innerText.replace(/\s+/g, ' ')), choisir: !!q('[data-atelier-question="9103"]'), retirer: !!q('[data-atelier-retirer="9103"]'), lancer: q('[data-atelier-lancer]') && q('[data-atelier-lancer]').disabled, ferme: (q('[data-atelier-ferme]') || {}).innerText || '' }; });
+      await pg.screenshot({ path: path.join(SORTIE, `verif-${tag}.png`) });
+      dit(/3 vérifiée\(s\) · 1 corrigée\(s\) seule\(s\) · 1 à corriger/.test(v1.recap), `V1 ${tag} la vérification part seule : le récapitulatif`, v1.recap);
+      dit(v1.lignes.some((l) => /^9102:corrige:.*Taille : même libellé/.test(l)) && v1.lignes.some((l) => /^9103:a-corriger:.*Manque : la taille/.test(l)) && v1.choisir && v1.retirer, `V2 ${tag} sous chaque ligne : la correction dite, ce qui manque, « Choisir : la taille » / « Retirer de la file »`, v1.lignes.join(' | '));
+      dit(v1.lancer === true && /1 annonce\(s\) à corriger/.test(v1.ferme), `V3 ${tag} Lancer fermé tant qu'il reste une annonce à corriger (dit)`, v1.ferme);
+      await R(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-question="9103"]'); c.value = '56'; c.dispatchEvent(new Event('change')); });
+      await pg.waitForTimeout(300);
+      const env = await R(() => window.__envoyes.filter((m) => m.action === 'atelierVerifier'));
+      const l4 = await R(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-lancer]').disabled);
+      dit(env.length === 2 && env[1].ids.join(',') === '9103' && env[1].reponses['9103'].size_id === '56' && !env[1].reponses['9102'] && l4 === false, `V4 ${tag} SA taille revérifiée pour CETTE paire seule ; Lancer s'ouvre`, JSON.stringify(env[1]));
+      await pg.screenshot({ path: path.join(SORTIE, `verif-ok-${tag}.png`) });
+      // V5 : retirer une paire de la file.
+      await R(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-question="9103"]'); });
+      await R(() => { const s2 = document.getElementById('vrm-badge').shadowRoot; const f = s2.querySelector('[data-geste-fermer]'); if (f) f.click(); });
+      await pg.waitForTimeout(200);
+      await R(() => { const s2 = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ann-action]'); s2.value = 'republier'; s2.dispatchEvent(new Event('change')); });
+      await pg.waitForTimeout(400);
+      await R(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-retirer="9103"]'); b.click(); });
+      await pg.waitForTimeout(400);
+      const v5 = await R(() => ({ lignes: Array.from(document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-atelier-paire]')).map((x) => x.getAttribute('data-atelier-paire')), env: window.__envoyes.filter((m) => m.action === 'atelierVerifier').slice(-1)[0] }));
+      dit(v5.lignes.join(',') === '9102,9104' && v5.env.tous.join(',') === '9102,9104', `V5 ${tag} « Retirer de la file » : la paire sort, la file est revérifiée`, JSON.stringify(v5));
+      dit(!errs.length, `V6 ${tag} aucune erreur de page`, errs.join(' | '));
       await ctx.close();
     }
-  } catch (e) { ko++; console.log('KO  exception : ' + (e && e.stack || e)); }
-  finally { if (b) await b.close(); srv.close(); }
-  console.log(ko ? `\n❌ banc repub-verifier : ${ko} KO` : '\n✅ banc repub-verifier : tout est OK');
+  } finally { await nav.close(); }
+  console.log(ko ? `\n❌ banc repub-verifier : ${ko} KO` : `\n✅ banc repub-verifier : ${ok} contrôles`);
   process.exit(ko ? 1 : 0);
 })();

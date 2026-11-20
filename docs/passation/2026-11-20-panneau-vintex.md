@@ -151,6 +151,18 @@ les deux lignes gardées). L'app ne fait plus aucun geste ; dans la 5.410.0 l'ex
   télécharger l'extension, se connecter, VOIR une fiche / une vente / une notification, réglages de l'app (notifications,
   langue), poser un prix mini.
 
+### Fusion de `claude/repub-messages-malins` (9001d2119)
+- Vrai merge : capacités `repubfidele` `repubverif` `messagesmalins` et leurs FONCTIONS gardées avec les miennes ; §9 et
+  Quoi de neuf : les deux ; l'atelier Republier et l'écran des favoris de l'app restent retirés (actions-extension).
+- L'atelier du panneau utilise `verifierRepub` (`atelierVerifier`, gardé dans `vrmAtelierVerif`) et la règle de l'app
+  recopiée (`resumeVerif`, `lancerPermis`, `partiraPas`, `reponsesDe`) : récapitulatif « N vérifiée(s) · N corrigée(s)
+  seule(s) · N à corriger », sous chaque ligne la correction / ce qui manque, « Choisir : la taille » (valeurs de
+  Vinted), « Retirer de la file », **Lancer fermé** tant qu'il en reste une (revérifié par le fond à `atelierLancer`),
+  une absente ne part jamais, SA réponse part avec SA paire (`reponses` de `recreerVinted`).
+- Messages aux favoris : la fin de la file dans le panneau dit le `bilan` (`phraseBilanFavoris`, recopiée).
+- Bancs : `repub-verifier` refait sur le PANNEAU (V1–V6, 390/1512 clair/sombre) ; `republication-parfaite` ré-axé (A0 :
+  l'app n'a plus d'atelier ; B : l'écran plein sur vinted.fr) — l'atelier lui-même est jugé par `grand-panneau`.
+
 ### Ce qui reste
 - Les réponses aux questions de « Publier sur… » servent à CET envoi (le fond n'écrit pas `main`) : elles seront
   reposées à la prochaine publication du même article.
