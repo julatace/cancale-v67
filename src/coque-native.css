@@ -32,7 +32,7 @@
    propriété de DESSIN d'un bouton natif est rendue à ce que disent les couches (donc `vrm-natif`, états compris : appui,
    survol, indisponible, focus). La mise en page (largeur, marges, flex) reste celle de l'écran. L'identifiant de <main>
    passe devant les règles d'avant ; `html` couvre les feuilles posées dans un portail. */
-:is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule) {
+:is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule, .n-segmente, .n-segmente-choix) {
   background: revert-layer; color: revert-layer; font: revert-layer; letter-spacing: revert-layer; text-transform: revert-layer;
   text-decoration: revert-layer; text-align: revert-layer; border: revert-layer; border-radius: revert-layer; box-shadow: revert-layer;
   padding: revert-layer; min-height: revert-layer; min-width: revert-layer; height: revert-layer; filter: revert-layer; opacity: revert-layer;
@@ -40,6 +40,9 @@
   -webkit-tap-highlight-color: revert-layer; white-space: revert-layer;
 }
 :is(#vrm-contenu, html) .n-bouton-icone-seule { width: revert-layer; display: revert-layer; }
+:is(#vrm-contenu, html) .n-segmente-choix :is(.n-segmente-libelle, .n-segmente-n) { font: inherit; color: inherit; background: transparent; }
+/* Un chevron qui RAMÈNE (le retour d'un fil eBay) : le glyphe natif, retourné. */
+.vrm-fil-retour-glyphe { transform: scaleX(-1); }
 :is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule) :is(.n-bouton-libelle, .n-bouton-icone, .n-bouton-nombre) {
   font: inherit; color: inherit; letter-spacing: inherit; background: transparent;
 }

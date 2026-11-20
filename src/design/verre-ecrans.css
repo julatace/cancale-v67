@@ -240,14 +240,7 @@
    La liste : « Toutes · Offres · Non lues » en verre fumé (l'actif en porcelaine), puis UN verre par compte, le compte
    de l'onglet d'abord (son badge), du plus récent au plus ancien dedans ; une rangée = la photo de la paire (44, rayon
    12), le pseudo, l'heure (et le point bleu d'un non lu), la plaque N° et le dernier mot — une offre en ambre. */
-:root:root:root:root:root body .vg-ms-vues { display: flex; padding: 3px; margin: 12px 0 2px; border-radius: 17px; background: rgb(10 38 76 / .30); border: 1px solid rgb(255 255 255 / .26); }
-:root:root:root:root:root body .vg-ms-vue { flex: 1; min-width: 0; height: 44px; min-height: 44px !important; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 6px !important; border: 0 !important; border-radius: 14px !important;
-  background: transparent !important; background-image: none !important; box-shadow: none !important; color: #FFFFFF !important; font: 600 14px/1 var(--sb-police-texte, Inter, sans-serif) !important; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-:root:root:root:root:root body .vg-ms-vue.is-on { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
-:root:root:root:root:root[data-theme="dark"] body .vg-ms-vue.is-on { background: rgb(238 244 251 / .95) !important; }
-:root:root:root:root:root body .vg-ms-n { font-style: normal; font: 750 11.5px/20px var(--sb-police-texte, Inter, sans-serif); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: rgb(255 255 255 / .12); }
-:root:root:root:root:root body .vg-ms-vue.is-on .vg-ms-n { background: rgb(12 29 48 / .08); }
-:root:root:root:root:root body .vg-ms-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
+:root:root:root:root:root body .vg-ms-vues { margin: 12px 0 2px; }   /* (20 nov.) les vues = le Segmente natif : plus de verre fumé ni de puces faites main */
 :root:root:root:root:root body .vg-ms-groupe { margin: 0; }
 :root:root:root:root:root body .vg-ms-groupe-h { display: flex; align-items: center; gap: 7px; margin: 16px 4px 8px; color: var(--sv-clair) !important; font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: 0 !important; text-transform: none !important; }
 :root:root:root:root:root body .vg-ms-groupe-h b { font: inherit; color: inherit !important; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -465,8 +458,6 @@
   :root:root:root:root:root body [data-fils-tous] .vrm-message-workspace { gap: 16px !important; background: none !important; box-shadow: none !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column { padding: 16px !important; border-radius: 26px !important;
     background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vues { background: rgb(12 29 48 / .06) !important; border-color: transparent !important; }
-  :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-vue:not(.is-on) { color: var(--sv-encre) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h, :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-groupe-h * { color: var(--sv-encre) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vg-ms-onglet { background: rgb(12 29 48 / .07) !important; border-color: transparent !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root body [data-fils-tous] .vrm-inbox-column .vrm-msg-list.vg-ms-liste { background: none !important; background-image: none !important; box-shadow: none !important; }
