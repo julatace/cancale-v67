@@ -470,6 +470,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **20 nov. · Relier achats et ventes : toutes les paires (relier-achats)** : plus récent d'abord des deux côtés, pastilles plateforme/marque/taille gardées, seuls les achats arrivés ; ventes > 12 mois, masquées, Leboncoin/eBay/Vestiaire ajoutées ; Achats (ordi) : colonne n° de suivi. `2026-11-20-relier-achats.md`. Geste : aucun.
 - **20 nov. · Ventes en tableau de travail (ventes-tableau)** : à l'ordinateur, À envoyer / En route = `TableauTravail` (transporteur en logo, statut en étiquette, cases = le lot, « Imprimer N » dans la barre, détail au toucher seulement) ; téléphone : logo + étiquette ; Terminées garde le segmenté. `2026-11-20-ventes-tableau.md`. Geste : aucun.
 - **20 nov. · 2ᵉ train du 20 nov. (ext. 5.410.0, branche `claude/integration-5410`)** : panneau-vintex (avec actions-extension, repub-messages-malins, lbc-vc-interesses) + minimaliste (avec argent-natif) ; écrans de gestes retirés gardés retirés, style minimaliste sur ce qui reste ; « Relier » d'Annonces · eBay laissé au bandeau (sa réponse attendue) ; paquets 5.410.0. `2026-11-20-panneau-vintex.md`, `2026-11-20-minimaliste.md`. Geste : installer la 5.410.0 dans CHAQUE Chrome.
 - **20 nov. · Annonces divisées par compte + téléphone revu + Argent fusionné (minimaliste)** : un groupe par compte, rangée courte, manque dit une fois, plein détaché des onglets ; `claude/argent-natif` fusionné, UN sélecteur. `2026-11-20-minimaliste.md` §2 ter-quater. Geste : aucun.
