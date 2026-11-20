@@ -45572,9 +45572,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // 12 derniers mois, ni annulées ni masquées, sans prix d'achat ni achat relié (la ligne de la vente,
   // `effEntry`) : le bénéfice réel attend leur achat. La cible : le titre de la vente, la taille et la
   // date de mise en ligne de SA fiche (par identité, `identiteAnnonce`), sinon la date de vente.
-  const fileVendus = useMemo(() => {
+  // (20 nov., Julien : « il n'y a même pas toutes les paires ») La règle prend sa BORNE : la liaison proposée et Ventes
+  // gardent les 12 derniers mois ; « Relier achats et ventes » prend TOUTES ses ventes (`fileVendusTous`, plus bas).
+  const vendusSansAchat = (borne) => {
     if (!Array.isArray(sales.items)) return null;
-    const borne = Date.now() - 365 * 86400e3, out = [];
+    const out = [];
     for (const o of sales.items) {
       if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
       const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
@@ -45587,8 +45589,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price, photo: (fiche && fiche.photo) || orderPhoto(o) || '' } });
     }
     return out.sort((x, y) => y.ts - x.ts);
+  };
+  const fileVendus = useMemo(() => vendusSansAchat(Date.now() - 365 * 86400e3),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, numeros, saleOv]);
+  [sales.items, numeros, saleOv]);
   // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
   // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
   const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats' || glisserOuvert || only === 'completer';
@@ -45664,6 +45668,44 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // en un geste annulable 5 s. Rien n'est relié sans SON glisser PUIS son « Oui ».
   const ouvrirGlisser = (init = null) => { const c = pickerFor ? (pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '')) : ''; setPickerFor(null);
     setGlisserOuvert({ achat: init && init.achat ? String(init.achat) : '', cible: init && init.cible ? String(init.cible) : c }); if (accounts.length && !fillBuyAchats.items) chargerAchats(); };
+  // (20 nov., Julien : « il n'y a même pas toutes les paires ») Mesuré sur sa base (lecture seule) : l'écran ne listait que
+  // les annonces Vinted EN LIGNE et les ventes Vinted des 12 DERNIERS MOIS. Il manquait : les ventes plus anciennes (aucune
+  // borne ici : une vente de 2024 sans achat attend son achat comme une autre), les annonces MASQUÉES par Vinted et « à
+  // confirmer » (toujours chez lui, `<masquees-regle>`), et TOUTES ses annonces et ventes Leboncoin, eBay et Vestiaire
+  // (l'article de src/articles/modele.js, lu par la lecture d'Annonces — `lireAnnoncesEgalite`). Les règles d'identité
+  // restent celles de chaque liste (« sans achat relié » : ni achat relié, ni prix d'achat connu).
+  const fileVendusTous = useMemo(() => (glisserOuvert ? vendusSansAchat(-Infinity) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  [glisserOuvert, sales.items, numeros, saleOv]);
+  const fileAchatHorsLigne = useMemo(() => (glisserOuvert ? fileSansAchat({ annonces: [...(masqueesSurEtagere || []), ...(Array.isArray(listings.aConfirmer) ? listings.aConfirmer : [])].filter((it) => it && !acctOffOf(it)),
+    numeros, prixAchat: (e) => { const a = prixAchatDe(e, buyByNum); return a != null && !isNaN(a) ? a : null; }, maintenant: Date.now() }) : []),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [glisserOuvert, masqueesSurEtagere, listings.aConfirmer, numeros, buyByNum]);
+  // Les articles des AUTRES sites sans achat (porteur = son annonce, `vrm_articles_sites`) : undefined en lecture, [] sinon.
+  const [articlesSitesGlisser, setArticlesSitesGlisser] = useState(undefined);
+  const [faitsSitesTic, setFaitsSitesTic] = useState(0);
+  useEffect(() => {
+    if (!glisserOuvert) return undefined;
+    let vivant = true;
+    Promise.all([import('./ecrans/AnnoncesEgalite.jsx'), import('./articles/modele.js')]).then(async ([E, M]) => {
+      const lu = await E.lireAnnoncesEgalite(accounts);
+      if (!vivant) return;
+      if (!lu) { setArticlesSitesGlisser([]); return; }
+      const r = M.construireArticles({ annonces: (lu.annonces || []).filter((a) => a && a.site !== 'vinted'), fiches: load('vinted_annonce_numeros', {}) || {}, faits: load(M.CLE_ARTICLES, {}) || {},
+        achatsParNum: load('vinted_buyprice_by_num', {}) || {}, cle: cleNum, aVinted: accounts.length > 0 });
+      setArticlesSitesGlisser(r.articles.filter((a) => a.porteur && a.porteur.type === 'site' && a.achat == null && !a.achatRelie && !['retiree', 'brouillon'].includes(a.etat)));
+    }).catch(() => { if (vivant) setArticlesSitesGlisser([]); });
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glisserOuvert, faitsSitesTic]);
+  // Les liens d'achat de l'écran : ceux des fiches et des ventes, ET ceux posés sur une annonce d'un autre site.
+  const liensGlisser = useMemo(() => {
+    if (!glisserOuvert) return liensAchats;
+    const m = new Map(liensAchats);
+    for (const e of Object.values(load('vrm_articles_sites', {}) || {})) { if (!e || e.buyFromId == null || String(e.buyFromId) === '') continue; const k = String(e.buyFromId); m.set(k, (m.get(k) || 0) + 1); }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [glisserOuvert, liensAchats, faitsSitesTic]);
   const ciblesGlisser = useMemo(() => {
     if (!glisserOuvert) return [];
     const jour = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
@@ -45672,17 +45714,44 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     for (const x of (fileAchat || [])) { const f = x.fiche || numeros[x.id] || {};
       out.push({ key: cleArticleAnnonce(x.id), genre: 'annonce', id: String(x.id), titre: (x.item && x.item.title) || '', photo: (x.item && x.item.photo) || '', num: f.numero ? String(f.numero) : '',
         taille: String((x.item && (x.item.size || x.item.size_title)) || f.size || ''),   // (17 nov., lot relier-taille) « ✓ même taille »
+        site: 'vinted', ts: x.ts || null, marque: String((x.item && (x.item.brand || x.item.brand_title)) || extractBrand(String((x.item && x.item.title) || '')) || ''),
         sous: [prixTxt(x.item && x.item.price), x.ts ? tr('liaison.enLigneLe', { date: jour(x.ts) }) : ''].filter(Boolean).join(' · ') }); }
-    for (const x of (fileVendus || [])) {
+    const vues = new Set(out.map((c) => c.key));
+    for (const x of (fileAchatHorsLigne || [])) { const k = cleArticleAnnonce(x.id); if (vues.has(k)) continue; vues.add(k); const f = x.fiche || numeros[x.id] || {};
+      out.push({ key: k, genre: 'annonce', id: String(x.id), titre: (x.item && x.item.title) || '', photo: (x.item && x.item.photo) || '', num: f.numero ? String(f.numero) : '',
+        taille: String((x.item && (x.item.size || x.item.size_title)) || f.size || ''), site: 'vinted', ts: x.ts || null,
+        marque: String((x.item && (x.item.brand || x.item.brand_title)) || extractBrand(String((x.item && x.item.title) || '')) || ''),
+        sous: [prixTxt(x.item && x.item.price), x.item && x.item._vrmMasquee ? tr('glisser.masquee') : tr('glisser.aConfirmer')].filter(Boolean).join(' · ') }); }
+    for (const x of (fileVendusTous || fileVendus || [])) {
       out.push({ key: x.key, genre: 'vente', tx: String(x.o.transaction_id), idf: x.idf || null, titre: x.o.title || '', photo: (x.cible && x.cible.photo) || '', num: x.fiche && x.fiche.numero ? String(x.fiche.numero) : '',
         taille: String((x.cible && x.cible.taille) || (typeof x.o.size_title === 'string' ? x.o.size_title : '') || ''),
+        site: 'vinted', ts: x.ts || null, marque: String(extractBrand(String(x.o.title || '')) || ''),
         sous: [prixTxt(x.o.price), x.o.date ? tr('liaison.venduLe', { date: jour(x.o.date) }) : ''].filter(Boolean).join(' · ') }); }
+    // Les autres sites : l'ARTICLE (son annonce porte le lien, `vrm_articles_sites`), par l'identifiant de son annonce.
+    for (const a of (articlesSitesGlisser || [])) {
+      const an = a.annonces.find((x) => x.site === a.porteur.site && String(x.id) === String(a.porteur.id)) || a.annonces[0] || {};
+      const vendue = a.etat === 'vendue';
+      out.push({ key: 's:' + a.porteur.cle, genre: vendue ? 'vente' : 'annonce', site: a.porteur.site, article: a, titre: a.titre || '', photo: a.photo || '', num: a.numero || '',
+        taille: a.taille || '', ts: an.depuis || a.depuis || null, marque: String(an.marque || extractBrand(a.titre || '') || ''),
+        sous: [a.prix != null ? prixTxt(a.prix) : '', an.depuis ? tr(vendue ? 'liaison.venduLe' : 'liaison.enLigneLe', { date: jour(an.depuis) }) : ''].filter(Boolean).join(' · ') });
+    }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [glisserOuvert, fileAchat, fileVendus, numeros]);
+  }, [glisserOuvert, fileAchat, fileVendus, fileVendusTous, fileAchatHorsLigne, articlesSitesGlisser, numeros]);
   const relierGlisse = async (a, cible) => {
     if (!a || !cible) return false;
     const w = await ecritureRelierAchat(a); if (!w) return false;
+    // (20 nov.) Une annonce d'un AUTRE site : le lien sur SON annonce (`opsFait`, src/articles/modele.js — la même écriture
+    // que « Acheté » d'Annonces), relue juste avant ; carte pas lue ⇒ rien. Un geste annulable, comme toute liaison.
+    if (cible.article) {
+      const M = await import('./articles/modele.js');
+      const lire = (k) => { try { const v = load(k, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
+      const r = M.opsFait({ article: cible.article, champs: { buyPrice: w.buyPrice, buyFromId: w.buyFromId, buyFrom: w.buyFrom }, cartes: { fiches: lire('vinted_annonce_numeros'), faits: lire(M.CLE_ARTICLES) || {}, parNum: lire('vinted_buyprice_by_num') || {} } });
+      if (!r || r.refus || !Array.isArray(r.ops) || !r.ops.length) { toast(tr('glisser.pasEcrit'), 'error'); return false; }
+      gesteVrm(tr('glisser.fait', { qui: cible.num ? `N°${cible.num}` : `« ${String(cible.titre || '').slice(0, 40)} »` }), r.ops, {}, () => setFaitsSitesTic((t) => t + 1));
+      setFaitsSitesTic((t) => t + 1);
+      return true;
+    }
     // (16 nov.) Le même geste que toute liaison : le bénéfice et « Reçu » dans la pilule, annulable 5 s.
     const o = cible.genre === 'vente' ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible.tx)) || null : null;
     const it = cible.genre === 'annonce' ? (listings.items || []).find((x) => x && String(x.id) === String(cible.id)) || null : null;
@@ -54358,7 +54427,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               const m = montantCommande(o);
               return { cle: String(o.transaction_id), o, tk, titre: o.title || '', photo: orderPhoto(o) || '', prix: m != null ? montant(m, { devise: o.price?.currency_code || 'EUR' }) : '', prixNombre: m,
                 t: quandCommandeVinted(o), num: buyNumByTxn[String(o.transaction_id)] || '', compte: o._acc ? accNameOf(o._acc) : '', etape: st,
-                transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '' };
+                transporteur: ls && ls.nom ? { nom: ls.nom, logo: ls.logo } : null, code: st.step === 3 && tk ? codeRetrait(tk.code) : '',
+                // (20 nov., Julien : « comme Ventes ») Le N° DE SUIVI de l'achat (lu par l'extension : `suivisVinted`, `suiviCourant`,
+                // ou le colis relié par SON n° de transaction) et le lien chez SON transporteur (`ligneSuiviAchat`, la ligne du téléphone).
+                suivi: ls && ls.su ? { n: ls.su, lien: ls.lien || null } : null };
             });
             const filtresA = [
               ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreAchatsT.compte || 'tous', onChange: (v) => setFiltreAchatsT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
@@ -54491,7 +54563,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {/* (17 nov., Julien : « quand je fais les trois petits points, ça ne me propose pas de relier ») Un achat LIBRE
                         (pas annulé, ni en retour / litige, ni relié) : « Relier à une vente / annonce » ouvre le mode Relier, cet achat
                         déjà choisi (bandeau fixe) — un toucher sur la vente ou l'annonce, puis « Oui ». */}
-                    {!cancelled && (numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id)) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
+                    {!cancelled && st.step === 4 && (numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id)) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -58368,7 +58440,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       {curSub==='bordereaux' && !scanOuvert && !tourneeDepot && !depotOuvert ? <BarreAnnulerDepose attente={deposeScan.attente} onAnnuler={deposeScan.annuler} zIndex={Z_CONFIRMATION - 1}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* (16 nov., lot relier-glisser) « Relier en glissant » : plein écran, au-dessus de la feuille. */}
-      {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
+      {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensGlisser}
+          recuDe={(a)=>achatStage(a, trackForBuy(a)).step === 4}
           tresProbables={liaison && liaison.parAchat ? liaison.parAchat : null} cibles={ciblesGlisser} prixDe={prixPayeAchat} compteDe={(a)=>accNameOf(a && a._acc)||''}
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}

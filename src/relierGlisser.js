@@ -197,3 +197,65 @@ export function texteApresLiaison({ genre = 'vente', prix = null, entree = null 
   return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }),
     titre: t('liaison.relieTitre', {}), sous: t(genre === 'annonce' ? 'liaison.relieSousAffiche' : 'liaison.relieSous', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
 }
+
+// ── (20 nov., Julien : « trie de la plus récente à la plus ancienne, des deux côtés ; des filtres plateforme, marque,
+//    taille ; ne me propose jamais un achat pas encore livré ») ─────────────────────────────────────────────────────
+// LE TRI : la date la plus récente d'abord, des deux côtés (achat : la date de la commande ; vente : la date de vente ;
+// annonce : sa mise en ligne). Une ligne sans date lisible va À LA FIN (jamais devinée), l'ordre d'avant gardé entre elles.
+const dateMsDe = (v) => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : Date.parse(String(v)); if (!Number.isFinite(n) || n <= 0) return null; return n < 1e12 ? n * 1000 : n; };
+export function plusRecentDabord(liste, dateDe) {
+  if (!Array.isArray(liste)) return liste;
+  return liste.map((x, i) => ({ x, i, d: dateMsDe(typeof dateDe === 'function' ? dateDe(x) : null) }))
+    .sort((p, q) => (p.d == null) - (q.d == null) || (q.d || 0) - (p.d || 0) || p.i - q.i).map((p) => p.x);
+}
+// LES ACHATS QU'ON PEUT RELIER : seulement ceux qu'il A (reçus ou retirés). `recuDe(a)` : la règle de l'app (l'étape
+// « Arrivé » de `etapeAchat` : transaction finalisée, commande livrée, retrait prouvé par le transporteur — un colis encore
+// au point relais, en route ou payé n'y est pas). « Pas su » (pas de règle, ou une règle qui ne rend pas `true`) ⇒ écarté :
+// une paire qu'il n'a pas encore ne se relie pas à une annonce (§5 : « pas su » ne vaut pas « oui »).
+export function seulementRecus(liste, recuDe) {
+  if (!Array.isArray(liste) || typeof recuDe !== 'function') return liste;
+  return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) === true; } catch (_) { return false; } });
+}
+// LES FACETTES : plateforme, marque, taille — des DEUX côtés, chacune lue par son getter (jamais devinée : une ligne sans
+// marque lue n'a pas de marque, elle sort quand une marque est choisie). Rend les choix présents avec leur nombre, triés
+// (plateformes dans l'ordre des sites, marques par nombre puis nom, tailles en nombre).
+export const FACETTES = ['site', 'marque', 'taille'];
+export const ORDRE_SITES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
+const normFacette = (k, v) => { const s = String(v == null ? '' : v).trim(); if (!s) return ''; return k === 'marque' ? s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') : k === 'taille' ? s.replace(',', '.').replace(/\s+/g, ' ') : s.toLowerCase(); };
+const valeurTaille = (t) => { const m = /(\d+(?:\.\d+)?)/.exec(String(t)); return m ? Number(m[1]) : Infinity; };
+export function facettesDe(liste, lire = {}) {
+  const out = {};
+  for (const k of FACETTES) {
+    const f = typeof lire[k] === 'function' ? lire[k] : null; const m = new Map();
+    if (f) for (const x of (Array.isArray(liste) ? liste : [])) { let v = ''; try { v = f(x); } catch (_) { v = ''; } const c = normFacette(k, v); if (!c) continue; const e = m.get(c) || { cle: c, libelle: String(v).trim(), n: 0 }; e.n++; m.set(c, e); }
+    const vals = [...m.values()];
+    if (k === 'site') vals.sort((a, b) => (ORDRE_SITES.indexOf(a.cle) + 1 || 99) - (ORDRE_SITES.indexOf(b.cle) + 1 || 99));
+    else if (k === 'taille') vals.sort((a, b) => valeurTaille(a.cle) - valeurTaille(b.cle) || a.cle.localeCompare(b.cle, 'fr'));
+    else vals.sort((a, b) => b.n - a.n || a.libelle.localeCompare(b.libelle, 'fr'));
+    out[k] = vals;
+  }
+  return out;
+}
+// Garder les lignes qui ont EXACTEMENT la valeur choisie de chaque facette (''/absente = toutes). « contient » n'existe pas ici :
+// « Nike » ne prend pas « Nike SB » s'il est lu « Nike SB » (deux marques), et une taille « 42 » ne prend pas « 42,5 ».
+export function filtrerFacettes(liste, choix = {}, lire = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const actives = FACETTES.filter((k) => choix && choix[k] && typeof lire[k] === 'function');
+  if (!actives.length) return liste;
+  return liste.filter((x) => actives.every((k) => { let v = ''; try { v = lire[k](x); } catch (_) { v = ''; } return normFacette(k, v) === normFacette(k, choix[k]); }));
+}
+// Un choix gardé qui n'existe plus dans la liste (achat relié depuis, marque partie) tombe : jamais une liste vide sans raison.
+export function choixValides(choix = {}, facettes = {}) {
+  const out = {};
+  for (const k of FACETTES) { const v = choix && choix[k]; if (v && Array.isArray(facettes[k]) && facettes[k].some((f) => f.cle === normFacette(k, v))) out[k] = normFacette(k, v); }
+  return out;
+}
+// Les choix GARDÉS (par appareil : un confort, jamais une donnée) — `vrm_relier_filtres` { achats: {…}, cibles: {…} }.
+export const CLE_FILTRES = 'vrm_relier_filtres';
+export function lireFiltresGardes(stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { const v = JSON.parse((stock && stock.getItem(CLE_FILTRES)) || 'null'); if (v && typeof v === 'object') return { achats: v.achats && typeof v.achats === 'object' ? v.achats : {}, cibles: v.cibles && typeof v.cibles === 'object' ? v.cibles : {} }; } catch (_) {}
+  return { achats: {}, cibles: {} };
+}
+export function garderFiltres(f, stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { if (stock) stock.setItem(CLE_FILTRES, JSON.stringify({ achats: f && f.achats ? f.achats : {}, cibles: f && f.cibles ? f.cibles : {} })); } catch (_) {}
+}

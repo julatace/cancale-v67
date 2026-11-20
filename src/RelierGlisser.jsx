@@ -15,19 +15,52 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tr, monnaie } from './i18n/index.js';
-import { appuiSuivant, vitesseBord, listesGlisser, marquerPour, achatsRelies, compterCibles, filtrerCibles, chercherAchats, chercherCibles, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
+import { appuiSuivant, vitesseBord, listesGlisser, marquerPour, achatsRelies, compterCibles, filtrerCibles, chercherAchats, chercherCibles, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS,
+  plusRecentDabord, seulementRecus, facettesDe, filtrerFacettes, choixValides, lireFiltresGardes, garderFiltres, FACETTES } from './relierGlisser.js';
 import { lotDe } from './suggestionsAchat.js';
 import { FaitsAchat, NoteTailleAchats } from './FaitsAchat.jsx';   // (17 nov., lot relier-taille)
 import { faitsAchat, sansTailleLue } from './faitsAchat.js';
 import './styles-relier-glisser.css';
 
 const montant = (n) => { try { return monnaie(n); } catch (_) { return `${Number(n).toFixed(2).replace('.', ',')} €`; } };
+// (20 nov.) Les FACETTES d'un côté (plateforme, marque, taille) : une pastille par facette, qui ouvre le sélecteur NATIF du
+// téléphone (un <select> posé sur la pastille) ; choisie = encre pleine. Une facette à une seule valeur n'est pas montrée
+// (un bouton qui ne change rien n'en est pas un) — sauf si elle est choisie (pour pouvoir la retirer).
+const NOM_SITE_RG = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+function Facettes({ cote, facettes, choix, onChoix }) {
+  const montrees = FACETTES.filter((k) => (facettes[k] || []).length > 1 || choix[k]);
+  if (!montrees.length) return null;
+  const libelleDe = (k, f) => (k === 'site' ? NOM_SITE_RG[f.cle] || f.libelle : k === 'taille' ? String(f.libelle).replace('.', ',') : f.libelle);
+  return (
+    <div className="vrm-rg-facettes" role="group" aria-label={tr('glisser.filtrer')} data-glisser-facettes={cote}>
+      {montrees.map((k) => {
+        const vals = facettes[k] || []; const v = choix[k] || ''; const sel = vals.find((f) => f.cle === v);
+        const tous = tr('glisser.facette.' + k + '.tous');
+        return (
+          <label key={k} className="vrm-rg-facette" data-glisser-facette={k} data-glisser-facette-valeur={v || undefined} aria-pressed={v ? 'true' : 'false'}>
+            <span className="vrm-rg-facette-txt">{sel ? libelleDe(k, sel) : tous}</span>
+            <svg className="vrm-rg-facette-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <select value={v} aria-label={tr('glisser.facette.' + k)} onChange={(e) => onChoix(k, e.target.value)}>
+              <option value="">{tous}</option>
+              {vals.map((f) => <option key={f.cle} value={f.cle}>{libelleDe(k, f)} ({f.n})</option>)}
+            </select>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
 const jourCourt = (d) => { const t = Date.parse(d || ''); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 
 export default function RelierGlisser({ achats, liens, tresProbables = null, cibles = [], prixDe, compteDe = () => '', photoDe = () => '', tailleDe = () => '',
   onRelier, onListe = null, onFermer, Photo, Icon, Retour = null, zIndex = 1400, C = {}, achatInitial = '', cibleInitiale = '',
-  details = undefined, marqueDe = null, couleursDe = null }) {
-  const L = useMemo(() => listesGlisser({ achats, liens, tresProbables, cibles }), [achats, liens, tresProbables, cibles]);
+  details = undefined, marqueDe = null, couleursDe = null, recuDe = null, siteDe = () => 'vinted' }) {
+  // (20 nov., Julien) Seuls les achats REÇUS ou RETIRÉS (`recuDe`, l'étape « Arrivé » de l'app) ; les deux listes du plus
+  // récent au plus ancien (achat : sa commande ; vente : sa date ; annonce : sa mise en ligne).
+  const L = useMemo(() => { const l = listesGlisser({ achats, liens, tresProbables, cibles });
+    return { ...l, achats: plusRecentDabord(seulementRecus(l.achats, recuDe), (x) => x.a && x.a.date), cibles: plusRecentDabord(l.cibles, (c) => c.ts) }; },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [achats, liens, tresProbables, cibles]);
   const [leve, setLeve] = useState(null);          // { tx, x, y, dx, dy, w, h }
   const [survol, setSurvol] = useState('');        // key de la cible sous le doigt
   // (17 nov., Julien : « je dois rester appuyé sur l'achat […] et après on ne voit pas ce que j'ai sélectionné ») RELIER
@@ -48,6 +81,14 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const [filtreA, setFiltreA] = useState('libres'), [filtreC, setFiltreC] = useState('toutes');
   const [qA, setQA] = useState(''), [qC, setQC] = useState('');   // la recherche de chaque liste
   const [nVusA, setNVusA] = useState(60), [nVusC, setNVusC] = useState(60);
+  // (20 nov.) Plateforme, marque, taille — des deux côtés, GARDÉES sur l'appareil (`vrm_relier_filtres`).
+  const [facChoix, setFacChoix] = useState(() => lireFiltresGardes());
+  const choisirFacette = (cote, k, v) => { setFacChoix((f) => { const n = { ...f, [cote]: { ...(f[cote] || {}), [k]: v || undefined } }; if (!v) delete n[cote][k]; garderFiltres(n); return n; }); if (cote === 'achats') setNVusA(60); else setNVusC(60); };
+  const lireA = useMemo(() => ({ site: (x) => { try { return siteDe(x.a) || 'vinted'; } catch (_) { return ''; } },
+    marque: (x) => (typeof marqueDe === 'function' ? marqueDe(String((x.a && x.a.title) || '')) || '' : ''), taille: (x) => tailleDe(x.a) || '' }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  []);
+  const lireC = useMemo(() => ({ site: (c) => c.site || 'vinted', marque: (c) => c.marque || '', taille: (c) => c.taille || '' }), []);
   const corpsRef = useRef(null), finA = useRef(null), finC = useRef(null), tirer = useRef(null);
   const bordDepuis = useRef(0), vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
   const parTx = useMemo(() => new Map((L.achats || []).map((x) => [x.tx, x])), [L.achats]);
@@ -193,11 +234,16 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const relies = useMemo(() => achatsRelies({ achats, liens }), [achats, liens]);
   const nRelies = Array.isArray(relies) ? relies.length : null;
   // « Très probable » : seulement pour la vente / l'annonce CHOISIE, et ces achats-là en tête.
-  const achatsVus = useMemo(() => chercherAchats(filtreA === 'relies' ? relies : marquerPour(L.achats, tresProbables, cibleChoisie), qA, { compteDe, marqueDe, tailleDe }),
+  const baseA = filtreA === 'relies' ? relies : L.achats;
+  const facA = useMemo(() => facettesDe(baseA, lireA), [baseA, lireA]);
+  const choixA = useMemo(() => choixValides(facChoix.achats, facA), [facChoix.achats, facA]);
+  const achatsVus = useMemo(() => chercherAchats(filtrerFacettes(filtreA === 'relies' ? relies : marquerPour(L.achats, tresProbables, cibleChoisie), choixA, lireA), qA, { compteDe, marqueDe, tailleDe }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtreA, relies, L.achats, tresProbables, cibleChoisie, qA]);
+    [filtreA, relies, L.achats, tresProbables, cibleChoisie, qA, choixA]);
   const nCibles = useMemo(() => compterCibles(L.cibles), [L.cibles]);
-  const ciblesVues = useMemo(() => chercherCibles(filtrerCibles(L.cibles, filtreC), qC), [L.cibles, filtreC, qC]);
+  const facC = useMemo(() => facettesDe(filtrerCibles(L.cibles, filtreC), lireC), [L.cibles, filtreC, lireC]);
+  const choixC = useMemo(() => choixValides(facChoix.cibles, facC), [facChoix.cibles, facC]);
+  const ciblesVues = useMemo(() => chercherCibles(filtrerFacettes(filtrerCibles(L.cibles, filtreC), choixC, lireC), qC), [L.cibles, filtreC, qC, choixC, lireC]);
   // Un choix fait (achat ou article) : la liste d'en face revient à « Libres » / garde son filtre.
   useEffect(() => { if (cibleChoisie && filtreA !== 'libres') setFiltreA('libres'); }, [cibleChoisie, filtreA]);
   const carteAchat = (x, flottante = false) => {
@@ -269,6 +315,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
               onChange={(e) => { setQA(e.target.value); setNVusA(60); }}/>
             {qA ? <button type="button" className="vrm-rg-cherche-x" aria-label={tr('glisser.effacer')} data-glisser-cherche-effacer="achats" onClick={() => { setQA(''); setNVusA(60); }}><Icon name="close" size={16}/></button> : null}
           </label>
+          <Facettes cote="achats" facettes={facA} choix={choixA} onChoix={(k, v) => choisirFacette('achats', k, v)}/>
           <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)} data-glisser-achats-vus={Array.isArray(achatsVus) ? String(achatsVus.length) : ''}>
             {achatsVus === undefined ? <li className="vrm-rg-vide">…</li>
               : achatsVus === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
@@ -278,7 +325,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                   <div className="vrm-rg-carte vrm-rg-achat is-relie" data-glisser-relie={x.tx}>{carteAchat(x)}</div>
                 </li>) : (
                 <li key={x.tx}>
-                  <button type="button" className="vrm-rg-carte vrm-rg-achat" data-glisser-achat={x.tx} aria-pressed={choisi === x.tx}
+                  <button type="button" className="vrm-rg-carte vrm-rg-achat" data-glisser-achat={x.tx} data-glisser-ts={Date.parse((x.a && x.a.date) || '') || undefined} aria-pressed={choisi === x.tx}
                     data-glisser-source={leve && leve.tx === x.tx ? '1' : undefined}
                     onPointerDown={(e) => debut(e, x)} onContextMenu={(e) => e.preventDefault()}
                     onClick={() => toucherAchat(x)}>
@@ -308,6 +355,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
               onChange={(e) => { setQC(e.target.value); setNVusC(60); }}/>
             {qC ? <button type="button" className="vrm-rg-cherche-x" aria-label={tr('glisser.effacer')} data-glisser-cherche-effacer="cibles" onClick={() => { setQC(''); setNVusC(60); }}><Icon name="close" size={16}/></button> : null}
           </label>
+          <Facettes cote="cibles" facettes={facC} choix={choixC} onChoix={(k, v) => choisirFacette('cibles', k, v)}/>
           <ul className="vrm-rg-liste" ref={listeCibles} data-glisser-cibles={String(L.cibles.length)} data-glisser-cibles-vues={String(ciblesVues.length)}>
             {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li>
               : !ciblesVues.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles-filtre">{tr('glisser.aucuneFiltre')}</li>
@@ -316,12 +364,12 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
               const propose = achatLeve && achatLeve.propose === String(c.key);
               return (
                 <li key={c.key}>
-                  <button type="button" className="vrm-rg-carte vrm-rg-cible" data-glisser-cible={c.key} data-glisser-ici={choisi ? c.key : undefined} aria-pressed={cibleChoisie === String(c.key)} data-glisser-genre={c.genre} data-glisser-survol={actif ? '1' : undefined} data-glisser-attendue={propose ? '1' : undefined}
+                  <button type="button" className="vrm-rg-carte vrm-rg-cible" data-glisser-cible={c.key} data-glisser-ici={choisi ? c.key : undefined} aria-pressed={cibleChoisie === String(c.key)} data-glisser-genre={c.genre} data-glisser-site={c.site || 'vinted'} data-glisser-ts={c.ts || undefined} data-glisser-survol={actif ? '1' : undefined} data-glisser-attendue={propose ? '1' : undefined}
                     onClick={() => toucherCible(c)}>
                     <span className="vrm-rg-photo" aria-hidden="true">{c.photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" draggable={false}/> : <Icon name="image" size={20}/>}</span>
                     <span className="vrm-rg-texte">
                       <span className="vrm-rg-titre">{c.num ? <b className="vrm-rg-num">N°{c.num}</b> : null}{c.titre || '—'}</span>
-                      <span className="vrm-rg-sous">{[c.genre === 'vente' ? tr('glisser.vendue') : tr('glisser.enVente'), c.taille ? tr('faits.taille', { taille: String(c.taille).replace('.', ',') }) : '', c.sous].filter(Boolean).join(' · ')}</span>
+                      <span className="vrm-rg-sous">{[c.site && c.site !== 'vinted' ? NOM_SITE_RG[c.site] || c.site : '', c.genre === 'vente' ? tr('glisser.vendue') : tr('glisser.enVente'), c.taille ? tr('faits.taille', { taille: String(c.taille).replace('.', ',') }) : '', c.sous].filter(Boolean).join(' · ')}</span>
                       {accordCible(c)}
                     </span>
                     {choisi ? <span className="vrm-rg-ici" aria-hidden="true">{tr('glisser.relierIci')}</span> : null}
