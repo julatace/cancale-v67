@@ -67,7 +67,7 @@
   .sm-boite[data-notee] { opacity: .72; }
   .sm-boite[data-etat="vendue"] { box-shadow: inset 0 0 0 3px var(--n-ambre); }
   .sm-boite[data-etat="plusenligne"] { outline: 2px dashed var(--n-ambre); outline-offset: -4px; }
-  .sm-boite[data-etat="double"] { box-shadow: inset 0 0 0 3px var(--n-doublon); }
+  .sm-boite[data-etat="doublon"] { box-shadow: inset 0 0 0 3px var(--n-doublon); }   /* deux paires sous un N° : le seul rouge */
   .sm-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   /* L'étiquette : du papier collé sur la boîte, le N° en grand (lisible de loin). */
   .sm-etiq { position: relative; display: flex; align-items: center; justify-content: center; max-width: 88%; min-width: 56%; padding: 0 4%;
