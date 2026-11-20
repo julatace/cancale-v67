@@ -937,6 +937,7 @@ import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, nouveautesAVoir, nouveautesDuCompte, marquerVues as marquerNouveautesVues, lireVues as lireVuesNouveautes } from './nouveautes.js';
 import { QuoiDeNeufCarte, QuoiDeNeufFeuille, QuoiDeNeufReglage } from './QuoiDeNeuf.jsx';
 import { SITES_TACHE, TACHES_SITE, estTacheSite, siteDeTache, sectionDeTache, sousSections, subDeTache, redirigerOnglet, filtreRetenu, retenirFiltre } from "./navigationTache.js";
+import { CLE_SITE_COURANT, brancherSiteCourant, lireSiteCourant, useSiteCourant, siteEffectif, sitePourTache } from "./siteCourant.js";   // (20 nov.) UN site courant pour toute l'app
 import { carteJournee as carteJourneeCloture, CLE_CLOTURE, CLE_CLOTURE_VUE, DEMANDE_CLOTURE } from "./clotureAnnee.js";   // (11 nov.) « Clôturer l'année »
 import { SEGMENTS_ARGENT, ONGLET_SEGMENT, CHEMINS_ARGENT, segmentArgent, vueCompta, questionsArgent } from "./argent.js";   // (10 nov.) Statistiques + Compta = Argent
 import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOIS } from "./cibleNotif.js";
@@ -3288,6 +3289,8 @@ const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   // (19 nov., ext. 5.409) « Depuis ta dernière visite » : la plus récente capture qu'il a VUE dans la feuille d'arrivée ({ at }) — vue ici, vue partout (src/capteNotif/arrivee.js).
   'vrm_capte_vu',
+  // (20 nov., décision « un sélecteur de plateforme global ») Le site regardé partout (src/siteCourant.js) : son choix, sur tous ses appareils.
+  CLE_SITE_COURANT,
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
   'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
@@ -5344,7 +5347,10 @@ const reprendreRecherches = (tab, now = Date.now()) => {
   }
 };
 // Le site retenu d'une tâche : celui du compte (synchronisé) d'abord, sinon celui de l'appareil.
-const filtreRetenuCompte = (tab) => { try { const s = siteReprise(carteReprise(), tab); if (s) return siteDeTache(tab, s); } catch (_) {} return filtreRetenu(tab); };
+brancherSiteCourant({ load: (k, d) => load(k, d), save: (k, v) => save(k, v) });
+// (20 nov., sélecteur de plateforme global) Le filtre d'une tâche est celui du SITE COURANT (src/siteCourant.js) — un seul
+// choix pour toute l'app ; les filtres retenus par tâche d'hier (`siteReprise`, `filtreRetenu`) ne décident plus.
+const filtreRetenuCompte = (tab) => { try { const s = sitePourTache(tab, lireSiteCourant(), TACHES_SITE); if (s) return siteDeTache(tab, s); } catch (_) {} try { const s = siteReprise(carteReprise(), tab); if (s) return siteDeTache(tab, s); } catch (_) {} return filtreRetenu(tab); };
 const siteDuTab = (tab, sub) => (estTacheSite(tab) ? siteDeTache(tab, sub) : ({ plat_vinted: 'vinted', plat_leboncoin: 'leboncoin', plat_ebay: 'ebay', plat_vestiaire: 'vestiaire' }[tab] || tab));
 if (typeof document !== 'undefined') {
   const auRepos = () => { try { quitterRecherches(_histoOnglet.tab || ''); } catch (_) {} ecrireRepriseMaintenant(); viderSave(CLE_REPRISE_ECRANS); };
@@ -20673,8 +20679,28 @@ const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: nul
 const SITES_COQUE = { v: ['vinted'] };
 const choisirSiteTache = (tache, site) => { try { window.dispatchEvent(new CustomEvent('vrm:site-tache', { detail: { tache, site } })); } catch (_) {} };
 const NOMS_SITES_COQUE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire', toutes: '' };
-const filtreSiteTableau = (tache, site) => { const l = (SITES_COQUE.v || []).filter((x) => x !== 'toutes'); return l.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: site, onChange: (v) => choisirSiteTache(tache, v),
-  options: l.map((x) => ({ cle: x, libelle: NOMS_SITES_COQUE[x] || x })) }] : []; };
+// (20 nov., sélecteur de plateforme global) Le filtre « Site » des tableaux de travail est le sélecteur global : plus de filtre
+// local (rend une liste vide ; la fonction reste pour les écrans qui l'appellent).
+const filtreSiteTableau = () => [];
+// (20 nov., sélecteur de plateforme global) Les sites RELIÉS, posés par la coque à chaque rendu (comme SITES_COQUE) : le
+// sélecteur et Aujourd'hui les lisent sans qu'on les leur passe.
+const SITES_RELIES_COQUE = { v: [] };
+const siteCourantCoque = (brut) => siteEffectif(brut, SITES_RELIES_COQUE.v);
+// Dans « Plus » (et la barre latérale), UNE rangée par plateforme reliée : sa page de réglages (comptes reliés et leur
+// lecture, connexion de l'extension sur ce site, réglages propres au site) — les panneaux de Paramètres qui les portent déjà.
+const REGLAGE_DU_SITE = { vinted: 'liens', leboncoin: 'connexions', ebay: 'ebay', vestiaire: 'connexions' };
+const groupePlateformes = (tab, setTab, taille) => {
+  const l = SITES_RELIES_COQUE.v || [];
+  if (!l.length) return null;
+  return { titre: tr('site.plus.titre'), entrees: l.map((x) => ({ cle: 'site-' + x, libelle: nomPlateforme(x), icone: <span className="n-site-logo" data-taille={taille}><LogoSite site={x}/></span>,
+    onChoisir: () => { DEMANDE_REGLAGE_SOUS.id = REGLAGE_DU_SITE[x]; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); },
+    attrs: { 'data-plus-site': x } })) };
+};
+function SelecteurSiteCoque() {
+  const [brut, poser] = useSiteCourant();
+  return <Natif.SelecteurSite sites={SITES_RELIES_COQUE.v} valeur={siteCourantCoque(brut)} onChange={poser} nom={nomPlateforme} Logo={(x) => <LogoSite site={x}/>}
+    tous={tr('site.tous')} libelle={tr('site.libelle')} attrs={{ 'data-selecteur-site': '' }}/>;
+}
 const ouvrirSanteNative = (tab, setTab) => { DEMANDE_REGLAGE_SOUS.id = 'sante'; if (tab === 'settings') { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } else setTab('settings'); };
 const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0; return typeof v === 'number' && v > 0 ? v : v === true ? true : undefined; };
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
@@ -20692,12 +20718,13 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const groupes = [
     { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
+    groupePlateformes(tab, setTab, 20),
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
       MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
-  ];
+  ].filter(Boolean);
   const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
     <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }} reduite={reduite} onReduire={onReduire} icone={<Icon name="menu" size={20}/>}
@@ -20725,6 +20752,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
   const groupes = plus ? [
     { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
+    groupePlateformes(tab, setTab, 22),
     { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={22}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
       { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
       e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
@@ -20732,7 +20760,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
       MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
       { cle: 'montants', libelle: tr('coque.cacherMontants'), icone: <Icon name="eyeOff" size={22}/>, interrupteur: { actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } } },
       streamVisible || stream ? { cle: 'stream', libelle: tr('natif.plus.stream'), icone: <Icon name="stream" size={22}/>, interrupteur: { actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } } } : null].filter(Boolean) },
-  ] : [];
+  ].filter(Boolean) : [];
   const actions = ordi ? null : (
     <Natif.ActionsCoque plusOuvert={plus} onPlus={() => setPlus(true)} pointPlus={!!(etat && etat.ton === 'ambre')}
       messages={{ n: nonLus > 0 ? nonLus : undefined, libelle: tr('nav.messages'), libellePastille: nonLus > 0 ? `${tr('nav.messages')} · ${nonLus}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
@@ -33900,9 +33928,14 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const S = useSourcesCarte(live);
   const maintenant = Date.now();
   const [objectifMois, poserObjectif, objectifBrut] = useObjectifMois();
+  // (20 nov., sélecteur de plateforme global) Les chiffres d'Aujourd'hui suivent le site courant : la MÊME question à
+  // `valeurChiffre`, avec la sélection { site } de la carte des chiffres (« Tous » = SEL_TOUT_V2, les chiffres d'avant).
+  const [siteBrut] = useSiteCourant();
+  const siteJ = siteCourantCoque(siteBrut);
+  const SEL_J = siteJ === 'toutes' ? SEL_TOUT_V2 : { site: siteJ, compte: null, periode: null };
   // Le modèle (src/aujourdhui/modele.js, reçu en `Mo`) : chaque valeur est DEMANDÉE à `valeurChiffre`, rien n'est calculé ici.
   const calculer = (Mo) => {
-  const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S),
+  const M = Mo.chiffresAujourdhui({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_J, REGLES_CARTE, maintenant), S),
     etatVendu: venduEtat(live), sansCompte: !!S.sansCompte, maintenant, raisonCourte, questions: questionsArgent, chiffreBrut,
     mois: new Date(maintenant).toLocaleDateString('fr-FR', { month: 'short' }) });
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
@@ -51753,7 +51786,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return { etat: 'lu', lignes };
             } catch (_) { return { etat: 'passu', lignes: [] }; }
           };
-          return (
+          return (<>
+            {/* (20 nov.) LE sélecteur de plateforme en tête d'Aujourd'hui : les chiffres suivent le site choisi. */}
+            {baseKO ? null : <SelecteurSiteCoque/>}
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
@@ -51767,7 +51802,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onVentes={() => { if (onNav) onNav('cat_ventes'); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
-          );
+          </>);
         }
         return (
           <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'}>
@@ -64838,6 +64873,40 @@ function AppCoeur() {
     return s;
   },[accountsLoaded,vintedAccounts,sitesLus,comptesEbay]);
   SITES_COQUE.v = sitesPresents ? [...sitesPresents] : ['vinted'];
+  // ── (20 nov., décision : « une application par plateforme ? » — non) LE SÉLECTEUR DE PLATEFORME GLOBAL ───────────────
+  // Les sites RELIÉS (un compte Vinted, une lecture Leboncoin / eBay / Vestiaire) — pas « présents » : Vinted et Vestiaire
+  // sont toujours dans `sitesPresents` (un écran « pas encore lu » y a son geste), le sélecteur ne propose que ce qui est
+  // relié. Moins de deux ⇒ aucun sélecteur (un vendeur Leboncoin seul ne voit rien de plus).
+  const sitesRelies = useMemo(() => {
+    const r = [];
+    if (Array.isArray(vintedAccounts) && vintedAccounts.length) r.push('vinted');
+    if (sitesLus && sitesLus.leboncoin) r.push('leboncoin');
+    if ((sitesLus && sitesLus.ebay) || (Array.isArray(comptesEbay) && comptesEbay.some((c) => c && !c.implicite))) r.push('ebay');
+    if (sitesLus && sitesLus.vestiaire) r.push('vestiaire');
+    return r;
+  }, [vintedAccounts, sitesLus, comptesEbay]);
+  const [siteCourantBrut, poserSiteCourant] = useSiteCourant();
+  const siteGlobal = siteEffectif(siteCourantBrut, sitesRelies);
+  // Le site courant ⇒ le filtre de la tâche affichée (Ventes, Annonces, Achats, Messages) ; « Tous » rend celui d'avant.
+  const ongletSiteVu = React.useRef(tab);
+  React.useEffect(() => {
+    ongletSiteVu.current = tab;
+    if (!estTacheSite(tab)) return;
+    const voulu = sitePourTache(tab, siteGlobal, TACHES_SITE);
+    if (voulu && siteDeTache(tab, platSub) !== voulu) setPlatSub(voulu);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, siteGlobal]);
+  // Un lien qui vise un site (`?tab=ventes&site=leboncoin`, une notification, « Tout l'écran Leboncoin ») CHANGE le site
+  // courant : un seul choix, jamais deux filtres qui se contredisent. Le changement d'onglet lui-même ne décide rien.
+  React.useEffect(() => {
+    if (!estTacheSite(tab) || ongletSiteVu.current !== tab) return;
+    const s = siteDeTache(tab, platSub);
+    if (!s || s === sitePourTache(tab, siteGlobal, TACHES_SITE)) return;
+    if (s === 'toutes' || sitesRelies.includes(s)) poserSiteCourant(s);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platSub]);
+  SITES_RELIES_COQUE.v = sitesRelies;
+  const selecteurSite = <SelecteurSiteCoque/>;
   React.useEffect(() => { const f = (e) => { const d = e && e.detail; if (!d || d.tache !== tab || !d.site) return; setPlatSub(d.site); retenirFiltre(d.tache, d.site, true); };
     window.addEventListener('vrm:site-tache', f); return () => window.removeEventListener('vrm:site-tache', f); }, [tab]);
   // (11 nov., lot états vides) AUCUN COMPTE RELIÉ, PROUVÉ : la liste des comptes Vinted lue et vide, les
@@ -66798,9 +66867,8 @@ function AppCoeur() {
     if(t==='ventes') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} data-vv-toutes={ongletColis==='toutes' ? '1' : undefined} aria-label={L.aEnvoyer}>
         <AFaireHote><GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
-          filtreNatif={{ cle: site, libelle: site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site),
-            options: ['toutes', 'vinted', 'leboncoin', 'ebay', 'vestiaire'].filter((x) => x === 'toutes' || x === site || !sitesPresents || sitesPresents.has(x)).map((x) => ({ cle: x, libelle: x === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(x) })),
-            onChoisir: (x) => { setPlatSub(x); retenirFiltre('ventes', x, true); noterReprise({ sites: { ventes: { valeur: x, at: Date.now() } } }); } }}
+          /* (20 nov.) La plateforme de Ventes natif est le sélecteur global : plus de filtre local (`filtreNatif` nul). */
+          filtreNatif={null}
           siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran></AFaireHote>
       </section>);
@@ -66837,6 +66905,8 @@ function AppCoeur() {
     const lbcNatif = t === 'ventes' && site === 'leboncoin' && !baseKO;
     return (
       <section className="vrm-tache" data-tache={t} data-natif={natifV ? '1' : undefined} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]} data-espace={t==='annonces' ? 'paires' : (t === 'ventes' || t === 'achats' ? 'ventes' : undefined)}>
+        {/* (20 nov., décision) LE sélecteur de plateforme, en tête de chaque écran principal (src/natif/SelecteurSite.jsx). */}
+        {baseKO ? null : selecteurSite}
         {/* (17 nov., nouveau design) Allumé : une tête À SOI (`v2-tete-tache`) — les règles d'hier réservaient 150 px à droite
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
         {natifV ? null : <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
@@ -66863,10 +66933,11 @@ function AppCoeur() {
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
           {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
             const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
+            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return <div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={t}/></span></div>;
             return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
               libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
               sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>
-              <FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/>
+              {/* (20 nov.) Le choix du SITE est le sélecteur global (au-dessus) : ce menu ne porte plus que le compte Vinted. */}
               {site==='vinted' && !baseKO && nCpt > 1 ? <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={t==='messages'}/> : null}
             </MenuPlateformeV2><span className="v2-aide"><PhraseEcran cle={t}/></span></div>; })() : null}
           {designV2App ? null : <PhraseEcran cle={t}/>}
@@ -66888,7 +66959,7 @@ function AppCoeur() {
         {designV2App && !baseKO && !natifV && (t === 'ventes' || t === 'achats' || t === 'annonces') ? <ARegler onglet={t} Icon={Icon} Photo={PhotoVinted}/> : null}
         <CacheSiV2 si={natifV || (designV2App && !sous)}>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
-          {designV2App || natifV ? null : <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>}
+          {/* (20 nov.) Plus de filtre de site local : le sélecteur de plateforme global, en tête de l'écran. */}
           {/* (14 nov., « Studio bleu clair ») Annonces Vinted : le choix du compte sur la MÊME ligne que les sites (une ligne de
               moins avant la liste). Le même composant, les mêmes états qu'avant dans l'espace Vinted. */}
           {t==='annonces' && site==='vinted' && !baseKO && !designV2App && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact court/>}
@@ -68266,7 +68337,7 @@ function AppCoeur() {
         {tab==='annonces'&&<GardeEcran nom="annonces">{!baseKO && !annoncesAncien && sectionDeTache('annonces', platSub)==='annonces'
           ? <>
               <AnnoncesEgaliteLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}
-                onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }}/>
+                onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }} site={siteGlobal}/>
               {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si>{rendreVinted('annonces')}</CacheSiV2> : null}
             </>
           : <>

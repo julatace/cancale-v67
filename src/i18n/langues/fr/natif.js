@@ -26,5 +26,8 @@ export default {
   "natif.detail.nom": "Détail",
   "natif.plus.etat": "État des actions",
   "natif.plus.stream": "Mode stream",
-  "natif.plus.nouveau": "Nouveau",
+  "natif.plus.nouveau": "Nouveau",,
+  "site.tous": "Tous",
+  "site.libelle": "Plateforme regardée",
+  "site.plus.titre": "Plateformes"
 };

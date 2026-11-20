@@ -128,7 +128,8 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '', liaison = null,
-  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null }) {
+  euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null,
+  filtreSite = true }) {   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
   const ordinateur = useOrdinateur();
   // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
   // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
@@ -179,7 +180,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           <Bouton variante="texte" onClick={toutCocher} attrs={{ 'data-eg-tout': '' }}>{liste.filter(cochable).every((a) => sel.has(a.cle)) && sel.size ? tr('egalite.selection.rien') : tr('egalite.selection.tout')}</Bouton>
           <Bouton variante="texte" onClick={quitter} attrs={{ 'data-eg-annuler': '' }}>{tr('egalite.selection.annuler')}</Bouton>
         </> : <>
-          {sites.length > 1 ? <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-eg-filtre': filtre.site }}>{filtre.site === 'tous' ? tr('egalite.site.titre') : tr('egalite.site.titre') + ' · ' + nomSite(filtre.site)}</Bouton> : null}
+          {filtreSite && sites.length > 1 ? <Bouton variante="teinte" onClick={() => setMenuSites(true)} attrs={{ 'data-eg-filtre': filtre.site }}>{filtre.site === 'tous' ? tr('egalite.site.titre') : tr('egalite.site.titre') + ' · ' + nomSite(filtre.site)}</Bouton> : null}
           {actions.length ? <Bouton variante="teinte" onClick={() => setMenuActions(true)} attrs={{ 'data-eg-actions': '' }}>{tr('egalite.actions')}</Bouton> : null}
         </>}
       </div>
