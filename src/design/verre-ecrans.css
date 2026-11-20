@@ -409,7 +409,9 @@
 @media (min-width: 1024px) {
   /* ARGENT · Résumé : trois colonnes — Reçu · Bénéfice puis les mois (ComptaFusion) ; l'à venir détaillé ; l'URSSAF puis le
      détail (bénéfice, vendu et reçu, rapports…). Le chiffre « vendu » au-dessus, en affiche. */
-  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, .92fr); column-gap: 20px; row-gap: 16px; align-items: start; }
+  /* (20 nov., lot argent-natif) Le Mois est natif (src/natif/ecrans/ArgentMois.jsx, sa propre grille de cartes) : le segment
+     redevient une PILE ; la grille à trois colonnes d'avant rangeait le Mois dans une colonne de 250 px. */
+  :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"]:not([hidden]) { display: flex !important; flex-direction: column; gap: 16px; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > * { min-width: 0; margin: 0 !important; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] > .vrm-argent-q.vg-argent { display: contents !important; }
   :root:root:root:root body .vrm-argent-partie[data-argent-vue="resume"] .vg-a-vendu { grid-column: 1 / -1; grid-row: 1; flex-direction: row !important; align-items: baseline !important; gap: 12px; padding: 0 4px !important; }

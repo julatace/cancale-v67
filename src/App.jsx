@@ -1166,7 +1166,8 @@ import { groupesParCompte as groupesParCompteV2, rangerEmails as rangerEmailsV2 
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
-import * as Natif from "./natif/index.js";   // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
+import * as Natif from "./natif/index.js";
+// (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md) — (20 nov.) le sélecteur de plateforme : `SelecteurSiteCoque` (src/siteCourant.js)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -20089,9 +20090,18 @@ function PhraseEcran({ cle, className = '' }) {
   // phrase reste dans la page pour les lecteurs d'écran (`vrm-sr-seul`) : rien de supprimé, rien de deviné.
   return <><p className={'vrm-phrase-ecran vrm-phrase-ecran-aide' + (className ? ' ' + className : '')} data-phrase-ecran={cle}><span className="vrm-sr-seul">{t}</span>{aide}</p>{premiere}</>;
 }
-function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '' }) {
+function ScreenHead({ icon, title, desc, right, principal, sous, phrase, date = '', titreCoque = false }) {
   const line = typeof icon === 'string' && ICON_PATHS[icon];
   const Titre = React.useContext(DansEspacePlateforme) ? 'h2' : 'h1';
+  // (20 nov., lot argent-natif) `titreCoque` : au téléphone, la COQUE pose le grand titre de l'écran (Argent) ; l'en-tête de
+  // l'écran ne garde que ce qu'il porte dessous (la ligne comptes, le segmenté) — jamais deux titres « Argent ».
+  const ordiTete = Natif.useOrdinateur();
+  if (titreCoque && !ordiTete) return sous || right ? (
+    <div className="n-arg-tete" data-tete-coque="">
+      {sous ? <div className="vrm-screen-head-sous" data-sous-titre="">{sous}</div> : null}
+      {right ? <div className="vrm-screen-actions">{right}</div> : null}
+    </div>
+  ) : null;
   // ⚠️ UNE MANCHETTE, PAS UN EN-TÊTE DE TABLEAU DE BORD. Le titre était une
   // ligne de 23 px avec une pastille ronde teintée devant — le gabarit de tous
   // les outils SaaS. Ici : un surtitre en capitales espacées, un titre large et
@@ -20683,7 +20693,7 @@ const filtreSiteTableau = () => [];
 // (20 nov., sélecteur de plateforme global) Les sites RELIÉS, posés par la coque à chaque rendu (comme SITES_COQUE) : le
 // sélecteur et Aujourd'hui les lisent sans qu'on les leur passe.
 const SITES_RELIES_COQUE = { v: [] };
-const siteCourantCoque = (brut) => siteEffectif(brut, SITES_RELIES_COQUE.v);
+export const siteCourantCoque = (brut) => siteEffectif(brut, SITES_RELIES_COQUE.v);   // (lu aussi par Argent : src/ecrans/Compta.jsx)
 // Dans « Plus » (et la barre latérale), UNE rangée par plateforme reliée : sa page de réglages (comptes reliés et leur
 // lecture, connexion de l'extension sur ce site, réglages propres au site) — les panneaux de Paramètres qui les portent déjà.
 const REGLAGE_DU_SITE = { vinted: 'liens', leboncoin: 'connexions', ebay: 'ebay', vestiaire: 'connexions' };
@@ -20745,6 +20755,9 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   const etat = useEtatActionsVu();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const natif = ECRANS_NATIFS.has(tab);
+  // (20 nov., lot argent-natif) Argent (ses quatre segments : `compta`, `dashboard`) a son GRAND TITRE au téléphone, comme
+  // Aujourd'hui — Julien, captures du 20 nov. : pas de grand titre « Argent » visible en haut. L'écran ne pose plus le sien.
+  const argentTab = tab === 'compta' || tab === 'dashboard';
   React.useEffect(() => { setPlus(false); }, [tab]);
   const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges, 22);
   const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
@@ -20766,7 +20779,7 @@ function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, reche
   );
   return (
     <>
-      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : titre} grandTitre={natif || (tab === 'journee' && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
+      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || ((tab === 'journee' || argentTab) && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
         recherche={ordi || rechercheOuverte || sansRecherche ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
       {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
     </>
@@ -24849,6 +24862,9 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // (10 nov.) LES QUATRE SEGMENTS D'ARGENT (src/argent.js) : le même contrôle segmenté que
 // partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
 // (même écran ⇒ seule la section change).
+// Le sélecteur de plateforme d'Argent : LE sélecteur de la coque (`SelecteurSiteCoque` : les sites reliés, `vrm_site_courant`) —
+// fusion du 20 nov. avec argent-natif : un seul composant, une seule clé, le même en tête de chaque onglet.
+function SelecteurSiteArgent() { return <SelecteurSiteCoque/>; }
 function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
   // (17 nov., nouveau design · Argent) Allumé : UNE ligne « Toutes les plateformes · N comptes › » (les comptes qui entrent
   // dans les totaux, la même règle `compteEcarte` que Compta ; le toucher mène aux comptes), puis UN contrôle segmenté
@@ -24859,15 +24875,17 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
     const liste = Array.isArray(comptes) ? comptes.filter((a) => a && a.vinted_user_id != null) : null;
     const dedans = liste ? liste.filter((a) => !compteEcarte(String(a.vinted_user_id), hAcc, panelOff || {})).length : null;
     const sous = liste == null || !liste.length ? '' : dedans === liste.length ? tr('v2.ar.comptes', { n: dedans }) : tr('v2.ar.comptesSur', { k: dedans, n: liste.length });
+    // (20 nov., décision du coordinateur) Le menu « Toutes les plateformes · N comptes » devient LE sélecteur de plateforme
+    // commun (src/natif/SelecteurSite.jsx, `vrm_site_courant`, les sites reliés seulement) ; le choix des comptes reste un
+    // réglage secondaire : une ligne discrète « Comptes · N › » qui mène aux comptes (la même destination qu'hier).
     return (
-      <div className="v2-argent-nav" data-v2-argent-nav={seg}>
-        <button type="button" className="v2-rangee v2-menu v2-argent-comptes" data-v2-rangee="" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
-          <span className="v2-menu-lib">{tr('v2.ar.toutes')}</span>
-          {sous ? <span className="v2-menu-sous">{sous}</span> : null}
-          <span className="v2-menu-fleche" aria-hidden="true"><Icon name="chevron" size={14}/></span>
-        </button>
+      <div className="v2-argent-nav n-arg-nav" data-v2-argent-nav={seg}>
+        <SelecteurSiteArgent/>
         <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
+        <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
+          {tr('arn.comptes')}{liste && liste.length ? ' · ' + (dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`) : ''} <span aria-hidden="true">›</span>
+        </button>
       </div>
     );
   }

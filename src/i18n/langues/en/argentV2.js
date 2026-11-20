@@ -55,5 +55,14 @@ export default {
   "v2.pm.zoom": "App zoom",
   "v2.pm.zoom.desc": "Enlarges the whole screen: text, buttons, images.",
   "v2.pm.texte": "Text size",
-  "v2.pm.texte.desc": "Enlarges only the text."
+  "v2.pm.texte.desc": "Enlarges only the text.",
+  "arn.vendu": "Sold",
+  "arn.aVenir": "Money to come",
+  "arn.coutsSaisis": "{v} costs entered",
+  "arn.voirTous": "See all {n}",
+  "arn.rien": "Nothing",
+  "arn.comment": "How it’s calculated",
+  "arn.comptes": "Accounts",
+  "site.tous": "All",
+  "site.choisir": "Choose a platform"
 };

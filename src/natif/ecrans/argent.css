@@ -1,0 +1,92 @@
+/* ── src/natif/ecrans/argent.css — ARGENT au style §2 bis (20 nov., lot argent-natif) ──────────────────────────────────
+   Les pièces natives d'Argent (`.n-arg`) posées DANS la page d'avant (`.vrm-argent`, qui a déjà sa marge de 16 et son
+   écart entre blocs) : les cartes et les tuiles n'ajoutent pas de marge à elles. Jetons `--n-*` seulement, ni
+   `!important`, ni `:has()` ; tailles 13 · 15 · 17 · 22 · 34 ; graisses 400 · 600 · 700 ; rayons 8 · 10 · 12 · rond. */
+@layer vrm-natif {
+  .n-arg { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  /* L'en-tête de l'écran au téléphone (la coque porte le titre) : la ligne comptes et le segmenté, sans marge à lui. */
+  .n-arg-tete { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-arg-rangees { gap: 0; margin-top: 10px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); overflow: hidden; }
+  .n-arg-rangees > .n-rangee + .n-rangee { border-top: 1px solid var(--n-trait); }
+  .n-arg-nav { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-arg-comptes { appearance: none; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; min-height: var(--n-cible); margin: 0; padding: 0 4px;
+    border: 0; background: transparent; color: var(--n-encre-2); font: var(--n-t-second); cursor: pointer; touch-action: manipulation; }
+  .n-arg-comptes:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: var(--n-r-plaque); }
+  .n-arg-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .n-arg .n-carte, .n-arg .n-tuiles, .vrm-argent .n-carte, [data-espace="argent"] .n-carte, [data-espace="argent"] .n-tuiles { margin: 0; }
+  /* Un lien discret : l'accent, jamais souligné (Julien, 20 nov. : « liens soulignés répétés »). */
+  .n-arg-lien { display: inline-flex; align-items: center; min-height: var(--n-cible); color: var(--n-accent); text-decoration: none; font: var(--n-t-legende-fort); }
+  .n-arg-lien:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: var(--n-r-plaque); }
+  .n-arg-affiche .n-affiche { padding: 16px 16px 8px; }
+  /* Les six mois : six colonnes (la règle des barres en pose sept). */
+  .n-arg .n-barres[data-arg-mois="6"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .n-arg-tuiles .n-tuiles-tete { margin-bottom: 8px; }
+  .n-arg-tuiles .n-tuiles-action { flex: 1 1 100%; }
+  .n-arg-tuiles .n-tuiles-action .n-bouton-bloc { display: flex; }
+  /* Un tableau compact dans une carte : chiffres alignés à droite, en colonnes tabulaires. */
+  .n-arg .n-rangee-valeur { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* Déclarer : le montant à recopier en grand, un petit « Copier » à côté (jamais pleine largeur). */
+  .n-arg-montant { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--n-trait); }
+  .n-arg-montant-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .n-arg-montant-lib { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-montant-val { font: var(--n-t-grand); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-arg-montant-val small { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-arg-montant .n-bouton-bloc { flex: 0 0 auto; display: inline-flex; width: auto; }
+  .n-arg-montant .n-bouton { min-height: var(--n-cible); padding: 8px 16px; }
+  .n-arg-gestes { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 16px 8px; border-top: 1px solid var(--n-trait); }
+  .n-arg-note { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-arg-lien-bouton { display: inline-flex; align-items: center; justify-content: center; align-self: center; min-height: var(--n-cible); padding: 0 12px; font: var(--n-t-corps); }
+
+  /* Trois chiffres en ligne dans une carte (« Les offres ») : libellé gris en petites capitales, valeur 17/600. */
+  .n-arg-trois { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--n-trait); }
+  .n-arg-fait { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 12px 16px; }
+  .n-arg-fait + .n-arg-fait { border-inline-start: 1px solid var(--n-trait); }
+  .n-arg-fait-lib { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-arg-fait-val { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-arg-fait-val[data-vide] { color: var(--n-encre-2); }
+  /* Un tableau compact : la première colonne prend le reste, les chiffres en colonnes alignées à droite. */
+  .n-arg-table { display: flex; flex-direction: column; min-width: 0; }
+  .n-arg-tr { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; column-gap: 12px; min-height: 44px; padding: 8px 16px; box-sizing: border-box;
+    border-bottom: 1px solid var(--n-trait); font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-arg-tr:last-child { border-bottom: 0; }
+  .n-arg-tr > [role="cell"]:not(:first-child), .n-arg-tr > [role="columnheader"]:not(:first-child) { text-align: end; white-space: nowrap; }
+  .n-arg-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-table[data-arg-ncol="1"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) minmax(56px, auto); }
+  .n-arg-table[data-arg-ncol="2"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(2, minmax(56px, auto)); }
+  .n-arg-table[data-arg-ncol="3"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(52px, auto)); }
+  .n-arg-table[data-arg-ncol="4"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(4, minmax(44px, auto)); }
+  .n-arg-table[data-arg-ncol="5"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(5, minmax(40px, auto)); column-gap: 8px; }
+  .n-arg-td-nom { display: flex; flex-direction: column; min-width: 0; }
+  .n-arg-td-nom b { font: var(--n-t-second-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-arg-td-nom small { font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* Un compte sans rien de lu : UNE ligne grise, qui traverse les colonnes. */
+  .n-arg-tr-muet .n-arg-td-muet { grid-column: 2 / -1; text-align: end; font: var(--n-t-legende); color: var(--n-encre-2); white-space: normal; }
+  .n-arg-table[data-arg-ncol="0"] .n-arg-tr-muet { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+  .n-arg-pied, .n-arg-vide { margin: 0; padding: 10px 16px; border-top: 1px solid var(--n-trait); font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-arg-vide { border-top: 0; }
+  /* Une coche « réglé », un « — » muet (Mois bouclé). */
+  .n-arg-actions { display: flex; align-items: center; gap: 4px; }
+  .n-arg-liste-filet { border-top: 1px solid var(--n-trait); }
+  .n-arg-num { margin-inline-end: 6px; font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-arg-coche { color: var(--n-encre-2); }
+  .n-arg-muet { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-arg-select { min-height: var(--n-cible); max-width: 180px; padding: 0 8px; border: 1px solid var(--n-trait); border-radius: var(--n-r-bouton); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-second); }
+
+  /* Un sous-groupe dans une carte (« À RACHETER ») et un segmenté de tri : en petites capitales grises, sans carte en plus. */
+  .n-arg-sous-groupe { border-bottom: 1px solid var(--n-trait); }
+  .n-arg-sous-titre { margin: 0; padding: 12px 16px 4px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-tri { padding: 8px 16px; border-bottom: 1px solid var(--n-trait); }
+  .n-arg-tri > .n-segmente { margin: 0; }
+  .n-arg-gris { color: var(--n-encre-2); font-weight: 400; }
+  /* Le « ? » discret d'une carte et le texte de sa feuille. */
+  .n-arg-q { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--n-r-rond); border: 1px solid var(--n-trait); font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-arg-aide-texte { padding: 0 var(--n-marge) 16px; font: var(--n-t-second); color: var(--n-encre); }
+  .n-arg-aide-texte p, .n-arg-aide-texte ul { margin: 0 0 8px; }
+  .n-arg-aide-texte ul { padding-inline-start: 18px; }
+  @media (min-width: 1024px) {
+    /* À l'ordinateur : une grille de cartes (le chiffre et les tuiles à gauche, les versements à droite). */
+    .n-arg-mois { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+    .n-arg-tuiles .n-tuiles-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+}

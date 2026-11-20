@@ -26,3 +26,12 @@
 .vrm-sc-ind-tend { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-sc-ind-ps { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-sc-ind-src { font-size: 12px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+
+/* (20 nov., lot argent-natif) La carte au style natif §2 bis (src/SanteComptes.jsx) : rangée du compte, indicateurs dépliés. */
+@layer vrm-natif {
+  /* Santé des comptes : la rangée du compte, puis ses indicateurs dépliés sur un fond à peine gris. */
+  .n-arg-sc + .n-arg-sc { border-top: 1px solid var(--n-trait); }
+  .n-arg-sc-inds { background: var(--n-carte-2); }
+  .n-arg-sc-inds .n-rangee { background: var(--n-carte-2); }
+  .n-arg-sc-geste { display: flex; justify-content: flex-end; padding: 0 8px; }
+}

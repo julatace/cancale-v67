@@ -356,7 +356,7 @@
     -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou);
     border-bottom: .5px solid var(--n-trait); opacity: 0; transition: opacity var(--n-duree) ease-out;
   }
-  .n-barre-titre[data-n-reduit]::before { opacity: 1; }
+  .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
   .n-barre-gauche { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }
   .n-barre-droite { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
   .n-barre-centre {

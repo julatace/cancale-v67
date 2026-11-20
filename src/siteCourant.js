@@ -20,12 +20,12 @@ const EVT = 'vrm:site-courant';
 let _io = null;
 export function brancherSiteCourant(io) { _io = io; }
 
-const valide = (v) => (SITES_COURANTS.includes(v) ? v : 'toutes');
+const valide = (v) => (v === 'tous' ? 'toutes' : SITES_COURANTS.includes(v) ? v : 'toutes');   // « tous » : l'écriture d'argent-natif
 
 export function lireSiteCourant() {
   try {
     if (_io && _io.load) return valide(_io.load(CLE_SITE_COURANT, 'toutes'));
-    const t = localStorage.getItem(CLE_SITE_COURANT); return valide(t ? JSON.parse(t) : 'toutes');
+    const t = localStorage.getItem(CLE_SITE_COURANT); let v = t; try { v = t ? JSON.parse(t) : 'toutes'; } catch (_) { /* une valeur écrite brute (« leboncoin ») */ } return valide(v);
   } catch (_) { return 'toutes'; }
 }
 

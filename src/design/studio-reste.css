@@ -238,7 +238,7 @@
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn {
   position: relative !important; min-height: 40px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important; background: transparent !important; box-shadow: none !important;
   color: var(--sb-encre-2) !important; font: 600 13px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important;
-  padding: 0 8px !important; flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important;
+  padding: 0 8px !important; flex: 1 1 auto !important; min-width: 44px !important; white-space: nowrap !important;   /* (20 nov., argent-natif) 44 au doigt : « 30 j », « Oui » faisaient 37–40 */
 }
 @media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
 /* (16 nov., parcours-vert) « Questions · Tout » (eBay) et la navigation « 1 · 2 » entre les questions d'une annonce :
