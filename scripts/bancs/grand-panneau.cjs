@@ -330,6 +330,10 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await cap(t.pg, N('commandes'));
         dit(a.vx.titre === 'Commandes' && a.ventesT.length === 5 && a.sousTitres === 5, `${T} : Commandes : 5 lignes, le statut Vinted sous chaque titre`, JSON.stringify({ t: a.vx.titre, v: a.ventesT, s: a.sousTitres }));
         dit(a.logos === 2, `${T} : transporteur avec SON logo (Chronopost, Mondial Relay) ; inconnu ⇒ rien`, a.logos);
+        // 5.410.2 : le bordereau de chaque vente (prêt ⇒ « Imprimer le bordereau » ; pas fourni ⇒ « Pas encore de bordereau »).
+        { const imp = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { imp: Array.from(r.querySelectorAll('.table6 [data-imprimer]')).map((b) => b.getAttribute('data-imprimer')), manque: Array.from(r.querySelectorAll('.table6 [data-bordereau-manque]')).map((b) => b.getAttribute('data-bordereau-manque')), n: !!r.querySelector('[data-imprimer-n]'), texte: r.querySelector('.carte').innerText }; });
+          dit(JSON.stringify(imp.imp) === '["91000000000"]' && JSON.stringify(imp.manque) === '["91000000001"]' && imp.n && /Pas encore de bordereau/.test(imp.texte), `${T} : « Imprimer le bordereau » sur la vente prête, « Pas encore de bordereau » sur l'autre, « Imprimer » en haut`, JSON.stringify({ i: imp.imp, m: imp.manque, n: imp.n }));
+          dit(!/à confirmer/i.test(imp.texte), `${T} : jamais « à confirmer » à l'écran`); }
         dit(a.etiquettes.filter((x) => /:ambre$/.test(x)).length === 2 && a.etiquettes.filter((x) => /:ambre$/.test(x)).every((x) => /^a_expedier/.test(x)), `${T} : « À expédier » en ambre, le reste neutre`, JSON.stringify(a.etiquettes));
         await clic(t.pg, '[data-fiche-b="v:91000000000"]');
         a = await lire(t.pg);

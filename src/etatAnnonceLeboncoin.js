@@ -29,7 +29,7 @@ export function etatAnnonceLeboncoin(ad, ventes = [], sortieDe = null, aConfirme
  const sortie = etat==='vendue' || etat==='retiree' ? null : (typeof sortieDe==='function' ? sortieDe(ad) : null);
  if (sortie==='plusvue') {etat='plusvue';label='Plus dans « Mes annonces »';}
  else if (sortie==='pause') {etat='pause';label='En pause';}
- if (etat==='active' && typeof aConfirmerDe==='function' && aConfirmerDe(ad)) {etat='aconfirmer';label='À confirmer';}
+ if (etat==='active' && typeof aConfirmerDe==='function' && aConfirmerDe(ad)) {etat='aconfirmer';label='Pas revue récemment';}
  const suivi=vente ? String(vente.stepLabel || vente.parcelStatus || '').slice(0,160) : '';
  const livraison=vente && (vente.parcelStatus || /colis|livr|expedi|transit|parcel|deliver|ship/i.test(suivi)) ? suivi : '';
  return {etat,label,livraison,suivi};

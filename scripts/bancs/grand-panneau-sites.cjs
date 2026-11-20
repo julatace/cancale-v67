@@ -262,6 +262,8 @@ const lireS = (pg) => pg.evaluate(() => {
         await clic(t.pg, '[data-fiche-b]');
         a = await lireS(t.pg);
         await t.pg.screenshot({ path: path.join(SORTIE, `${site}-ventes-${largeur}-${scheme}.png`) });
+        { const sansImp = await t.pg.evaluate(() => !document.getElementById('vrm-badge').shadowRoot.querySelector('[data-imprimer],[data-imprimer-n],[data-bordereau-manque]'));
+          dit(sansImp, `${T} : 5.410.2 — pas de bouton d'impression ici (le bordereau ${site === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'} reste sur le site, rien n'est promis)`); }
         dit(a.ventes.length === 1 && /a_expedier/.test(a.ventes[0]) && (site === 'vestiaire' ? a.transporteur === 'Chronopost' : true), `${T} : ventes du compte (à expédier${site === 'vestiaire' ? ', transporteur lu' : ''})`, JSON.stringify(a));
         await clic(t.pg, '[data-onglet-b="favoris"]');
         a = await lireS(t.pg);

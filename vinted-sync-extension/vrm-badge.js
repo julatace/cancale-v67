@@ -33,7 +33,7 @@
 //  - aucune couleur quand tout va bien (§7). L'ambre ne s'allume que s'il y a
 //    quelque chose à faire, et « pas su » reste gris — jamais un faux vert.
 // ════════════════════════════════════════════════════════════════════════════
-(() => {
+(function demarrerBadge() {
   // 5.332 (défaut #6, décision de Julien du 9 nov.) : sur Chrome / Edge /
   // Firefox, le formulaire de connexion vit dans un IFRAME de l'extension
   // (`popup.html?mode=carte`) — l'origine de l'extension, que la page du site ne
@@ -48,7 +48,13 @@
   // « listes » : Favoris · Annonces · Ventes du compte connecté, sans logo ni carte flottante.
   const LISTES = (() => { try { return globalThis.__vrmListes === true && /^(chrome|moz|safari-web)-extension:$/.test(location.protocol); } catch (_) { return false; } })();   // 5.362 (moyenne 69) : le mot de passe seulement dans l'iframe de l'extension
   if (window.top !== window && !CADRE) return;       // une seule carte par onglet
-  if (document.getElementById('vrm-badge')) return;  // déjà posée (SPA, double injection)
+  // 5.410.2 (Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ») : une carte déjà posée (double
+  // injection, ou la carte ORPHELINE d'une extension rechargée) — on attend qu'elle parte, puis on se pose. Absente
+  // 1,5 s de suite (la carte vivante se replace en moins d'une seconde quand la page la retire) ⇒ on démarre.
+  if (document.getElementById('vrm-badge')) {
+    try { let t = null; const mo = new MutationObserver(() => { if (document.getElementById('vrm-badge')) { clearTimeout(t); t = null; return; } if (!t) t = setTimeout(() => { if (!document.getElementById('vrm-badge')) { mo.disconnect(); demarrerBadge(); } else t = null; }, 1500); }); mo.observe(document.documentElement, { childList: true, subtree: true }); } catch (_) {}
+    return;
+  }
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
   if (!vivant()) return;
 
@@ -675,7 +681,12 @@
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-plein:#0068D6; --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; } }
   :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; }
   @media (max-width: 760px) { .carte[data-grand] { top: 0; bottom: 0; right: 0; left: 0; width: 100vw !important; height: 100dvh; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-shadow: none; } }
+  /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #8A4B00 sur #1C1C1E ne se lisait pas. */
+  .carte[data-grand] { --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-ambre: #FFB340; --n-ambre-fond: rgb(255 159 10 / .18); }
   .carte[data-grand] .t5 { min-height: 52px; }
+  .carte.on[data-grand] ~ .btn { display: none !important; }   /* 5.410.2 : le rond VRM ne recouvre plus le coin du panneau (son × ferme) */
   .carte[data-grand] .t5 .nom { font: 700 28px/34px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; max-width: 70%; color: var(--n-encre); }
   .carte[data-grand] .fermer { position: sticky; float: right; top: 0; width: 44px; height: 44px; border-radius: 22px; background: var(--n-carte-2); color: var(--n-encre); font-size: 22px; z-index: 2; }
   .carte[data-grand] .contenu > :not(.tete):not(.fermer):not(.b):not(style) { border-radius: 12px; }
@@ -769,7 +780,7 @@
   .cols5 { position: relative; }
   .cols5 > summary { list-style: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 10px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .cols5 > summary::-webkit-details-marker { display: none; }
-  .cols5 > summary::after { content: ' ▾'; }
+  .cols5 > summary::after { content: '▾'; margin-left: 6px; font-size: 12px; opacity: .7; }
   .cols5-l { position: absolute; z-index: 3; right: 0; top: 48px; min-width: 200px; background: var(--n-carte); border-radius: 12px; box-shadow: 0 8px 30px rgb(0 0 0/.18); padding: 6px; display: grid; }
   .cols5-l label { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; color: var(--n-encre); font: 400 15px/1 -apple-system, Inter, system-ui, sans-serif; }
   .chips5 { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
@@ -875,7 +886,7 @@
   .n6-d { display: inline-flex; align-items: center; gap: 8px; }
   .n6 .vue5 { min-width: 0; }
   .n6 .vue5 button { min-width: 44px; font-size: 16px; }
-  .table6 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; background: var(--n-carte); }
+  .table6 { margin: 0 16px; border-radius: 12px; overflow: hidden; background: var(--n-carte); }   /* NATIF §1 bis : un groupe blanc, sans filet */
   .table6 .rangs { margin: 0; padding: 0; list-style: none; }
   .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
   .corps6 .table5 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; }
@@ -883,7 +894,10 @@
   .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
   .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
   .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
-  .tr6 .cels6 { display: grid; grid-template-columns: repeat(var(--n6, 4), minmax(92px, auto)); gap: 0 12px; align-items: center; }
+  .tr6 .cels6 { display: grid; grid-template-columns: var(--g6, repeat(var(--n6, 4), minmax(92px, auto))); gap: 0 12px; align-items: center; }
+  .cel6 { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .th6-fixe { cursor: default; }
+  .cel6[data-col="bordereau"] { white-space: normal; } .cel6 .pas6 { display: block; line-height: 16px; }
   .th6r { min-height: 44px; background: var(--n-carte); border-bottom: .5px solid var(--n-trait); }
   .th6 { appearance: none; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 44px; padding: 0; font: 500 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); cursor: pointer; text-align: right; }
   .th6r > .th6 { justify-content: flex-start; }
@@ -895,8 +909,23 @@
   .art6 .st6 { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cel6 { text-align: right; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .cel6 b { font-weight: 600; }
-  .cel6[data-col="statut"], .cel6[data-col="transporteur"] { text-align: left; }
+  .cel6[data-col="statut"], .cel6[data-col="transporteur"], .cel6[data-col="limite"], .cel6[data-col="bordereau"] { text-align: left; }
+  .th6r .cels6 > [data-ven-tri="statut"], .th6r .cels6 > [data-ven-tri="transporteur"], .th6r .cels6 > [data-ann-tri="statut"], .th6r .cels6 > .th6-fixe { justify-content: flex-start; }
   .tr-l6 { display: inline-flex; align-items: center; gap: 8px; }
+  /* 5.410.2 : le livreur, le suivi, la date limite et le bordereau de chaque vente */
+  .cel6 .tr-l6 + .suivi6, .env6 .suivi6 { display: block; margin-top: 2px; font: 400 12px/16px ui-monospace, "SF Mono", Menlo, monospace; color: var(--n-encre-2); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .lim6 { font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gris6 { color: var(--n-encre-2); }
+  .imp6 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--n-teinte); color: var(--n-accent); font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, transform .12s ease; }
+  .imp6:hover { background: rgb(0 104 214 / .18); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
+  .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  .revue6 { padding: 8px 16px 0; margin: 0; }
+  .acc6 .imp-etat6 { padding: 4px 0; }
+  .vte6 > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .vte6 > span:first-child b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .env6 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; color: var(--n-encre-2); } .env6 .suivi6 { margin: 0; }
+  @media (prefers-reduced-motion: reduce) { .imp6 { transition: none; } }
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
   .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
@@ -932,7 +961,9 @@
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
   .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
-  .geste6 { margin: 12px 16px; padding: 12px 16px; border: .5px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); }
+  .geste6 { margin: 12px 16px; padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
+  .carte[data-grand] .geste6 .vu-btn:not(.vu-plein) { background: var(--n-carte-2); color: var(--n-encre); box-shadow: none; }
+  .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
   .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .prix6 { width: 110px; min-height: 44px; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
@@ -958,7 +989,7 @@
   .ra6 { flex: none !important; width: auto !important; min-width: 120px; min-height: 44px; }
   .au6-d [data-ra-etat] { margin: 8px 24px 0; }
   .tuiles6 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-  .tu6 { appearance: none; border: .5px solid var(--n-trait); background: var(--n-carte); border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
+  .tu6 { appearance: none; border: 0; background: var(--n-carte-2); transition: background-color .16s ease; border-radius: 12px; padding: 12px 14px; text-align: left; cursor: pointer; color: var(--n-encre); }
   .tu6 span { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .tu6 b { display: block; font: 700 28px/34px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
   .tu6[data-ton="ambre"] b { color: var(--n-ambre, #8A4B00); }
@@ -1734,6 +1765,7 @@
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   // 5.409 (captures « Commandes » de Vintex) : l'état en mots clairs — « Action requise : à expédier » en ambre, le reste neutre.
   const ETAT_VENTE = { a_expedier: 'Action requise : à expédier', en_route: 'En route : rien à faire', finalisee: 'Terminée', annulee: 'Annulée — pas une vente', pas_su: 'État pas encore lu' };
+  let relectureEssais = 0;
   function chargerListes(force) {
     if (listesEnVol || !vivant()) return;
     if (!force && listes && Date.now() - listesAt < 60000 && (!porteeTous || Array.isArray(listes.autres))) return;
@@ -1743,6 +1775,11 @@
         void chrome.runtime.lastError;
         listesEnVol = false;
         if (r && r.ok) { listes = r; listesAt = Date.now(); } else listesErreur = 'L’extension n’a pas répondu. Réessaie dans un instant.';
+        // 5.410.2 : le dressing de CE compte est en relecture (budget de lecture, compte de l'onglet, une requête à la
+        // fois — `retourSurVinted` du fond) ⇒ la liste est redemandée seule quand elle a eu le temps d'arriver (3 fois au
+        // plus) : ses annonces redeviennent « En vente » sans geste.
+        if (r && r.ok && r.annonces && r.annonces.relecture && !LISTES && relectureEssais < 3) { relectureEssais++; setTimeout(() => { if (carte.classList.contains('on')) chargerListes(true); }, 25000); }
+        else if (r && r.ok && r.annonces && !r.annonces.relecture) relectureEssais = 0;
         if (LISTES) rendreListesSeules(); else if (carte.classList.contains('on')) rendre();
       });
     } catch (_) { listesEnVol = false; }
@@ -1764,6 +1801,10 @@
   const COLS5_DEFAUT = ['prix', 'date', 'vues', 'favoris', 'statut'];
   // 5.410 (comme Vintex) : le N° est la plaque devant le titre, plus une colonne ; les colonnes de Vintex d'abord.
   const COLS6 = ['prix', 'date', 'vues', 'favoris', 'statut', 'mini', 'achat', 'place'];
+  // 5.410.2 (passe de finition) : des colonnes de LARGEUR FIXE — chaque rangée était sa propre grille, les valeurs
+  // glissaient d'une ligne à l'autre et les en-têtes ne tombaient pas au-dessus de leur colonne.
+  const W6 = { prix: '76px', date: '148px', vues: '60px', favoris: '72px', statut: '150px', mini: '84px', achat: '84px', place: '140px' };
+  const W6V = { prix: '72px', date: '96px', transporteur: '156px', limite: '112px', statut: '108px', bordereau: '128px' };
   const STATUTS5 = ['en_vente', 'brouillon', 'masque', 'reserve', 'vendu', 'a_confirmer'];
   let annConfirme = null, annEnVol = false, annResultat = null, annActionPre = '';
   // ══ 5.410 — LES GESTES DU PANNEAU (l'app ne les fait plus) : prix, atelier Republier, publier, offres ══
@@ -1953,7 +1994,7 @@
     if (c === 'vues') return x.vues != null ? esc(String(x.vues)) : '—';
     if (c === 'favoris') return x.favoris != null ? esc(String(x.favoris)) + ' ♥' : '—';
     if (c === 'place') return x.place ? esc(x.place) : '—';
-    if (c === 'statut') return `<span class="st5" data-statut="${esc(x.statut || '')}">${esc(TU('s_' + (x.statut || 'a_confirmer')))}</span>`;
+    if (c === 'statut') return `<span class="st5" data-statut="${esc(x.statut || '')}">${esc(libStatut5(x.statut || 'a_confirmer'))}</span>`;
     return '';
   };
   // ══ 5.410 (Julien, 20 nov. : « pour l'extension, tu fais pareil que Vintex ») — ARTICLES EN TABLEAU ═══════════════
@@ -1967,6 +2008,19 @@
   const trier5 = (l, tri) => l.slice().sort((a, b) => { const va = valeurTri5(a, tri.col), vb = valeurTri5(b, tri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * tri.sens; });
   const etiquette5 = (k, texte, ton) => `<span class="et6" data-statut="${esc(k)}"${ton ? ` data-ton="${ton}"` : ''}>${esc(texte)}</span>`;
   const enTeteTri5 = (c, libelle, attrTri) => `<button type="button" class="th6" ${attrTri}="${c}" aria-sort="${annTri.col === c ? (annTri.sens > 0 ? 'ascending' : 'descending') : 'none'}">${esc(libelle)}<i aria-hidden="true">${annTri.col === c ? (annTri.sens > 0 ? '↑' : '↓') : '↕'}</i></button>`;
+  // 5.410.2 (Julien, 20 nov. : « je ne comprends pas ce qu'est le statut "à confirmer", ça veut rien dire ») : la
+  // RÈGLE <enligne-regle> ne change pas (lecture complète de plus de 24 h ⇒ ni « en ligne » ni « partie ») ; ce qu'on
+  // MONTRE dit ce qui se passe : « Pas revue depuis 3 j », et UNE fois, en tête du groupe, le geste.
+  const joursDepuis5 = (t) => { const ms = Date.now() - Number(t || 0); return t && isFinite(ms) && ms >= 0 ? Math.max(1, Math.floor(ms / 86400000)) : null; };
+  function libStatut5(k) {
+    if (k !== 'a_confirmer') return TU('s_' + k);
+    const n = joursDepuis5(listes && listes.annonces && listes.annonces.lu);
+    return n ? TU('s_pas_revue_j', { n }) : TU('s_pas_revue');
+  }
+  function noteRevue5(a) {
+    if (!a || !(a.statuts ? a.statuts.a_confirmer > 0 : a.aConfirmer)) return '';
+    return `<p class="note5 revue6" data-pas-revue="${a.relecture ? 'relecture' : 'geste'}">${esc(TU(a.relecture ? 's_relecture' : 's_ouvre_compte'))}</p>`;
+  }
   function annoncesGrandHtml(e) {
     const a = listes.annonces;
     const ici = ORIGINE_ICI || 'https://www.vinted.fr';
@@ -1982,9 +2036,9 @@
     const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'publier', 'masquer', 'afficher', 'favoris', 'ouvrir'];
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
       + gestes.map((k) => `<option value="${k}"${((k === 'ouvrir' || k === 'supprimer' || k === 'publier') && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
-    const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU('s_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
+    const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(k === 'a_confirmer' ? 's_pas_revues' : 's_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
     const outils = `<div class="barre5 barre6">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">${statutMenu}</div>`
-      + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`);
+      + (st ? '' : `<div class="val gris" data-statuts-pas-su>${esc(TU('a_statuts_pas_su'))}</div>`) + noteRevue5(a);
     const ligneN = `<div class="n6"><span data-ann-n="${vus.length}">${esc(TU('a_n_articles', { n: vus.length }))}</span><span class="n6-d"><span class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}" aria-label="${esc(TU('a_liste'))}">☰</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}" aria-label="${esc(TU('a_grille'))}">▦</button></span>`
       + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS6.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></span></div>`;
     // 5.410 : supprimer sur Leboncoin — LA confirmation de l'app (recopiée dans le fond : titre, l'annonce, ce qui reste,
@@ -2003,16 +2057,74 @@
     const cellule = (x, c) => {
       if (c === 'prix') return `<b>${esc(eurosL(x.prix))}</b>`;
       if (c === 'date') return x.depuis ? (x.depuisAuMoins ? `<span data-date-au-moins title="${esc(TU('g6_au_moins_note'))}">${esc(TU('g6_au_moins', { d: dateCourte5(x.depuis) }))}</span>` : esc(dateCourte5(x.depuis))) : '—';
-      if (c === 'statut') return etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')), x.statut === 'brouillon' || x.statut === 'a_confirmer' ? 'ambre' : '');
+      if (c === 'statut') return etiquette5(x.statut || '', libStatut5(x.statut || 'a_confirmer'), x.statut === 'brouillon' ? 'ambre' : '');   // 5.410.2 : « pas revue » est gris (rien à faire ici)
       return celluleAnn(x, c);
     };
-    const enTete = `<div class="tr6 th6r" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
-    return haut + `<div class="table6" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}" data-tri="${annTri.col}:${annTri.sens}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr6" style="--n6:${cols.length}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="art6" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}</span></button><span class="cels6">${cols.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="a:${esc(x.id)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const enTete = `<div class="tr6 th6r" style="--n6:${cols.length};--g6:${cols.map((c) => W6[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''} aria-label="${esc(TU('a_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ann-tri')}<span class="cels6">${cols.map((c) => enTeteTri5(c, TU('c5_' + c), 'data-ann-tri')).join('')}</span><span></span></div>`;
+    return haut + `<div class="table6" data-annonces="${vus.length}" data-vue="liste" data-cols="${cols.join(' ')}" data-tri="${annTri.col}:${annTri.sens}">${enTete}<ul class="rangs" data-defil="annonces">${vus.map((x) => `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}${annSel.has(x.id) ? ' data-coche' : ''}><div class="tr6" style="--n6:${cols.length};--g6:${cols.map((c) => W6[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="art6" data-annonce="${esc(x.id)}" data-statut="${esc(x.statut || '')}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}</span></button><span class="cels6">${cols.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c5_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="a:${esc(x.id)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   // ══ 5.410 — COMMANDES (= les ventes) EN TABLEAU, comme Vintex : article + statut DE VINTED en sous-titre, Prix, Date,
   //    Transporteur (son logo, la copie de l'app ; rien relié ⇒ « — », jamais « inconnu »), état en étiquette (« Action
   //    requise » en ambre, le reste neutre), ⋯ (la fiche). « Choisir une action » : ouvrir la conversation, voir dans VRM.
-  const COLS_V6 = ['prix', 'date', 'transporteur', 'statut'];
+  const COLS_V6 = ['prix', 'date', 'transporteur', 'limite', 'statut', 'bordereau'];
+  // ══ 5.410.2 — LE BORDEREAU ET LE LIVREUR DE CHAQUE VENTE (Julien, 20 nov. : « quand j'ai fait une vente, on doit
+  // pouvoir imprimer le bordereau, avoir le livreur ») ═══════════════════════════════════════════════════════════
+  // Transporteur (SON logo + nom), n° de suivi et date limite LUS (e-mail du bordereau, suivi) — jamais devinés ;
+  // « Imprimer le bordereau » ouvre le PDF que VRM a déjà rangé (`bordereauCarte` : lecture seule, compte de l'onglet,
+  // aucune requête vers Vinted, rien d'acheté) ; « Imprimer les N » pour une sélection (un fichier par bordereau).
+  // Vinted ne l'a pas encore fourni ⇒ « Pas encore de bordereau », dit ; la base muette ⇒ « pas su », dit.
+  const venSel = new Set();
+  let impEtat = null, impEnVol = false;
+  const imprimable = (x) => !!(x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === true && /^\d{1,20}$/.test(String(x.tx || '')));   // Leboncoin / Vestiaire : leurs bordereaux restent sur le site
+  const transpHtml6 = (x, taille) => (x.transporteurCle && U.logoTransp ? `<span class="tr-l6">${U.logoTransp(x.transporteurCle, taille || 18)}<span>${esc(x.transporteur || U.nomTransp(x.transporteurCle))}</span></span>` : x.transporteur ? `<span class="tr-l6"><span>${esc(x.transporteur)}</span></span>` : '<span class="gris6">—</span>')
+    + (x.suivi ? `<small class="suivi6" data-suivi="${esc(x.suivi)}">${esc(x.suivi)}</small>` : '');
+  // « 23/11/2026 10 h 00 » ⇒ « 23/11 · 10 h 00 » dans la colonne (l'en-tête dit « Date limite ») ; le texte lu entier en titre.
+  const limiteCourte6 = (t) => { const m = /^(\d{1,2})\/(\d{1,2})\/\d{4}\s*(.*)$/.exec(String(t || '').trim()); return m ? `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}${m[3] ? ' · ' + m[3] : ''}` : String(t || ''); };
+  const limiteHtml6 = (x, long) => (x.limite ? `<span class="lim6" data-limite title="${esc(x.limite)}">${esc(long ? TU('v_avant', { d: x.limite }) : limiteCourte6(x.limite))}</span>` : '<span class="gris6">—</span>');
+  function boutonImp6(x, court) {
+    if (imprimable(x)) return `<button type="button" class="imp6" data-imprimer="${esc(x.tx)}"${impEnVol ? ' disabled' : ''}${court ? ` aria-label="${esc(TU('imp_un'))}" title="${esc(TU('imp_un'))}"` : ''}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 8V3.5h10V8M7 17H4.5V9.5a1.5 1.5 0 0 1 1.5-1.5h12a1.5 1.5 0 0 1 1.5 1.5V17H17"/><path d="M7 13.5h10v7H7z"/></svg><span>${esc(TU(court ? 'imp_court' : 'imp_un'))}</span></button>`;
+    if (x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false) return `<span class="pas6" data-bordereau-manque="${esc(x.tx)}" title="${esc(TU('imp_pas_note'))}">${esc(TU('imp_pas'))}</span>`;
+    return '<span class="gris6">—</span>';
+  }
+  function pdfDepuisB64(b64) { const bin = atob(String(b64 || '')); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: 'application/pdf' }); }
+  function imprimerBordereaux(txs) {
+    const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 10);
+    if (!ids.length || impEnVol) return;
+    impEnVol = true; impEtat = { ton: '', texte: TU('imp_en_cours') }; rendre();
+    // Ouvert DANS le geste (un onglet vide d'abord : le navigateur ne bloque pas la fenêtre), rempli à la réponse.
+    let fen = null; if (ids.length === 1) { try { fen = window.open('', '_blank'); } catch (_) { fen = null; } }
+    const nomDe = (tx) => { const v = listes && listes.ventes && (listes.ventes.liste || []).find((y) => y.tx === tx); return `bordereau-${v && v.num ? String(v.num).replace(/[^\w-]/g, '') : tx}.pdf`; };
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'bordereauCarte', txs: ids }, (r) => {
+        try { void chrome.runtime.lastError; } catch (_) {}
+        impEnVol = false;
+        if (!r || !r.ok) { try { if (fen) fen.close(); } catch (_) {} impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); return; }
+        const pdfs = Array.isArray(r.pdfs) ? r.pdfs : [];
+        let ouverts = 0, telecharges = 0;
+        pdfs.forEach((p, i) => {
+          let url = ''; try { url = URL.createObjectURL(pdfDepuisB64(p.b64)); } catch (_) { return; }
+          setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
+          if (i === 0 && fen) { try { fen.location.href = url; ouverts++; return; } catch (_) {} }
+          try { const a = document.createElement('a'); a.href = url; a.download = nomDe(p.tx); a.rel = 'noopener'; a.click(); telecharges++; } catch (_) {}
+        });
+        if (fen && !ouverts) { try { fen.close(); } catch (_) {} }
+        const manque = (r.manque || []).length, passu = (r.passu || []).length;
+        const parts = [];
+        if (ouverts) parts.push(TU('imp_ouvert'));
+        if (telecharges) parts.push(TU('imp_telecharges', { n: telecharges }));
+        if (manque) parts.push(TU('imp_manque', { n: manque }));
+        if (passu) parts.push(TU('imp_passu'));
+        impEtat = { ton: manque || passu ? 'ambre' : '', texte: parts.join(' · ') || TU('imp_passu') };
+        for (const p of pdfs) venSel.delete(String(p.tx));
+        rendre();
+      });
+    } catch (_) { impEnVol = false; impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); }
+  }
+  function brancherImpression(racine) {
+    racine.querySelectorAll('[data-imprimer]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); imprimerBordereaux([b.getAttribute('data-imprimer')]); }));
+    const tous = racine.querySelector('[data-imprimer-n]'); if (tous) tous.addEventListener('click', () => imprimerBordereaux(String(tous.getAttribute('data-imprimer-n')).split(',')));
+    racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); rendre(); }));
+  }
   let venStatuts = null, venStatutOuvert = false, venTri = { col: 'date', sens: -1 }, venCherche = '';
   const ETAT_V6 = { a_expedier: ['v_action', 'ambre'], en_route: ['v_rien', ''], finalisee: ['v_terminee', ''], annulee: ['v_annulee', ''], pas_su: ['v_pas_su', ''] };
   function ventesGrandHtml(e) {
@@ -2025,13 +2137,16 @@
     const valeur = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.date) || 0 : c === 'transporteur' ? String(x.transporteur || '') : c === 'statut' ? String(x.etat || '') : String(x.titre || '').toLowerCase());
     const vus = v.liste.filter((x) => choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
     const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
-    const outils = `<div class="barre5 barre6"><select class="act5" disabled aria-label="${esc(TU('a_choisir'))}"><option>${esc(TU('a_choisir'))}</option></select><input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
-    const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>`;
+    const prets = v.liste.filter(imprimable);
+    for (const t of [...venSel]) if (!prets.some((x) => x.tx === t)) venSel.delete(t);
+    const aImprimer = venSel.size ? prets.filter((x) => venSel.has(x.tx)) : prets;
+    const impN = aImprimer.length ? `<button type="button" class="vu-btn vu-sec impn6" data-imprimer-n="${esc(aImprimer.slice(0, 10).map((x) => x.tx).join(','))}"${impEnVol ? ' disabled' : ''}>${esc(TU(aImprimer.length === 1 ? 'imp_un' : 'imp_n', { n: Math.min(10, aImprimer.length) }))}</button>` : '';
+    const outils = `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
+    const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>` + (impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : '');
     if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>`;
-    const transp = (x) => (x.transporteurCle && U.logoTransp ? `<span class="tr-l6">${U.logoTransp(x.transporteurCle, 18)}<span>${esc(x.transporteur || U.nomTransp(x.transporteurCle))}</span></span>` : x.transporteur ? esc(x.transporteur) : '—');
-    const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transp(x) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
-    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => enTeteTri5(c, TU('c6_' + c), 'data-ven-tri')).join('')}</span><span></span></div>`;
-    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length}"><span></span><button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x, true) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
+    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
+    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}">${imprimable(x) ? `<label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(x.tx) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label>` : '<span></span>'}<button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));
@@ -2107,10 +2222,10 @@
     if (!a) return '<div class="val gris" data-annonces="pas_su">Tes annonces n’ont pas pu être lues pour l’instant : rien n’est affiché plutôt qu’une liste fausse.</div>';
     if (!LISTES && carte.hasAttribute('data-grand')) return annoncesGrandHtml(e);
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
-    const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${a.aConfirmer ? `À confirmer · lues ${esc(depuis(a.lu) || 'il y a longtemps')}` : `${Number(a.total).toLocaleString('fr-FR')} en ligne · lues ${esc(depuis(a.lu) || '')}`}${a.relecture ? ' · relecture en cours' : ''}</div>`;
+    const tete = `<div class="lu" data-annonces-lu="${a.lu || ''}">${a.aConfirmer ? esc(TU('s_pas_revue_lu', { d: depuis(a.lu) || TU('s_longtemps') })) : `${Number(a.total).toLocaleString('fr-FR')} en ligne · lues ${esc(depuis(a.lu) || '')}`}${a.relecture ? ' · relecture en cours' : ''}</div>`;
     if (!a.liste.length) return tete + '<div class="val gris" data-annonces="0">Aucune annonce en ligne dans la dernière lecture de ton dressing.</div>';
     const avecN = a.liste.some((x) => x.num);
-    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-annonces="${a.liste.length}" data-defil="annonces">${a.liste.map((x) => `${LISTES ? `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="_blank" rel="noopener">${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me"><span class="sg">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}</span>${x.favoris != null ? ` · <span class="sg">${x.favoris} ♥</span>` : ''}${a.aConfirmer ? ' · <span class="sg">à confirmer</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>` : `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}><button type="button" class="rang" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id ? 'true' : 'false'}">${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me"><span class="sg">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}</span>${x.favoris != null ? ` · <span class="sg">${x.favoris} ♥</span>` : ''}${a.aConfirmer ? ' · <span class="sg">à confirmer</span>' : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></button>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`}`).join('')}</ul>`
+    return tete + `<ul class="rangs${avecN ? ' avec-n' : ''}" data-annonces="${a.liste.length}" data-defil="annonces">${a.liste.map((x) => `${LISTES ? `<li><a class="rang" data-annonce="${esc(x.id)}" href="${esc(ici + '/items/' + encodeURIComponent(x.id))}" target="_blank" rel="noopener">${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me"><span class="sg">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}</span>${x.favoris != null ? ` · <span class="sg">${x.favoris} ♥</span>` : ''}${a.aConfirmer ? ` · <span class="sg">${esc(libStatut5('a_confirmer'))}</span>` : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></a></li>` : `<li${ficheOuverte === 'a:' + x.id ? ' data-ouverte' : ''}><button type="button" class="rang" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}" aria-expanded="${ficheOuverte === 'a:' + x.id ? 'true' : 'false'}">${debutN(avecN, x.num)}${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || 'Annonce')}</span><span class="me"><span class="sg">${x.jours != null ? `en ligne depuis ${x.jours} j` : 'date pas lue'}</span>${x.favoris != null ? ` · <span class="sg">${x.favoris} ♥</span>` : ''}${a.aConfirmer ? ` · <span class="sg">${esc(libStatut5('a_confirmer'))}</span>` : ''}</span></span><span class="px">${esc(eurosL(x.prix))}</span></button>${ficheOuverte === 'a:' + x.id ? ficheAnnonceHtml(x, ici) : ''}</li>`}`).join('')}</ul>`
       + (a.total > a.liste.length ? `<div class="val gris">Les ${a.liste.length} plus récentes · ${Number(a.total).toLocaleString('fr-FR')} en tout.</div>` : '');
   }
   function ventesHtml(e) {
@@ -2154,8 +2269,8 @@
     return `<div class="fiche5" data-fiche="v:${esc(x.tx)}" role="region" aria-label="${esc(x.titre || '')}">`
       + (x.photo ? `<div class="ph5" data-photos="1"><img src="${esc(x.photo)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></div>` : '')
       + `<div class="g5">${fait5('p_num', x.num || null, 'num')}${fait5('p_prix', Number(x.prix) > 0 ? eurosL(x.prix) : null, 'prix')}${fait5('p_etat_vente', ETAT_VENTE[x.etat] || null, 'etat')}`
-      + `${fait5('p_bordereau', x.bordereau === true ? TU('p_pret') : x.bordereau === false ? TU('p_pas_la') : null, 'bordereau')}${fait5('p_date', x.date ? depuis(x.date) : null, 'date')}${fait5('p_transporteur', x.transporteur || null, 'transporteur')}</div>`
-      + `<div class="ge5">${conv ? `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + conv)}" target="_top" data-geste="conv">${esc(TU('p_ouvrir_conv'))}</a>` : ''}<a class="vu-btn vu-sec" href="https://vrm.center/?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(x.tx)}" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
+      + `${fait5('p_bordereau', x.bordereau === true ? TU('p_pret') : x.bordereau === false ? TU('p_pas_la') : null, 'bordereau')}${fait5('p_date', x.date ? depuis(x.date) : null, 'date')}${fait5('p_transporteur', x.transporteur || null, 'transporteur')}${fait5('p_suivi', x.suivi || null, 'suivi')}${fait5('c6_limite', x.limite || null, 'limite')}</div>`
+      + `<div class="ge5">${imprimable(x) ? boutonImp6(x) : ''}${conv ? `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + conv)}" target="_top" data-geste="conv">${esc(TU('p_ouvrir_conv'))}</a>` : ''}<a class="vu-btn vu-sec" href="https://vrm.center/?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(x.tx)}" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
   }
   // ══ 5.409 — MESSAGES : les conversations du compte de l'onglet (la boîte rangée), du plus récent ═════════
   // Toucher une conversation l'ouvre sur Vinted (la réponse part de Vinted : la carte n'envoie pas encore).
@@ -2399,7 +2514,10 @@
       <section class="sec6"><h3>${esc(TU('v6_aujourdhui'))}</h3><div class="tuiles6">
         ${tuile('v6_ventes_jour', ventesJour, 'ventes')}${tuile('v6_a_expedier', aExpedier, 'ventes', aExpedier ? 'ambre' : '')}${tuile('v6_non_lus', nonLus, 'messages')}${tuile('v6_en_vente', enVente, 'annonces')}
       </div>${j ? `<p class="note5" data-accueil-jauge>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))} · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</p>` : ''}</section>
-      <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
+      <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : ''}${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => { const vt = (x.s === 'ventes' || x.s === 'bordereaux') && l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.find((y) => y.tx === String(x.id || '').split(':')[0]) : null;
+        // 5.410.2 : une vente captée dit son livreur, son n° de suivi, sa date limite et s'imprime d'ici.
+        return vt ? `<div class="rg6 vte6" data-accueil-capte="${esc(x.s)}" data-accueil-vente="${esc(vt.tx)}"><span><b>${esc(TU('ns_' + x.s))} · ${esc(vt.titre || '')}</b><small>${esc(depuis(x.t) || '')}${vt.limite ? ' · ' + esc(TU('v_avant', { d: limiteCourte6(vt.limite) })) : ''}</small><span class="env6">${transpHtml6(vt, 16)}</span></span><span class="v6">${boutonImp6(vt)}</span></div>`
+          : `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`; }).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
     </div>`;
   }
   function vxHtml(e, corps, extras) {
@@ -2419,7 +2537,7 @@
           <h1 data-vx-titre>${esc(TU(PAGES6[cle]))}</h1>${nom ? `<span class="compte6" data-vx-compte><i aria-hidden="true">${esc(nom.charAt(0).toUpperCase())}</i>${esc(nom)}</span>` : ''}
           <span class="esp6"></span><button type="button" class="maj6" data-vx-maj data-lu="${lu || ''}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg><span>${esc(lu ? TU('v6_mis_a_jour', { quand: depuis(lu) || '' }) : TU('v6_mettre_a_jour'))}</span></button>
           <button class="fermer rond6" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button></header>
-        <div class="corps6">${extras || ''}${corps}</div>
+        <div class="corps6" data-defil="corps6">${extras || ''}${corps}</div>
       </div>
     </div>`;
   }
@@ -2454,6 +2572,7 @@
     </section>`;
   }
   function brancherListes(racine, e) {
+    brancherImpression(racine);
     try { brancherGestes6(racine); } catch (_) {}
     racine.querySelectorAll('[data-onglet-b]').forEach((b) => b.addEventListener('click', () => {
       ongletListe = b.getAttribute('data-onglet-b'); ranger({ vrmCarteOnglet: ongletListe });
@@ -2984,6 +3103,8 @@
       ${grand5 ? '' : detailsHtml}`);
     contenu.querySelectorAll('[data-defil]').forEach((el) => { const v = defils[el.getAttribute('data-defil')]; if (v) el.scrollTop = v; });
     if (hautCarte) carte.scrollTop = hautCarte;
+    reposerDefil();
+    if (grand5) garderPanneau();
     brancherReparer();
     brancherRapport();
     const det = carte.querySelector('[data-detail]');
@@ -3601,10 +3722,77 @@
     hote.setAttribute('data-lien-panneau', lienPanneau.page);
     setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
   }
+
   // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
-  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { fermerCarte(); } }, true); } catch (_) {}
+  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
-  function fermerCarte() { if (LISTES) return; doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+  function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
+
+  // ══ 5.410.2 — LE PANNEAU RESTE OUVERT, DANS LE MÊME ÉTAT, JUSQU'À SON × ═══════════════════════════════════════
+  // Julien, 20 nov. : « parfois l'extension se ferme toute seule sur Vinted ». Mesuré au banc
+  // (scripts/bancs/panneau-persistant.cjs) sur la 5.410.1 — quatre façons de le perdre :
+  //  1. la PAGE retire l'hôte (Vinted / Next.js qui refait le document à une navigation ou à une hydratation
+  //     ratée) : rien ne le remettait, la carte disparaissait jusqu'au rechargement ;
+  //  2. une navigation pleine (un lien, « retour ») recharge ce script : l'état « ouvert » vivait en mémoire ⇒
+  //     panneau fermé, page, sélection et défilement perdus ;
+  //  3. le SURVOL du logo ouvrait le grand panneau et la sortie de la souris (vers la barre d'onglets) le
+  //     refermait 180 ms après ;
+  //  4. un toucher sur le voile autour du panneau (ou une page de Vinted) le fermait.
+  // L'état (ouvert, page, sélection, fiche, conversation, défilement) est rangé PAR ONGLET par le fond
+  // (`panneauEtat` : chrome.storage.session, il survit au service worker tué — §4.9), jamais dans la page.
+  // Seuls son × et Échap (hors d'un champ ou d'une fenêtre du site) le ferment ; l'état est alors oublié.
+  let panneauDernier = '', panneauMinut = null, defilARendre = null, defilJusque = 0;
+  function etatPanneauVu() {
+    const defil = {}; try { contenu.querySelectorAll('[data-defil]').forEach((el) => { if (el.scrollTop > 0) defil[el.getAttribute('data-defil')] = Math.round(el.scrollTop); }); } catch (_) {}
+    return { ouvert: true, page: ongletListe, sel: [...annSel].slice(0, 200), selV: [...venSel].slice(0, 200), fiche: ficheOuverte || '', conv: convChoisie || '', defil };
+  }
+  function garderPanneau() {
+    if (CADRE || LISTES || !carte.hasAttribute('data-grand') || !carte.classList.contains('on')) return;
+    clearTimeout(panneauMinut);
+    panneauMinut = setTimeout(() => {
+      if (!carte.classList.contains('on')) return;
+      const e = etatPanneauVu(), j = JSON.stringify(e);
+      if (j === panneauDernier) return;
+      panneauDernier = j;
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'panneauEtat', quoi: 'poser', etat: e }, () => { try { void chrome.runtime.lastError; } catch (_) {} }); } catch (_) {}
+    }, 350);
+  }
+  function oublierPanneau() {
+    clearTimeout(panneauMinut); panneauDernier = ''; defilARendre = null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'panneauEtat', quoi: 'fermer' }, () => { try { void chrome.runtime.lastError; } catch (_) {} }); } catch (_) {}
+  }
+  // Le défilement rangé se repose dès que la liste est assez longue pour lui (les listes arrivent après le 1er rendu).
+  function reposerDefil() {
+    if (!defilARendre) return;
+    if (Date.now() > defilJusque) { defilARendre = null; return; }
+    try { contenu.querySelectorAll('[data-defil]').forEach((el) => { const k = el.getAttribute('data-defil'), v = defilARendre[k]; if (v == null) return; if (el.scrollHeight - el.clientHeight >= v - 1) { el.scrollTop = v; delete defilARendre[k]; } }); } catch (_) {}
+    if (!Object.keys(defilARendre).length) defilARendre = null;
+  }
+  function restaurerPanneau(et) {
+    if (!et || et.ouvert !== true || CADRE || LISTES || lienPanneau) return;
+    if (ONGLETS5.includes(et.page)) ongletListe = et.page;
+    annSel = new Set((Array.isArray(et.sel) ? et.sel : []).map(String).filter((x) => /^[\w-]{1,40}$/.test(x)));
+    venSel.clear(); for (const t of Array.isArray(et.selV) ? et.selV : []) if (/^\d{1,20}$/.test(String(t))) venSel.add(String(t));
+    if (typeof et.fiche === 'string' && /^[av]:[\w-]{1,40}$/.test(et.fiche)) ficheOuverte = et.fiche;
+    if (typeof et.conv === 'string' && /^[\w@:.-]{0,80}$/.test(et.conv)) convChoisie = et.conv;
+    defilARendre = et.defil && typeof et.defil === 'object' ? Object.assign({}, et.defil) : null; defilJusque = Date.now() + 15000;
+    hote.setAttribute('data-panneau-repris', et.page || '');
+    doigt = true; carte.classList.add('on'); rafraichir();
+  }
+  if (!CADRE && !LISTES && !lienPanneau) {
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'panneauEtat', quoi: 'lire' }, (r) => { try { void chrome.runtime.lastError; } catch (_) {} if (r && r.ok && r.etat) restaurerPanneau(r.etat); }); } catch (_) {}
+    try { contenu.addEventListener('scroll', garderPanneau, true); } catch (_) {}
+  }
+  // La page a retiré l'hôte ⇒ il revient tout de suite, au même endroit, panneau et défilement compris.
+  function replacerHote() {
+    if (hote.isConnected || CADRE || LISTES) return;
+    if (!vivant()) return;
+    let defil = null; try { defil = panneauDernier ? JSON.parse(panneauDernier).defil : null; } catch (_) {}
+    try { (document.documentElement || document.body).appendChild(hote); } catch (_) { return; }
+    hote.setAttribute('data-replace', String((Number(hote.getAttribute('data-replace')) || 0) + 1));
+    if (defil && carte.classList.contains('on')) { defilARendre = defil; defilJusque = Date.now() + 15000; reposerDefil(); }
+  }
+  if (!CADRE && !LISTES) setInterval(() => { if (!vivant()) { try { hote.remove(); } catch (_) {} return; } replacerHote(); }, 1000);
 
   // ══ 5.351 (lot extension-visuel) : DÉPLACER, RÉDUIRE, TEINTE ══
   // (5.376 : la carte n'ouvre plus VRM — « Colis · Messages · Offres » sont retirés.)
@@ -3738,7 +3926,7 @@
   try { if (window.visualViewport) window.visualViewport.addEventListener('resize', replacerLogo); } catch (_) {}
   try {
     let minut = null;
-    const mo = new MutationObserver(() => { if (minut) return; minut = setTimeout(() => { minut = null; replacerLogo(); }, 300); });
+    const mo = new MutationObserver(() => { if (!hote.isConnected) replacerHote(); if (minut) return; minut = setTimeout(() => { minut = null; replacerLogo(); }, 300); });
     mo.observe(document.documentElement, { childList: true, subtree: true });
   } catch (_) {}
   setTimeout(replacerLogo, 600); setTimeout(replacerLogo, 2000);   // les barres posées après le premier rendu du site
@@ -3811,6 +3999,9 @@
   hote.addEventListener('pointerenter', (e) => {
     if (CADRE || (e.pointerType && e.pointerType !== 'mouse')) return;
     if (question.classList.contains('on')) return;
+    // 5.410.2 : le GRAND panneau ne s'ouvre pas au simple survol (il couvrait l'écran puis se refermait dès que la
+    // souris sortait de la fenêtre : « il se ferme tout seul ») — un clic sur le logo l'ouvre, son × le ferme.
+    if (carte.hasAttribute('data-grand') && !carte.classList.contains('on')) return;
     // 5.377 : la souris sur le petit message n'ouvre pas la carte (elle le garderait affiché).
     if (!capteEl.hidden) { const r = capteEl.getBoundingClientRect(); if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return; }
     cacherCapte('carte');
@@ -3822,12 +4013,14 @@
   hote.addEventListener('pointerleave', (e) => {
     if (CADRE || (e.pointerType && e.pointerType !== 'mouse')) return;
     if (doigt || !connexion.hidden) return;             // un formulaire ouvert ne se ferme pas au survol
+    if (carte.hasAttribute('data-grand')) return;        // 5.410.2 : le grand panneau ne se ferme QUE par son ×
     clearTimeout(minuteur); minuteur = setTimeout(() => carte.classList.remove('on'), 180);
   });
   // Au doigt, toucher ailleurs dans la page referme la carte (sans rien cliquer
   // à sa place : on n'empêche pas le geste du site).
   document.addEventListener('pointerdown', (e) => {
     if (CADRE || !carte.classList.contains('on')) return;
+    if (carte.hasAttribute('data-grand')) return;        // 5.410.2 : un clic sur le voile, sur la page : le panneau reste
     let dedans = false; try { dedans = e.composedPath().includes(hote); } catch (_) {}
     if (!dedans) fermerCarte();
   }, true);
