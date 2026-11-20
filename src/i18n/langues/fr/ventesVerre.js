@@ -124,5 +124,17 @@ export default {
   "vn.e.coches": {"one": "{n} coché", "other": "{n} cochés"},
   "vn.e.deposer": {"one": "{n} à déposer", "other": "{n} à déposer"},
   "vn.auMoins": "au moins {n} à envoyer",
-  "vn.detailVide": "Touche une vente pour la voir ici."
+  "vn.detailVide": "Touche une vente pour la voir ici.",
+  "vn.lbc.aGenerer": "Bordereau à générer",
+  "vn.lbc.prets": "Prêts à imprimer",
+  "vn.lbc.genererTous": "Générer tous",
+  "vn.lbc.generer": "à générer",
+  "vn.lbc.pret": "prêt",
+  "vn.lbc.fait": "Colis fait",
+  "vn.lbc.pasEncore": "Pas encore",
+  "vn.lbc.poste": "Posté",
+  "vn.lbc.suivre": "Suivre",
+  "vn.lbc.rien": "Aucun colis Leboncoin à envoyer.",
+  "vn.lbc.pasLu": "Colis Leboncoin : pas encore lus.",
+  "vn.lbc.limite": "Le bordereau se génère sur leboncoin.fr : toucher la vente l’y ouvre."
 };

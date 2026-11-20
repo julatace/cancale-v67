@@ -66789,9 +66789,10 @@ function AppCoeur() {
     if(baseKO) return null;
     if(t==='ventes'&&site==='leboncoin') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site="leboncoin" aria-label={L.aEnvoyer}>
-        {/* (12 nov., finitions) L'intertitre prend la marge de l'écran (il touchait le bord gauche). */}
-        <header className="vrm-colis-section-tete" data-colis-section="ventes" id={ID_SECTION_COLIS.ventes} style={{ paddingInline: 16 }}><h2 className="vrm-colis-section-titre">{L.aEnvoyer}</h2></header>
-        <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes} enSection/></div>
+        {/* (20 nov.) Le segment « À envoyer · En route » de la liste (comme Ventes · Vinted) dit où on est : plus d'intertitre.
+            L'ancre de la section reste (les liens « À envoyer » y descendent). */}
+        <div className="vrm-colis-section-tete" data-colis-section="ventes" id={ID_SECTION_COLIS.ventes}/>
+        <div data-colis-leboncoin=""><LeboncoinColis lbcVentes={lbcVentes} enSection onglet={ongletColis} onOnglet={choisirOngletColis}/></div>
       </section>);
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
     if(t==='ventes') return (
@@ -66830,12 +66831,18 @@ function AppCoeur() {
     // (19 nov., « VRM natif ») Ventes : l'écran natif porte son grand titre, sa recherche, son filtre et ses listes ; la tête,
     // les filtres et les cartes d'avant ne sont plus rendus autour (la liste d'avant ne reste que sous « Terminées »).
     const natifV = VENTES_NATIF && t === 'ventes' && !baseKO && site !== 'leboncoin' && (!sous || sec === 'ventes');
+    const titreDansCoque = ECRANS_NATIFS.has(t) && !ordi;
+    // (20 nov., « les mêmes dispositions sur toutes les plateformes ») Ventes · Leboncoin : le MÊME segment que Ventes · Vinted
+    // (À envoyer · En route · Terminées, `ongletColis`) ; la liste des ventes d'avant n'est que sous « Terminées ».
+    const lbcNatif = t === 'ventes' && site === 'leboncoin' && !baseKO;
     return (
       <section className="vrm-tache" data-tache={t} data-natif={natifV ? '1' : undefined} data-tache-site={site} data-tache-section={sec} aria-label={TITRES_TACHE[t]} data-espace={t==='annonces' ? 'paires' : (t === 'ventes' || t === 'achats' ? 'ventes' : undefined)}>
         {/* (17 nov., nouveau design) Allumé : une tête À SOI (`v2-tete-tache`) — les règles d'hier réservaient 150 px à droite
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
         {natifV ? null : <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
-          {t === 'ventes' && !(designV2App && v2VentesColis && !baseKO) ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
+          {/* (20 nov., « les mêmes dispositions sur toutes les plateformes ») Au téléphone, un écran natif (Ventes, Annonces) a déjà
+              son grand titre dans la coque : Ventes · Leboncoin / eBay ne le répète plus (ni la date), comme Ventes · Vinted. */}
+          {t === 'ventes' && !titreDansCoque && !(designV2App && v2VentesColis && !baseKO) ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           {designV2App && t === 'achats' && !baseKO
             /* (17 nov., audit visuel A3) « Ajouter un achat » : plein COMPACT sur la ligne du titre (jamais posé sur la liste). */
             ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
@@ -66851,7 +66858,7 @@ function AppCoeur() {
                portail) : au téléphone la recherche de la liste (le scanner dedans), à l'ordinateur le plein « Imprimer les N
                bordereaux » en haut à droite — son compte et son geste restent ceux de la liste. */
             ? <div className="v2-titre-ligne vv-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><span className="vv-tete-place" data-vv-tete-place="ventes"/></div>
-            : <h1>{TITRES_TACHE[t]}</h1>}
+            : titreDansCoque ? null : <h1>{TITRES_TACHE[t]}</h1>}
           {/* (17 nov., nouveau design) PLATEFORME + COMPTE = UN MENU sous le grand titre : les mêmes contrôles qu'avant
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
           {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
@@ -66896,16 +66903,23 @@ function AppCoeur() {
             (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
             ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
         {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
+        {/* (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») Ventes · eBay ouvre la MÊME
+            liste que Ventes · Vinted (l'écran natif : À envoyer · En route · Terminées) ; ce qu'eBay a EN PLUS (tableau, à traiter,
+            offres, argent, santé) est un groupe de rangées sous la liste, chacune ouvre sa section (rien n'est perdu, §4.11). */}
+        {t==='ventes' && natifV && sous && !baseKO ? <Natif.Groupe titre={nomPlateforme(site)} attrs={{ 'data-tache-sections': site }}>
+          {sous.filter(([id])=>id!=='ventes').map(([id,l])=><Natif.Rangee key={id} titre={aCleTr('nav.sous.'+site+'.'+id) ? tr('nav.sous.'+site+'.'+id) : l} fin="chevron"
+            onClick={()=>{ setEbayCible(null); setPlatSub(subDeTache(site,id)); }} attrs={{ 'data-tache-section-entree': id }}/>)}
+        </Natif.Groupe> : null}
         {/* (19 nov., Ventes « comme avant ») La bande du mois est de nouveau à l'écran, en tête de « Toutes » ; sous « À envoyer »
             et « En route » elle reste MONTÉE, cachée (ce qu'elle publie), jamais posée sous les colis. */}
         {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={natifV || (designV2App && v2VentesColis && ongletColis !== 'toutes')}><div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div></CacheSiV2>}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
-        {t==='ventes' && !baseKO && !(natifV && ongletColis !== 'toutes') && !(designV2App && v2VentesColis && ongletColis !== 'toutes' && ongletColisMontre !== 'envoyes') && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
+        {t==='ventes' && !baseKO && !((natifV || lbcNatif) && ongletColis !== 'toutes') && !(designV2App && v2VentesColis && ongletColis !== 'toutes' && ongletColisMontre !== 'envoyes') && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={natifV || (designV2App && v2VentesColis && ongletColis !== 'toutes')}><div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div></CacheSiV2>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         {/* (17 nov., nouveau design) Ventes : la liste des ventes est la vue « Toutes » du segmenté ; sur « À envoyer » et
             « En route », elle reste MONTÉE mais cachée (ses nombres publiés), jamais posée sous les colis. */}
-        <CacheSiV2 si={(natifV || (designV2App && t === 'ventes' && v2VentesColis)) && ongletColis !== 'toutes'}>
+        <CacheSiV2 si={(natifV || lbcNatif || (designV2App && t === 'ventes' && v2VentesColis)) && ongletColis !== 'toutes'}>
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
         {/* (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire (src/filUnique.js). */}
         {site==='toutes' && t==='messages' ? rendreVinted('messages', true)
