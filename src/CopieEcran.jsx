@@ -23,38 +23,57 @@ export function ageCopieTexte(min) {
   return tr('natif.copie.heures', { n: Math.floor(m / 60) });
 }
 
-// Où poser la mention : l'en-tête du premier groupe visible, sinon la ligne du grand titre de la coque.
-// `zone` : où chercher les groupes (le contenu de l'écran) ; `portee` : où chercher le grand titre.
+// Où poser la mention : sur une ligne d'en-tête qui EXISTE déjà (le grand titre de la coque, l'en-tête d'un groupe, le
+// titre de l'écran), à droite, là où rien n'est dessiné — jamais une ligne de plus (rien ne saute au remplacement),
+// jamais sur un bouton ou un texte. `portee` : où chercher le grand titre (la coque copiée), sinon le document.
+const LARGEUR_MENTION = 170;
 function placeMention(hote, enveloppe, portee = null) {
   try {
     const base = enveloppe.getBoundingClientRect();
+    const m = enveloppe.querySelector('.vrm-ce-mention');
+    const L = m && m.scrollWidth ? Math.min(LARGEUR_MENTION + 40, m.scrollWidth + 8) : LARGEUR_MENTION;
     const H = (typeof window !== 'undefined' ? window.innerHeight : 800) || 800;
-    for (const t of (hote.querySelector('.vrm-copie-zone') || hote).querySelectorAll('.n-groupe-tete')) {
-      const r = t.getBoundingClientRect();
-      if (r.height < 10 || r.top > H * 0.8) continue;
-      // un en-tête qui porte déjà quelque chose à droite (un compte, un lien) : on passe
-      if (t.querySelector('button, .n-groupe-tete-droite, .n-groupe-compte')) continue;
-      return { top: Math.round(r.top - base.top + r.height / 2), dans: 'groupe' };
-    }
+    const droite = base.right - 16, gauche = droite - L;
+    // Ce qui est DESSINÉ (feuilles de texte, boutons, icônes, pastilles) dans la bande d'une ligne.
+    const occupe = (y) => {
+      for (const e of (portee || hote).querySelectorAll('button, svg, img, .n-pastille, .n-plaque, a, input, span, b, small, strong, p, h1, h2, h3, div')) {
+        if (e.closest('.vrm-ce-mention')) continue;
+        if (e.localName === 'div' || e.localName === 'span' || e.localName === 'p' || e.localName === 'h1' || e.localName === 'h2' || e.localName === 'h3' || e.localName === 'b' || e.localName === 'small' || e.localName === 'strong') {
+          // un bloc de TEXTE seulement (pas un conteneur) : son texte propre
+          if (![...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+        }
+        const r = e.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom < y - 10 || r.top > y + 10) continue;
+        // la largeur réelle du texte (un titre en bloc pleine largeur n'occupe que ses lettres)
+        let dr = r.right;
+        if (e.childNodes.length === 1 && e.firstChild.nodeType === 3) { try { const rg = document.createRange(); rg.selectNodeContents(e); dr = rg.getBoundingClientRect().right; } catch (_) {} }
+        if (dr > gauche && r.left < droite) return true;
+      }
+      return false;
+    };
+    const cands = [];
     const titre = (portee || document).querySelector('.vrm-main h1.n-grand-titre');
-    if (titre) {
-      const r = titre.getBoundingClientRect();
-      const zone = portee ? (hote.querySelector('.vrm-copie-zone') || hote).getBoundingClientRect() : base;
-      if (r.height > 10 && r.bottom <= zone.top + 4 && zone.top - r.bottom < 80) return { top: Math.round(r.top - base.top + r.height / 2 + 4), dans: 'titre' };
+    if (titre) { const r = titre.getBoundingClientRect(); if (r.height > 10 && r.bottom <= base.top + 120) cands.push({ r, dans: 'titre' }); }
+    for (const t of (hote.querySelector('.vrm-ce-zone') || hote).querySelectorAll('.n-groupe-tete, h1, h2, header')) {
+      const r = t.getBoundingClientRect();
+      if (r.height < 10 || r.top > H * 0.6) continue;
+      cands.push({ r, dans: t.classList.contains('n-groupe-tete') ? 'groupe' : 'titre' });
     }
+    cands.sort((a, b) => a.r.top - b.r.top);
+    for (const c of cands) { const y = c.r.top + c.r.height / 2; if (!occupe(y)) return { top: Math.round(y - base.top), dans: c.dans }; }
   } catch (_) {}
-  return { top: 10, dans: 'haut' };
+  return null;
 }
 
 function Mention({ place, pasAJour, age, onReessayer }) {
   return (
-    <div className={'vrm-copie-mention' + (place ? ' is-pose' : '')} data-copie-mention={place ? place.dans : ''} style={{ top: place ? place.top : 10 }}>
+    <div className={'vrm-ce-mention' + (place ? ' is-pose' : '') + (place && place.dans === 'aucune' ? ' is-bas' : '')} data-copie-mention={place ? place.dans : ''} style={place && place.dans !== 'aucune' ? { top: place.top } : undefined}>
       {pasAJour ? <>
         <span>{tr('natif.copie.pasAJour')}</span>
         <span aria-hidden="true">·</span>
-        <button type="button" className="vrm-copie-reessayer" data-copie-reessayer="" onClick={() => { if (onReessayer) onReessayer(); }}>{tr('natif.copie.reessayer')}</button>
+        <button type="button" className="vrm-ce-reessayer" data-copie-reessayer="" onClick={() => { if (onReessayer) onReessayer(); }}>{tr('natif.copie.reessayer')}</button>
       </> : <>
-        <span className="vrm-copie-roue" aria-hidden="true"/>
+        <span className="vrm-ce-roue" aria-hidden="true"/>
         <span>{tr('natif.copie.misAJour', { age: ageCopieTexte(age) })}</span>
       </>}
     </div>
@@ -70,22 +89,26 @@ export function CoqueCopie({ copie, maintenant = null }) {
     const h = hote.current; if (!h) return;
     try { h.inert = true; } catch (_) {}
     h.setAttribute('inert', '');
-    const z = h.querySelector('.vrm-copie-zone'); if (z) z.setAttribute('data-copie-contenu', '');
-    if (enveloppe.current) setPlace(placeMention(h, enveloppe.current, h));
+    const z = h.querySelector('.vrm-ce-zone'); if (z) z.setAttribute('data-copie-contenu', '');
+    if (enveloppe.current) setPlace(placeMention(h, enveloppe.current, h) || { dans: 'aucune' });
   }, [copie && copie.coque && copie.coque.html]);
   if (!copie || !copie.coque || !copie.coque.html) return null;
   const age = ageCopieMin(copie, maintenant || Date.now());
   return (
-    <div ref={enveloppe} className="vrm-ji vrm-copie vrm-copie-coque" data-copie-ecran={copie.ecran} data-copie-t={String(copie.t)} data-copie-age={String(age)} data-copie-etat="mise-a-jour" aria-busy="true" style={{ position: 'absolute', inset: 0 }}>
+    <div ref={enveloppe} className="vrm-ji vrm-ce vrm-ce-coque" data-copie-ecran={copie.ecran} data-copie-t={String(copie.t)} data-copie-age={String(age)} data-copie-etat="mise-a-jour" aria-busy="true" style={{ position: 'absolute', inset: 0 }}>
       <span className="vrm-sr-seul" role="status">{tr('natif.copie.nom')}</span>
-      <div ref={hote} className="vrm-copie-contenu" dangerouslySetInnerHTML={{ __html: copie.coque.html }}/>
+      <div ref={hote} className="vrm-ce-contenu" dangerouslySetInnerHTML={{ __html: copie.coque.html }}/>
       <Mention place={place} pasAJour={false} age={age}/>
     </div>
   );
 }
 
+// LA COPIE DANS L'APP, à la place exacte de l'écran vrai : le conteneur de la copie EST le conteneur de l'écran prêt
+// (`vrm-attente-pret`, enfant direct de l'attente) — la même arborescence, donc les mêmes règles de style (une règle
+// « .vrm-attente-pret > section » s'applique pareil) : rien ne bouge quand l'écran vrai prend la place.
+// src/AttenteEcran.jsx la pose SANS cadre (`sansCadre`). La mention est sa voisine, hors du contenu inerte.
 export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant = null }) {
-  const hote = React.useRef(null), enveloppe = React.useRef(null);
+  const hote = React.useRef(null);
   const [now, setNow] = React.useState(() => maintenant || Date.now());
   React.useEffect(() => { if (maintenant) return undefined; const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, [maintenant]);
   const [place, setPlace] = React.useState(null);
@@ -94,21 +117,23 @@ export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant =
     const h = hote.current; if (!h) return;
     try { h.inert = true; } catch (_) {}
     h.setAttribute('inert', '');
-    if (enveloppe.current) setPlace(placeMention(h, enveloppe.current));
+    const parent = h.parentElement;
+    if (parent && getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+    if (parent) setPlace(placeMention(h, parent) || { dans: 'aucune' });
   }, [copie && copie.html]);
   if (!copie || !copie.html) return null;
   const age = ageCopieMin(copie, maintenant || now);
   const pasAJour = etat === 'pas-a-jour';
   // Le HTML est la projection NETTOYÉE (liste blanche, src/copieEcran.js `nettoyer`) que l'écran vrai a rendue.
-  const html = copie.html;
   return (
-    <div ref={enveloppe} className="vrm-ji vrm-copie" data-copie-ecran={copie.ecran} data-copie-t={String(copie.t)} data-copie-age={String(age)}
-      data-copie-etat={pasAJour ? 'pas-a-jour' : 'mise-a-jour'} aria-busy={pasAJour ? undefined : 'true'}
-      onClickCapture={(e) => { if (!(e.target && e.target.closest && e.target.closest('[data-copie-reessayer]'))) { e.preventDefault(); e.stopPropagation(); } }}>
+    <>
       <span className="vrm-sr-seul" role="status">{tr('natif.copie.nom')}</span>
-      <div ref={hote} className="vrm-copie-contenu" data-copie-contenu="" dangerouslySetInnerHTML={{ __html: html }}/>
+      <div ref={hote} className="vrm-attente-pret vrm-attente-sans-fondu vrm-ce vrm-ce-contenu" data-copie-contenu="" data-copie-ecran={copie.ecran} data-copie-t={String(copie.t)}
+        data-copie-age={String(age)} data-copie-etat={pasAJour ? 'pas-a-jour' : 'mise-a-jour'} aria-busy={pasAJour ? undefined : 'true'}
+        dangerouslySetInnerHTML={{ __html: copie.html }}/>
       <Mention place={place} pasAJour={pasAJour} age={age} onReessayer={onReessayer}/>
-    </div>
+    </>
   );
 }
+VueCopie.sansCadre = true;
 export default VueCopie;

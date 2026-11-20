@@ -104,7 +104,7 @@ async function visiter(ctx, ecran) {
       const pg = await ctx.newPage();
       const url0 = `http://localhost:${PORT}/?tab=annonces`;
       await pg.goto(url0, { waitUntil: 'domcontentloaded', timeout: 120000 });
-      const vue = await pg.waitForSelector('#root [data-copie-ecran="annonces"] [data-copie-contenu]', { timeout: 60000 }).then(() => true, () => false);
+      const vue = await pg.waitForSelector('#root [data-copie-ecran="annonces"][data-copie-contenu]', { timeout: 60000 }).then(() => true, () => false);
       dit(vue, 'lectures tenues : la copie d\'Annonces est À L\'ÉCRAN dans l\'app');
       const ecritAvant = etat.ecritures.length;
       // Les rangées de la copie, touchées ; Entrée pressée.
@@ -113,11 +113,11 @@ async function visiter(ctx, ecran) {
       await pg.keyboard.press('Enter').catch(() => {}); await attendre(1200);
       const apres = await pg.evaluate(() => {
         const cop = document.querySelector('#root [data-copie-ecran="annonces"]');
-        const h = cop && cop.querySelector('[data-copie-contenu]');
+        const h = cop;   // le conteneur de la copie EST son contenu inerte (src/CopieEcran.jsx)
         const tout = h ? [...h.querySelectorAll('*')] : [];
         return {
           inerte: !!(h && h.hasAttribute('inert')), etat: cop && cop.getAttribute('data-copie-etat'), age: cop && cop.getAttribute('data-copie-age'),
-          mention: !!(cop && cop.querySelector('[data-copie-mention]')), on: tout.filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
+          mention: !!(cop && cop.parentElement.querySelector('[data-copie-mention]')), on: tout.filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
           href: tout.filter((e) => e.hasAttribute('href')).length, id: tout.filter((e) => e.hasAttribute('id')).length, script: tout.filter((e) => /^(script|iframe|object|embed)$/i.test(e.localName)).length,
           fiche: !!document.querySelector('[data-fiche-paire]'), url: location.pathname + location.search, encore: !!cop, rangees: cop ? cop.querySelectorAll('.n-rangee').length : 0,
         };
@@ -145,7 +145,7 @@ async function visiter(ctx, ecran) {
       const vue = await pg.waitForSelector('#root [data-copie-ecran="annonces"][data-copie-etat="pas-a-jour"]', { timeout: 60000 }).then(() => true, () => false);
       dit(vue, 'base injoignable : la copie est montrée « Pas à jour »');
       await attendre(6000);
-      const r = await pg.evaluate(() => { const c = document.querySelector('#root [data-copie-ecran="annonces"]'); return { la: !!c, etat: c && c.getAttribute('data-copie-etat'), bouton: !!(c && c.querySelector('[data-copie-reessayer]')), rangees: c ? c.querySelectorAll('.n-rangee').length : 0 }; });
+      const r = await pg.evaluate(() => { const c = document.querySelector('#root [data-copie-ecran="annonces"]'); return { la: !!c, etat: c && c.getAttribute('data-copie-etat'), bouton: !!(c && c.parentElement.querySelector('[data-copie-reessayer]')), rangees: c ? c.querySelectorAll('.n-rangee').length : 0 }; });
       dit(r.la && r.etat === 'pas-a-jour', '6 s plus tard, la copie est TOUJOURS là (jamais un écran vide)');
       dit(r.bouton, 'avec SON bouton « Réessayer »');
       dit(r.rangees >= 5, `ses rangées restent lisibles (${r.rangees})`);

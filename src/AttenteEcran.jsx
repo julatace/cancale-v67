@@ -138,7 +138,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   return <div className="vrm-attente" data-attente={visible ? (tout ? 'pret' : 'plafond') : (avecInstantane ? 'instantane' : 'attente')} data-attente-ecran={ecran} data-attente-manque={manquent.join(' ') || undefined} data-attente-instantane={vuInstantane.current ? '1' : undefined}>
     <DrapeauxAvantMesure/>
     {/* L'instantané prend le cadre de l'écran prêt (`vrm-attente-pret` : mêmes marges), sans fondu. */}
-    {!visible && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
+    {!visible && (avecInstantane ? (instantane.type && instantane.type.sansCadre ? instantane : <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div>) : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
     {/* Remplacé EN PLACE : après un instantané, l'écran vrai arrive sans fondu (rien ne « réapparaît »). */}
     <div className={visible ? (vuInstantane.current ? 'vrm-attente-pret vrm-attente-sans-fondu' : aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
       <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{enfants ? children : null}</VisibleCtx.Provider></Ctx.Provider>

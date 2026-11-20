@@ -194,11 +194,14 @@ export function capturerCopie(racine, { owner, ecran, maintenant = Date.now(), h
   let copieCoque = null;
   if (coque && coque.contains(racine) && pageEnHaut(racine)) {
     try {
-      const cc = copierElague(coque, (el) => { const r = el.getBoundingClientRect(); if (cacheParStyle(el, r)) return true; if (r.width === 0 && r.height === 0) return false; return r.top >= vh || r.bottom <= 0 || r.left >= vw || r.right <= 0; },
-        (src, dst) => { if (src === racine) dst.classList.add('vrm-copie-zone'); });
+      // Dans la zone des écrans, seuls la barre du haut, le grand titre et l'écran lui-même : les bandeaux PASSAGERS
+      // posés entre eux (fraîcheur, photos, statut, nouveautés) ne sont pas copiés — ils décaleraient la copie.
+      const passager = (el) => { const p = el.parentElement; return !!p && p.classList.contains('vrm-main') && !el.contains(racine) && /(fraicheur|sous-ile|bandeau|neuf-hote|compte-bloque|liaison)/.test(String(el.className || '')); };
+      const cc = copierElague(coque, (el) => { if (passager(el)) return true; const r = el.getBoundingClientRect(); if (cacheParStyle(el, r)) return true; if (r.width === 0 && r.height === 0) return false; return r.top >= vh || r.bottom <= 0 || r.left >= vw || r.right <= 0; },
+        (src, dst) => { if (src === racine) dst.classList.add('vrm-ce-zone'); });
       nettoyer(cc);
       const h = cc.outerHTML;
-      if (h && h.length <= MAX_HTML && h.includes('vrm-copie-zone')) copieCoque = { html: h, vw: Math.round(vw), vh: Math.round(vh) };
+      if (h && h.length <= MAX_HTML && h.includes('vrm-ce-zone')) copieCoque = { html: h, vw: Math.round(vw), vh: Math.round(vh) };
     } catch (_) { copieCoque = null; }
   }
   return {
