@@ -40,13 +40,19 @@ Julien : « Colis à retirer beaucoup plus visuel, c'est pas exceptionnel, tu pe
 ## Preuves
 - `node scripts/audit-retraits-visuel.cjs` (rétention, trajet) et `--mutation` : 11/11 (masquer à la limite dans la vue,
   la carte, `pickupUnion`, la copie des codes ; étape devinée ; évènement non mesuré ; courante pas la plus loin).
-- Banc `scripts/bancs/retraits-visuel.cjs` : **215 verts, 0 rouge** — 390 tactile clair/sombre, Safari 390×664,
+- Banc `scripts/bancs/retraits-visuel.cjs` : **240 verts, 0 rouge** — 390 tactile clair/sombre, Safari 390×664,
   1512 clair/sombre, 1280, base vide ; 15 colis + dépassé (code + QR) + retourné + annulé + 50 achats au même titre
   (aucune photo de leurre) ; acheteur QUE Leboncoin et QUE Vestiaire (390 et 1512). `CAS=sites` pour ces deux-là seuls.
   La photo d'un achat Leboncoin est jugée par identité (`data-rp-photo-src`) : l'image de img.leboncoin.fr ne se charge
   pas dans le banc (celle de Vestiaire oui), l'app la montre comme les autres.
 - `retraits-parfaits` 17 verts (il jugeait l'échafaudage d'avant : `vrm_banc_dom_ancien` retiré), `colis-achat-auto`
   121 verts, audits `retraits-parfaits`, `quoi-de-neuf`, `traduction`, `coherence` verts.
+
+- « Aller au contenu » et la bulle Messages SUR la carte (vus par le coordinateur sur `tel-390-clair-trajet`) : un
+  artefact de capture — `locator.screenshot` d'une carte plus haute que l'écran agrandit la fenêtre et y pose les
+  éléments fixes. Dans la page, le lien est hors écran sans focus clavier et rien ne recouvre la carte (contrôles `A`
+  et `C`, mutation `MUTATION=couvrir` ⇒ rouge). Le banc capture maintenant ce que voit l'utilisateur (`capturerVu`).
+  Vérifié aussi fusionné avec `claude/argent-natif` (barre du haut native) : 240 verts, carte non recouverte.
 
 ## Geste de Julien
 Aucun.
