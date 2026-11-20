@@ -26,6 +26,7 @@ import './retraits.css';
 
 // (20 nov., rétention) Tout colis que `pickupUnion` n'a pas FINI par une preuve reste dans la carte de son point :
 // les comptés, puis les « à vérifier » (date limite dépassée…), code et QR visibles (src/retraitsVue.js `colisDuPoint`).
+const SITES = { leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', ebay: 'eBay' };   // noms de marque, non traduits
 const MENTION = { depasse: 'retraits.m.depasse', 'trop-long': 'retraits.m.tropLong', 'sans-code': 'retraits.m.sansCode', transporteur: 'retraits.m.transporteur', doute: 'retraits.m.doute', autre: 'retraits.m.autre' };
 const lireNouveaux = () => { try { return JSON.parse(localStorage.getItem(CLE_RETRAITS_VUS) || 'null'); } catch (_) { return null; } };
 const texteRebours = (c) => {
@@ -71,12 +72,15 @@ function Trajet({ t }) {
 function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
   const relie = !!(c && c.etat === 'relie');
   const pasLu = !!(c && c.etat === 'pas-lu');
-  const titre = relie ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
+  // (20 nov., Julien : « les mêmes dispositions sur toutes les plateformes ») Un achat Leboncoin ou Vestiaire relié à CE
+  // colis par son n° de suivi (`achatsAutres`, src/retraitQr.js) : SA photo et SON titre, comme un achat Vinted ; le site dit.
+  const autre = !!(c && c.etat === 'autre-site');
+  const titre = relie || autre ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
   const phrase = texteContenu(c, tr);
   const details = relie ? [c.taille ? tr('retraits.c.taille', { t: c.taille }) : '', phrase].filter(Boolean) : [];
   return (
     <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
-      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={photo && relie && c.photo ? c.photo : undefined} data-v2-photo-article={photo ? '' : undefined}>
+      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={photo && (relie || autre) ? (c.photo || x.photo || undefined) : undefined} data-v2-photo-article={photo ? '' : undefined}>
         {photo || <Icon name="box" size={26}/>}
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
       </span>
@@ -87,6 +91,7 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
           {neuf ? <span className="n-rp-etiquette" data-n-ton="accent" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
           {x.num ? <span className="n-rp-num" data-rp-num={x.num}>N° {x.num}</span> : null}
           {relie && c.nb ? <span className="n-rp-etiquette" data-n-ton="neutre">{tr('retraits.c.lot', { n: c.nb })}</span> : null}
+          {autre && SITES[c.site] ? <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-site={c.site}>{SITES[c.site]}</span> : null}
           {prix ? <span className="n-rp-prix" data-rp-prix="">{prix}</span> : null}
           {details.length ? <span className="n-rp-dedans" data-rp-prix={c.prix ? '' : undefined} data-v2-contenu="relie" data-v2-contenu-tx={c.tx || undefined} data-v2-contenu-compte={c.compte || undefined}>{details.join(' · ')}</span> : null}
         </span>

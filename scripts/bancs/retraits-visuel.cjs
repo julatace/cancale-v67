@@ -265,6 +265,55 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   await ctx.close();
 }
 
+// (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») UN ACHETEUR QUI N'A QUE
+// LEBONCOIN (ou QUE VESTIAIRE) : aucun compte Vinted, aucun achat Vinted ; ses achats sur le site, chacun relié à SON
+// colis par son n° de suivi (le lien Mondial Relay de Leboncoin, le n° de Vestiaire). La même carte : le contenu d'abord
+// (photo + titre de l'achat du site), la barre du trajet, le code, le QR, la rétention (un colis à la date dépassée).
+const SITE_SEUL = {
+  leboncoin: [['87300001', 'mondialrelay', '730001', 'TABAC DU PORT, 1 QUAI TEST, 35400 SAINT-MALO', 2, true], ['87300002', 'mondialrelay', '730002', 'TABAC DU PORT, 1 QUAI TEST, 35400 SAINT-MALO', -1, false]],
+  vestiaire: [['XW300000001TS', 'chronopost', '830001', 'RELAIS DE LA PLAGE, 5 RUE TEST, 35800 DINARD', 3, true], ['XW300000002TS', 'chronopost', '830002', 'RELAIS DE LA PLAGE, 5 RUE TEST, 35800 DINARD', -2, true]],
+};
+function baseSite(site) {
+  const b = base();
+  b.accounts = [];
+  b.rows = b.rows.filter((r) => !/^(email_track_|harvest_|transp_)/.test(r.id));
+  const m = b.main[0].data; m.vrm_plateformes_affichees = { sites: [site], at: '2026-11-01T10:00:00.000Z' };
+  const lbc = {}, vc = {};
+  SITE_SEUL[site].forEach(([suivi, carrier, code, lieu, jl, qr], k) => {
+    b.rows.push({ id: `email_track_${carrier}_${suivi}`, data: { type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Arrivé au point de retrait', subject: `Votre colis ${suivi} est disponible`,
+      receivedAt: iso((jl < 0 ? -6 : -1) * J), emailAt: iso((jl < 0 ? -6 : -1) * J), arriveLe: iso((jl < 0 ? -6 : -1) * J), code, code2: null, lieu, limite: jour(jl), consigne: false,
+      ...(qr ? { qrB64: pngInvente(k + 11), qrType: 'image/png' } : {}), account: '' } });
+    const img = `https://img.leboncoin.fr/api/v1/lbcpb1/images/test/${suivi}.jpg`;
+    if (site === 'leboncoin') lbc['L' + k] = { txId: 'L' + k, itemId: String(600 + k), isSeller: false, title: `Jordan 4 du bon coin ${k + 1}`, price: 9000, image: img, label: { trackingUrl: `https://www.mondialrelay.fr/suivi-de-colis/?exp=${suivi}&pays=FR` } };
+    else vc['A' + k] = { nom: `Samba Vestiaire ${k + 1}`, etat: 'shipped', suivi, transporteur: 'Chronopost', photo: `https://images.vestiairecollective.com/test/${suivi}.jpg` };
+  });
+  if (site === 'leboncoin') b.rows.push({ id: 'lbc_ventes', data: { ventes: lbc } });
+  else { b.rows.push({ id: 'vc_achats', data: { achats: vc } }); b.rows.push({ id: 'vc_ventes', data: { ventes: {} } }); b.rows.push({ id: 'vc_listings', data: { liens: {} } }); }
+  return b;
+}
+async function siteSeul(nav, { site, W, sombre }) {
+  const b = baseSite(site);
+  const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
+  await allumer(pg);
+  const r = await attendre(pg, (x) => x.colis.length >= 2, 40000);
+  await pg.waitForTimeout(1200);
+  const th = `${site} seul ${W} ${sombre ? 'sombre' : 'clair'}`;
+  const L = SITE_SEUL[site];
+  const nomAchat = (k) => site === 'leboncoin' ? `Jordan 4 du bon coin ${k + 1}` : `Samba Vestiaire ${k + 1}`;
+  const par = L.map(([suivi, , code, , jl, qr], k) => ({ suivi, code, jl, qr, k, c: r.colis.find((x) => x.code === code) }));
+  dit(par.every((p) => !!p.c), `S ${th} : la carte du point montre ses 2 colis, avec leur code`, r.colis.map((x) => x.code));
+  dit(par.every((p) => p.c && p.c.contenu && p.c.contenu.etat === 'autre-site' && p.c.contenu.titre === nomAchat(p.k) && p.c.contenu.photo.includes(p.suivi) && p.c.contenu.avantCode),
+    `S ${th} : le contenu d'abord — la photo et le titre de SON achat ${site} (relié par son n° de suivi)`, par.map((p) => p.c && p.c.contenu));
+  dit(par.every((p) => p.c && p.c.trajet.length === 5 && p.c.trajet.some((e) => e.cle === 'point' && e.lue) && !p.c.trajet.find((e) => e.cle === 'paye').lue), `S ${th} : la barre du trajet (Au point lu ; Payé gris : aucune date lue)`);
+  dit(par.every((p) => !p.qr || (p.c && p.c.qr && p.c.qr.gauche >= p.c.qr.codeDroite)), `S ${th} : le QR à droite du code`);
+  const dep = par.find((p) => p.jl < 0);
+  dit(!!dep && dep.c && dep.c.verif === 'depasse', `S ${th} : date limite dépassée ⇒ gardé, « à vérifier », code visible`, dep && dep.c);
+  dit(!erreurs.length, `S ${th} : aucune erreur de page`, erreurs);
+  await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
+  const c1 = pg.locator('[data-rp-point]').first(); if (await c1.count()) { await c1.scrollIntoViewIfNeeded().catch(() => {}); await c1.screenshot({ path: path.join(SHOTS, `${site}-seul-${W}-${sombre ? 'sombre' : 'clair'}.png`) }).catch(() => {}); }
+  await ctx.close();
+}
+
 async function vide(nav, { W, sombre }) {
   const b = baseVide();
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats' });
@@ -285,6 +334,8 @@ async function vide(nav, { W, sombre }) {
     for (const sombre of [false, true]) await cas(nav, { W: 1512, sombre, nom: 'ordi-1512' });
     await cas(nav, { W: 1280, sombre: false, nom: 'ordi-1280' });
     await vide(nav, { W: 390, sombre: false }); await vide(nav, { W: 1512, sombre: true });
+    await siteSeul(nav, { site: 'leboncoin', W: 390, sombre: false }); await siteSeul(nav, { site: 'leboncoin', W: 1512, sombre: true });
+    await siteSeul(nav, { site: 'vestiaire', W: 390, sombre: true }); await siteSeul(nav, { site: 'vestiaire', W: 1512, sombre: false });
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} retraits-visuel : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);

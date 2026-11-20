@@ -63,7 +63,7 @@ async function attendrePasses(pg, attendreNouveau = true) {
   try {
     for (const W of [390, 1512]) {
       const { ctx, pg, erreurs, tel } = await ouvrir(nav, { W, sombre: false, b, url: '/?tab=achats' });
-      await pg.addInitScript((v) => { try { localStorage.setItem('vrm_design_v2', '1'); if (!sessionStorage.getItem('rp_init')) { localStorage.setItem('vrm_retraits_vus', v); sessionStorage.setItem('rp_init', '1'); } } catch (_) {}
+      await pg.addInitScript((v) => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); /* (20 nov.) l'écran d'aujourd'hui, pas l'échafaudage d'avant */ if (!sessionStorage.getItem('rp_init')) { localStorage.setItem('vrm_retraits_vus', v); sessionStorage.setItem('rp_init', '1'); } } catch (_) {}
         // Les toasts vus (ils partent seuls après quelques secondes) : notés au passage.
         window.__toasts = []; const obs = new MutationObserver(() => { for (const t of document.querySelectorAll('.vrm-toast')) { const x = t.textContent.trim(); if (x && !window.__toasts.includes(x)) window.__toasts.push(x); } });
         document.addEventListener('DOMContentLoaded', () => obs.observe(document.body, { childList: true, subtree: true })); }, VUS);
