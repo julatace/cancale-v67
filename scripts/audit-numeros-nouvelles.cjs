@@ -221,7 +221,7 @@ function constante(app, nom) {
   {
     const sk = (APP.match(/const SYNC_KEYS\s*=\s*\[[\s\S]*?\];/) || [''])[0];
     dit(/'vrm_numero_ecrit'/.test(sk) || /CLE_NUMERO_ECRIT/.test(sk), 'le choix « qui numérote » est synchronisé (SYNC_KEYS)');
-    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,1100}(?:toast|accompagner)\([\s\S]{0,300}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
+    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,1100}(?:toast|accompagner|poserToastNumeros)\([\s\S]{0,900}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
     dit(/versExtension\(ext, \{ type: 'numerotes'/.test(APP), '… et envoyés à la carte de l’extension');
     dit(/id: 'numeros-nouveaux'[\s\S]{0,400}avant: ouvrirAEcrire/.test(APP) && /if \(modeNum === 'vrm' && nouveauxAEcrire\.length\)/.test(APP), 'Ma journée : « N nouveaux articles numérotés · N°… » ouvre « à écrire sur tes cartons »');
     // (19 nov., décision de Julien : « pratique, pas chiant » — l'app ne harcèle plus) « N articles sans numéro » n'est plus une carte ni une boucle de feuilles : la question « Son N° ? » de l'atelier « Compléter ».
