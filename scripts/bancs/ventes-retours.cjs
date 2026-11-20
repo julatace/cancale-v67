@@ -189,8 +189,8 @@ const segment = async (pg, i) => { await pg.locator('[data-vn="ventes"] .n-segme
         await pg.screenshot({ path: path.join(SHOTS, `relier-${W}-${th}.png`) });
         dit(a.th, 'colonne « Achat » dans le tableau');
         const lt = await pg.evaluate(() => { const L = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-ligne] .n-tt-article-titre')].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().width));
-          return { min: L.length ? Math.min(...L) : 0, site: !!document.querySelector('[data-vn="ventes"] [data-tt-th="site"]'), deb: document.documentElement.scrollWidth - innerWidth }; });
-        dit(lt.min >= 200 && lt.deb <= 1, `colonnes Site et Achat ensemble : chaque titre garde ≥ 200 px, rien ne déborde (${lt.min} px · site ${lt.site})`);
+          const cadre = document.querySelector('[data-vn="ventes"] [data-tt-tableau]'); return { cadreDeb: cadre ? cadre.scrollWidth - cadre.clientWidth : 0, min: L.length ? Math.min(...L) : 0, site: !!document.querySelector('[data-vn="ventes"] [data-tt-th="site"]'), deb: document.documentElement.scrollWidth - innerWidth }; });
+        dit(lt.min >= 200 && lt.deb <= 1 && lt.cadreDeb <= 1, `colonnes Site et Achat ensemble : chaque titre garde ≥ 200 px, rien ne déborde, le tableau ne défile pas de côté (${lt.min} px · cadre ${lt.cadreDeb} · site ${lt.site})`);
         const v = a.L.filter((x) => x.site === 'vinted');
         dit(v.length && v.every((x) => x.bouton && x.svg && x.nom), `chaque vente Vinted : le bouton-icône Relier, nommé (${v.filter((x) => x.bouton).length}/${v.length})`, v.slice(0, 2));
         dit(v.filter((x) => x.relie).every((x) => /\d/.test(x.texte)) && v.filter((x) => !x.relie).every((x) => /Relier/i.test(x.nom)), 'reliée : le prix d’achat ; sinon « Relier à son achat »', v.slice(0, 3));

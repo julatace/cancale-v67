@@ -268,3 +268,12 @@
   .n-vt-relier-prix { white-space: nowrap; font-variant-numeric: tabular-nums; }
   @media (pointer: coarse) { .n-vt-relier { min-height: var(--n-cible); min-width: var(--n-cible); } }
 }
+
+/* (20 nov.) Ventes, tableau étroit (≈ 1280 px d'écran : colonnes Site et Achat en plus) : la date de VENTE se replie, le titre garde
+   ≥ 200 px (banc ventes-retours) ; la date LIMITE et le statut restent. Plus large : toutes les colonnes. */
+@layer vrm-natif {
+  @container tt (max-width: 1100px) {
+    .n-vt [data-tt-col="date"], .n-vt [data-tt-th="date"] { display: none; }
+    .n-vt .n-tt-article { max-width: 272px; }
+  }
+}

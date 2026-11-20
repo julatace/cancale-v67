@@ -213,6 +213,8 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
     { cle: 'achat', libelle: tr('vt.col.achat'), tri: (l) => (l.r.achat ? (l.r.achat.relie ? 1 : 0) : null), rendu: (l) => celluleAchat(l.r.achat, Icon) },
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num} doublon={l.r.numDouble}/> : null) },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => { const n = parseFloat(String(l.prix || '').replace(/[^\d,.-]/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; }, rendu: (l) => l.prix || null },
+    // (20 nov.) Tableau étroit (1280 px, Site + Achat en plus) : la date de vente se replie (src/natif/tableau.css, requête de conteneur)
+    // pour que le titre garde ≥ 200 px ; la date LIMITE reste.
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => dateCourte(l.t) },
     { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => l.r.transporteur || null,
       rendu: (l) => (l.r.transporteur ? <span className="n-tt-transporteur" data-transporteur={l.r.transporteurCle || ''}>{logoTr(l.r)}<span>{l.r.transporteur}</span></span> : null) },
