@@ -126,7 +126,7 @@ export function CoqueCopie({ copie, maintenant = null }) {
 // (`vrm-attente-pret`, enfant direct de l'attente) — la même arborescence, donc les mêmes règles de style (une règle
 // « .vrm-attente-pret > section » s'applique pareil) : rien ne bouge quand l'écran vrai prend la place.
 // src/AttenteEcran.jsx la pose SANS cadre (`sansCadre`). La mention est sa voisine, hors du contenu inerte.
-export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant = null }) {
+export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant = null, avant = null }) {   // `avant` : un nœud VIVANT posé avant la copie (les pastilles de l'ordinateur)
   const hote = React.useRef(null);
   const [now, setNow] = React.useState(() => maintenant || Date.now());
   React.useEffect(() => { if (maintenant) return undefined; const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, [maintenant]);
@@ -147,6 +147,7 @@ export function VueCopie({ copie, etat = 'maj', onReessayer = null, maintenant =
   // Le HTML est la projection NETTOYÉE (liste blanche, src/copieEcran.js `nettoyer`) que l'écran vrai a rendue.
   return (
     <>
+      {avant}
       <span className="vrm-sr-seul" role="status">{tr('natif.copie.nom')}</span>
       <div ref={hote} className="vrm-attente-pret vrm-attente-sans-fondu vrm-ce vrm-ce-contenu" data-copie-contenu="" data-copie-ecran={copie.ecran} data-copie-t={String(copie.t)}
         data-copie-age={String(age)} data-copie-etat={pasAJour ? 'pas-a-jour' : 'mise-a-jour'} aria-busy={pasAJour ? undefined : 'true'}

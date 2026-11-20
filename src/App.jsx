@@ -20994,7 +20994,8 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
       const t = trouver(); if (!t || !t.parentElement) return;
       if (titre && titre !== t) titre.removeAttribute('data-avec-pastilles');
       titre = t;
-      if (h.previousElementSibling !== t || !h.isConnected) t.insertAdjacentElement('afterend', h);
+      const avant = h.previousElementSibling;
+      if (!h.isConnected || !(avant === t || (avant && avant.hasAttribute('data-site-hote') && avant.previousElementSibling === t))) t.insertAdjacentElement('afterend', h);
       marquer(t);
     };
     placer();
@@ -21002,7 +21003,8 @@ function SelecteurSiteCoque({ indisponible = false, raison = '', nombres = null 
     // Le titre peut arriver après (écran encore en lecture) : on attend qu'il soit là, puis on reste à côté de lui.
     const racine = document.querySelector('.n-coque') || document.body;
     const mo = new MutationObserver(() => {
-      if (!h.isConnected || h.previousElementSibling !== titre || !vis(titre)) { placer(); if (h.isConnected) setHote(h); }
+      const av = h.previousElementSibling;
+      if (!h.isConnected || !vis(titre) || !(av === titre || (av && av.hasAttribute('data-site-hote') && av.previousElementSibling === titre))) { placer(); if (h.isConnected) setHote(h); }
       else if (titre) marquer(titre);   // ne réécrit que ce qui a changé (style du titre, place qui reste)
     });
     mo.observe(racine, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-avec-pastilles', 'style'] });
@@ -66699,7 +66701,10 @@ function AppCoeur() {
   // Hors ligne, l'écran VRAI se lit depuis les lignes gardées sur l'appareil (lot K) et ses gestes hors ligne restent
   // possibles : la copie ne le bloque pas. Seule une base injoignable EN LIGNE (rien de relisible) garde la copie.
   const copieEnPanne = !!copieIci && baseKO && !horsLigne;
-  const instantaneEcranIci = copieIci ? <VueCopie copie={copieIci} etat={copieEnPanne ? 'pas-a-jour' : 'maj'} onReessayer={() => { try { window.location.reload(); } catch (_) {} }}/>
+  // (20 nov. soir) À l'ordinateur, les pastilles vivent À CÔTÉ du titre de la coque, hors de la copie de l'écran : pendant la
+  // copie, le sélecteur vrai y est posé aussi (le même choix, la même place), pour que rien ne bouge quand l'écran arrive.
+  const selecteurCopie = ordi && copieIci && ['journee', 'annonces', 'ventes', 'achats', 'messages'].includes(tab) ? (tab === 'annonces' ? <SelecteurSiteAnnonces/> : <SelecteurSiteCoque/>) : null;
+  const instantaneEcranIci = copieIci ? <VueCopie avant={selecteurCopie} copie={copieIci} etat={copieEnPanne ? 'pas-a-jour' : 'maj'} onReessayer={() => { try { window.location.reload(); } catch (_) {} }}/>
     : !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>

@@ -61,6 +61,7 @@
     [data-avec-pastilles] { display: inline-block; vertical-align: middle; }
     [data-avec-pastilles] + .n-site-hote { display: inline-block; }   /* sa largeur : la place qui reste (posée par la coque) */
     .n-site-hote > .n-selecteur-site { max-width: 100%; }
+    .n-site-hote + .n-site-hote { display: none; }   /* l'écran vrai arrive pendant la copie : une seule rangée */
   }
   @media (prefers-reduced-motion: reduce) { .n-pastille-site { transition: none; } .n-pastille-site:active { transform: none; } }
 }
