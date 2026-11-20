@@ -61,5 +61,8 @@ export default {
   "arn.coutsSaisis": "{v} coûts saisis",
   "arn.voirTous": "Voir les {n}",
   "arn.rien": "Rien",
-  "arn.comment": "Comment c’est calculé"
+  "arn.comment": "Comment c’est calculé",
+  "arn.comptes": "Comptes",
+  "site.tous": "Tous",
+  "site.choisir": "Choisir une plateforme"
 };

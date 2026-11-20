@@ -60,6 +60,7 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../natif/ecrans/ArgentMois.jsx';
+import { useSiteCourant } from '../natif/SelecteurSite.jsx';
 import { useOrdinateur, Carte as NCarte, Rangee as NRangee, Bouton as NBouton } from '../natif/index.js';
 import '../natif/ecrans/argent.css';   // (20 nov., lot argent-natif) Mois au style natif §2 bis
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : déclarer, ventes sans prix d'achat   // (17 nov., phase 2) Argent · Mois
@@ -3514,10 +3515,12 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
             {moisChoix.map((ym)=><option key={ym} value={ym}>{libelleMois(ym)}</option>)}
           </select>
         </div>
-        <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
-          <Bouton variante="secondaire" icone="printer" data-recap-imprimer="" disabled={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} style={{flex:'0 0 auto'}} title={tr('compta.recapImprimerTitre')}>{recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')}</Bouton>
-          <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'0 0 auto'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
-          <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'0 0 auto'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
+        {/* (20 nov., lot argent-natif) Trois RANGÉES sobres (icône, geste, chevron) au lieu de trois gros boutons empilés
+            pleine largeur (une règle du design du 17 nov. étire tout groupe de trois boutons dans Argent). */}
+        <div className="n-arg n-arg-rangees" data-recap-gestes="">
+          <NRangee icone={<Icon name="printer" size={22}/>} titre={recapEnCours==='imprimer'?'…':tr('compta.recapImprimer')} fin="chevron" indisponible={!!recapEnCours || !pretImprimer} onClick={imprimerRecap} attrs={{ 'data-recap-imprimer': '', title: tr('compta.recapImprimerTitre') }}/>
+          <NRangee icone={<Icon name="doc" size={22}/>} titre={recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('pdf')} attrs={{ 'data-recap-pdf': '' }}/>
+          <NRangee icone={<Icon name="save" size={22}/>} titre={recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')} fin="chevron" indisponible={!!recapEnCours} onClick={()=>exporterRecap('csv')} attrs={{ 'data-recap-csv': '', title: tr('compta.fichierExcelNumbers') }}/>
         </div>
         <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
@@ -3744,7 +3747,10 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P, regLu, regPret } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  const sel = { site: 'toutes', compte: null, periode: null };
+  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
+  // de site d'hier) ; « tous » = les chiffres de toujours.
+  const [siteCourant] = useSiteCourant();
+  const sel = { site: siteCourant === 'tous' ? 'toutes' : siteCourant, compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });   // « nov. » : le libellé tient sur une ligne au téléphone
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
@@ -3841,7 +3847,10 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const S = useSourcesCarte(liveStats || liveCoque);
   const { P } = usePrevisionUrssaf();
   const profil = useProfilFiscal();
-  const sel = { site: 'toutes', compte: null, periode: null };
+  // (20 nov.) Le site choisi en tête d'Argent (`vrm_site_courant`) : la MÊME règle de la carte (`valeurChiffre`, son filtre
+  // de site d'hier) ; « tous » = les chiffres de toujours.
+  const [siteCourant] = useSiteCourant();
+  const sel = { site: siteCourant === 'tous' ? 'toutes' : siteCourant, compte: null, periode: null };
   const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
   const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
@@ -3888,7 +3897,9 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [calc, ym, versements, ventesVcER]);
   const MAX = 30;
-  const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  // Un site choisi : ses versements seulement (un filtre d'affichage sur la plateforme de chaque ligne, rien de recalculé).
+  const NOM_PF = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+  const lignesV = livre ? [...livre.lignes].filter((l) => siteCourant === 'tous' || String(l.plateforme || '').toLowerCase().startsWith(String(NOM_PF[siteCourant] || siteCourant).toLowerCase().slice(0, 4))).sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
   const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
   // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
   // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
@@ -3908,7 +3919,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} sansBarres={siteCourant !== 'tous'}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.

@@ -22,7 +22,7 @@ const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Mat
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre.
 const coupe = (t) => { const m = /^(.*?)[\s  ]*€$/.exec(String(t)); return m ? [m[1], '€'] : [String(t), '']; };
 
-export default function ArgentMois({ poster, phrase, moisLong, barres, faits, geste, versements, montant, vendu = null }) {
+export default function ArgentMois({ poster, phrase, moisLong, barres, faits, geste, versements, montant, vendu = null, sansBarres = false }) {
   const [choisi, setChoisi] = React.useState(barres.length - 1);
   const [tout, setTout] = React.useState(false);
   const MONTRES = 8;   // le tableau reste court ; « Voir les 25 » déplie le reste (rien n'est caché sans le dire)
@@ -50,9 +50,9 @@ export default function ArgentMois({ poster, phrase, moisLong, barres, faits, ge
       <div className="n-arg-col">
         <Carte className="n-arg-affiche" attrs={{ 'data-v2-argent-recu': cents(valeur), 'data-v2-argent-partiel': partiel ? '1' : undefined, 'data-v2-argent-phrase': '' }}>
           <Affiche valeur={n} unite={u} libelle={(partiel && valeur != null ? tr('journee.moins') + ' · ' : '') + tr('v2.ar.recusEn', { mois: moisLong })} ecart={ligne}>
-            <Barres libelle={tr('v2.ar.graphe')} choisie={choisi} onChoisir={setChoisi}
+            {sansBarres ? null : <Barres libelle={tr('v2.ar.graphe')} choisie={choisi} onChoisir={setChoisi}
               attrs={{ 'data-arg-mois': String(barres.length), 'data-v2-argent-barres': barres.map((x) => cents(x.v)).join(','), 'data-v2-argent-barre-v': b ? cents(b.v) : '' }}
-              barres={barres.map((x) => ({ cle: x.cle, lettre: x.l, valeur: x.v, libelle: `${x.long} : ${x.v == null ? tr('v2.ar.pasSu') : texteBarre(x)}` }))}/>
+              barres={barres.map((x) => ({ cle: x.cle, lettre: x.l, valeur: x.v, libelle: `${x.long} : ${x.v == null ? tr('v2.ar.pasSu') : texteBarre(x)}` }))}/>}
           </Affiche>
         </Carte>
         <Tuiles className="n-arg-tuiles" attrs={{ 'data-v2-argent-faits': String(connus.length) }}

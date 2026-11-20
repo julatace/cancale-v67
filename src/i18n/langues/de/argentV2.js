@@ -61,5 +61,8 @@ export default {
   "arn.coutsSaisis": "{v} Kosten erfasst",
   "arn.voirTous": "Alle {n} ansehen",
   "arn.rien": "Nichts",
-  "arn.comment": "Wie es berechnet wird"
+  "arn.comment": "Wie es berechnet wird",
+  "arn.comptes": "Konten",
+  "site.tous": "Alle",
+  "site.choisir": "Plattform wählen"
 };

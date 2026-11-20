@@ -61,5 +61,8 @@ export default {
   "arn.coutsSaisis": "{v} costs entered",
   "arn.voirTous": "See all {n}",
   "arn.rien": "Nothing",
-  "arn.comment": "How it’s calculated"
+  "arn.comment": "How it’s calculated",
+  "arn.comptes": "Accounts",
+  "site.tous": "All",
+  "site.choisir": "Choose a platform"
 };

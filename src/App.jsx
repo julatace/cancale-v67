@@ -1165,7 +1165,8 @@ import { groupesParCompte as groupesParCompteV2, rangerEmails as rangerEmailsV2 
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
-import * as Natif from "./natif/index.js";   // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
+import * as Natif from "./natif/index.js";
+import { SelecteurSite, useSiteCourant } from "./natif/SelecteurSite.jsx";   // (20 nov.) le sélecteur de plateforme commun   // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -24840,6 +24841,11 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // (10 nov.) LES QUATRE SEGMENTS D'ARGENT (src/argent.js) : le même contrôle segmenté que
 // partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
 // (même écran ⇒ seule la section change).
+// Le sélecteur de plateforme d'Argent : les sites RELIÉS (ceux des filtres de la coque, `SITES_COQUE`).
+function SelecteurSiteArgent() {
+  const [site, setSite] = useSiteCourant();
+  return <SelecteurSite valeur={site} onChange={setSite} sites={(SITES_COQUE.v || []).filter((x) => x !== 'toutes')}/>;
+}
 function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
   // (17 nov., nouveau design · Argent) Allumé : UNE ligne « Toutes les plateformes · N comptes › » (les comptes qui entrent
   // dans les totaux, la même règle `compteEcarte` que Compta ; le toucher mène aux comptes), puis UN contrôle segmenté
@@ -24850,15 +24856,17 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
     const liste = Array.isArray(comptes) ? comptes.filter((a) => a && a.vinted_user_id != null) : null;
     const dedans = liste ? liste.filter((a) => !compteEcarte(String(a.vinted_user_id), hAcc, panelOff || {})).length : null;
     const sous = liste == null || !liste.length ? '' : dedans === liste.length ? tr('v2.ar.comptes', { n: dedans }) : tr('v2.ar.comptesSur', { k: dedans, n: liste.length });
+    // (20 nov., décision du coordinateur) Le menu « Toutes les plateformes · N comptes » devient LE sélecteur de plateforme
+    // commun (src/natif/SelecteurSite.jsx, `vrm_site_courant`, les sites reliés seulement) ; le choix des comptes reste un
+    // réglage secondaire : une ligne discrète « Comptes · N › » qui mène aux comptes (la même destination qu'hier).
     return (
-      <div className="v2-argent-nav" data-v2-argent-nav={seg}>
-        <button type="button" className="v2-rangee v2-menu v2-argent-comptes" data-v2-rangee="" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
-          <span className="v2-menu-lib">{tr('v2.ar.toutes')}</span>
-          {sous ? <span className="v2-menu-sous">{sous}</span> : null}
-          <span className="v2-menu-fleche" aria-hidden="true"><Icon name="chevron" size={14}/></span>
-        </button>
+      <div className="v2-argent-nav n-arg-nav" data-v2-argent-nav={seg}>
+        <SelecteurSiteArgent/>
         <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
+        <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
+          {tr('arn.comptes')}{liste && liste.length ? ' · ' + (dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`) : ''} <span aria-hidden="true">›</span>
+        </button>
       </div>
     );
   }

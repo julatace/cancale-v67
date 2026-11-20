@@ -247,4 +247,7 @@
     .n-carte-titres { flex: 1 1 auto; min-width: min(100%, max-content); }
     .n-carte-action { margin-inline-start: auto; }
   }
+  /* (20 nov.) Le sélecteur de plateforme commun (src/natif/SelecteurSite.jsx) : un segmenté, sans marge à lui. */
+  .n-selecteur-site { min-width: 0; }
+  .n-selecteur-site > .n-segmente { margin: 0; }
 }

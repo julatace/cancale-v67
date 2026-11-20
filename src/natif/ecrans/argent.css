@@ -6,6 +6,12 @@
   .n-arg { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   /* L'en-tête de l'écran au téléphone (la coque porte le titre) : la ligne comptes et le segmenté, sans marge à lui. */
   .n-arg-tete { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-arg-rangees { gap: 0; margin-top: 10px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte); overflow: hidden; }
+  .n-arg-rangees > .n-rangee + .n-rangee { border-top: 1px solid var(--n-trait); }
+  .n-arg-nav { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-arg-comptes { appearance: none; align-self: flex-end; display: inline-flex; align-items: center; gap: 4px; min-height: var(--n-cible); margin: 0; padding: 0 4px;
+    border: 0; background: transparent; color: var(--n-encre-2); font: var(--n-t-second); cursor: pointer; touch-action: manipulation; }
+  .n-arg-comptes:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: var(--n-r-plaque); }
   .n-arg-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .n-arg .n-carte, .n-arg .n-tuiles, .vrm-argent .n-carte, [data-espace="argent"] .n-carte, [data-espace="argent"] .n-tuiles { margin: 0; }
   /* Un lien discret : l'accent, jamais souligné (Julien, 20 nov. : « liens soulignés répétés »). */
