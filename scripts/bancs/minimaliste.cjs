@@ -76,7 +76,8 @@ const ECRANS = TOUS.filter((e) => VOULUS.includes(e.cle));
 //  · l'ambre d'un geste à faire (`--n-ambre-fond`) et le rouge d'un doublon de N° (fonds teintés voulus) ;
 //  · la plaque d'un N° (`.n-plaque`), une pastille, un interrupteur, un champ de saisie ;
 //  · les tuiles chiffres d'Aujourd'hui (`[data-n-affiche]`, `.n-affiche`) : grandes mais sobres, jamais une ombre.
-const EXCEPTIONS = '.n-feuille-panneau, .n-feuille, .n-volet, .n-onglets, .n-barre-titre, .n-laterale, .n-plaque, .n-pastille, .n-interrupteur, input, textarea, select, img, canvas, video, svg, [data-banc-exception]';
+const FEUILLES = '.n-feuille-panneau, .n-feuille, .n-volet, .vrm-fs, .sb-feuille, .v2-feuille, .vrm-sheet, .n-poussee';
+const EXCEPTIONS = '.n-onglets, .n-barre-titre, .n-laterale, .n-plaque, .n-pastille, .n-interrupteur, input, textarea, select, img, canvas, video, svg, [data-banc-exception]';
 
 function mesurer({ tel, mut }) {
   const COQUE = '.n-onglets, .n-laterale, .n-barre-titre, .vrm-mobile-nav, .vrm-atelier-rail, .vrm-toasts, .n-toast';
@@ -120,7 +121,8 @@ function mesurer({ tel, mut }) {
   const nom = (e) => { const c = (typeof e.className === 'string' ? e.className : '').split(/\s+/).filter(Boolean).slice(0, 2).join('.'); return e.tagName.toLowerCase() + (c ? '.' + c : '') + ' « ' + (e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40) + ' »'; };
   const tous = []; const vus = new Set();
   for (const r of racines) for (const e of [r, ...r.querySelectorAll('*')]) { if (vus.has(e)) continue; vus.add(e); if (!enCoque(e) && visible(e)) tous.push(e); }
-  const exc = (e) => !!e.closest(EXC);
+  // Une feuille n'est exceptée qu'ELLE-MÊME (son ombre, son fond) : ce qu'elle contient est jugé.
+  const exc = (e) => e.matches(window.__bancFeuilles) || !!e.closest(EXC);
   const out = { cartes: [], ombres: [], soulignes: [], gris: [], pleins: [], grisLarges: [], contraste: [], cibles: [], coupes: [], nTextes: 0 };
   const cartesEls = new Set();
   for (const e of tous) {
@@ -128,7 +130,7 @@ function mesurer({ tel, mut }) {
     // C2 ombres
     const om = cs.boxShadow && cs.boxShadow !== 'none' ? cs.boxShadow.split(/,(?![^(]*\))/).filter((s) => !/inset/.test(s) && (() => { const n = s.replace(/rgba?\([^)]*\)|color\([^)]*\)|#[0-9a-f]+/gi, '').trim().split(/\s+/).map(parseFloat); return (n[2] || 0) > 0.5 || Math.abs(n[1] || 0) > 0.5; })()) : [];
     const ombreTexte = cs.textShadow && cs.textShadow !== 'none' && (e.innerText || '').trim();
-    if ((om.length || ombreTexte) && !e.closest('.n-feuille-panneau, .n-feuille, .n-volet, [data-banc-exception]') && !e.matches(':focus, :focus-within')) out.ombres.push(nom(e));
+    if ((om.length || ombreTexte) && !e.matches(window.__bancFeuilles) && !e.closest('[data-banc-exception]') && !e.matches(':focus, :focus-within')) out.ombres.push(nom(e));
     // C1 cartes décorées
     if (!exc(e) && r.width >= 120 && r.height >= 40) {
       // Un dégradé d'UNE couleur (un filet de séparation dessiné en dégradé) n'est pas une décoration.
@@ -197,7 +199,7 @@ async function ouvrirEcran(nav, fen, sombre, ec, base) {
   await o.pg.evaluate(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   await o.pg.reload({ waitUntil: 'domcontentloaded' });
   await P.pret(o.pg);
-  await o.pg.evaluate((x) => { window.__bancExceptions = x; }, EXCEPTIONS);
+  await o.pg.evaluate((x) => { window.__bancExceptions = x[0]; window.__bancFeuilles = x[1]; }, [EXCEPTIONS, FEUILLES]);
   if (ec.evt) { await o.pg.evaluate((x) => window.dispatchEvent(x.detail == null ? new Event(x.nom) : new CustomEvent(x.nom, { detail: x.detail })), ec.evt); await o.pg.waitForTimeout(ATTENTE); }
   for (const c of ec.clics || []) {
     let fait = false;
