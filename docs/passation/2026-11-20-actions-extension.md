@@ -135,3 +135,21 @@ la case eBay), « Tout arrêter » (arrêt d'urgence : éteindre ne fait aucun g
 | changer / baisser un prix Vinted | Argent → Soldes → Remettre les prix | commande baisserPrixVinted | src/soldes.js:120 (commandeRemise) | audit-actions-gardees.cjs, audit-annonces-outils.cjs, audit-argent-prix.cjs, audit-baisse-conseillee.cjs, audit-baisse-prix.cjs, audit-coherence.cjs |
 | changer un prix Leboncoin | Argent → Soldes → Remettre les prix | commande lbcPrix | src/soldes.js:121 (commandeRemise) | audit-actions-gardees.cjs, audit-argent-prix.cjs, audit-donnees-ecrans.cjs, audit-lbc-plus.cjs, audit-prix-attente.cjs, audit-securite-comptes.cjs |
 | changer un prix Vestiaire | Argent → Soldes → Remettre les prix | commande vcPrix | src/soldes.js:122 (commandeRemise) | audit-actions-gardees.cjs, audit-argent-prix.cjs, audit-prix-attente.cjs, audit-securite-comptes.cjs, audit-vc-prix.cjs, bancs/prix-sans-manuel.cjs |
+
+## Audits et bancs réécrits sur la nouvelle règle
+Les contrôles qui EXIGEAIENT un geste de plateforme dans l'app ont été réécrits pour exiger l'inverse (le lien du panneau, rien
+d'envoyé) — jamais affaiblis côté extension (audit-actions-gardees, audit-lbc-supprimer §1-2, audit-moteur-offres… inchangés) :
+annonces-actions (B11-B14, B24, F3), annonces-outils (A2, A5), argent-prix (114.10), annuler-commandes (D), baisse-conseillee (H4),
+brouillons-proposables, confort-securite (P3), contre-offre-mini (B4-B5), corbeille (G9), correspondances (G3), dormantes (E5),
+envoi-fil, extension-restes (S3), favoris-sans-vente (H1-H3), favoris-sites (A7), flux-divers (A13), lbc-supprimer (§3),
+message-sur (S1, S4, S5), offres-sures (C6), plancher-stock (E4), plateformes-logo (B20), plateformes-restes (C7),
+publier-partout (G2, G14), qui-dorment, qualite-photo (F), quoi-republier, relance-favoris (F2), republie-telephone,
+republier-programme (B1, B2), retirer-ailleurs (I3), robustesse-metier (H4, H5), suivi-travail (B), textes-courts, traduction
+(MIGRES), vc-messages (M9), vendeurs-differents (C5), verif-annonce (B1, B3), verif-publication (C7, C9), vestiaire-plus (C1).
+Bancs : `app-tableaux` (vue « auto » retirée avec l'écran), `favoris-clair`, `favoris-compte`, `favoris-sans-vente` SUPPRIMÉS
+(ils montaient src/FavorisVinted.jsx, retiré) ; le nouveau banc `actions-extension` les remplace pour le geste.
+
+⚠️ À porter par le panneau (ce que l'app faisait avant SON clic et qu'elle ne fait plus) : la garde anti double-vente avant
+d'accepter une offre (`avisAcceptationManuelle`, relue au clic), la vérification d'annonce avant de publier (`problemesAnnonce`,
+photos Vestiaire `photosExigeesVc`), la confirmation « sans retour » de la suppression Leboncoin, le pilote du mode auto des
+favoris et la veille des republications programmées.
