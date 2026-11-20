@@ -35344,6 +35344,27 @@ function confirmerOffresAuto() {
       desc: "Dès qu'une offre atteint le « mini » d'une annonce, VRM l'accepte à ta place, pas tout de suite : entre 3 et 20 minutes après l'avoir vue, tiré au hasard (une à la fois, uniquement le compte ouvert dans le navigateur de l'extension, plafond 50/h). L'extension doit rester ouverte pendant ce délai.\n\n⚠️ Important : sur Vinted, un programme qui accepte peut être vu comme un robot — c'est un risque pour le compte, que tu prends en l'allumant. Sur eBay c'est sans risque (réglage natif), pas sur Vinted.\n\nRemplis « Accepter dès » sur les annonces que tu veux laisser partir à ce prix.",
       ok: 'Oui, accepter tout seul', cancel: 'Annuler' });
 }
+// (20 nov., bugs-terrain) `useState` dont le setter, appelé hors d'un événement (réponse réseau, minuterie, promesse), passe
+// par `startTransition` : les mises à jour d'une même vague sont rendues ensemble, par tranches. Dans un geste : immédiat.
+const enGeste = () => { try { const e = typeof window !== 'undefined' ? window.event : null; return !!e && e.type !== 'message'; } catch (_) { return false; } };
+// La VAGUE : les mises à jour hors geste de TOUS les moteurs sont gardées au plus `VAGUE_MS` puis appliquées ensemble, en
+// une transition (un rendu pour la vague, pas un par lecture). Un geste applique d'abord la vague en attente (l'ordre est gardé).
+const VAGUE_MS = 80;
+const _vague = []; let _vagueMinuterie = null;
+const viderVague = () => {
+  _vagueMinuterie = null;
+  const l = _vague.splice(0);
+  if (l.length) React.startTransition(() => { for (const f of l) f(); });
+};
+function useStateVague(init) {
+  const [v, set] = React.useState(init);
+  const poser = React.useCallback((x) => {
+    if (enGeste()) { if (_vague.length) { if (_vagueMinuterie) clearTimeout(_vagueMinuterie); _vagueMinuterie = null; const l = _vague.splice(0); for (const f of l) f(); } set(x); return; }
+    _vague.push(() => set(x));
+    if (!_vagueMinuterie) _vagueMinuterie = setTimeout(viderVague, VAGUE_MS);
+  }, []);
+  return [v, poser];
+}
 // (20 nov., bugs-terrain) L'index de `bordForItem` : bordereaux par N° (`cleNum`, dans l'ordre de la liste) et premier
 // bordereau par annonce (`txnItem[transaction]`). Gardé par la liste et la table (WeakMap) : recalculé quand l'une change.
 const _indexBordsItem = new WeakMap();
@@ -35365,6 +35386,11 @@ const indexBordsItem = (list, txnItem) => {
 const _indexBordsVide = {};
 const _indexBordsListeVide = [];
 function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
+  // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
+  // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
+  // d'une lecture, minuterie) part en transition (`useStateVague`) : React regroupe les mises à jour arrivées avant son
+  // rendu et rend par tranches (le fil n'est plus pris d'un bloc). Un geste (clic, frappe : `window.event`) reste immédiat.
+  const useState = useStateVague;
   // (20 nov., sélecteur de plateforme) Le site choisi pour toute l'app : Aujourd'hui ne montre que les colis, retraits et
   // ventes de CE site (le site de chaque ligne est connu par identité : la plateforme de sa vente).
   const [siteJourBrut] = useSiteCourant(); const siteJour = siteCourantCoque(siteJourBrut);

@@ -103,7 +103,9 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         const montants = texte.match(/-?\d[\d ]*(?:,\d{1,2})? ?€/g) || [];
         const comptes = texte.match(/\b\d[\d ]* (?:ventes?|achats?|colis|annonces?|paires?|comptes?|bordereaux?)\b/g) || [];
         const attrs = [];
-        for (const e of main.querySelectorAll('*')) for (const a of e.attributes) if (a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)) attrs.push(a.name + '=' + a.value);
+        // (20 nov., bugs-terrain) Les attributs d'UN élément dans l'ordre de leur NOM : leur ordre dans le DOM dit seulement à quel
+        // rendu chacun a été posé (un attribut posé par un second rendu passe en dernier), pas un chiffre.
+        for (const e of main.querySelectorAll('*')) attrs.push(...[...e.attributes].filter((a) => a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)).map((a) => a.name + '=' + a.value).sort());
         return { montants, comptes, attrs };
       });
     }
