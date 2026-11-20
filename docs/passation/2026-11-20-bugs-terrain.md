@@ -57,3 +57,17 @@ Prochain levier : les dérivés lourds (`pickupUnion`, `expeditions`, `cartesCol
 dans un magasin indexé par leurs données ; rangées mémoïsées (props stables) ; le moteur des outils de retrait monté après
 le calme. Non fait, et pourquoi : `load()` mémoïsé (des appelants modifient l'objet rendu puis `save` : risque de fausse
 donnée) ; `useTitreReduit` et `ajusterChiffre` (le temps mesuré est la mise en page que l'image ferait de toute façon).
+
+### Le levier (a) mesuré avant de le construire (20 nov., nuit)
+Même mesure fixe (Achats, 12 comptes, ×4, 42 s, ~26 s de tâches longues) :
+- **Rendus de la coque (4)** : moteurs enveloppés dans `React.memo` avec fonctions stabilisées : les rendus de la coque
+  n'atteignaient le moteur que 2–3 fois (props changées : `accounts`, `accountsReady`, `liveStats`, `sitesPresents`) ; ~40 rendus
+  par moteur viennent de SES propres lectures asynchrones. Gain nul ⇒ retiré.
+- **Un seul moteur par onglet (2)** : le moteur des outils de retrait RETIRÉ entièrement (essai sur le build) : 26,4 → 25,6 s.
+  Ce n'est pas le nombre de moteurs.
+- **Rangées (3)** : l'écran Achats fait ~2 550 nœuds ; la réconciliation des rangées n'est pas le coût.
+- Trace (catégories timeline) : `FunctionCall` 30,9 s, `TimerFire` 8,6 s, `UpdateLayoutTree` 5,3 s, `Layout` 0,3 s.
+  Le coût est le JavaScript du moteur (14,5 s inclusifs) refait à chacun de ses ~40 rendus, et les minuteries.
+⇒ Diviser par 3 demande de SORTIR le calcul du moteur : les dérivés (`pickupUnion`, `expeditions`, `cartesColis`,
+`listeEnvoyes`, l'affectation, `usePasEnLigne`) dans un magasin de module recalculé quand ses SOURCES changent (pas à chaque
+rendu), et les lectures asynchrones du moteur regroupées (un rendu par vague de données, pas un par lecture).
