@@ -90,3 +90,7 @@
     .n-arg-tuiles .n-tuiles-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 }
+
+/* (20 nov., fusion minimaliste) Déclarer : « Oui · Non » du versement libératoire, posé dans une ligne étroite — depuis que
+   le segmenté d'avant dessine le natif (boutons-natifs), ses choix tombaient à 41 px (banc argent-natif T). */
+@layer n-anciens { html body :is([data-taux-option="liberatoire"], [data-micro-vl-choix]) { min-width: 56px !important; } }
