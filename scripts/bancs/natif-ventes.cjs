@@ -115,9 +115,9 @@ function mesure(src) {
   const pleins = [...document.querySelectorAll('[data-n-variante="plein"], .sb-btn-plein, [data-v2b="principal"]')].filter(vis);
   const plein = document.querySelector('[data-vn-plein]');
   const rangs = [...document.querySelectorAll('[data-vn-liste] [data-vn-rang], [data-vn-liste] [data-vn-route]')].filter(vis);
-  const rg = rangs.map((r) => { const case_ = r.querySelector('input.n-case'); const t = r.querySelector('.n-rangee-titre'); const v = r.querySelector('.n-rangee-valeur');
+  const rg = rangs.map((r) => { const case_ = r.querySelector('input.n-case'); const t = r.querySelector('.n-rangee-titre'); const v = r.querySelector('.n-rangee-valeur') || r.querySelector('[data-vt-prix]');   // (21 nov., ventes-lisibles) le prix sur la ligne sous le titre
     return { cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), coche: case_ ? (case_.checked ? 1 : 0) : null, dispo: case_ ? !case_.disabled : null, bord: r.getAttribute('data-vn-bordereau') || null, lim: r.getAttribute('data-vn-limite'), code: r.getAttribute('data-vn-limite-code'),
-      num: !!r.querySelector('.n-plaque'), titre: !!(t && t.textContent.trim()), prix: !!(v && v.textContent.trim()), place: r.getAttribute('data-vn-place') || '', texte: r.textContent,
+      pied: r.hasAttribute('data-n-a-pied'), num: !!r.querySelector('.n-plaque'), titre: !!(t && t.textContent.trim()), prix: !!(v && v.textContent.trim()), place: r.getAttribute('data-vn-place') || '', texte: r.textContent,
       vig: (() => { const vg = r.querySelector('.n-vignette'); if (!vg) return 'absente'; const im = vg.tagName === 'IMG' ? vg : vg.querySelector('img');
         if (im) return im.complete && im.naturalWidth > 0 ? 'photo' : 'vide'; return vg.querySelector('svg path, svg use, svg circle, svg rect') ? 'icone' : 'vide'; })(),
       morceaux: [...r.querySelectorAll('.n-rangee-sous-texte, .n-rangee-note, .n-rangee-detail')].flatMap((e) => e.textContent.split(' · ').map((x) => x.trim()).filter(Boolean)),
@@ -180,7 +180,8 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(r.every((x) => x.lTitre >= 120 && x.lSous >= 120), `titre et date limite lisibles (largeurs mini ${Math.min(...r.map((x) => x.lTitre))} / ${Math.min(...r.map((x) => x.lSous))} px)`);
       const hauts = r.map((x) => x.bas - x.haut);
       // (20 nov.) Un colis SANS bordereau dit sa raison dans la méta, qui passe à la ligne plutôt que d'être coupée : ≤ 108.
-      dit(r.every((x) => x.bas - x.haut <= (x.bord === 'attente' ? 108 : 84)), `rangées compactes (≤ 84 px, ≤ 108 sans bordereau ; la plus haute : ${Math.max(...hauts)})`);
+      // (21 nov., ventes-lisibles) L'achat (« Relier », « Prix d'achat », 44 de haut) au pied de la rangée : ≤ 180 avec lui.
+      dit(r.every((x) => x.bas - x.haut <= (x.pied ? 180 : x.bord === 'attente' ? 108 : 84)), `rangées compactes (≤ 84 px, ≤ 108 sans bordereau, ≤ 180 avec l'achat au pied ; la plus haute : ${Math.max(...hauts)})`);
       const freq = {}; for (const x of r) for (const k of new Set(x.morceaux)) freq[k] = (freq[k] || 0) + 1;
       const partout = Object.keys(freq).filter((k) => r.length >= 3 && freq[k] === r.length);
       dit(!partout.length, 'aucune phrase redite sur toutes les rangées', partout);

@@ -71,13 +71,14 @@
   .n-tt-td .n-vt-prix-champ { width: 104px; }
   .n-tt-td .n-vt-achat { gap: 6px; }
   @container tt (min-width: 1161px) { [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 260px; } }
-  /* Tableau étroit (le détail ouvert à côté, un écran de 1280) : le titre garde 200 px sur deux lignes, le champ se resserre,
+  /* Tableau étroit (le détail ouvert à côté, un écran de 1280) : le titre garde 200 px (la vignette en plus) sur deux lignes, le champ se resserre,
      la vignette reste de 56 — le tableau tient sans glisser sous le détail (banc ventes-tableau « V »). */
   @container tt (max-width: 1160px) {
-    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 200px; }
-    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 240px; }
+    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 276px; }
+    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 300px; }
     [data-vn="ventes"] .n-tt-td-article .n-vignette, [data-ventes-tableau] .n-tt-td-article .n-vignette { width: 56px; height: 56px; }
-    .n-tt-td .n-vt-prix-champ { width: 76px; padding: 0 18px 0 8px; font: var(--n-t-legende); }
+    .n-tt-td .n-vt-prix-champ { width: 68px; padding: 0 18px 0 8px; font: var(--n-t-legende); }
+    [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 4px; }
     .n-tt-td .n-vt-prix-eur { right: 7px; font: var(--n-t-legende); }
     .n-tt-td .n-vt-achat { gap: 4px; }
   }
@@ -135,10 +136,10 @@
 }
 /* La photo d'une case ne s'agrandit pas au toucher (la visionneuse de <PhotoVinted>) : le toucher CHOISIT l'achat. */
 @layer vrm-natif { .n-la-photo > *, .n-la-photo img { pointer-events: none; } }
-/* Tableau très étroit (le détail ouvert sur un écran de 1512 ou moins) : le champ « Payé » se réduit à son « € » (44 px) et
+/* Tableau très étroit (≤ 860 px : le détail ouvert sur un écran de 1512 ou moins ; un écran de 1280 sans détail n'y est pas) : le champ « Payé » se réduit à son « € » (44 px) et
    s'ouvre PAR-DESSUS au toucher (un toucher : le champ prend la main) ; le titre garde 180 px. */
 @layer vrm-natif {
-  @container tt (max-width: 940px) {
+  @container tt (max-width: 860px) {
     [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 180px; }
     [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 200px; }
     [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 3px; }
