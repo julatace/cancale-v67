@@ -161,6 +161,7 @@ const attendreFeuilles = (doc, ms) => new Promise((r) => {
     setTimeout(r, ms);
   } catch (_) { r(); }
 });
+export const ATTENTE_RECHARGEMENT_MS = 8000;
 export async function chargerSur(charger, { relance = 450, verifier = verifierMorceauPerime } = {}) {
   let err = null, vide = false;
   for (let i = 0; i < 2; i++) {
@@ -175,7 +176,10 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
   // reste à l'écran jusqu'au rechargement), jamais un écran tombé le temps qu'il parte.
   let recharge = false;
   try { recharge = await verifier('morceau'); } catch (_) {}
-  if (recharge) return new Promise(() => {});
+  // (21 nov., fluidité — Julien : « ça charge dans le vide ») Le rechargement n'a pas eu lieu (l'app installée de l'iPhone
+  // peut l'ignorer) : passé 8 s, l'attente cède à l'erreur marquée « morceau » (le filet de l'écran dit « Mettre à jour
+  // VRM ») — jamais un squelette pour toujours.
+  if (recharge) return new Promise((_, ko) => { setTimeout(() => ko(marquer(err, vide)), ATTENTE_RECHARGEMENT_MS); });
   throw marquer(err, vide);
 }
 
