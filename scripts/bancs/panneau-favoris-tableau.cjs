@@ -14,7 +14,7 @@
 //       `lancer` reçoit exactement des favoris cochables, `confirme: true` ;
 //   T7. pendant l'envoi : « 3 sur 15 », « Tout arrêter », les rangées passent En attente → Envoi en cours → Message envoyé ;
 //   T8. un refus du serveur (« déjà préparés ») se dit SUR les rangées concernées, aucune feuille qui reste ouverte ;
-//   T9. « Réglages » ouvre une feuille (versions du message, rythme), Échap la ferme ;
+//   T9. « Réglages » ouvre une feuille (5.417 : l’éditeur des messages — versions, rythme), Échap la ferme ;
 //   J.  (5.410.8, la file de Julien du 21 nov. : 25 annulés, 1 en attente, 5 envoyés, 1 refus « vinted_robot », file ACTIVE)
 //       l'aperçu calculé par la VRAIE règle du serveur (api/_lib/favoris-carte.js) : 26 « Pas encore contacté » avec leur
 //       case, « offre X € » sur chacun, la file d'hier dite (« 1 en attente · Reprendre · Annuler la file »), « Annuler
@@ -161,7 +161,7 @@ const lireF = (pg) => pg.evaluate(() => {
     segs: Array.from(r.querySelectorAll('[data-fav6-filtre]')).map((b) => b.getAttribute('data-fav6-filtre') + ':' + b.querySelector('b').textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')),
     tri: q('.fav6-table') ? q('.fav6-table').getAttribute('data-tri') : null,
     bas: q('[data-fav6-bas]') ? { vis: vis(q('[data-fav6-bas]')), n: q('[data-fav-coches]').getAttribute('data-fav-coches'), bouton: q('[data-fav-envoyer]').textContent, off: q('[data-fav-envoyer]').disabled, colle: getComputedStyle(q('[data-fav6-bas]')).position, bas: Math.round(q('[data-fav6-bas]').getBoundingClientRect().bottom), corps: Math.round(q('.corps6').getBoundingClientRect().bottom) } : null,
-    feuille: q('[data-fav6-feuille]') ? { k: q('[data-fav6-feuille]').getAttribute('data-fav6-feuille'), vis: vis(q('[data-fav6-feuille]')), msg: q('.fav6-feuille [data-fav-message]') ? q('.fav6-feuille [data-fav-message]').textContent : '', versions: /versions?/.test(q('.fav6-feuille').innerText), offre: q('.fav6-feuille [data-fav-offre]') ? q('.fav6-feuille [data-fav-offre]').getAttribute('data-fav-offre') : null, rythme: q('.fav6-feuille [data-fav-rythme]') ? q('.fav6-feuille [data-fav-rythme]').getAttribute('data-fav-rythme') : null, lancer: !!q('.fav6-feuille [data-fav-lancer]'), textes: r.querySelectorAll('.fav6-feuille [data-rf-texte]').length } : null,
+    feuille: q('[data-fav6-feuille]') ? { k: q('[data-fav6-feuille]').getAttribute('data-fav6-feuille'), vis: vis(q('[data-fav6-feuille]')), msg: q('.fav6-feuille [data-fav-message]') ? q('.fav6-feuille [data-fav-message]').textContent : '', versions: /versions?/.test(q('.fav6-feuille').innerText), offre: q('.fav6-feuille [data-fav-offre]') ? q('.fav6-feuille [data-fav-offre]').getAttribute('data-fav-offre') : null, rythme: q('.fav6-feuille [data-fav-rythme]') ? q('.fav6-feuille [data-fav-rythme]').getAttribute('data-fav-rythme') : null, lancer: !!q('.fav6-feuille [data-fav-lancer]'), textes: r.querySelectorAll('.fav6-feuille [data-rf-texte], .fav6-feuille [data-fp-texte]').length } : null,
     envoi: q('.fav6-envoi') ? { texte: q('.fav6-envoi').innerText, arreter: !!q('.fav6-envoi [data-fav-arreter]'), faits: q('.fav6-envoi [data-fav-envoyes]') ? q('.fav6-envoi [data-fav-envoyes]').getAttribute('data-fav-envoyes') : null } : null,
     principalAilleurs: !!q('.ext6 [data-fav="encours"]'),
     erreur: q('[data-fav-erreur6]') ? q('[data-fav-erreur6]').textContent : '',
