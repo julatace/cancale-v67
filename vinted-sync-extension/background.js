@@ -21480,7 +21480,10 @@ async function publierAussiStop() {
 // Un ordre à l'onglet de travail (vrm-depot-aussi.js) : une étape à la fois, réponse attendue (délai borné).
 function ordreAussi(tabId, ordre, ms) {
   return new Promise((ok) => {
-    let fini = false; const fin = (r) => { if (fini) return; fini = true; ok(r); };
+    // Le service worker reste éveillé pendant qu'une page tape une longue description (MV3 : 30 s sans appel ⇒ tué) :
+    // un appel au stockage toutes les 10 s, le temps de l'ordre (la même garde que l'onglet de travail Vinted).
+    const veille = setInterval(() => { try { chrome.storage.local.get(AUSSI_JOBS); } catch (_) {} }, 10000);
+    let fini = false; const fin = (r) => { if (fini) return; fini = true; clearInterval(veille); ok(r); };
     const t = setTimeout(() => fin(null), ms || 20000);
     try { chrome.tabs.sendMessage(tabId, Object.assign({}, ordre, { from: 'vrm-fond', action: 'aussiUI' }), { frameId: 0 }, (r) => { void chrome.runtime.lastError; clearTimeout(t); fin(r || null); }); } catch (_) { clearTimeout(t); fin(null); }
   });
