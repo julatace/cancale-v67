@@ -19,9 +19,10 @@
    puis le reste en pleine largeur. L'ordre de lecture (DOM) ne change pas. */
 .sj-journee .sj-tete { display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important; align-items: center !important; justify-items: stretch !important; }
 .sj-journee .sj-tete > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
-.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; }
+.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; grid-column: 1 !important; }
 .sj-journee .sj-tete > .sj-titre { grid-row: 2 !important; grid-column: 1 !important; }
-.sj-journee .sj-tete > .sj-phrase { grid-row: 2 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 2px !important; }
+/* (21 nov., style Vintex) Plus de second titre « Ma journée » : le « ? » se pose au bout de la ligne du bonjour. */
+.sj-journee .sj-tete > .sj-phrase { grid-row: 1 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 4px !important; }
 
 /* ── 2. LES PLATEAUX (Annonces · Stock · Achats, sites, vues, sous-rubriques) : la touche dessinée reste de 38–40 px
    dans son puits de 44–48 px, mais la CIBLE au doigt couvre toute la hauteur du puits (un toucher sur le bord du

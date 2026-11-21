@@ -1,0 +1,41 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   (21 nov. 2026, décision de Julien) STYLE « COMME VINTEX — 2ᵉ JET » : L'ÉCHELLE RÉDUITE SUR LES ÉCRANS D'AVANT.
+   Les écrans natifs lisent les jetons (src/natif/jetons.css) ; les écrans d'avant (Achats, Messages, Paramètres, Stock,
+   la tête de Ma journée, Argent) gardaient des tailles écrites en dur, souvent sous des `:root:root…` et des `!important`
+   (34 px de titre, 52–104 px de chiffre, 24 px de section). Mesuré par la sonde du chantier (récit
+   docs/passation/2026-11-21-style-vintex.md §3). Ici, et seulement ici, ces tailles sont ramenées à l'échelle du contrat
+   (NATIF.md §1) : titre d'écran 22/700, chiffre d'affiche 30/700, chiffre de case 20/600, titre de section 15/700,
+   corps 14. Le préfixe `:root` ×12 passe devant les règles d'hier (au plus ×9) sans dépendre de l'ordre des feuilles.
+   Aucune couleur ici, aucune mise en page : des tailles.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Titre d'écran : 22/28 700. */
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-market-heading h1, .vrm-tache-tete h1, .vrm-set-h1, .vrm-screen-head h1,
+  .vrm-screen-head .vrm-display, .vrm-fu-titre-tete, .sm-titre, .sr-titre, .v2-titre, .sb-ecran-titre, .vrm-set-tete h1, .vrm-set-tete h2) {
+  font-size: 22px !important; line-height: 28px !important; font-weight: 700 !important; letter-spacing: -.3px !important;
+}
+
+/* Chiffre d'affiche (le vendu du jour, du mois, la dépense) : 30/36 700 ; l'euro suit (en em). */
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand, .vrm-fu-grand,
+  .vrm-argent-w[data-argent-q="vendu"] .vrm-argent-w-n, .vg-a-vendu .vrm-argent-w-n, .vrm-argent-partie .vg-a-vendu .vrm-argent-w-n) {
+  font-size: 30px !important; line-height: 36px !important; font-weight: 700 !important; letter-spacing: -.8px !important;
+}
+:root:root:root:root:root:root:root:root:root:root:root:root body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting :is(.vrm-fu-grand, .vrm-jv2-grand) {
+  font-size: 30px !important; line-height: 36px !important;
+}
+
+/* Chiffre d'une case (Reçu, Bénéfice, En route, À venir…) : 20/28 600. */
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-fu-case b, .vrm-argent-w .vrm-argent-w-n, .vg-a-venir-total, .vrm-av-resume-total,
+  .vrm-ui-bande-n, .vrm-ca-periode-tuiles .vrm-display, .vrm-pm-total .vrm-pm-case b) {
+  font-size: 20px !important; line-height: 28px !important; font-weight: 600 !important; letter-spacing: -.2px !important;
+}
+
+/* Titre de section : 15/20 700, en minuscules. */
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-day-titre-section, .sj-titre-section h2, .vrm-sx-titre, .vrm-fu-titre-section h2) {
+  font-size: 15px !important; line-height: 20px !important; font-weight: 700 !important; letter-spacing: -.1px !important;
+}
+
+/* Le corps d'une rangée d'avant : 14. */
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-achats-retirer-titre, .vrm-bilan-val, .vrm-delai-val, .vrm-sx-tete) {
+  font-size: 14px !important; line-height: 20px !important;
+}

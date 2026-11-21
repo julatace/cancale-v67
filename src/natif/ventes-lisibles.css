@@ -25,18 +25,18 @@
 
   /* ── L'achat : « Relier » (les maillons) et le champ « Prix d'achat », côte à côte ; reliée : « Acheté 30 € » ── */
   .n-vt-achat { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; white-space: nowrap; }
-  .n-vt-achat .n-vt-relier { gap: 6px; min-height: 36px; padding: 0 12px 0 4px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-accent));
-    font: var(--n-t-legende-fort); }
+  .n-vt-achat .n-vt-relier { gap: 6px; min-height: 36px; padding: 0 12px 0 4px; border-radius: var(--n-r-bouton); background: var(--n-carte); color: var(--n-encre);
+    box-shadow: inset 0 0 0 1px var(--n-bord); font: var(--n-t-controle); }   /* (21 nov., style Vintex) contour fin, à l'encre */
   .n-vt-achat .n-vt-relier-rond { width: 28px; height: 28px; background: transparent; }
-  .n-vt-achat .n-vt-relier:hover, .n-vt-achat .n-vt-relier:focus-visible { background: var(--n-accent); color: var(--n-sur-plein, #fff); }
+  .n-vt-achat .n-vt-relier:hover, .n-vt-achat .n-vt-relier:focus-visible { background: var(--n-appui); color: var(--n-encre); }
   .n-vt-achat .n-vt-relier:hover .n-vt-relier-rond, .n-vt-achat .n-vt-relier:focus-visible .n-vt-relier-rond { background: transparent; color: inherit; }
-  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier { background: transparent; color: var(--n-encre); font: var(--n-t-second-fort); padding-inline-end: 6px; }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier { background: transparent; box-shadow: none; color: var(--n-encre); font: var(--n-t-second-fort); padding-inline-end: 6px; }
   .n-vt-achat[data-vt-achat="relie"] .n-vt-relier-rond, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier-rond { color: var(--n-encre-2); }
   .n-vt-achat[data-vt-achat="relie"] .n-vt-relier:hover, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier:hover { background: var(--n-carte-2); color: var(--n-encre); }
   .n-vt-relier-mot { white-space: nowrap; }
   .n-vt-prix { position: relative; display: inline-flex; align-items: center; margin: 0; }
-  .n-vt-prix-champ { box-sizing: border-box; width: 120px; height: 36px; margin: 0; padding: 0 24px 0 12px; border: .5px solid var(--n-trait); border-radius: var(--n-r-bouton);
-    background: var(--n-fond); color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; outline: none; }
+  .n-vt-prix-champ { box-sizing: border-box; width: 120px; height: 36px; margin: 0; padding: 0 24px 0 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-bouton);
+    background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; outline: none; }
   .n-vt-prix-champ::placeholder { color: var(--n-encre-2); opacity: 1; }
   .n-vt-prix-champ:focus { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
   .n-vt-prix[data-vt-faux="1"] .n-vt-prix-champ { border-color: var(--n-ambre); }
