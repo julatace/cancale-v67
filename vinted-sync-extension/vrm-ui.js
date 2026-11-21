@@ -955,7 +955,7 @@
     m3_t_afficher: { fr: '{n} affichées', en: '{n} shown', es: '{n} visibles', it: '{n} visibili', de: '{n} eingeblendet' },
     m3_t_afficher_1: { fr: '1 affichée', en: '1 shown', es: '1 visible', it: '1 visibile', de: '1 eingeblendet' },
     m3_feuille: { fr: 'Avant / après — relis avant de lancer', en: 'Before / after — check before you start', es: 'Antes / después — revisa antes de lanzar', it: 'Prima / dopo — controlla prima di avviare', de: 'Vorher / nachher — vor dem Start prüfen' },
-    m3_vert: { fr: 'En vert : ce qui change. En gris : ce qui reste pareil. « — » : VRM ne le sait pas.', en: 'Green: what changes. Grey: what stays the same. “—”: VRM doesn’t know it.', es: 'En verde: lo que cambia. En gris: lo que no cambia. «—»: VRM no lo sabe.', it: 'In verde: ciò che cambia. In grigio: ciò che resta uguale. «—»: VRM non lo sa.', de: 'Grün: was sich ändert. Grau: was gleich bleibt. „—“: VRM weiß es nicht.' },
+    m3_vert: { fr: 'En vert : ce qui change. En gris : ce qui reste pareil. « — » : VRM ne le sait pas.', en: 'Green: what changes. Grey: what stays the same. “—”: VRM doesn’t know it.', es: 'En verde: lo que cambia. En gris: lo que no cambia. «—»: VRM no lo sabe.', it: 'In verde: ciò che cambia. In grigio: ciò che resta uguale. «—»: VRM non lo sa.', de: 'Grün: was sich ändert. Grau: was gleich bleibt. „—“: VRM weiß es nicht.' },
     m3_revoir: { fr: 'Voir l’avant / après', en: 'See before / after', es: 'Ver antes / después', it: 'Vedi prima / dopo', de: 'Vorher / nachher ansehen' },
     m3_lancer: { fr: 'Lancer', en: 'Start', es: 'Lanzar', it: 'Avvia', de: 'Starten' },
     m3_retour: { fr: 'Modifier', en: 'Edit', es: 'Editar', it: 'Modifica', de: 'Ändern' },
@@ -1120,7 +1120,7 @@
   .vu-aa-l > summary:focus-visible { outline: none; box-shadow: inset var(--vu-anneau); }
   .vu-aa-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; display: block; background: var(--n-neutre, var(--vu-socle)); }
   .vu-aa-ti { min-width: 0; display: grid; gap: 2px; }
-  .vu-aa-ti b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vu-aa-ti b { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
   .vu-aa-ti small { display: flex; gap: 6px; align-items: center; color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; }
   .vu-aa-d { font: 600 13px/1.2 var(--vu-police); white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: var(--vu-chg); color: var(--vu-chg-encre); font-variant-numeric: tabular-nums; }
   .vu-aa-d[data-ton="ambre"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); }
@@ -1139,9 +1139,10 @@
   .vu-aa-champs li[data-c="manque"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); font-weight: 600; }
   .vu-bl { display: grid; gap: 8px; }
   .vu-bl-tot { font: 650 15px/1.3 var(--vu-police); color: inherit; }
-  .vu-bl-l { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--n-trait, var(--vu-filet)); background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); font: 400 14px/1.35 var(--vu-police); }
-  .vu-bl-l > .vu-aa-t, .vu-bl-l > .vu-frise, .vu-bl-l > .vu-bl-r, .vu-bl-l > .vu-bl-g { grid-column: 1 / -1; }
-  .vu-bl-l > .vu-aa-t { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 10px; overflow: hidden; }
+  .vu-bl-l { font: 400 14px/1.35 var(--vu-police); }
+  .vu-bl-c { display: grid; gap: 10px; padding: 0 12px 12px; }
+  .vu-bl-c > .vu-aa-t { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 10px; overflow: hidden; }
+  .vu-bl-c > .vu-frise { padding-top: 4px; }
   .vu-bl-r { margin: 0; color: var(--vu-ambre); font-size: 13px; }
   .vu-bl-g { display: flex; flex-wrap: wrap; gap: 8px; }
   .vu-bl-g .vu-btn, .vu-bl-g .vu-lien { min-height: 44px; }
@@ -1271,10 +1272,9 @@
     const lig = [];
     const ajout = (k, av, ap, opts = {}) => { const A = v(av), P = v(ap); lig.push({ k, av: A, ap: P, chg: opts.chg != null ? opts.chg : (A != null && P != null && A !== P), garde: !!opts.garde }); };
     ajout('prix', euro(a.prix), euro(p.prix != null ? p.prix : a.prix));
-    ajout('etat', statutTxt(a.statut), statutTxt(p.statut != null ? p.statut : a.statut));
+    ajout('etat', statutTxt(a.statut), statutTxt(p.statut != null ? p.statut : a.statut), l.sorte === 'republier' ? { chg: !!statutTxt(p.statut) } : {});   // republier : une NOUVELLE annonce (même état, autre identifiant)
     ajout('depuis', depuisTxt(a.depuis, maintenant), depuisTxt(p.depuis != null ? p.depuis : a.depuis, maintenant));
     ajout('num', l.num ? String(l.num) : null, l.num ? T('m3_garde', { v: String(l.num) }) : null, { chg: false, garde: true });
-    ajout('titre', l.titre, l.titre, { chg: false });
     return lig;
   }
   const photoAa = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? `<img class="vu-aa-img" src="${esc(u)}" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy">` : '<span class="vu-aa-img" aria-hidden="true"></span>');
@@ -1286,10 +1286,11 @@
     if (opts.photo !== false) h += `<div class="k">${esc(T('m3_photo'))}</div><div data-v="meme">${photoAa(l.photo)}</div><div data-v="meme" data-aa-photo-apres>${photoAa(l.photo)}${l.sorte === 'republier' ? `<small>${esc(T('m3_memes_photos'))}</small>` : ''}</div>`;
     for (const c of lig) {
       if (c.k === 'titre' && opts.titre === false) continue;
+      if (opts.compact && c.k === 'etat' && !c.chg) continue;
       if (c.av == null && c.ap == null && c.k !== 'prix') continue;
       h += `<div class="k">${esc(T('m3_' + c.k))}</div><div data-aa="${c.k}" data-cote="avant" data-v="${etat(c, 'av')}">${val(c.av)}</div><div data-aa="${c.k}" data-cote="apres" data-v="${etat(c, 'ap')}">${val(c.ap)}${c.k === 'etat' && l.sorte === 'republier' ? ` · ${esc(T('m3_nouvelle'))}` : ''}</div>`;
     }
-    if (l.sorte === 'republier') {
+    if (l.sorte === 'republier' && !opts.compact) {
       const ch = Array.isArray(l.champs) ? l.champs : null;
       h += `<div class="k">${esc(T('m3_champs'))}</div><div class="plein" data-aa="champs" data-v="${ch ? 'meme' : 'inconnu'}">${ch ? `<ul class="vu-aa-champs">${CHAMPS_MODIF.map((k) => { const c = ch.find((x) => x && x.k === k); const e = c && ['copie', 'corrige', 'manque', 'absent'].includes(c.etat) ? c.etat : null; return `<li data-champ="${k}" data-c="${e || 'inconnu'}">${e === 'copie' ? '✓ ' : ''}${esc(T('m3_c_' + k))}${e === 'corrige' ? ' · ' + esc(T('m3_c_corrige')) : e === 'manque' ? ' · ' + esc(T('m3_c_manque')) : e === 'absent' ? ' · ' + esc(T('m3_c_absent')) : e ? '' : ' · —'}</li>`; }).join('')}</ul>` : esc(T('m3_c_pas_verifie'))}</div>`;
     }
@@ -1332,14 +1333,20 @@
     const dom = /^[\w.-]*vinted\.(fr|com|it|de)$/.test(String(opts.domaine || '')) ? String(opts.domaine) : 'www.vinted.fr';
     const nOk = B.filter((b) => b.ok === true).length, nKo = B.length - nOk;
     const lien = (id) => (/^\d{4,15}$/.test(String(id || '')) ? `https://${dom}/items/${id}` : '');
+    // Une rangée par annonce : le résumé (ce qui a changé, ou l'étape où elle s'est arrêtée, en ambre) ; dépliée, le
+    // tableau Avant | Après (seulement ce qui compte : prix, mise en ligne, état s'il change, N°) ou la frise et SA phrase.
     return `<div class="vu-bl" data-bilan="${B.length}" data-bilan-ok="${nOk}"><div class="vu-bl-tot">${esc(nKo ? T('m3_bilan', { ok: nOk, ko: nKo }) : T('m3_bilan_ok', { ok: nOk }))}</div>${B.map((b) => {
-      const av = b.avant || {}, ap = b.apres || {};
-      const l = { id: b.id, sorte: b.sorte === 'masquer' ? (ap.statut === 'en_vente' ? 'afficher' : 'masquer') : b.sorte, titre: b.titre, photo: b.photo, num: b.num,
-        avant: av, apres: b.ok === true ? ap : { prix: av.prix, statut: av.statut, depuis: av.depuis } };
-      const voir = b.ok === true ? lien(ap.id || b.id) : lien(b.id);
-      return `<div class="vu-bl-l" data-bilan-ligne="${esc(b.id)}" data-ok="${b.ok === true ? '1' : '0'}">${photoAa(b.photo)}<span class="vu-aa-ti"><b>${esc(b.titre || '—')}</b><small>${b.num ? etiquette(b.num) : ''}${b.ok === true && b.sorte === 'republier' && ap.id && String(ap.id) !== String(b.id) ? `${esc(T('m3_lien_nouveau'))} · ${esc(ap.id)}` : ''}</small></span>`
-        + (b.ok === true ? tableAaHtml(l, t, { photo: false, titre: false }) : friseHtml({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 }) + (b.erreur && b.erreur.raison ? `<p class="vu-bl-r" data-bilan-raison>${esc(b.erreur.raison)}</p>` : ''))
-        + `<div class="vu-bl-g">${b.ok !== true && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(b.ok === true ? (ap.id || b.id) : b.id)}">${esc(T(b.ok === true ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div>`; }).join('')}</div>`;
+      const av = b.avant || {}, ap = b.apres || {}, ok = b.ok === true;
+      const sorte = b.sorte === 'masquer' ? (ap.statut === 'en_vente' ? 'afficher' : 'masquer') : b.sorte;
+      const l = { id: b.id, sorte, titre: b.titre, photo: b.photo, num: b.num, avant: av, apres: ok ? ap : { prix: av.prix, statut: av.statut, depuis: av.depuis } };
+      const voir = ok ? lien(ap.id || b.id) : lien(b.id);
+      const fr = friseModif({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 });
+      const ou = fr.find((e) => e.etat === 'erreur');
+      const resume = ok ? (sorte === 'republier' ? `${depuisTxt(av.depuis, t) || '—'} → ${depuisTxt(ap.depuis, t) || '—'}` : resumeLigne(l, t)) : `${ou ? nomEtape(b.sorte, ou.k) + ' · ' : ''}${T('m3_a_reprendre')}`;
+      const ouvert = !ok || B.length === 1;
+      return `<details class="vu-aa-l vu-bl-l" data-bilan-ligne="${esc(b.id)}" data-ok="${ok ? '1' : '0'}"${ouvert ? ' open' : ''}><summary>${photoAa(b.photo)}<span class="vu-aa-ti"><b>${esc(b.titre || '—')}</b><small>${b.num ? etiquette(b.num) : ''}${ok && b.sorte === 'republier' && ap.id && String(ap.id) !== String(b.id) ? `<span data-bilan-nouveau="${esc(ap.id)}">${esc(T('m3_lien_nouveau'))} · ${esc(ap.id)}</span>` : ''}</small></span><span class="vu-aa-d"${ok ? '' : ' data-ton="ambre"'} data-bilan-resume>${esc(resume)}</span></summary><div class="vu-bl-c">`
+        + (ok ? tableAaHtml(l, t, { photo: false, titre: false, compact: true }) : friseHtml({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 }) + (b.erreur && b.erreur.raison ? `<p class="vu-bl-r" data-bilan-raison>${esc(b.erreur.raison)}</p>` : ''))
+        + `<div class="vu-bl-g">${!ok && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(ok ? (ap.id || b.id) : b.id)}">${esc(T(ok ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div></details>`; }).join('')}</div>`;
   }
   const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro });
   globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF });

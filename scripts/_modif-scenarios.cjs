@@ -150,4 +150,4 @@ function preuvesSansFait(snaps) {
   }
   return [...new Set(fautes)];
 }
-module.exports = { UID, DRESSING, NUMS, PHOTO, jouerRepub, jouerPrix, preuvesSansFait, copie };
+module.exports = { UID, DRESSING, NUMS, PHOTO, MODELE_R, jouerRepub, jouerPrix, preuvesSansFait, faitPour, copie };
