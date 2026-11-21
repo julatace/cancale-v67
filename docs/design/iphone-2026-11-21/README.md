@@ -1,6 +1,69 @@
 # Design iPhone — 21 nov. 2026
 
-## ⚠️ 2ᵉ passe (la bonne) : la famille « Vintex »
+## ⚠️⚠️ 3ᵉ passe (la plus récente) : V4 « énergique clair » et V5 « premium sombre »
+
+Julien sur V1/V2/V3 : « tu peux faire mieux sur le design » ; il a coché **trop fade / pas d'impact**, **textes et
+tailles** (pas assez pro), **boutons et formes** (pas assez finis). Donc : la finition et la structure de Vintex restent,
+on y ajoute une **personnalité**. Dossiers `vintex-v4-energique/` et `vintex-v5-premium/` (6 écrans + `composants.html`).
+Dans le dépôt les vignettes restent des baskets dessinées ; les captures montrées à Julien (scratchpad) utilisent des
+photos réelles découpées dans ses captures — jamais versionnées.
+
+**Critique de V2 (ce qui faisait « gabarit ») et ce qui a changé :**
+1. Fade : tout blanc-gris, accent vu une fois ⇒ un parti pris de couleur (V4 vert vif `#12C468` + fond légèrement teinté
+   `#F4F5F2` ; V5 « volt » `#D4FF3F` sur quasi-noir) et un **moment** en tête d'Aujourd'hui (carte du chiffre du mois).
+2. Typo plate (15/13/12 partout, gris trop proches) ⇒ échelle nette **34 / 22 / 17 / 15 / 13**, titres et chiffres en
+   **Inter Display** 700 au tracking négatif (−0,9 px à 34, −2,2 px à 56), trois gris bien séparés, chiffres
+   tabulaires seulement dans les colonnes (prix, compteurs).
+3. Mur de boîtes à contour identiques ⇒ hiérarchie : plein 50 px 17/600 (UN par écran) ; secondaires 44 ; bouton icône
+   44 ; état pressé = enfoncé 97 % + fond plus sombre.
+4. Icônes grêles ⇒ un seul jeu au trait 1,6, 20 dans les contrôles, 22 dans les pastilles, 26 dans la barre ; l'onglet
+   actif a son icône pleine et un trait d'accent.
+5. Étiquettes délavées à contour ⇒ pleines et franches, 24 px, 13/600 ; plaque N° en **encre pleine** (V4) / blanche
+   (V5), comme une étiquette de carton ; logos de site en vrais carrés de couleur.
+6. Rythme : 32 au-dessus d'un titre de section, 12 dessous, rien entre les rangées d'un groupe (filets 0,5 px) ;
+   coins 18 (cartes) / 24 (carte du chiffre, feuilles) ; ombres quasi invisibles ; barres haut/bas en verre (flou).
+
+### Jetons (à poser dans `src/natif/jetons.css`)
+
+| jeton | V4 énergique (clair) | V5 premium (sombre) |
+|---|---|---|
+| `--n-fond` / `--n-carte` / `--n-carte-2` | `#F4F5F2` / `#FFFFFF` / `#EFF1ED` | `#09090B` / `#141417` / `#1C1C20` |
+| `--n-trait` (0,5 px) / `--n-bord` (1 px) | `rgb(16 24 18/.12)` / `rgb(16 24 18/.11)` | `rgb(255 255 255/.09)` / `rgb(255 255 255/.10)` |
+| encre / texte / `-2` / `-3` | `#0B0F0C` / `#1E2420` / `#5F6762` / `#98A09B` | `#F7F7F8` / `#E7E7EA` / `#9C9CA4` / `#67676F` |
+| `--n-accent` = `--n-plein` / pressé | `#12C468` / `#0EAB5A` | `#D4FF3F` / `#BCE62E` |
+| `--n-sur-plein` (texte sur l'accent) | `#03230F` | `#0A0D00` |
+| accent en texte (lien) / voile / anneau | `#067A40` / `rgb(18 196 104/.14)` / `.30` | `#D4FF3F` / `rgb(212 255 63/.12)` / `.32` |
+| étiquette verte fond / texte | `#DDF6E7` / `#055F31` | `rgb(212 255 63/.12)` / `#DAFF5E` |
+| `--n-ambre-fond` / `--n-ambre` | `#FFEDC9` / `#874800` | `rgb(255 176 58/.15)` / `#FFC163` |
+| étiquette grise fond / texte | `#ECEEEA` / `#434A45` | `#212125` / `#A6A6AE` |
+| doublon : étiquette / plaque pleine | `#FFE1DD`·`#AE2318` / `#AE2318` + blanc | `rgb(255 92 80/.16)`·`#FF8A7F` / `#FF6B5E` + `#1A0300` |
+| plaque N° fond / texte | `#0B0F0C` / `#FFFFFF` | `#F2F2F3` / `#0A0A0B` |
+| carte du chiffre (Aujourd'hui) | `radial-gradient(120% 90% at 100% 0, rgb(18 196 104/.38), transparent 55%), linear-gradient(160deg,#0A1F16,#0C2C20 55%,#0E3526)` | `radial-gradient(90% 80% at 0 0, rgb(212 255 63/.16), transparent 60%), linear-gradient(180deg,#141417,#101013)` |
+| verre des barres (`--n-barre` + `saturate(180%) blur(20px)`) | `rgb(250 251 249/.80)` (maquette : .94) | `rgb(12 12 14/.72)` (maquette : .92) |
+| pastille de notification | `#0B0F0C` / blanc, anneau 2,5 px couleur du fond | `#D4FF3F` / `#0A0D00`, anneau 2,5 px |
+| ombre | `0 1px 2px rgb(16 24 18/.04), 0 2px 8px rgb(16 24 18/.03)` | aucune (filet 0,5 px) |
+
+**Texte** : `--n-t34: 700 34px/40px` et `--n-t22: 700 22px/28px` en **Inter Display** (OFL 1.1, libre, à livrer en
+woff2 à côté de `src/design/polices/inter-latin-wght-normal.woff2`) ; `17/600`, `15/400` (500 pour un titre de rangée),
+`13/400` en police système/Inter. Chiffre d'affiche d'Aujourd'hui : 56/700 Inter Display, −2,2 px (le seul).
+**Mesures** : marge 16 ; contrôle 44, plein 50, rayon 12 ; carte 18 ; carte du chiffre et feuille 24 ; rangée 68,
+vignette 52 rayon 10 ; étiquette 24 pilule ; plaque 22 rayon 6 ; case 22 rayon 7 ; interrupteur 51 × 31 ; barre
+d'onglets 49 + zone sûre, icônes 26, libellé 11/600, « + » = pavé d'encre 48 × 40 rayon 14.
+
+**Composants à changer** (un seul lot) : les 13 de la section « famille Vintex » ci-dessous, avec en plus :
+`Affiche` (carte du chiffre d'Aujourd'hui : chiffre 56, puce « +412 € · 7 j », 30 barres du `vrm_benefice_jours` déjà
+publié — les 7 derniers jours en accent —, objectif, et 3 compteurs séparés de filets) ; `Plaque` pleine ; `Pastille`
+pleines sans contour ; `BarreOnglets` en verre, icône active pleine + trait d'accent ; `TetePage` en Inter Display 34 ;
+`Groupe` : titre de section 22 Inter Display + compte gris de même taille.
+
+**Recommandation : V4 (énergique clair) par défaut, V5 comme mode sombre.** V4 garde la clarté de Vintex que Julien aime,
+gagne l'impact qui manquait (carte du chiffre, vert vif, plaques d'encre, titres d'affiche) et reste lisible en plein
+jour ; V5 est la version de nuit, la plus « premium ». Le vert vif ne sert qu'au plein, à l'onglet actif, aux
+interrupteurs et aux 7 dernières barres : il reste rare.
+
+---
+
+## 2ᵉ passe : la famille « Vintex » (V1, V2, V3)
 
 Retour de Julien sur les directions A/B/C (plus bas, gardées pour l'historique) : « je veux vraiment que ce soit comme
 Vintex, parce que là je n'aime pas trop les boutons, les formes, etc. Ça fait un peu bâclé, je veux que ce soit beaucoup
