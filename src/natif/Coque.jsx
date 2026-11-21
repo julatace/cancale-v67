@@ -83,7 +83,7 @@ export function CoqueRacine({ defile = 'page', volets = 'deux', className = '', 
 export function CoqueEcran({ className = '', attrs = null, children }) {
   return <main className={cx('n-coque-ecran', className)} data-n-coque-ecran="" {...(attrs || {})}>{children}</main>;
 }
-export function ActionsCoque({ messages = null, compte = null, avatar = null, plusOuvert = false, onPlus, pointPlus = false }) {
+export function ActionsCoque({ messages = null, compte = null, avatar = null, plusOuvert = false, onPlus, pointPlus = false, sansCompte = false, libelleCompte = '', ecran = false }) {
   return (
     <>
       {messages ? (
@@ -95,13 +95,15 @@ export function ActionsCoque({ messages = null, compte = null, avatar = null, pl
           pastille={messages.n ? (messages.n === true ? <span className="n-coin-point" aria-hidden="true"/> : <Pastille ton="ambre-plein" className="n-coin-pastille">{messages.n}</Pastille>) : null}
         />
       ) : null}
-      <BoutonIcone
-        libelle={tr('natif.plus.ouvrir')}
+      {/* (21 nov., onglets-menu) `ecran` : la photo ouvre un ÉCRAN (le Menu), pas une feuille — ni aria-haspopup ni aria-expanded ;
+          `sansCompte` : sur le Menu lui-même, la photo n'est pas répétée. */}
+      {sansCompte ? null : <BoutonIcone
+        libelle={libelleCompte || tr('natif.plus.ouvrir')}
         icone={avatar || <Avatar compte={compte}/>}
         onClick={onPlus}
-        attrs={{ 'data-n-coque-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': plusOuvert ? 'true' : 'false' }}
+        attrs={ecran ? { 'data-n-coque-plus': '', 'data-n-coque-compte': '' } : { 'data-n-coque-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': plusOuvert ? 'true' : 'false' }}
         pastille={pointPlus ? <span className="n-coin-point" aria-hidden="true"/> : null}
-      />
+      />}
     </>
   );
 }

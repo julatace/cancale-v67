@@ -136,5 +136,14 @@ export default {
   "vn.lbc.suivre": "Seguir",
   "vn.lbc.rien": "Ningún paquete de Leboncoin por enviar.",
   "vn.lbc.pasLu": "Paquetes de Leboncoin: aún no leídos.",
-  "vn.lbc.limite": "La etiqueta se genera en leboncoin.fr: tocar la venta la abre allí."
+  "vn.lbc.limite": "La etiqueta se genera en leboncoin.fr: tocar la venta la abre allí.",
+  "vn.acces.titre": "Por resolver y devoluciones",
+  "vn.acces.regler": {"one": "{n} por resolver", "other": "{n} por resolver"},
+  "vn.acces.retours": {"one": "{n} devolución o disputa", "other": "{n} devoluciones y disputas"},
+  "vn.retourEtiquette": "Etiqueta de devolución",
+  "vn.o.stock1": "Dónde está este artículo en el stock",
+  "vn.o.stockN": "Dónde están estos artículos en el stock",
+  "vn.o.bordsFaits": {"one": "{n} etiqueta ya tratada", "other": "{n} etiquetas ya tratadas"},
+  "vn.o.voir": "Verlas",
+  "vn.o.masquer": "Ocultar"
 };

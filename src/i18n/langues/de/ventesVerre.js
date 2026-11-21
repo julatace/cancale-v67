@@ -136,5 +136,14 @@ export default {
   "vn.lbc.suivre": "Verfolgen",
   "vn.lbc.rien": "Kein Leboncoin-Paket zu versenden.",
   "vn.lbc.pasLu": "Leboncoin-Pakete: noch nicht gelesen.",
-  "vn.lbc.limite": "Das Etikett wird auf leboncoin.fr erstellt: Tippen auf den Verkauf öffnet es dort."
+  "vn.lbc.limite": "Das Etikett wird auf leboncoin.fr erstellt: Tippen auf den Verkauf öffnet es dort.",
+  "vn.acces.titre": "Zu klären und Retouren",
+  "vn.acces.regler": {"one": "{n} zu klären", "other": "{n} zu klären"},
+  "vn.acces.retours": {"one": "{n} Retoure oder Streitfall", "other": "{n} Retouren und Streitfälle"},
+  "vn.retourEtiquette": "Retourenetikett",
+  "vn.o.stock1": "Wo ist dieser Artikel im Lager",
+  "vn.o.stockN": "Wo sind diese Artikel im Lager",
+  "vn.o.bordsFaits": {"one": "{n} Etikett bereits erledigt", "other": "{n} Etiketten bereits erledigt"},
+  "vn.o.voir": "Anzeigen",
+  "vn.o.masquer": "Ausblenden"
 };

@@ -96,5 +96,24 @@ export default {
   "egalite.groupe.sansCompte": "Senza account",
   "egalite.groupe.n": {"one": "{n} annuncio", "other": "{n} annunci"},
   "egalite.groupe.achats": {"one": "{n} prezzo d’acquisto da completare", "other": "{n} prezzi d’acquisto da completare"},
-  "egalite.groupe.aRelier": {"one": "{n} annuncio da collegare", "other": "{n} annunci da collegare"}
+  "egalite.groupe.aRelier": {"one": "{n} annuncio da collegare", "other": "{n} annunci da collegare"},
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "egalite.etat.bloque": "Bloccati",
+  "egalite.etatAnnonce.bloque": "account bloccato",
+  "egalite.vide.bloque": "Nessun account bloccato.",
+  "egalite.d.vueGrille": "Mostra a griglia",
+  "egalite.d.vueListe": "Mostra a elenco",
+  "egalite.d.gestes": "Azioni per «{titre}»",
+  "egalite.d.ouvrir": "Apri",
+  "egalite.d.conseil.dort": "Ferma · {n} g",
+  "egalite.d.trace.lecture": "Letto il {d}",
+  "egalite.d.trace.vu": "Visto online il {d}",
+  "egalite.d.trace.numero": "N. assegnato il {d}",
+  "egalite.d.trace.inconnu": "Data sconosciuta",
+  "egalite.d.bloque.phrase": "Ultimi annunci noti di questo account. Fuori dai totali, nessuna azione.",
+  "egalite.d.bloque.phraseDate": "Ultimi annunci noti ({d}). Fuori dai totali, nessuna azione.",
+  "egalite.d.bloque.aucunGeste": "Account bloccato: non si fa nulla su questo account. Puoi aprire la scheda.",
+  "egalite.d.regler.relier": "{n} da collegare",
+  "egalite.d.regler.achat": "{n} prezzi d’acquisto",
+  "egalite.d.aReglerN": {"one": "{n} da sistemare", "other": "{n} da sistemare"}
 };

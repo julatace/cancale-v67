@@ -37,6 +37,25 @@ import { MUTATION_COPIE } from './copieEcran.js';
 export const PLAFOND_ATTENTE_MS = 2500;
 // Avec un instantané à montrer, l'écran vrai attend ses données jusqu'à ce plafond.
 export const PLAFOND_INSTANTANE_MS = 20000;
+// (21 nov., fluidité) Données là, l'écran vrai attend encore que son PREMIER ÉCRAN soit rempli (aucun squelette natif
+// dedans) — au plus ce temps-là, une copie montrée (elle tient la place, rien ne presse), ou un squelette.
+export const PLAFOND_PEINT_COPIE_MS = 6000;
+export const PLAFOND_PEINT_MS = 1200;
+// Les briques d'attente (src/natif/Attente.jsx `.n-os`, src/Squelette.jsx `.vrm-sq-barre`) : les mêmes que celles qui
+// empêchent une copie d'être prise (src/copieEcran.js `capturerCopie`).
+export const SELECTEUR_BRIQUES = '.n-os, .vrm-sq-barre';
+// Une brique d'attente dans la première hauteur de fenêtre de l'écran vrai (encore caché, posé à sa place : `.vrm-attente-cache`
+// le met en haut de l'attente, à la même largeur — ses mesures sont celles qu'il aura).
+export function attenteDansPremierEcran(el) {
+  try {
+    const H = (typeof window !== 'undefined' && window.innerHeight) || 800;
+    for (const b of el.querySelectorAll(SELECTEUR_BRIQUES)) {
+      const r = b.getBoundingClientRect();
+      if (r.height > 0 && r.width > 0 && r.top < H && r.bottom > 0) return true;
+    }
+  } catch (_) {}
+  return false;
+}
 const Ctx = React.createContext(null);
 // (6 nov., v36-raccords) L'écran est-il MONTRÉ ? Faux tant qu'il attend (monté, caché) :
 // un conseil (src/Conseils.jsx) ne se décide pas sur un écran que personne ne voit encore.
@@ -108,6 +127,8 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
     return () => { try { cancelAnimationFrame(a); } catch (_) {} clearTimeout(b); clearTimeout(filet); };
   }, [enfants]);
   const [monte, setMonte] = React.useState(false);
+  const [peint, setPeint] = React.useState(false);
+  const hoteVrai = React.useRef(null);
   // Les composants de l'écran s'annoncent dans leurs effets de mise en page, AVANT celui-ci : après lui, ce qui n'est
   // pas annoncé n'est pas attendu.
   React.useLayoutEffect(() => { if (enfants) setMonte(true); }, [enfants]);
@@ -117,7 +138,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   // (20 nov., affichage instantané) Une lecture RATÉE (base injoignable, hors ligne) avec une copie à montrer : la copie
   // RESTE (« Pas à jour · Réessayer », src/CopieEcran.jsx) au lieu d'un écran vide qui dirait sa panne.
   const garde = !!instantane && !!garderInstantane && !ouvert && MUTATION_COPIE !== 'panne';
-  const visible = !garde && enfants && (ouvert || tout || plafond);
+  const visible = !garde && enfants && (ouvert || (tout && peint) || plafond);
   // Une fois ouvert, il le reste.
   React.useLayoutEffect(() => { if (visible && !ouvert) setOuvert(true); }, [visible, ouvert]);
   // Ouvert par ses données (pas par le plafond) : la prochaine fois, il revient sans squelette.
@@ -127,6 +148,25 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
   const vuInstantane = React.useRef(false);
   if (!visible && avecInstantane) vuInstantane.current = true;
   if (!visible && !avecInstantane) aAttendu.current = true;
+  // (21 nov., fluidité) L'écran vrai est-il PEINT ? Ses données essentielles sont là, mais une partie de son premier écran
+  // peut encore attendre la sienne (une liste qui se calcule, son squelette natif `.n-os`) : tant que c'est le cas, ce qui
+  // est montré (la copie, le squelette) reste — l'écran vrai prend la place d'un bloc, déjà rempli, jamais une copie
+  // remplacée par des blocs gris qui se remplissent ensuite (mesuré, banc couches-chargement : Ventes au toucher, copie →
+  // squelettes → liste, CLS 0,32). Borné : `PLAFOND_PEINT_*` après les données.
+  React.useEffect(() => {
+    if (ouvert || peint || !enfants || !tout) return undefined;
+    const el = hoteVrai.current;
+    if (!el || typeof MutationObserver === 'undefined') { setPeint(true); return undefined; }
+    let fini = false, image = 0, obs = null;
+    const conclure = () => { if (fini) return; fini = true; setPeint(true); };
+    const voir = () => { image = 0; if (!fini && !attenteDansPremierEcran(el)) conclure(); };
+    const bientot = () => { if (!image && !fini) { try { image = requestAnimationFrame(voir); } catch (_) { voir(); } } };
+    try { obs = new MutationObserver(bientot); obs.observe(el, { subtree: true, childList: true }); } catch (_) {}
+    const plafondPeint = setTimeout(conclure, avecInstantane ? PLAFOND_PEINT_COPIE_MS : PLAFOND_PEINT_MS);
+    voir();
+    return () => { fini = true; clearTimeout(plafondPeint); try { if (image) cancelAnimationFrame(image); } catch (_) {} try { if (obs) obs.disconnect(); } catch (_) {} };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvert, peint, enfants, tout]);
   React.useEffect(() => {
     if (ouvert) return undefined;
     const t = setTimeout(() => setPlafond(true), avecInstantane ? Math.max(plafondMs, plafondInstantaneMs) : plafondMs);
@@ -142,7 +182,7 @@ export function AttenteEcran({ ecran, attendus = [], donnees = null, ordi = fals
         ne passent jamais devant ceux de l'écran vrai (`getElementById` rend l'élément vrai dès qu'il est monté). */}
     {!visible && !(avecInstantane && instantane.type && instantane.type.sansCadre) && (avecInstantane ? <div className="vrm-attente-pret vrm-attente-sans-fondu" data-attente-instantane-cadre="">{instantane}</div> : <Squelette ecran={ecran} ordi={ordi} data-demarrage-attente=""/>)}
     {/* Remplacé EN PLACE : après un instantané, l'écran vrai arrive sans fondu (rien ne « réapparaît »). */}
-    <div className={visible ? (vuInstantane.current ? 'vrm-attente-pret vrm-attente-sans-fondu' : aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
+    <div ref={hoteVrai} className={visible ? (vuInstantane.current ? 'vrm-attente-pret vrm-attente-sans-fondu' : aAttendu.current ? 'vrm-attente-pret' : undefined) : 'vrm-attente-cache'} aria-hidden={visible ? undefined : 'true'}>
       <Ctx.Provider value={ctx}><VisibleCtx.Provider value={visible}>{enfants ? children : null}</VisibleCtx.Provider></Ctx.Provider>
     </div>
     {!visible && avecInstantane && instantane.type && instantane.type.sansCadre ? instantane : null}

@@ -30,34 +30,38 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   try { P = await import(pathToFileURL(path.join(R, 'src', 'navPaires.js')).href); } catch (_) {}
   try { E = await import(pathToFileURL(path.join(R, 'src', 'design', 'espace.js')).href); } catch (_) {}
   const BAR_GROUPE = { cat_expedition: 'ventes', organisation: 'settings', dashboard: 'compta', semaine: 'journee', litiges: 'ventes' };
-  const barre = ['journee', 'paires', 'achats', 'ventes', 'compta'];
+  // (21 nov., onglets-menu — « garde les onglets ») La barre du bas : Aujourd'hui · Annonces · Ventes · Achats · Argent ;
+  // Stock, Messages, E-mails, Paramètres… s'ouvrent depuis le Menu ou l'en-tête (ils EMPILENT). `BARRE_DU_BAS` dans src/App.jsx.
+  const barre = ['journee', 'paires', 'ventes', 'achats', 'compta'];
   const groupe = (t) => (P ? P.groupeBarre(t, BAR_GROUPE) : t);
 
   // H1
   const f = H && H.entreeHistorique;
   const cas = f ? [
-    ['journee', 'compta', 'remplacer'], ['compta', 'journee', 'remplacer'], ['ventes', 'achats', 'remplacer'], ['achats', 'annonces', 'remplacer'],
-    ['annonces', 'garage', 'remplacer'], ['compta', 'dashboard', 'remplacer'], ['journee', 'semaine', 'remplacer'], ['ventes', 'litiges', 'remplacer'],
-    ['compta', 'messages', 'empiler'], ['messages', 'ventes', 'empiler'], ['journee', 'settings', 'empiler'], ['settings', 'organisation', 'empiler'],
+    ['journee', 'annonces', 'remplacer'], ['annonces', 'ventes', 'remplacer'], ['ventes', 'achats', 'remplacer'], ['achats', 'compta', 'remplacer'], ['compta', 'journee', 'remplacer'],
+    ['menu', 'garage', 'empiler'], ['journee', 'menu', 'empiler'], ['compta', 'messages', 'empiler'], ['messages', 'ventes', 'empiler'],
+    ['compta', 'dashboard', 'remplacer'], ['journee', 'semaine', 'remplacer'], ['ventes', 'litiges', 'remplacer'],
+    ['journee', 'settings', 'empiler'], ['settings', 'organisation', 'empiler'],
   ].map(([a, b, att]) => [a, b, att, f({ vrmTab: a, vrmSub: 'ventes' }, { tab: b, sub: 'ventes' }, groupe, barre)]) : [];
-  dit(!!f && cas.every((c) => c[2] === c[3]), `H1 d'un onglet de la barre à un autre (Annonces ↔ Stock, Argent ↔ Statistiques compris) : REMPLACER ; un écran du menu : EMPILER (${cas.length} cas)`, JSON.stringify(cas.filter((c) => c[2] !== c[3])));
+  dit(!!f && cas.every((c) => c[2] === c[3]), `H1 d'un onglet de la barre à un autre (et dans un même groupe : Argent ↔ Statistiques) : REMPLACER ; un écran du Menu : EMPILER (${cas.length} cas)`, JSON.stringify(cas.filter((c) => c[2] !== c[3])));
   dit(!!f && f({ vrmTab: 'ventes', vrmSub: 'ventes', vrmFeuille: 'x' }, { tab: 'compta', sub: 'ventes' }, groupe, barre) === 'empiler', 'H1 une feuille ouverte n\'est jamais écrasée (elle se ferme par le retour)');
-  dit(!!f && f({ vrmTab: 'ventes', vrmSub: 'ventes' }, { tab: 'ventes', sub: 'ventes' }, groupe, barre) === 'rien' && f({}, { tab: 'compta', sub: 'ventes' }, groupe, barre) === 'remplacer', 'H1 rien de changé ⇒ rien ; la première entrée (sans écran = Ma journée) ⇒ remplacée');
+  dit(!!f && f({ vrmTab: 'ventes', vrmSub: 'ventes' }, { tab: 'ventes', sub: 'ventes' }, groupe, barre) === 'rien' && f({}, { tab: 'annonces', sub: 'ventes' }, groupe, barre) === 'remplacer', 'H1 rien de changé ⇒ rien ; la première entrée (sans écran = Ma journée) ⇒ remplacée');
   // H2
   const bloc = (() => { const k = app.indexOf('const pousser=()=>{'); return k < 0 ? '' : app.slice(k, k + 1400); })();
   dit(/entreeHistorique\(/.test(bloc) && /replaceState\(/.test(bloc) && /pushState\(/.test(bloc) && !/if\(st\.vrmTab===h\.tab && st\.vrmSub===h\.sub\) return;\s*window\.history\.pushState/.test(bloc), 'H2 la coque passe chaque changement d\'écran par `entreeHistorique` (remplacer ou empiler)', bloc.slice(0, 200));
   // B1
-  const mB = /const BOTTOM_TABS=\[([\s\S]*?)\n\];/.exec(app);
-  const defs = {}; for (const m of app.matchAll(/const (ONGLET_\w+)=entreeNav\(\{id:(?:ID_PAIRES|'(\w+)')/g)) defs[m[1]] = m[2] || 'paires';
-  const ids = mB ? mB[1].split('\n').map((l) => { const a = /entreeNav\(\{id:'(\w+)'/.exec(l); if (a) return a[1]; const b = /^\s*(ONGLET_\w+),?\s*$/.exec(l); return b ? defs[b[1]] : null; }).filter(Boolean) : [];
-  dit(JSON.stringify(ids) === JSON.stringify(barre), 'B1 la barre = Aujourd\'hui · Annonces · Achats · Ventes · Argent', JSON.stringify(ids));
+  const mB = /const BARRE_DU_BAS=\[([^\]]*)\]/.exec(app);
+  const ids = mB ? mB[1].split(',').map((x) => x.trim().replace(/'/g, '')).map((x) => (x === 'ID_PAIRES' ? 'paires' : x)) : [];
+  const mO = /const ORDRE_NATIF=\[([^\]]*)\]/.exec(app);
+  const ordre = mO ? mO[1].split(',').map((x) => x.trim().replace(/'/g, '')).map((x) => (x === 'ID_PAIRES' ? 'paires' : x)) : [];
+  dit(JSON.stringify(ids) === JSON.stringify(barre) && JSON.stringify(ordre) === JSON.stringify(barre), 'B1 la barre = Aujourd\'hui · Annonces · Ventes · Achats · Argent', JSON.stringify({ ids, ordre }));
   // (17 nov., Julien, trois fois : « Le + dégueulasse ») PLUS DE DISQUE dans la barre, réglage allumé ou éteint : cinq onglets.
   dit(!/<DisqueEventail\b/.test(app), 'B1 aucun disque « + » dans la barre (cinq onglets, rien entre eux)');
   // B2
   const tous = ['journee', 'annonces', 'garage', 'achats', 'ventes', 'compta', 'dashboard', 'semaine', 'litiges', 'messages'];
   const allume = tous.map((t) => [t, groupe(t)]);
-  const attendu = { journee: 'journee', annonces: 'paires', garage: 'paires', achats: 'achats', ventes: 'ventes', compta: 'compta', dashboard: 'compta', semaine: 'journee', litiges: 'ventes', messages: 'messages' };
-  dit(!!P && allume.every(([t, g]) => g === attendu[t]) && !P.estPaires('achats'), 'B2 l\'onglet allumé est celui de l\'écran (Achats ⇒ Achats, plus « Annonces »)', JSON.stringify(allume.filter(([t, g]) => g !== attendu[t])));
+  const attendu = { journee: 'journee', annonces: 'paires', garage: 'garage', achats: 'achats', ventes: 'ventes', compta: 'compta', dashboard: 'compta', semaine: 'journee', litiges: 'ventes', messages: 'messages' };
+  dit(!!P && allume.every(([t, g]) => g === attendu[t]) && !P.estPaires('achats'), 'B2 le groupe de chaque écran (Stock et Achats ont le leur ; la barre allume Menu pour eux)', JSON.stringify(allume.filter(([t, g]) => g !== attendu[t])));
   dit(!!E && E.espaceDe('achats', BAR_GROUPE) === 'paires' && E.espaceDe('annonces', BAR_GROUPE) === 'paires', 'B2 l\'aplat d\'Achats reste celui des paires (aucune teinte de plus)', E && E.espaceDe('achats', BAR_GROUPE));
   // B3
   const coque = (() => { const k = app.indexOf('function AppCoeur'); return k < 0 ? app : app.slice(k); })();

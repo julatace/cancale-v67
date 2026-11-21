@@ -243,6 +243,11 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
     f.ctx.ongletVestiaire = async () => ({ ok: true, compte: '4242', tabId: 9 });
     f.lignes['vc_fil_conv1'] = { compte: '4242' };
     f.store.vrmVcRecette = { recette: { rejouable: true } };
+    // (intégration 21 nov.) Depuis la 5.412 (vc-ecrire), répondre sur Vestiaire passe par la PAGE : le champ et le bouton appris
+    // d'un envoi à la main (`vrmVcUi`), l'onglet ouvert sur CETTE conversation. Sans eux l'envoi s'arrêtait avant la sécurité
+    // (« pas appris ») et E10 ne jugeait plus le contrôle anti-robot : ils sont posés, la garde jugée est bien celle du robot.
+    f.store.vrmVcUi = { champ: { sel: 'textarea' }, envoi: { sel: 'button' } };
+    try { const tg = f.ctx.chrome.tabs.get; f.ctx.chrome.tabs.get = async (id) => (id === 9 ? { id: 9, url: 'https://www.vestiairecollective.com/messages/conv1' } : tg(id)); } catch (_) {}
     vc = await f.ctx.repondreVestiaire({ conv: 'conv1', texte: 'Bonjour' });
   } catch (e) { vc = { err: String(e) }; }
   dit(vc && vc.accepte === false && /vérifie ton compte/.test(String(vc.raison || '')), 'E10 Vestiaire : après un contrôle anti-robot, « Envoyer sur Vestiaire » ne part plus, dit', vc);

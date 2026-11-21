@@ -17,6 +17,8 @@
 export const SELECTEUR_ATTENTE = '[data-demarrage-attente],[data-demarrage-vrm],[data-equipe-attente],[data-confidentialite="verification"]';
 let fini = false;
 let obs = null;
+// Le fondu de sortie du logo (index.html, `#vrm-demarrage` : `transition: opacity .18s`) — court (≤ 200 ms).
+export const DUREE_SORTIE_MS = 180;
 
 // (15 nov., chantier « ouverture ») LA PROGRESSION HONNÊTE de l'écran de démarrage : le rail avance à de
 // VRAIS jalons, jamais au temps qui passe — page lue (0,12, index.html), app lancée (0,3, src/main.jsx),
@@ -49,10 +51,15 @@ export function finDemarrage(raison = '') {
   etapeDemarrage('pret');
   let reduit = false;
   try { reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
-  if (reduit) { el.remove(); finFond(); return; }
-  el.setAttribute('data-sortie', '');
-  el.setAttribute('aria-busy', 'false');
-  setTimeout(() => { try { el.remove(); } catch (_) {} finFond(); }, 380);
+  // (21 nov., fluidité — Julien : « des écrans qui se superposent quand ça charge ») Une COPIE ou un instantané peint dans
+  // l'écran de démarrage (`data-apercu`, src/OuvertureInstantanee.jsx) : la coque de l'app montre déjà le MÊME écran à la
+  // même place — l'écran de démarrage s'en va d'un coup. En fondu, les deux se voyaient l'un à travers l'autre pendant
+  // 340 ms (mesuré, banc couches-chargement : rangées doublées, pastilles qui disparaissent en transparence).
+  // Sans copie non plus : le logo qui s'efface PAR-DESSUS l'écran prêt est encore deux couches à la fois (banc
+  // couches-chargement, 1512 : « demarrage + ecran:compta »). L'écran de démarrage part d'un coup, partout ; le passage
+  // reste doux par le fond « en verre », identique dessous (aucun éclair).
+  void reduit;
+  el.setAttribute('data-sortie', ''); el.setAttribute('aria-busy', 'false'); el.remove(); finFond();
 }
 
 // Une page qui ne montre qu'une attente garde l'écran de démarrage.
