@@ -67,6 +67,28 @@ de capitales).
 **Ordinateur** : le tableau de travail « Articles » (Vintex) reste la vue par défaut (ce qui lui plaît) ; la bascule grille montre
 désormais les MÊMES cartes « Dressing » (`TableauTravail` reçoit `carteGrille`, prop optionnelle, aucun autre écran touché).
 
+## 2e passe au téléphone (même jour) — « je n'aime pas du tout l'affichage sur iPhone, essaye de changer »
+
+Julien a vu les captures 390 de la 1re passe (grille par défaut) : refusées. Nouvelle direction, celle de la page « Articles » de
+Vintex, compacte et nette :
+- **LISTE par défaut** (`vrm_annonces_vue_tel`, la grille reste choisissable par la bascule). `RangeeArticle`
+  (`src/natif/ecrans/AnnoncesCartes.jsx`) : rangée 64–72 px, vignette 52 arrondie (place réservée), titre complet 15/19 normal sur
+  2 lignes, UNE ligne méta grise 13 (« logo · N° · 12 j · ♡ 4 · 👁 41 », taille seulement si absente du titre), filets fins qui
+  partent du texte, fond blanc PLEINE LARGEUR (plus de carte arrondie dans la page), « ⋯ » discret gris à droite (les gestes de
+  l'article : ce que faisait le balayage — Prix mini, Prix d'achat, Relier N°, Autre…, Que sur ce site — plus les actions
+  applicables et la fiche). L'état en étiquette douce seulement s'il n'est pas « en ligne » (et pas « Compte bloqué », déjà dit par
+  l'en-tête du compte).
+- **Deux formes**, `formeRangee` : **A** (par défaut) = le prix en gras à droite en haut, « mini » dessous, l'état dans la méta ;
+  **B** = le prix en gras DANS la méta, le titre a toute la largeur, l'état en haut à droite. A retenue : le prix se lit en
+  colonne comme chez Vintex, l'état ne se coupe jamais, et le « mini » garde sa place.
+- **En-tête** : grand titre, une recherche (+ bascule, « ⋯ »), segments, puis UNE ligne fine « Mis à jour il y a 18 min ·
+  ● 24 à régler › · ⟳ » ; intertitres de compte petits (13/18 gris, « shop_cancale · 29 »).
+- **Grille plus sobre** : photo carrée, titre 2 lignes, UNE ligne « logo · prix · N° · ⋯ » (le ⋯ discret à côté du prix, plus
+  de gros rond noir sur la photo).
+- Banc : formes A et B, clair et sombre : rangées 64–72, vignette 52 réservée, ≥ 8 rangées entières par écran (base de
+  1 000), aucun plein, « À régler » sur la ligne de « Mis à jour », liste pleine largeur, aucun état coupé — 80 verts ; rouge sur
+  l'arbre d'avant.
+
 ## Gestes — avant / après (aucun perdu)
 
 | geste | avant (origin/main) | après |
@@ -78,7 +100,7 @@ désormais les MÊMES cartes « Dressing » (`TableauTravail` reçoit `carteGril
 | N à relier | rangée en tête de chaque compte | dans « À régler » (une rangée, feuille si deux sujets) |
 | N prix d'achat à compléter | rangée en tête de chaque compte | dans « À régler » |
 | toucher une annonce → fiche (N°) / fiche courte | ✓ | ✓ (carte et rangée) |
-| balayage : Prix mini, Acheté / Autre…, Relier N° | ✓ (liste) | ✓ (liste) ; en grille : le « ⋯ » de la carte (Republier et chaque action applicable, Prix mini, Prix d'achat, Relier, Toute la fiche) |
+| balayage : Prix mini, Acheté / Autre…, Relier N°, Que sur ce site | ✓ (liste) | le « ⋯ » discret de chaque rangée et de chaque carte (les mêmes gestes, plus chaque action applicable et la fiche) |
 | replier un compte | ✓ | ✓ (intertitre collant) |
 | Voir N de plus | ✓ | ✓ |
 | « À régler » (`aRegler`) | ✓ | ✓ |
