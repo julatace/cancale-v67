@@ -57,11 +57,20 @@ const propreJournal = (journal, site, id) => { const e = journal && journal['pro
 // (21 nov., fluidité — capture iPhone de Julien : Annonces en squelette, qui ne finissait pas) Une lecture qui ne répond
 // JAMAIS (réseau du téléphone qui se perd, requête pendue) retenait toute la liste : `Promise.all` attendait pour toujours.
 // Chaque lecture a maintenant sa borne : passé ce temps, elle vaut « pas su » (le site est dit dans « ce qui manque »),
-// jamais un squelette éternel ; la suivante relecture (⟳, retour sur l'écran, signal) la refait.
-export const BORNE_LECTURE_MS = 15000;
+// jamais un squelette éternel. Une lecture lente qui finit APRÈS sa borne n'est pas perdue : elle demande une relecture de
+// l'écran (`vrm:annonces-relire`), qui la trouve alors en cache ou la refait.
+export const BORNE_LECTURE_MS = 8000;
+export const EVT_RELIRE_ANNONCES = 'vrm:annonces-relire';
+let _relireTardAt = 0;
 export const borneLecture = (p, ms = BORNE_LECTURE_MS, repli = null) => new Promise((ok) => {
-  const t = setTimeout(() => ok(repli), ms);
-  Promise.resolve(p).then((v) => { clearTimeout(t); ok(v); }, () => { clearTimeout(t); ok(repli); });
+  let passe = false;
+  const t = setTimeout(() => { passe = true; ok(repli); }, ms);
+  Promise.resolve(p).then((v) => {
+    clearTimeout(t);
+    if (!passe) { ok(v); return; }
+    // Une fois par minute au plus : une lecture toujours plus lente que sa borne ne relance pas l'écran en boucle.
+    if (v != null && Date.now() - _relireTardAt > 60000) { _relireTardAt = Date.now(); try { window.dispatchEvent(new CustomEvent(EVT_RELIRE_ANNONCES)); } catch (_) {} }
+  }, () => { clearTimeout(t); if (!passe) ok(repli); });
 });
 export async function lireAnnoncesEgalite(accounts) {
   const horsCompte = comptesStockEcartes();
@@ -158,8 +167,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   React.useEffect(() => {
     const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };
-    window.addEventListener('vrm:save', f); window.addEventListener('vrm:ext', g);
-    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:ext', g); };
+    // Une lecture arrivée après sa borne (`borneLecture`) : une relecture, une seule à la fois (le minuteur les regroupe).
+    let tr2 = 0; const h = () => { clearTimeout(tr2); tr2 = setTimeout(() => setTic((t) => t + 1), 300); };
+    window.addEventListener('vrm:save', f); window.addEventListener('vrm:ext', g); window.addEventListener(EVT_RELIRE_ANNONCES, h);
+    return () => { clearTimeout(tr2); window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:ext', g); window.removeEventListener(EVT_RELIRE_ANNONCES, h); };
   }, []);
   const seuil = (() => { try { const s = Number(localStorage.getItem('vrm_qd_seuil')); return [30, 60, 90].includes(s) ? s : 30; } catch (_) { return 30; } })();
   const modele = React.useMemo(() => {

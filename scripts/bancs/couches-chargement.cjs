@@ -265,7 +265,7 @@ async function visite(pg, cdp, etiquette, vise, geste, duree) {
   const fin = await rafale(cdp, path.join(RAFALE, etiquette));
   if (geste) { await pg.evaluate(() => window.__vrmCouches.demarrer()); await geste(); }
   await pret(pg, vise, 30000);
-  await calme(pg, 1500, duree);
+  await calme(pg, 1500, PENDRE ? Math.max(duree, 30000) : duree);
   await attendre(800);
   const rel = await pg.evaluate(() => window.__vrmCouches.arreter());
   const n = await fin();
@@ -316,7 +316,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
         const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
         const fin = await rafale(cdp, path.join(RAFALE, `${fmt}-ouverture-${id}`));
         await aller(pg, `http://localhost:${PORT}/?tab=${id}`, 'commit');
-        await pret(pg, id, 60000); await calme(pg, 1500, 20000); await attendre(800);
+        await pret(pg, id, 60000); await calme(pg, 1500, PENDRE ? 30000 : 20000); await attendre(800);
         const rel = await pg.evaluate(() => window.__vrmCouches.arreter());
         const n = await fin(); const j = juger(rel, id); j.captures = n; j.restes = await restes(pg);
         rapporter(fmt, 'ouverture', id, j, sortie);

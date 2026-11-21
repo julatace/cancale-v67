@@ -177,6 +177,7 @@ import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
 import { REQUETE_LITIGES, requetePseudos, litigesDeLignes, pseudosDeLignes } from './vintedDejaRelie.js';
 import { installerGardeHorsLigne, horsLigneActif, etatHorsLigne, noterAbonnement, effacerLaissezPasser, suivreHorsLigne } from './porteHorsLigne.js';
+import { installerLectureBornee } from './lectureBornee.js';
 import { installerJetonFrais } from './jetonFrais.js';   // (14 nov., fiabilité prod) jamais une requête avec un jeton déjà expiré
 // ⟦→ ecrans/Reglages.jsx #7⟧
 // (6 nov., vitesse 2) SuiviReceptionEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
@@ -1917,6 +1918,8 @@ installerGardeEcriture(SUPABASE_URL);
 // n'a pas refait la vérification, aucune requête vers la base ou nos routes ne
 // part et aucun message n'est envoyé à l'extension (lecture seule de l'appareil).
 installerGardeHorsLigne(SUPABASE_URL);
+// (21 nov., fluidité) Une lecture de la base qui ne répond jamais finit en « pas su » (src/lectureBornee.js) : plus d'attente éternelle.
+installerLectureBornee(SUPABASE_URL);
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
 // (13 nov., lot 54) `PARRAIN_DU_LIEN` : le code arrivé PAR CE CHARGEMENT — l'écran de connexion
