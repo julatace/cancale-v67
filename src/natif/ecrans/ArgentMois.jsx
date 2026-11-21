@@ -43,8 +43,8 @@ function Ligne({ libelle, valeur, sous = null, tonSous = 'neutre', onClick = nul
     </>
   );
   return onClick
-    ? <button type="button" className="n-arg-l n-arg-l-touche" onClick={onClick} {...(attrs || {})}>{corps}</button>
-    : <div className="n-arg-l" {...(attrs || {})}>{corps}</div>;
+    ? <button type="button" className="n-arg-l n-arg-l-touche" data-arg-rangee="" onClick={onClick} {...(attrs || {})}>{corps}</button>
+    : <div className="n-arg-l" data-arg-rangee="" {...(attrs || {})}>{corps}</div>;
 }
 
 export default function ArgentMois({ poster, phrase, note = '', moisLong, barres, faits, geste, versements, montant, vendu = null, comptes = null, sansBarres = false }) {
