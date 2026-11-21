@@ -4124,6 +4124,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       capteLotPourOnglet(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
+    // 5.428 (choix 57) : « Vinted a masqué » dans l'Accueil du panneau (lecture VRM seule, compte de l'onglet).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'moderationCarte') {
+      moderationCarte(sender).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
     // 5.409 : masquer / afficher depuis « Choisir une action » du panneau, sur SON clic.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'masquerCarte') {
       masquerCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
@@ -5352,6 +5357,10 @@ async function storeWriteReq(domain, method, url, body, contexteFavori=null,tabI
   // ⚠️ 5.370 (régression de 5.356, `audit-extension-5186`) : la FORME d'une écriture sensible,
   //    oui (réponse, profil, téléphone) — mais JAMAIS celle d'un moyen de paiement, d'un mot de
   //    passe ou d'une identité (une carte bancaire ne gagne pas de forme). Le retrait (`payout`) garde la sienne.
+  // 5.428 (choix 57) : SA requête « masquer / afficher » vue ici ⇒ ce n'est pas Vinted qui l'a masquée.
+  if (method === 'PUT' && /^\/api\/v2\/items\/(\d{4,15})\/is_hidden$/.test(path)) {
+    try { const c = typeof body === 'string' ? JSON.parse(body) : body; if (c && typeof c.is_hidden === 'boolean') await noterMasqueVu(uid, /\/items\/(\d+)\//.exec(path)[1], c.is_hidden); } catch (_) {}
+  }
   const forme = (WREQ_FORME.test(path) || (WREQ_SENSIBLE.test(path) && !WREQ_SANS_FORME.test(path))) ? formeCorps(body) : null;   // AVANT de retirer le contenu
   if (WREQ_SENSIBLE.test(path)) body = '[retiré : donnée personnelle ou bancaire]';
   // Cle courte par type d'action : on remplace les ids numeriques pour regrouper
@@ -6531,10 +6540,53 @@ function etatsDressingModeration(items) {
   }
   return out;
 }
+// (21 nov., ext. 5.428, choix 57 de Julien) CE QUE DIT L'ANNONCE MASQUÉE : son titre et sa taille (affichage
+// seulement — l'alerte désigne toujours l'IDENTIFIANT), et la raison SI Vinted en donne une. ⚠️ Forme MESURÉE le
+// 21 nov. sur la vraie base : les dressings rangés (allégés) n'ont AUCUN champ de raison, et aucune ligne brute n'en
+// montre (seuls `is_hidden`, `hidden_at` sur des conversations). Les champs ci-dessous ne sont donc lus QUE s'ils
+// arrivent un jour, sous ces noms exacts et en texte ; sinon rien n'est deviné : « Vinted ne dit pas pourquoi ».
+const CHAMPS_RAISON_MASQUAGE = ['hide_reason', 'hidden_reason', 'moderation_reason', 'moderation_status', 'item_alert_type'];
+const CONSEILS_MASQUAGE = [
+  ['authenticite', /authent|counterfeit|replica|fake|contrefa|copie/i],
+  ['photos', /photo|picture|image/i],
+  ['interdit', /prohib|forbidden|interdit|not allowed|policy|r[eè]gle/i],
+  ['description', /descri|title|titre|brand|marque|categor/i],
+];
+function texteCourtModeration(v, n) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n) : ''; }
+function raisonMasquage(it) {
+  if (!it || typeof it !== 'object') return '';
+  const cands = [];
+  for (const k of CHAMPS_RAISON_MASQUAGE) cands.push(it[k]);
+  const al = it.item_alert && typeof it.item_alert === 'object' ? it.item_alert : null;
+  if (al) cands.push(al.title, al.message, al.item_alert_type);
+  for (const c of cands) { const t = texteCourtModeration(c, 160); if (t && !/^(true|false|null|\d+)$/i.test(t)) return t; }
+  return '';
+}
+// Le conseil suit la raison LUE (un mot-clé de son texte) ; pas de raison ⇒ '' (l'écran dit « Vinted ne dit pas pourquoi »).
+function conseilMasquage(raison) {
+  const r = String(raison || '');
+  if (!r) return '';
+  for (const [c, re] of CONSEILS_MASQUAGE) if (re.test(r)) return c;
+  return 'autre';
+}
+// Ce que la lecture complète dit de chaque annonce MASQUÉE : { [id]: { ti, ta, r } } (titre ≤ 80, taille ≤ 16, raison).
+function detailsMasqueesModeration(items) {
+  const out = {};
+  for (const it of Array.isArray(items) ? items : []) {
+    if (etatArticleModeration(it) !== 'h') continue;
+    const ta = it.size_title != null ? it.size_title : (it.size && typeof it.size === 'object' ? it.size.title : it.size);
+    out[String(it.id)] = { ti: texteCourtModeration(it.title, 80), ta: texteCourtModeration(typeof ta === 'number' ? String(ta) : ta, 16), r: raisonMasquage(it) };
+  }
+  return out;
+}
 // `avant` / `apres` : { at (ms), etats } — deux lectures COMPLÈTES du même compte.
 // `supprimees` : { [id]: date } de SES suppressions (`null` = pas su).
 // `vacances` : true · false · null (son profil).
-function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {}) {
+// `masquesConnus` (5.428) : { [id]: 'vrm' | 'lui' } — les annonces que VRM (son journal) ou LUI (sa requête vue sur
+// vinted.fr dans ce Chrome) ont masquées depuis la lecture d'avant : ce n'est pas Vinted ⇒ aucune alerte. `null` = pas
+// su (journal illisible) ⇒ aucune « masquée » (jamais d'alerte sur « pas su ») ; absent = rien de connu.
+// `details` (5.428) : { [id]: { ti, ta, r } } posés sur l'événement (affichage, raison).
+function evenementsDressingModeration({ avant, apres, supprimees, vacances, masquesConnus, details } = {}) {
   const rien = (raison) => ({ evenements: [], raison });
   if (!apres || !apres.etats || typeof apres.etats !== 'object' || !Number.isFinite(Number(apres.at))) return rien('lecture');
   if (!avant || !avant.etats || typeof avant.etats !== 'object' || !Number.isFinite(Number(avant.at))) return rien('premiere-lecture');
@@ -6546,13 +6598,25 @@ function evenementsDressingModeration({ avant, apres, supprimees, vacances } = {
   const raisons = [];
   if (vacances === true && masquees.length) { masquees = []; raisons.push('vacances'); }
   if (masquees.length >= 3 && masquees.length === ouverts.length) { masquees = []; raisons.push('tout-masque'); }
+  if (masquees.length && masquesConnus === null) { masquees = []; raisons.push('masques-pas-sus'); }
+  else if (masquees.length && masquesConnus && typeof masquesConnus === 'object') {
+    const par = masquees.filter((id) => masquesConnus[id] === 'vrm' || masquesConnus[id] === 'lui');
+    if (par.length) { masquees = masquees.filter((id) => !par.includes(id)); raisons.push(par.some((id) => masquesConnus[id] === 'vrm') ? 'par-vrm' : 'par-lui'); }
+  }
   let disparues = Object.keys(A).filter((id) => (A[id] === 'o' || A[id] === 'h') && !Object.prototype.hasOwnProperty.call(B, id));
   if (disparues.length && (supprimees === null || supprimees === undefined || typeof supprimees !== 'object')) { disparues = []; raisons.push('suppressions-pas-sues'); }
   else disparues = disparues.filter((id) => !(supprimees[id] != null && supprimees[id] !== ''));
   const restants = Object.keys(B).filter((id) => B[id] === 'o' || B[id] === 'h' || B[id] === 'r');
   if (disparues.length >= 3 && !restants.length) { disparues = []; raisons.push('tout-disparu'); }
   const evenements = [];
-  for (const id of masquees.sort()) evenements.push({ k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av });
+  for (const id of masquees.sort()) {
+    const d = details && typeof details === 'object' && details[id] ? details[id] : null;
+    const e = { k: `masquee:${id}:${at}`, s: 'masquee', t: at, a: id, av };
+    if (d && d.ti) e.ti = d.ti;
+    if (d && d.ta) e.ta = d.ta;
+    if (d && d.r) { e.r = d.r; e.c = conseilMasquage(d.r); }
+    evenements.push(e);
+  }
   for (const id of disparues.sort()) evenements.push({ k: `disparue:${id}:${at}`, s: 'disparue', t: at, a: id, av });
   return { evenements, raison: raisons.join(',') };
 }
@@ -6579,6 +6643,12 @@ function nettoyerModeration(e) {
   const f = Number(e.f); if (e.f != null && Number.isFinite(f) && f >= t) o.f = f;
   const r = typeof e.r === 'string' ? e.r.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
   if (r) o.r = r;
+  if (e.s === 'masquee') {
+    const ti = texteCourtModeration(e.ti, 80), ta = texteCourtModeration(e.ta, 16);
+    if (ti) o.ti = ti;
+    if (ta) o.ta = ta;
+    if (r && ['authenticite', 'photos', 'interdit', 'description', 'autre'].includes(e.c)) o.c = e.c;
+  }
   return o;
 }
 // Ajoute les nouveaux événements à la liste rangée (jamais deux fois) et ferme
@@ -6685,9 +6755,20 @@ function guetterDressing(uid, items, at) {
       // Les lectures passent une à une (la chaîne) : celle-ci est APRÈS la précédente, même à la même milliseconde.
       const t = Math.max(Number(at) || Date.now(), avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) + 1 : 0);
       const vacances = await vacancesVues(u);
-      let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances });
+      // 5.428 (choix 57) : masquée par LUI ou par VRM ≠ masquée par Vinted — ce Chrome d'abord (ses requêtes vues,
+      // le journal local) ; le journal des AUTRES Chrome n'est lu QUE s'il reste une masquée à juger (égress).
+      const details = detailsMasqueesModeration(items);
+      const depuis = avant && Number.isFinite(Number(avant.at)) ? Number(avant.at) - MASQUES_MARGE_MS : 0;
+      let connus = await masquesConnusLocaux(u, depuis);
+      let r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances, masquesConnus: connus, details });
+      if (r.evenements.some((e) => e.s === 'masquee')) {
+        const ailleurs = await masquesConnusJournalBase(u, depuis);
+        if (ailleurs === null) { noterDiag('moderation_journal_pas_su'); return null; }   // pas su : rien d'avancé, la lecture suivante rejuge
+        connus = Object.assign({}, ailleurs, connus);
+        r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: {}, vacances, masquesConnus: connus, details });
+      }
       // Les suppressions ne se lisent QUE s'il y a une disparue à juger (égress).
-      if (r.evenements.some((e) => e.s === 'disparue')) r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: await suppressionsModeration(u), vacances });
+      if (r.evenements.some((e) => e.s === 'disparue')) r = evenementsDressingModeration({ avant, apres: { at: t, etats }, supprimees: await suppressionsModeration(u), vacances, masquesConnus: connus, details });
       if (r.raison) noterDiag(`moderation_rien_${r.raison.split(',')[0]}`);
       const ouverts = (avant && Array.isArray(avant.ouverts)) ? avant.ouverts : [];
       const aFermer = ouverts.some((a) => etats[a] && etats[a] !== 'h');
@@ -6703,6 +6784,60 @@ function guetterDressing(uid, items, at) {
       return r.evenements.length;
     } catch (_) { return null; }
   });
+}
+// ══ 5.428 (choix 57) : QUI a masqué ? ══════════════════════════════════════════════════════════════
+// · LUI : sa requête « masquer » vue sur vinted.fr dans CE Chrome (`storeWriteReq`, chemin
+//   `/api/v2/items/{id}/is_hidden`, corps `{ is_hidden: true }`) — `vrmMasquesVus` { uid: { id: { at, h } } } ;
+// · VRM : son journal (`noterJournal(uid, 'masquee')` — vendue ailleurs, « Masquer » du panneau), local puis les
+//   lignes `journal_vrm_{uid}_*` des autres Chrome (projection `e` seulement).
+// Un masquage fait depuis l'app Vinted du téléphone n'est vu par personne : la carte le dit (« si tu ne l'as pas
+// masquée toi-même depuis ton téléphone »).
+const MASQUES_VUS = 'vrmMasquesVus';
+const MASQUES_MARGE_MS = 10 * 60000;
+async function noterMasqueVu(uid, id, h, par = 'lui') {
+  const u = String(uid || ''), i = String(id || '');
+  if (!/^\d{1,20}$/.test(u) || !/^\d{4,15}$/.test(i) || typeof h !== 'boolean') return false;
+  return unModerationALaFois(async () => {
+    try {
+      const m = (await chrome.storage.local.get(MASQUES_VUS))[MASQUES_VUS] || {};
+      const l = m[u] && typeof m[u] === 'object' ? m[u] : {};
+      l[i] = { at: Date.now(), h, par: par === 'vrm' ? 'vrm' : 'lui' };
+      const lim = Date.now() - 30 * 864e5;
+      m[u] = Object.fromEntries(Object.entries(l).filter(([, x]) => x && Number(x.at) > lim).sort((a, b) => b[1].at - a[1].at).slice(0, 300));
+      await chrome.storage.local.set({ [MASQUES_VUS]: m });
+      return true;
+    } catch (_) { return false; }
+  });
+}
+// { [id]: 'lui' | 'vrm' } connus dans CE Chrome depuis `depuis` (ms).
+async function masquesConnusLocaux(uid, depuis) {
+  const out = {};
+  try {
+    const m = ((await chrome.storage.local.get(MASQUES_VUS))[MASQUES_VUS] || {})[uid] || {};
+    for (const [id, x] of Object.entries(m)) if (x && x.h === true && Number(x.at) >= depuis) out[id] = x.par === 'vrm' ? 'vrm' : 'lui';
+  } catch (_) {}
+  try {
+    const j = ((await chrome.storage.local.get('vrmJournal')).vrmJournal || {})[uid] || [];
+    for (const e of j) if (e && e.s === 'masquee' && e.a && Number(e.t) >= depuis) out[String(e.a)] = 'vrm';
+  } catch (_) {}
+  return out;
+}
+// Le journal de VRM des AUTRES Chrome (base) : { [id]: 'vrm' } — `null` = pas su.
+async function masquesConnusJournalBase(uid, depuis) {
+  const rows = await sbGet(`app_data?id=like.${JOURNAL_LIGNE}${uid}_*&select=id,e:data->e`);
+  if (rows === null || !Array.isArray(rows)) return null;
+  const out = {};
+  for (const r of rows) for (const e of Array.isArray(r && r.e) ? r.e : []) if (e && e.s === 'masquee' && e.a && Number(e.t) >= depuis) out[String(e.a)] = 'vrm';
+  return out;
+}
+// Les annonces masquées PAR VINTED, encore masquées, du compte de L'ONGLET — pour l'Accueil du panneau (lecture VRM seule).
+async function moderationCarte(sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: true, uid: '', liste: [], hors: true };
+  const rows = await sbGet(`app_data?id=eq.${MODERATION_LIGNE}${o.uid}&select=e:data->e`);
+  if (rows === null || !Array.isArray(rows)) return { ok: false };
+  const l = ((rows[0] && rows[0].e) || []).map(nettoyerModeration).filter((e) => e && e.s === 'masquee' && !e.f && Date.now() - e.t < 14 * 864e5);
+  return { ok: true, uid: o.uid, liste: l.sort((p, q) => q.t - p.t).slice(0, 10) };
 }
 // Un événement du COMPTE (banni, restreint, ou le compte redevenu actif).
 function noterCompteModeration(uid, sorte, { raison = '', jusqua = null } = {}) {
@@ -23772,6 +23907,7 @@ async function masquerCarte(msg, sender) {
     if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(String(uid), recu.at, 1); faits.push({ id, ok: false, code: r && r.pause ? 'pause' : r && r.sansPage === 'element' ? 'element' : 'onglet', ...(r && r.raison ? { raison: r.raison } : {}) }); break; }
     if (r.incertain) { faits.push({ id, ok: false, code: 'incertain', raison: "Vinted n'a pas répondu clairement : regarde l'annonce (rien ne sera renvoyé)" }); break; }
     if (!r.ok) { faits.push({ id, ok: false, code: 'refus', status: r.status || 0 }); break; }
+    try { await noterMasqueVu(String(uid), id, !!voulu, 'vrm'); } catch (_) {}   // 5.428 : son geste (pas Vinted), même sans relecture
     const j = r.json && typeof r.json === 'object' ? r.json : {};
     const relu = j.item && typeof j.item.is_hidden === 'boolean' ? j.item.is_hidden : (typeof j.is_hidden === 'boolean' ? j.is_hidden : null);
     faits.push({ id, ok: true, relu: relu === voulu ? true : relu === null ? null : false });
@@ -25844,6 +25980,7 @@ async function masquerAilleursTickUn() {
   });
   if (!r || r.pasParti || pasParti(r)) { await rendre(); return { lu: true, attend: r && r.pause ? 'pause' : 'onglet' }; }
   if (!r.ok) { noterDiag('masquer_refus_' + (r.status || 0)); await noterMasquee(id, { uid, etat: 'refuse', voulu, status: r.status || 0, at: Date.now() }); return { lu: true, refuse: id, status: r.status || 0 }; }
+  try { await noterMasqueVu(uid, id, !!voulu, 'vrm'); } catch (_) {}   // 5.428 : le geste de VRM (pas Vinted), même sans relecture
   const j = r.json && typeof r.json === 'object' ? r.json : {};
   const relu = j.item && typeof j.item === 'object' && typeof j.item.is_hidden === 'boolean' ? j.item.is_hidden : (typeof j.is_hidden === 'boolean' ? j.is_hidden : null);
   const base = { uid, voulu, num: String(fiche.num || '').slice(0, 12), site: String(fiche.site || '').slice(0, 20), at: Date.now() };
