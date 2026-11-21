@@ -335,6 +335,9 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
         <Rangee icone={<Icon name="check" size={22}/>} titre={E.autres > 0 ? tr('impr.choisirAutres', { n: E.autres }) : tr('vv.choisir')} fin="chevron" onClick={fg(g.choisir)} attrs={{ 'data-lot-ouvrir': '1' }}/>
         <Rangee icone={<Icon name="scan" size={22}/>} titre={tr('sv.scanner.envoi')} fin="chevron" onClick={fg(g.scanner)} attrs={{ 'data-vn-outil': 'scanner' }}/>
         {g.stock ? <Rangee icone={<Icon name="home" size={22}/>} titre={tr(g.stock.n > 1 ? 'vn.o.stockN' : 'vn.o.stock1')} fin="chevron" onClick={fg(g.stock.ouvrir)} attrs={{ 'data-colis-stock': String(g.stock.n) }}/> : null}
+        {/* (21 nov., lot relier-code) « N ventes sans achat » : la feuille « Lier à un achat », vente après vente. */}
+        {g.serieRelier ? <Rangee icone={<Icon name="link" size={22}/>} titre={tr('la.serie.entree')} valeur={tr('la.serie.sansAchat', { n: g.serieRelier.n })} fin="chevron" onClick={fg(g.serieRelier.ouvrir)}
+          attrs={{ 'data-vn-serie-relier': String(g.serieRelier.n) }}/> : null}
         {g.bordsFaits ? <Rangee icone={<Icon name="doc" size={22}/>} titre={tr('vn.o.bordsFaits', { n: g.bordsFaits.n })} valeur={tr(g.bordsFaits.ouvert ? 'vn.o.masquer' : 'vn.o.voir')} onClick={fg(g.bordsFaits.basculer)}
           attrs={{ 'data-bords-faits': String(g.bordsFaits.n), 'data-bords-faits-voir': '', 'aria-expanded': g.bordsFaits.ouvert ? 'true' : 'false' }}/> : null}
     </Groupe>

@@ -1,0 +1,44 @@
+/* ── src/natif/relier-facile.css — « Relier » plus facile (21 nov. 2026, lot relier-code) ──────────────────────────────────────
+   Julien : « rends relier les achats à la vente / à l'annonce plus facile ». En tête de la feuille « Lier à un achat » (et de son
+   inverse depuis un achat) : la MEILLEURE proposition sur une carte fine (contour d'un filet, pas d'ombre), sa raison en petit gris,
+   « Pas celle-ci » et « Relier » ; dessous 2–3 suggestions en rangées fines ; puis la grille. Style Vintex : contours fins,
+   étiquettes pastel, pas de bleu vif en aplat hors du seul « Relier », pas de rouge, pas de violet. Jetons `--n-*`. */
+@layer vrm-natif {
+  .n-rf-props { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 4px; }
+  .n-rf-best { border: .5px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .n-rf-best[data-la-choisi] { border-color: var(--n-accent); box-shadow: 0 0 0 1px var(--n-accent) inset; }
+  .n-rf-best-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .n-rf-best-mot { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-rf-etiquette { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 11px; font: var(--n-t-legende-fort); white-space: nowrap;
+    background: rgb(120 120 128 / .14); color: var(--n-encre-2); }
+  .n-rf-etiquette[data-ton="vert"] { background: rgb(52 199 89 / .14); color: #1E6B34; }
+  :root[data-theme="dark"] .n-rf-etiquette[data-ton="vert"] { background: rgb(48 209 88 / .18); color: #7EE2A0; }
+  .n-rf-best-corps { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+  .n-rf-best-photo { flex: none; width: 72px; height: 72px; border-radius: var(--n-r-vignette); overflow: hidden; background: rgb(120 120 128 / .16); }
+  .n-rf-best-photo img, .n-rf-autre-photo img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .n-rf-best-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-rf-best-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .n-rf-raison { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-rf-raison:empty { display: none; }
+  .n-rf-best-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rf-best-pied b { font: var(--n-t-second-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-rf-best-gestes { display: flex; gap: 8px; justify-content: flex-end; }
+  .n-rf-best-gestes .n-rf-relier { flex: 1; max-width: 220px; }
+  .n-rf-relier[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-rf-autres { display: flex; flex-direction: column; border: .5px solid var(--n-trait); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-rf-autres-tete { padding: 10px 12px 4px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-rf-autre { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border: 0; border-top: .5px solid var(--n-trait); background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+  .n-rf-autres-tete + .n-rf-autre { border-top: 0; }
+  .n-rf-autre[data-la-choisi] { background: var(--n-teinte); }
+  .n-rf-autre-photo { flex: none; width: 48px; height: 48px; border-radius: var(--n-r-vignette); overflow: hidden; background: rgb(120 120 128 / .16); }
+  .n-rf-autre-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .n-rf-autre-titre { font: var(--n-t-second); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+  .n-rf-autre-prix { flex: none; font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .n-rf-grille-tete { padding: 4px 0 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-rf-lot { align-self: flex-start; display: inline-flex; align-items: center; min-height: 20px; padding: 0 7px; border-radius: 10px; background: var(--n-ambre-fond); color: var(--n-ambre); font: var(--n-t-legende-fort); white-space: nowrap; }
+  .n-rf-lot-tete { margin: 0 0 8px; padding: 10px 12px; border-radius: var(--n-r-carte); background: var(--n-ambre-fond); color: var(--n-ambre); font: var(--n-t-second-fort); }
+  .n-rf-serie { display: flex; align-items: center; gap: 10px; padding: 0 0 8px; }
+  .n-rf-serie-n { flex: none; font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .n-rf-serie-barre { flex: 1; height: 4px; border-radius: 2px; background: rgb(120 120 128 / .16); overflow: hidden; }
+  .n-rf-serie-barre > span { display: block; height: 100%; background: var(--n-encre-2); border-radius: 2px; }
+}

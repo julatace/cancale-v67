@@ -415,6 +415,9 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           onClick={() => { setMenuActions(false); onPublier(); }} attrs={{ 'data-eg-publier': '' }}/></Groupe> : null}
         <Groupe>{actions.map((x) => <Rangee key={x.cle} icone={Icon && x.icone ? <Icon name={x.icone} size={22}/> : null} titre={x.libelle} sousTitre={x.court || ''} fin="chevron"
           onClick={() => { setMenuActions(false); setSel(new Set()); setAction(x.cle); }} attrs={{ 'data-eg-action': x.cle }}/>)}</Groupe>
+        {/* (21 nov., lot relier-code) « Relier mes achats en série » : annonce après annonce, la meilleure proposition en tête. */}
+        {onCompleter && !A ? <Groupe><Rangee icone={Icon ? <Icon name="link" size={22}/> : <Glyphe nom="link" taille={22}/>} titre={tr('la.serie.entreeAnnonces')} fin="chevron"
+          onClick={() => { setMenuActions(false); onCompleter('relier-serie'); }} attrs={{ 'data-eg-serie-relier': '' }}/></Groupe> : null}
         {/* (20 nov., « téléphone bâclé ») Les outils propres d'un site vivent ICI, plus en bas de la liste. */}
         {onEcranSite && filtre.site !== 'tous' ? <Groupe><Rangee titre={tr('egalite.ecranSite', { site: nomSite(filtre.site) })} sousTitre={tr('egalite.ecranSite.sous')} fin="chevron"
           onClick={() => { setMenuActions(false); onEcranSite(filtre.site); }} attrs={{ 'data-eg-ecran-site': filtre.site }}/></Groupe> : null}

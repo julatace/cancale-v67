@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
+  { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
