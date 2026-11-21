@@ -151,6 +151,13 @@
   .nf-c-geste .n-bouton { min-height: 44px; }
   .nf-site[data-nf-vide-site] .nf-logo { opacity: .72; }
   .nf-etat-raison { margin-left: 6px; font: var(--n-t-legende); white-space: nowrap; }
+  /* Téléphone : un nombre ou une date pas lus ne prennent pas de place (la ligne 2 reste alignée à gauche). */
+  .nf-site:not(.nf-site-tete) :is(.nf-c-vues, .nf-c-fav, .nf-c-date)[data-nf-vide] { display: none; }
+  /* Une rangée sans annonce (pas publiée, pas lu) : le site, son état dessous, « Publier » à droite sur les deux lignes. */
+  .nf-site[data-nf-vide-site] { grid-template-areas: "site compte compte compte compte geste" "site etat etat etat etat geste"; }
+  .nf-site[data-nf-vide-site] .nf-c-prix { display: none; }
+  .nf-site[data-nf-vide-site] .nf-c-etat { justify-self: start; }
+  .nf-site[data-nf-vide-site] .nf-c-geste { grid-area: geste; align-self: center; }
   .nf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* ── 7. L'histoire : une frise fine, la date à gauche ── */
@@ -201,7 +208,9 @@
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) [data-nf-vide] { visibility: visible; }
     .nf[data-nf-ordi] .nf-c-etat { justify-self: end; }
     .nf[data-nf-ordi] .nf-c-geste { display: block; justify-self: end; }
-    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-c-prix { display: block; }
+    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-c-prix, .nf[data-nf-ordi] .nf-site[data-nf-vide-site] .nf-c-prix { display: block; }
+    .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) :is(.nf-c-vues, .nf-c-fav, .nf-c-date)[data-nf-vide] { display: block; }
+    .nf[data-nf-ordi] .nf-site[data-nf-vide-site] .nf-c-etat { justify-self: end; }
   }
 }
 @layer vrm-natif {

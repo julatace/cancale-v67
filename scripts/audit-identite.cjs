@@ -605,5 +605,44 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('« achat saisi deux fois » doit se décider par référence (n° de transaction, commande, facture), jamais par ressemblance', JSON.stringify(r));
 }
 
+// ── 17. (21 nov., lot fiche-sites) « SUR LES SITES » DE LA FICHE ───────────────────────────────────────
+// Cinquante annonces Leboncoin, eBay et Vestiaire RIGOUREUSEMENT identiques à l'article (même titre), sans
+// référence, SKU ni lien : la fiche du N°12 ne dit « en ligne » sur AUCUN de ces sites (« pas publiée »), et la
+// seule annonce qui porte l'identité (« VRM-12 ») est la seule reliée. Les règles exécutées telles quelles
+// (src/prixPartout.js `sitesDuNumero`, src/ficheSites.js `rangeesSitesFiche`) ; le module de la fiche ne lit
+// aucun titre. La série depuis Achats ne relie rien sans SON « Oui » (audit-fiche-sites S8).
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const PP = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'prixPartout.js'))});
+    const FS = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'ficheSites.js'))});
+    const T = ${JSON.stringify(TITRE)};
+    const lbc = {}, vc = {};
+    for (let i = 0; i < ${N}; i++) { lbc[String(3100000000 + i)] = { status: 'active', subject: T, price: 60 }; vc[String(41000 + i)] = { statut: 'published', titre: T, prix: 60 }; }
+    const ebay = Array.from({ length: ${N} }, (_, i) => ({ itemId: String(980000 + i), title: T, price: 60 }));
+    const cleNum = (v) => String(v == null ? '' : v).trim().toUpperCase();
+    const numLbc = (ad) => (/^VRM-(\\w+)$/.exec(String(ad.ref || '')) || [])[1] || '';
+    const numVc = (id, it) => (/^VRM-(\\w+)$/.exec(String(it.ref || '')) || [])[1] || '';
+    // eBay : \`toutSurLeNumero\` ne garde que les annonces dont le SKU désigne CE N° — aucune ici.
+    const rn = { annonces: [], annoncesEbay: [], manques: [] };
+    const r0 = PP.sitesDuNumero('12', { rn, fiches: {}, lbcItems: lbc, vcItems: vc }, { cleNum, numLbc, numVc });
+    const rangs = FS.rangeesSitesFiche(r0.sites.map((x) => ({ ...x, etat: 'en-ligne' })), { pasLus: [], publier: true });
+    lbc['3100000007'] = { ...lbc['3100000007'], ref: 'VRM-12' };
+    const r1 = PP.sitesDuNumero('12', { rn, fiches: {}, lbcItems: lbc, vcItems: vc }, { cleNum, numLbc, numVc });
+    console.log(JSON.stringify({ n0: r0.sites.length, etats: rangs.map((r) => r.site + ':' + r.etat).join(','), n1: r1.sites.map((x) => x.id).join(','), ebay: ebay.length }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.n0 === 0 && r.etats === 'vinted:pas-publiee,leboncoin:pas-publiee,ebay:pas-publiee,vestiaire:pas-publiee'
+    ? ok('la fiche d\'un N° parmi 50 annonces identiques sur trois sites : « pas publiée » partout (aucune liaison par le titre)')
+    : nok('« Sur les sites » doit relier une annonce par identité (référence, SKU, lien), jamais par son titre', JSON.stringify(r));
+  r && r.n1 === '3100000007'
+    ? ok('et la seule annonce qui porte « VRM-12 » est la seule reliée')
+    : nok('l\'annonce qui porte l\'identité du N° doit être reliée, et elle seule', JSON.stringify(r));
+  const srcFS = fs.readFileSync(path.join(__dirname, '..', 'src', 'ficheSites.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
+  !/\.(titre|title|subject)\b/.test(srcFS)
+    ? ok('src/ficheSites.js ne lit aucun titre')
+    : nok('src/ficheSites.js ne doit lire aucun titre');
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
