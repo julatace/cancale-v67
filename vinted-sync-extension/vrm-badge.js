@@ -1486,6 +1486,11 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .fav6-bas-t small { font: 400 12px/16px var(--n-police); }
   .carte[data-grand] .ext6 { margin: 8px 16px 0; }
   .carte[data-grand] .ext6 > * { background: var(--n-carte) !important; border: 1px solid var(--n-trait); border-radius: 12px !important; box-shadow: var(--n-ombre) !important; color: var(--n-encre) !important; }
+  .carte[data-grand] .ext6 > :not(.champ6) { padding: 12px 14px !important; }
+  .carte[data-grand] .ext6 .principal .p-t { font: 600 14px/20px var(--n-police); }
+  .carte[data-grand] .ext6 .principal .p-t .p-n { font-size: 15px; }
+  .carte[data-grand] .ext6 .principal .p-l2 { font: 500 13px/18px var(--n-police); }
+  .carte[data-grand] .ext6 .vu-bandeau { background: var(--n-carte-2); color: var(--n-encre); border: 1px solid var(--n-trait); }
   /* L'onglet de travail : UNE ligne discrète « ● Onglet de travail actif · Voir » (le chemin reste dit à l'ordinateur). */
   .carte[data-grand] .ext6 > .champ6.ot6 { display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px 0 12px; border: 1px solid var(--n-trait); border-radius: 8px !important; box-shadow: none !important; background: var(--n-carte) !important; }
   .carte[data-grand] .champ6.ot6 > span { flex: 1 1 auto; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
@@ -1495,6 +1500,12 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .champ6.ot6 .note5 { font: 400 12px/16px var(--n-police); color: var(--n-encre-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .carte[data-grand] .champ6.ot6 .vu-btn { min-height: 44px; padding: 0 10px; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 500 13px/18px var(--n-police); color: var(--n-encre); }
   .carte[data-grand] .champ6.ot6 .vu-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* Seule dans son bloc, la ligne fait partie de la tête : blanche sous le titre, un filet dessous, « · Voir » à la suite. */
+  .carte[data-grand] .ext6:has(> .champ6.ot6:only-child) { margin: 0; }
+  .carte[data-grand] .ext6 > .champ6.ot6:only-child { min-height: 44px; padding: 0 8px 0 16px; border: 0; border-bottom: 1px solid var(--n-trait); border-radius: 0 !important; background: var(--n-carte) !important; justify-content: flex-start; }
+  .carte[data-grand] .champ6.ot6 > span { flex: 0 1 auto; }
+  .carte[data-grand] .champ6.ot6 .vu-btn { padding: 0 8px 0 0; }
+  .carte[data-grand] .champ6.ot6 .vu-btn::before { content: '·'; margin-right: 6px; color: var(--n-encre-3); }
   /* Le parcours en étapes (favoris) : des pastilles numérotées et leur nom ; au téléphone, une barre de progression fine
      de 4 segments, et « Étape 1 sur 4 · Sélection » dit dessous — jamais un libellé coupé. */
   .carte[data-grand] .et10 { gap: 6px; margin: 0 0 4px; }
@@ -1566,7 +1577,7 @@ function vrmVerifVisible(sel) {
   @media (max-width: 760px) {
     .carte[data-grand] .tete6 { padding: max(6px, env(safe-area-inset-top)) 4px 0 16px; min-height: 0; }
     .carte[data-grand] .tete6 h1 { font: 700 20px/26px var(--n-police); letter-spacing: -.3px; }
-    .carte[data-grand] .tete6 .maj6 { margin: -6px 0 0 -10px; padding: 0 10px; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+    .carte[data-grand] .tete6 .maj6 { margin: -10px 0 -2px -10px; padding: 0 10px; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
     .carte[data-grand] .tete6 .maj6 svg { width: 13px; height: 13px; }
     .carte[data-grand] .barre6 { padding: 8px 12px; }
     .carte[data-grand] .table6, .carte[data-grand] .corps6 .table5 { margin: 0 12px; }
