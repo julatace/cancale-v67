@@ -1013,11 +1013,12 @@ function vrmVerifVisible(sel) {
   .fp-cond .vu-seg { flex-wrap: wrap; }
   .fp-ap { padding: 10px 0; }
   .fp-ap small { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
-  .fp-bulle { margin: 6px 0; padding: 10px 14px; border-radius: 16px 16px 16px 4px; background: var(--n-carte-2, var(--n-carte)); color: var(--n-encre); font: 400 15px/21px -apple-system, Inter, system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .fp6 textarea:focus, .fp6 input:focus, .fp6 select:focus { outline: none; border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .fp-bulle { margin: 6px 0; padding: 10px 14px; border-radius: 16px 16px 16px 4px; background: var(--n-carte); border: .5px solid var(--n-trait); color: var(--n-encre); font: 400 15px/21px -apple-system, Inter, system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
   .fp-bulle[data-vide] { color: var(--n-encre-2); font-style: italic; }
   .fp6 select { min-height: 44px; width: 100%; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .fp6 .cd6-l input[type=number] { width: 84px; min-height: 44px; box-sizing: border-box; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
-  @media (max-width: 760px) { .fp-cond { grid-template-columns: minmax(0, 1fr); } .fp-st { flex-basis: 100%; margin-left: 0; order: 3; } .fp-vt { flex-wrap: wrap; } }
+  @media (max-width: 760px) { .fp-cond { grid-template-columns: minmax(0, 1fr); } .fp-st { flex-basis: 100%; margin-left: 0; order: 3; } .fp-vt { flex-wrap: wrap; } .fp-vt .rond6 { margin-left: auto; } }
   @media (max-width: 760px) {
     .fav6-barre .seg6 { flex: 1 1 100%; overflow-x: auto; scrollbar-width: none; display: flex; }
     .fav6-barre .seg6 button { flex: 0 0 auto; }
@@ -1849,7 +1850,7 @@ function vrmVerifVisible(sel) {
   //    haute), offre au % + arrondi (toujours remontée au plancher), délai et filtres, aperçu sur un VRAI favori de la
   //    liste, statistiques par version. Tout est jugé par le FOND (`favorisPerso` : la règle du moteur) ; rien ne
   //    s'enregistre sans « Enregistrer ».
-  let fpBr = null, fpVerif = null, fpStats = null, fpFavori = '', fpActif = null, fpEtat = null, fpEnVol = false, fpVerifT = null, fpDemande = 0;
+  let fpBr = null, fpVerif = null, fpStats = null, fpFavori = '', fpActif = null, fpRestaurer = false, fpDernierClic = 0, fpDefil = 0, fpEtat = null, fpEnVol = false, fpVerifT = null, fpDemande = 0;
   const FP_MAX = 2000, FP_VERSIONS = 8, FP_REGLES = 10, FP_RV = 5;
   const FP_VARS_B = [['prénom', 'fp_v_prenom'], ['article', 'fp_v_article'], ['marque', 'fp_v_marque'], ['taille', 'fp_v_taille'], ['prix', 'fp_v_prix'], ['prix_offre', 'fp_v_prix_offre'], ['remise', 'fp_v_remise']];
   const FP_JOURS = [1, 2, 3, 4, 5, 6, 0];
@@ -1996,7 +1997,7 @@ function vrmVerifVisible(sel) {
     const s = carte.querySelector('[data-fp-favori]'); if (s && !s.__fp) { s.__fp = 1; s.addEventListener('change', () => { fpFavori = s.value; fpVerifier(a, false); }); }
   }
   function fpOuvrir(a) {
-    fpBr = null; fpVerif = null; fpEtat = null; fpStats = null; fpActif = null;
+    fpBr = null; fpVerif = null; fpEtat = null; fpStats = null; fpActif = null; fpDefil = 0;
     lireCommeBleam(true);
     try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'stats' }, (r) => { void chrome.runtime.lastError; fpStats = r && r.ok ? r : { ok: false }; if (favFeuille === 'reglages') rendre(); }); } catch (_) {}
     fpVerifier(a, true);
@@ -2016,13 +2017,15 @@ function vrmVerifVisible(sel) {
   }
   function brancherFp(a) {
     const r = carte.querySelector('[data-fp-editeur]'); if (!r || !fpBr) return;
+    // Un redessin (ajouter, retirer, un jour touché, la réponse du fond) garde l'endroit où il était dans la feuille.
+    const fe = r.closest('.fav6-feuille'); if (fe) { if (fpDefil) fe.scrollTop = fpDefil; fe.addEventListener('scroll', () => { fpDefil = fe.scrollTop; }, { passive: true }); }
     const regle = (id) => fpBr.regles.find((x) => x.id === id);
     r.querySelectorAll('[data-fp-texte]').forEach((t) => {
       const k = t.getAttribute('data-fp-texte');
-      t.addEventListener('focus', () => { fpActif = { k, pos: t.selectionStart }; });
-      t.addEventListener('input', () => { const f = fpTrouver(k); if (f.v) f.v.texte = t.value.slice(0, FP_MAX); fpActif = { k, pos: t.selectionStart }; const n = r.querySelector(`[data-fp-n="${f.id}"]`); if (n) n.textContent = `${t.value.length}/${FP_MAX}`; fpVerifier(a, false); });
+      t.addEventListener('focus', () => { if (!fpActif || fpActif.k !== k) fpActif = { k, pos: t.selectionStart, t: Date.now() }; });
+      t.addEventListener('input', () => { const f = fpTrouver(k); if (f.v) f.v.texte = t.value.slice(0, FP_MAX); fpActif = { k, pos: t.selectionStart, t: Date.now() }; const n = r.querySelector(`[data-fp-n="${f.id}"]`); if (n) n.textContent = `${t.value.length}/${FP_MAX}`; fpVerifier(a, false); });
       t.addEventListener('keyup', () => { if (fpActif && fpActif.k === k) fpActif.pos = t.selectionStart; });
-      t.addEventListener('click', () => { fpActif = { k, pos: t.selectionStart }; });
+      t.addEventListener('click', () => { fpActif = { k, pos: t.selectionStart, t: Date.now() }; });
     });
     r.querySelectorAll('[data-fp-inserer]').forEach((b) => b.addEventListener('mousedown', (ev) => ev.preventDefault()));
     r.querySelectorAll('[data-fp-inserer]').forEach((b) => b.addEventListener('click', () => {
@@ -2030,11 +2033,11 @@ function vrmVerifVisible(sel) {
       const k = fpActif && fpActif.k.slice(0, fpActif.k.lastIndexOf(':')) === cible ? fpActif.k : cible + ':' + l[l.length - 1].id;
       const f = fpTrouver(k); if (!f.v) return;
       const mot = '{' + b.getAttribute('data-fp-inserer') + '}', pos = fpActif && fpActif.k === k && Number.isInteger(fpActif.pos) ? fpActif.pos : f.v.texte.length;
-      const avant = f.v.texte.slice(0, pos), apres = f.v.texte.slice(pos), sep = avant && !/\s$/.test(avant) ? ' ' : '';
-      f.v.texte = (avant + sep + mot + apres).slice(0, FP_MAX); fpActif = { k, pos: (avant + sep + mot).length };
+      const avant = f.v.texte.slice(0, pos), apres = f.v.texte.slice(pos), sep = avant && !/\s$/.test(avant) ? ' ' : '', sep2 = apres && !/^[\s,.!?;:)]/.test(apres) ? ' ' : '';
+      f.v.texte = (avant + sep + mot + sep2 + apres).slice(0, FP_MAX); fpActif = { k, pos: (avant + sep + mot).length, t: Date.now() }; fpRestaurer = true;
       rendre(); fpVerifier(a, false);
     }));
-    r.querySelectorAll('[data-fp-ajouter]').forEach((b) => b.addEventListener('click', () => { const c = b.getAttribute('data-fp-ajouter'), l = fpListe(c); const id = fpNouvelId(c === 'un' ? 'u' : c === 'lot' ? 'l' : 'v'); l.push({ id, texte: '' }); fpActif = { k: c + ':' + id, pos: 0 }; rendre(); }));
+    r.querySelectorAll('[data-fp-ajouter]').forEach((b) => b.addEventListener('click', () => { const c = b.getAttribute('data-fp-ajouter'), l = fpListe(c); const id = fpNouvelId(c === 'un' ? 'u' : c === 'lot' ? 'l' : 'v'); l.push({ id, texte: '' }); fpActif = { k: c + ':' + id, pos: 0, t: Date.now() }; fpRestaurer = true; rendre(); }));
     r.querySelectorAll('[data-fp-retirer]').forEach((b) => b.addEventListener('click', () => { const f = fpTrouver(b.getAttribute('data-fp-retirer')); const i = f.l.indexOf(f.v); if (i >= 0) f.l.splice(i, 1); fpActif = null; rendre(); fpVerifier(a, false); }));
     const ra = r.querySelector('[data-fp-regle-ajouter]'); if (ra) ra.addEventListener('click', () => { fpBr.regles.push({ id: fpNouvelId('r'), heures: null, jours: null, prix: null, marques: null, textes: [{ id: fpNouvelId('v'), texte: '' }] }); rendre(); });
     r.querySelectorAll('[data-fp-regle-retirer]').forEach((b) => b.addEventListener('click', () => { fpBr.regles = fpBr.regles.filter((x) => x.id !== b.getAttribute('data-fp-regle-retirer')); rendre(); fpVerifier(a, false); }));
@@ -2046,7 +2049,7 @@ function vrmVerifVisible(sel) {
       if (ch === 'hde' || ch === 'ha') { const h = Object.assign({ de: null, a: null }, x.heures || {}); h[ch === 'hde' ? 'de' : 'a'] = v === '' ? null : Number(v); x.heures = h.de == null && h.a == null ? null : h; }
       else if (ch === 'pmin' || ch === 'pmax') { const p = Object.assign({ min: null, max: null }, x.prix || {}); p[ch === 'pmin' ? 'min' : 'max'] = v === '' ? null : Number(v.replace(',', '.')); x.prix = p.min == null && p.max == null ? null : p; }
       else if (ch === 'marques') { const l = v.split(/[,;]+/).map((m) => m.trim()).filter(Boolean); x.marques = l.length ? l : null; }
-      const pr = r.querySelector(`[data-fp-regle="${id}"] .fp-rt small`); if (pr) { const n = (x.heures && x.heures.de != null && x.heures.a != null && x.heures.de !== x.heures.a ? 1 : 0) + (x.jours && x.jours.length && x.jours.length < 7 ? 1 : 0) + (x.prix ? 1 : 0) + (x.marques ? 1 : 0); pr.textContent = n === 1 ? TU('fp_cond1') : TU('fp_condn', { n }); }
+      const pr = r.querySelector(`[data-fp-regle="${id}"] .fp-rt small`); if (pr) { const bloc = pr.closest('[data-fp-regle]'); const n = (x.heures && x.heures.de != null && x.heures.a != null && x.heures.de !== x.heures.a ? 1 : 0) + (x.jours && x.jours.length && x.jours.length < 7 ? 1 : 0) + (x.prix ? 1 : 0) + (x.marques ? 1 : 0); pr.textContent = n === 1 ? TU('fp_cond1') : TU('fp_condn', { n }); if (bloc) bloc.setAttribute('data-fp-precision', String(n)); }
       fpVerifier(a, false);
     }));
     r.querySelectorAll('[data-fp-rj]').forEach((b) => b.addEventListener('click', () => { const [id, d] = b.getAttribute('data-fp-rj').split('.'); const x = regle(id); if (!x) return; const j = Number(d); const l = Array.isArray(x.jours) ? x.jours.slice() : []; x.jours = l.includes(j) ? l.filter((y) => y !== j) : l.concat([j]); if (!x.jours.length) x.jours = null; rendre(); fpVerifier(a, false); }));
@@ -2055,7 +2058,12 @@ function vrmVerifVisible(sel) {
     const en = r.querySelector('[data-fp-enregistrer]'); if (en) en.addEventListener('click', () => fpEnregistrer(a));
     fpBrancherApercu(a);
     // Le curseur revient là où il était (un redessin ne fait pas perdre la saisie).
-    if (fpActif) { const t = r.querySelector(`[data-fp-texte="${fpActif.k}"]`); if (t && (!document.activeElement || document.activeElement === hote || document.activeElement === document.body)) { try { t.focus({ preventScroll: true }); const p = Math.min(t.value.length, Number.isInteger(fpActif.pos) ? fpActif.pos : t.value.length); t.setSelectionRange(p, p); } catch (_) {} } }
+    //    Seulement après SON geste d'écriture (insérer, ajouter) ou s'il tapait il y a moins de 4 s sans avoir touché
+    //    autre chose depuis — jamais quand il vient de toucher un autre bouton.
+    r.addEventListener('pointerdown', (ev) => { const b = ev.target && ev.target.closest ? ev.target.closest('button, select, input:not([data-fp-texte])') : null; if (b && !b.hasAttribute('data-fp-inserer')) fpDernierClic = Date.now(); }, true);
+    const garder = fpActif && (fpRestaurer || (Number(fpActif.t) > fpDernierClic && Date.now() - Number(fpActif.t) < 4000));
+    fpRestaurer = false;
+    if (garder) { const t = r.querySelector(`[data-fp-texte="${fpActif.k}"]`); if (t) { const p = Math.min(t.value.length, Number.isInteger(fpActif.pos) ? fpActif.pos : t.value.length); try { t.focus({ preventScroll: true }); t.setSelectionRange(p, p); } catch (_) {} fpActif.pos = p; } }
   }
   // Les feuilles : « Réglages » (textes et rythme — le même chemin gardé que la page Automatisations, `reglagesFavoris`)
   // et la confirmation (le récapitulatif de toujours, `recapFavHtml`, avec « Confirmer l'envoi »).

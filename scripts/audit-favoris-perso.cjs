@@ -135,6 +135,25 @@ async function verifier(SRC, BG) {
     const cm = fonction(BG, 'choixMessageFavori');
     dit(/choisirMessageFavori\(/.test(cm) && /derniere/.test(cm) && /refusee/.test(cm) && /sur:/.test(cm), 'P10 choixMessageFavori n’appelle pas la règle avec ses gardes');
   } catch (e) { fautes.push('P8/P10 : ' + e.message); }
+  // P11 — l'enregistrement depuis le panneau (vrai `favorisPersoCarte`) : SON toucher, versions jugées, copie d'avant sûre.
+  try {
+    const code = [bloc(BG, RDEB, RFIN), bloc(BG, MDEB, MFIN), bloc(BG), fonction(BG, 'prixTexteFavori'), fonction(BG, 'personnaliserMessageFavori'), fonction(BG, 'fpJugerTexte'), fonction(BG, 'fpApercu'), fonction(BG, 'favorisPersoCarte')].join('\n');
+    const ecrit = [];
+    const c = { Intl, Date, Math, Number, String, Array, Object, Set, Map, JSON, RegExp, isFinite, ongletCarte: () => ({ url: 'https://www.vinted.fr/' }), compteConnecte: async () => '111',
+      reglagesFavorisCarte: async (m) => { ecrit.push(['avant', m]); return { ok: true }; }, reglageAutoCarte: async (m) => { ecrit.push(['perso', m]); return { ok: true, relu: true }; } };
+    vm.runInNewContext(code + '\n;globalThis.__p = favorisPersoCarte;', c);
+    const S = {};
+    let r = await c.__p({ quoi: 'enregistrer', reglage: { un: [{ id: 'u1', texte: 'La {marque} en {taille} ?' }] } }, S);
+    dit(r.ok === false && r.code === 'sure' && !ecrit.length, 'P11 aucune version « 1 article » sûre : enregistré quand même');
+    r = await c.__p({ quoi: 'enregistrer', reglage: { un: [{ id: 'u1', texte: 'Salut' }], regles: [{ prix: { min: 1 }, textes: ['Mon WhatsApp ?'] }] } }, S);
+    dit(r.ok === false && r.code === 'texte' && !ecrit.length, 'P11 un texte interdit (dans une règle) est enregistré');
+    r = await c.__p({ quoi: 'enregistrer', reglage: { un: [{ id: 'u1', texte: 'La {marque} ?' }, { id: 'u2', texte: 'Bonjour {prénom} !' }] }, offre: { pct: 12, arrondi: true }, rythme: 'prudent' }, S);
+    const av = ecrit.find((x) => x[0] === 'avant'), pe = ecrit.find((x) => x[0] === 'perso');
+    dit(r.ok && av && av[1].message === 'Bonjour {pseudo} !' && !(av[1].variantes || []).length && av[1].offre && av[1].offre.pct === 12 && av[1].offre.arrondi === true && av[1].rythme === 'prudent', 'P11 la copie d’avant n’est pas la version sûre ({prénom} → {pseudo}), ou l’offre / le rythme manquent : ' + JSON.stringify(av && av[1]));
+    dit(pe && pe[1].cle === 'vinted_bleam' && pe[1].valeur.section === 'favMessages' && pe[1].valeur.valeur.un.length === 2 && pe[1].confirme === false, 'P11 SES versions ne vont pas dans vinted_bleam.favMessages : ' + JSON.stringify(pe && pe[1]).slice(0, 200));
+    r = await c.__p({ quoi: 'verifier', reglage: { un: [{ id: 'u1', texte: 'Paie par PayPal {pseudo}' }, { id: 'u2', texte: 'Salut {nom}' }] }, favori: { pseudo: 'lea', titre: 'Nike', prix: 50 } }, S);
+    dit(r.ok && r.versions.u1.motifs.length && r.versions.u1.motifs[0].code === 'paiement' && r.versions.u2.erreur === 'variable' && r.apercu && r.apercu.ok === false, 'P11 « verifier » ne signale pas un texte refusé / une variable inconnue : ' + JSON.stringify(r).slice(0, 300));
+  } catch (e) { fautes.push('P11 : ' + e.message); }
   return fautes;
 }
 
@@ -154,7 +173,7 @@ const MUTATIONS = [
   const SRC = fs.readFileSync(F_SRC, 'utf8'), BG = fs.readFileSync(F_BG, 'utf8');
   const prouve = process.argv.includes('--prouve');
   const f = await verifier(SRC, BG);
-  if (f.length) { for (const x of f) console.log('❌ ' + x); console.log(`audit-favoris-perso : ${f.length} rouge(s)`); } else console.log('✅ audit-favoris-perso : toutes les règles tiennent (P1–P10)');
+  if (f.length) { for (const x of f) console.log('❌ ' + x); console.log(`audit-favoris-perso : ${f.length} rouge(s)`); } else console.log('✅ audit-favoris-perso : toutes les règles tiennent (P1–P11)');
   if (!prouve) process.exit(f.length ? 1 : 0);
   let ok = 0;
   for (const [nom, mut] of MUTATIONS) {
