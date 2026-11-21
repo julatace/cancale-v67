@@ -93,7 +93,7 @@ export function scorePriorite({ jours, vues = null, favoris = null, baisse = nul
 // opts : { jours, parJour, maintenant, cle (`cleNum`), comptesBloques (Set d'uid), comptesPersonnels (Set d'uid),
 //          comptesHorsVente (Set d'uid : achats), enLitige ({ nums: Set de clés N°, ids: Set d'identifiants d'annonce } | null),
 //          journalVues (`vrm_vues_lues`.a : { 'vinted#id': série }) }
-// Rend { n (proposables), liste (les `parJour` premières, classées), reste, exclues: { vendue, masquee, litige, bloque, perso },
+// Rend { n (proposables), liste (les `parJour` premières, classées), classees (toutes, classées), reste, exclues: { vendue, masquee, litige, bloque, perso },
 //        sansCompteur (proposables dont vues ou favoris ne sont pas lus), reglage }.
 export function republierEnPriorite(articles, opts = {}) {
   if (!Array.isArray(articles)) return articles === undefined ? undefined : null;
@@ -108,9 +108,16 @@ export function republierEnPriorite(articles, opts = {}) {
   let sansCompteur = 0;
   for (const a of articles) {
     if (!a || !Array.isArray(a.annonces)) continue;
+    // Une annonce Vinted assez ancienne mais MASQUÉE par Vinted, ou d'un compte BLOQUÉ mis en pause (sa dernière trace) : elle
+    // n'est pas « en ligne », la règle « Dorment » ne la voit pas — elle est COMPTÉE parmi les écartées (dite, jamais cachée).
+    const vieille = (etat) => a.annonces.some((y) => y.site === 'vinted' && y.etat === etat && y.depuis != null && maintenant - y.depuis >= reglage.jours * JOUR_MS);
     // LA règle « Dorment », au site Vinted.
-    if (!filtrerArticles([a], { site: 'vinted', etat: 'dorment', seuil: reglage.jours, maintenant, cle }).length) continue;
-    const enLigne = a.annonces.filter((x) => x.site === 'vinted' && x.etat === 'enligne' && x.depuis != null && maintenant - x.depuis >= reglage.jours * JOUR_MS)
+    if (!filtrerArticles([a], { site: 'vinted', etat: 'dorment', seuil: reglage.jours, maintenant, cle }).length) {
+      if (vieille('masquee')) exclues.masquee += 1; else if (vieille('bloque')) exclues.bloque += 1;
+      continue;
+    }
+    // L'annonce à republier : SA plus ancienne annonce Vinted en ligne (la règle ci-dessus a dit qu'elle dort ; on ne la redit pas).
+    const enLigne = a.annonces.filter((x) => x.site === 'vinted' && x.etat === 'enligne' && x.depuis != null)
       .sort((x, y) => x.depuis - y.depuis || (str(x.id) < str(y.id) ? -1 : 1));
     const x = enLigne[0];
     if (!x) continue;
@@ -132,7 +139,7 @@ export function republierEnPriorite(articles, opts = {}) {
   proposables.sort((p, q) => q.score - p.score || q.jours - p.jours || (p.annonce.id < q.annonce.id ? -1 : p.annonce.id > q.annonce.id ? 1 : 0));
   proposables.forEach((p, i) => { p.rang = i + 1; });
   const liste = proposables.slice(0, reglage.parJour);
-  return { n: proposables.length, liste, reste: proposables.length - liste.length, exclues, sansCompteur, reglage };
+  return { n: proposables.length, liste, classees: proposables, reste: proposables.length - liste.length, exclues, sansCompteur, reglage };
 }
 
 // LA RAISON d'une ligne, en morceaux (l'écran les dit dans sa langue) : « 41 j · 136 vues · 0 favori · vues qui baissent ».

@@ -326,14 +326,19 @@ const motsEntiers = (t, mots) => { const x = ' ' + t + ' '; for (const m of mots
 // lettres reste un morceau de mot (« dunk » dans « dunks »). Exporté : scripts/audit-recherche-partout.cjs l'exécute.
 const CHIFFRES_SEULS = /^\d+$/;
 const estChiffre = (c) => c >= 48 && c <= 57;
-export function contientMot(t, m) {
-  if (!m) return true;
-  if (!CHIFFRES_SEULS.test(m)) return t.includes(m);
+const nombreDans = (t, m) => {
   for (let i = t.indexOf(m); i >= 0; i = t.indexOf(m, i + 1)) {
     if (!estChiffre(t.charCodeAt(i - 1)) && !estChiffre(t.charCodeAt(i + m.length))) return true;
   }
   return false;
+};
+export function contientMot(t, m) {
+  if (!m) return true;
+  if (!CHIFFRES_SEULS.test(m)) return t.includes(m);
+  return nombreDans(t, m);
 }
+// Vitesse : la forme de chaque mot tapé est jugée UNE fois par recherche (pas une fois par objet).
+const testeurMot = (m) => (!m ? () => true : CHIFFRES_SEULS.test(m) ? (t) => nombreDans(t, m) : (t) => t.includes(m));
 // (21 nov., prio-recherche) LES FAUTES DE FRAPPE, POUR LE TEXTE SEULEMENT. Un mot tapé de 4 lettres ou plus, SANS chiffre,
 // qui n'est dans aucun mot du texte, trouve un mot à UNE faute près (une lettre en trop, en moins, changée ou deux lettres
 // inversées : « addidas », « nkie », « spezail ») — deux fautes à partir de 8 lettres. Jamais un N°, un suivi, un code, une
@@ -364,15 +369,28 @@ export function distanceMots(a, b, max = 2) {
 const motsDe = (e) => (e._mots || (e._mots = e.t ? e.t.split(/[^a-z0-9]+/).filter((x) => x.length >= 2) : []));
 // Un mot tapé « à peu près » dans le texte de l'entrée : un mot du texte à `fautesPermises` près, ou le DÉBUT d'un mot plus
 // long (« jordn » pour « jordans »). Jamais pour un mot qui a des chiffres.
-function presDe(e, m) {
-  if (!floutable(m)) return false;
+// Le mot tapé est-il « à peu près » ce mot du texte ? (un mot à `fautesPermises` près, ou le DÉBUT d'un mot plus long).
+function motProche(m, x) {
   const d = fautesPermises(m);
-  for (const x of motsDe(e)) {
-    if (Math.abs(x.length - m.length) <= d && distanceMots(m, x, d) <= d) return true;
-    if (m.length >= 5 && x.length > m.length + d && distanceMots(m, x.slice(0, m.length), d) <= d) return true;
-  }
-  return false;
+  if (Math.abs(x.length - m.length) <= d && distanceMots(m, x, d) <= d) return true;
+  return m.length >= 5 && x.length > m.length + d && distanceMots(m, x.slice(0, m.length), d) <= d;
 }
+// Vitesse : le VOCABULAIRE de l'index (ses mots distincts, quelques milliers) est fait une fois par index ; un mot tapé est
+// comparé à ce vocabulaire UNE fois par recherche (`prochesDe`), puis chaque entrée ne fait qu'un test d'appartenance.
+function vocabulaire(index) {
+  if (index._vocab) return index._vocab;
+  const v = new Set();
+  for (const e of index.entrees) for (const x of motsDe(e)) if (!/\d/.test(x)) v.add(x);   // un mot avec un chiffre n'est jamais « à peu près »
+  index._vocab = v;
+  return v;
+}
+function prochesDe(index, m) {
+  const out = new Set();
+  if (!floutable(m)) return out;
+  for (const x of vocabulaire(index)) if (motProche(m, x)) out.add(x);
+  return out;
+}
+const presDe = (e, proches) => !!proches && proches.size > 0 && motsDe(e).some((x) => proches.has(x));
 
 // Cherche `q` dans l'index. Rend { q, groupes: { paire: [...], vente: [...], … }, totaux, total }
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
@@ -394,6 +412,9 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const numeroLike = cents == null && /^[A-Z]{0,3}\d{1,6}$/.test(qa) && qa.length <= 7;
   // (21 nov.) Les fautes de frappe ne jouent que pour des MOTS (au moins un mot de 4 lettres sans chiffre), jamais pour une identité.
   const flou = cents == null && mots.some(floutable);
+  const proches = flou ? mots.map((m) => prochesDe(index, m)) : null;
+  const tests = mots.map(testeurMot);
+  const identBlocs = qa.length >= 6 && /\d/.test(qa);
   const trouve = [];
   for (const e of index.entrees) {
     let par = null, exact = false, valeur = '';
@@ -411,13 +432,13 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
       else { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
     }
     if (!par && qn.length >= 3 && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
-    if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => mots.every((m) => contientMot(l, m))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
+    if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => tests.every((f) => f(l))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
     let bonus = 0;
     // Un n° recopié par blocs (« XW 300 000 007 FR ») écrit DANS un titre : le titre le propose encore (jamais une identité).
-    if (!par && e.t && (mots.every((m) => contientMot(e.t, m)) || (qa.length >= 6 && /\d/.test(qa) && (e._alnum || (e._alnum = alnum(e.t))).includes(qa)))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
+    if (!par && e.t && (tests.every((f) => f(e.t)) || (identBlocs && (e._alnum || (e._alnum = alnum(e.t))).includes(qa)))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
     // À peu près : chaque mot est dans le texte, ou à une faute près — au moins un mot floutable, aucun nombre en jeu autrement qu'entier.
     let approx = false;
-    if (!par && flou && e.t && mots.every((m) => contientMot(e.t, m) || presDe(e, m))) { par = 'titre'; approx = true; bonus = 0.6 + (e.enLigne === false ? 0.1 : 0); }
+    if (!par && flou && e.t && tests.every((f, k) => f(e.t) || presDe(e, proches[k]))) { par = 'titre'; approx = true; bonus = 0.6 + (e.enLigne === false ? 0.1 : 0); }
     if (par) trouve.push(approx ? { e, par, exact, valeur, rang: RANG[par] + bonus, approx: true } : { e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus });
   }
   const numVal = (e) => { const m = /(\d+)$/.exec(e.numK || ''); return m ? Number(m[1]) : Infinity; };
