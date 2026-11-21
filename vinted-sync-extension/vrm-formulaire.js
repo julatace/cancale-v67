@@ -555,12 +555,14 @@
       if (captcha()) return vuCaptcha();
       const b = await attendre(SEL.ajouter, 15000); if (b.captcha) return vuCaptcha(); if (b.absent) return manque('enregistrer');
       ecouter();
+      // 5.423 (`modifavantapres`) : la preuve « nouveau prix tapé » — le champ montre EXACTEMENT le nouveau prix avant « Enregistrer ».
+      const tape = Math.round(Number(String(a.el.value || '').replace(/[\s€]/g, '').replace(',', '.')) * 100) === Math.round(prix * 100);
       const att = reponseDe('PUT', new RegExp(`/api/v2/item_upload/items/${id}$`), 60000, d && d.cle);
       clic(b.el);
       const r = await att;
-      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
-      if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
-      return { ok: true, rep: r };
+      if (!r) return { ok: false, code: 'sans-reponse', parti: true, tape };
+      if (r.captcha) return Object.assign(vuCaptcha(), { parti: true, tape });
+      return { ok: true, rep: r, tape };
     },
     // 5.414 : LA GRILLE DES TAILLES d'une catégorie, LUE par la page « Vendre » (aucune écriture) : la catégorie choisie
     // dans le formulaire (son identifiant, sinon son libellé exact), et la réponse que la PAGE reçoit pour elle.

@@ -1119,6 +1119,14 @@ function vrmVerifVisible(sel) {
   .geste6 select { min-height: 44px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; max-width: 520px; }
   .geste6 .au6-l li { border-bottom: .5px solid var(--n-trait); }
   .geste6 .pied6 { padding: 12px 0 0; }
+  /* 5.423 (modifavantapres) : la frise dans une rangée de l'atelier, le suivi en cours, la feuille Avant | Après. */
+  .geste6 .rg6-frise { flex-wrap: wrap; }
+  .geste6 .rg6-frise > .vu-frise { flex: 1 1 100%; padding: 2px 0 8px; }
+  .modif6 .vu-frise { margin: 8px 0 4px; }
+  .modif6 .vu-bl { margin-top: 10px; }
+  .geste6 .vu-aa { margin: 4px 0 0; }
+  .aa6 { margin: 0 12px 8px; }
+  .carte[data-grand] a.vu-btn { text-decoration: none; display: inline-flex; width: auto; }
   .offre6 .conf5 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
   @media (max-width: 760px) { .geste6 { margin: 8px; } .offre6 { flex-direction: column; align-items: stretch; } .geste6 .rg6 { flex-wrap: wrap; } }
   .cd6-l { display: flex; align-items: center; gap: 12px; max-width: 520px; }
@@ -2615,17 +2623,46 @@ function vrmVerifVisible(sel) {
   // Le plancher montré (la règle du fond le revérifie) : le prix mini, sinon l'achat + 10 %, sinon « pas su ».
   const plancher6 = (x) => (Number(x.mini) > 0 ? { v: Number(x.mini), de: 'mini' } : Number(x.achat) > 0 ? { v: Math.ceil(Number(x.achat) * 110) / 100, de: 'achat' } : null);
   const envoyer6 = (msg, fin) => { geste6EnVol = true; rendre(); try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge' }, msg), (r) => { void chrome.runtime.lastError; geste6EnVol = false; try { fin(r || null); } catch (_) {} rendre(); }); } catch (_) { geste6EnVol = false; fin(null); rendre(); } };
+  // 5.423 : les lignes de la feuille Avant | Après — ce que le panneau a LU (dressing rangé, contrôle avant départ) et ce que
+  //    SON geste posera (son nouveau prix, « maintenant », « masquée »). Une valeur absente reste absente (« — »).
+  const prixSaisi6 = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+  const deAnn6 = (id) => (((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === id) || { id });
+  const avantAnn6 = (x) => ({ prix: Number(x.prix) > 0 ? Number(x.prix) : null, statut: x.statut || null, depuis: Number(x.depuis) > 0 ? Number(x.depuis) : null });
+  function lignesPrix6() {
+    return geste6.ids.map((id) => { const x = deAnn6(id); const p = prixSaisi6(geste6.prix[id]); return p ? { id, sorte: 'baisse', titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { prix: p } } : null; }).filter(Boolean);
+  }
+  function lignesAtelier6() {
+    const g = geste6, V = (g.verif && g.verif.paires) || {};
+    return g.ids.filter((id) => !(V[id] && V[id].etat === 'absente')).map((id) => { const x = deAnn6(id), v = V[id] || null; const pl = plancher6(x);
+      const pc = v && Number(v.prixCoffre) > 0 ? Number(v.prixCoffre) : null;
+      return { id, sorte: 'republier', titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { prix: pc ? (pl && pc < pl.v ? pl.v : pc) : null, statut: 'en_vente', depuis: 'maintenant' }, champs: v && Array.isArray(v.champs) ? v.champs : null }; });
+  }
+  function lignesMasquer6(c) {
+    return c.ids.map((id) => { const x = deAnn6(id); return { id, sorte: c.k, titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { statut: c.k === 'masquer' ? 'masque' : 'en_vente' } }; });
+  }
   function geste6Html() {
     if (!geste6) return '';
     const toutes = (listes && listes.annonces && listes.annonces.toutes) || [];
     const de = (id) => toutes.find((y) => y.id === id) || { id };
     const etat = geste6Etat ? `<p class="note5" role="status" data-geste-etat="${geste6Etat.ok ? 'ok' : 'ko'}">${esc(geste6Etat.texte)}</p>` : '';
     const fermer = `<button type="button" class="vu-btn" data-geste-fermer>${esc(TU('ra_annuler'))}</button>`;
+    // 5.423 (`modifavantapres`) : AVANT de lancer, la feuille Avant | Après de chaque annonce (valeurs LUES, « — » sinon) ;
+    //    « Modifier » revient à la saisie, le bouton plein lance. Rien ne part avant SON « Lancer ».
+    if (geste6.k === 'prix' && geste6.aa) {
+      const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      const L = lignesPrix6();
+      return `<section class="geste6" data-geste="prix" data-aa-vue><h3>${esc(TU('m3_feuille'))}</h3>${etat}${hc}${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}<div class="pied6"><button type="button" class="vu-btn" data-aa-retour>${esc(TU('m3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol || !L.length || geste6.hausseConf ? ' disabled' : ''}>${esc(TU('m3_lancer'))}</button></div></section>`;
+    }
+    if (geste6.k === 'atelier' && geste6.aa) {
+      const g = geste6, lp = g.verif && g.verif.lancer;
+      const L = lignesAtelier6();
+      return `<section class="geste6" data-geste="atelier" data-aa-vue><h3>${esc(TU('m3_feuille'))}</h3>${etat}<p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}<div class="pied6"><button type="button" class="vu-btn" data-aa-retour>${esc(TU('m3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || !L.length || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('m3_lancer'))}</button></div></section>`;
+    }
     if (geste6.k === 'prix') {
       const lignes = geste6.ids.map((id) => { const x = de(id); const pl = plancher6(x); const v = geste6.prix[id] != null ? geste6.prix[id] : '';
         return `<div class="rg6" data-prix-ligne="${esc(id)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b><small>${esc(TU('g6_prix_vu', { p: Number(x.prix) > 0 ? euroTxt(x.prix) : '—' }))} · ${esc(pl ? TU(pl.de === 'mini' ? 'g6_plancher_mini' : 'g6_plancher_achat', { p: euroTxt(pl.v) }) : TU('g6_plancher_pas_su'))}</small></span><input type="text" inputmode="decimal" class="prix6" data-prix-nouveau="${esc(id)}" value="${esc(v)}" aria-label="${esc(TU('g6_nouveau_prix'))}" placeholder="${esc(TU('g6_nouveau_prix'))}"></div>`; }).join('');
       const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
-      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_confirmer'))}</button></div></section>`;
+      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('m3_revoir'))}</button></div></section>`;
     }
     if (geste6.k === 'atelier') {
       const g = geste6, ph = g.photo;
@@ -2640,7 +2677,7 @@ function vrmVerifVisible(sel) {
         <div class="rg6"><span><b>${esc(TU(g.mode === 'aleatoire' ? 'g6_entre' : 'g6_toutes'))}</b></span><span class="outils"><input type="number" min="1" max="120" class="prix6" data-atelier-min value="${g.min}" aria-label="min">${g.mode === 'aleatoire' ? `<input type="number" min="1" max="120" class="prix6" data-atelier-max value="${g.max}" aria-label="max">` : ''}<span>min</span></span></div>
         ${curseur('bright', 0.5, 1.5, 0.05, 'g6_luminosite')}${curseur('contrast', 0.5, 1.5, 0.05, 'g6_contraste')}${curseur('sat', 0, 2, 0.05, 'g6_saturation')}${curseur('zoom', 1, 2, 0.05, 'g6_zoom')}${curseur('rot', -15, 15, 1, 'g6_rotation')}
         <label class="rg6"><span><b>${esc(TU('g6_lettre'))}</b></span><input type="checkbox" data-atelier-lettre${g.lettre ? ' checked' : ''}></label>
-        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('g6_lancer'))}</button></div>${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
+        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('m3_revoir'))}</button></div>${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
     }
     if (geste6.k === 'publier') {
       const g = geste6, x = de(g.id);
@@ -2692,12 +2729,63 @@ function vrmVerifVisible(sel) {
       envoyer6({ action: 'ecrireInteressesLbc', annonce: lbcInt.annonce, convs: gens, textes: lbcInt.textes.map((t) => t.trim()).filter(Boolean), confirme: true }, (r) => { lbcInt.conf = false; lbcInt.etat = { ok: !!(r && r.accepte), texte: r && r.accepte ? TU('li_parti') : (r && r.raison) || TU('ra_ko') }; if (r && r.accepte) { lbcIntEtat = lbcInt.etat; lbcInt = null; } });
     });
   }
+  // 5.423 (`modifavantapres`) : la modification EN COURS — l'état que le fond pose pour l'écran plein (`vrmActionEnCours`,
+  //    lu dans chrome.storage.local, compte de CET onglet seulement) : la frise de l'annonce en cours (preuve par preuve),
+  //    « 2 sur 6 », le temps, « Tout arrêter » ; puis le bilan de la série (Avant | Après, « Voir sur Vinted », « Reprendre »).
+  let modifEtat = null, modifSig = '', modifFermeDebut = 0, modifReprise = '';
+  const SORTES_MODIF6 = ['republier', 'baisse', 'masquer'];
+  const modifDuCompte6 = () => { const a = modifEtat; return a && listes && listes.compte && String(a.uid) === String(listes.compte.id) && SORTES_MODIF6.includes(a.sorte) && a.modif && Date.now() - Number(a.maj || 0) < 30 * 60000 ? a : null; };
+  function lireModif6() {
+    try {
+      chrome.storage.local.get('vrmActionEnCours', (g) => {
+        void chrome.runtime.lastError;
+        const a = g && g.vrmActionEnCours && g.vrmActionEnCours.v === 1 ? g.vrmActionEnCours : null;
+        modifEtat = a;
+        const sig = a && a.modif ? JSON.stringify([a.uid, a.actif, a.enCours, a.fait, a.total, a.modif, (a.bilan || []).map((b) => [b.id, b.ok, b.at])]) : '';
+        if (sig === modifSig) return;
+        modifSig = sig;
+        let saisie = false; try { const f = ombre.activeElement; saisie = !!(f && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName)); } catch (_) {}
+        if (!saisie && carte.hasAttribute('data-grand')) rendre();
+      });
+    } catch (_) {}
+  }
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch.vrmActionEnCours) lireModif6(); }); } catch (_) {}
+  setTimeout(lireModif6, 0);
+  const tempsModif6 = (a) => { const m = a.modif, e = Math.max(0, Date.now() - Number(m.debut || Date.now())), est = Number(m.estimeMs) || 0, apres = Math.max(0, (Number(a.total) || 0) - (Number(a.fait) || 0) - 1);
+    return est ? TU('m3_ecoule', { e: U.duree(e), r: U.duree(Math.max(0, est - e) + apres * est) }) : TU('m3_ecoule_seul', { e: U.duree(e) }); };
+  setInterval(() => { const a = modifDuCompte6(); if (!a || !a.actif || !a.enCours) return; const tp = ombre.querySelector('[data-modif6-temps]'); if (tp) tp.textContent = tempsModif6(a); }, 1000);
+  function suiviModif6Html(sansRepublier) {
+    const a = modifDuCompte6(); if (!a || !U.MODIF) return '';
+    const enCours = a.actif === true && a.enCours === true && !a.modif.fin;
+    const bilan = (Array.isArray(a.bilan) ? a.bilan : []).filter((b) => b && b.sorte === a.sorte);
+    if (sansRepublier && a.sorte === 'republier') return '';
+    if (!enCours && (!bilan.length || modifFermeDebut === Number(a.modif.debut))) return '';
+    const it = a.item || {}, i = Math.min(Number(a.total) || 0, (Number(a.fait) || 0) + (enCours ? 1 : 0));
+    const tete = enCours ? TU('m3_suivi', { i: Math.max(1, i), n: Math.max(1, i, Number(a.total) || 1) }) : TU('m3_suivi_fin');
+    const cours = enCours ? `<div class="rg6 modif6-cours" data-modif6-cours="${esc(it.id || '')}"><span><b>${it.num ? plaque(it.num) + ' ' : ''}${esc(it.titre || '—')}</b></span></div>${U.MODIF.friseHtml(a.modif)}<p class="note5" data-modif6-temps>${esc(tempsModif6(a))}</p>` : '';
+    return `<section class="geste6 modif6" data-modif6="${esc(a.sorte)}" data-modif6-etat="${enCours ? 'cours' : 'fin'}"><h3>${esc(tete)}</h3>${cours}${U.MODIF.bilanHtml(bilan, { domaine: location.hostname })}${modifReprise ? `<p class="note5" role="status" data-modif6-reprise-ko>${esc(modifReprise)}</p>` : ''}<div class="pied6">${enCours ? `<button type="button" class="vu-btn vu-plein" data-modif6-arreter>${esc(TU('c_tout_arreter'))}</button>` : `<span></span><button type="button" class="vu-btn" data-modif6-fermer>${esc(TU('m3_fermer'))}</button>`}</div></section>`;
+  }
+  function brancherModif6(R) {
+    const ar = R.querySelector('[data-modif6-arreter]'); if (ar) ar.addEventListener('click', () => { ar.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => { void chrome.runtime.lastError; lireModif6(); }); } catch (_) {} });
+    const fe = R.querySelector('[data-modif6-fermer]'); if (fe) fe.addEventListener('click', () => { const a = modifDuCompte6(); modifFermeDebut = a ? Number(a.modif.debut) : 0; modifReprise = ''; rendre(); });
+    R.querySelectorAll('.modif6 [data-modif-reprendre]').forEach((b) => b.addEventListener('click', () => {
+      b.disabled = true; modifReprise = '';
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reprendreModif', id: b.getAttribute('data-modif-reprendre'), confirme: true }, (r) => { void chrome.runtime.lastError; if (!(r && r.ok)) modifReprise = (r && r.raison) || TU('ra_ko'); chargerListes(true); lireModif6(); rendre(); }); } catch (_) { b.disabled = false; }
+    }));
+  }
+  const domaineVinted6 = () => (/(^|\.)vinted\.(fr|com|it|de)$/.test(location.hostname) ? location.hostname : 'www.vinted.fr');
   function atelierEtatHtml() {
     const a = listes && listes.atelier;
     if (!a || !Array.isArray(a.ids)) return '';
     const toutes = (listes.annonces && listes.annonces.toutes) || [];
+    // 5.423 : chaque paire de l'atelier a SA frise — la paire en cours suit l'écran (preuves en direct), les autres gardent
+    //    les preuves rangées à leur fin (`paires[id].preuves`) ; une paire arrêtée dit son étape en ambre et « Reprendre ».
+    const live = (() => { const m = modifDuCompte6(); return m && m.sorte === 'republier' && m.modif ? m : null; })();
     const l = a.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; const p = a.paires && a.paires[id]; const et = p ? p.etape : 'attente';
-      return `<div class="rg6" data-atelier-etape="${esc(id)}:${esc(et)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${p && p.raison ? `<small>${esc(p.raison)}</small>` : ''}</span><span>${etiquette5(et, TU('g6_e_' + (['cours', 'fait', 'planifiee', 'arret'].includes(et) ? et : 'attente')), et === 'arret' ? 'ambre' : '')}${et === 'arret' ? ` <button type="button" class="vu-btn" data-atelier-reprendre="${esc(id)}">${esc(TU('g6_reprendre'))}</button>` : ''}</span></div>`; }).join('');
+      const fr = !U.MODIF ? '' : live && String(live.modif.id) === String(id) && !live.modif.fin && et === 'cours' ? U.MODIF.friseHtml(live.modif)
+        : p && p.preuves && (et === 'fait' || et === 'arret' || et === 'planifiee') ? U.MODIF.friseHtml({ sorte: 'republier', preuves: p.preuves, fin: 1, ...(et === 'arret' ? { erreur: p.erreur || { raison: p.raison || '' } } : {}) }) : '';
+      const voir = et === 'fait' && p && /^\d{4,15}$/.test(String(p.nouvelId || '')) ? ` <a class="vu-btn" href="https://${domaineVinted6()}/items/${esc(p.nouvelId)}" target="_blank" rel="noopener" data-atelier-voir="${esc(p.nouvelId)}">${esc(TU('m3_voir'))}</a>` : '';
+      return `<div class="rg6${fr ? ' rg6-frise' : ''}" data-atelier-etape="${esc(id)}:${esc(et)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${p && p.raison ? `<small>${esc(p.raison)}</small>` : ''}</span><span>${etiquette5(et, TU('g6_e_' + (['cours', 'fait', 'planifiee', 'arret'].includes(et) ? et : 'attente')), et === 'arret' ? 'ambre' : '')}${et === 'arret' ? ` <button type="button" class="vu-btn" data-atelier-reprendre="${esc(id)}">${esc(TU('g6_reprendre'))}</button>` : ''}${voir}</span>${fr}</div>`; }).join('');
     return `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
   }
   // Les OFFRES en attente (Messagerie, Commandes) : accepter (vend la paire : confirmation, garde anti double-vente),
@@ -2723,6 +2811,7 @@ function vrmVerifVisible(sel) {
   function brancherGestes6(racine) {
     const R = racine;
     try { brancherLbcInt(R); } catch (_) {}
+    try { brancherModif6(R); } catch (_) {}
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
     R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
@@ -2734,10 +2823,13 @@ function vrmVerifVisible(sel) {
       const toutes = (listes.annonces && listes.annonces.toutes) || [];
       const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; return { id, prix: String(geste6.prix[id] || '').replace(',', '.'), prixVu: x.prix, num: x.num || '' }; }).filter((x) => x.prix);
       if (!items.length) { geste6Etat = { ok: false, texte: TU('g6_prix_vide') }; rendre(); return; }
+      // 5.423 : la première fois, la feuille Avant | Après (rien ne part) ; « Lancer » depuis la feuille envoie.
+      if (!geste6.aa) { geste6.aa = true; geste6Etat = null; rendre(); return; }
       // Une HAUSSE se confirme d'abord (« Monter à X € ? ») — jamais automatique.
       const hausses = items.filter((x) => Number(x.prix) > Number(x.prixVu));
       if (hausses.length && !geste6.hausseOk) { geste6.hausseConf = hausses; geste6.items = items; rendre(); return; }
       geste6.hausseOk = false;
+      geste6.aa = false;
       envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
         geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code).join(' · ') : '') };
         if (n) chargerListes(true); });
@@ -2752,8 +2844,10 @@ function vrmVerifVisible(sel) {
     const al = R.querySelector('[data-atelier-lettre]'); if (al) al.addEventListener('change', () => { geste6.lettre = al.checked; });
     R.querySelectorAll('[data-atelier-question]').forEach((c) => c.addEventListener('change', () => { if (!c.value) return; const id = c.getAttribute('data-atelier-question'); atelierVerifier6([id], { [id]: { [c.getAttribute('data-champ')]: c.value } }); }));
     R.querySelectorAll('[data-atelier-retirer]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-atelier-retirer'); geste6.ids = geste6.ids.filter((x) => x !== id); atelierVerifier6([], null); }));
+    const aaR = R.querySelector('[data-aa-retour]'); if (aaR) aaR.addEventListener('click', () => { if (geste6) { geste6.aa = false; geste6.hausseConf = null; } rendre(); });
     const la = R.querySelector('[data-atelier-lancer]'); if (la) la.addEventListener('click', () => {
       const g = geste6;
+      if (!g.aa) { g.aa = true; geste6Etat = null; rendre(); return; }   // 5.423 : d'abord la feuille Avant | Après
       envoyer6({ action: 'atelierLancer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, confirme: true }, (r) => {
         if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
     });
@@ -2846,10 +2940,10 @@ function vrmVerifVisible(sel) {
     //    « sans retour »), rendue par le fond lui-même ; « Oui, supprimer de Leboncoin » renvoie avec `sansRetour`.
     const cs = annConfirme && annConfirme.k === 'supprimer' && annConfirme.conf ? annConfirme.conf : null;
     const conf = cs ? `<div class="conf5" role="alertdialog" data-ann-confirme="supprimer" data-irreversible><p><b>${esc(cs.titre)}</b></p>${(cs.lignes || []).map((l) => `<p>${esc(l)}</p>`).join('')}<p class="note5">${esc(cs.reste || '')}</p><p><b>${esc(cs.sansRetour || '')}</b></p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(cs.ok)}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div></div>`
-      : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
+      : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>${U.MODIF && (annConfirme.k === 'masquer' || annConfirme.k === 'afficher') ? `<div class="aa6" data-ann-aa>${U.MODIF.avantApresHtml(lignesMasquer6(annConfirme))}</div>` : ''}` : '';   // 5.423 : l'avant / après de chaque annonce
     const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
-    const haut = outils + conf + res + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
+    const haut = outils + conf + res + suiviModif6Html(!!(listes && listes.atelier && Array.isArray(listes.atelier.ids))) + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
     if (!vus.length) return haut + `<div class="val gris vide6" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
     if (annVue === 'grille') {
       return haut + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))} · ${etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')))}</span></button></li>`).join('')}</ul>`

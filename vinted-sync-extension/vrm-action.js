@@ -106,6 +106,13 @@
   .chaine [data-etat="encours"] .pu { opacity: 1; animation: vu-pouls 1.4s ease-in-out infinite; }
   @keyframes vu-pouls { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
   @media (max-width: 560px) { .chaine { justify-content: center; } }
+  /* 5.423 : la frise d'une modification (preuve par preuve), le temps, et le bilan Avant | Après. */
+  .modif { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
+  .modif .vu-frise { color: var(--vu-sur-2); }
+  [data-action-bilan] .boite { width: min(680px, 100%); }
+  [data-action-bilan] .titre { font-size: 22px; }
+  [data-action-bilan] .vu-bl { max-height: min(56vh, 520px); overflow: auto; overscroll-behavior: contain; }
+  @media (max-width: 560px) { [data-action-bilan] .boite { align-content: start; } [data-action-bilan] .vu-bl { max-height: none; } }
   @media (prefers-reduced-motion: reduce) { .anim .voile, .anim .boite, .anim .pastille, .sort, .chaine .pu { animation: none; } }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
@@ -216,7 +223,7 @@
   // Un script de la page qui fait défiler pendant l'écran : remis où il était.
   window.addEventListener('scroll', () => { if (plein() && verrou && (window.scrollY !== verrou.y || window.scrollX !== verrou.x)) { try { window.scrollTo(verrou.x, verrou.y); } catch (_) {} } }, { capture: true, passive: true });
 
-  const NOMS = { favoris: 'a_favoris', republier: 'a_republier', baisse: 'a_baisse', offres: 'a_offres', apresvente: 'a_apresvente', supprimer: 'a_supprimer' };   // 5.410.4
+  const NOMS = { favoris: 'a_favoris', republier: 'a_republier', baisse: 'a_baisse', offres: 'a_offres', apresvente: 'a_apresvente', supprimer: 'a_supprimer', masquer: 'm3_a_masquer' };   // 5.410.4 · 5.423
   const QUOI = { ouverture: 'q_ouverture', sorte: 'q_sorte', heure: 'q_heure', jour: 'q_jour', rythme: 'q_rythme', 'autre-compte': 'q_autre', serie: 'q_serie', rodage: 'q_rodage', espace: 'q_espace', calme: 'q_calme' };
   function compte(a) { return a.total > 0 ? T('f_sur', { n: Number(a.fait) || 0, total: Number(a.total) }) : T('a_faites', { n: Number(a.fait) || 0 }); }
   const vinted = (u) => u && /^https:\/\/[\w.-]*vinted\.net\//.test(String(u));
@@ -231,7 +238,23 @@
   };
   // 5.408 (`repubetapes`) : l'étape de LA paire en cours, telle que le service worker l'a annoncée
   // (coffre › brouillon › supprimée › en ligne). Rendue au premier dessin ET tenue à jour sur place (majPlein).
+  // 5.423 (`modifavantapres`) : une modification d'annonce (republier, prix, masquer) a SA frise — chaque étape cochée sur SA
+  //    preuve (vrm-ui.js `<frise-modif-regle>`), l'étape en cours animée sobrement, le temps écoulé et l'estimation.
+  const M = U.MODIF || null;
+  const modifDe = (a) => (M && a && a.modif && M.ETAPES[a.modif.sorte] && a.item && String(a.modif.id || '') === String(a.item.id || '') ? a.modif : null);
+  const tempsTxt = (a, m) => {
+    const ecoule = Math.max(0, Date.now() - Number(m.debut || Date.now()));
+    const est = Number(m.estimeMs) > 0 ? Number(m.estimeMs) : 0;
+    const apres = Math.max(0, (Number(a.total) || 0) - (Number(a.fait) || 0) - 1);
+    return est ? T('m3_ecoule', { e: U.duree(ecoule), r: U.duree(Math.max(0, est - ecoule) + apres * est) }) : T('m3_ecoule_seul', { e: U.duree(ecoule) });
+  };
+  const modifHtml = (a) => { const m = modifDe(a); return m ? `<div class="modif" data-modif="${esc(m.sorte)}">${M.friseHtml(m)}<div class="vu-sous" data-modif-temps>${esc(tempsTxt(a, m))}</div></div>` : ''; };
+  // L'après : le bilan de la série (avant | après, « Voir sur Vinted » ; ce qui s'est arrêté, en ambre, avec « Reprendre »).
+  const bilanVu = (a) => !!(M && a && a.modif && a.modif.fin && Array.isArray(a.bilan) && a.bilan.length && !(a.actif && a.enCours));
+  let fermeDebut = 0, repriseModif = '';
+  try { fermeDebut = Number(sessionStorage.getItem('vrm_modif_ferme')) || 0; } catch (_) {}
   const chaineHtml = (a) => {
+    if (modifDe(a)) return modifHtml(a);
     const it = a.item || {};
     const rp = a.sorte === 'republier' && a.repub && String(a.repub.id || '') === String(it.id || '') ? a.repub : null;
     if (!rp) return '';
@@ -242,6 +265,8 @@
       return `<li data-etape="${k}" data-etat="${etat}"${k === 'enligne' && du ? ` data-action-enligne="${du}"` : ''}><span class="pu" aria-hidden="true">${etat === 'faite' ? '✓' : ''}</span>${esc(nom)}</li>`; }).join('')}</ol>`;
   };
   const numDe = (it) => (num && numPour === String(it.id || '') ? U.etiquette(num, true) : (it.num ? U.etiquette(it.num, true) : ''));
+  // 5.423 : le temps écoulé de la modification en cours, chaque seconde (rien d'autre n'est redessiné).
+  setInterval(() => { if (vue !== 'plein' || !action) return; const m = modifDe(action), tp = racine.querySelector('[data-modif-temps]'); if (m && tp) { const t = tempsTxt(action, m); if (tp.textContent !== t) tp.textContent = t; } }, 1000);
   function minuter() {
     clearInterval(minuteur); minuteur = null;
     const dans = racine.querySelector('[data-action-dans]');
@@ -261,6 +286,12 @@
     if (ti) { const t = it.titre || ''; if (ti.textContent !== t) ti.textContent = t; ti.hidden = !t; }
     const su = racine.querySelector('[data-action-suite]');
     if (su) { const h = suiteHtml(a); if (su.getAttribute('data-h') !== h) { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); su.replaceChildren(...Array.from(d.body.childNodes)); su.setAttribute('data-h', h); } }
+    // 5.423 : la frise de la modification, sur place (remplacée seulement si une étape change ; le temps, chaque seconde).
+    if (modifDe(a)) {
+      const m = modifDe(a), h = M.friseHtml(m), fr = racine.querySelector('.modif .vu-frise');
+      if (!fr || fr.outerHTML !== h) { const d = new DOMParser().parseFromString('<body>' + modifHtml(a) + '</body>', 'text/html'); const el = d.body.firstElementChild; const cur = racine.querySelector('.modif'); if (cur) cur.replaceWith(el); else if (su) su.after(el); }
+      const tp = racine.querySelector('[data-modif-temps]'); if (tp) tp.textContent = tempsTxt(a, m);
+    } else
     // 5.408 : la chaîne des étapes suit la paire en cours, sur place (remplacée seulement si elle change).
     { const h = chaineHtml(a), ch = racine.querySelector('.chaine'), cur = ch ? ch.outerHTML : '';
       if (h !== cur) { if (!h) { if (ch) ch.remove(); } else { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); const el = d.body.firstElementChild;
@@ -314,6 +345,12 @@
     }
     racine.removeAttribute('data-h');
     hote.removeAttribute('data-cote-bas');   // 5.410.5 : plus de bandeau en haut
+    // 5.423 (`modifavantapres`) : l'APRÈS — le bilan de la série reste jusqu'à SON « Fermer » (ou la prochaine annonce).
+    if (bilanVu(a)) {
+      if (fermeDebut && Number(a.modif.debut) === fermeDebut) { clearInterval(minuteur); minuteur = null; vue = 'ferme'; hote.style.display = 'none'; poser(''); deverrouiller(); gel(false); return; }
+      rendreBilan(a);
+      return;
+    }
     if (!a.actif) {
       // La fin : un ✓ (ou « Arrêté »), puis l'écran s'efface ; tout est rendu à la page.
       clearInterval(minuteur); minuteur = null;
@@ -342,7 +379,7 @@
     const entree = neuf && lot !== lotAvant;
     racine.classList.toggle('anim', entree);
     if (entree) setTimeout(() => racine.classList.remove('anim'), 450);
-    lotVu = lot; vue = 'plein';
+    lotVu = lot; vue = 'plein'; if (modifDe(a)) lotModif = lot;
     poser(`<div class="voile" data-action-plein data-lot="${esc(lot)}" role="dialog" aria-modal="true" aria-label="${esc(titre)}"><div class="boite vu-coque vu-sur-coque">
         <div class="h"><span class="vu-point"></span><span>VRM · ${esc(T('a_en_direct'))}</span></div>
         <div class="corps">
@@ -364,6 +401,39 @@
     try { const b = racine.querySelector('[data-arreter]'); if (b && !racine.contains(ombre.activeElement)) b.focus({ preventScroll: true }); } catch (_) {}
     minuter();
     brancher();
+  }
+  // 5.423 : le bilan (après une annonce, ou à la fin / à l'arrêt de la série) — Avant | Après, « Voir sur Vinted », et ce qui
+  //    s'est arrêté (l'étape en ambre, la phrase, « Reprendre » sur SON toucher). Vinted n'est plus verrouillé : c'est fini ici.
+  function rendreBilan(a) {
+    clearInterval(minuteur); minuteur = null;
+    deverrouiller(); gel(false);
+    const arret = !a.actif && a.fin && a.fin.raison === 'arret';
+    const encore = a.actif === true && (Number(a.total) || 0) > (Number(a.fait) || 0);
+    const nom = T(NOMS[a.sorte] || 'a_republier');
+    const b = a.bilan.filter((x) => x && x.sorte === a.sorte);
+    const h = `<div class="voile" data-action-bilan="${esc(lotDe(a))}" data-fin="${arret ? 'arret' : encore ? 'suite' : 'fini'}" role="dialog" aria-modal="true" aria-label="${esc(nom)}"><div class="boite vu-coque vu-sur-coque">
+        <div class="h"><span class="vu-point"${arret ? ' data-k="arrete"' : ''}></span><span>VRM · ${esc(nom)} · ${esc(compte(a))}</span></div>
+        <div class="titre">${esc(arret ? T('a_arrete') : encore ? T('m3_suivi', { i: Number(a.fait) || 0, n: Number(a.total) || 0 }) : T('m3_suivi_fin'))}</div>
+        ${M.bilanHtml(b, { domaine: location.hostname })}
+        ${repriseModif ? `<div class="dit" role="status" data-modif-reprise-ko>${esc(repriseModif)}</div>` : ''}
+        <div class="gestes${encore ? '' : ' seul'}">${encore ? `<button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button><button class="vu-btn vu-sec" data-modif-fermer>${esc(T('m3_fermer'))}</button>` : `<button class="vu-btn vu-plein" data-modif-fermer>${esc(T('m3_fermer'))}</button>`}</div>
+      </div></div>`;
+    if (vue === 'bilan' && racine.getAttribute('data-hb') === h) return;
+    vue = 'bilan'; poser(h); racine.setAttribute('data-hb', h);
+    brancher();
+    const f = racine.querySelector('[data-modif-fermer]');
+    if (f) f.addEventListener('click', () => { fermeDebut = Number(a.modif.debut) || 0; try { sessionStorage.setItem('vrm_modif_ferme', String(fermeDebut)); } catch (_) {} repriseModif = ''; rendre(); });
+    racine.querySelectorAll('[data-modif-reprendre]').forEach((x) => x.addEventListener('click', () => {
+      x.disabled = true; repriseModif = '';
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-action', action: 'reprendreModif', id: x.getAttribute('data-modif-reprendre'), confirme: true }, (r) => {
+          void chrome.runtime.lastError;
+          if (!(r && r.ok)) { repriseModif = (r && r.raison) || T('m3_a_reprendre'); x.disabled = false; racine.removeAttribute('data-hb'); rendre(); }
+          lire();
+        });
+      } catch (_) { x.disabled = false; }
+    }));
+    try { const btn = racine.querySelector('[data-modif-fermer]'); if (btn && !racine.contains(ombre.activeElement)) btn.focus({ preventScroll: true }); } catch (_) {}
   }
   // La vérification est-elle FAITE ? Plus de captcha dans la page, et une réponse normale de Vinted
   // rangée par l'extension APRÈS l'arrêt (`vrmFlux.vinted.okAt`). Lu toutes les 1,5 s ; rien ne repart seul.
@@ -422,8 +492,14 @@
   }
   const FRAIS_MS = 3 * 60000;
   // Ce que dit un état (réponse du fond, ou relu dans chrome.storage.local quand le fond ne répond pas).
+  let lotModif = '';
   function appliquer(a, sur) {
     const avant = action;
+    // 5.423 : le bilan d'une modification de CE lot (vu dans cet onglet) prend la place, même après « Tout arrêter » ;
+    //    il reste affiché jusqu'à « Fermer » ou jusqu'à la prochaine annonce qui démarre.
+    if (a && a.modif && a.modif.fin && Array.isArray(a.bilan) && a.bilan.length && !(a.actif && a.enCours) && lotModif && lotDe(a) === lotModif) { action = a; finA = 0; nulA = 0; rendre(); return; }
+    if (vue === 'bilan' && action && !(a && a.actif && a.enCours)) return;
+    if (a && a.actif && a.enCours && a.modif && fermeDebut && Number(a.modif.debut) !== fermeDebut) fermeDebut = 0;
     // « Tout arrêter » vient d'être touché : un état lu AVANT l'arrêt ne rallume pas l'écran.
     if (a && a.actif && Date.now() - arretA < 5000) return;
     if (a && a.actif) { action = a; finA = 0; nulA = 0; }
