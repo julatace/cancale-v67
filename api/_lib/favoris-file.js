@@ -219,7 +219,7 @@ export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version
   // (20 nov., ext. 5.410.3 `favorisbleam`) `aimes` : combien d'articles de CE compte la personne a mis en favori dans la file
   // (le message « lot » part à partir de 2, une fois par personne, côté extension).
   e.autorise=true;
-  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,aimes:new Set(g.jobs.filter(x=>x&&x.recipientId===j.recipientId).map(x=>x.itemId)).size,message:j.message,...(variantesValides(j.variantes)?{variantes:j.variantes}:{}),...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
+  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),...(j.notificationId?{notificationId:String(j.notificationId)}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,aimes:new Set(g.jobs.filter(x=>x&&x.recipientId===j.recipientId).map(x=>x.itemId)).size,message:j.message,...(variantesValides(j.variantes)?{variantes:j.variantes}:{}),...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
 }
 export function verifierReservation(d,{owner,jeton,maintenant}){
   d=initialiserFile(d);const e=d.enCours;

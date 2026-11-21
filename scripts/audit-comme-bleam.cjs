@@ -156,13 +156,14 @@ async function auditerRepub() {
 // ── LES FAVORIS ─────────────────────────────────────────────────────────────
 const JETON = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'jeton' };
-function monterFav({ offre = true, aimes = 1, fiche = { numero: '41', min: '40' }, achat = null, message = 'Bonjour {username} !', store, apresReponse, prixFil = false } = {}) {
+function monterFav({ offre = true, aimes = 1, fiche = { numero: '41', min: '40' }, achat = null, message = 'Bonjour {username} !', store, apresReponse, prixFil = false, cloche = ['n-banc', 'n-autre'] } = {}) {
   // 5.410.5 : la VRAIE forme mesurée le 20 nov. — chaque photo porte `is_suspicious: false` (réponse normale, 200).
   const photosVraies = [{ id: 1, is_suspicious: false }, { id: 2, is_suspicious: false }];
   const conv = { id: 301, opposite_user: { id: 201, login: 'pseudo_banc' }, transaction: { id: 5001, item_id: 101, ...(prixFil ? { item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' }, photos: photosVraies } } : {}) }, allow_reply: true, messages: [] };
   const lignes = { main: { vinted_annonce_numeros: { '101': fiche }, ...(achat ? { vinted_buyprice_by_num: { '41': achat } } : {}) } };
   const f = faireFond({ src: BG, connecte: UID, comptes: [ACC], lignes, store: store || { __commeBleamDefaut: true },
     vinted: (e) => {
+      if (e.methode === 'GET' && /\/inbox-notifications\/v1\/notifications$/.test(e.chemin)) return { status: 200, body: { notifications: cloche.map((id) => ({ id, entry_type: 20 })) } };   // 5.410.8 : la cloche
       if (e.methode === 'POST' && /\/api\/v2\/conversations$/.test(e.chemin)) return { status: 200, body: { conversation: conv, code: 0 } };
       if (e.methode === 'PUT' && /\/mark_as_read$/.test(e.chemin)) return { status: 200, body: { code: 0 } };
       if (e.methode === 'GET' && /\/api\/v2\/conversations\/\d+$/.test(e.chemin)) return { status: 200, body: { conversation: conv } };
@@ -175,7 +176,7 @@ function monterFav({ offre = true, aimes = 1, fiche = { numero: '41', min: '40' 
   f.ctx.fetch = async (url, o = {}) => {
     if (String(url).startsWith('https://vrm.center/api/compte')) {
       const c = JSON.parse(o.body || '{}');
-      const j = c.action === 'consommer' ? { ok: true, uid: UID, suivi: 's', travail: { itemId: '101', recipientId: '201', initiator: 'native-fixture', aimes, message, ...(offre ? { offre: { mode: 'pct', valeur: 10, arrondi: false } } : {}) } } : { ok: true, autorise: true, uid: UID };
+      const j = c.action === 'consommer' ? { ok: true, uid: UID, suivi: 's', travail: { notificationId: 'n-banc', itemId: '101', recipientId: '201', initiator: 'native-fixture', aimes, message, ...(offre ? { offre: { mode: 'pct', valeur: 10, arrondi: false } } : {}) } } : { ok: true, autorise: true, uid: UID };
       return { ok: true, status: 200, json: async () => j };
     }
     return fetchFond(url, o);
@@ -202,12 +203,23 @@ async function auditerFavoris() {
     const m2 = (corpsDe(f2, /replies$/)[0] || {}).reply || {};
     dit(m2.body && !/plusieurs de mes articles/.test(m2.body), 'F5b — une seule fois par personne : la fois suivante, le message choisi', m2.body); }
   { const f = monterFav({ fiche: { numero: '41' } }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
-    dit(r.json.resultat === 'envoye' && !/O/.test(seqFav(f)), 'F6 — ni prix mini ni prix d’achat ⇒ PAS d’offre (le message part)', seqFav(f)); }
+    const o6 = corpsDe(f, /offers$/)[0];
+    dit(r.json.resultat === 'envoye' && seqFav(f) === 'CMO' && o6 && o6.offer.price === '45', 'F6 — 5.410.8 (Julien : « comme Bleam ») : ni prix mini ni achat ⇒ l’offre part QUAND MÊME, au % réglé (45 €), après le message', `${seqFav(f)} ${JSON.stringify(o6)}`); }
   { const f = monterFav({ fiche: { numero: '41', min: '48' } }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
-    dit(!/O/.test(seqFav(f)), 'F7 — l’offre de sa règle (45 €) serait sous le prix mini (48 €) ⇒ pas d’offre', seqFav(f)); }
+    const o7 = corpsDe(f, /offers$/)[0];
+    dit(seqFav(f) === 'CMO' && o7 && o7.offer.price === '48', 'F7 — l’offre de sa règle (45 €) sous le prix mini (48 €) ⇒ REMONTÉE à 48 €, jamais dessous', `${seqFav(f)} ${JSON.stringify(o7)}`); }
+  { const f = monterFav({ fiche: { numero: '41', min: '50' } }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(r.json.resultat === 'envoye' && seqFav(f) === 'CM', 'F17 — prix mini au prix de l’annonce (50 €) ⇒ aucune offre possible (le message, qui ne l’annonce pas, part)', seqFav(f)); }
+  { const f = monterFav({ message: 'Bonjour {username}, je te propose une offre dessus !' }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(seqFav(f) === 'COM', 'F18 — un texte qui ANNONCE une offre ⇒ l’offre part AVANT lui (jamais une offre annoncée qui n’existe pas)', seqFav(f)); }
+  { const f = monterFav({ fiche: { numero: '41', min: '50' }, message: 'Bonjour {username}, je te propose une offre dessus !' }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(r.json.resultat === 'ignore' && !/[MO]/.test(seqFav(f)), 'F18b — texte qui annonce une offre, offre impossible (plancher au prix) ⇒ ni offre ni message', `${seqFav(f)} ${JSON.stringify(r.json)}`); }
+  { const f = monterFav({ cloche: ['n-autre'] }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
+    dit(r.json.resultat === 'ignore' && r.json.raison === 'favori_trop_ancien' && seqFav(f) === '', 'F19 — le favori n’est plus dans la cloche de Vinted (trop ancien) ⇒ rien n’est écrit, sauté et dit', `${seqFav(f)} ${JSON.stringify(r.json)}`); }
   { const f = monterFav({ fiche: { numero: '41' }, achat: '30' }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const f2 = monterFav({ fiche: { numero: '41' }, achat: '42' }); await f2.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
-    dit(/O$/.test(seqFav(f)) && !/O/.test(seqFav(f2)), 'F8 — sans prix mini, le plancher est l’achat + 10 % (30 € ⇒ 33 € : offre ; 42 € ⇒ 46,20 € : pas d’offre)', `${seqFav(f)} / ${seqFav(f2)}`); }
+    const o8 = corpsDe(f, /offers$/)[0], o8b = corpsDe(f2, /offers$/)[0];
+    dit(o8 && o8.offer.price === '45' && o8b && o8b.offer.price === '46.20', 'F8 — sans prix mini, le plancher est l’achat + 10 % (30 € ⇒ 33 € : offre à 45 € ; 42 € ⇒ 46,20 € : offre remontée à 46,20 €)', `${JSON.stringify(o8)} / ${JSON.stringify(o8b)}`); }
   { const f = monterFav({ message: 'Je vous propose {prix} !' }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     dit(seqFav(f) === 'COM', 'F9 — un message qui annonce le prix de l’offre ({prix}) garde l’ordre d’avant : offre puis message (jamais un prix annoncé pour une offre pas faite)', seqFav(f)); }
   { const f = monterFav({ apresReponse: (ff) => { ff.store.vrmToutArrete = { on: true, at: Date.now() }; } }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
@@ -219,7 +231,8 @@ async function auditerFavoris() {
   //        → POST replies → POST offers ; le fil porte le prix ⇒ AUCUNE lecture de la transaction, aucun PUT.
   { const f = monterFav({ prixFil: true }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const seq = f.j.vinted.map((v) => `${v.methode} ${String(v.chemin).replace(/\d+/g, '#')}`).join(' | ');
-    dit(r.json.resultat === 'envoye' && seq === 'POST /api/v#/conversations | GET /api/v#/conversations/# | POST /api/v#/conversations/#/replies | POST /api/v#/transactions/#/offers', 'F12 — exactement les 4 requêtes de Bleam, dans son ordre (relecture du fil, ni `mark_as_read` ni transaction relue)', seq); }
+    const pc = (f.ctx.__vrmPausesVues || []).find((x) => x[0] === 'favori:cloche');
+    dit(r.json.resultat === 'envoye' && seq === 'GET /inbox-notifications/v#/notifications | POST /api/v#/conversations | GET /api/v#/conversations/# | POST /api/v#/conversations/#/replies | POST /api/v#/transactions/#/offers' && pc && pc[1] >= 3800, 'F12 — exactement les 5 requêtes de Bleam, dans son ordre (la cloche, ≥ 3,8 s, la conversation, sa relecture, le message, l’offre)', seq + ' ' + JSON.stringify(pc)); }
   // F15 — 5.410.5 : comme Bleam (« il ouvre un onglet tout petit, le sien, et c'est là qu'il fait ses actions ») : TOUTES les
   //        requêtes de la séquence partent de l'ONGLET DE TRAVAIL VRM, jamais de l'onglet où il navigue (7).
   { const f = monterFav({ prixFil: true });
@@ -228,7 +241,7 @@ async function auditerFavoris() {
     const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const cree = (f.j.ongletsCrees || [])[0];
     const tabs = f.j.vinted.map((v) => v.tab);
-    dit(r.json.resultat === 'envoye' && cree && cree.active === false && tabs.length === 4 && tabs.every((t) => t === cree.id) && (f.store.vrmOngletTravail || {}).tabId === cree.id, 'F15 — les 4 requêtes partent de l’onglet de travail VRM (ouvert en arrière-plan, retenu), aucune de son onglet', JSON.stringify({ cree, tabs })); }
+    dit(r.json.resultat === 'envoye' && cree && cree.active === false && tabs.length === 5 && tabs.every((t) => t === cree.id) && /\/inbox$/.test(cree.url) && (f.store.vrmOngletTravail || {}).tabId === cree.id, 'F15 — les 5 requêtes (cloche comprise) partent de l’onglet de travail VRM (ouvert sur /inbox en arrière-plan, retenu), aucune de son onglet', JSON.stringify({ cree, tabs })); }
   // F16 — l'onglet de travail FERMÉ pendant une série (vu par Chrome) ⇒ rien ne part, dit ; la fois suivante, un neuf s'ouvre.
   { const f = monterFav({ store: { __commeBleamDefaut: true, vrmOngletTravail: { tabId: 999, uid: UID, maj: Date.now() - 20000, fermeAt: Date.now() - 1000 } } });
     const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
@@ -252,7 +265,9 @@ const MUTATIONS = [
   ['sans-ecart', "  if (!ecarts || ecarts.length) {\n    noterDiag('formulaire_brouillon_ecart');", "  if (false) {\n    noterDiag('formulaire_brouillon_ecart');"],
   ['suppression-incertaine-publie', "  if (!rd.ok) return fin(rd.r);", "  if (!rd.ok && !/incertain/.test(String(rd.r && rd.r.etape))) return fin(rd.r);"],
   ['sans-arret', "  try { if ((await toutArreteDepuis(null)) > 0) return { code: 'tout-arrete', raison: \"« Tout arrêter » a été touché\" }; } catch (_) {}", ''],
-  ['sans-plancher', "  if (!pl) { noterDiag('favori_offre_sans_plancher'); return fini; }", "  if (!pl) { noterDiag('favori_offre_sans_plancher'); }\n  if (pl && Math.round(Number(prix) * 100) < pl.c) { return fini; }\n  if (false) { return fini; }"],
+  ['sans-remontee', "  if (pl && c < pl.c) { c = pl.c; noterDiag('favori_offre_remontee_plancher'); }", ''],
+  ['sans-cloche', "    if(liste&&!liste.some(n=>n&&String(n.id)===String(body.notificationId))){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}", ''],
+  ['offre-apres-annonce', "    if(versionB&&!(offre&&(prixRequisFavori(versionB.texte)||annonceOffreFavori(versionB.texte)))){", "    if(versionB&&!(offre&&prixRequisFavori(versionB.texte))){"],
   ['initiateur', "initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator", 'initiator:body.initiator'],
   ['fil-pas-relu', "  if(seqBleam||!filVerifiable(c)){", "  if(!filVerifiable(c)){"],
   ['tx-toujours-lue', "  if(seqBleam&&(prFil||!offre)){", "  if(false){"],
