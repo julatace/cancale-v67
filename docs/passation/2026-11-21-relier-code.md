@@ -75,8 +75,10 @@ des colis touchée.
   sur cinq à 3 achats identiques, une sur sept servie par un lot de 2) : 390/1512 clair/sombre **84 verts** ; sur le build
   d'avant (`BANC_DIST`, 390) : rouge (aucune meilleure, aucun « Relier »).
 - Banc `scripts/bancs/retrait-billet.cjs` (3 colis inventés reliés à leurs achats, 2 au même point, un VRAI QR du code par
-  qrcode-generator) : code, QR, bandeau, photo, un seul niveau, hauteur ≤ 240, aucun bleu, aucun « Copier », plein écran — voir le
-  compte rendu de fin pour les chiffres ; sur le build d'avant : rouge.
+  qrcode-generator) : code, QR, bandeau, photo, un seul niveau, hauteur ≤ 240 (184 / 231 / 172 px), aucun bleu, aucun « Copier »,
+  plein écran : B 390+1512 clair/sombre **106 verts**, A 390 **54 verts** ; sur le build d'avant (390) : rouge.
+- `retraits-visuel` 240 verts (K : plus de « Copier » ; I : photo ≥ 48), `relais-prevision` 52, `audit-retraits-parfaits` F5 suit
+  l'attribut de la sorte déplacé.
 - `audit-identite`, `audit-traduction`, `audit-quoi-de-neuf`, `audit-icones`, `audit-tdz`, `audit-variables`,
   `audit-relier-glisser` (75), `audit-liaison-achat` (37), `audit-retraits-visuel`, `audit-retraits-parfaits`,
   `audit-pluriels-croises` verts. `audit-boutons-natifs` rouge AUSSI avant (AchatsTableau ligne 30, Reglages) : pas touché.
