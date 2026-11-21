@@ -19662,6 +19662,173 @@ async function prixMiniAnnonce(itemId) {
   let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
   return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
+// <favoris-perso-regle>
+const FP_VARS = { 'prénom': 'prenom', prenom: 'prenom', pseudo: 'pseudo', username: 'pseudo', article: 'article', marque: 'marque', taille: 'taille', prix: 'prix', prix_offre: 'prix_offre', remise: 'remise' };
+// Variables qui peuvent manquer pour un favori (la version qui les porte est alors sautée).
+const FP_INCERTAINES = ['marque', 'taille', 'prix_offre', 'remise'];
+const FP_SEUIL_MESURE = 10;              // moins d'envois ⇒ « non mesuré »
+const FP_VENDU_JOURS = 14;               // vendu dans les 14 j après le message (annonce du message = annonce vendue)
+// Les variables d'un texte : { vars: Set des noms canoniques, inconnue: '{x}' ou '', accolade: bool }.
+function fpLireVariables(modele) {
+  const vars = new Set(); let inconnue = '';
+  const reste = String(modele == null ? '' : modele).replace(/\{([^{}]*)\}/g, (tout, d) => {
+    const k = Object.prototype.hasOwnProperty.call(FP_VARS, d) ? FP_VARS[d] : '';
+    if (k) { vars.add(k); return ''; }
+    const o = d.split('|'); if (o.length >= 2 && o.every((x) => x.length <= 200)) return '';
+    if (!inconnue) inconnue = tout.slice(0, 40); return '';
+  });
+  return { vars, inconnue, accolade: /[{}]/.test(reste) };
+}
+// L'erreur d'écriture d'un texte (rien = '') : vide, trop long, variable inconnue, accolade pas fermée.
+function fpErreurTexte(modele) {
+  const t = String(modele == null ? '' : modele);
+  if (!t.trim()) return 'vide';
+  if (t.trim().length > FP_TEXTE_MAX) return 'long';
+  const v = fpLireVariables(t);
+  if (v.inconnue) return 'variable';
+  if (v.accolade) return 'accolade';
+  return '';
+}
+// Une version « sûre » : n'utilise que des variables toujours connues (l'enregistrement en exige une en « 1 article »).
+const fpVersionSure = (t) => !fpErreurTexte(t) && !FP_INCERTAINES.some((k) => fpLireVariables(t).vars.has(k));
+const fpEuros = (v) => { const n = Number(v); if (!(isFinite(n) && n > 0)) return ''; const c = Math.round(n * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
+const fpPropre = (s, n) => (typeof s === 'string' ? s.replace(/[{}\s]+/g, ' ').trim().slice(0, n) : '');
+// Les valeurs SUES pour ce favori ('' = pas su). `fav` : { pseudo, article, marque, taille, prix } ; `offre` : { prix } ou null.
+function fpValeurs(fav, offre) {
+  const f = fav && typeof fav === 'object' ? fav : {};
+  const pseudo = fpPropre(f.pseudo, 80);
+  const prix = Number(f.prix) > 0 ? Number(f.prix) : null, po = offre && Number(offre.prix) > 0 ? Number(offre.prix) : null;
+  const remise = prix && po && po < prix ? Math.round((1 - po / prix) * 100) : 0;
+  return { prenom: pseudo, pseudo, article: fpPropre(f.article, 80) || 'cet article', marque: fpPropre(f.marque, 40), taille: fpPropre(f.taille, 30),
+    prix: fpEuros(po != null ? po : prix), prix_offre: po != null ? fpEuros(po) : '', remise: remise > 0 ? remise + ' %' : '' };
+}
+// Les variables d'un texte dont la valeur n'est pas sue pour ce favori.
+function fpManque(modele, val) { return [...fpLireVariables(modele).vars].filter((k) => !val[k]); }
+// Pose les variables NOUVELLES ({prénom} {marque} {taille} {prix_offre} {remise}) ; laisse {pseudo} {username}
+// {article} {prix} {a|b} à `personnaliserMessageFavori` (la règle d'avant, inchangée, qui les pose à l'envoi).
+function fpPreremplir(modele, val) {
+  return String(modele == null ? '' : modele).replace(/\{([^{}]*)\}/g, (tout, d) => {
+    const k = Object.prototype.hasOwnProperty.call(FP_VARS, d) ? FP_VARS[d] : '';
+    if (k === 'prenom' || k === 'marque' || k === 'taille' || k === 'prix_offre' || k === 'remise') return val[k] || tout;
+    return tout;
+  });
+}
+// L'heure et le jour de Paris (0 = dimanche) au moment `t`.
+function fpContexteParis(t) {
+  const d = new Date(Number.isFinite(Number(t)) ? Number(t) : Date.now());
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23', weekday: 'short' }).formatToParts(d);
+    const h = Number((p.find((x) => x.type === 'hour') || {}).value), w = (p.find((x) => x.type === 'weekday') || {}).value;
+    const j = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(w);
+    if (Number.isInteger(h) && j >= 0) return { heure: h % 24, jour: j };
+  } catch (_) { /* Intl absent */ }
+  return { heure: d.getHours(), jour: d.getDay() };
+}
+const fpNormMarque = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Le nombre de conditions d'une règle (sa PRÉCISION).
+const fpPrecision = (r) => (r.heures ? 1 : 0) + (r.jours ? 1 : 0) + (r.prix ? 1 : 0) + (r.marques ? 1 : 0);
+// Une règle s'applique-t-elle ? Toutes ses conditions vraies ; une valeur pas sue rend sa condition FAUSSE.
+function fpRegleVraie(r, ctx, fav) {
+  if (!r || !fpPrecision(r)) return false;
+  if (r.heures) { const h = Number(ctx && ctx.heure); if (!Number.isInteger(h)) return false; const { de, a } = r.heures; if (!(de < a ? h >= de && h < a : h >= de || h < a)) return false; }
+  if (r.jours) { const j = Number(ctx && ctx.jour); if (!r.jours.includes(j)) return false; }
+  if (r.prix) { const p = Number(fav && fav.prix); if (!(p > 0)) return false; if (r.prix.min != null && p < r.prix.min) return false; if (r.prix.max != null && p > r.prix.max) return false; }
+  if (r.marques) { const m = fpNormMarque(fav && fav.marque); if (!m || !r.marques.some((x) => fpNormMarque(x) === m)) return false; }
+  return true;
+}
+// Les règles qui s'appliquent, dans l'ordre où elles sont essayées : la plus précise, puis la plus haute.
+function fpReglesApplicables(regles, ctx, fav) {
+  return (Array.isArray(regles) ? regles : []).map((r, i) => ({ r, i })).filter((x) => fpRegleVraie(x.r, ctx, fav))
+    .sort((x, y) => fpPrecision(y.r) - fpPrecision(x.r) || x.i - y.i).map((x) => x.r);
+}
+// Les groupes de versions essayés, dans l'ordre. `ancien` : { message, variantes, lot } (les textes d'avant).
+function fpGroupes(reglage, ancien, ctx, fav, lotPermis) {
+  const R = reglage && typeof reglage === 'object' ? fpReglage(reglage) : null;
+  const g = [];
+  if (R && R.un.length) {
+    if (lotPermis && R.lot.length) g.push({ cas: 'lot', regle: null, versions: R.lot.map((v) => ({ cle: v.id, n: null, lot: true, modele: v.texte })) });
+    for (const r of fpReglesApplicables(R.regles, ctx, fav)) g.push({ cas: 'regle', regle: r.id, versions: r.textes.map((v) => ({ cle: v.id, n: null, modele: v.texte })) });
+    g.push({ cas: 'un', regle: null, versions: R.un.map((v, i) => ({ cle: v.id, n: i < 5 ? i + 1 : null, modele: v.texte })) });
+    return { source: 'perso', groupes: g };
+  }
+  const a = ancien && typeof ancien === 'object' ? ancien : {};
+  if (lotPermis && typeof a.lot === 'string' && a.lot.trim() && a.lot.length <= FP_TEXTE_MAX) g.push({ cas: 'lot', regle: null, versions: [{ cle: 'lot', n: 0, lot: true, modele: a.lot.trim() }] });
+  const l = [a.message].concat(Array.isArray(a.variantes) ? a.variantes : []).slice(0, 5);
+  g.push({ cas: 'un', regle: null, versions: l.map((t, i) => ({ cle: 'a' + (i + 1), n: i + 1, modele: typeof t === 'string' ? t.trim() : '' })).filter((v) => v.modele) });
+  return { source: 'ancien', groupes: g };
+}
+// ── LE CHOIX ──────────────────────────────────────────────────────────────
+// x = { reglage, ancien, fav, offre ({ prix } ou null), ctx ({ heure, jour }), lotPermis, sur(texte)→bool,
+//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard }
+// → { ok: true, source, cas, regle, version: { cle, n, lot, modele, texte }, possibles }  (`texte` = variables nouvelles posées)
+//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable', manque: [...] }
+function choisirMessageFavori(x) {
+  const o = x && typeof x === 'object' ? x : {};
+  const val = fpValeurs(o.fav, o.offre);
+  const { source, groupes } = fpGroupes(o.reglage, o.ancien, o.ctx || {}, o.fav || {}, o.lotPermis === true);
+  const sur = typeof o.sur === 'function' ? o.sur : () => true, refusee = typeof o.refusee === 'function' ? o.refusee : () => false;
+  const d = o.derniere && typeof o.derniere === 'object' ? o.derniere : {};
+  const tirer = typeof o.hasard === 'function' ? o.hasard : Math.random;
+  let vuInterdit = false; const manques = new Set();
+  for (const g of groupes) {
+    const possibles = [];
+    for (const v of g.versions) {
+      if (fpErreurTexte(v.modele)) continue;
+      const m = fpManque(v.modele, val);
+      if (m.length) { m.forEach((k) => manques.add(k)); continue; }
+      const texte = fpPreremplir(v.modele, val);
+      if (!sur(texte) || refusee(v.modele)) { vuInterdit = true; continue; }
+      possibles.push(Object.assign({}, v, { texte }));
+    }
+    if (!possibles.length) continue;
+    let cands = possibles;
+    for (const k of [d.acheteur, d.compte]) { if (k == null || k === '') continue; const c = cands.filter((v) => v.cle !== String(k)); if (c.length) cands = c; }
+    const h = Number(tirer());
+    const v = cands[Math.min(cands.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cands.length)))];
+    return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length };
+  }
+  if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
+  return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
+}
+// Au moins une version qui pourrait partir (vérifiée AVANT toute écriture chez Vinted) : un texte sûr, jamais refusé.
+function fpUneEnvoyable(reglage, ancien, sur, refusee) {
+  const { groupes } = fpGroupes(reglage, ancien, {}, {}, true);
+  const s = typeof sur === 'function' ? sur : () => true, r = typeof refusee === 'function' ? refusee : () => false;
+  return groupes.some((g) => g.versions.some((v) => !fpErreurTexte(v.modele) && s(v.modele) && !r(v.modele)));
+}
+// Ce que le réglage a besoin de lire pour un favori (la marque / la taille ne sont lues que si un texte ou une règle les demande).
+function fpBesoins(reglage) {
+  const R = reglage && typeof reglage === 'object' ? fpReglage(reglage) : null;
+  if (!R) return { marque: false, taille: false };
+  const textes = R.un.concat(R.lot, ...R.regles.map((r) => r.textes)).map((v) => fpLireVariables(v.texte).vars);
+  return { marque: textes.some((s) => s.has('marque')) || R.regles.some((r) => !!r.marques), taille: textes.some((s) => s.has('taille')) };
+}
+// ── LES STATISTIQUES PAR VERSION ──────────────────────────────────────────
+// envois : [{ k (clé de version) | v (n° d'avant), t, i (annonce), o (offre faite) }] ;
+// ventes : Map annonce → date de la vente (ms) ou null (vendue, date pas sue) — annonces PROUVÉES vendues seulement.
+// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, mesure } } ; `vendus` = annonce du message vendue dans les
+//   14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à part : « au moins »).
+function statsVersionsFavoris(envois, ventes) {
+  const out = {};
+  const V = ventes instanceof Map ? ventes : new Map();
+  for (const e of Array.isArray(envois) ? envois : []) {
+    if (!e || typeof e !== 'object') continue;
+    const k = typeof e.k === 'string' && e.k ? e.k : Number(e.v) > 0 ? 'a' + Number(e.v) : Number(e.v) === 0 && e.v != null ? 'lot' : '';
+    if (!k) continue;
+    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, mesure: false };
+    s.envoyes++;
+    if (e.o === true || e.o === 1) s.avecOffre++;
+    const i = e.i != null ? String(e.i) : '';
+    if (i && V.has(i)) {
+      const dv = V.get(i), t = Number(e.t);
+      if (dv == null) s.vendusSansDate++;
+      else if (Number.isFinite(t) && dv >= t && dv - t <= FP_VENDU_JOURS * 864e5) s.vendus++;
+    }
+  }
+  for (const s of Object.values(out)) s.mesure = s.envoyes >= FP_SEUIL_MESURE;
+  return out;
+}
+// </favoris-perso-regle>
 // ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
 const INITIATEUR_BLEAM = 'seller_enters_notification';
 // 5.410.5 (« tous les envois pareils », export de l'Observateur du 20 nov.) : avant de RÉPONDRE dans une conversation où
@@ -27589,7 +27756,57 @@ function paliersPlus(o) {
 //    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
 //    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
 //    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing'];
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages'];
+// ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
+//    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
+//    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
+//    chacune ses versions). Ce n'est PAS une automatisation : `actif` reste toujours faux (rien à allumer, aucune
+//    confirmation) ; les versions servent dès qu'il y en a une « 1 article », sinon les textes d'avant restent la
+//    source (`vrm_favoris_reglages_{uid}` + le message lot de « comme Bleam »). Le choix du texte : <favoris-perso-regle>.
+//    Limite d'un message Vinted : 2 000 caractères (la borne de l'envoi, `body.message.length > 2000`).
+const FP_TEXTE_MAX = 2000, FP_VERSIONS_MAX = 8, FP_REGLES_MAX = 10, FP_REGLE_VERSIONS_MAX = 5, FP_MARQUES_MAX = 12;
+const fpId = (v) => (typeof v === 'string' && /^[a-z0-9]{1,16}$/.test(v) ? v : '');
+function fpVersions(l, pre, max) {
+  const out = [], vus = new Set();
+  for (const x of Array.isArray(l) ? l : []) {
+    const t = typeof x === 'string' ? x : x && typeof x === 'object' ? x.texte : null;
+    if (typeof t !== 'string' || !t.trim() || t.trim().length > FP_TEXTE_MAX) continue;
+    let id = fpId(x && x.id) || pre + (out.length + 1);
+    while (vus.has(id)) id = pre + (out.length + 1) + 'x' + vus.size;
+    vus.add(id); out.push({ id, texte: t.trim() });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function fpRegles(l) {
+  const out = [], vus = new Set();
+  for (const r of Array.isArray(l) ? l : []) {
+    if (!r || typeof r !== 'object') continue;
+    const h = r.heures && typeof r.heures === 'object' ? r.heures : null;
+    const hd = h ? bleamEnt(h.de, 0, 23, null) : null, hf = h ? bleamEnt(h.a, 1, 24, null) : null;
+    const jours = Array.isArray(r.jours) ? [...new Set(r.jours.map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort() : [];
+    const p = r.prix && typeof r.prix === 'object' ? r.prix : null;
+    const pn = p && p.min != null && p.min !== '' ? Number(p.min) : null, px = p && p.max != null && p.max !== '' ? Number(p.max) : null;
+    const prixOk = (pn == null || (Number.isFinite(pn) && pn >= 0 && pn <= 100000)) && (px == null || (Number.isFinite(px) && px > 0 && px <= 100000)) && !(pn != null && px != null && px < pn);
+    const marques = (Array.isArray(r.marques) ? r.marques : []).map((m) => String(m == null ? '' : m).replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean);
+    let id = fpId(r.id) || 'r' + (out.length + 1);
+    while (vus.has(id)) id = 'r' + (out.length + 1) + 'x' + vus.size;
+    const regle = { id,
+      heures: hd != null && hf != null && hd !== hf ? { de: hd, a: hf } : null,
+      jours: jours.length && jours.length < 7 ? jours : null,
+      prix: prixOk && (pn != null || px != null) ? { min: pn != null ? Math.round(pn * 100) / 100 : null, max: px != null ? Math.round(px * 100) / 100 : null } : null,
+      marques: marques.length ? [...new Set(marques)].slice(0, FP_MARQUES_MAX) : null,
+      textes: fpVersions(r.textes, id + 'v', FP_REGLE_VERSIONS_MAX) };
+    // Une règle sans condition ou sans texte ne s'appliquerait jamais (ou toujours) : elle n'est pas gardée.
+    if (!regle.textes.length || !(regle.heures || regle.jours || regle.prix || regle.marques)) continue;
+    vus.add(id); out.push(regle);
+    if (out.length >= FP_REGLES_MAX) break;
+  }
+  return out;
+}
+function fpReglage(o) {
+  return { actif: false, v: 1, un: fpVersions(o.un, 'u', FP_VERSIONS_MAX), lot: fpVersions(o.lot, 'l', FP_VERSIONS_MAX), regles: fpRegles(o.regles) };
+}
 const BLEAM_STRATEGIES = ['anti', 'destock', 'vierge'];
 const BLEAM_TRIS = ['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'];
 // Les stratégies prêtes (Bleam) : étapes en jours depuis la mise en ligne de l'annonce, `repeter` (jours après la
@@ -27630,6 +27847,7 @@ function bleamSection(nom, v) {
     return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
+  if (nom === 'favMessages') return fpReglage(o);
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }

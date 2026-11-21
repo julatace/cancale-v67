@@ -82,7 +82,57 @@ function paliersPlus(o) {
 //    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
 //    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
 //    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing'];
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages'];
+// ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
+//    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
+//    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
+//    chacune ses versions). Ce n'est PAS une automatisation : `actif` reste toujours faux (rien à allumer, aucune
+//    confirmation) ; les versions servent dès qu'il y en a une « 1 article », sinon les textes d'avant restent la
+//    source (`vrm_favoris_reglages_{uid}` + le message lot de « comme Bleam »). Le choix du texte : <favoris-perso-regle>.
+//    Limite d'un message Vinted : 2 000 caractères (la borne de l'envoi, `body.message.length > 2000`).
+const FP_TEXTE_MAX = 2000, FP_VERSIONS_MAX = 8, FP_REGLES_MAX = 10, FP_REGLE_VERSIONS_MAX = 5, FP_MARQUES_MAX = 12;
+const fpId = (v) => (typeof v === 'string' && /^[a-z0-9]{1,16}$/.test(v) ? v : '');
+function fpVersions(l, pre, max) {
+  const out = [], vus = new Set();
+  for (const x of Array.isArray(l) ? l : []) {
+    const t = typeof x === 'string' ? x : x && typeof x === 'object' ? x.texte : null;
+    if (typeof t !== 'string' || !t.trim() || t.trim().length > FP_TEXTE_MAX) continue;
+    let id = fpId(x && x.id) || pre + (out.length + 1);
+    while (vus.has(id)) id = pre + (out.length + 1) + 'x' + vus.size;
+    vus.add(id); out.push({ id, texte: t.trim() });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function fpRegles(l) {
+  const out = [], vus = new Set();
+  for (const r of Array.isArray(l) ? l : []) {
+    if (!r || typeof r !== 'object') continue;
+    const h = r.heures && typeof r.heures === 'object' ? r.heures : null;
+    const hd = h ? bleamEnt(h.de, 0, 23, null) : null, hf = h ? bleamEnt(h.a, 1, 24, null) : null;
+    const jours = Array.isArray(r.jours) ? [...new Set(r.jours.map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort() : [];
+    const p = r.prix && typeof r.prix === 'object' ? r.prix : null;
+    const pn = p && p.min != null && p.min !== '' ? Number(p.min) : null, px = p && p.max != null && p.max !== '' ? Number(p.max) : null;
+    const prixOk = (pn == null || (Number.isFinite(pn) && pn >= 0 && pn <= 100000)) && (px == null || (Number.isFinite(px) && px > 0 && px <= 100000)) && !(pn != null && px != null && px < pn);
+    const marques = (Array.isArray(r.marques) ? r.marques : []).map((m) => String(m == null ? '' : m).replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean);
+    let id = fpId(r.id) || 'r' + (out.length + 1);
+    while (vus.has(id)) id = 'r' + (out.length + 1) + 'x' + vus.size;
+    const regle = { id,
+      heures: hd != null && hf != null && hd !== hf ? { de: hd, a: hf } : null,
+      jours: jours.length && jours.length < 7 ? jours : null,
+      prix: prixOk && (pn != null || px != null) ? { min: pn != null ? Math.round(pn * 100) / 100 : null, max: px != null ? Math.round(px * 100) / 100 : null } : null,
+      marques: marques.length ? [...new Set(marques)].slice(0, FP_MARQUES_MAX) : null,
+      textes: fpVersions(r.textes, id + 'v', FP_REGLE_VERSIONS_MAX) };
+    // Une règle sans condition ou sans texte ne s'appliquerait jamais (ou toujours) : elle n'est pas gardée.
+    if (!regle.textes.length || !(regle.heures || regle.jours || regle.prix || regle.marques)) continue;
+    vus.add(id); out.push(regle);
+    if (out.length >= FP_REGLES_MAX) break;
+  }
+  return out;
+}
+function fpReglage(o) {
+  return { actif: false, v: 1, un: fpVersions(o.un, 'u', FP_VERSIONS_MAX), lot: fpVersions(o.lot, 'l', FP_VERSIONS_MAX), regles: fpRegles(o.regles) };
+}
 const BLEAM_STRATEGIES = ['anti', 'destock', 'vierge'];
 const BLEAM_TRIS = ['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'];
 // Les stratégies prêtes (Bleam) : étapes en jours depuis la mise en ligne de l'annonce, `repeter` (jours après la
@@ -123,6 +173,7 @@ function bleamSection(nom, v) {
     return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
+  if (nom === 'favMessages') return fpReglage(o);
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }
@@ -221,4 +272,4 @@ function ligneAvecReglage(ligne, cle, valeur, par, maintenant) {
 }
 // </reglages-auto-ligne>
 
-export { BLEAM_SECTIONS, BLEAM_PRESETS, bleamDe, bleamSection, REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, RA_BAISSE_PCT, RA_BAISSE_JOURS, RA_CADENCE_DEFAUT, RA_CADENCE_BORNES, cadenceDe, superposerReglagesAuto, reglageAutoNormalise, ligneAvecReglage };
+export { FP_TEXTE_MAX, FP_VERSIONS_MAX, FP_REGLES_MAX, FP_REGLE_VERSIONS_MAX, fpReglage, BLEAM_SECTIONS, BLEAM_PRESETS, bleamDe, bleamSection, REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, RA_BAISSE_PCT, RA_BAISSE_JOURS, RA_CADENCE_DEFAUT, RA_CADENCE_BORNES, cadenceDe, superposerReglagesAuto, reglageAutoNormalise, ligneAvecReglage };
