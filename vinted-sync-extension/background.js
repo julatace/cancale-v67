@@ -14407,7 +14407,9 @@ async function appliquerReponses(uid, it, reponses) {
 async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
   const poses = await appliquerReponses(uid, it, reponses);
   let codes = [];
-  let manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
+  // 5.414 : le CONTRÔLE AVANT (`verifierRepub`, aucun formulaire en cours) lit la grille par la page si elle manque (`lirePage`) ;
+  //    pendant une republication, le cache seulement.
+  let manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: !ctx.lirePage, codesManque: codes });
   const completes = [];
   // Deux tours au plus : une catégorie reprise peut rendre d'autres champs
   // obligatoires (l'état, la taille de CETTE catégorie), repris au second tour.
@@ -14415,7 +14417,7 @@ async function reglerAvant(uid, acc, it, ids, reponses, ctx = {}) {
     const faits = await completerParIdentite(uid, acc, it, ids, codes.slice());
     if (!faits.length) break;
     completes.push(...faits);
-    codes = []; manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: true, codesManque: codes });
+    codes = []; manque = await champsManquantsAvant(uid, acc, it, ids, { cacheSeul: !ctx.lirePage, codesManque: codes });
   }
   const question = manque.length ? await questionRepub(uid, it, codes, ctx) : null;
   return { manque, question, completes, reponses: poses };
@@ -16276,8 +16278,8 @@ async function verifierRepub(msg) {
     const tailleDe = (x) => JSON.stringify((Array.isArray(x.item_attributes) ? x.item_attributes : []).find((a) => a && a.code === 'size') || null);
     const t0 = tailleDe(it);
     const rep = reponses[id] && typeof reponses[id] === 'object' ? reponses[id] : null;
-    const rg = await reglerAvant(uid, acc, it, [id], rep, { id });
-    const g = Number(it.catalog_id) > 0 ? await grilleTailles(uid, acc, it.catalog_id, { cacheSeul: true }) : null;
+    const rg = await reglerAvant(uid, acc, it, [id], rep, { id, lirePage: true });
+    const g = Number(it.catalog_id) > 0 ? await grilleTailles(uid, acc, it.catalog_id, {}) : null;
     const corrections = [];
     if (tailleDe(it) !== t0 && !(rep && rep.size)) corrections.push({ champ: 'size', nom: 'la taille', raison: "sa taille n'est plus dans la grille de Vinted pour cette catégorie : la même taille (même libellé) de la grille d'aujourd'hui est posée" });
     for (const c of rg.completes) corrections.push({ champ: c, nom: NOM_QUESTION[c] || c, raison: 'repris de cette même annonce' });

@@ -79,7 +79,8 @@ essaie('moteur sous garde', () => {
   const iRep = BG.indexOf('async function repondreOffre');
   const finRep = BG.indexOf('async function', iRep + 20);
   const corpsRep = iRep >= 0 ? BG.slice(iRep, finRep > 0 ? finRep : iRep + 2000) : '';
-  dit(/await garde\([\s\S]*offer_requests\/\$\{oid\}\/accept/.test(corpsRep),
+  // 5.414 (`toutinterface`) : « Accepter » se fait par l'INTERFACE (`repondreOffreInterface` → la page) — `garde` le précède.
+  dit(/await garde\([\s\S]*repondreOffreInterface\(/.test(corpsRep),
     "chaque acceptation passe par `garde` (compte connecté, plafond 20/h, pause) AVANT d'appeler Vinted");
   dit(/await garde\(/.test(corps), "le moteur vérifie `garde` avant d'agir");
   // ESPACEMENT entre deux acceptations : il doit EXISTER (étalement + laisser le
@@ -122,7 +123,7 @@ essaie('app', () => {
   // (20 nov., décision « toute action se fait dans l'extension ») L'app n'accepte plus rien : la messagerie Vinted et
   // l'interrupteur vivent dans le PANNEAU de l'extension. Une acceptation dans l'app, s'il en reste, part d'un clic (ci-dessous).
   const PAN = (() => { try { return lire('vinted-sync-extension/vrm-badge.js') + lire('vinted-sync-extension/vrm-ui.js'); } catch (_) { return ''; } })();
-  dit(accepts.length > 0 || /offer_requests\/\$\{[^}]+\}\/accept|\/accept[`'"]/.test(PAN + lire('vinted-sync-extension/background.js')), "une offre précise s'accepte (messagerie de l'app, ou panneau de l'extension)");
+  dit(accepts.length > 0 || /offer_requests\/\$\{[^}]+\}\/accept|\/accept[`'"]/.test(PAN + lire('vinted-sync-extension/background.js')) || (/async repondreOffre\(d\)/.test(lire('vinted-sync-extension/vrm-formulaire.js')) && /RE_ACCEPTER/.test(lire('vinted-sync-extension/vrm-formulaire.js'))), "une offre précise s'accepte (messagerie de l'app, ou panneau de l'extension — « Accepter » par la page, 5.414)");
   const sansClic = accepts.filter((a) => !/onClick=\{\s*\(?\)?\s*=>\s*$/.test(APP.slice(Math.max(0, a.index - 40), a.index)));
   dit(sansClic.length === 0, "chaque acceptation d'offre part d'un clic (jamais une boucle)",
     sansClic.map((a) => 'l.' + ligneDe(APP, a.index)).join(' · '));
