@@ -381,8 +381,8 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {aReglerTel}
         {travail && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
           <span>{depuisMaj(majLe, maintenantMaj)}</span>
-          {travail.onRafraichir ? <button type="button" className="n-ad-rafraichir" aria-label={tr('tableau.rafraichir')} disabled={!!travail.rafraichit} aria-busy={travail.rafraichit ? 'true' : undefined}
-            onClick={() => travail.onRafraichir()} data-ad-rafraichir="">{Icon ? <Icon name="sync" size={18}/> : null}</button> : null}
+          {travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
+            onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}
         </div> : null}
         {aRegler.length && !A ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
           {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
