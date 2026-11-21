@@ -79,10 +79,10 @@ export function chiffresAujourdhui({ valeur, etatVendu = 'encours', sansCompte =
 //   écart           seulement entre deux vendus lus en entier, et une période d'avant qui a vendu (pas de « +∞ % »).
 // `precedente(p)` → { de, a } : la période d'avant, coupée au même moment (fourni par l'app : ses règles de période).
 export const PERIODES_STATS = ['jour', 'semaine', 'mois'];
-export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => '', beneficeMois = null }) {
+export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => '', beneficeMois = null, periodes = PERIODES_STATS }) {
   const lu = (x) => !!x && x.valeur != null;
   const out = {};
-  for (const p of PERIODES_STATS) {
+  for (const p of periodes) {
     const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
     const vendu = { valeur: lu(V) ? V.valeur : null, partiel: lu(V) && !!V.partiel, note: lu(V) ? '' : (raisonCourte(V) || '') };
     const ventes = { valeur: lu(N) ? N.valeur : null, partiel: lu(N) && !!N.partiel, note: lu(N) ? '' : (raisonCourte(N) || '') };
@@ -111,7 +111,22 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
       const P = valeur('vendu', precedente(p)) || {};
       if (lu(P) && !P.partiel && P.valeur > 0) ecart = Math.round(((vendu.valeur - P.valeur) / P.valeur) * 100);
     }
-    out[p] = { vendu, ventes, panier, benefice, ecart };
+    // (21 nov., Julien : « bénéfice dans Ma journée — brut et net du mois, et d'aujourd'hui, les mêmes chiffres que
+    // Comptabilité ») LES DEUX, CHACUN À SON PROPRIÉTAIRE, jamais recalculés ici :
+    //   brut  `valeur('brut', p)` = `chiffreBrut` sur `vrm_benefice_jours` (la ligne « Bénéfice brut » de Comptabilité),
+    //         sa couverture « k/n » quand des prix d'achat manquent — jamais « au moins » ;
+    //   net   `valeur('benefice', p)` = `chiffreBenefice(beneficePeriode)` (« Ton bénéfice » de Comptabilité) ; au JOUR,
+    //         la même règle sans les dépenses (elles se comptent au mois : `chargesAuMois`) — c'est dit.
+    const Br = valeur('brut', p) || {};
+    const mB = /^(\d+) sur (\d+)$/.exec(String(Br.couverture || ''));
+    let brut = lu(Br) ? { valeur: Br.valeur, partiel: !!Br.partiel, couverture: mB ? `${mB[1]}/${mB[2]}` : '', note: '' } : { valeur: null, partiel: false, couverture: '', note: raisonCourte(Br) || '' };
+    if (brut.valeur != null && Number.isFinite(Br.n) && entier(ventes) && ventes.valeur > Br.n) {
+      brut = Br.n === 0 ? { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '' } : { ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` };
+    }
+    const Nt = valeur('benefice', p) || {};
+    const net = { valeur: lu(Nt) ? Nt.valeur : null, note: lu(Nt) ? '' : (raisonCourte(Nt) || ''), raison: lu(Nt) ? '' : (Nt.raison || ''),
+      avantDepenses: !!(Nt.B && (Nt.B.chargesAuMois || Nt.B.depenses === 'jamais')), auMois: !!(Nt.B && Nt.B.chargesAuMois) };
+    out[p] = { vendu, ventes, panier, benefice, brut, net, ecart };
   }
   return out;
 }
@@ -195,10 +210,25 @@ export function parCompteEtSite({ lignes, valeur, periodes = PERIODES_STATS }) {
 // route du journal, src/securiteCompte.js), depuis minuit, comptés par famille. Journal pas lu ⇒ null ; rien ⇒ [].
 export const FAMILLES_VRM = [['baisses', ['baisse_prix']], ['favoris', ['favori', 'favori_offre']], ['offres', ['offre_acceptee']],
   ['republications', ['republication']], ['bordereaux', ['bordereau']], ['messages', ['message_envoye']], ['offresFaites', ['offre_faite']]];
-export function vrmDuJour(evenements, maintenant = Date.now()) {
+// (21 nov., lot journee-stats) L'heure d'un événement : la route rend des MILLISECONDES (`ms()` de
+// api/_lib/securite-compte.js) — `Date.parse("1763…")` rendait NaN : « Ce que VRM a fait » ne comptait JAMAIS rien.
+// Un nombre, une chaîne de chiffres ou une date ISO ; sinon null (l'événement n'est dans aucune période).
+export const heureEvenement = (at) => {
+  if (at == null || at === '') return null;
+  const n = typeof at === 'number' ? at : /^\d+$/.test(String(at)) ? Number(at) : Date.parse(String(at));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+// LES GESTES DE VRM ACCEPTÉS entre deux instants [de, a) — LA règle de « Ce que VRM a fait » (Aujourd'hui) et des
+// « gestes faits » de Statistiques (src/aujourdhui/pilotage.js) : résultat « ok », un type d'une famille de FAMILLES_VRM.
+export const TYPES_VRM = FAMILLES_VRM.flatMap(([, t]) => t);
+export function gestesVrmEntre(evenements, de, a) {
   if (!Array.isArray(evenements)) return null;
+  return evenements.filter((e) => { const t = e && e.resultat === 'ok' && TYPES_VRM.includes(e.type) ? heureEvenement(e.at) : null; return t != null && t >= de && t < a; });
+}
+export function vrmDuJour(evenements, maintenant = Date.now()) {
   const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
-  const du = evenements.filter((e) => e && e.resultat === 'ok' && Date.parse(String(e.at || '')) >= minuit.getTime() && Date.parse(String(e.at || '')) <= maintenant + 60000);
+  const du = gestesVrmEntre(evenements, minuit.getTime(), maintenant + 60000);
+  if (!du) return null;
   return FAMILLES_VRM.map(([cle, types]) => ({ cle, n: du.filter((e) => types.includes(e.type)).length })).filter((x) => x.n > 0);
 }
 
@@ -218,10 +248,17 @@ export function capteDuJour(entrees, maintenant = Date.now()) {
 // (19 nov., Julien : « tu peux trouver mieux, peut-être d'autres stats ») + stock en ligne, vitesse de vente, prévision du
 // mois (les trois montrées d'office), marge, marques, paires qui dorment, argent à venir, vues et favoris.
 // (« Meilleurs moments » : refusé par Julien le 19 nov. — ne pas l'ajouter.)
-export const CARTES_AUJOURDHUI = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
-export const CARTES_DEFAUT = ['chiffres', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'ventes'];
+// (21 nov., lot journee-stats — Julien : « toute l'application doit être simplifiée et ergonomique », « ça fait trop vibe
+// codé ») MA JOURNÉE EST COURTE : « À faire » (à envoyer · à retirer, une carte de hauteur fixe) en haut, puis les chiffres
+// clés (CA, ventes, bénéfice BRUT et NET, aujourd'hui et le mois — sans activation, sa demande), puis les dernières ventes.
+// Toutes les autres statistiques sont dans Statistiques (Pilotage · Finances, 7 j · 30 j · 90 j), montrées d'office ;
+// ici, elles restent ajoutables par « Personnaliser » (un choix d'affichage, pas une activation).
+// Le choix rangé avant ce lot (sans `v: 2`) décrivait l'ANCIEN écran (8 cartes empilées) : il n'est plus suivi.
+export const VERSION_CARTES = 2;
+export const CARTES_AUJOURDHUI = ['afaire', 'chiffres', 'ventes', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
+export const CARTES_DEFAUT = ['afaire', 'chiffres', 'ventes'];
 export function cartesChoisies(brut) {
-  const ok = brut && typeof brut === 'object' && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
+  const ok = brut && typeof brut === 'object' && Number(brut.v) === VERSION_CARTES && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
   const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];
   const montrees = ok && Array.isArray(brut.montrees) ? brut.montrees.filter((x) => CARTES_AUJOURDHUI.includes(x)) : CARTES_DEFAUT;
   return { ordre, montrees: new Set(montrees) };
@@ -234,12 +271,15 @@ export function choixPlusRecent(a, b) {
   const ok = (x) => !!x && typeof x === 'object' && Array.isArray(x.ordre);
   if (!ok(a)) return ok(b) ? b : null;
   if (!ok(b)) return a;
+  // (21 nov.) Un choix de l'écran d'aujourd'hui (`v: 2`) l'emporte sur un choix de l'ancien écran, quel que soit son `rev`.
+  const va = Number(a.v) === VERSION_CARTES, vb = Number(b.v) === VERSION_CARTES;
+  if (va !== vb) return va ? a : b;
   const ra = Number(a.rev) || 0, rb = Number(b.rev) || 0;
   if (ra !== rb) return ra > rb ? a : b;
   return (Number(b.at) || 0) > (Number(a.at) || 0) ? b : a;
 }
 export function nouveauChoix(avant, { ordre, montrees }, maintenant = Date.now()) {
-  return { ordre: [...ordre], montrees: [...montrees], rev: (Number(avant && avant.rev) || 0) + 1, at: maintenant };
+  return { v: VERSION_CARTES, ordre: [...ordre], montrees: [...montrees], rev: (Number(avant && avant.rev) || 0) + 1, at: maintenant };
 }
 
 // LES CHIFFRES DU RELEVÉ PAR PÉRIODE (vitesse, marge, marques) — le relevé des ventes FINALISÉES de l'écran Ventes
@@ -248,6 +288,7 @@ export function nouveauChoix(avant, { ordre, montrees }, maintenant = Date.now()
 // `margesPar` (marge = brut ÷ CA des ventes au prix d'achat connu, « sur N »). Les marques : la marque LUE de l'annonce
 // (`marqueLue`), jamais devinée d'un titre ; sans marque lue, la vente compte dans « sans marque lue ».
 // `bornes(p)` → { de, a } (les règles de période de l'app). Relevé pas lu ⇒ null.
+const top5 = (G) => (G ? { top: [...G.groupes].sort((a, b) => b.n - a.n || b.ca - a.ca).slice(0, 5).map((x) => ({ k: x.k, n: x.n, ca: x.ca })), sans: G.sansCle } : null);
 export function releveParPeriode({ lignes, bornes, delaisPar, margesPar, periodes = PERIODES_STATS }) {
   if (!Array.isArray(lignes)) return null;
   const out = {};
@@ -263,6 +304,10 @@ export function releveParPeriode({ lignes, bornes, delaisPar, margesPar, periode
       vitesse: D ? { mediane: D.mediane, nDelai: D.nDelai, n: D.n } : null,
       marge: g ? { pct: g.marge, brut: g.brut, nCout: g.nCout, n: g.n } : { pct: null, brut: null, nCout: 0, n: L.length },
       marques: parMarque ? { top: [...parMarque.groupes].sort((a, b) => b.ca - a.ca || b.n - a.n).slice(0, 5).map((x) => ({ k: x.k, n: x.n, ca: x.ca })), sansMarque: parMarque.sansCle } : null,
+      // (21 nov., lot journee-stats) Les modèles (`modeleSur` : la marque LUE + un mot de modèle du titre, sinon rien) et les
+      // tailles (la taille LUE de l'annonce reliée par SA transaction) — même règle de groupe que les marques.
+      modeles: top5(margesPar(L, (l) => (l.modele && typeof l.modele === 'object' ? l.modele.nom : l.modele) || '')),
+      tailles: top5(margesPar(L, (l) => l.taille || '')),
     };
   }
   return out;

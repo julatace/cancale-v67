@@ -1,0 +1,15 @@
+/* ── src/natif/ecrans/stats.css — Statistiques · Pilotage et Finances (21 nov., lot journee-stats) ──
+   Mêmes règles que natif.css : jetons `--n-*` seulement, ni `!important`, ni `:has()`, tailles 13 · 17, graisses 400 · 600,
+   cibles ≥ 44. La barre des deux segments ne bouge pas d'un état à l'autre ; chaque série d'« Activité quotidienne » a sa
+   hauteur fixe (la place est réservée avant l'arrivée des chiffres). */
+@layer vrm-natif {
+  .n-ps { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .n-ps-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+  .n-ps-barre > * { flex: 1 1 220px; min-width: 0; max-width: 420px; }
+  .n-ps-serie { padding: 4px 0 0; }
+  .n-ps-serie + .n-ps-serie { border-top: 1px solid var(--n-trait); }
+  .n-ps-serie-tete { display: flex; justify-content: space-between; gap: 12px; margin: 8px 16px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ps-serie-v { color: var(--n-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .n-ps-courbe.n-courbe { height: 56px; margin: 8px 16px 12px; }
+  .n-ps-courbe.n-courbe[data-n-dense] { gap: 1px; }
+}

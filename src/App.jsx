@@ -1175,7 +1175,9 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
 // (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
-const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
+const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));
+// (21 nov., lot journee-stats) Statistiques · Pilotage et Finances (7 · 30 · 90 j) : le morceau et son modèle (src/aujourdhui/pilotage.js).
+const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -33665,15 +33667,20 @@ const caBeneficeDuMois = (m, toutes) => {
 // (4 nov.) `jusqua` (ms, optionnel) : les VENTES s'arrêtent au jour de `jusqua` inclus (« Comparer deux mois »
 // au même point d'un mois en cours) ; les dépenses restent celles des mois de la
 // période. Absent : la règle d'avant, inchangée.
+// (21 nov., lot journee-stats — Julien : « bénéfice dans Ma journée, brut et net du mois, et d'aujourd'hui ») `periode`
+// 'jour' : minuit → minuit, la MÊME règle (frais de vente, URSSAF de ces ventes) SANS les dépenses — elles se notent au
+// mois et ne se partagent pas entre les jours (`chargesAuMois: true`, l'écran le dit) ; jamais une dépense devinée.
 const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true, jusqua = null }) => {
-  const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
+  const auJour = periode === 'jour';
+  const de = auJour ? (() => { const d = new Date(maintenant); d.setHours(0, 0, 0, 0); return d; })() : debutPeriode(maintenant, periode);
+  const a = auJour ? new Date(de.getFullYear(), de.getMonth(), de.getDate() + 1) : decalerPeriode(de, periode, 1);
   // La publication est au JOUR : la coupe garde le jour entier où elle tombe.
   const finJ = jusqua != null ? (() => { const d = new Date(jusqua); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; })() : null;
   const v = beneficeDesJours(jours, de, finJ && finJ < a ? finJ : a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
   const yms = [];
   for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
-  const charges = periode === 'annee'
+  const charges = auJour ? 0 : periode === 'annee'
     ? comptaChargesAnnee(compta, de.getFullYear()).total
     : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
@@ -33697,7 +33704,7 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
   const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf };
+  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -34089,6 +34096,18 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
   return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI}
     onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
+}
+// (21 nov., lot journee-stats) STATISTIQUES · PILOTAGE ET FINANCES — la question au propriétaire (`valeurChiffre` sur les
+// sources de la carte des chiffres : les MÊMES que Ma journée et Argent), les ventes de la coque et les outils de lecture ;
+// le morceau (src/aujourdhui/StatsBranche.jsx) range tout par `statsFenetre` (src/aujourdhui/pilotage.js). Aucune règle ici.
+function StatsPilotageApp({ liveStats, onNav }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const live = liveStats || liveCoque;
+  const S = useSourcesCarte(live);
+  const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav}
+    onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -68495,7 +68514,7 @@ function AppCoeur() {
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
