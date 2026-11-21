@@ -234,6 +234,9 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
               case 'repondreOffre': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; { const rep = await envoi('PUT', `/api/v2/transactions/${d.tx}/offer_requests/${d.oid}/${d.accepter ? 'accept' : 'reject'}`, null); return { ok: true, rep, vu: true, autre: false }; }
               case 'masquer': if (!new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi('PUT', `/api/v2/items/${d.id}/is_hidden`, { is_hidden: !!d.voulu }), vu: true };
               case 'prix': if (!new RegExp(`^/items/${d.id}/edit/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi('PUT', `/api/v2/item_upload/items/${d.id}`, { item: { id: Number(d.id), price: String(d.prix), ...(d.titre ? { title: String(d.titre) } : {}) } }) };
+              // 5.414 : le bordereau et l'évaluation — la fausse page envoie le corps que la vraie enverrait (adresse du compte, dépôt choisi).
+              case 'bordereau': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi('PUT', `/api/v2/transactions/${d.tx}/shipment/order`, { seller_address_id: d.adresse == null ? null : d.adresse, drop_off_type: d.depot || null, label_type: null }) };
+              case 'evaluation': if (!new RegExp(`^/inbox/${d.conv}/?$`).test(chemin)) return { ok: false, code: 'identite', chemin }; return { ok: true, rep: await envoi(String(d.methode || 'POST'), String(d.chemin), d.corps) };
               case 'reponse': return { ok: false, code: 'sans-reponse' };
               default: return { ok: false, code: 'etape' };
             }

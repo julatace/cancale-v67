@@ -191,6 +191,10 @@
   const RE_MASQUER = /^(masquer|masquer l'article|masquer l'annonce|hide|hide item|nascondi|nascondi l'articolo|ocultar|ocultar articulo|ausblenden|artikel ausblenden)$/;
   const RE_AFFICHER = /^(afficher|afficher l'article|afficher l'annonce|rendre visible|show|show item|unhide|mostra|mostra l'articolo|mostrar|mostrar articulo|einblenden|anzeigen|artikel einblenden)$/;
   const RE_ENVOYER = /^(envoyer|envoyer le message|send|send message|invia|enviar|senden)$/;
+  const RE_BORDEREAU = /^(obtenir le bordereau|generer le bordereau|imprimer le bordereau|obtenir l'etiquette|generer l'etiquette|obtenir le bordereau d'envoi|get shipping label|get label|generate label|print shipping label|ottieni l'etichetta|genera l'etichetta|obtener la etiqueta|generar etiqueta|versandetikett erhalten|versandetikett erstellen)$/;
+  const RE_CONFIRMER_BORDEREAU = /^(confirmer|continuer|valider|obtenir le bordereau|generer le bordereau|confirm|continue|get label|conferma|continua|confirmar|continuar|bestatigen|weiter)$/;
+  const RE_EVALUER = /^(laisser une evaluation|evaluer|laisser un avis|leave feedback|leave a review|rate|lascia un feedback|valuta|dejar una valoracion|valorar|bewertung abgeben|bewerten)$/;
+  const RE_ENVOYER_EVAL = /^(envoyer|publier|valider|send|submit|post|invia|pubblica|enviar|publicar|senden|absenden|veroffentlichen)$/;
   // La fenêtre (dialogue) de Vinted ouverte : une seule visible, sinon rien.
   const dialogue = () => { const l = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-testid*="modal" i]')].filter((x) => visible(x) && !deVrm(x)); const fin = l.filter((el) => !l.some((x) => x !== el && el.contains(x))); return fin.length === 1 ? fin[0] : null; };
   // Le champ du message (hors fenêtre) : un seul candidat.
@@ -546,6 +550,67 @@
       ecouter();
       const att = reponseDe('PUT', new RegExp(`/api/v2/item_upload/items/${id}$`), 60000, d && d.cle);
       clic(b.el);
+      const r = await att;
+      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
+      if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
+      return { ok: true, rep: r };
+    },
+    // 5.414 : LE BORDEREAU d'une vente, par la conversation de CETTE vente : son bouton (nom exact, un seul), puis, si
+    // Vinted ouvre une fenêtre, SA confirmation — jamais un choix fait à sa place : une fenêtre qui demande de choisir
+    // (plusieurs options, aucune cochée, ou un dépôt appris qui n'y est pas) ⇒ arrêt AVANT de confirmer, nommé.
+    async bordereau(d) {
+      const conv = String((d && d.conv) || ''), tx = String((d && d.tx) || ''), depot = d && d.depot ? String(d.depot) : '';
+      if (!/^[1-9]\d{0,19}$/.test(conv) || !/^[1-9]\d{0,19}$/.test(tx)) return { ok: false, code: 'etape' };
+      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      const b = await attendre(() => { const x = parNom(RE_BORDEREAU, document, /(shipping[-_]?label|label[-_]?(button|cta)|get[-_]?label)/i, /cancel|close|download|track/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      if (b.captcha) return vuCaptcha(); if (b.absent) return manque('bordereau-bouton'); if (b.el === 'AMBIGU') return manque('bordereau-bouton-ambigu');
+      ecouter();
+      const att = reponseDe('PUT', new RegExp(`/api/v2/transactions/${tx}/shipment/order$`), 30000, d && d.cle);
+      let parti = false; att.then(() => { parti = true; });
+      clic(b.el);
+      const dl = await attendre(() => (parti ? 'PARTI' : dialogue()), 6000);
+      if (dl.el && dl.el !== 'PARTI') {
+        const choix = [...dl.el.querySelectorAll('input[type="radio"], [role="radio"]')].filter(visible);
+        const coche = (x) => x.checked === true || x.getAttribute('aria-checked') === 'true';
+        if (depot) {
+          const o = choix.filter((x) => new RegExp(`(^|[-_])${depot.replace(/[^\w-]/g, '')}($|[-_])`, 'i').test(`${x.value || ''} ${x.id || ''} ${x.getAttribute('data-testid') || ''}`));
+          if (o.length !== 1) return manque('bordereau-depot');
+          if (!coche(o[0])) { clic(o[0]); await nap(300); }
+        } else if (choix.length > 1 && choix.filter(coche).length !== 1) return manque('bordereau-choix');
+        const c = parNom(RE_CONFIRMER_BORDEREAU, dl.el, /confirm|submit|continue/i, /cancel|close|annul/i, true);
+        if (c.ambigu) return manque('bordereau-confirmer-ambigu'); if (!c.el) return manque('bordereau-confirmer');
+        if (captcha()) return vuCaptcha();
+        clic(c.el);
+      }
+      const r = await att;
+      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
+      if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
+      return { ok: true, rep: r };
+    },
+    // 5.414 : L'ÉVALUATION 5 étoiles d'une vente, dans SA conversation : « Laisser une évaluation », la 5ᵉ étoile, le
+    // texte tapé, « Envoyer » ; la requête attendue est celle qu'il a faite lui-même une fois (méthode + chemin appris).
+    async evaluation(d) {
+      const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || ''), meth = String((d && d.methode) || 'POST').toUpperCase(), ch = String((d && d.chemin) || '');
+      if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim() || !/^\/api\/v2\/[\w/-]+$/.test(ch) || !['POST', 'PUT'].includes(meth)) return { ok: false, code: 'etape' };
+      if (!new RegExp(`^/inbox/${conv}/?$`).test(location.pathname)) return { ok: false, code: 'identite', chemin: location.pathname };
+      const b = await attendre(() => { const x = parNom(RE_EVALUER, document, /(leave[-_]?)?feedback[-_]?(button|cta)|review[-_]?button/i, /cancel|close/i); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      if (b.captcha) return vuCaptcha(); if (b.absent) return manque('evaluation-bouton'); if (b.el === 'AMBIGU') return manque('evaluation-bouton-ambigu');
+      clic(b.el);
+      const zone = await attendre(() => dialogue() || document.querySelector('[data-testid*="feedback" i] textarea, form textarea') && document, 15000);
+      if (zone.captcha) return vuCaptcha(); if (zone.absent) return manque('evaluation-fenetre');
+      const ici = zone.el === document ? document : zone.el;
+      const e5 = [...ici.querySelectorAll('button, [role="radio"], input[type="radio"], label')].filter((x) => visible(x) && (/(^|[-_])(star|rating)[-_]?5$/i.test(x.getAttribute('data-testid') || '') || /^(5 etoiles|5 sur 5|5 stars|5 out of 5|5 stelle|5 estrellas|5 sterne)$/.test(norm(nomAcc(x))) || (x.value === '5' && x.type === 'radio')));
+      if (e5.length !== 1) return manque(e5.length ? 'evaluation-etoile-ambigue' : 'evaluation-etoile');
+      clic(e5[0]); await nap(300);
+      const tas = [...ici.querySelectorAll('textarea')].filter((x) => visible(x) && !x.disabled && !x.readOnly);
+      if (tas.length !== 1) return manque(tas.length ? 'evaluation-texte-ambigu' : 'evaluation-texte');
+      if (!(await saisir(tas[0], texte, { garderFocus: true }))) return { ok: false, code: 'valeur', manque: 'evaluation-texte' };
+      const s = parNom(RE_ENVOYER_EVAL, ici, /submit|send|confirm/i, /cancel|close|annul/i, true);
+      if (s.ambigu) return manque('evaluation-envoyer-ambigu'); if (!s.el) return manque('evaluation-envoyer');
+      if (captcha()) return vuCaptcha();
+      ecouter();
+      const att = reponseDe(meth, new RegExp(`^${ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`), 30000, d && d.cle);
+      clic(s.el);
       const r = await att;
       if (!r) return { ok: false, code: 'sans-reponse', parti: true };
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });

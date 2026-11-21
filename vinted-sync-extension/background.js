@@ -17006,6 +17006,8 @@ const GESTES_INTERFACE = Object.freeze({
   masquer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   supprimer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   prix: { route: (d) => `/items/${d.id}/edit`, re: (d) => new RegExp(`^/items/${d.id}/edit/?$`) },
+  bordereau: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
+  evaluation: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
 });
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
@@ -17066,7 +17068,7 @@ async function ouvrirConversationTravail(acc, conv) {
 }
 // La conversation d'une transaction (pour une offre ou sa réponse) : par IDENTITÉ seulement — la conversation captée
 // qui porte CETTE transaction, sinon la commande captée (`conversation_id`). Rien ⇒ '' (rien ne part).
-async function convDeTransaction(uid, tx) {
+async function convDeTransaction(uid, tx, acc = null) {
   if (!/^\d{1,20}$/.test(String(uid || '')) || !ID_INTERFACE.test(String(tx || ''))) return '';
   try { const o = (await offresEnAttente(String(uid))).find((x) => String(x.tx) === String(tx)); if (o && ID_INTERFACE.test(String(o.conv))) return String(o.conv); } catch (_) {}
   try {
@@ -17079,8 +17081,23 @@ async function convDeTransaction(uid, tx) {
     try {
       const r = await sbGet(`app_data?id=eq.harvest_${uid}_${k}&select=v:data->payload->my_orders`);
       const os = r && r[0] && Array.isArray(r[0].v) ? r[0].v : [];
-      const cs = [...new Set(os.filter((o) => o && String(o.transaction_id) === String(tx) && o.conversation_id != null).map((o) => String(o.conversation_id)))].filter((c) => ID_INTERFACE.test(c));
-      if (cs.length === 1) return cs[0];
+      const tous = [...new Set(os.filter((o) => o && String(o.transaction_id) === String(tx) && o.conversation_id != null).map((o) => String(o.conversation_id)))];
+      const cs = tous.filter((c) => ID_INTERFACE.test(c));
+      if (cs.length === 1 && tous.length === 1) return cs[0];
+      // La commande porte l'UUID de la conversation (pas son numéro, celui de l'adresse /inbox/{n°}) : UNE lecture
+      // (budget de lecture, compte de l'onglet) rend son numéro — gardé seulement si la conversation lue porte CETTE
+      // transaction (identité), jamais une ressemblance.
+      if (acc && tous.length === 1 && /^[0-9a-f-]{16,64}$/i.test(tous[0])) {
+        const g = await gardeLecture(String(uid), acc, 'colis');
+        if (g) return '';
+        const lu = await vintedPage(acc, 'GET', `/api/v2/conversations/${encodeURIComponent(tous[0])}`, null, { timeoutMs: 12000 });
+        const c = lu && lu.ok && lu.json && lu.json.conversation;
+        const n = c && c.id != null ? String(c.id) : '';
+        const t = c && c.transaction && c.transaction.id != null ? String(c.transaction.id) : '';
+        if (ID_INTERFACE.test(n) && t === String(tx)) return n;
+        noterDiag('conv_uuid_pas_resolue');
+        return '';
+      }
     } catch (_) {}
   }
   return '';
@@ -19501,14 +19518,14 @@ async function gesteAppParInterface(acc, uid, methode, endpoint, msg) {
   }
   m = /^\/api\/v2\/transactions\/([1-9]\d{0,19})\/offer_requests\/([1-9]\d{0,19})\/(accept|reject)$/.exec(endpoint);
   if (methode === 'PUT' && m) {
-    const conv = ID_INTERFACE.test(String((msg && msg.conv) || '')) ? String(msg.conv) : await convDeTransaction(uid, m[1]);
+    const conv = ID_INTERFACE.test(String((msg && msg.conv) || '')) ? String(msg.conv) : await convDeTransaction(uid, m[1], acc);
     return repondreOffreInterface(acc, { conv, tx: m[1], oid: m[2], accepter: m[3] === 'accept' });
   }
   m = /^\/api\/v2\/transactions\/([1-9]\d{0,19})\/offers$/.exec(endpoint);
   if (methode === 'POST' && m) {
     const prix = Number(msg && msg.body && msg.body.offer && msg.body.offer.price);
     if (!(prix > 0)) return rien('prix de l’offre illisible — rien n’est parti');
-    const conv = ID_INTERFACE.test(String((msg && msg.conv) || '')) ? String(msg.conv) : await convDeTransaction(uid, m[1]);
+    const conv = ID_INTERFACE.test(String((msg && msg.conv) || '')) ? String(msg.conv) : await convDeTransaction(uid, m[1], acc);
     if (!conv) return { ...rien('la conversation de cette transaction n’est pas connue de VRM : rien n’est parti'), sansPage: 'identite' };
     return interfaceVinted(acc, 'offre', { conv, tx: m[1], prix });
   }
@@ -25075,11 +25092,6 @@ async function genererBordereau(uid, tx, opts = {}) {
   const accts = await getStoredAccounts();
   const acc = accts.find(a => String(a.vinted_user_id) === String(uid));
   if (!acc) return { ok: false, error: 'compte introuvable' };
-  // ⚠️ 5.414 (`toutinterface`) : AVANT toute garde (aucune place prise) — rien ne part par requête, c'est dit.
-  if (!opts.__parInterface) {
-    noterDiag('bordereau_interface_pas_encore');
-    return { ok: false, deja: false, status: 0, pasParti: true, interface: true, error: 'commande le bordereau sur vinted.fr (la vente → « Envoyer ») : VRM ne le commande plus par requête, il récupère le PDF dès qu’il existe. Rien n’est parti.' };
-  }
   // `gardeFaite` : une commande de l'app est déjà passée par `gardeStricte`
   // (et a déjà consommé son créneau du plafond) — la refaire en brûlerait deux.
   if (!opts.gardeFaite) { const stop = await garde(uid, acc, { sorte: 'bordereau' }); if (stop) return stop; }   // anti-blocage
@@ -25093,10 +25105,16 @@ async function genererBordereau(uid, tx, opts = {}) {
   const depot = opts.automatique ? await depotBordereau(uid) : { dropOff: null };
   if (depot.refus) { noterDiag('bordereau_boite_pas_apprise'); return { ok: false, error: depot.refus }; }
   // ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : le bordereau n'est plus COMMANDÉ par
-  //    une requête fabriquée. Le geste de l'interface (la vente → « Envoyer » → choix du dépôt → confirmer) n'a pas encore
-  //    été relevé sur la vraie page : rien ne part, c'est dit ; le PDF d'un bordereau qu'il commande lui-même reste
-  //    récupéré (lecture). La place réservée est rendue.
-  const r = { status: 0, ok: false, json: { message: 'à commander sur vinted.fr' }, pasParti: true };
+  //    une requête fabriquée. VRM ouvre la conversation de CETTE vente (par identité : `convDeTransaction`, jamais
+  //    devinée) dans l'onglet de travail, touche SON bouton « bordereau » puis la confirmation de Vinted — jamais un choix
+  //    à sa place (le dépôt « boîte aux lettres » seulement s'il l'a appris de SA commande à la main) ; la PAGE envoie.
+  //    `adresse` ne sert qu'aux bancs (la fausse page) : la vraie page prend la sienne.
+  const conv = ID_INTERFACE.test(String(opts.conv || '')) ? String(opts.conv) : await convDeTransaction(uid, tx, acc);
+  if (!conv) { noterDiag('bordereau_sans_conversation'); return { ok: false, deja: false, status: 0, pasParti: true, error: "VRM ne connaît pas la conversation de cette vente : ouvre-la une fois sur vinted.fr (rien n'est parti)" }; }
+  const ri = await interfaceVinted(acc, 'bordereau', { conv, tx: String(tx), depot: depot.dropOff || '', adresse: adr });
+  if (ri && (ri.rienParti || ri.pause)) { noterDiag('bordereau_interface_pas_parti'); return { ok: false, deja: false, status: 0, pasParti: true, error: `${ri.raison || raisonSansPage(ri) || "ouvre vinted.fr dans ce Chrome, connecté sur ce compte"} — rien n'est parti` }; }
+  if (ri && ri.incertain) { noterDiag('bordereau_interface_incertain'); return { ok: false, deja: false, status: 0, incertain: true, error: "Vinted n'a pas répondu clairement : regarde la vente sur Vinted (rien ne sera renvoyé avant 6 h)" }; }
+  const r = ri || { status: 0, ok: false, json: null };
   logActivity(r.ok ? '📄 Bordereau généré' : `⚠️ Bordereau : Vinted a refusé (${r.status})`);
   if (r.ok) await noterJournal(uid, 'bordereau', { x: tx, auto: opts.automatique === true });
   // ⚠️ ON MESURE LES ÉCHECS AU LIEU DE LES SUPPOSER (§5.24). Sans ça, « il y a
@@ -36060,12 +36078,34 @@ async function messageAcheteurGeste(uid, a, R) {
   return { ok: true, variante: tx.n };
 }
 async function evaluationGeste(uid, a, R) {
+  const wr = await sbGet(`app_data?id=like.harvest_${uid}_wreq_*feedback*&select=id,m:data->>method,p:data->>path,b:data->>body`);
+  if (wr === null) return { pasParti: true, code: 'lecture' };
+  const appris = evaluationApprise(wr);
+  if (!appris) { noterDiag('bleam_eval_pas_appris'); return { ok: false, code: 'pas-appris' }; }
+  const acc = await compteDe(uid); if (!acc) return { pasParti: true, code: 'compte' };
+  const tx = await texteAcheteur(uid, 'eval5', R.eval5.textes);
+  if (!tx) return { ok: false, code: 'texte' };
   // ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : l'évaluation n'est plus REJOUÉE par
-  //    requête (la forme apprise de SA propre évaluation). Le geste par l'interface (les étoiles, le texte, « Envoyer »)
-  //    n'a pas encore été relevé sur la vraie page : RIEN ne part, c'est noté (jamais deux fois pour la même vente) et dit.
-  void R; void a;
-  noterDiag('bleam_eval_interface_pas_encore');
-  return { ok: false, code: 'interface-pas-encore', raison: 'laisse l’évaluation sur vinted.fr (la vente → « Laisser une évaluation ») : VRM ne l’envoie plus par requête. Rien n’est parti.' };
+  //    requête. VRM ouvre la conversation de CETTE vente (par identité, jamais devinée), « Laisser une évaluation », la
+  //    5ᵉ étoile, SON texte tapé, « Envoyer » ; la PAGE envoie. Ce qu'il a fait lui-même une fois (méthode + chemin) ne
+  //    sert plus qu'à reconnaître la réponse de la page. Conversation inconnue ⇒ rien ne part.
+  const conv = ID_INTERFACE.test(String(a.conv || '')) ? String(a.conv) : await convDeTransaction(uid, a.tx, acc);
+  if (!conv) { noterDiag('bleam_eval_sans_conversation'); return { pasParti: true, code: 'conversation' }; }
+  const c = corpsEvaluation(appris, a.tx, tx.texte);
+  const recu = {};
+  const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, recu, sorte: 'evaluation', rythme: true, secu: { sorte: 'autre', mode: 'auto' } });
+  if (stop) return { pasParti: true, code: stop.code };
+  const r = await avecActionPlein('apresvente', { uid, total: 1 }, () => avecVinted(async () => {
+    { const s2 = await gardeStricte(uid, acc, { lecture: true }); if (s2) return { pasParti: true }; }
+    await wait(800 + Math.floor(Math.random() * 1600));
+    return interfaceVinted(acc, 'evaluation', { conv, tx: String(a.tx), texte: tx.texte, methode: appris.methode, chemin: c.chemin, corps: c.corps });
+  }));
+  if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(uid, recu.at, 1); return { pasParti: true, code: r && (r.code || r.sansPage) }; }
+  if (r.incertain) return { ok: false, code: 'incertain' };   // peut-être partie : notée, JAMAIS renvoyée
+  if (!r.ok) { if (!r.pause && refusRestreint(r)) await poserFreinRepub(uid, r); return { ok: false, status: r.status }; }
+  await noterVarianteDerniere(uid, 'av_eval5', tx.n); await noterTexteRecent(uid, tx.texte);
+  await noterJournal(uid, 'evaluation', { x: a.tx, auto: true });
+  return { ok: true };
 }
 // STOCK AUTO : la paire vendue (identité : SON annonce ⇒ SA fiche ⇒ SON N°) a encore des exemplaires (quantité posée
 // par LUI sur le N°, ≥ 2) ⇒ remise en ligne par le moteur de republication (`executerCommande`, coffre → brouillon →
