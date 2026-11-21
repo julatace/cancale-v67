@@ -105,6 +105,10 @@ const AchatsSiteLazy = aLaDemande(() => import('./achats/AchatsSite.jsx'));   //
 import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
 import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import './design/studio-reste.css';   // (14 nov., Studio bleu clair) Argent, Messages, Paramètres, Communauté, E-mails, connexion, feuilles
+// (21 nov., fluidité — banc couches-chargement, Annonces à l'ouverture : CLS 0,28) La feuille de l'écran Annonces voyageait
+// avec son morceau : la COPIE de l'écran (peinte avant lui) se mettait en page SANS elle (le « ⋯ » sous la recherche), puis
+// tout sautait de 44 px quand le morceau arrivait. Importée ici, avec l'app (6 Ko) : copie et écran vrai ont la même mise en page.
+import './natif/ecrans/annonces.css';
 import {preparerLiaisonOAuth,lireLiaisonOAuth,resultatLiaisonPermis} from './auth/liaisonOAuth.js';
 import {poserIntention as poserIntentionOAuth,lireIntention as lireIntentionOAuth,CLE_INTENTION as CLE_INTENTION_OAUTH} from './auth/compteNeuf.js';
 import {messageErreurOAuth} from './auth/erreursOAuth.js';   // (11 nov., lot connexions-oauth)
@@ -20877,7 +20881,12 @@ function MemoireDefilement({ ecran }) {
     // Au premier écran après une ouverture, les données arrivent du nuage : on
     // tient la position plus longtemps (6 s), sauf geste de la personne.
     const tenir=MemoireDefilement.dejaRendu?2500:6000; MemoireDefilement.dejaRendu=true;
-    const delai=setTimeout(()=>{restauration=false;position=haut;cancelAnimationFrame(image);},tenir);
+    // (21 nov., fluidité — banc couches-chargement : Annonces revenue en haut, 700 px → 0) Au téléphone (CPU ×4), le premier
+    // rendu d'un écran remonté peut prendre plus que ce temps : la position n'était pas encore atteignable (écran trop court)
+    // quand on cessait de la tenir. Tant qu'elle n'est pas atteinte, on la tient encore (par pas de 0,5 s, 8 s au plus).
+    const debutTenue=Date.now();
+    const finirTenue=()=>{ if(!arrete&&restauration&&Math.abs(main.scrollTop-cible)>=2&&Date.now()-debutTenue<8000){ delai=setTimeout(finirTenue,500); return; } restauration=false;position=haut;cancelAnimationFrame(image); };
+    let delai=setTimeout(finirTenue,tenir);
     return ()=>{
       arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);document.removeEventListener('visibilitychange',auMasquage);
       positions.current.set(owner+':'+ecran,position);

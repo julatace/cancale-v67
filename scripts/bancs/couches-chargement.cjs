@@ -336,7 +336,9 @@ function rapporter(fmt, quoi, vise, j, sortie) {
           const avant = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); const se = document.scrollingElement; const el = m && m.scrollHeight > m.clientHeight + 10 && getComputedStyle(m).overflowY !== 'visible' ? m : se; el.scrollTop = 700; return Math.round(el.scrollTop); });
           await attendre(600);
           await toucher(pg, 'journee', tel); await pret(pg, 'journee'); await calme(pg, 1000, 10000);
+          if (process.env.DEBUG) await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); window.__defil = []; const t0 = performance.now(); const f = () => { const mm = document.querySelector('.vrm-main'); window.__defil.push(Math.round(performance.now() - t0) + ':' + (mm ? Math.round(mm.scrollTop) + '/' + Math.round(mm.scrollHeight) : '-')); if (performance.now() - t0 < 12000) setTimeout(f, 150); }; f(); });
           await toucher(pg, id, tel); await pret(pg, id); await calme(pg, 1000, 10000); await attendre(500);
+          if (process.env.DEBUG) console.log('       défilement ' + id + ' : ' + (await pg.evaluate(() => (window.__defil || []).join(' '))));
           const apres = await pg.evaluate(() => Math.round(Math.max(document.scrollingElement.scrollTop, (document.querySelector('.vrm-main') || {}).scrollTop || 0)));
           sortie.push({ fmt, quoi: 'defilement', vise: id, avant, apres });
           dit(avant > 100 && Math.abs(apres - avant) <= 8, `${fmt} défilement de ${id} conservé au retour (${avant} px → ${apres} px)`);
