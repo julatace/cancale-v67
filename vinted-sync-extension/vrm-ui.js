@@ -930,22 +930,26 @@
   // Les jetons vivent sur `:host` (une shadow root) ET sur `.vu-racine` (un élément de page) :
   // la même feuille sert les deux. Le JOUR par défaut ; la NUIT par le système, ou par le choix
   // fait dans VRM (`data-theme` « sombre » / « clair » posé sur l'hôte, 5.351).
-  const JOUR = `--vu-coque-uni:#174C88;--vu-coque:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240/.16) 0%,rgb(120 180 240/0) 55%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
-    --vu-sur:#FFFFFF;--vu-sur-2:#E6EFF9;--vu-plaque:#FFFFFF;--vu-plaque-2:#F4F8FC;--vu-encre:#0C1D30;--vu-muet:#4A5B6D;--vu-filet:rgb(18 52 96/.12);
-    --vu-ombre:0 .5px 0 rgb(18 52 96/.06),0 1px 2px rgb(18 52 96/.08),0 10px 24px -14px rgb(18 52 96/.32);
-    --vu-plein:#FFFFFF;--vu-plein-appui:#DCE6F1;--vu-plein-encre:#0C1D30;--vu-plein-sur-plaque:#0C1D30;--vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:rgb(0 96 204/.10);--vu-teinte-appui:rgb(0 96 204/.18);--vu-teinte-encre:#0050A8;--vu-lien:#0050A8;--vu-anneau:0 0 0 3px rgb(0 96 204/.45);
-    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E3ECF5;--vu-barre:#0060CC;
+  // 5.419 (Julien, 21 nov. : « on a un style assez simple et après des couleurs bleu vif qui ne vont pas ensemble ») :
+  //    la palette SOBRE « façon Vintex » — fond gris clair / noir, plaques blanches / #1C1C1E, filets gris fins, l'ENCRE
+  //    pour le bouton plein, liens à l'encre, un accent VERT SAPIN rare (onglet actif, interrupteurs, cases), ambre =
+  //    geste à faire. Plus aucun bleu (audit-couleur-panneau).
+  const JOUR = `--vu-coque-uni:#F2F2F7;--vu-coque:#F2F2F7;
+    --vu-sur:#111114;--vu-sur-2:#6C6C70;--vu-plaque:#FFFFFF;--vu-plaque-2:#F7F7F8;--vu-encre:#111114;--vu-muet:#6C6C70;--vu-filet:rgb(60 60 67/.16);
+    --vu-ombre:0 .5px 0 rgb(0 0 0/.05),0 1px 2px rgb(0 0 0/.06),0 10px 24px -14px rgb(0 0 0/.22);
+    --vu-plein:#111114;--vu-plein-appui:#2C2C2E;--vu-plein-encre:#FFFFFF;--vu-plein-sur-plaque:#111114;--vu-plein-sur-plaque-encre:#FFFFFF;
+    --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
+    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#E9DCC4;--vu-kraft-encre:#2A2116;--vu-kraft-doux:#6B5A40;--vu-kraft-bord:rgb(42 33 22/.22);
-    --vu-voile:rgb(10 22 40/.55);--vu-toast:#0C1D30;--vu-toast-encre:#F2F7FD;`;
-  const NUIT = `--vu-coque-uni:#0C2848;--vu-coque:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220/.14) 0%,rgb(90 150 220/0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
-    --vu-sur:#F2F7FD;--vu-sur-2:#C9D8E8;--vu-plaque:#16273C;--vu-plaque-2:#1C2F47;--vu-encre:#F2F7FD;--vu-muet:#A7B8CB;--vu-filet:rgb(255 255 255/.10);
+    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;`;
+  const NUIT = `--vu-coque-uni:#000000;--vu-coque:#000000;
+    --vu-sur:#F2F2F7;--vu-sur-2:#98989F;--vu-plaque:#1C1C1E;--vu-plaque-2:#2C2C2E;--vu-encre:#F2F2F7;--vu-muet:#98989F;--vu-filet:rgb(84 84 88/.55);
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
-    --vu-plein:#EAF2FB;--vu-plein-appui:#C9D9EA;--vu-plein-encre:#06111F;--vu-plein-sur-plaque:#EAF2FB;--vu-plein-sur-plaque-encre:#06111F;
-    --vu-teinte:rgb(74 163 255/.16);--vu-teinte-appui:rgb(74 163 255/.26);--vu-teinte-encre:#8CC4FF;--vu-lien:#8CC4FF;--vu-anneau:0 0 0 3px rgb(140 196 255/.55);
-    --vu-ambre:#F2B65E;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#24384F;--vu-barre:#8CC4FF;
+    --vu-plein:#F2F2F7;--vu-plein-appui:#D1D1D6;--vu-plein-encre:#111114;--vu-plein-sur-plaque:#F2F2F7;--vu-plein-sur-plaque-encre:#111114;
+    --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
+    --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#3A3226;--vu-kraft-encre:#F3E9D6;--vu-kraft-doux:#CDBB9C;--vu-kraft-bord:rgb(243 233 214/.22);
-    --vu-voile:rgb(2 8 18/.66);--vu-toast:#EAF2FB;--vu-toast-encre:#06111F;`;
+    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -953,8 +957,8 @@
   :host, .vu-racine { --vu-police: "Inter VRM", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
     --vu-e-appui: 100ms cubic-bezier(.2,.9,.25,1); --vu-e-retour: 200ms cubic-bezier(.32,1.25,.5,1); }
   .vu-racine, .vu-racine * , .vu-coque, .vu-coque * { box-sizing: border-box; }
-  .vu-coque { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14); border-radius: 22px;
-    box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(8 26 50/.7); font: 400 14px/1.4 var(--vu-police); -webkit-font-smoothing: antialiased; }
+  .vu-coque { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid var(--vu-filet); border-radius: 22px;
+    box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(0 0 0/.7); font: 400 14px/1.4 var(--vu-police); -webkit-font-smoothing: antialiased; }
   .vu-plaque { background: var(--vu-plaque); color: var(--vu-encre); border-radius: 18px; box-shadow: var(--vu-ombre); }
   .vu-muet { color: var(--vu-muet); }
   .vu-sur-muet { color: var(--vu-sur-2); }
@@ -972,12 +976,12 @@
   .vu-plaque .vu-plein { background: var(--vu-plein-sur-plaque); color: var(--vu-plein-sur-plaque-encre); }
   .vu-sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); }
   .vu-sec:active:not(:disabled) { background: var(--vu-teinte-appui); }
-  .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: rgb(255 255 255/.16); color: var(--vu-sur); }
+  .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: var(--vu-teinte); color: var(--vu-sur); }
   .vu-lien { appearance: none; border: 0; background: transparent; padding: 0 4px; min-height: 44px; display: inline-flex; align-items: center; color: var(--vu-lien); font: 600 14px/1.2 var(--vu-police); cursor: pointer; text-decoration: none; }
   .vu-sur-coque .vu-lien { color: var(--vu-sur); text-decoration: underline; text-underline-offset: 3px; }
   /* Le contrôle segmenté : une piste, l'onglet choisi en porcelaine. */
   .vu-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 2px; padding: 3px; border-radius: 14px; background: var(--vu-socle); }
-  .vu-sur-coque .vu-seg, .vu-coque > .vu-seg { background: rgb(0 0 0/.22); }
+  .vu-sur-coque .vu-seg, .vu-coque > .vu-seg { background: var(--vu-teinte); }
   .vu-seg button { appearance: none; border: 0; min-height: 44px; padding: 0 8px; border-radius: 11px; background: transparent; color: var(--vu-muet);
     font: 600 14px/1.2 var(--vu-police); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; touch-action: manipulation; position: relative; }
   .vu-sur-coque .vu-seg button, .vu-coque > .vu-seg button { color: var(--vu-sur-2); }
@@ -993,7 +997,7 @@
   .vu-n.vu-grand::before { left: 8px; width: 6px; height: 6px; margin-top: -3px; }
   /* La progression : un trait fin. */
   .vu-barre { height: 4px; border-radius: 999px; background: var(--vu-socle); overflow: hidden; }
-  .vu-sur-coque .vu-barre { background: rgb(255 255 255/.18); }
+  .vu-sur-coque .vu-barre { background: var(--vu-teinte-appui); }
   .vu-barre > i { display: block; height: 100%; border-radius: 999px; background: var(--vu-barre); transition: width .4s cubic-bezier(.32,.72,0,1); }
   .vu-sur-coque .vu-barre > i { background: var(--vu-sur); }
   /* Le point d'état : neutre quand tout va bien (§7), ambre pour un geste, creux pour une pause. */
@@ -1001,7 +1005,7 @@
   .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(224 138 18/.25); }
   .vu-point[data-k="pause"], .vu-point[data-k="prudence"], .vu-point[data-k="attente"], .vu-point[data-k="reseau"], .vu-point[data-k="arrete"] { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
   /* Le bandeau fin (une nouvelle version) et la ligne secondaire. */
-  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: rgb(255 255 255/.12); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
+  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: var(--vu-teinte); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
   .vu-bandeau > span { flex: 1; min-width: 0; }
   .vu-sous { font: 500 13px/1.4 var(--vu-police); color: var(--vu-sur-2); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
   .vu-sous b { color: var(--vu-sur); font-weight: 600; }
@@ -1022,24 +1026,24 @@
     font: 600 14px/1.4 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.25), 0 16px 36px -12px rgb(0 0 0/.55); transition: opacity .2s ease; }
   [data-vrm-ui="bandeau"] { position: fixed !important; left: 16px !important; bottom: 16px !important; z-index: 2147483645 !important; display: block;
     width: max-content; max-width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px; border-radius: 18px;
-    background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14);
-    font: 400 14px/1.45 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(8 26 50/.7); }
+    background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid var(--vu-filet);
+    font: 400 14px/1.45 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(0 0 0/.7); }
   [data-vrm-ui] b, [data-vrm-ui] strong { font-weight: 700; }
   [data-vrm-ui] a { color: inherit; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
   [data-vrm-ui] button { all: initial; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin: 8px 8px 0 0; padding: 0 16px;
     border-radius: 14px; background: var(--vu-plein); color: var(--vu-plein-encre); font: 600 14px/1.2 var(--vu-police); cursor: pointer; }
   [data-vrm-ui] button:focus-visible { box-shadow: var(--vu-anneau); }
-  [data-vrm-ui] button + button { background: rgb(255 255 255/.16); color: var(--vu-sur); }
+  [data-vrm-ui] button + button { background: var(--vu-teinte); color: var(--vu-sur); }
   [data-vrm-ui] div, [data-vrm-ui] p, [data-vrm-ui] span, [data-vrm-ui] ul, [data-vrm-ui] li { font: inherit; color: inherit; }
   [data-vrm-ui] div + div, [data-vrm-ui] p { display: block; margin-top: 4px; }
   /* Les anciens gabarits portaient leurs couleurs en ligne (gris sur noir) : sur la coque bleue,
      la feuille commune les reprend (contraste ≥ 4,5:1), sans toucher au texte. */
   [data-vrm-ui="bandeau"] [style*="color:#8A93A3"], [data-vrm-ui="bandeau"] [style*="color:#6B7485"], [data-vrm-ui="bandeau"] [style*="color:#8b95a5"] { color: var(--vu-sur-2) !important; }
   [data-vrm-ui="bandeau"] [style*="color:#E8ECF2"] { color: var(--vu-sur) !important; }
-  [data-vrm-ui="bandeau"] [style*="color:#F5A524"] { color: #FFE2A8 !important; }
+  [data-vrm-ui="bandeau"] [style*="color:#F5A524"] { color: var(--vu-ambre) !important; }
   [data-vrm-ui] button[style] { border: 0 !important; min-height: 44px !important; padding: 0 16px !important; border-radius: 14px !important; font: 600 14px/1.2 var(--vu-police) !important; }
   [data-vrm-ui] button[style]:first-of-type { background: var(--vu-plein) !important; color: var(--vu-plein-encre) !important; }
-  [data-vrm-ui] button[style] ~ button[style] { background: rgb(255 255 255/.16) !important; color: var(--vu-sur) !important; }
+  [data-vrm-ui] button[style] ~ button[style] { background: var(--vu-teinte) !important; color: var(--vu-sur) !important; }
   @media (prefers-reduced-motion: reduce) { [data-vrm-ui] { transition: none !important; } }
   `;
   // Pose la feuille dans une shadow root (ou un élément), une fois.

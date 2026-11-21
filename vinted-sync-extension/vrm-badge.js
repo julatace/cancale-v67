@@ -110,38 +110,38 @@ function vrmVerifVisible(sel) {
      qu'avant (5.328) : toute la carte suit. Avant : un verre blanc à 88 % posé sur la page
      sombre de Vinted, qui la rendait GRISE (capture de Julien, 15 nov.). */
   :host { all: initial;
-    --fond: #060E19; --carte: #122135; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #EAF2FB; --doux: #9CB0C6; --pale: #7F93AA;
-    --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(20 35 54 / .9); --verre: #122135;
-    --champ: rgb(0 0 0 / .22); --anneau: rgba(74,163,255,.35);
+    --fond: #000000; --carte: #1C1C1E; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #F2F2F7; --doux: #98989F; --pale: #8E8E93;
+    --accent: #3FD49A; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
+    --champ: rgb(0 0 0 / .22); --anneau: rgba(63,212,154,.35);
     --ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
-    --fond-carte: linear-gradient(180deg, #15263D 0%, #0C1829 100%);
-    --plan: rgb(20 35 54 / .9); --plan-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-    --touche-fond: linear-gradient(180deg, #1D3049, #172840); --touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+    --fond-carte: linear-gradient(180deg, #1C1C1E 0%, #141416 100%);
+    --plan: rgb(28 28 30 / .9); --plan-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+    --touche-fond: linear-gradient(180deg, #2C2C2E, #242426); --touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
     --enfonce: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
-    --plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #EAF2FB 60%); --plein-encre: #0C1D30; --plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9); }
+    --plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #F2F2F7 60%); --plein-encre: #111114; --plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9); }
   /* 5.351 : la teinte CHOISIE dans VRM (Réglages → Apparence, recopiée par le pont
      de vrm.center : data-theme sur l'hôte) passe avant celle du système ; sans
      choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
-    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
-      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
-      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
-      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
-      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
-      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
-      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
-      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
+    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
+      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
+      --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .07), 0 1px 2px rgb(60 60 67 / .07), 0 12px 26px -14px rgb(60 60 67 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F7F7F8); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .14), 0 1px 1.5px rgb(60 60 67 / .08), 0 4px 9px -5px rgb(60 60 67 / .26);
+      --enfonce: inset 0 1px 2px rgb(60 60 67 / .20), inset 0 0 0 .5px rgb(60 60 67 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   }
-  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
-      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
-      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
-      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
-      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
-      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
-      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
-      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
+  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
+      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
+      --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .07), 0 1px 2px rgb(60 60 67 / .07), 0 12px 26px -14px rgb(60 60 67 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F7F7F8); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .14), 0 1px 1.5px rgb(60 60 67 / .08), 0 4px 9px -5px rgb(60 60 67 / .26);
+      --enfonce: inset 0 1px 2px rgb(60 60 67 / .20), inset 0 0 0 .5px rgb(60 60 67 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   * { box-sizing: border-box; font-family: "Inter VRM", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .btn { position: relative; width: 44px; height: 44px; padding: 0; border: .5px solid rgba(255,255,255,.14); border-radius: 12px;
     background: #000; cursor: pointer; display: block;
@@ -335,9 +335,9 @@ function vrmVerifVisible(sel) {
   /* 5.377 : Favoris · Annonces · Ventes — la direction « bleu clair, porcelaine » (Julien, 14 nov.) :
      quatre formes de bouton (ici la TOUCHE et le LIEN ; un seul plein, « Envoyer le message ») ;
      l'actif est ENFONCÉ + DIODE, jamais une autre couleur de fond ; une rangée n'a pas de bouton. */
-  :host { --porc1: #16273C; --porc2: #122135; --creux: #091320; --diode: #4AA3FF; --o: 0 0 0; --plaque-t: #EAF2FB; }
-  @media (prefers-color-scheme: light) { :host(:not([data-theme="sombre"])) { --porc1: #FFFFFF; --porc2: #F7FAFD; --creux: #E4EEF7; --diode: #0060CC; --o: 18 52 96; --plaque-t: #0C1D30; } }
-  :host([data-theme="clair"]) { --porc1: #FFFFFF; --porc2: #F7FAFD; --creux: #E4EEF7; --diode: #0060CC; --o: 18 52 96; --plaque-t: #0C1D30; }
+  :host { --porc1: #1C1C1E; --porc2: #1C1C1E; --creux: #000000; --diode: #3FD49A; --o: 0 0 0; --plaque-t: #F2F2F7; }
+  @media (prefers-color-scheme: light) { :host(:not([data-theme="sombre"])) { --porc1: #FFFFFF; --porc2: #F7F7F8; --creux: #E5E5EA; --diode: #0F6B4C; --o: 18 52 96; --plaque-t: #111114; } }
+  :host([data-theme="clair"]) { --porc1: #FFFFFF; --porc2: #F7F7F8; --creux: #E5E5EA; --diode: #0F6B4C; --o: 18 52 96; --plaque-t: #111114; }
   .listes { margin-top: 8px; }
   .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; }
   .touche { position: relative; min-height: 44px; padding: 0 10px; border: 0; border-radius: 13px; color: var(--texte); font-size: 14px; font-weight: 600; cursor: pointer;
@@ -477,27 +477,27 @@ function vrmVerifVisible(sel) {
      mesuré sur les couleurs calculées, sur la partie la plus sombre du dégradé pour le verre
      et la plus claire pour le blanc (banc verre-extension-site). Accent rare, ambre = geste,
      jamais violet ni rouge. Sans flou possible (ou transparence réduite) : verre opaque. */
-  :host { --vb-fond-uni: #0C2848;
-    --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-    --vb-verre: rgb(8 18 33 / .72); --vb-verre-o: #0E2139; --vb-verre-bord: rgb(255 255 255 / .12);
+  :host { --vb-fond-uni: #000000;
+    --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 60%), linear-gradient(170deg, #141416 0%, #000000 50%, #000000 100%);
+    --vb-verre: rgb(28 28 30 / .72); --vb-verre-o: #1C1C1E; --vb-verre-bord: rgb(255 255 255 / .12);
     --vb-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
-    --vb-sur: #FFFFFF; --vb-sur-2: #D6E4F3; --pale: #8FA3B9;
+    --vb-sur: #FFFFFF; --vb-sur-2: #C7C7CC; --pale: #8E8E93;
     --plan: rgb(255 255 255 / .05); --plan-ombre: inset 0 0 0 .5px rgb(255 255 255 / .07);
-    --vb-plein-sur-bleu: #FFFFFF; --vb-plein-sur-bleu-t: #0C1D30; }
+    --vb-plein-sur-bleu: #FFFFFF; --vb-plein-sur-bleu-t: #111114; }
   @media (prefers-color-scheme: light) {
-    :host(:not([data-theme="sombre"])) { --vb-fond-uni: #174C88;
-      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
-      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
-      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+    :host(:not([data-theme="sombre"])) { --vb-fond-uni: #F2F2F7;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 70%), linear-gradient(170deg, #F2F2F7 0%, #F2F2F7 45%, #E5E5EA 100%);
+      --vb-verre: rgb(255 255 255 / .9); --vb-verre-o: #E5E5EA; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(0 0 0 / .6);
+      --vb-sur: #111114; --vb-sur-2: #6C6C70; --pale: #6C6C70;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(60 60 67 / .08); }
   }
-  :host([data-theme="clair"]) { --vb-fond-uni: #174C88;
-      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
-      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
-      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+  :host([data-theme="clair"]) { --vb-fond-uni: #F2F2F7;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 70%), linear-gradient(170deg, #F2F2F7 0%, #F2F2F7 45%, #E5E5EA 100%);
+      --vb-verre: rgb(255 255 255 / .9); --vb-verre-o: #E5E5EA; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(0 0 0 / .6);
+      --vb-sur: #111114; --vb-sur-2: #6C6C70; --pale: #6C6C70;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(60 60 67 / .08); }
   /* Le panneau : le dégradé, opaque (une couleur unie dessous, au cas où). */
   .carte, .question { background-color: var(--vb-fond-uni); background-image: var(--vb-fond); border: 1px solid rgb(255 255 255 / .14); padding: 14px 12px 12px; }
   .carte .tete, .question .tete { padding: 0 4px; margin-bottom: 4px; min-height: 30px; }
@@ -542,7 +542,7 @@ function vrmVerifVisible(sel) {
      (jauge, capté), un bandeau fin pour la version, un contrôle segmenté. Les plaques de porcelaine
      remplacent les quatre boîtes grises. Les jetons sont ceux de vrm-ui.js (--vu-*). */
   .carte, .question { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14);
-    border-radius: 22px; padding: 12px; width: min(380px, calc(100vw - 24px)); box-shadow: 0 1px 2px rgb(0 0 0/.2), 0 30px 60px -24px rgb(8 26 50/.75); }
+    border-radius: 22px; padding: 12px; width: min(380px, calc(100vw - 24px)); box-shadow: 0 1px 2px rgb(0 0 0/.2), 0 30px 60px -24px rgb(0 0 0/.75); }
   .carte:has(.q4), .carte:has(.listes), .carte:has(.apercu) { width: min(380px, calc(100vw - 24px)); }
   .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err {
     background: var(--vu-plaque); color: var(--vu-encre); border: 0; border-radius: 18px; box-shadow: var(--vu-ombre); -webkit-backdrop-filter: none; backdrop-filter: none; margin: 8px 0 0; }
@@ -704,15 +704,15 @@ function vrmVerifVisible(sel) {
      grosse partie de l'écran sur Vinted, beaucoup plus visuel et compréhensible ») : sur vinted.fr, connecté,
      la carte devient un panneau de 76 % de la largeur (1100 px au plus) à l'ordinateur, PLEIN ÉCRAN au
      téléphone ; design natif (docs/design/NATIF.md : fond #F2F2F7 / #000, cartes blanches / #1C1C1E, accent
-     #0068D6 rare). Les jetons --vu-* sont redéfinis DANS le panneau : les pièces existantes le suivent. */
-  .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0068D6; --n-teinte:rgb(0 104 214/.12);
+     accent rare). 5.419 : accent vert sapin (#0F6B4C / nuit #3FD49A), plein = encre, plus aucun bleu. Les jetons --vu-* sont redéfinis DANS le panneau : les pièces existantes le suivent. */
+  .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0F6B4C; --n-teinte:rgb(15 107 76/.10); --n-neutre:rgb(118 118 128/.12); --n-vert:#1F7A3A; --n-vert-fond:#E6F4EA; --n-teal:#2C6E73; --n-teal-fond:#E3F1F1;
     --vu-coque-uni:var(--n-fond); --vu-coque:none; --vu-sur:var(--n-encre); --vu-sur-2:var(--n-encre-2); --vu-plaque:var(--n-carte); --vu-plaque-2:var(--n-carte-2); --vu-encre:var(--n-encre); --vu-muet:var(--n-encre-2);
-    --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#0068D6; --vu-plein-appui:#0058B6; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#0068D6; --vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:var(--n-teinte); --vu-teinte-encre:#0058B6; --vu-lien:#0068D6; --vu-socle:#E5E5EA; --vu-barre:#0068D6; --vu-ambre:#8A4B00;
+    --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#111114; --vu-plein-appui:#2C2C2E; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#111114; --vu-plein-sur-plaque-encre:#FFFFFF;
+    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#8A4B00;
     position: fixed; top: 4vh; bottom: 4vh; right: 2vw; left: auto; width: min(1100px, 76vw) !important; max-height: none; height: auto; border-radius: 16px; border: 0;
     padding: 12px 20px 20px; background: var(--n-fond) !important; color: var(--n-encre); box-shadow: 0 8px 30px rgb(0 0 0/.12), 0 0 0 100vmax rgb(0 0 0/.28); overflow-y: auto; overscroll-behavior: contain; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-plein:#0068D6; --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; }
   @media (max-width: 760px) { .carte[data-grand] { top: 0; bottom: 0; right: 0; left: 0; width: 100vw !important; height: 100dvh; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-shadow: none; } }
   /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #8A4B00 sur #1C1C1E ne se lisait pas. */
   .carte[data-grand] { --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; }
@@ -739,7 +739,7 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .rang .px { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .carte[data-grand] .rang .px.quand { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .carte[data-grand] .rang.nonlu .ti { font-weight: 700; }
-  .pt5 { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--n-accent, #0068D6); margin-right: 6px; vertical-align: middle; }
+  .pt5 { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--n-accent, #0F6B4C); margin-right: 6px; vertical-align: middle; }
   .carte[data-grand] li[data-ouverte] > .rang { background: var(--n-teinte); }
   .fiche5 { padding: 4px 16px 16px; }
   .ph5 { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 0; }
@@ -772,7 +772,7 @@ function vrmVerifVisible(sel) {
     .carte[data-grand] .listes5 { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 16px; align-items: start; }
     .carte[data-grand] .seg5 { grid-template-columns: none; grid-auto-flow: row; grid-auto-rows: 44px; background: transparent; padding: 0; gap: 2px; top: 0; }
     .carte[data-grand] .seg5 button { justify-content: flex-start; text-align: left; padding: 0 12px; border-radius: 10px; color: var(--n-encre); display: flex; align-items: center; }
-    .carte[data-grand] .seg5 button[aria-selected="true"] { background: var(--n-teinte); color: var(--n-accent); box-shadow: none; }
+    .carte[data-grand] .seg5 button[aria-selected="true"] { background: var(--n-carte); color: var(--n-encre); box-shadow: 0 1px 2px rgb(0 0 0/.12); }
     .carte[data-grand] .panneau { margin-top: 0; }
     .carte[data-grand] .reg5 { justify-content: flex-start !important; }
     .deux5 { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0,1fr); min-height: 60vh; }
@@ -783,7 +783,7 @@ function vrmVerifVisible(sel) {
   .outils5 { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
   .cherche5 { flex: 1; min-width: 0; min-height: 44px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); padding: 0 12px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; }
   .filtre5 { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; cursor: pointer; }
-  .filtre5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
+  .filtre5[aria-pressed="true"] { background: var(--n-neutre); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait); }
   .volet5 { padding: 16px; }
   .vide5 { display: grid; place-content: center; text-align: center; gap: 6px; min-height: 50vh; color: var(--n-encre-2); font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .vide5 b { color: var(--n-encre); font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
@@ -824,7 +824,7 @@ function vrmVerifVisible(sel) {
   .chips5 { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
   .chip5 { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; position: relative; }
   .chip5::after { content: ''; position: absolute; inset: -4px 0; }
-  .chip5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
+  .chip5[aria-pressed="true"] { background: var(--n-neutre); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait); }
   .tr5 { display: grid; grid-template-columns: 44px minmax(220px, 2fr) minmax(0, 5fr); align-items: center; gap: 0 8px; padding: 0 8px; }
   .tr5 .cels5 { display: grid; grid-template-columns: repeat(var(--n5, 4), minmax(56px, 1fr)); gap: 0 8px; align-items: center; }
   .th5 { min-height: 36px; font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); border-bottom: .5px solid var(--n-trait); }
@@ -835,7 +835,7 @@ function vrmVerifVisible(sel) {
   .cel5 { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .lc5 { display: none; }
   .st5 { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .st5[data-statut="nouveau"] { background: var(--n-teinte); color: var(--n-accent); }
+  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
   li[data-coche] > .tr5, li[data-coche] > .case5 { background: var(--n-teinte); }
   @media (max-width: 760px) {
     .th5 { display: none; }
@@ -858,7 +858,7 @@ function vrmVerifVisible(sel) {
   .au5-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .au5-t h3 { margin: 8px 0; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); text-transform: none; letter-spacing: 0; }
   .et5 { padding: 2px 10px; border-radius: 6px; font: 600 13px/20px -apple-system, Inter, system-ui, sans-serif; background: var(--n-carte-2); color: var(--n-encre-2); }
-  .et5[data-etat="on"] { background: var(--n-teinte); color: var(--n-accent); }
+  .et5[data-etat="on"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .rg5-l b { font-weight: 600; color: var(--n-encre); text-align: right; }
   .rg5-l span { color: var(--n-encre); }
   .trn5 { grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) 24px; min-height: 52px; text-decoration: none; color: var(--n-encre); }
@@ -954,8 +954,8 @@ function vrmVerifVisible(sel) {
   .cel6 .tr-l6 + .suivi6, .env6 .suivi6 { display: block; margin-top: 2px; font: 400 12px/16px ui-monospace, "SF Mono", Menlo, monospace; color: var(--n-encre-2); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .lim6 { font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .gris6 { color: var(--n-encre-2); }
-  .imp6 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--n-teinte); color: var(--n-accent); font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, transform .12s ease; }
-  .imp6:hover { background: rgb(0 104 214 / .18); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
+  .imp6 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, transform .12s ease; }
+  .imp6:hover { background: var(--n-neutre); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
   .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
@@ -967,10 +967,12 @@ function vrmVerifVisible(sel) {
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
   .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
-  .et6[data-statut="en_vente"] { background: var(--n-teinte); color: var(--n-accent); }
+  .et6[data-statut="en_vente"] { background: var(--n-vert-fond); color: var(--n-vert); }
+  .et6[data-statut="en_route"] { background: var(--n-teal-fond); color: var(--n-teal); }
+  .et6[data-statut="finalisee"] { background: var(--n-vert-fond); color: var(--n-vert); }
   /* 5.410.7 — les favoris en tableau (mêmes pièces que Commandes) ; l'état en étiquette, l'accent seulement pour « en cours ». */
-  .et6[data-ton="accent"] { background: var(--n-teinte); color: var(--n-accent); }
-  .et6[data-statut="envoye"], .et6[data-statut="offre"] { background: var(--n-teinte); color: var(--n-encre); }
+  .et6[data-ton="accent"] { background: var(--n-teal-fond); color: var(--n-teal); }
+  .et6[data-statut="envoye"], .et6[data-statut="offre"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .fav6-barre .seg6 { flex: 0 1 auto; min-width: 0; }
   .fav6-barre .seg6 button { padding: 0 12px; white-space: nowrap; }
   .fav6-barre .seg6 b { font-weight: 600; opacity: .72; margin-left: 2px; }
@@ -1032,7 +1034,7 @@ function vrmVerifVisible(sel) {
   .fp-al:empty { display: none; }
   .fp-ins { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
   .fp-ins button, .fp-ajout { appearance: none; min-height: 44px; padding: 0 12px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
-  .fp-ajout { border-style: dashed; color: var(--n-accent, #0068D6); margin: 8px 0 0; }
+  .fp-ajout { border-style: dashed; color: var(--n-encre, #111114); margin: 8px 0 0; }
   .fp-r { padding: 4px 0 8px; border-top: .5px solid var(--n-trait); }
   .fp-rt { display: flex; align-items: center; gap: 4px; min-height: 44px; }
   .fp-rt b { font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); margin-right: 6px; }
@@ -1101,7 +1103,7 @@ function vrmVerifVisible(sel) {
   .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
-  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .geste6 { margin: 12px 16px; padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
   .carte[data-grand] .geste6 .vu-btn:not(.vu-plein) { background: var(--n-carte-2); color: var(--n-encre); box-shadow: none; }
   .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
@@ -1122,7 +1124,7 @@ function vrmVerifVisible(sel) {
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
   /* 5.410.3 : un choix (rond ou case) À GAUCHE de son libellé, la ligne entière se touche (44 px). */
   .champ6.cb6 { flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; }
-  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0068D6); }
+  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0F6B4C); }
   .champ6.cb6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .champ6.cb6 .note5 { margin: 0; }
   .champ6.ot6 { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
@@ -1265,7 +1267,7 @@ function vrmVerifVisible(sel) {
   .verif6[hidden] { display: none !important; }
   .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
   .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
-  .verif6[data-verif="faite"] .pv { background: #0068D6; }
+  .verif6[data-verif="faite"] .pv { background: var(--n-accent, #0F6B4C); }
   @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
   :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }
 </style>

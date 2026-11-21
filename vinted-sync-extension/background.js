@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.418.0';
+const CODE_VERSION = '5.419.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -16865,7 +16865,7 @@ async function marquerOngletTravail(tabId, raison) {
         const o = h.attachShadow({ mode: 'open' });
         o.innerHTML = '<style>:host{all:initial}.v{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgb(12 16 22/.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font:400 15px/1.4 -apple-system,system-ui,sans-serif;color:#fff;cursor:default;user-select:none}'
           + '.b{max-width:440px;width:100%;background:#16181d;border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgb(0 0 0/.45);text-align:center}.b h1{margin:0 0 8px;font:700 19px/1.3 -apple-system,system-ui,sans-serif}.b p{margin:0 0 8px;color:#c9ced6}.b p[data-raison]{color:#ffd28a}.b p[data-raison=""]{display:none}'
-          + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;padding:0 20px;border-radius:12px;background:#fff;color:#111;font:600 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button:focus-visible{outline:2px solid #0068D6;outline-offset:2px}</style>'
+          + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;padding:0 20px;border-radius:12px;background:#fff;color:#111;font:600 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button:focus-visible{outline:2px solid #0F6B4C;outline-offset:2px}</style>'
           + '<div class="v" data-voile-travail><div class="b" role="dialog" aria-modal="true"><h1 data-titre></h1><p data-note></p><p data-raison=""></p><button type="button" data-arreter></button></div></div>';
         (document.documentElement || document.body).appendChild(h);
         o.querySelector('[data-arreter]').addEventListener('click', (ev) => { ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => { void chrome.runtime.lastError; b.textContent = T('f6_arrete', 'Arrêté'); }); } catch (_) {} });
