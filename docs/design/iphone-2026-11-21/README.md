@@ -1,5 +1,21 @@
 # Design iPhone — 21 nov. 2026
 
+## ⚠️⚠️⚠️⚠️ 6ᵉ passe (la plus récente) : « comme Vintex », 2ᵉ jet — `vintex-vrai-2/`
+
+Julien sur `vintex-vrai/` : « tu peux faire mieux, mais garde les onglets ». Changé :
+- **Onglets de l'app actuelle** en bas : Aujourd'hui · Annonces · Ventes · Achats · Argent (icônes Lucide, l'actif en rose
+  sur voile rose pâle comme la barre latérale de Vintex, compteurs en pastille ambre = gestes) ; plus de « + », plus de
+  Menu ni de Messages en onglet : la bulle Messages est en haut à droite, à côté de ⟳.
+- **Moins gris** : fond très légèrement teinté `#F1F3F6`, cartes blanches à ombre douce
+  (`0 1px 2px rgb(16 24 40/.04), 0 2px 6px rgb(16 24 40/.04)`), étiquettes plus franches (vert `#DDF4E6`/`#17744A`, ambre
+  `#FFEBC4`/`#874600`, gris `#ECEEF1`/`#4C525B`, **teal « en route »** `#DAF0F0`/`#0D6A6B`), logos de sites et de
+  transporteurs en vraie couleur (16 px), vignettes 48 rayon 10, carte « Vendu en novembre » : chiffre 30/700, jauge
+  teal→vert, fond à peine teinté `#F3FBF9`.
+- **Échelle réduite** : titres d'écran 22/700, corps 14, méta 12, contrôles 36 (zone 44), rangées 56, marges 16 ; plus
+  d'en-tête de colonnes au téléphone, filtres et compteur sur une ligne ⇒ **8 annonces** au premier écran.
+
+---
+
 ## ⚠️⚠️⚠️ 5ᵉ passe (la plus récente) : « comme Vintex », vraiment — `vintex-vrai/`
 
 Julien, à qui on a demandé l'app dont il adore le look : « Vintex », seul. Donc ni « inspiré de » ni personnalité de notre
