@@ -64,5 +64,16 @@ export default {
   "arn.comment": "How it’s calculated",
   "arn.comptes": "Accounts",
   "site.tous": "All",
-  "site.choisir": "Choose a platform"
+  "site.choisir": "Choose a platform",
+  "arn.recuEn": "Received in {mois}",
+  "arn.aideRecu": "Each sale counts in the month the money was paid out to you (order completed), all platforms, on the chosen accounts. “At least”: some sales are not dated yet; what is missing is written under the figure.",
+  "arn.chiffres": "{mois} in numbers",
+  "arn.prixASaisir": {"one": "{n} purchase price to enter out of {sur}", "other": "{n} purchase prices to enter out of {sur}"},
+  "arn.col.num": "No.",
+  "arn.col.article": "Item",
+  "arn.col.jour": "Day",
+  "arn.col.site": "Site",
+  "arn.col.achat": "Cost",
+  "arn.col.marge": "Margin",
+  "arn.col.recu": "Received"
 };

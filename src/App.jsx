@@ -22,7 +22,6 @@ import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from
 import { trierSerie, resumeSerie, csvDe, clesSelectionnables, portee } from './selectionSerie.js';
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
-import { automatisationsActives } from './automatisationsEtat.js';   // (21 nov., onglets-menu) « N actives » sur la tuile du Menu
 import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from './BoutonExtension.jsx';   // (20 nov.) « … dans l'extension »
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
@@ -37,6 +36,7 @@ import ARetirerAilleurs from './ARetirerAilleurs.jsx';
 import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
 // (19 nov., décisions « 1 oui, 3 oui », ext. 5.409) La baisse par règle (éteinte par défaut) et « vendue ailleurs ⇒ masquée ».
 import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
+import { automatisationsActives, AUTOMATISATIONS_COMPTEES } from './automatisationsEtat.js';   // (21 nov., lot journee-stats) « N sur 3 » dans Statistiques ; (onglets-menu) « N actives » sur la tuile du Menu
 import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage } from './reglagesAutoLigne.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
@@ -1205,7 +1205,9 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // (19 nov.) « VRM natif » : l'écran compose src/natif/. Chargé à la demande, AVEC les composants natifs et leur CSS
 // (≈ 10 Ko compressés) : le budget de démarrage (scripts/budget-vitesse.json, audit-poids-demarrage) reste tenu.
-const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
+const AujourdhuiV2 = aLaDemandeDiscret(() => import("./aujourdhui/Branche.jsx"));
+// (21 nov., lot journee-stats) Statistiques · Pilotage et Finances (7 · 30 · 90 j) : le morceau et son modèle (src/aujourdhui/pilotage.js).
+const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -1214,8 +1216,9 @@ import { brancherARegler, ajoutPastille, pastilleMessages } from "./designV2/aRe
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
-import { colisDuPoint } from "./retraitsVue.js";
-import { prevoirRetraits } from "./relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
+import { ligneVente, ligneAchat, CLE_PUB_TRANSP, JOURS_PUB_TRANSP } from "./statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
+import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
+import { prevoirRetraits } from "./relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -25271,9 +25274,10 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
       <div className="v2-argent-nav n-arg-nav" data-v2-argent-nav={seg}>
         <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
-        <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
+        {/* (21 nov., argent-vintex) Sur Mois, « Comptes · N › » est la dernière rangée des chiffres (src/natif/ecrans/ArgentMois.jsx). */}
+        {seg !== 'resume' ? <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
           {tr('arn.comptes')}{liste && liste.length ? ' · ' + (dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`) : ''} <span aria-hidden="true">›</span>
-        </button>
+        </button> : null}
       </div>
     );
   }
@@ -33801,15 +33805,20 @@ const caBeneficeDuMois = (m, toutes) => {
 // (4 nov.) `jusqua` (ms, optionnel) : les VENTES s'arrêtent au jour de `jusqua` inclus (« Comparer deux mois »
 // au même point d'un mois en cours) ; les dépenses restent celles des mois de la
 // période. Absent : la règle d'avant, inchangée.
+// (21 nov., lot journee-stats — Julien : « bénéfice dans Ma journée, brut et net du mois, et d'aujourd'hui ») `periode`
+// 'jour' : minuit → minuit, la MÊME règle (frais de vente, URSSAF de ces ventes) SANS les dépenses — elles se notent au
+// mois et ne se partagent pas entre les jours (`chargesAuMois: true`, l'écran le dit) ; jamais une dépense devinée.
 const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant = Date.now(), toutes = false, urssaf = true, jusqua = null }) => {
-  const de = debutPeriode(maintenant, periode), a = decalerPeriode(de, periode, 1);
+  const auJour = periode === 'jour';
+  const de = auJour ? (() => { const d = new Date(maintenant); d.setHours(0, 0, 0, 0); return d; })() : debutPeriode(maintenant, periode);
+  const a = auJour ? new Date(de.getFullYear(), de.getMonth(), de.getDate() + 1) : decalerPeriode(de, periode, 1);
   // La publication est au JOUR : la coupe garde le jour entier où elle tombe.
   const finJ = jusqua != null ? (() => { const d = new Date(jusqua); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 1); return d; })() : null;
   const v = beneficeDesJours(jours, de, finJ && finJ < a ? finJ : a);
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
   const yms = [];
   for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
-  const charges = periode === 'annee'
+  const charges = auJour ? 0 : periode === 'annee'
     ? comptaChargesAnnee(compta, de.getFullYear()).total
     : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
@@ -33833,7 +33842,7 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
   const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
-  return { ...v, libelle: libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf };
+  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -34224,7 +34233,23 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
   // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
   return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}
     onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
+}
+// (21 nov., lot journee-stats) STATISTIQUES · PILOTAGE ET FINANCES — la question au propriétaire (`valeurChiffre` sur les
+// sources de la carte des chiffres : les MÊMES que Ma journée et Argent), les ventes de la coque et les outils de lecture ;
+// le morceau (src/aujourdhui/StatsBranche.jsx) range tout par `statsFenetre` (src/aujourdhui/pilotage.js). Aucune règle ici.
+function StatsPilotageApp({ liveStats, onNav }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const live = liveStats || liveCoque;
+  const S = useSourcesCarte(live);
+  const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  // Les automatisations actives : LA règle de la rangée de Paramètres (src/automatisationsEtat.js), lue, jamais devinée.
+  let auto = null; try { auto = { n: automatisationsActives(load), sur: AUTOMATISATIONS_COMPTEES }; } catch (_) { auto = null; }
+  return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav} automatisations={auto}
+    onAutomatisations={() => { try { ouvrirPanneau({ site: 'vinted', page: 'automatisations' }); } catch (_) { if (onNav) onNav('settings'); } }}
+    onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -38338,6 +38363,56 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
   // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
   const transporteurVente = (b, tx) => transporteurParTx(b, tx, { pdfParTx: pdfEtiquettesParTx(), departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  // (21 nov., lot journee-stats — Julien : « fais les stats par transporteur, achat et vente ») LA PUBLICATION DES COLIS PAR
+  // TRANSPORTEUR (src/statsTransporteurs.js `ligneVente` / `ligneAchat`) : ici, l'écran qui a toutes les sources, chaque colis
+  // rangé PAR IDENTITÉ — la vente par SON bordereau (n° de transaction) et la ligne `depart_` de CE n° ; l'achat par SES n° de
+  // suivi (`suivisAchat`), la ligne `transp_` de CE n° et le trajet lu (`etapesTrajet`). Statistiques la LIT (sur cet appareil).
+  // Une lecture pas faite ou ratée (départs, lignes du transporteur) n'écrit RIEN de sa partie : « rien lu » ne vaut pas « rien ».
+  // Ni titre, ni acheteur, ni n° : les dates, le transporteur, les drapeaux, le nom du point.
+  useEffect(() => {
+    try {
+      const owner = AUTH.user?.id; if (!owner) return;
+      const borne = Date.now() - JOURS_PUB_TRANSP * 86400000;
+      // DEUX clés (ventes, achats) : deux instances de l'écran (Ventes, Achats) écrivent chacune SA partie, sans s'écraser.
+      const publier = (partie, L) => {
+        const cle = CLE_PUB_TRANSP + '_' + partie, avant = load(cle, null);
+        if (avant && avant.owner === owner && JSON.stringify(avant.L) === JSON.stringify(L) && Date.now() - (avant.at || 0) < 6 * 3600000) return;
+        save(cle, { owner, at: Date.now(), L });
+        try { window.dispatchEvent(new CustomEvent('vrm:stats-transporteurs')); } catch (_) {}
+      };
+      const departs = vcLoc0.departs;
+      if (Array.isArray(sales.items) && departs && typeof departs.get === 'function') {
+        const L = [];
+        for (const o of sales.items) {
+          const tx = o && o.transaction_id != null ? String(o.transaction_id) : ''; if (!tx) continue;
+          const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
+          if (classifyOrderStatus(o.status) === 'cancelled' && !/retour|rembours|suspend/i.test(String(o.status || ''))) continue;   // annulée : aucun colis
+          const b = bordParTx[tx] || null;
+          const n = normaliserSuivi(b && b.suivi);
+          const lim = b ? lireDateLimite(b.dateLimite) : null;
+          L.push(ligneVente({ tr: transporteurVente(b, tx), venteAt: t, depart: n ? (departs.get(n) || null) : null, limiteAt: lim ? lim.at : null, status: o.status }));
+        }
+        publier('ventes', L);
+      }
+      if (Array.isArray(buys.items) && transpMap && typeof transpMap.get === 'function') {
+        const L = [];
+        for (const o of buys.items) {
+          const t = Date.parse((o && o.date) || ''); if (!Number.isFinite(t) || t < borne) continue;
+          if (classifyOrderStatus(o.status) === 'cancelled' && !/non\s+r[ée]clam/i.test(String(o.status || ''))) continue;
+          const su = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '');
+          const ln = su ? (transpMap.get(su) || null) : null;
+          const r = relaisDe(o) || {};
+          const ev = etatColisVinted(o, Date.now(), transpMap) || {};
+          const trajet = etapesTrajet({ payeAt: o.date, evenements: ln && evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln ? ln.carrier : '',
+            arriveesAt: Number.isFinite(ev.arriveeSure) ? [ev.arriveeSure] : [], retireAt: ln && ln.etat === 'retire' ? ln.etatAt : null });
+          L.push(ligneAchat({ tr: transporteurDuColis({ declare: r.transporteur || '', suivi: su, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
+            payeAt: t, ligne: ln, trajet, status: o.status }));
+        }
+        publier('achats', L);
+      }
+    } catch (_) { /* une règle qui casse n'écrit rien : la publication d'avant reste */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats]);
   // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
   // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
   const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);
@@ -63878,7 +63953,9 @@ function ongletLienSimple(search) {
   try { const p = new URLSearchParams(search || ''); const t = p.get('tab'); if (!t || [...p.keys()].length !== 1) return null; return ECRANS_COPIE.includes(t) ? t : null; } catch (_) { return null; }
 }
 const ESSENTIELS_ECRAN = {
-  journee: ['comptes', 'nuage', 'stats', 'notifs', 'carte', 'ventes', 'achats', 'annonces', 'messages'],
+  // (21 nov., lot journee-stats — captures de Julien : « Mis à jour il y a 2 h » et la roue, longtemps) Ma journée n'attend
+  // plus neuf lectures derrière une copie datée : chaque carte réserve SA place et dit « lecture… » (rien ne saute).
+  journee: ['comptes', 'nuage'],
   ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
   annonces: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'annonces'],
   achats: ['comptes', 'nuage', 'sites', 'carte', 'achats'],
@@ -68930,7 +69007,7 @@ function AppCoeur() {
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les

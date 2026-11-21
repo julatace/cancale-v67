@@ -31,6 +31,10 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
   { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet lisible', phrase: 'Gros chiffres sur fond blanc, QR à côté, Copier et Plein écran.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
+  { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
+  { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
@@ -54,9 +58,11 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'vestiaire-ecrire', date: '2026-11-21', titre: 'Vestiaire : lire et répondre depuis l’extension', phrase: 'Le fil dans le panneau ; ton message tapé sur la page.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.411, Julien : « prévoir les colis à aller chercher pour chaque point relais ») docs/passation/2026-11-21-relais-prevision.md
   { id: 'relais-prevision', date: '2026-11-21', titre: 'À retirer : chaque point relais, ce qui arrive', phrase: 'Les colis arrivés et en route, rangés par point, avec leur date.', tab: 'achats', pour: 'tous', mode: 'tous' },
-  // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
-  { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.8, Julien : « je ne peux pas sélectionner les favoris », « l'onglet doit être bloqué », « pas d'offre en plus ») docs/passation/2026-11-21-favoris-corrections.md
+  // (21 nov., lot journee-stats, Julien : « bénéfice dans Ma journée, brut et net » ; « beaucoup plus de statistiques ») docs/passation/2026-11-21-journee-stats.md
+  // (21 nov., lot journee-stats, Julien : « fais les stats par transporteur, achat et vente »)
+  { id: 'stats-transporteurs', date: '2026-11-21', titre: 'Statistiques par transporteur, ventes et achats', phrase: 'Délais de dépôt, de livraison et de retrait, sur dates lues.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'journee-stats', date: '2026-11-21', titre: 'Ma journée courte, bénéfice brut et net', phrase: 'Colis et chiffres en haut, le détail dans Statistiques.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'favoris-corriges', date: '2026-11-21', titre: 'Favoris : cases, offre et onglet bloqué', phrase: 'Une file annulée se renvoie ; l’offre part toujours ; l’onglet VRM est voilé.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.7, Julien : « une liste pour les favoris comme pour les ventes » ; « ouvre un autre onglet pour travailler ») docs/passation/2026-11-21-favoris-tableau.md
   { id: 'favoris-tableau', date: '2026-11-21', titre: 'Les favoris en tableau, comme les commandes', phrase: 'Dans l’extension, page Favoris : cocher, envoyer, suivre chaque rangée.', tab: 'extension', pour: 'tous', mode: 'tous' },

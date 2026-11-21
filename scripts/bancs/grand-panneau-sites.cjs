@@ -71,7 +71,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
   const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}, orion ? { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1 Orion/1.0' } : {}));
   const pg = await ctx.newPage();
   const erreurs = [];
-  pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
+  pg.on('pageerror', (e) => erreurs.push(String((e && e.stack) || e).slice(0, 600)));
   await pg.route('**/*', (r) => {
     const u = r.request().url();
     if (/logo-vrm-96\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
@@ -95,6 +95,9 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = { ok: true, uid: '111', apercu: copie(ap) };
           else if (msg.action === 'favorisCarte' && msg.quoi === 'lancer') rep = msg.confirme === true ? { ok: true } : { ok: false };
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
+          // (intégration 21 nov.) Vestiaire · Favoris montre, depuis la 5.412, les personnes qui ont aimé (`aimesVcCarte`) : la
+          // forme RÉELLE de la réponse du fond (src : background.js `aimesVcCarte`), pas un `{ ok: true }` vide qui faisait planter la page.
+          else if (msg.action === 'aimesVcCarte') rep = { ok: true, compte: 'moi', appris: false, articles: [], sansArticle: true };
           setTimeout(() => cb && cb(rep), 0);
         } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { (window.__ranges = window.__ranges || []).push(copie(o)); if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } },
@@ -158,7 +161,7 @@ async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
   const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
   const pg = await ctx.newPage();
   const erreurs = [];
-  pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 200)));
+  pg.on('pageerror', (e) => erreurs.push(String((e && e.stack) || e).slice(0, 600)));
   await pg.route('**/*', (r) => (/logo-vrm-96\.png/.test(r.request().url()) ? r.fulfill({ status: 200, contentType: 'image/png', body: LOGO }) : r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;font-family:sans-serif"><main style="padding:20px;height:2000px">Le site</main></body></html>' })));
   await pg.goto(S.url);
   await pg.evaluate(({ e, js, ui, L }) => {
@@ -167,7 +170,7 @@ async function ouvrirSite(nav, site, { scheme, largeur, hauteur, mobile }) {
     const orig = Element.prototype.attachShadow;
     Element.prototype.attachShadow = function (o) { return orig.call(this, Object.assign({}, o, { mode: 'open' })); };
     window.chrome = { runtime: { id: 'ext', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version: e.version }), lastError: null,
-      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; else if (msg.action === 'interessesLbc') rep = { ok: true, compte: 'moi', appris: true, annonces: [{ annonce: 'a1', n: 2, aEcrire: 1, attendent: 1 }], liste: [{ conv: 'c1', annonce: 'a1', messagesDeLui: 2, dernierAt: new Date(Date.now() - 3600000).toISOString(), attendTaReponse: true, dejaEcrit: false }, { conv: 'c2', annonce: 'a1', messagesDeLui: 1, dernierAt: new Date(Date.now() - 7200000).toISOString(), attendTaReponse: false, dejaEcrit: true }], serie: null, parToucher: 10, ecartS: [40, 90] }; else if (msg.action === 'ecrireInteressesLbc') rep = msg.confirme === true ? { accepte: true } : { accepte: false }; else if (msg.action === 'reglageAuto') rep = msg.confirme === true || !(msg.valeur && msg.valeur.actif) ? { ok: true } : { ok: false, code: 'confirmation' }; else if (msg.action === 'supprimerLbcCarte') rep = msg.sansRetour === true ? { accepte: true, etape: 'fait' } : { accepte: false, code: 'sans-retour', confirmation: { titre: 'Supprimer le N°7 de Leboncoin ?', lignes: ['N°7 · Paire A'], reste: 'L’article reste dans ton stock, avec son N°.', sansRetour: 'C’est sans retour : Leboncoin ne rend pas une annonce supprimée.', ok: 'Oui, supprimer de Leboncoin', irreversible: true } }; setTimeout(() => cb && cb(rep), 0); } },
+      sendMessage: (msg, cb) => { window.__envoyes.push(copie(msg)); let rep = { ok: true }; if (msg.action === 'etat') rep = copie(e); else if (msg.action === 'carteListes') rep = copie(L); else if (msg.action === 'capteLot') rep = { ok: true, lot: null }; else if (msg.action === 'aimesVcCarte') rep = { ok: true, compte: 'moi', appris: false, articles: [], sansArticle: true }; else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false }; else if (msg.action === 'interessesLbc') rep = { ok: true, compte: 'moi', appris: true, annonces: [{ annonce: 'a1', n: 2, aEcrire: 1, attendent: 1 }], liste: [{ conv: 'c1', annonce: 'a1', messagesDeLui: 2, dernierAt: new Date(Date.now() - 3600000).toISOString(), attendTaReponse: true, dejaEcrit: false }, { conv: 'c2', annonce: 'a1', messagesDeLui: 1, dernierAt: new Date(Date.now() - 7200000).toISOString(), attendTaReponse: false, dejaEcrit: true }], serie: null, parToucher: 10, ecartS: [40, 90] }; else if (msg.action === 'ecrireInteressesLbc') rep = msg.confirme === true ? { accepte: true } : { accepte: false }; else if (msg.action === 'reglageAuto') rep = msg.confirme === true || !(msg.valeur && msg.valeur.actif) ? { ok: true } : { ok: false, code: 'confirmation' }; else if (msg.action === 'supprimerLbcCarte') rep = msg.sansRetour === true ? { accepte: true, etape: 'fait' } : { accepte: false, code: 'sans-retour', confirmation: { titre: 'Supprimer le N°7 de Leboncoin ?', lignes: ['N°7 · Paire A'], reste: 'L’article reste dans ton stock, avec son N°.', sansRetour: 'C’est sans retour : Leboncoin ne rend pas une annonce supprimée.', ok: 'Oui, supprimer de Leboncoin', irreversible: true } }; setTimeout(() => cb && cb(rep), 0); } },
       storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener() {} } } };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -184,7 +187,7 @@ const lireS = (pg) => pg.evaluate(() => {
     lignes: r.querySelectorAll('.table6 [data-annonce]').length, sansCompte: q('[data-sans-compte]') ? q('[data-sans-compte]').getAttribute('data-sans-compte') : null,
     options: q('[data-ann-action]') ? Array.from(q('[data-ann-action]').options).map((o) => o.value).filter(Boolean) : [],
     ventes: Array.from(r.querySelectorAll('[data-vente]')).map((x) => x.getAttribute('data-vente') + ':' + x.getAttribute('data-vente-etat')),
-    favSite: q('[data-favoris-site]') ? q('[data-favoris-site]').innerText : '', autoSite: q('[data-auto-site]') ? q('[data-auto-site]').innerText : '',
+    favSite: q('[data-favoris-site]') ? q('[data-favoris-site]').innerText : q('[data-vc-aimes-note]') ? q('[data-vc-aimes-note]').innerText : '', autoSite: q('[data-auto-site]') ? q('[data-auto-site]').innerText : '',
     notifs: r.querySelectorAll('[data-notif]').length, msgSite: q('[data-messages-site]') ? q('[data-messages-site]').getAttribute('data-messages-site') : null, msgTexte: q('[data-messages-site]') ? q('[data-messages-site]').innerText : '', convs: r.querySelectorAll('[data-conv-b]').length, transporteur: q('[data-fait="transporteur"] b') ? q('[data-fait="transporteur"] b').innerText : '',
     debord: document.documentElement.scrollWidth > window.innerWidth };
 });

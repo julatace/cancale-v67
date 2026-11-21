@@ -18,7 +18,7 @@
 // Un LOT dit combien de ses articles sont déjà reliés ; il reste proposé jusqu'à son nombre, son prix ne se divise jamais.
 // Rien n'est relié sans son toucher sur « Oui » (`relier`, seul appel d'`onRelier`).
 import React from 'react';
-import { tr } from '../../i18n/index.js';
+import { tr, localeCourante } from '../../i18n/index.js';
 import { tousAchatsLibresDetail } from '../../suggestionsAchat.js';
 import { rangerPropositions, etatLot } from '../../relierPropositions.js';
 import '../ventes-lisibles.css';
@@ -28,7 +28,7 @@ const PAS = 60;
 // Les tranches de prix (« Prix ▾ ») : bornes en euros, incluses ; la dernière n'a pas de plafond.
 export const TRANCHES_PRIX = [['0-20', 0, 20], ['20-40', 20, 40], ['40-60', 40, 60], ['60-100', 60, 100], ['100+', 100, null]];
 const prixCourt = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : `${Number(n).toFixed(Number(n) % 1 ? 2 : 0).replace('.', ',')} €`);
-const jourCourt = (d) => { const t = Date.parse(d || ''); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+const jourCourt = (d) => { const t = Date.parse(d || ''); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' })   /* (intégration 21 nov.) la langue choisie, plus le français figé */; } catch (_) { return ''; } };
 
 function Pilule({ cle, libelle, valeur, options, onChoix, tous }) {
   const sel = options.find((o) => o.cle === valeur);

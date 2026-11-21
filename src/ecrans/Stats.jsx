@@ -324,7 +324,7 @@ function RepliStats({ id, titre, phrase, children, ouvertDefaut = false }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
+function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
   const designV2 = useDesignV2();   // (17 nov., phase 2) un seul segmenté : la période en menu compact, « Prix qui marche » en lien
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
@@ -676,13 +676,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav || pilotage ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{/* (intégration 21 nov.) PILOTAGE · FINANCES · TRANSPORTEURS DANS la tête (sous la barre d'Argent) : posé plus bas, comme enfant de la
+          grille de l'écran, il tombait sous toutes les anciennes cartes (390 : `order` 7 ; 1512 : la vitrine rangée en 2ᵉ rangée) —
+          ~4 900 px plus bas. Banc stats-pilotage-place. */}
+        {pilotage ? <div className="vrm-stats-pilotage" data-stats-pilotage="">{pilotage}</div> : null}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
         <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
           <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <Icon name="chevron" size={14}/></label>
         {versPrix ? <BoutonV2 role="texte" onClick={versPrix} attrs={{ 'data-v2-stats-prix': '' }}>{tr('v2.st.prix')}</BoutonV2> : null}
       </div> : null}</div> : null} right={designV2 ? null : <Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
 
+      {/* (21 nov., lot journee-stats) PILOTAGE · FINANCES, 7 j · 30 j · 90 j — src/natif/ecrans/StatsPilotage.jsx : dans la tête (plus haut). */}
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
