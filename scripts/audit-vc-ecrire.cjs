@@ -108,7 +108,7 @@ ${o.captcha ? '<iframe src="https://geo.captcha-delivery.com/captcha/?x=1" style
     if (${o.muet ? 'true' : 'false'} || !t.trim()) return;
     window.__envoyes.push(t);
     fetch(base + conv + '/message' + qs, { method: 'POST', body: JSON.stringify({ message: { id: '${MOI}-a1b2c3d4-e5f6', text: t, mentioned_users: [] } }) });
-    document.querySelector('textarea').value = '';
+    ${o.garde ? '' : "document.querySelector('textarea').value = '';"}
   });
 </script></body></html>`;
 
@@ -152,7 +152,7 @@ async function navigateur() {
   try {
     // E1 — apprendre de SON envoi (frappes et clic VRAIS : isTrusted).
     {
-      const { ctx, pg, envoisStream } = await page(b);
+      const { ctx, pg, envoisStream } = await page(b, { garde: true });   // le champ garde le texte après l'envoi : le texte serait lisible s'il était retenu
       await pg.click('textarea'); await pg.keyboard.type('Merci !'); await pg.click('[data-testid="send-message"]');
       await pg.waitForTimeout(400);
       const st = await pg.evaluate('window.__store'); const env = await pg.evaluate('window.__envois');
@@ -213,7 +213,7 @@ async function navigateur() {
       const { ctx, pg } = await page(b, { store, captcha: true });
       const r = await pg.evaluate(`window.__ordre({ from: 'vrm-fond', action: 'vcEcrireUI', conv: ${JSON.stringify(CONV)}, texte: 'Bonjour', compte: '${MOI}' })`);
       const fr = await pg.evaluate('window.__frappes');
-      dit(r && r.erreur === 'verification' && r.defi === true && fr === 0, 'E6 · une vérification VISIBLE ⇒ arrêt, rien n’est tapé', JSON.stringify({ r, fr }));
+      dit(r && r.erreur === 'verification' && r.defi === true && fr === 0 && !r.tape, 'E6 · une vérification VISIBLE ⇒ arrêt AVANT de toucher le champ, rien n’est tapé', JSON.stringify({ r, fr }));
       await ctx.close();
     }
     // E7 — plus de recette de requête.

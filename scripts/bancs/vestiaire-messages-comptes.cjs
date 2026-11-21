@@ -1,7 +1,7 @@
 // BANC : vestiaire-messages-comptes (21 nov.) — après la construction (BANC_PORT pour le port ; SHOTS=dossier pour les captures).
 // Messages · Vestiaire et Ventes avec Vestiaire (lot vestiaire-messages, extension 5.412.0). Données INVENTÉES (dépôt public).
 // 390 tactile clair, 1512 sombre.
-//   A. Messages · Vestiaire : les comptes SÉPARÉS (règle du 12 nov.) — le compte ouvert dans l'onglet d'abord, puis l'autre
+//   A. Messages (liste mélangée, FilsTous) : les comptes Vestiaire SÉPARÉS (règle du 12 nov.) — le compte ouvert dans l’onglet d’abord, puis l’autre
 //      compte ; dans chaque groupe le plus récent en haut ; un en-tête par groupe ; aucun bouton d'envoi dans l'app (le
 //      geste est dans le panneau de l'extension) ; le fil se lit.
 //   B. Ventes : la vente Vestiaire (lue par l'extension) est dans la liste, avec le logo du site.
@@ -130,22 +130,24 @@ const sain = async (pg, ecran) => {
       LIGNES = lignes();
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A. Messages · Vestiaire', async () => {
+        // (20 nov. soir, plus de sélecteur de plateforme) Messages = la liste MÉLANGÉE (FilsTous, l'écran monté) :
+        // les conversations Vestiaire y sont groupées PAR COMPTE, le compte ouvert dans l'onglet Vestiaire d'abord.
         await pg.goto(`http://localhost:${PORT}/?tab=messages`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForTimeout(2000);
-        await pg.click('[data-filtre-site="messages"] [data-site="vestiaire"]', { timeout: 15000 });
-        await pg.waitForSelector('[data-vc-conv]', { timeout: 20000 });
-        await pg.waitForTimeout(500);
-        const v = await pg.evaluate(() => ({ ordre: [...document.querySelectorAll('[data-vc-conv]')].map((e) => [e.getAttribute('data-vc-conv'), e.getAttribute('data-vc-conv-compte-rang')]),
-          groupes: [...document.querySelectorAll('[data-vc-groupe]')].map((e) => e.getAttribute('data-vc-groupe') + ':' + e.innerText.trim()), phrase: (document.querySelector('[data-vc-groupes]') || {}).innerText || '' }));
-        dit(JSON.stringify(v.ordre.map((x) => x[0])) === JSON.stringify(['55556666-71000002', '33334444-71000001', '77778888-71000003']), 'A · le compte ouvert d’abord (le plus récent en haut), puis l’AUTRE compte — même si sa conversation est plus récente', JSON.stringify(v.ordre));
-        dit(v.groupes.length === 2 && /^ouvert:Compte ouvert dans ce Chrome$/.test(v.groupes[0]) && /^autre:Autre compte Vestiaire$/.test(v.groupes[1]), 'A · un en-tête par groupe de compte', JSON.stringify(v.groupes));
-        dit(/Chaque compte à part/.test(v.phrase), 'A · la règle est dite UNE fois', v.phrase);
+        await pg.waitForSelector('[data-msg-groupe^="vestiaire:"]', { timeout: 25000 });
+        await pg.waitForTimeout(800);
+        const v = await pg.evaluate(() => [...document.querySelectorAll('[data-msg-groupe]')].map((g) => ({ cle: g.getAttribute('data-msg-groupe'), onglet: g.getAttribute('data-msg-groupe-onglet') === '1',
+          titre: (g.querySelector('h3') || {}).innerText || '', fils: [...g.querySelectorAll('[data-fil]')].map((b) => b.innerText.replace(/\s+/g, ' ').trim()) })));
+        const vc = v.filter((g) => g.cle.startsWith('vestiaire:'));
+        dit(vc.length === 2 && vc[0].cle === 'vestiaire:11112222' && vc[0].onglet && vc[1].cle === 'vestiaire:99998888' && !vc[1].onglet, 'A · Vestiaire : le compte ouvert dans l’onglet d’abord, puis l’AUTRE compte (groupes séparés) — même si l’autre a la conversation la plus récente', JSON.stringify(vc.map((g) => [g.cle, g.onglet, g.titre])));
+        dit(/Autre compte Vestiaire/.test(vc[1] ? vc[1].titre : ''), 'A · l’autre compte est nommé (« Autre compte Vestiaire »), jamais confondu', vc[1] && vc[1].titre);
+        dit(vc[0] && vc[0].fils.length === 2 && /Sac cabas/.test(vc[0].fils[0]) && /Salomon/.test(vc[0].fils[1]), 'A · dans le compte ouvert, le plus récent en haut — et la conversation dont le fil n’est pas encore lu est MONTRÉE (Salomon, vue dans la liste Vestiaire)', JSON.stringify(vc[0] && vc[0].fils));
         await capture(pg, 'messages-' + nomVp);
-        await pg.click('[data-vc-conv="55556666-71000002"] button, [data-vc-conv="55556666-71000002"] [role="button"]', { timeout: 10000 }).catch(() => pg.click('[data-vc-conv="55556666-71000002"]'));
-        await pg.waitForSelector('[data-vc-fil="lu"]', { timeout: 15000 });
-        const f = await pg.evaluate(() => ({ n: (document.querySelector('[data-vc-fil="lu"]') || { getAttribute: () => '' }).getAttribute('data-vc-fil-n'), pied: (document.querySelector('[data-vc-repondre]') || { getAttribute: () => '' }).getAttribute('data-vc-repondre'),
-          envoyer: [...document.querySelectorAll('[data-vc-fil-ouvert] button')].map((x) => x.innerText).filter((t) => /^Envoyer$/i.test(t.trim())).length }));
-        dit(f.n === '2' && f.pied === 'panneau' && f.envoyer === 0, 'A · le fil se lit (2 messages) ; répondre ouvre le panneau de l’extension (aucun envoi depuis l’app)', JSON.stringify(f));
+        await pg.click('[data-msg-groupe="vestiaire:11112222"] [data-fil] >> text=Sac cabas');
+        await pg.waitForSelector('[data-vc-fil-ouvert="55556666-71000002"]', { timeout: 15000 });
+        await pg.waitForTimeout(800);
+        const f = await pg.evaluate(() => { const c = document.querySelector('[data-vc-fil-ouvert="55556666-71000002"]'); return { t: c ? c.innerText : '', pied: (document.querySelector('[data-vc-repondre]') || { getAttribute: () => '' }).getAttribute('data-vc-repondre'),
+          envoyer: c ? [...c.querySelectorAll('button')].filter((x) => /^Envoyer$/i.test(x.innerText.trim())).length : -1 }; });
+        dit(/Bonjour !/.test(f.t) && /Vous faites un prix/.test(f.t) && f.pied === 'panneau' && f.envoyer === 0, 'A · le fil se lit (2 messages) ; répondre ouvre le panneau de l’extension (aucun envoi depuis l’app)', JSON.stringify({ pied: f.pied, envoyer: f.envoyer, t: f.t.slice(0, 160) }));
         await sain(pg, 'Messages · Vestiaire');
         await capture(pg, 'fil-' + nomVp);
       });
@@ -153,7 +155,7 @@ const sain = async (pg, ecran) => {
         await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
         await pg.waitForFunction(() => /Gucci Ace blanche/.test(document.body.innerText), null, { timeout: 25000 });
         await pg.waitForTimeout(800);
-        const v = await pg.evaluate(() => { const r = [...document.querySelectorAll('li, tr, [role="row"], [data-tx]')].filter((e) => /Gucci Ace blanche/.test(e.innerText) && e.innerText.length < 600); const e = r[r.length - 1]; return { t: e ? e.innerText.replace(/\s+/g, ' ') : '', logo: !!(e && e.querySelector('[data-logo-site="vestiaire"], [data-site="vestiaire"], svg[aria-label*="Vestiaire" i], img[alt*="Vestiaire" i]')) || /Vestiaire/.test(e ? e.innerText : '') }; });
+        const v = await pg.evaluate(() => { const r = [...document.querySelectorAll('li, tr, [role="row"], [data-tx], [data-vente], [data-rangee], a, button, div')].filter((e) => /Gucci Ace\s+blanche/.test(e.innerText) && e.innerText.length < 300 && /180,50/.test(e.innerText)).sort((a, b) => a.innerText.length - b.innerText.length); const e = r[0]; window.__rangee = e ? e.outerHTML.slice(0, 3000) : ''; return { t: e ? e.innerText.replace(/\s+/g, ' ') : '', logo: !!(e && e.querySelector('[data-logo-site="vestiaire"], [data-site="vestiaire"], svg[aria-label*="Vestiaire" i], img[alt*="Vestiaire" i]')) || /Vestiaire/.test(e ? e.innerText : '') }; });
         dit(!!v.t, 'B · la vente Vestiaire est dans Ventes', v.t);
         dit(v.logo, 'B · avec le site (logo ou nom Vestiaire) sur sa rangée', v.t);
         await sain(pg, 'Ventes');
