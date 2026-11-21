@@ -21,6 +21,10 @@ export default {
     "one": "{n} offen",
     "other": "{n} offen"
   },
+  "menu.sombre": "Dunkelmodus",
+  "menu.langue": "Sprache",
+  "menu.deconnexion": "Abmelden",
+  "menu.etat": "Status der Aktionen",
   "menu.chercher": "Suchen",
   "creer.onglet": "Einstellen",
   "creer.titre": "Einstellen",

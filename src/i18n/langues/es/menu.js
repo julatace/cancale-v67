@@ -21,6 +21,10 @@ export default {
     "one": "{n} pendiente",
     "other": "{n} pendientes"
   },
+  "menu.sombre": "Modo oscuro",
+  "menu.langue": "Idioma",
+  "menu.deconnexion": "Cerrar sesión",
+  "menu.etat": "Estado de las acciones",
   "menu.chercher": "Buscar",
   "creer.onglet": "Publicar",
   "creer.titre": "Publicar",

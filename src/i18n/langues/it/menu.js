@@ -21,6 +21,10 @@ export default {
     "one": "{n} da fare",
     "other": "{n} da fare"
   },
+  "menu.sombre": "Modalità scura",
+  "menu.langue": "Lingua",
+  "menu.deconnexion": "Esci",
+  "menu.etat": "Stato delle azioni",
   "menu.chercher": "Cerca",
   "creer.onglet": "Pubblica",
   "creer.titre": "Pubblica",

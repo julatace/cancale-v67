@@ -21064,15 +21064,20 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
     { titre: tr('menu.groupe.aide'), cle: 'aide', tuiles: [
       { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } },
-      tuile('extension'), vus.has('communaute') || tab === 'communaute' ? tuile('communaute') : null, vus.has('parrainage') ? tuile('parrainage') : null].filter(Boolean) },
+      tuile('extension'),
+      // (21 nov.) « État des actions » (MULTI_USER) : son panneau (EtatActions, monté muet dans la coque) s'ouvrait par la photo du
+      // compte et « Plus », retirés : sa tuile est ici (et dans la barre latérale), un point ambre quand un geste est à faire.
+      MULTI_USER ? { cle: 'etat-actions', libelle: tr('menu.etat'), icone: <Icon name="shield" size={taille}/>, point: ETAT_ACTIONS_VU && ETAT_ACTIONS_VU.ton === 'ambre' ? true : undefined,
+        onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} }, attrs: { 'data-n-plus-entree': 'etat-actions', 'data-etat-ton': (ETAT_ACTIONS_VU && ETAT_ACTIONS_VU.ton) || '' } } : null,
+      vus.has('communaute') || tab === 'communaute' ? tuile('communaute') : null, vus.has('parrainage') ? tuile('parrainage') : null].filter(Boolean) },
   ].filter((g) => g.tuiles.length);
 }
 // ⚠️⚠️ (21 nov., onglets-menu) L'ÉCRAN « MENU » (téléphone : la 5ᵉ place de la barre du bas, comme Bleam) : la carte du
 // compte (⇒ Paramètres), puis Gestion · Dans l'extension · Aide en tuiles de deux colonnes, puis les deux interrupteurs
 // rapides (cacher les montants, mode stream) et l'état de la synchronisation. Tout ce qu'il y avait dans « Plus » y est,
 // sauf ce qui est déjà dans la barre (Messages) ou dans Paramètres (Tout va bien ?, Mon profil, État des actions).
-function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null }) {
-  useProfilVendeur(); useEcransVusTick();
+function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null, sombre = false, basculerSombre = null }) {
+  useProfilVendeur(); useEcransVusTick(); useEtatActionsVu();
   const montants = useMontantsCaches();
   const stream = useStream();
   const uid = (AUTH.user && AUTH.user.id) || '';
@@ -21089,7 +21094,15 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
         {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
+        {/* (21 nov., comme le Menu de Bleam) le bas du Menu : thème, langue, déconnexion — les mêmes gestes que Paramètres
+            (Apparence et langue, Se déconnecter), à un toucher ; la langue ouvre SA rubrique, la déconnexion demande d'abord. */}
+        {basculerSombre ? <Natif.Rangee titre={tr('menu.sombre')} icone={<Icon name="contraste" size={22}/>} interrupteur={{ actif: !!sombre, onChange: () => basculerSombre(), attrs: { 'data-bouton-sombre': '', 'data-sombre': sombre ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'sombre' }}/> : null}
+        <Natif.Rangee titre={tr('menu.langue')} icone={<Icon name="langue" size={22}/>} valeur={NOMS_LANGUES[langueCourante()] || ''} fin="chevron"
+          onClick={() => { DEMANDE_REGLAGE_SOUS.id = 'apparence'; revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }} attrs={{ 'data-n-plus-entree': 'langue' }}/>
       </Natif.Groupe>
+      {uid ? <Natif.Groupe attrs={{ 'data-n-menu-sortie': '' }}>
+        <Natif.Rangee titre={tr('menu.deconnexion')} icone={<Icon name="door" size={22}/>} onClick={() => { seDeconnecter(); }} attrs={{ 'data-n-plus-entree': 'deconnexion', 'data-n-deconnexion': '' }}/>
+      </Natif.Groupe> : null}
       {etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}
     </div>
   );
@@ -68648,7 +68661,7 @@ function AppCoeur() {
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
         {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
-        {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
+        {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} sombre={dark} basculerSombre={toggleDark} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}

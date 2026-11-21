@@ -106,6 +106,19 @@ async function telephone(nav, b, sombre, erreursTout) {
   dit(o4 && o4.carte && o4.groupes.join(',') === 'gestion,extension,aide' && o4.cols === 2 && !o4.petites && !o4.deborde && !o4.docDeborde && !o4.coupes.length,
     `O4 ${t} : Menu = carte du compte + Gestion · Dans l’extension · Aide, deux colonnes, tuiles ≥ 56, rien ne déborde ni n’est coupé`, o4);
   const tuilesVues = o4 ? o4.cles : [];
+  // O4b le bas du Menu (comme Bleam) : cacher les montants, mode sombre, langue, se déconnecter ; le mode sombre bascule
+  const bas = await pg.evaluate(() => [...document.querySelectorAll('[data-n-menu] [data-n-menu-reglages] [data-n-plus-entree], [data-n-menu] [data-n-menu-sortie] [data-n-plus-entree]')].map((x) => x.getAttribute('data-n-plus-entree')));
+  const sombreAvant = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || document.documentElement.className);
+  await pg.locator('[data-n-menu] [data-bouton-sombre]').first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(700);
+  const sombreApres = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || document.documentElement.className);
+  await pg.locator('[data-n-menu] [data-bouton-sombre]').first().tap({ timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(700);
+  const sombreRetour = await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || document.documentElement.className);
+  dit(['montants', 'sombre', 'langue', 'deconnexion'].every((x) => bas.includes(x)) && sombreApres !== sombreAvant && sombreRetour === sombreAvant,
+    `O4 ${t} : bas du Menu = montants · mode sombre · langue · se déconnecter ; le mode sombre bascule et revient`, { bas, sombreAvant, sombreApres, sombreRetour });
+  await pg.locator('[data-n-menu] [data-n-plus-entree="langue"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'settings'); await pg.waitForTimeout(1200);
+  const langue = await pg.evaluate(() => ({ ecran: document.querySelector('.vrm-main').getAttribute('data-ecran'), panneau: !![...document.querySelectorAll('[data-sous-panneau="apparence"], [data-reglage-apparence]')].find((x) => x.getClientRects().length) }));
+  dit(langue.ecran === 'settings', `O4 ${t} : « Langue » ouvre Paramètres (Apparence et langue)`, langue);
+  await pg.locator('[data-n-onglet="menu"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'menu'); await pg.waitForTimeout(600);
   for (const id of TUILES_ECRANS.filter((x) => tuilesVues.includes(x))) {
     if ((await ecranVu(pg)) !== 'menu') { await pg.locator('[data-n-onglet="menu"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'menu'); await pg.waitForTimeout(600); }
     const n0 = erreurs.length;
@@ -203,7 +216,7 @@ async function ordinateur(nav, b, sombre, erreursTout) {
     return { groupes, pied: !!pied, barreBas, deborde: lat.scrollHeight > lat.clientHeight + 1 && getComputedStyle(lat).overflowY === 'visible' };
   });
   const attendu = [['journee', 'annonces', 'publier', 'messages'], ['ventes', 'achats', 'garage', 'compta', 'emails'], ['favoris-ext', 'automatisations-ext'], ['notifications', 'extension', 'communaute']];
-  const vu = o8 ? o8.groupes.map((g) => g.entrees.filter((x) => x !== 'parrainage')) : [];
+  const vu = o8 ? o8.groupes.map((g) => g.entrees.filter((x) => x !== 'parrainage' && x !== 'etat-actions')) : [];
   const conforme = o8 && vu.length === 4 && attendu.every((a, i) => a.filter((x) => x !== 'garage').every((x) => vu[i].includes(x)) && vu[i].every((x) => a.includes(x)));
   dit(conforme && o8.pied && o8.barreBas === 0, `O8 ${t} : la barre latérale suit les groupes du Menu, Paramètres en pied, pas de barre du bas`, o8);
   if (!sombre) await pg.screenshot({ path: path.join(SHOTS, '1512-journee.png') });

@@ -21,6 +21,10 @@ export default {
     "one": "{n} à faire",
     "other": "{n} à faire"
   },
+  "menu.sombre": "Mode sombre",
+  "menu.langue": "Langue",
+  "menu.deconnexion": "Se déconnecter",
+  "menu.etat": "État des actions",
   "menu.chercher": "Chercher",
   "creer.onglet": "Publier",
   "creer.titre": "Publier",

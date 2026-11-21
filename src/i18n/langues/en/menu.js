@@ -21,6 +21,10 @@ export default {
     "one": "{n} to do",
     "other": "{n} to do"
   },
+  "menu.sombre": "Dark mode",
+  "menu.langue": "Language",
+  "menu.deconnexion": "Sign out",
+  "menu.etat": "Action status",
   "menu.chercher": "Search",
   "creer.onglet": "List",
   "creer.titre": "List",
