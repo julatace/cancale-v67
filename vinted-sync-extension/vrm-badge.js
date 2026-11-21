@@ -3200,7 +3200,7 @@ function vrmVerifVisible(sel) {
       + (vc ? filVcHtml(x) : (() => {
         // 5.430 : la question de l'acheteur repérée par la règle des réponses rapides (sinon le dernier message), sa langue.
         const rr = rrParConv[x.conv] && rrParConv[x.conv].data, q = rr && rr.question ? String(rr.question) : '';
-        const cle = x.conv + ':d', ind = rr && rr.langue ? rr.langue : '';
+        const cle = x.conv + ':d', ind = rr && rr.langueIndice ? rr.langueIndice : '';
         const h = `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>` + tradBulle(cle, x.texte || '', ind);
         if (q && q !== x.texte) { langueTexte(x.conv + ':q', q, ind); }
         // La langue reconnue par le navigateur choisit SES versions dans cette langue (une seule relecture).
@@ -3475,8 +3475,10 @@ function vrmVerifVisible(sel) {
     const l = langueAcheteurConv(conv);
     if (!l || !TRAD.presente()) return '';
     const r = tradsRep[conv];
-    if (r && r.etat === 'fait') return `<div class="vu-trad" data-trad-rep="fait" data-trad-rep-langue="${esc(r.lang)}"><b>${esc(TU('tr_ton_texte'))}</b><span data-trad-rep-original>${esc(r.original)}</span></div>`
-      + `<div class="vu-trad" data-trad-rep-texte><b>${esc(TU('tr_ta_reponse', { l: nomL(r.lang) }))}</b><span>${esc(r.texte)}</span><small>${esc(TU('tr_verifie'))}</small></div>`
+    // Le champ montre SON texte ; dessous, la traduction (les deux à la fois, jamais deux fois le même). Une fois la
+    // traduction mise dans le champ, c'est SON texte d'origine qui reste dit dessous.
+    if (r && r.etat === 'utilise') return String(brouillons.get(conv) || '').trim() === r.texte ? `<div class="vu-trad" data-trad-rep="utilise" data-trad-rep-langue="${esc(r.lang)}"><b>${esc(TU('tr_ton_texte'))}</b><span data-trad-rep-original>${esc(r.original)}</span><small>${esc(TU('tr_verifie'))}</small></div>` : '';
+    if (r && r.etat === 'fait') return `<div class="vu-trad" data-trad-rep="fait" data-trad-rep-langue="${esc(r.lang)}" data-trad-rep-texte><b>${esc(TU('tr_ta_reponse', { l: nomL(r.lang) }))}</b><span>${esc(r.texte)}</span><small>${esc(TU('tr_verifie'))}</small></div>`
       + `<div class="ge5"><button type="button" class="vu-btn vu-sec" data-trad-rep-utiliser="${esc(conv)}">${esc(TU('tr_utiliser'))}</button></div>`;
     if (r && r.etat === 'ko') return `<p class="note5" data-trad-rep="ko">${esc(TU('tr_ko'))}</p>`;
     return `<button type="button" class="vu-lien" data-trad-rep-lancer="${esc(conv)}"${r && r.etat === 'charge' ? ' disabled aria-busy="true"' : ''}>${esc(TU(r && r.etat === 'charge' ? 'tr_charge' : 'tr_ma_reponse', { l: nomL(l) }))}</button>`;
@@ -3650,7 +3652,7 @@ function vrmVerifVisible(sel) {
       else { const m = /:vc(\d+)$/.exec(cle); const f = filsVc[conv]; texte = m && f && f.data && f.data.messages && f.data.messages[Number(m[1])] ? f.data.messages[Number(m[1])].t || '' : ''; }
       if (texte) traduireBulle(cle, texte); }));
     racine.querySelectorAll('[data-trad-rep-lancer]').forEach((b) => b.addEventListener('click', () => traduireReponse(b.getAttribute('data-trad-rep-lancer'))));
-    racine.querySelectorAll('[data-trad-rep-utiliser]').forEach((b) => b.addEventListener('click', () => { const conv = b.getAttribute('data-trad-rep-utiliser'), r = tradsRep[conv]; if (r && r.etat === 'fait') { brouillons.set(conv, r.texte); delete tradsRep[conv]; rendre(); } }));
+    racine.querySelectorAll('[data-trad-rep-utiliser]').forEach((b) => b.addEventListener('click', () => { const conv = b.getAttribute('data-trad-rep-utiliser'), r = tradsRep[conv]; if (r && r.etat === 'fait') { brouillons.set(conv, r.texte); tradsRep[conv] = Object.assign({}, r, { etat: 'utilise' }); rendre(); } }));
     { const sel = racine.querySelector('[data-na-seuil]'); if (sel) sel.addEventListener('change', () => { bmBrouillon.noteAcheteurs = Object.assign({}, bmVal('noteAcheteurs'), { seuil: Number(sel.value) }); bmEnvoyer('noteAcheteurs', false, false); }); }
     racine.querySelectorAll('[data-na-neuf]').forEach((b) => b.addEventListener('click', () => { bmBrouillon.noteAcheteurs = Object.assign({}, bmVal('noteAcheteurs'), { neufAccepter: b.getAttribute('data-na-neuf') === 'oui' }); bmEnvoyer('noteAcheteurs', false, false); }));
   }

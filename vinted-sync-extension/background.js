@@ -29295,7 +29295,9 @@ async function reponsesRapidesCarte(msg, sender) {
   //    écrites dans cette langue ; absente ⇒ les indices simples de la règle.
   const langueDetectee = RR_LANGUES.includes(String((msg && msg.langueAcheteur) || '')) ? String(msg.langueAcheteur) : null;
   const r = rrPropositions({ messages, reglage, vars, langueUi, partie, langueDetectee, sur: (t) => !MESSAGE_SUR.risquesMessage(String(t || ''), site).length });
-  return { ok: true, reglage, ia, item, fil: 'lu', question: r.question, langue: r.langue || null, propositions: r.propositions };
+  // 5.430 : `langueIndice` = la langue que les SEULS indices simples reconnaissent dans sa question (null si rien de sûr) —
+  //    le panneau d'un navigateur sans LanguageDetector s'en sert pour dire « ce message semble en … ».
+  return { ok: true, reglage, ia, item, fil: 'lu', question: r.question, langue: r.langue || null, langueIndice: (r.question && rrLangue(r.question)) || null, propositions: r.propositions };
 }
 
 // ── OFFRE LOT AUX FAVORIS ─────────────────────────────────────────────────────────────────────────────────────────────
