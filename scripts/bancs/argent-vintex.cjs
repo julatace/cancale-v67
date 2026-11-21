@@ -39,6 +39,9 @@ const releve = {};
 
 // La base de Julien en forme (inventée) : micro-entrepreneur mensuel, la ligne du CA déclaré publiée (comme argent-natif).
 const micro = (b) => { const m = b.main[0].data; m.vinted_regime = 'micro'; m.vinted_urssaf_freq = 'mensuel'; m.vrm_urssaf_declare = {};
+  // Deux prix d'achat saisis (comme sa capture : « 2 sur 15 ») : sans eux, l'ancien écran ne montrait pas la couverture
+  // à côté du plein et la contradiction ne se jouait pas. Inventés, par N° (`vinted_buyprice_by_num`, sa saisie).
+  m.vinted_buyprice_by_num = { 1: 10, 4: 20 };
   const mois = [], recu = {}; const d = new Date(); d.setDate(1);
   for (let k = 0; k < 7; k++) { const ym = d.toISOString().slice(0, 7); const ca = [1840.5, 2604.2, 15070.84, 1988, 2210.4, 1760, 2390][k]; mois.push({ ym, n: 20 + k * 3, ca, nMasq: 0, caMasq: 0, par: { Vinted: { n: 18 + k * 3, ca: ca - 120 }, Leboncoin: { n: 2, ca: 120 } }, nApres: 0, caApres: 0, nDouble: 0, caDouble: 0, nAilleurs: 0, caAilleurs: 0, declare: null }); recu[ym] = ca; d.setMonth(d.getMonth() - 1); }
   m.vinted_urssaf_mois = { mois, aDater: null, ecartees: 0, sources: { Vinted: 'lu', Leboncoin: 'lu', eBay: 'lu', Vestiaire: 'lu' }, declare: {}, recu, recuJours: {}, nonComptees: { n: 0, par: {}, parC: {} }, at: Date.now() };
@@ -68,9 +71,15 @@ const MESURE = () => {
   const propre = (e) => [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').replace(/[  ]/g, ' ').trim();
   const nom = (e) => (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : e.tagName.toLowerCase());
   // M — un montant entier : pas de débord, pas de rognage par un parent qui coupe, pas de « … ».
+  // Un parent qui DÉFILE (auto/scroll) ne rogne pas : ce qui est sous le pli se lit en défilant. Seul un axe
+  // hidden/clip coupe vraiment, et on ne juge que cet axe.
+  const coupe = (v) => v === 'hidden' || v === 'clip';
   const rogne = (e) => { const r = e.getBoundingClientRect();
-    for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
-      const p = x.getBoundingClientRect(); if (r.left < p.left - 1 || r.right > p.right + 1 || r.top < p.top - 1 || r.bottom > p.bottom + 1) return true; }
+    for (let x = e.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (/auto|scroll/.test(cs.overflowX + cs.overflowY)) break;   // au-delà du défileur, plus rien ne rogne le contenu
+      const cx = coupe(cs.overflowX), cy = coupe(cs.overflowY); if (!cx && !cy) continue;
+      const p = x.getBoundingClientRect();
+      if (cx && (r.left < p.left - 1 || r.right > p.right + 1)) return true;
+      if (cy && (r.top < p.top - 1 || r.bottom > p.bottom + 1)) return true; }
     return false; };
   const montantsCoupes = [];
   for (const e of feuilles(sec)) { const t = (e.innerText || '').trim(); if (!/€/.test(t)) continue;
@@ -119,11 +128,11 @@ const MESURE = () => {
   const cibles = [];
   for (const e of sec.querySelectorAll('button, a[href], [role="button"]')) { if (!vu(e)) continue; const r = e.getBoundingClientRect(); if (r.width < 43.5 || r.height < 43.5) cibles.push((e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30) + ' ' + Math.round(r.width) + '×' + Math.round(r.height)); }
   // N — le relevé des chiffres portés (data-*), Mois seulement ; les versements MONTRÉS au téléphone (8 avant comme après).
-  const MISE_EN_PAGE = /^data-(arg-(?!vendu)|n-|v2-argent-faits|v2-argent-barre-v$|v2-principal|v2-pas-su)/;
+  const MISE_EN_PAGE = /^data-(arg-(?!vendu)|n-|courant$|v2-argent-faits|v2-argent-barre-v$|v2-principal|v2-pas-su)/;
   const chiffres = [];
   const prend = (e, rang) => { for (const a of e.attributes) if (a.name.startsWith('data-') && !MISE_EN_PAGE.test(a.name) && /^-?\d+(?:[.,/]\d+)*$/.test(a.value)) chiffres.push((rang != null ? '#' + rang + ' ' : '') + a.name + '=' + a.value); };
   for (const e of [sec, ...sec.querySelectorAll('*')]) { if (e.closest('[data-v2-argent-versement]')) continue; prend(e); }
-  for (const e of document.querySelectorAll('[data-v2-argent-comptes]')) prend(e);
+  for (const e of document.querySelectorAll('[data-v2-argent-comptes]')) if (!sec.contains(e)) prend(e);   // hors de Mois (la barre d'avant) ; dedans, déjà relevé
   [...sec.querySelectorAll('[data-v2-argent-versement]')].filter(vu).slice(0, 8).forEach((r, i) => prend(r, i));
   return { chiffres: chiffres.sort(), montantsCoupes: [...new Set(montantsCoupes)].slice(0, 12), regle, parlePrix, pleinsMois, lignesPhrase, aNote, moisEcrits, moisN,
     comptesDansCarte, versCoupes: [...new Set(versCoupes)].slice(0, 8), deborde, cibles: [...new Set(cibles)].slice(0, 8) };

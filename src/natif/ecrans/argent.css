@@ -90,7 +90,7 @@
   .n-arg-recu { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 8px; min-width: 0; }
   .n-arg-recu-haut { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: -6px 0 -6px; }
   .n-arg-recu-lib { font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); min-width: 0; }
-  .n-arg-recu-chiffre { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 6px; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-arg-recu-chiffre { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 6px; min-width: 0; white-space: nowrap; color: var(--n-encre); }   /* chiffres proportionnels : « 1 841 » garde son espace visible en grand */
   .n-arg-recu-chiffre[data-n-vide] { color: var(--n-encre-3); }
   .n-arg-recu-moins { font: var(--n-t-second); color: var(--n-encre-2); }
   .n-arg-recu-n { font: var(--n-t-affiche); letter-spacing: -.02em; }
