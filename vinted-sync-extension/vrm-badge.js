@@ -983,6 +983,41 @@ function vrmVerifVisible(sel) {
   .fav6-reg .rg6 { flex-wrap: wrap; gap: 8px; }
   .fav6-reg .rg6 .vu-seg { flex: 1 1 100%; }
   .fav6-reg .pied6 { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0 0; }
+  /* 5.417 (favorisperso2) — l'éditeur des messages aux favoris : sobre, des rangées séparées par un filet, la bulle
+     d'aperçu comme un message reçu ; ambre = un texte à corriger ; aucune carte flottante empilée. */
+  .fav6-feuille[data-fav6-feuille="reglages"] { width: min(760px, 100%); }
+  .fp6 h3 { margin: 18px 0 6px; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .fp6 h3:first-of-type { margin-top: 4px; }
+  .fp6 .fp-sous { margin: 0 0 6px; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .fp6 .fp-compte { display: flex; align-items: center; gap: 8px; min-height: 44px; border-bottom: .5px solid var(--n-trait); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .fp6 .fp-compte small { color: var(--n-encre-2); font-weight: 400; }
+  .fp-v { padding: 10px 0; border-bottom: .5px solid var(--n-trait); }
+  .fp-vt { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .fp-vt b { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  .fp-st { margin-left: auto; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fp-v textarea { display: block; width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; }
+  .fp-v[data-fp-ko] textarea { border-color: var(--n-ambre, #B26B00); }
+  .fp-pied { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding-top: 4px; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .fp-n { font-variant-numeric: tabular-nums; }
+  .fp-al { color: var(--n-ambre, #B26B00); }
+  .fp-al:empty { display: none; }
+  .fp-ins { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
+  .fp-ins button, .fp-ajout { appearance: none; min-height: 44px; padding: 0 12px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .fp-ajout { border-style: dashed; color: var(--n-accent, #0068D6); margin: 8px 0 0; }
+  .fp-r { padding: 4px 0 8px; border-top: .5px solid var(--n-trait); }
+  .fp-rt { display: flex; align-items: center; gap: 4px; min-height: 44px; }
+  .fp-rt b { font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); margin-right: 6px; }
+  .fp-rt small { color: var(--n-encre-2); margin-right: auto; }
+  .fp-cond { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+  .fp-cond .champ6 input { max-width: none; }
+  .fp-cond .vu-seg { flex-wrap: wrap; }
+  .fp-ap { padding: 10px 0; }
+  .fp-ap small { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .fp-bulle { margin: 6px 0; padding: 10px 14px; border-radius: 16px 16px 16px 4px; background: var(--n-carte-2, var(--n-carte)); color: var(--n-encre); font: 400 15px/21px -apple-system, Inter, system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .fp-bulle[data-vide] { color: var(--n-encre-2); font-style: italic; }
+  .fp6 select { min-height: 44px; width: 100%; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .fp6 .cd6-l input[type=number] { width: 84px; min-height: 44px; box-sizing: border-box; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  @media (max-width: 760px) { .fp-cond { grid-template-columns: minmax(0, 1fr); } .fp-st { flex-basis: 100%; margin-left: 0; order: 3; } .fp-vt { flex-wrap: wrap; } }
   @media (max-width: 760px) {
     .fav6-barre .seg6 { flex: 1 1 100%; overflow-x: auto; scrollbar-width: none; display: flex; }
     .fav6-barre .seg6 button { flex: 0 0 auto; }
@@ -1808,6 +1843,220 @@ function vrmVerifVisible(sel) {
     const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b><small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
     return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
+  // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser, améliore ça ») ══════════
+  //    L'ÉDITEUR DES MESSAGES AUX FAVORIS, compte de l'onglet : versions « 1 article » et « lot » (une au hasard à chaque
+  //    envoi), variables insérables, messages conditionnels (heures, jours, prix, marque ; la plus précise puis la plus
+  //    haute), offre au % + arrondi (toujours remontée au plancher), délai et filtres, aperçu sur un VRAI favori de la
+  //    liste, statistiques par version. Tout est jugé par le FOND (`favorisPerso` : la règle du moteur) ; rien ne
+  //    s'enregistre sans « Enregistrer ».
+  let fpBr = null, fpVerif = null, fpStats = null, fpFavori = '', fpActif = null, fpEtat = null, fpEnVol = false, fpVerifT = null, fpDemande = 0;
+  const FP_MAX = 2000, FP_VERSIONS = 8, FP_REGLES = 10, FP_RV = 5;
+  const FP_VARS_B = [['prénom', 'fp_v_prenom'], ['article', 'fp_v_article'], ['marque', 'fp_v_marque'], ['taille', 'fp_v_taille'], ['prix', 'fp_v_prix'], ['prix_offre', 'fp_v_prix_offre'], ['remise', 'fp_v_remise']];
+  const FP_JOURS = [1, 2, 3, 4, 5, 6, 0];
+  // Les clés de texte écrites EN ENTIER (audit-extension-feuille L3).
+  const FP_ERR = { vide: 'fp_err_vide', long: 'fp_err_long', variable: 'fp_err_variable', accolade: 'fp_err_accolade' };
+  const FP_RISQUE = { telephone: 'fp_r_telephone', email: 'fp_r_email', lien: 'fp_r_lien', paiement: 'fp_r_paiement', messagerie: 'fp_r_messagerie', hors: 'fp_r_hors', mainpropre: 'fp_r_mainpropre', contrefacon: 'fp_r_contrefacon' };
+  const fpNouvelId = (pre) => pre + Date.now().toString(36).slice(-5) + Math.floor(Math.random() * 1296).toString(36);
+  const fpRegleLue = (r) => ({ id: r.id, heures: r.heures ? { de: r.heures.de, a: r.heures.a } : null, jours: Array.isArray(r.jours) ? r.jours.slice() : null, prix: r.prix ? { min: r.prix.min, max: r.prix.max } : null, marques: Array.isArray(r.marques) ? r.marques.slice() : null, textes: (r.textes || []).map((v) => ({ id: v.id, texte: v.texte })) });
+  function fpInit() {
+    const au = (listes && listes.automatisations) || {}, f = au.favoris || {}, fm = au.bleam && au.bleam.favMessages;
+    const of = f.offre || null;
+    const offre = { pct: of && of.mode === 'pct' && of.pct ? of.pct : '', arrondi: !!(of && of.arrondi), mode: of ? of.mode : null, valeur: of ? of.valeur : null };
+    if (fm && Array.isArray(fm.un) && fm.un.length) return { source: 'perso', un: fm.un.map((v) => ({ id: v.id, texte: v.texte })), lot: (fm.lot || []).map((v) => ({ id: v.id, texte: v.texte })), regles: (fm.regles || []).map(fpRegleLue), offre };
+    // Rien d'écrit ici : SES textes d'avant deviennent « Message 1, 2… » (mêmes n° : leurs statistiques suivent).
+    const lotAvant = cbEtat && cbEtat.reglages && typeof cbEtat.reglages.messageLot === 'string' ? cbEtat.reglages.messageLot.trim() : '';
+    return { source: 'ancien', un: (Array.isArray(f.textes) ? f.textes : []).map((t, i) => ({ id: 'a' + (i + 1), texte: String(t || '') })).filter((v) => v.texte.trim()), lot: lotAvant ? [{ id: 'lot', texte: lotAvant }] : [], regles: [], offre };
+  }
+  const fpListe = (cle) => (cle === 'un' ? fpBr.un : cle === 'lot' ? fpBr.lot : ((fpBr.regles.find((r) => 'r:' + r.id === cle) || {}).textes || []));
+  const fpTrouver = (cleId) => { const i = cleId.lastIndexOf(':'); const cle = cleId.slice(0, i), id = cleId.slice(i + 1); return { cle, id, l: fpListe(cle), v: fpListe(cle).find((x) => x.id === id) }; };
+  function fpAlerte(id) {
+    const j = fpVerif && fpVerif.versions ? fpVerif.versions[id] : null;
+    if (!j) return '';
+    if (j.erreur) return TU(FP_ERR[j.erreur] || 'fp_err_variable');
+    if (j.motifs && j.motifs.length) return TU('fp_risque', { quoi: TU(FP_RISQUE[j.motifs[0].code] || 'fp_r_lien'), mot: j.motifs[0].mot });
+    return '';
+  }
+  function fpStatsTexte(id) {
+    const s = fpStats && fpStats.stats ? fpStats.stats[id] : null;
+    const n = s ? s.envoyes : 0;
+    if (!s || !s.mesure) return TU('fp_st_non', { n });
+    return TU('fp_st', { n, o: s.avecOffre, v: s.vendus }) + (s.vendusSansDate ? ' · ' + TU('fp_st_sans_date', { n: s.vendusSansDate }) : '');
+  }
+  function fpVersionsHtml(cle, max) {
+    const l = fpListe(cle);
+    const ver = l.map((v, i) => { const al = fpAlerte(v.id);
+      return `<div class="fp-v" data-fp-v="${esc(cle)}:${esc(v.id)}"${al ? ' data-fp-ko' : ''}><div class="fp-vt"><b>${esc(TU('fp_message_n', { n: i + 1 }))}</b><span class="fp-st" data-fp-stats="${esc(v.id)}">${esc(fpStatsTexte(v.id))}</span>`
+        + `<button type="button" class="rond6" data-fp-retirer="${esc(cle)}:${esc(v.id)}" aria-label="${esc(TU('fp_retirer', { n: i + 1 }))}" title="${esc(TU('fp_retirer', { n: i + 1 }))}">×</button></div>`
+        + `<textarea data-fp-texte="${esc(cle)}:${esc(v.id)}" maxlength="${FP_MAX}" rows="3" aria-label="${esc(TU('fp_message_n', { n: i + 1 }))}">${esc(v.texte)}</textarea>`
+        + `<div class="fp-pied"><span class="fp-n" data-fp-n="${esc(v.id)}">${v.texte.length}/${FP_MAX}</span><span class="fp-al" data-fp-alerte="${esc(v.id)}" role="alert">${esc(al)}</span></div></div>`; }).join('');
+    const ins = `<div class="fp-ins" role="group" aria-label="${esc(TU('fp_inserer'))}">${FP_VARS_B.map(([k, lib]) => `<button type="button" data-fp-inserer="${k}" data-fp-cible="${esc(cle)}">+ ${esc(TU(lib))}</button>`).join('')}</div>`;
+    return ver + (l.length ? ins : '') + (l.length < max ? `<button type="button" class="fp-ajout" data-fp-ajouter="${esc(cle)}">+ ${esc(TU('fp_ajouter'))}</button>` : '');
+  }
+  const fpNb = (v) => (v == null || v === '' ? '' : String(v));
+  function fpReglesHtml() {
+    return fpBr.regles.map((r, i) => {
+      const n = (r.heures ? 1 : 0) + (r.jours && r.jours.length && r.jours.length < 7 ? 1 : 0) + (r.prix && (r.prix.min != null || r.prix.max != null) ? 1 : 0) + (r.marques && r.marques.length ? 1 : 0);
+      const id = esc(r.id), j = r.jours || [];
+      return `<div class="fp-r" data-fp-regle="${id}" data-fp-precision="${n}"><div class="fp-rt"><b>${esc(TU('fp_regle_n', { n: i + 1 }))}</b><small>${esc(n === 1 ? TU('fp_cond1') : TU('fp_condn', { n }))}</small>`
+        + `<button type="button" class="rond6" data-fp-monter="${id}" aria-label="${esc(TU('fp_monter'))}" title="${esc(TU('fp_monter'))}"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="rond6" data-fp-descendre="${id}" aria-label="${esc(TU('fp_descendre'))}" title="${esc(TU('fp_descendre'))}"${i === fpBr.regles.length - 1 ? ' disabled' : ''}>↓</button><button type="button" class="rond6" data-fp-regle-retirer="${id}" aria-label="${esc(TU('fp_regle_retirer'))}" title="${esc(TU('fp_regle_retirer'))}">×</button></div>`
+        + `<div class="fp-cond"><label class="champ6"><b>${esc(TU('fp_c_heures'))}</b><span class="cd6-l"><input type="number" min="0" max="23" inputmode="numeric" data-fp-rc="${id}.hde" value="${esc(fpNb(r.heures && r.heures.de))}" aria-label="${esc(TU('fp_de'))}"> – <input type="number" min="1" max="24" inputmode="numeric" data-fp-rc="${id}.ha" value="${esc(fpNb(r.heures && r.heures.a))}" aria-label="${esc(TU('fp_a'))}"> h</span></label>`
+        + `<label class="champ6"><b>${esc(TU('fp_c_prix'))}</b><span class="cd6-l"><input type="number" min="0" step="1" inputmode="decimal" data-fp-rc="${id}.pmin" value="${esc(fpNb(r.prix && r.prix.min))}" aria-label="${esc(TU('fp_de'))}"> – <input type="number" min="0" step="1" inputmode="decimal" data-fp-rc="${id}.pmax" value="${esc(fpNb(r.prix && r.prix.max))}" aria-label="${esc(TU('fp_a'))}"> €</span></label>`
+        + `<div class="champ6"><b>${esc(TU('fp_c_jours'))}</b><div class="vu-seg vue5" role="group" aria-label="${esc(TU('fp_c_jours'))}">${FP_JOURS.map((d) => `<button type="button" data-fp-rj="${id}.${d}" aria-pressed="${j.includes(d)}">${esc(TU(BM_JOUR[d]))}</button>`).join('')}</div></div>`
+        + `<label class="champ6"><b>${esc(TU('fp_c_marques'))}</b><input type="text" data-fp-rc="${id}.marques" value="${esc((r.marques || []).join(', '))}" placeholder="${esc(TU('fp_marques_ex'))}"></label></div>`
+        + fpVersionsHtml('r:' + r.id, FP_RV) + '</div>';
+    }).join('') + (fpBr.regles.length < FP_REGLES ? `<button type="button" class="fp-ajout" data-fp-regle-ajouter>+ ${esc(TU('fp_regle_ajouter'))}</button>` : '');
+  }
+  // L'offre prévue pour l'aperçu : la règle du fond (prix au % réglé, arrondi, REMONTÉE au plancher prix mini / achat + 10 %).
+  function fpOffreApercu(x) {
+    const pct = Number(fpBr.offre.pct), prix = Number(x && x.prix);
+    if (!(prix > 0)) return null;
+    if (!(Number.isInteger(pct) && pct >= 1 && pct <= 99)) return fpBr.offre.mode && fpBr.offre.mode !== 'pct' && x.offre > 0 ? { v: Number(x.offre), remontee: false, autre: true } : null;
+    let c = Math.round(Math.round(prix * 100) * (100 - pct) / 100);
+    if (fpBr.offre.arrondi) c = Math.floor(c / 100) * 100;
+    const toutes = (listes && listes.annonces && (listes.annonces.toutes || listes.annonces.liste)) || null;
+    const ann = toutes ? toutes.find((y) => String(y.id) === String(x.itemId)) : null;
+    const pl = plancher6(Object.assign({}, ann || {}, Number(x.mini) > 0 ? { mini: x.mini } : {}));
+    const brut = c;
+    if (pl && c < Math.round(pl.v * 100)) c = Math.round(pl.v * 100);
+    if (c >= Math.round(prix * 100) || c < 100) return { sans: true, pl };
+    return { v: c / 100, remontee: c !== brut, pl, pct };
+  }
+  const fpFavoris = (a) => favTous(a).filter((x) => x && x.itemId).slice(0, 60);
+  function fpFavoriChoisi(a) { const l = fpFavoris(a); return l.find((x) => x.id === fpFavori) || l.find((x) => x.cochable) || l[0] || null; }
+  function fpFavoriPourFond(a) {
+    const x = fpFavoriChoisi(a); if (!x) return null;
+    const toutes = (listes && listes.annonces && (listes.annonces.toutes || listes.annonces.liste)) || null;
+    const ann = toutes ? toutes.find((y) => String(y.id) === String(x.itemId)) : null;   // par IDENTITÉ d'annonce
+    return { pseudo: x.pseudo || '', titre: x.titre || '', prix: x.prix, marque: (ann && ann.marque) || '', taille: (ann && ann.taille) || '' };
+  }
+  function fpApercuHtml(a) {
+    const l = fpFavoris(a), x = fpFavoriChoisi(a);
+    if (!x) return `<p class="note5" data-fp-apercu-vide>${esc(TU('fp_ap_aucun'))}</p>`;
+    const sel = `<label class="champ6"><b>${esc(TU('fp_ap_sur'))}</b><select data-fp-favori>${l.map((y) => `<option value="${esc(y.id)}"${y.id === x.id ? ' selected' : ''}>${esc((y.pseudo || TU('fl_acheteur')) + ' · ' + (y.titre || TU('fl_article')))}</option>`).join('')}</select></label>`;
+    const ap = fpVerif && fpVerif.apercu, o = fpOffreApercu(x);
+    const casTxt = !ap ? TU('fp_ap_calcul') : !ap.ok ? TU(ap.raison === 'variable' ? 'fp_ap_rien_variable' : 'fp_ap_rien_texte') : ap.cas === 'regle' ? TU('fp_ap_regle', { n: Math.max(1, fpBr.regles.findIndex((r) => r.id === ap.regle) + 1) }) : TU('fp_ap_defaut');
+    const hasard = ap && ap.ok && ap.possibles > 1 ? ' · ' + TU('fp_ap_hasard', { n: ap.possibles }) : '';
+    const offreTxt = !o ? TU('fp_ap_sans_offre') : o.sans ? TU('fp_ap_sous_plancher') : o.autre ? TU('fp_ap_offre', { p: eurosFav(o.v) }) : o.remontee ? TU(o.pl && o.pl.de === 'achat' ? 'fp_ap_offre_achat' : 'fp_ap_offre_mini', { p: eurosFav(o.v) }) : TU('fp_ap_offre_pct', { p: eurosFav(o.v), pct: o.pct });
+    const lot = fpVerif && fpVerif.apercuLot && fpVerif.apercuLot.ok && fpVerif.apercuLot.cas === 'lot' ? `<small>${esc(TU('fp_ap_lot'))}</small><p class="fp-bulle" data-fp-ap-lot>${esc(fpVerif.apercuLot.texte)}</p>` : '';
+    return sel + `<div class="fp-ap" data-fp-ap-cas="${esc(ap && ap.ok ? ap.cas : ap ? 'rien' : 'calcul')}" data-fp-ap-regle="${esc(ap && ap.regle || '')}" data-fp-ap-cle="${esc(ap && ap.cle || '')}"><small data-fp-ap-titre>${esc(TU('fp_ap_recevrait') + ' · ' + casTxt + hasard)}</small>`
+      + `<p class="fp-bulle" data-fp-ap-texte${ap && ap.ok ? '' : ' data-vide'}>${esc(ap && ap.ok ? ap.texte : ap ? TU('fp_ap_rien_note') : '…')}</p><small data-fp-ap-offre="${o && !o.sans ? o.v : ''}">${esc(offreTxt)}</small>${lot}</div>`;
+  }
+  function fpEditeurHtml(a) {
+    if (!fpBr) fpBr = fpInit();
+    const au = (listes && listes.automatisations) || {}, f = au.favoris || null;
+    if (!f) return `<section class="fav6-reg fp6" data-fav6-reglages-feuille><h3>${esc(TU('f6_reglages_titre'))}</h3><p class="note5" role="status">${esc(TU('f6_reglages_charge'))}</p><div class="pied6"><button type="button" class="vu-btn" data-fav6-fermer>${esc(TU('f6_fermer'))}</button></div></section>`;
+    const nom = listes && listes.compte && listes.compte.nom ? '@' + listes.compte.nom : '';
+    const ry = (raBrouillon.favoris && raBrouillon.favoris.rythme) || f.rythme || 'normal';
+    const etat = fpEtat ? `<p class="note5" role="status" data-fp-etat="${fpEtat.ok ? 'ok' : 'ko'}">${esc(fpEtat.texte)}</p>` : '';
+    const sureKo = fpVerif && fpVerif.sure === false && fpBr.un.length ? `<p class="note5 fp-al" data-fp-sure-ko>${esc(TU('fp_sure_ko'))}</p>` : '';
+    const of = fpBr.offre;
+    const autreOffre = of.mode && of.mode !== 'pct' ? `<p class="fp-sous" data-fp-offre-autre>${esc(TU('fp_offre_autre', { o: of.mode === 'euros' ? '−' + eurosFav(of.valeur) : eurosFav(of.valeur) }))}</p>` : '';
+    const bmF = bmVal('favoris'), bmOn = bmF.actif === true;
+    const confF = bmConfirme && bmConfirme.section === 'favoris' ? `<div class="conf5" role="alertdialog" data-bm-confirme="favoris"><p>${esc(TU('ra_confirme_q', { nom: TU('bm_s_favoris') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    return `<section class="fav6-reg fp6" data-fav6-reglages-feuille data-fp-editeur data-fp-source="${esc(fpBr.source)}"><h3>${esc(TU('f6_reglages_titre'))}</h3>`
+      + `<div class="fp-compte" data-fp-compte>${esc(TU('fp_sur', { c: nom || TU('fl_acheteur') }))}<small>${esc(TU('fp_sur_note'))}</small></div>${etat}`
+      + `<h3>${esc(TU('fp_t_un'))}</h3><p class="fp-sous">${esc(TU('fp_un_note'))}</p>${sureKo}<div data-fp-cas="un">${fpVersionsHtml('un', FP_VERSIONS)}</div>`
+      + `<h3>${esc(TU('fp_t_lot'))}</h3><p class="fp-sous">${esc(TU('fp_lot_note'))}</p><div data-fp-cas="lot">${fpVersionsHtml('lot', FP_VERSIONS)}</div>`
+      + `<h3>${esc(TU('fp_t_regles'))}</h3><p class="fp-sous">${esc(TU('fp_regles_note'))}</p><div data-fp-regles="${fpBr.regles.length}">${fpReglesHtml()}</div>`
+      + `<h3>${esc(TU('fp_t_offre'))}</h3><p class="fp-sous">${esc(TU('fp_offre_note'))}</p>${autreOffre}`
+      + `<div class="rg6"><span><b>${esc(TU('fp_offre_pct'))}</b></span><span class="cd6-l"><input type="number" min="1" max="90" step="1" inputmode="numeric" data-fp-offre-pct value="${esc(fpNb(of.pct))}" aria-label="${esc(TU('fp_offre_pct'))}"> %</span></div>`
+      + `<div class="rg6"><span><b>${esc(TU('fp_arrondi'))}</b></span><div class="vu-seg vue5" role="group">${[['non', 'fp_arrondi_non'], ['oui', 'fp_arrondi_oui']].map(([k, l]) => `<button type="button" data-fp-arrondi="${k}" aria-pressed="${(k === 'oui') === !!of.arrondi}">${esc(TU(l))}</button>`).join('')}</div></div>`
+      + `<h3>${esc(TU('fp_t_delai'))}</h3><p class="fp-sous">${esc(TU('fp_delai_note'))}</p>${confF}`
+      + `<div class="rg6"><span><b>${esc(TU('ra_etat'))}</b></span><button type="button" class="vu-btn ra6" data-bm-bascule="favoris" aria-pressed="${bmOn}">${esc(TU(bmOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`
+      + bmNombre('favoris', 'apresMin', 'fp_delai', 0, 1440) + bmNombre('favoris', 'noteMin', 'bm_note_min', 0, 5) + bmNombre('favoris', 'parArticle', 'bm_par_article', 0, 50) + bmNombre('favoris', 'periodeJours', 'bm_periode', 0, 90) + bmNombre('favoris', 'reecrireJours', 'bm_reecrire', 0, 30)
+      + `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('f6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>`
+      + `<h3>${esc(TU('fp_t_apercu'))}</h3><div data-fp-apercu>${fpApercuHtml(a)}</div>`
+      + `<p class="fp-sous" data-fp-stats-note>${esc(fpStats ? (fpStats.ok ? TU(fpStats.ventesLues ? 'fp_stats_note' : 'fp_stats_sans_ventes', { n: fpStats.envois }) : TU('fp_stats_ko')) : TU('fp_stats_charge'))}</p>`
+      + `<div class="pied6"><button type="button" class="vu-btn" data-fav6-fermer>${esc(TU('f6_fermer'))}</button><button type="button" class="vu-btn vu-plein" data-fp-enregistrer${fpEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div></section>`;
+  }
+  // Ce que le fond juge (la règle du moteur) : chaque version, et l'aperçu sur le favori choisi.
+  function fpVerifier(a, tout) {
+    clearTimeout(fpVerifT);
+    fpVerifT = setTimeout(() => {
+      if (!fpBr) return;
+      const n = ++fpDemande, x = fpFavoriChoisi(a), o = x ? fpOffreApercu(x) : null;
+      const f = (listes && listes.automatisations && listes.automatisations.favoris) || {};
+      const ancien = { message: (f.textes || [])[0] || '', variantes: (f.textes || []).slice(1), lot: cbEtat && cbEtat.reglages ? cbEtat.reglages.messageLot || '' : '' };
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'verifier', reglage: { un: fpBr.un, lot: fpBr.lot, regles: fpBr.regles }, ancien, favori: fpFavoriPourFond(a), offre: o && !o.sans ? { prix: o.v } : null }, (r) => {
+        void chrome.runtime.lastError; if (n !== fpDemande || !r || !r.ok) return; fpVerif = r;
+        if (tout) { rendre(); return; }
+        fpMajSurPlace(a);
+      }); } catch (_) {}
+    }, tout ? 0 : 260);
+  }
+  // Sans redessiner (le curseur reste où il est) : alertes, compteurs, aperçu.
+  function fpMajSurPlace(a) {
+    const r = carte.querySelector('[data-fp-editeur]'); if (!r) return;
+    r.querySelectorAll('[data-fp-alerte]').forEach((el) => { const id = el.getAttribute('data-fp-alerte'); const t = fpAlerte(id); el.textContent = t; const v = el.closest('.fp-v'); if (v) { if (t) v.setAttribute('data-fp-ko', ''); else v.removeAttribute('data-fp-ko'); } });
+    const ap = r.querySelector('[data-fp-apercu]'); if (ap) poserHtml(ap, fpApercuHtml(a));
+    const sk = r.querySelector('[data-fp-sure-ko]'); if (sk && fpVerif && fpVerif.sure !== false) sk.remove();
+    fpBrancherApercu(a);
+  }
+  function fpBrancherApercu(a) {
+    const s = carte.querySelector('[data-fp-favori]'); if (s && !s.__fp) { s.__fp = 1; s.addEventListener('change', () => { fpFavori = s.value; fpVerifier(a, false); }); }
+  }
+  function fpOuvrir(a) {
+    fpBr = null; fpVerif = null; fpEtat = null; fpStats = null; fpActif = null;
+    lireCommeBleam(true);
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'stats' }, (r) => { void chrome.runtime.lastError; fpStats = r && r.ok ? r : { ok: false }; if (favFeuille === 'reglages') rendre(); }); } catch (_) {}
+    fpVerifier(a, true);
+  }
+  function fpEnregistrer(a) {
+    if (fpEnVol || !fpBr) return;
+    fpEnVol = true; fpEtat = null; rendre();
+    const pct = Number(fpBr.offre.pct);
+    const offre = Number.isInteger(pct) && pct >= 1 && pct <= 90 && (fpBr.offre.changee || fpBr.offre.mode === 'pct') ? { pct, arrondi: !!fpBr.offre.arrondi } : null;
+    const rythme = raBrouillon.favoris && raBrouillon.favoris.rythme;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'enregistrer', reglage: { un: fpBr.un, lot: fpBr.lot, regles: fpBr.regles }, ...(offre ? { offre } : {}), ...(rythme ? { rythme } : {}) }, (r) => {
+      void chrome.runtime.lastError; fpEnVol = false;
+      fpEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) };
+      if (r && r.ok) { if (raBrouillon.favoris) delete raBrouillon.favoris.rythme; chargerListes(true); apercuFavAt = 0; if (bmBrouillon.favoris) bmEnvoyer('favoris', bmVal('favoris').actif === true, false); }
+      rendre();
+    }); } catch (_) { fpEnVol = false; fpEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
+  function brancherFp(a) {
+    const r = carte.querySelector('[data-fp-editeur]'); if (!r || !fpBr) return;
+    const regle = (id) => fpBr.regles.find((x) => x.id === id);
+    r.querySelectorAll('[data-fp-texte]').forEach((t) => {
+      const k = t.getAttribute('data-fp-texte');
+      t.addEventListener('focus', () => { fpActif = { k, pos: t.selectionStart }; });
+      t.addEventListener('input', () => { const f = fpTrouver(k); if (f.v) f.v.texte = t.value.slice(0, FP_MAX); fpActif = { k, pos: t.selectionStart }; const n = r.querySelector(`[data-fp-n="${f.id}"]`); if (n) n.textContent = `${t.value.length}/${FP_MAX}`; fpVerifier(a, false); });
+      t.addEventListener('keyup', () => { if (fpActif && fpActif.k === k) fpActif.pos = t.selectionStart; });
+      t.addEventListener('click', () => { fpActif = { k, pos: t.selectionStart }; });
+    });
+    r.querySelectorAll('[data-fp-inserer]').forEach((b) => b.addEventListener('mousedown', (ev) => ev.preventDefault()));
+    r.querySelectorAll('[data-fp-inserer]').forEach((b) => b.addEventListener('click', () => {
+      const cible = b.getAttribute('data-fp-cible'), l = fpListe(cible); if (!l.length) return;
+      const k = fpActif && fpActif.k.slice(0, fpActif.k.lastIndexOf(':')) === cible ? fpActif.k : cible + ':' + l[l.length - 1].id;
+      const f = fpTrouver(k); if (!f.v) return;
+      const mot = '{' + b.getAttribute('data-fp-inserer') + '}', pos = fpActif && fpActif.k === k && Number.isInteger(fpActif.pos) ? fpActif.pos : f.v.texte.length;
+      const avant = f.v.texte.slice(0, pos), apres = f.v.texte.slice(pos), sep = avant && !/\s$/.test(avant) ? ' ' : '';
+      f.v.texte = (avant + sep + mot + apres).slice(0, FP_MAX); fpActif = { k, pos: (avant + sep + mot).length };
+      rendre(); fpVerifier(a, false);
+    }));
+    r.querySelectorAll('[data-fp-ajouter]').forEach((b) => b.addEventListener('click', () => { const c = b.getAttribute('data-fp-ajouter'), l = fpListe(c); const id = fpNouvelId(c === 'un' ? 'u' : c === 'lot' ? 'l' : 'v'); l.push({ id, texte: '' }); fpActif = { k: c + ':' + id, pos: 0 }; rendre(); }));
+    r.querySelectorAll('[data-fp-retirer]').forEach((b) => b.addEventListener('click', () => { const f = fpTrouver(b.getAttribute('data-fp-retirer')); const i = f.l.indexOf(f.v); if (i >= 0) f.l.splice(i, 1); fpActif = null; rendre(); fpVerifier(a, false); }));
+    const ra = r.querySelector('[data-fp-regle-ajouter]'); if (ra) ra.addEventListener('click', () => { fpBr.regles.push({ id: fpNouvelId('r'), heures: null, jours: null, prix: null, marques: null, textes: [{ id: fpNouvelId('v'), texte: '' }] }); rendre(); });
+    r.querySelectorAll('[data-fp-regle-retirer]').forEach((b) => b.addEventListener('click', () => { fpBr.regles = fpBr.regles.filter((x) => x.id !== b.getAttribute('data-fp-regle-retirer')); rendre(); fpVerifier(a, false); }));
+    const bouger = (id, d) => { const i = fpBr.regles.findIndex((x) => x.id === id), j = i + d; if (i < 0 || j < 0 || j >= fpBr.regles.length) return; const l = fpBr.regles; [l[i], l[j]] = [l[j], l[i]]; rendre(); fpVerifier(a, false); };
+    r.querySelectorAll('[data-fp-monter]').forEach((b) => b.addEventListener('click', () => bouger(b.getAttribute('data-fp-monter'), -1)));
+    r.querySelectorAll('[data-fp-descendre]').forEach((b) => b.addEventListener('click', () => bouger(b.getAttribute('data-fp-descendre'), 1)));
+    r.querySelectorAll('[data-fp-rc]').forEach((c) => c.addEventListener('input', () => {
+      const [id, ch] = c.getAttribute('data-fp-rc').split('.'); const x = regle(id); if (!x) return; const v = c.value.trim();
+      if (ch === 'hde' || ch === 'ha') { const h = Object.assign({ de: null, a: null }, x.heures || {}); h[ch === 'hde' ? 'de' : 'a'] = v === '' ? null : Number(v); x.heures = h.de == null && h.a == null ? null : h; }
+      else if (ch === 'pmin' || ch === 'pmax') { const p = Object.assign({ min: null, max: null }, x.prix || {}); p[ch === 'pmin' ? 'min' : 'max'] = v === '' ? null : Number(v.replace(',', '.')); x.prix = p.min == null && p.max == null ? null : p; }
+      else if (ch === 'marques') { const l = v.split(/[,;]+/).map((m) => m.trim()).filter(Boolean); x.marques = l.length ? l : null; }
+      const pr = r.querySelector(`[data-fp-regle="${id}"] .fp-rt small`); if (pr) { const n = (x.heures && x.heures.de != null && x.heures.a != null && x.heures.de !== x.heures.a ? 1 : 0) + (x.jours && x.jours.length && x.jours.length < 7 ? 1 : 0) + (x.prix ? 1 : 0) + (x.marques ? 1 : 0); pr.textContent = n === 1 ? TU('fp_cond1') : TU('fp_condn', { n }); }
+      fpVerifier(a, false);
+    }));
+    r.querySelectorAll('[data-fp-rj]').forEach((b) => b.addEventListener('click', () => { const [id, d] = b.getAttribute('data-fp-rj').split('.'); const x = regle(id); if (!x) return; const j = Number(d); const l = Array.isArray(x.jours) ? x.jours.slice() : []; x.jours = l.includes(j) ? l.filter((y) => y !== j) : l.concat([j]); if (!x.jours.length) x.jours = null; rendre(); fpVerifier(a, false); }));
+    const pc = r.querySelector('[data-fp-offre-pct]'); if (pc) pc.addEventListener('input', () => { fpBr.offre.pct = pc.value === '' ? '' : Number(pc.value); fpBr.offre.changee = true; fpVerifier(a, false); });
+    r.querySelectorAll('[data-fp-arrondi]').forEach((b) => b.addEventListener('click', () => { fpBr.offre.arrondi = b.getAttribute('data-fp-arrondi') === 'oui'; fpBr.offre.changee = true; rendre(); fpVerifier(a, false); }));
+    const en = r.querySelector('[data-fp-enregistrer]'); if (en) en.addEventListener('click', () => fpEnregistrer(a));
+    fpBrancherApercu(a);
+    // Le curseur revient là où il était (un redessin ne fait pas perdre la saisie).
+    if (fpActif) { const t = r.querySelector(`[data-fp-texte="${fpActif.k}"]`); if (t && (!document.activeElement || document.activeElement === hote || document.activeElement === document.body)) { try { t.focus({ preventScroll: true }); const p = Math.min(t.value.length, Number.isInteger(fpActif.pos) ? fpActif.pos : t.value.length); t.setSelectionRange(p, p); } catch (_) {} } }
+  }
   // Les feuilles : « Réglages » (textes et rythme — le même chemin gardé que la page Automatisations, `reglagesFavoris`)
   // et la confirmation (le récapitulatif de toujours, `recapFavHtml`, avec « Confirmer l'envoi »).
   function feuilleFav6(a) {
@@ -1815,19 +2064,7 @@ function vrmVerifVisible(sel) {
     let corps = '';
     if (favFeuille === 'confirmer' && a && a.etat === 'pret' && envoiFl(a).envoi.length) corps = recapFavHtml(a);
     else if (favFeuille === 'reglages') {
-      const f = listes && listes.automatisations ? listes.automatisations.favoris : null, m = (a && a.message) || {};
-      const b0 = raBrouillon.favoris || {};
-      const tx = Array.isArray(b0.textes) ? b0.textes.slice() : (f && Array.isArray(f.textes) ? f.textes.slice() : []);
-      while (tx.length < Math.min(5, Math.max(2, tx.length + (tx[tx.length - 1] ? 1 : 0)))) tx.push('');
-      const ry = b0.rythme || (f && f.rythme) || 'normal';
-      const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : eurosFav(m.offre.valeur)) : '';
-      const etat = raEtat && raEtat.auto === 'favoris' ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
-      corps = `<section class="fav6-reg" data-fav6-reglages-feuille><h3>${esc(TU('f6_reglages_titre'))}</h3>${etat}`
-        + (f ? `<p class="note5">${esc(TU('au6_messages_note'))}</p>${tx.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-rf-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join('')}`
-          + `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('f6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>`
-          : `<p class="note5" role="status">${esc(TU('f6_reglages_charge'))}</p>`)
-        + `<p class="note5" data-fav6-offre-regle="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('f6_offre_regle', { o: offreTxt }) : TU('f6_sans_offre_regle'))} ${esc(TU('f6_offre_vrm'))}</p>`
-        + `<div class="pied6"><button type="button" class="vu-btn" data-fav6-fermer>${esc(TU('f6_fermer'))}</button>${f ? `<button type="button" class="vu-btn vu-plein" data-rf-enregistrer${raEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button>` : ''}</div></section>`;
+      corps = fpEditeurHtml(a);   // 5.417 (`favorisperso2`) : l'éditeur des messages
     } else return '';
     return `<div class="fav6-voile" data-fav6-voile><div class="fav6-feuille" role="dialog" aria-modal="true" data-fav6-feuille="${favFeuille}">${favFeuille === 'confirmer' ? `<button type="button" class="rond6 fav6-x" data-fav6-fermer aria-label="${esc(TU('f6_fermer'))}">×</button>` : ''}${corps}</div></div>`;
   }
@@ -1866,7 +2103,8 @@ function vrmVerifVisible(sel) {
     const ch = racine.querySelector('[data-fav6-cherche]'); if (ch) ch.addEventListener('input', () => { favCherche = ch.value; const pos = ch.selectionStart; vusFl = PAGE_FL; rendre(); const n = carte.querySelector('[data-fav6-cherche]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } });
     const at = racine.querySelector('[data-fav6-annonce-tout]'); if (at) at.addEventListener('click', () => { filtreAnnonce = ''; rendre(); });
     const su = racine.querySelector('[data-fav-suite]'); if (su) su.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
-    const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); rendre(); });
+    const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); fpOuvrir(apercuFav); rendre(); });
+    if (favFeuille === 'reglages') brancherFp(apercuFav);   // 5.417
     const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; rendre(); });
     const fermer = () => { favFeuille = null; vueFav = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();

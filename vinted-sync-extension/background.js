@@ -20918,7 +20918,7 @@ async function favorisPersoCarte(msg, sender) {
     const surs = R.un.filter((v) => fpVersionSure(v.texte)).map((v) => v.texte.replace(/\{prénom\}/g, '{pseudo}'));
     if (!surs.length) return { ok: false, code: 'sure', raison: 'Garde au moins un message « 1 article » sans {marque}, {taille}, {prix_offre} ni {remise} : VRM l’envoie quand l’information manque.' };
     // La copie « d'avant » (envois d'une extension plus ancienne, aperçu du serveur), puis SES versions.
-    const c1 = await reglagesFavorisCarte({ message: surs[0], variantes: surs.slice(1, 5), ...(msg.offre && typeof msg.offre === 'object' ? { offre: { pct: Number(msg.offre.pct), arrondi: msg.offre.arrondi === true } } : {}) }, sender);
+    const c1 = await reglagesFavorisCarte({ message: surs[0], variantes: surs.slice(1, 5), ...(['normal', 'prudent'].includes(msg.rythme) ? { rythme: msg.rythme } : {}), ...(msg.offre && typeof msg.offre === 'object' ? { offre: { pct: Number(msg.offre.pct), arrondi: msg.offre.arrondi === true } } : {}) }, sender);
     if (!c1.ok) return c1;
     const c2 = await reglageAutoCarte({ cle: 'vinted_bleam', valeur: { uid: String(uid), section: 'favMessages', valeur: R }, confirme: false }, sender);
     if (!c2.ok) return Object.assign({}, c2, { raison: (c2.raison || 'Écriture impossible') + ' (le message principal est enregistré, pas tes autres versions).' });
