@@ -2137,8 +2137,11 @@ function vrmVerifVisible(sel) {
   function fpStatsTexte(id) {
     const s = fpStats && fpStats.stats ? fpStats.stats[id] : null;
     const n = s ? s.envoyes : 0;
-    if (!s || !s.mesure) return TU('fp_st_non', { n });
-    return TU('fp_st', { n, o: s.avecOffre, v: s.vendus }) + (s.vendusSansDate ? ' · ' + TU('fp_st_sans_date', { n: s.vendusSansDate }) : '');
+    // 5.420 (`favorisreponses`) : les réponses de l'acheteur, sur les fils RELUS après l'envoi (« pas relu » ≠ « pas de réponse »).
+    const rep = s && s.relues ? ' · ' + TU('fp_st_rep', { r: s.reponses, l: s.relues, p: Math.round((s.reponses * 100) / s.relues) }) : s && s.envoyes ? ' · ' + TU('fp_st_rep_passu') : '';
+    const oa = s && s.offresAcceptees ? ' · ' + TU('fp_st_oa', { n: s.offresAcceptees }) : '';
+    if (!s || !s.mesure) return TU('fp_st_non', { n }) + rep + oa;
+    return TU('fp_st', { n, o: s.avecOffre, v: s.vendus }) + rep + oa + (s.vendusSansDate ? ' · ' + TU('fp_st_sans_date', { n: s.vendusSansDate }) : '');
   }
   function fpVersionsHtml(cle, max) {
     const l = fpListe(cle);
