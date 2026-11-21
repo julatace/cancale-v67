@@ -36,6 +36,11 @@ LECTURES (GET) restent permises, dans leurs budgets.
   republication (`cacheSeul`) : aucune page de plus — le formulaire choisit la taille par son identifiant, absente ⇒
   arrêt nommé avant le brouillon.
 - **Retry-After** : lu sur la réponse que la page reçoit (`vrm-formulaire.js` → `constaterFormulaire`).
+- **Contrôle avant** (`verifierRepub`, « N à corriger ») : une grille absente du cache est LUE par la page (`lirePage`) —
+  aucun formulaire n'est en cours à ce moment ; pendant une republication, le cache seulement.
+- **Moteur d'offres** : il relit déjà le fil juste avant le geste (`relireOffre`) ; `repondreOffre({ relue: true })` ne le
+  relit pas une seconde fois. Un geste de l'app / du panneau (sans relecture) relit le fil avant « Accepter / Refuser ».
+- Texte d'un message de l'app : `reply.body`, sinon `message` / `body` (formes anciennes) — jamais inventé.
 
 ## Inventaire : chaque écriture qui partait par requête, et son geste d'interface
 
@@ -135,6 +140,12 @@ Relevés le 20 nov. (formulaire de dépôt) : `header-upload-item-button`, `add-
   l'audit qui garde la garantie), repub-copie-fidele (G1–G5, `--prouve` 4/4), republication-parfaite, robustesse-
   extension, securite-comptes, tout-generer. Identifiants des fixtures rendus numériques (« c7001 » ⇒ « 87001 ») :
   une vraie conversation Vinted porte un numéro, et `interfaceVinted` refuse tout le reste.
+
+Bancs rejoués : interface-vinted 24/24 (+ 9/9 mutations, rouge sur `origin/main` : 23 rouges), repub-formulaire 14/14
+(+ 7/7 mutations ; la mutation « captcha aveugle » suit la vérification VISIBLE), grand-panneau 434 (Paramètres : plus de
+« Directe », « c'est la seule méthode » dit ; captures `methode-republication-390-light.png`…), audit-comme-bleam
+`--prouve` 15/15 + rouge sur `origin/main`. Rouges identiques sur `origin/main` (hors de ce lot) : bancs carte-extension
+(40), carte-orion-sans-onglet (13), badge (32), panneau-persistant (6) ; cross-post (écrans eBay/Leboncoin de l'app).
 
 ## Pas fait / à décider
 
