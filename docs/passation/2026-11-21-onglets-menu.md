@@ -45,8 +45,10 @@ Seul double assumé : thème, langue, déconnexion au bas du Menu ET dans Param�
 - Banc `scripts/bancs/onglets-menu.cjs` (390 tactile clair + sombre, 1512 clair + sombre, base inventée) : touche chaque
   onglet, la bulle, la photo, chaque tuile, la carte du compte, « ‹ Menu », chaque entrée de la latérale et vérifie l'écran
   monté (`data-ecran`) et l'onglet allumé. **Après : 108 verts, 0 rouge** (⚠️ dit pour Stock, voir plus bas).
-  Sur origin/main (`git archive`, build, `BANC_DIST=`) : voir le compte rendu de la session (les contrôles de ce qui a changé
-  sont rouges ; O1 — la barre — est vert sur les deux, c'est voulu).
+  Sur origin/main (`git archive`, build, `BANC_DIST=`) : **64 verts, 36 rouges** — rouges : O2 (champ sous le titre),
+  O3 (la photo ouvre le Menu), O4, O5, O6, O8, O9 (Menu, Paramètres), O11, O12, O13 (« 33 » sur la photo). Verts sur les
+  deux, c'est voulu : O1 (la barre est la même). O7 et O10 sont verts aussi sur l'ancien code : sur la base inventée,
+  l'ancienne pastille ne variait pas — O10 ne prouve la règle que sur une vraie base (la correction : `badgesStables`).
 - Audits verts : traduction, quoi-de-neuf, coherence, icones, barre-achats, coque-tablette, onglets-a, onglets-d,
   onglets-rapides. `audit-coque-parametres` : 1 rouge (« icône search » dans Réglages), déjà rouge sur origin/main.
 
