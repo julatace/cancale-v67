@@ -1,5 +1,52 @@
 # Design iPhone — 21 nov. 2026
 
+## ⚠️⚠️⚠️ 5ᵉ passe (la plus récente) : « comme Vintex », vraiment — `vintex-vrai/`
+
+Julien, à qui on a demandé l'app dont il adore le look : « Vintex », seul. Donc ni « inspiré de » ni personnalité de notre
+cru : les 6 écrans (+ Notifications, pour la comparaison) dessinés comme si l'équipe Vintex avait fait son app mobile.
+Transposé seulement là où il le faut : la barre latérale devient la barre du bas, les colonnes trop larges deviennent des
+rangées empilées. Ni leur logo ni leur nom. (Les directions D1/D2/D3 de la 4ᵉ passe sont abandonnées, restées en
+brouillon hors du dépôt ; V4/V5, V1–V3 et A/B/C plus bas sont l'historique.)
+
+⚠️ **vintex.app n'est pas joignable depuis cette session** (le réseau du conteneur ne l'autorise pas) : les relevés
+ci-dessous viennent UNIQUEMENT des 3 photos de Julien (Articles, Commandes, Notifications), agrandies zone par zone. À
+confirmer sur le site dès qu'il est autorisé : la famille exacte de la police, le bouton plein, une version mobile.
+
+### Relevés sur Vintex (photos)
+
+| élément | relevé | dans la maquette |
+|---|---|---|
+| police | grotesque neutre type **Inter** (a à deux étages, chiffres à empattement du 1) — à confirmer | Inter |
+| titre d'écran | « Articles », ~18 px, 600, encre zinc-900, précédé de l'icône « panneau » | 18/600 `#18181B` (sans l'icône panneau : pas de barre latérale au téléphone) |
+| puce de compte | pilule à contour 1 px gris, avatar rond 16 px coloré avec l'initiale, texte ~12–13 px | `26 px`, contour `#E4E4E7`, avatar `#3F3F46` (leur violet est refusé chez VRM) |
+| « Mis à jour à l'instant » | bouton à contour, icône ⟳ fine à gauche, à droite de l'en-tête | bouton icône ⟳ 36 (le texte complet ne tient pas à 390 px) |
+| filets | en-tête et barre d'outils séparés par un filet pleine largeur ; rangées séparées d'un filet très clair | `#E4E4E7` (structure) · `#EDEDEF` (rangées) |
+| barre d'outils | « Choisir une action ⌄ » (select à contour, texte gris) · séparateur vertical · champ « Rechercher un article… » (loupe) · « Statut » (icône filtre) · Notifications : « ♡ Favoris », « 📅 7 jours », « Statut ① » (pastille rose), « × Effacer » sans contour | identique, sur 2 lignes |
+| contrôles | ~36 px de haut, rayon ~8 px, contour 1 px `#E4E4E7`, ombre xs, texte 14 px 500, icône 16 à gauche | 36 (+ zone tactile 44), rayon 8, `0 1px 2px rgb(0 0 0/.05)` |
+| compteur | « 54 articles », « 4 sur 12 » : 12 px gris au-dessus du tableau ; à droite « Colonnes » et le choix liste/grille | identique |
+| tableau | carte à contour 1 px, rayon ~10–12, en-tête de colonnes 12 px 500 gris avec ⇅ / ↑ ; case à cocher pâle 16 rayon 4 ; vignette ~40 rayon 6 | rayon 10, vignette 40 rayon 6, case 16 |
+| rangée | ~52 px ; titre 14 px 400 gris foncé (`#3F3F46`) ; phrase d'état 12 px gris clair (« Commande expédiée et en cours d'acheminement ! ») ; prix 14 px 600 encre « 54,00 € » ; date « 14/11/2026 11:30 » ; vues, favoris en chiffres gris ; « ⋯ » gris | 60 px (titre sur 2 lignes au téléphone), mêmes tailles et gris |
+| transporteur | petit carré de couleur 10 px + nom 13–14 px ; « — » quand vide | identique |
+| étiquettes | pilule ~20 px, 12 px 500, fond pastel + texte coloré + filet de la même teinte : **Vendu / Terminée** vert ; **En vente / Rien à faire pour l'instant / Échec / Non traitée** rose-rouge ; **Annulée** gris sans fond | vert `#EAF6EE`/`#2E8A4E` ; ⚠️ le rose-rouge de Vintex est **interdit chez VRM (rouge = doublon de N°)** : « Non traitée », « À expédier », « À trancher » ⇒ ambre (geste) ; « En vente », « Rien à faire pour l'instant », « Annulée » ⇒ gris |
+| barre latérale | icônes **Lucide** (house, scroll-text, archive, package, shopping-cart, calculator, message-square, bell, user-plus, bot, sparkles, gift, gamepad), ~18 px ; l'actif = carré arrondi **rose pâle** et icône rose | barre du bas : mêmes icônes Lucide (lucide-static, ISC), l'actif sur le même rose pâle `#FBE6EB` / `#BE3A5A` |
+| bouton plein | non visible sur les photos | encre `#18181B` (le plein par défaut de ce genre d'interface), UN par écran au plus |
+
+### Jetons à poser dans `src/natif/jetons.css`
+
+`--n-fond #FFFFFF` · `--n-carte #FFFFFF` · `--n-carte-2 #FAFAFA` (bande de groupe) · `--n-bord #E4E4E7` · `--n-trait #EDEDEF` ·
+`--n-encre #18181B` · texte `#3F3F46` · `--n-encre-2 #71717A` · `--n-encre-3 #A1A1AA` · `--n-appui #F4F4F5` ·
+`--n-plein #18181B` / `--n-sur-plein #FFFFFF` · actif (onglet, pastille de compteur) `#FBE6EB` / `#BE3A5A` ·
+étiquette verte `#EAF6EE` / `#2E8A4E` / filet `#D3ECDC` · ambre `#FDF1DF` / `#985300` / `#F5DDB5` · grise `#F4F4F5` /
+`#71717A` / `#E7E7EA` · doublon `#FDECEC` / `#C8322B` / `#F8CFCC` · ombre `0 1px 2px rgb(0 0 0/.05)`.
+Texte : 18/600 (titre) · 14/400 (corps, 500 pour un contrôle, 600 pour un prix) · 12/400 (secondaire, en-têtes de
+colonnes en 500) · 10,5/500 (libellés de la barre du bas). Mesures : contrôle 36 (zone 44), rayon 8 ; tableau rayon 10 ;
+vignette 40 rayon 6 ; case 16 rayon 4 ; étiquette 20 pilule ; interrupteur 36 × 20 (encre quand allumé) ; marge 16.
+Composants à changer : ceux de la section « famille Vintex » plus bas (même liste), avec ces valeurs.
+
+Fichiers : `vintex-vrai/` (`aujourdhui`, `annonces`, `ventes`, `notifications`, `fiche`, `menu`, `favoris`).
+
+---
+
 ## ⚠️⚠️ 3ᵉ passe (la plus récente) : V4 « énergique clair » et V5 « premium sombre »
 
 Julien sur V1/V2/V3 : « tu peux faire mieux sur le design » ; il a coché **trop fade / pas d'impact**, **textes et
