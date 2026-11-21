@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.415.0, Julien : « au moment de la connexion ça doit s'améliorer ») docs/passation/2026-11-21-extension-connexion.md
+  { id: 'connexion-extension', date: '2026-11-21', titre: 'Connecter l’extension : deux chemins clairs', phrase: 'Mot de passe dans l’extension, ou liaison par vrm.center.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.414, Julien : « elle ne doit pas se tromper […] on ne fait plus les requêtes ») docs/passation/2026-11-21-extension-interface.md
   { id: 'extension-interface', date: '2026-11-21', titre: 'L’extension clique et tape : plus aucune requête', phrase: 'Messages, offres, republication : tout passe par la page Vinted, vérifié.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.413.0, Julien : « je veux que ce soit dans ce style-là, surtout sur le téléphone ») docs/passation/2026-11-21-panneau-telephone.md
