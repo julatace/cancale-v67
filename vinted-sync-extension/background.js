@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.420.0';
+const CODE_VERSION = '5.431.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -11101,13 +11101,15 @@ function unNotifSuiviALaFois(fn) {
   _chaineNotifsSuivi = suite.then(() => {}, () => {});
   return suite;
 }
-function mettreNotifSuivi(uid, tx) {
+// 5.431 : `action` 'retour' — le colis RETOUR d'une vente (`capterSuivisRetours`) ; le serveur relit et ne sonne qu'à l'arrivée.
+function mettreNotifSuivi(uid, tx, action = 'suivi') {
   return unNotifSuiviALaFois(async () => {
     try {
       if (!/^\d{1,20}$/.test(String(uid || '')) || !/^\d{4,20}$/.test(String(tx || ''))) return;
       const f = (await chrome.storage.local.get(SUIVI_NOTIFS))[SUIVI_NOTIFS] || {};
-      const k = `${uid}:${tx}`;
-      f[k] = { uid: String(uid), tx: String(tx), at: Date.now(), essais: 0 };
+      const retour = action === 'retour';
+      const k = `${uid}:${tx}${retour ? ':r' : ''}`;
+      f[k] = { uid: String(uid), tx: String(tx), at: Date.now(), essais: 0, ...(retour ? { action: 'retour' } : {}) };
       await chrome.storage.local.set({ [SUIVI_NOTIFS]: f });
     } catch (_) {}
   });
@@ -11130,7 +11132,7 @@ async function envoyerNotifsSuiviUn() {
         const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
         const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
-          body: JSON.stringify({ action: 'suivi', tx: String(e.tx), uid: String(e.uid) }) });
+          body: JSON.stringify({ action: e.action === 'retour' ? 'retour' : 'suivi', tx: String(e.tx), uid: String(e.uid) }) });
         clearTimeout(t); status = r.status;
       } catch (_) { status = 0; }
       if (status >= 200 && status < 300) { issues[k] = { de: e, fin: 'retirer' }; n++; noterDiag('suivi_notif_envoyee'); }
@@ -13772,6 +13774,8 @@ async function visiteVintedUnPassage() {
     //    le colis du point relais à son achat — lecture de colis, `suivicolis`). Avant, il passait après les
     //    versements et les relevés (jusqu'à 13 lectures) et n'était plus jamais lu (mesure-famine-suivi).
     await capterSuivisAchats(uid);
+    // 5.431 (21 nov.) : le colis RETOUR des ventes en retour de ce compte (mêmes bornes que le suivi des achats).
+    await capterSuivisRetours(uid);
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
@@ -26867,6 +26871,85 @@ async function capterSuivisAchats(uid) {
     //    relecture) s'arrêtent avant (`reserveAutresQueVersement`, `reserveLectures` ; « pas su » ⇒ réserve entière).
     await noterLecturesDues(uid, 'suivi', dusColis());
     if (ecrits) logActivity(`📦 Suivi Vinted relu pour ${ecrits} achat${ecrits > 1 ? 's' : ''}`);
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ 5.431 (21 nov., lot 77 « Suivi des retours ») — LE COLIS D'UN RETOUR QUI REVIENT ═══════════════════════
+// Julien : « pour chaque retour accepté, le n° de suivi du colis retour et son transporteur, les étapes du colis qui
+// revient ». MESURÉ (lecture seule, 21 nov.) : aucune vente en retour (transaction 440) n'a de n° en base ; son
+// `shipment` est celui du RETOUR (230 « Bordereau envoyé au vendeur », 310 « colis déposé ») ; seul le suivi que
+// Vinted montre de CETTE transaction (`journey_summary`, la lecture des achats, forme reconnue) peut le porter.
+// `capterSuivisRetours` le lit pour les VENTES de CE compte en retour (sa transaction rangée à 440, la vente dans SA
+// liste `orders_sold` — des identités, jamais un titre), pas encore remboursées ni finalisées, dans les MÊMES bornes
+// que le suivi des achats (budget « suivi », 6/h, une requête à la fois, compte de l'onglet, mémo de 3 h), au plus
+// 2 par visite. Rangé tel quel dans `harvest_{uid}_retour_{tx}` (étapes, n°, transporteur, point) ; c'est l'APP
+// (api/_lib/retour-vente-suivi.js) qui juge si la ligne est celle du retour (aucun n° de l'aller, étapes datées après
+// le début du retour) — l'extension ne décide rien. Écrite seulement si quelque chose change ; une étape nouvelle met
+// `/api/push { action: 'retour' }` en file (le serveur relit et ne sonne qu'à l'ARRIVÉE prouvée, une fois).
+const RETOUR_MAX_PAR_VISITE = 2;
+const RETOUR_FINI = /rembours|finalis|annul/i;
+async function capterSuivisRetours(uid) {
+  try {
+    if (!uid) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const txs = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&meta->>status=eq.440&select=id,tx:meta->>id,side:data->payload->transaction->>user_side`);
+    if (txs === null) return 0;                                            // pas su
+    const enRetour = new Set(txs.filter((r) => r && String(r.side || '') === 'seller' && /^\d{4,20}$/.test(String(r.tx || ''))).map((r) => String(r.tx)));
+    if (!enRetour.size) return 0;
+    const vs = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (!Array.isArray(vs)) return 0;                                      // pas su
+    const ventes = (vs[0] && Array.isArray(vs[0].v)) ? vs[0].v : [];
+    const cibles = ventes.filter((o) => o && enRetour.has(String(o.transaction_id)) && !RETOUR_FINI.test(String(o.status || ''))
+      && String(o.transaction_user_status || '') !== 'failed' && String(o.transaction_user_status || '') !== 'completed');
+    if (!cibles.length) return 0;
+    const lignes = await sbGetTout(`app_data?id=like.harvest_${uid}_retour_*&select=id,dt:data->dernier->>t,nu:data->>suivi,sv:data->>suivisVinted,rn:data->>relaisNom`);
+    if (lignes === null) return 0;                                         // pas su
+    const avant = new Map();
+    for (const r of lignes) { const tx = (/_retour_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) avant.set(tx, r); }
+    const memo = (await chrome.storage.local.get('vrmRetourFaits')).vrmRetourFaits || {};
+    const maintenant = Date.now();
+    for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
+    // Jamais lus d'abord, puis le moins récemment lu.
+    cibles.sort((a, b) => (Number(memo[String(a.transaction_id)]) || 0) - (Number(memo[String(b.transaction_id)]) || 0));
+    let n = 0, ecrits = 0;
+    for (const o of cibles) {
+      if (n >= RETOUR_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      if (memo[tx] && maintenant - Number(memo[tx]) < SUIVI_RETRY_MS) continue;
+      const refus = await gardeLecture(uid, acc, 'suivi');
+      if (refus) { noterDiag(`retour_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }
+      if (!(await compterLectureSuivi(uid))) { noterDiag('retour_plafond_heure'); break; }
+      memo[tx] = Date.now(); n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}/shipment/journey_summary`);
+      if (!rep || !rep.ok || !rep.json) { noterDiag(`retour_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, SUIVI_RETRY_MS)) break; continue; }
+      if (estErreurVinted(rep.json)) { noterDiag('retour_erreur_vinted'); continue; }
+      const contrat = contratSuivi(allegerSuivi(rep.json));
+      const nt = numerosDuTrajet(rep.json);
+      const rel = nettoyerRelaisSuivi(relaisDestination(rep.json));
+      if (!contrat && !(nt && nt.liste && nt.liste.length)) { noterDiag('retour_forme_inconnue'); continue; }
+      const sv = unionNumerosSuivi('', [contrat && contrat.suivi, ...((nt && nt.liste) || []).map((e) => e.n)].filter(Boolean));
+      const data = { v: 1, tx, sens: 'retour', capturedAt: new Date().toISOString(),
+        etapes: (contrat && contrat.etapes) || [], dernier: (contrat && contrat.dernier) || null, n: ((contrat && contrat.etapes) || []).length,
+        transporteur: (contrat && contrat.transporteur) || null, suivi: (contrat && contrat.suivi) || (sv[0] || null),
+        suivisVinted: sv.length ? sv.join(',') : null, suiviCourant: (nt && nt.courant) || null,
+        relaisNom: rel ? rel.nom : null, relaisRue: rel ? (rel.rue || null) : null, relaisCp: rel ? (rel.cp || null) : null, relaisVille: rel ? (rel.ville || null) : null };
+      const a = avant.get(tx);
+      const dernierNeuf = libelleSuivi((data.dernier && data.dernier.t) || '') !== libelleSuivi((a && a.dt) || '');
+      const change = !a || dernierNeuf || String(data.suivi || '') !== String(a.nu || '') || String(data.suivisVinted || '') !== String(a.sv || '') || String(data.relaisNom || '') !== String(a.rn || '');
+      if (!change) { noterDiag('retour_rien_de_neuf'); continue; }
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_retour_${tx}`, data }], 'id');
+      if (ok === false) { noterDiag('retour_ecriture_ratee'); delete memo[tx]; break; }
+      ecrits++;
+      noterDiag('retour_ecrit');
+      notifierApp({ type: 'maj', quoi: 'retour', uid: String(uid), tx });
+      if (dernierNeuf && data.dernier) { await mettreNotifSuivi(uid, tx, 'retour'); await envoyerNotifsSuivi(); }
+    }
+    await chrome.storage.local.set({ vrmRetourFaits: memo });
+    if (ecrits) logActivity(`↩️ Suivi relu pour ${ecrits} retour${ecrits > 1 ? 's' : ''}`);
     return n;
   } catch (_) { return 0; }
 }

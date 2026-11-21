@@ -7,6 +7,9 @@
 //   POST { action:'retrait', tx }            → l'extension a lu un code de retrait neuf (5.204)
 //   POST { action:'suivi', tx, uid }         → l'extension a vu une étape de plus dans le
 //                                              suivi Vinted d'un achat (5.214, _lib/suivi-vinted.js)
+//   POST { action:'retour', tx, uid }        → (21 nov., ext. 5.431) une étape de plus du colis RETOUR d'une
+//                                              vente : « Retour arrivé · Remettre en ligne ? », une fois, sur
+//                                              l'arrivée PROUVÉE (_lib/retour-vente-notif.js)
 //   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
 //                                              la route RELIT les comptes elle-même (rien du corps)
 //                                              et notifie une fois par compte (_lib/compte-relie.js)
@@ -33,6 +36,7 @@ import { contexteVendeur } from './_lib/owner.js';
 import { utilisateurDe } from './_lib/session.js';
 import { notifierRetraitConversation } from './email-inbound.js';
 import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
+import { notifierRetourVente } from './_lib/retour-vente-notif.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
@@ -117,6 +121,13 @@ async function traiter(req, res) {
     // CE vendeur (un compte d'un autre vendeur est refusé), une fois par étape.
     if (body.action === 'suivi') {
       const r = await notifierSuiviVinted(body.tx, body.uid);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (21 nov., ext. 5.431, lot 77) LE COLIS RETOUR D'UNE VENTE a une étape de plus : la route relit tout et ne
+    // sonne qu'à l'ARRIVÉE prouvée (transporteur, e-mail du même n°), une fois par retour.
+    if (body.action === 'retour') {
+      const r = await notifierRetourVente(body.tx, body.uid);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
