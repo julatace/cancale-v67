@@ -149,6 +149,14 @@ async function ecranPlein(nav, vp, T, N, cap, sc) {
   dit(x1 && x2 && x3 && x1.av === `${euro(lu('91010001'))}|meme` && x1.ap === `${euro(relu('91010001'))}|chg` && x2.av === `${euro(lu('91010002'))}|meme` && x2.ap === `${euro(relu('91010002'))}|chg` && x3.ok === '0' && x3.frise === 'faite,faite,erreur,attente' && x3.voir === 'Ouvrir sur Vinted' && !x3.rep,
     `E5 ${T} bilan du lot : 60 € → 54 €, 75 € → 67,50 € (prix RELUS, en vert) ; la 3ᵉ refusée : « Enregistré » en ambre, « Ouvrir sur Vinted »`, JSON.stringify(b3));
   await cap(pg2, N('ecran-prix-bilan'));
+  // E6 — une baisse AUTOMATIQUE (règle, cycle de vie) : pas de bilan à fermer sur Vinted (le clavier de Vinted libre).
+  await pg2.evaluate(() => document.getElementById('vrm-action').shadowRoot.querySelector('[data-modif-fermer]').click());
+  await pg2.waitForTimeout(200);
+  const auto = (() => { const x = frais(sc.prix.final); x.modif = Object.assign({}, x.modif, { auto: true, debut: Date.now() }); return x; })();
+  await pg2.evaluate((a) => window.__poser(a), auto);
+  await pg2.waitForTimeout(450);
+  const e6 = await pg2.evaluate(() => { const o = document.getElementById('vrm-action').shadowRoot; return { bilan: !!o.querySelector('[data-action-bilan]') }; });
+  dit(!e6.bilan, `E6 ${T} une baisse automatique ne pose pas de bilan à fermer sur Vinted`, JSON.stringify(e6));
   dit(!t.erreurs.length && !t2.erreurs.length, `T ${T} écran plein : aucune erreur de page`, t.erreurs.concat(t2.erreurs).join(' | '));
   await t2.ctx.close();
 }

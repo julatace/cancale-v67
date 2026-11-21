@@ -21026,7 +21026,7 @@ async function avecActionPlein(sorte, msg, fn) {
   if (ap) { if (ap.titre) item.titre = ap.titre; if (ap.photo) item.photo = ap.photo; }
   const bilan0 = suite && Array.isArray(a0.bilan) ? a0.bilan.slice(-BILAN_MODIF_MAX) : [];
   await poserAction({ actif: true, sorte, uid, debut: suite ? a0.debut : Date.now(), fait, total, enCours: true, prochain: null, quoi: '', item, ...(serie ? { serie } : {}),
-    ...(modifiable ? { modif: { id: item.id, sorte, debut: Date.now(), estimeMs: ESTIME_MODIF_MS[sorte], preuves: {} }, bilan: bilan0 } : bilan0.length ? { bilan: bilan0 } : {}) });
+    ...(modifiable ? { modif: { id: item.id, sorte, debut: Date.now(), estimeMs: ESTIME_MODIF_MS[sorte], preuves: {}, ...(msg && (msg.auto === true || msg.modifAuto === true) ? { auto: true } : {}) }, bilan: bilan0 } : bilan0.length ? { bilan: bilan0 } : {}) });
   let r;
   try { r = await fn(); }
   finally {
@@ -37362,7 +37362,7 @@ async function stockAutoGeste(uid, a, R) {
   const n = Number(R.stockAuto.stock[num]);
   if (!(n >= 2)) return { ok: false, code: 'pas-de-stock' };
   const pl = plancherBaisse(fiche, m.vinted_buyprice_by_num);
-  const r = await executerCommande({ cmd: 'recreerVinted', uid: String(uid), id: a.item, confirme: true, dupliquer: true, methode: 'directe', total: 1, num: String(fiche.numero), ...(pl ? { plancher: pl.c / 100 } : {}) }).catch(() => null);
+  const r = await executerCommande({ cmd: 'recreerVinted', uid: String(uid), id: a.item, confirme: true, dupliquer: true, methode: 'directe', total: 1, modifAuto: true, num: String(fiche.numero), ...(pl ? { plancher: pl.c / 100 } : {}) }).catch(() => null);
   if (!r || !r.accepte || !['fait', 'double', 'attente'].includes(r.etape)) return r && (r.code === 'vinted-pause' || r.code === 'onglet-vinted' || r.code === 'plafond') ? { pasParti: true, code: r.code } : { ok: false, code: (r && (r.code || r.etape)) || 'sans-reponse' };
   // La quantité − 1, dans SA ligne de réglages (comparer-et-échanger) ; 1 restant = la paire remise en ligne.
   await modifierLigneCas(REGLAGES_AUTO_ID, (d) => {
@@ -37508,7 +37508,7 @@ async function cycleVieTickUn() {
     await noterFait();
     return { lu: true, action: 'baisse', id: String(x.it.id), prix: x.r.vouluC / 100 };
   }
-  const r = await executerCommande({ cmd: 'recreerVinted', uid, id: String(x.it.id), confirme: true, total: 1, ...(x.fiche && x.fiche.numero ? { num: String(x.fiche.numero) } : {}), ...(x.pl ? { plancher: x.pl.c / 100 } : {}) }).catch(() => null);
+  const r = await executerCommande({ cmd: 'recreerVinted', uid, id: String(x.it.id), confirme: true, total: 1, modifAuto: true, ...(x.fiche && x.fiche.numero ? { num: String(x.fiche.numero) } : {}), ...(x.pl ? { plancher: x.pl.c / 100 } : {}) }).catch(() => null);
   if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { await noterFait(); return { lu: true, action: 'republier', id: String(x.it.id) }; }
   return { lu: true, action: 'republier', pasParti: true, code: (r && (r.code || r.etape)) || 'sans-reponse' };
 }

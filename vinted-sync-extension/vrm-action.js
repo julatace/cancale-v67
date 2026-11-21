@@ -198,7 +198,8 @@
     try { window.scrollTo(v.x, v.y); } catch (_) {}
   }
   // 5.410.3 : pendant le FORMULAIRE (republication « comme Bleam »), pas de « Réduire » : Vinted reste verrouillé jusqu'à la fin ou « Tout arrêter ».
-  const plein = () => !!(action && action.actif && (!reduit || action.formulaire) && !vintedParle && !(action.verification));
+  // 5.423 : le bilan (après) et l'écran fermé par « Fermer » ne retiennent plus ni le clavier ni le défilement de Vinted.
+  const plein = () => !!(action && action.actif && (!reduit || action.formulaire) && !vintedParle && !(action.verification) && vue !== 'bilan' && vue !== 'ferme');
   // Ce qui défile DANS l'écran (sa boîte, quand elle déborde) défile ; rien n'atteint la page.
   const dansBoite = (ev) => { try { const p = ev.composedPath(); if (!p.includes(hote)) return null; return p.find((el) => el && el.classList && el.classList.contains('boite')) || null; } catch (_) { return null; } };
   const TOUCHES_DEFIL = [' ', 'Spacebar', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -250,7 +251,8 @@
   };
   const modifHtml = (a) => { const m = modifDe(a); return m ? `<div class="modif" data-modif="${esc(m.sorte)}">${M.friseHtml(m)}<div class="vu-sous" data-modif-temps>${esc(tempsTxt(a, m))}</div></div>` : ''; };
   // L'après : le bilan de la série (avant | après, « Voir sur Vinted » ; ce qui s'est arrêté, en ambre, avec « Reprendre »).
-  const bilanVu = (a) => !!(M && a && a.modif && a.modif.fin && Array.isArray(a.bilan) && a.bilan.length && !(a.actif && a.enCours));
+  // Une modification AUTOMATIQUE (baisse par règle, cycle de vie) ne pose pas de bilan à fermer sur Vinted (le panneau et le journal le disent).
+  const bilanVu = (a) => !!(M && a && a.modif && a.modif.fin && !a.modif.auto && Array.isArray(a.bilan) && a.bilan.length && !(a.actif && a.enCours));
   let fermeDebut = 0, repriseModif = '';
   try { fermeDebut = Number(sessionStorage.getItem('vrm_modif_ferme')) || 0; } catch (_) {}
   const chaineHtml = (a) => {
