@@ -447,8 +447,6 @@ export default {
   // (21 nov., lot relier-code) la carte de retrait en billet
   "retraits.b.code": "Código de recogida",
   "retraits.b.plein": "Pantalla completa",
-  "retraits.b.copier": "Copiar",
-  "retraits.b.copie": "Copiado",
   "retraits.b.auPoint": "En el punto",
   "retraits.b.avant": "recoger antes del {date}",
   "retraits.b.avantAuj": "recoger hoy {h}"

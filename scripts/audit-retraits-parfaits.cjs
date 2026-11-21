@@ -173,7 +173,7 @@ const lire = (p) => { try { return fs.readFileSync(path.join(R, p), 'utf8'); } c
     dit(/comparerRetraits\(avantN, tous, Date\.now\(\)\)/.test(app) && /toast\(t, 'info'\)/.test(app), 'F4 la liste publiée annonce le nouveau (toast) — la même liste que « à retirer »');
     // (20 nov.) Les colis à retirer sont des cartes par point (src/natif/RetraitsPoints.jsx).
     const pr = lire('src/natif/RetraitsPoints.jsx');
-    dit(/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
+    dit((/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) || /data-rp-sorte-etiquette=\{sorte \? \(p\.consigne \? 'consigne' : 'comptoir'\) : undefined\}/.test(pr)) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
     dit(/sorte: sorteRetrait\(\{ lieu: t\.lieu/.test(app), 'F6 chaque colis d’e-mail porte sa sorte (src/retraitSorte.js)');
   });
 
