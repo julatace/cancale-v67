@@ -153,7 +153,7 @@ const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', prix: 'tag', publier: 'shop', republier: 'sync', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', numero: 'journal' };
 const ATTRS_TUILE = { prix: { 'data-fiche-prix': '' }, publier: { 'data-fiche-publier-ailleurs': '' }, republier: { 'data-fiche-republier': '' }, dupliquer: { 'data-fiche-dupliquer': '' } };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, forfait = null, sites = null, sitesManques = undefined, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   const [vueFiche, setVueFiche] = useVueFiche();
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
@@ -228,7 +228,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     reste: [l.vendeur ? tr('fd.h.vendeur', { nom: l.vendeur }) : '', l.compte || '', l.sites && l.sites.length ? l.sites.map((x) => NOM_SITE_FD[x] || x).join(', ') : '', l.detail ? tr(l.detail, { n: l.n }) : ''].filter(Boolean).join(' · ') })) : [];
   // « Tout voir » : le détail d'avant, posé tel quel sous l'histoire ouverte — rien n'est supprimé, rien n'est derrière « ⋯ ».
   const toutVoir = p ? (<>
-    {!double && r && r.detail && !faits.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
+    {!double && r && r.detail && !faits.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail detail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
+    {/* (21 nov., lot rentabilite) Le forfait d'emballage qu'il règle (éteint par défaut), là où l'emballage de cette vente n'est pas noté. */}
+    {!double && r && r.detail && forfait && (r.detail.detailFrais || []).some((l) => l.cle === 'emballage' && (l.src === 'aucun' || l.src === 'forfait')) ? forfait : null}
     {etat && !double ? <EtatArticle etat={etat}/> : null}
     <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>
     <HistoriqueModifications owner={owner} numero={p.num}/>

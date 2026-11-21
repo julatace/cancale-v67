@@ -173,8 +173,15 @@ const OV = {
   '7102': { buyPrice: '50', fraisComplets: true },
   '7104': { buyPrice: '55', fraisComplets: true },
 };
+const NUMEROS = {
+  '901': { numero: '11', buyPrice: '60', fees: '2', commission: '3', emballage: '0.80', fraisComplets: true },
+  '902': { numero: '12', buyPrice: '50', fraisComplets: true },
+  '904': { numero: '14', buyPrice: '55', fraisComplets: true },
+};
 const cap = maintenant.toISOString();
+const txn = (tx, item) => ({ id: `harvest_${UID}_txn_${tx}`, data: { capturedAt: cap, payload: { transaction: { id: tx, item_id: item, status: 450, status_title: 'Commande finalisée', status_updated_at: cap } } } });
 const LIGNES = [
+  txn(7101, 901), txn(7102, 902), txn(7103, 903), txn(7104, 904),
   { id: `harvest_${UID}_orders_sold`, data: { capturedAt: cap, payload: { my_orders: VENTES } } },
   { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: cap, payload: { my_orders: [] } } },
   { id: `harvest_${UID}_listings`, data: { uid: UID, type: 'listings', nItems: 0, capturedAt: cap, payload: { items: [], pagination: { total_entries: 0 } } } },
@@ -203,8 +210,8 @@ async function ouvrirApp(b, port, tel, sombre, url) {
   await pg.addInitScript(({ s, ov }) => { try {
     if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1');
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', JSON.stringify(s));
-    localStorage.setItem('vinted_sale_overrides', JSON.stringify(ov));
-  } catch (_) {} }, { s: !!sombre, ov: OV });
+    localStorage.setItem('vinted_sale_overrides', JSON.stringify(ov)); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n));
+  } catch (_) {} }, { s: !!sombre, ov: OV, n: NUMEROS });
   await pg.route(/^https?:\/\/[^/]*vinted\.net\//i, (r) => { const m = /\/b(\d+)\//.exec(r.request().url()); return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: photoSvg(m ? Number(m[1]) : 0) }); });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
@@ -225,64 +232,67 @@ async function ouvrirApp(b, port, tel, sombre, url) {
   await pg.goto(`http://localhost:${port}/${url}`, { waitUntil: 'domcontentloaded' });
   return { ctx, pg, errs };
 }
-const ouvrirVente = async (pg, tx) => {
-  const t = pg.locator(`.vrm-sale-row[data-tx="${tx}"] .vrm-ledger-sale-toggle`).first();
-  if (await t.getAttribute('aria-expanded') !== 'true') {
-    const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer');
-    if (await croix.count()) { await croix.first().click(); await pg.locator('.vrm-ledger-drawer-host:not([hidden])').first().waitFor({ state: 'detached', timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(150); }
-  }
-  await t.scrollIntoViewIfNeeded();
-  if (await t.getAttribute('aria-expanded') !== 'true') await t.click();
-  const id = await t.getAttribute('aria-controls');
-  await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 });
-  await pg.waitForTimeout(400);
-  return id;
+// La fiche d'une vente (natif) : Ventes › Terminées, toucher la vente, « Tout voir » ; le détail du bénéfice (`data-ba-ligne`).
+const ouvrirFiche = async (pg, tel, titre) => {
+  const fermer = pg.locator('[data-fiche-paire] button').filter({ hasText: /Vente|Retour|Fermer/ }).first();
+  if (await pg.locator('[data-fiche-paire]').count()) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(600); }
+  if (await pg.locator('[data-fiche-paire]').count() && await fermer.count()) { await fermer.click().catch(() => {}); await pg.waitForTimeout(600); }
+  const seg = pg.locator('.n-segmente-choix').filter({ hasText: 'Terminées' });
+  if (await seg.count()) { await seg.first().click(); await pg.waitForTimeout(800); }
+  const row = pg.getByText(titre, { exact: false }).first();
+  await row.scrollIntoViewIfNeeded(); if (tel) await row.tap(); else await row.click();
+  await pg.locator('[data-fiche-paire]').first().waitFor({ timeout: 10000 });
+  await pg.waitForTimeout(800);
+  const tv = pg.locator('[data-fd-tout-voir]');
+  if (await tv.count() && await tv.first().getAttribute('aria-expanded') !== 'true') { await tv.first().click(); await pg.waitForTimeout(600); }
 };
-const lireVente = (pg, id) => pg.evaluate((id) => {
-  const d = document.getElementById(id); if (!d) return null;
-  const L = {}; for (const x of d.querySelectorAll('[data-cr-ligne]')) L[x.getAttribute('data-cr-ligne')] = { src: x.getAttribute('data-cr-src'), c: x.getAttribute('data-cr-c'), t: x.innerText.replace(/\s+/g, ' ') };
-  const b = d.querySelector('[data-recap-benef-etat]');
-  return { L, net: b ? b.getAttribute('data-cr-net') : null, benef: b ? b.getAttribute('data-benef-vente') : null, etat: b ? b.getAttribute('data-cr-etat') : null, emb: (d.querySelector('[data-recap-emballage]') || { getAttribute: () => null }).getAttribute('data-recap-emballage'),
-    forfait: (d.querySelector('[data-cr-forfait]') || { getAttribute: () => null }).getAttribute('data-cr-forfait'), deb: d.scrollWidth - d.clientWidth };
-}, id);
+const lireFiche = (pg) => pg.evaluate(() => {
+  const b = document.querySelector('[data-benef-article]'); if (!b) return null;
+  const L = {}; for (const x of b.querySelectorAll('[data-ba-ligne]')) L[x.getAttribute('data-ba-ligne')] = { v: x.getAttribute('data-ba-valeur'), t: x.innerText.replace(/\s+/g, ' ') };
+  const f = document.querySelector('[data-cr-forfait]');
+  return { etat: b.getAttribute('data-benef-article'), net: b.getAttribute('data-benef-article-valeur'), L, forfait: f ? f.getAttribute('data-cr-forfait') : null,
+    resume: (document.querySelector('[data-fiche-resume-benefice]') || { getAttribute: () => null }).getAttribute('data-fiche-resume-benefice') };
+});
 const cts = (x) => (x == null ? null : String(Math.round(Number(x) * 100)));
 async function ventes(b, port, tel, sombre) {
   const th = sombre ? 'sombre' : 'clair', W = tel ? 390 : 1512, T = `Ventes · ${W} · ${th}`;
   console.log(`\n── ${T}`);
   const r = await ouvrirApp(b, port, tel, sombre, '?tab=cat_ventes');
   try {
-    await r.pg.locator('.vrm-sale-row[data-tx] .vrm-ledger-sale-toggle').first().waitFor({ timeout: 30000 });
-    await r.pg.waitForTimeout(1200);
+    await r.pg.waitForTimeout(6000);
     await essaie(`${T} V1`, async () => {
-      const id = await ouvrirVente(r.pg, 7101); const v = await lireVente(r.pg, id);
-      if (MUT === 'net') await r.pg.evaluate((id) => { const b = document.getElementById(id).querySelector('[data-recap-benef-etat]'); if (b) b.setAttribute('data-cr-net', '5500'); }, id);
-      const v2 = MUT === 'net' ? await lireVente(r.pg, id) : v;
-      dit(v2.L.commission && v2.L.commission.src === 'saisi' && v2.L.commission.c === '300' && v2.L.boost && v2.L.boost.c === '200' && v2.L.port && v2.L.port.src === 'aucun' && v2.L.port.c === ''
-        && v2.emb === '80' && v2.net === '5420' && cts(v2.benef) === v2.net && v2.etat === 'ok',
-        `V1 ${T} 7101 : 120 − commission notée 3 − boost 2 − emballage 0,80 − port « pas noté » − achat 60 = 54,20 € ; le net = le bénéfice de la règle`, v2);
-      await r.pg.screenshot({ path: path.join(SHOTS, `vente-cout-reel-${W}-${th}.png`) });
-      const id3 = await ouvrirVente(r.pg, 7103); const w3 = await lireVente(r.pg, id3);
-      dit(w3.net === '' && w3.etat === 'achat' && w3.L.commission && w3.L.commission.src === 'regle' && w3.L.commission.c === '0', `V1b ${T} 7103 sans prix d’achat : net « — » ; commission Vinted : aucune (la protection acheteur est payée par l’acheteur)`, w3);
+      await ouvrirFiche(r.pg, tel, 'Air Max 90');
+      const v = await lireFiche(r.pg);
+      const v2 = MUT === 'net' && v ? { ...v, net: '5500' } : v;
+      dit(v2 && v2.L['cr-commission'] && v2.L['cr-commission'].v === '300' && v2.L['cr-boost'] && v2.L['cr-boost'].v === '200' && v2.L['cr-emballage'] && v2.L['cr-emballage'].v === '80'
+        && v2.L['cr-port'] && v2.L['cr-port'].v === '' && /pas noté/.test(v2.L['cr-port'].t) && v2.L.site && v2.L.site.v === '0' && v2.net === '5420' && v2.resume === v2.net,
+        `V1 ${T} N°11 : 120 − commission notée 3 − boost 2 − emballage 0,80 − port « pas noté » − achat 60 = 54,20 € ; le bénéfice de la fiche est le même nombre`, v2);
+      await r.pg.screenshot({ path: path.join(SHOTS, `vente-cout-reel-${W}-${th}.png`), fullPage: false });
+      await r.pg.locator('[data-benef-article]').first().screenshot({ path: path.join(SHOTS, `vente-cout-reel-detail-${W}-${th}.png`) }).catch(() => {});
     });
     await essaie(`${T} V2`, async () => {
-      const id = await ouvrirVente(r.pg, 7102); const v = await lireVente(r.pg, id);
-      dit(v.forfait === '' && v.net === '4000' && v.emb === 'non-saisi', `V2 ${T} forfait éteint par défaut : 7102 garde 40 € (rien deviné)`, v);
-      await r.pg.locator(`[id="${id}"] [data-cr-forfait-ouvrir]`).click();
-      await r.pg.locator(`[id="${id}"] [data-cr-forfait-champ]`).fill('0,80');
-      await r.pg.locator(`[id="${id}"] [data-cr-forfait-activer]`).click();
+      await ouvrirFiche(r.pg, tel, 'Samba OG');
+      const v = await lireFiche(r.pg);
+      dit(v && v.forfait === '' && v.net === '4000' && v.L['cr-emballage'] && v.L['cr-emballage'].v === '', `V2 ${T} N°12 : forfait éteint par défaut, emballage « pas noté » (—), 40 € (rien deviné)`, v);
+      await r.pg.locator('[data-cr-forfait-ouvrir]').first().click();
+      await r.pg.locator('[data-cr-forfait-champ]').first().fill('0,80');
+      await r.pg.locator('[data-cr-forfait-activer]').first().click();
       await r.pg.waitForTimeout(900);
-      const id2 = await ouvrirVente(r.pg, 7102); const v2 = await lireVente(r.pg, id2);
+      await ouvrirFiche(r.pg, tel, 'Samba OG');
+      const v2 = await lireFiche(r.pg);
       const pose = await r.pg.evaluate(() => JSON.parse(localStorage.getItem('vrm_forfait_emballage') || 'null'));
-      dit(pose && pose.actif === true && v2.net === '3920' && cts(v2.benef) === '3920' && v2.emb === '80', `V2b ${T} « Régler » 0,80 € : 7102 passe à 39,20 € (emballage = forfait), le bénéfice de la règle aussi`, { pose, v2 });
-      await r.pg.screenshot({ path: path.join(SHOTS, `vente-forfait-${W}-${th}.png`) });
-      const id1 = await ouvrirVente(r.pg, 7101); const v1 = await lireVente(r.pg, id1);
-      dit(v1.net === '5420', `V2c ${T} 7101 (emballage saisi 0,80 €) ne bouge pas : l’emballage saisi passe devant le forfait`, v1);
-      const id4 = await ouvrirVente(r.pg, 7102);
-      await r.pg.locator(`[id="${id4}"] [data-cr-forfait-ouvrir]`).click();
-      await r.pg.locator(`[id="${id4}"] [data-cr-forfait-eteindre]`).click();
+      dit(pose && pose.actif === true && v2 && v2.net === '3920' && v2.L['cr-emballage'].v === '80' && /forfait/.test(v2.L['cr-emballage'].t), `V2b ${T} « Régler » 0,80 € : N°12 passe à 39,20 €, l’emballage dit « forfait »`, { pose, v2 });
+      await r.pg.locator('[data-benef-article]').first().screenshot({ path: path.join(SHOTS, `vente-forfait-${W}-${th}.png`) }).catch(() => {});
+      await ouvrirFiche(r.pg, tel, 'Air Max 90');
+      const v1 = await lireFiche(r.pg);
+      dit(v1 && v1.net === '5420', `V2c ${T} N°11 (emballage saisi 0,80 €) ne bouge pas : l’emballage saisi passe devant le forfait`, v1);
+      await ouvrirFiche(r.pg, tel, 'Samba OG');
+      await r.pg.locator('[data-cr-forfait-ouvrir]').first().click();
+      await r.pg.locator('[data-cr-forfait-eteindre]').first().click();
       await r.pg.waitForTimeout(900);
-      const id5 = await ouvrirVente(r.pg, 7102); const v5 = await lireVente(r.pg, id5);
-      dit(v5.net === '4000', `V2d ${T} « Éteindre » : 7102 revient à 40 €`, v5);
+      await ouvrirFiche(r.pg, tel, 'Samba OG');
+      const v5 = await lireFiche(r.pg);
+      dit(v5 && v5.net === '4000', `V2d ${T} « Éteindre » : N°12 revient à 40 €`, v5);
     });
     dit(await r.pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${T} : aucun débordement horizontal`);
     dit(r.errs.length === 0, `${T} : aucune erreur`, r.errs.join(' | '));

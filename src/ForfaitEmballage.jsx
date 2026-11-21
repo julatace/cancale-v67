@@ -8,7 +8,10 @@ import { tr } from './i18n/index.js';
 import { centimes, forfaitDe } from './beneficePaire.js';
 
 const euros = (c) => (c / 100).toFixed(2).replace('.', ',').replace(/,00$/, '') + ' €';
-export default function ForfaitEmballage({ lire, ecrire }) {
+// `forme` : 'dl' (une ligne d'une liste <dl>, la fiche de vente d'avant) · 'ba' (une ligne du détail du bénéfice de la fiche).
+export default function ForfaitEmballage({ lire, ecrire, forme = 'dl' }) {
+  const Dt = forme === 'ba' ? 'span' : 'dt', Dd = forme === 'ba' ? 'span' : 'dd';
+  const classe = forme === 'ba' ? 'vrm-ba-ligne vrm-cr-forfait' : 'vrm-recap-ligne vrm-cr-forfait';
   const [r, setR] = React.useState(() => { try { return lire() || null; } catch (_) { return null; } });
   const [edit, setEdit] = React.useState(false);
   const [txt, setTxt] = React.useState(() => (r && r.montant ? String(r.montant).replace('.', ',') : ''));
@@ -17,9 +20,9 @@ export default function ForfaitEmballage({ lire, ecrire }) {
   const poser = (x) => { setR(x); try { ecrire(x); } catch (_) {} };
   if (!edit) {
     return (
-      <div className="vrm-recap-ligne vrm-cr-forfait" data-cr-forfait={c != null ? String(c) : ''}>
-        <dt><span className="vrm-cr-lib">{tr('cr.forfait')}<small>{c != null ? tr('cr.forfait.sous') : tr('cr.forfait.eteint')}</small></span></dt>
-        <dd><button type="button" className="vrm-cr-lien" data-cr-forfait-ouvrir="" onClick={() => setEdit(true)}>{c != null ? euros(c) : tr('cr.forfait.regler')}</button></dd>
+      <div className={classe} data-cr-forfait={c != null ? String(c) : ''}>
+        <Dt><span className="vrm-cr-lib">{tr('cr.forfait')}<small>{c != null ? tr('cr.forfait.sous') : tr('cr.forfait.eteint')}</small></span></Dt>
+        <Dd><button type="button" className="vrm-cr-lien" data-cr-forfait-ouvrir="" onClick={() => setEdit(true)}>{c != null ? euros(c) : tr('cr.forfait.regler')}</button></Dd>
       </div>
     );
   }
@@ -30,14 +33,14 @@ export default function ForfaitEmballage({ lire, ecrire }) {
     setErr(false); poser({ actif: true, montant: t, at: Date.now() }); setEdit(false);
   };
   return (
-    <div className="vrm-recap-ligne vrm-cr-forfait" data-cr-forfait-edition="">
-      <dt><span className="vrm-cr-lib">{tr('cr.forfait')}<small>{tr('cr.forfait.aide')}</small></span></dt>
-      <dd className="vrm-cv-champ">
+    <div className={classe} data-cr-forfait-edition="">
+      <Dt><span className="vrm-cr-lib">{tr('cr.forfait')}<small>{tr('cr.forfait.aide')}</small></span></Dt>
+      <Dd className="vrm-cv-champ">
         <input inputMode="decimal" aria-label={tr('cr.forfait.montant')} aria-invalid={err ? 'true' : undefined} value={txt} placeholder="0,80"
           onChange={(ev) => { setTxt(ev.target.value); setErr(false); }} onKeyDown={(ev) => { if (ev.key === 'Enter') activer(); }} data-cr-forfait-champ=""/>
         <button type="button" className="vrm-cv-ok" onClick={activer} data-cr-forfait-activer="">{tr('cr.forfait.activer')}</button>
         {c != null ? <button type="button" className="vrm-cr-lien" onClick={() => { poser({ actif: false, montant: r && r.montant ? r.montant : '', at: Date.now() }); setEdit(false); }} data-cr-forfait-eteindre="">{tr('cr.forfait.eteindre')}</button> : null}
-      </dd>
+      </Dd>
     </div>
   );
 }
