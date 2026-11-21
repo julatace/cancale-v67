@@ -45,7 +45,7 @@ if (process.argv.includes('--prouve')) {
     ['sansCompte', 'ecrire', "      if (String(msg.compte || '') !== et.moi) return arret('autre-compte');", ''],
     ['sansCaptcha', 'ecrire', "        if (r.width >= 120 && r.height >= 60 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth) return true;", ''],
     ['captchaToutCadre', 'ecrire', "        if (r.width >= 120 && r.height >= 60 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth) return true;", '        return true;'],
-    ['faitSansVu', 'ecrire', "        const g = await d.p;\n        if (g && (!moiOk(g)", "        const g = (await d.p) || { statut: 200, ids: [id], moi: et.moi, defi: false };\n        if (g && (!moiOk(g)"],
+    ['faitSansVu', 'ecrire', '  const fini = (g, extra) => (g ? ', '  const fini = (g, extra) => ((g = g || { statut: 200, defi: false }) ? '],
     ['deuxALaFois', 'ecrire', "    if (ordreEnCours) return arret('en-cours');", ''],
     ['etapeDevinee', 'ecrire', "      if (!t.el) return { r: arret(t.n ? 'etape-ambigue' : 'etape-introuvable',", "      if (!t.el && false) return { r: arret(t.n ? 'etape-ambigue' : 'etape-introuvable',"],
     ['toutDunCoup', 'ecrire', "    for (const ch of [...texte]) {", "    for (const ch of [texte]) {"],
