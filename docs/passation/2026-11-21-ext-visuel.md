@@ -69,3 +69,22 @@ Zips NON régénérés (consigne). `claude/ext-5421` et `claude/ext-5423` fusion
 ## Preuves
 
 Voir la fin de ce fichier (résultats des bancs et audits) et les planches AVANT / APRÈS dans le scratchpad de la session.
+
+## Résultats (arbre final de `claude/ext-visuel`)
+
+| contrôle | résultat |
+|---|---|
+| banc `panneau-telephone` | 200 verts, 0 rouge |
+| banc `favoris-envoi` | 152 verts, 0 rouge |
+| banc `grand-panneau` | 451 verts, 0 rouge |
+| banc `commandes-selection` | 52 verts, 0 rouge |
+| banc `agent-panneau` | 57 verts, 0 rouge |
+| banc `modif-avant-apres` | 69 verts, 0 rouge |
+| banc `extension-surfaces` | 26 rouges, **les mêmes que sur l'arbre d'avant** (26) ; attente visuelle O adaptée (photo 96, compteur 28) |
+| `audit-couleur-panneau` | 19 verts ; `--prouve` : 5 mutations rouges sur 5 ; `--racine <arbre d'avant>` : 9 rouges (titres 28, rangées 17, plaque 24) |
+| `audit-traduction` · `audit-action-plein` · `audit-coherence` · `audit-onglet-travail` · `audit-quoi-de-neuf` | verts |
+| `audit-extension-feuille` | 1 rouge, déjà sur l'arbre d'avant (clés `sa_e_` … de la 5.420) |
+| `npm run build` | vert |
+
+Les attentes changées sont seulement visuelles : la vignette de banc (pixel rose → gris neutre) et, dans
+`extension-surfaces`, la taille de la photo et du compteur de l'écran plein. Aucun contrôle de comportement touché.
