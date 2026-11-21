@@ -64,5 +64,16 @@ export default {
   "arn.comment": "Cómo se calcula",
   "arn.comptes": "Cuentas",
   "site.tous": "Todos",
-  "site.choisir": "Elegir una plataforma"
+  "site.choisir": "Elegir una plataforma",
+  "arn.recuEn": "Recibido en {mois}",
+  "arn.aideRecu": "Cada venta cuenta en el mes en que se te pagó el dinero (pedido finalizado), todas las plataformas, en las cuentas elegidas. «Al menos»: algunas ventas aún no tienen fecha; lo que falta se indica bajo la cifra.",
+  "arn.chiffres": "{mois} en cifras",
+  "arn.prixASaisir": {"one": "{n} precio de compra por introducir de {sur}", "other": "{n} precios de compra por introducir de {sur}"},
+  "arn.col.num": "N.º",
+  "arn.col.article": "Artículo",
+  "arn.col.jour": "Día",
+  "arn.col.site": "Sitio",
+  "arn.col.achat": "Compra",
+  "arn.col.marge": "Margen",
+  "arn.col.recu": "Recibido"
 };

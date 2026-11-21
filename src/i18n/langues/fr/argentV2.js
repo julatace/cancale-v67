@@ -64,5 +64,16 @@ export default {
   "arn.comment": "Comment c’est calculé",
   "arn.comptes": "Comptes",
   "site.tous": "Tous",
-  "site.choisir": "Choisir une plateforme"
+  "site.choisir": "Choisir une plateforme",
+  "arn.recuEn": "Reçu en {mois}",
+  "arn.aideRecu": "Chaque vente compte dans le mois où l’argent t’a été versé (commande finalisée), toutes plateformes, sur les comptes choisis. « Au moins » : des ventes ne sont pas encore datées ; ce qui manque est écrit sous le chiffre.",
+  "arn.chiffres": "{mois} en chiffres",
+  "arn.prixASaisir": {"one": "{n} prix d’achat à saisir sur {sur}", "other": "{n} prix d’achat à saisir sur {sur}"},
+  "arn.col.num": "N°",
+  "arn.col.article": "Article",
+  "arn.col.jour": "Jour",
+  "arn.col.site": "Site",
+  "arn.col.achat": "Achat",
+  "arn.col.marge": "Marge",
+  "arn.col.recu": "Reçu"
 };

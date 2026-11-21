@@ -25135,9 +25135,10 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
       <div className="v2-argent-nav n-arg-nav" data-v2-argent-nav={seg}>
         <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
-        <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
+        {/* (21 nov., argent-vintex) Sur Mois, « Comptes · N › » est la dernière rangée des chiffres (src/natif/ecrans/ArgentMois.jsx). */}
+        {seg !== 'resume' ? <button type="button" className="n-arg-comptes" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
           {tr('arn.comptes')}{liste && liste.length ? ' · ' + (dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`) : ''} <span aria-hidden="true">›</span>
-        </button>
+        </button> : null}
       </div>
     );
   }

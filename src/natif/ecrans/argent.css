@@ -84,6 +84,70 @@
   .n-arg-aide-texte { padding: 0 var(--n-marge) 16px; font: var(--n-t-second); color: var(--n-encre); }
   .n-arg-aide-texte p, .n-arg-aide-texte ul { margin: 0 0 8px; }
   .n-arg-aide-texte ul { padding-inline-start: 18px; }
+  /* ── Mois « comme Vintex » (21 nov., lot argent-vintex) : rangées fines, montants entiers, une ligne par phrase. ── */
+  .n-arg-vx .n-carte-corps { min-width: 0; }
+  /* Le reçu du mois : le libellé gris + « ? », le chiffre en grand (« au moins » posé devant, petit), le manque en une ligne. */
+  .n-arg-recu { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 8px; min-width: 0; }
+  .n-arg-recu-haut { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: -6px 0 -6px; }
+  .n-arg-recu-lib { font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); min-width: 0; }
+  .n-arg-recu-chiffre { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 6px; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-arg-recu-chiffre[data-n-vide] { color: var(--n-encre-3); }
+  .n-arg-recu-moins { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-arg-recu-n { font: var(--n-t-affiche); letter-spacing: -.02em; }
+  .n-arg-recu-u { font: var(--n-t-section); color: var(--n-encre-2); }
+  .n-arg-recu-note { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* Les six mois : « Juin ▬▬▬ 1 988 € », une rangée chacun, le mois en cours en encre et en accent. */
+  .n-arg-mois6 { list-style: none; margin: 0; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--n-trait); }
+  .n-arg-m6 { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 30px;
+    font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-arg-m6-nom { text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-arg-m6-piste { height: 6px; border-radius: var(--n-r-rond); background: var(--n-squelette); overflow: hidden; }
+  .n-arg-m6-plein { display: block; height: 100%; border-radius: inherit; background: var(--n-encre-3); }
+  .n-arg-m6-v { text-align: end; white-space: nowrap; min-width: 64px; }
+  .n-arg-m6[data-courant] { color: var(--n-encre); font: var(--n-t-second-fort); }
+  .n-arg-m6[data-courant] .n-arg-m6-plein { background: var(--n-accent); }
+  /* Une rangée de chiffre : libellé à gauche (et sa ligne grise), le montant à droite — jamais coupé. */
+  .n-arg-l { appearance: none; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin: 0; padding: 8px 16px; box-sizing: border-box;
+    border: 0; background: transparent; color: var(--n-encre); text-align: start; font: var(--n-t-corps); }
+  .n-arg-l + .n-arg-l, .n-arg-vt + .n-arg-l { border-top: 1px solid var(--n-trait); }
+  .n-arg-l-touche { cursor: pointer; touch-action: manipulation; }
+  .n-arg-l-touche:active { background: var(--n-appui); }
+  .n-arg-l-touche:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-arg-l-textes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-arg-l-lib { font: var(--n-t-corps); color: var(--n-encre); }
+  .n-arg-l-sous { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-arg-l-sous[data-n-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-legende-fort); }
+  .n-arg-l-val { flex: 0 0 auto; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre); }
+  .n-arg-l-val[data-n-vide] { color: var(--n-encre-2); font-weight: 400; }
+  .n-arg-l-chev { flex: 0 0 auto; width: 8px; height: 8px; margin-inline-start: -4px; border-top: 2px solid var(--n-encre-3); border-right: 2px solid var(--n-encre-3); transform: rotate(45deg); }
+  /* Les versements : N° | titre (deux lignes) + « 19 nov. · Vinted · acheté 100 € » | montant + marge. */
+  .n-arg-vt { display: flex; flex-direction: column; min-width: 0; }
+  .n-arg-vt-tr { appearance: none; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; column-gap: 12px; width: 100%;
+    min-height: 60px; margin: 0; padding: 8px 16px; box-sizing: border-box; border: 0; background: transparent; color: var(--n-encre); text-align: start; font: var(--n-t-second); }
+  .n-arg-vt-tr + .n-arg-vt-tr { border-top: 1px solid var(--n-trait); }
+  button.n-arg-vt-tr { cursor: pointer; touch-action: manipulation; }
+  button.n-arg-vt-tr:active { background: var(--n-appui); }
+  button.n-arg-vt-tr:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-arg-vt-num { display: flex; align-items: center; min-width: 0; }
+  .n-arg-vt-article { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .n-arg-vt-titre { font: var(--n-t-second); color: var(--n-encre); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .n-arg-vt-meta { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-arg-vt-recu { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .n-arg-vt-montant { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-arg-vt-marge-tel { font: var(--n-t-legende); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre-2); }
+  .n-arg-vt-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-vt .n-arg-gris { font: var(--n-t-legende); }
+
+  @media (min-width: 1024px) {
+    /* À l'ordinateur : le tableau des versements à colonnes (N° · Article · Jour · Site · Achat · Marge · Reçu). */
+    .n-arg-vt-tr { grid-template-columns: 64px minmax(0, 1fr) 72px 92px 72px 72px 84px; min-height: 44px; }
+    .n-arg-vt-th.n-arg-vt-tr { min-height: 32px; }
+    .n-arg-vt-jour, .n-arg-vt-site { white-space: nowrap; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; }
+    .n-arg-vt-achat, .n-arg-vt-marge, .n-arg-vt-recu, .n-arg-vt-th > :nth-child(n+5) { text-align: end; justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .n-arg-vt-titre { -webkit-line-clamp: 1; }
+    .n-arg-vt-montant { font: var(--n-t-second-fort); }
+    .n-arg-vx.n-arg-mois { grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); }
+  }
   @media (min-width: 1024px) {
     /* À l'ordinateur : une grille de cartes (le chiffre et les tuiles à gauche, les versements à droite). */
     .n-arg-mois { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
