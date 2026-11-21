@@ -52,6 +52,26 @@ l'a confirmé (panneau) ». Déjà jugé ailleurs (référencé dans l'en-tête 
 - 10 mutations de `background.js` (verrou, blocage avant départ, refus HTTP 200, `rienParti`, confirmée réaffichée,
   re-tranchable, clé sans compte, moteur non prévenu, incertain = refusé, réponse relue sur `json`) : 10/10 rouges.
 
+## ⚠️ Le workflow restera rouge : les pas APRÈS l'audit (rejoués localement, garde réseau posée)
+
+GitHub s'arrête au premier pas rouge : l'audit masquait les suivants (le 19 nov., le run tombait déjà à
+« récupération »). Rejoués un à un ici après `npm run build` (BANC_PORT libre) :
+
+| pas | état | cause |
+|---|---|---|
+| récupération (`recuperation-auth`, `recuperation-pannes-interface`) | **corrigé ici** | la garde réseau pose `vrm_banc_dom_ancien` dans chaque page ; les tests comptaient `localStorage.length` ⇒ ils ignorent cette clé d'échafaudage (seulement elle ; mutation « la page écrit une clé » ⇒ rouge) |
+| `confidentialite` | rouge | attend `[data-reception-emails]` sur `?tab=settings` : la réception d'e-mails ne vit plus que dans Achats (`aFilter==='attente'`) |
+| `orion-paquet` | rouge ICI seulement | `background.js` changé, zips de main gardés : vert après la régénération de l'intégrateur |
+| `espace-emails-interface` | rouge | attend le texte « Bordereau de ta vente » (passé par `tr()` le 13 nov., ec273c5ee) |
+| `conversation-relecture-interface` | rouge | attend le bouton « Actualiser la conversation » (Messages refait) |
+| `favoris-historique-interface`, `favoris-automatisation-interface` | rouges | importent `./src/FavorisVinted.jsx`, qui n'existe plus |
+| `messagerie` (LIVE_ONLY, SEARCH_ONLY) | rouges | délais dépassés sur des sélecteurs de l'ancienne Messagerie |
+| `bordereau-qr-lecture` | rouge ICI seulement | il lui faut `VRM_PDFJS_DIR` (téléchargé par le workflow) |
+| tous les autres (session, Orion, numéros, emails, synchro, inscription, connexion, SQL…) | verts | |
+
+Ces rouges viennent des refontes d'écrans (pas de ce lot) : à reporter par les sessions qui ont déplacé ces écrans,
+comme ici — jamais en supprimant le test.
+
 ## Les autres workflows rouges sur main (21 nov., non traités ici — hors périmètre)
 
 - **Reprise des chantiers VRM** : `regles` (pas « archives portables » : `scripts/tests/orion-base-validee.py`
