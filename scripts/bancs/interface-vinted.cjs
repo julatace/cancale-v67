@@ -39,6 +39,9 @@ const dit = (c, m, d) => { if (c) { ok++; if (!process.env.SILENCE) console.log(
 
 // 50 favoris identiques : même titre, même texte ; seuls les identifiants (article, personne) diffèrent.
 const FAVORIS = Array.from({ length: 50 }, (_, k) => ({ item: String(7000100 + k), receiver: String(9000100 + (k % 7 === 0 ? 0 : k)), conv: String(5000100 + k) }));
+// Le MÊME article aimé par plusieurs personnes (le cas courant) : seule la personne distingue la ligne.
+const MEME_ARTICLE = ['9100001', '9100002', '9100003'].map((r, i) => ({ item: FAVORIS[5].item, receiver: r, conv: String(5000300 + i) }));
+const TOUS = FAVORIS.concat(MEME_ARTICLE);
 
 const PAGE = (o) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Vinted (banc)</title>
 <style>body{margin:0;font:15px/1.4 system-ui,sans-serif}header{height:56px;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #ddd}
@@ -51,7 +54,7 @@ main{padding:16px;display:grid;gap:10px;max-width:720px}.cloche{position:absolut
 <script>
 (() => {
   const O = ${JSON.stringify(o || {})};
-  const FAV = ${JSON.stringify(FAVORIS)};
+  const FAV = ${JSON.stringify(TOUS)};
   const J = window.__journal = [], R = window.__requetes = [];
   const note = (quoi, x) => J.push(Object.assign({ quoi, t: performance.now() }, x || {}));
   const envoi = (m, u, corps) => { R.push({ m, u, corps: corps == null ? null : JSON.stringify(corps) }); return fetch(u, { method: m, headers: { 'content-type': 'application/json' }, body: corps == null ? null : JSON.stringify(corps) }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) })); };
@@ -126,7 +129,7 @@ async function ouvrir(b, chemin, o = {}) {
     const u = new URL(r.request().url());
     const json = (s, b2) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(b2) });
     if (/captcha-delivery|recaptcha/.test(u.hostname + u.pathname)) return r.fulfill({ status: 200, contentType: 'text/html', body: '<p>vérification</p>' });
-    if (u.pathname === '/api/v2/conversations') { let c = {}; try { c = JSON.parse(r.request().postData() || '{}'); } catch (_) {} const f = FAVORIS.find((x) => x.item === c.item_id && x.receiver === c.opposite_user_id); return json(200, { conversation: { id: Number(f ? f.conv : 1) } }); }
+    if (u.pathname === '/api/v2/conversations') { let c = {}; try { c = JSON.parse(r.request().postData() || '{}'); } catch (_) {} const f = TOUS.find((x) => x.item === c.item_id && x.receiver === c.opposite_user_id); return json(200, { conversation: { id: Number(f ? f.conv : 1) } }); }
     if (/\/replies$/.test(u.pathname)) return json(200, { code: 0 });
     if (/\/offers$/.test(u.pathname)) return json(o.offreRefusee ? 400 : 200, o.offreRefusee ? { code: 99, message: 'prix trop bas' } : { code: 0 });
     if (/\/offer_requests\//.test(u.pathname)) return json(200, { code: 0 });
@@ -150,9 +153,9 @@ async function banc() {
   try {
     // ── I1 : 50 favoris identiques, 12 tirages
     { const tirages = [0, 3, 7, 14, 21, 22, 28, 35, 41, 42, 48, 49]; const faux = [];
-      for (const k of tirages) {
+      for (const k of tirages.concat(['m0', 'm2'])) {
         const { ctx, pg } = await ouvrir(b, '/inbox');
-        const f = FAVORIS[k];
+        const f = typeof k === 'string' ? MEME_ARTICLE[Number(k.slice(1))] : FAVORIS[k];
         const r = await etape(pg, 'favoriOuvrir', { itemId: f.item, receiverId: f.receiver, lien: '', cle: 'f' + k });
         const { R, J, chemin } = await lire(pg);
         const corps = R.length === 1 ? JSON.parse(R[0].corps) : null;
@@ -161,7 +164,7 @@ async function banc() {
         if (SHOTS && k === 21) await pg.screenshot({ path: path.join(SHOTS, 'interface-favori-conversation.png') });
         await ctx.close();
       }
-      dit(!faux.length, `I1 — 50 favoris identiques (même titre, même pseudo) : ${tirages.length} tirages, la ligne cliquée est TOUJOURS celle de cet article et de cette personne (identifiants), une seule`, JSON.stringify(faux.slice(0, 2)));
+      dit(!faux.length, `I1 — 50 favoris identiques (même titre, même pseudo) + le même article aimé par 3 personnes : ${tirages.length + 2} tirages, la ligne cliquée est TOUJOURS celle de cet article et de cette personne (identifiants), une seule`, JSON.stringify(faux.slice(0, 2)));
     }
     // ── I2 : doublon d'identités ⇒ ambigu, rien
     { const { ctx, pg } = await ouvrir(b, '/inbox', { doublon: true });
