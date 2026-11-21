@@ -159,6 +159,13 @@ function attentesAvant(f) {
     dit(ec.length >= 1 && ec[0][0] === 'ecriture:premier' && ec[0][1] >= 2000 && ec[0][1] <= 6000, '1er message : « ecriture:premier », 2 à 6 s', JSON.stringify(ec));
     dit(lireSt(f).premierFait === true, 'l’état de la file retient que le 1er est parti', JSON.stringify(lireSt(f).premierFait));
   }
+  console.log('\nI2b. Même chose hors séquence « comme Bleam » (offre d’abord, puis le message)');
+  {
+    const { f } = await monde({ store: { vrmCommeBleam: { favoris: false } } });
+    await f.ctx.tickFavorisCarte();
+    const ec = (f.ctx.__vrmPausesVues || []).filter((x) => /^ecriture:/.test(x[0]));
+    dit(repliques(f).length >= 1 && ec.length >= 1 && ec[0][0] === 'ecriture:premier' && ec[0][1] <= 6000, 'le 1er message part, au temps d’écriture de son clic', JSON.stringify(ec));
+  }
   // ── I3 : le message suivant ────────────────────────────────────────────────────────────────────────────
   console.log('\nI3. Le message suivant : le temps d’une série');
   {

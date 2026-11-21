@@ -990,6 +990,13 @@ function vrmVerifVisible(sel) {
   .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
   .fav6 > .note5 { padding: 0 16px; margin: 4px 0 8px; }
   .fav6-bas .vu-btn { flex: 0 0 auto; width: auto; }
+  /* 5.419 : Commandes — filtres rapides, barre de la sélection, confirmation « Commander ». */
+  .ven6-seg { margin: 0 0 10px; display: flex; flex-wrap: wrap; }
+  .ven6-seg button { flex: 1 1 auto; min-height: 44px; }
+  .ven6-bas { flex-wrap: wrap; }
+  .ven6-conf { position: sticky; bottom: 76px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 16px 0; padding: 12px 14px; border-radius: 14px; background: var(--n-carte); border: 1px solid var(--n-trait); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .ven6-conf > span { flex: 1 1 220px; }
+  .ven6-conf .vu-btn { min-height: 44px; width: auto; }
   .tout6 { display: none; min-height: 44px; }
   .fav6 .err6 { color: var(--n-ambre); }
   .fav6-bas { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-carte); box-shadow: 0 -1px 0 var(--n-trait), 0 8px 28px rgb(0 0 0 / .16); }
@@ -2902,9 +2909,71 @@ function vrmVerifVisible(sel) {
   function brancherImpression(racine) {
     racine.querySelectorAll('[data-imprimer]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); imprimerBordereaux([b.getAttribute('data-imprimer')]); }));
     const tous = racine.querySelector('[data-imprimer-n]'); if (tous) tous.addEventListener('click', () => imprimerBordereaux(String(tous.getAttribute('data-imprimer-n')).split(',')));
-    racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); rendre(); }));
+    racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); venConfirme = null; rendre(); }));
+    // 5.419 : tout sélectionner (les commandes MONTRÉES), filtres rapides, la barre de la sélection.
+    const vt = racine.querySelector('[data-ven-tout]'); if (vt) vt.addEventListener('change', () => { racine.querySelectorAll('[data-ven-sel]').forEach((c) => { const k = c.getAttribute('data-ven-sel'); if (vt.checked) venSel.add(k); else venSel.delete(k); }); venConfirme = null; rendre(); });
+    racine.querySelectorAll('[data-ven-filtre]').forEach((b) => b.addEventListener('click', () => { venFiltre = b.getAttribute('data-ven-filtre'); venConfirme = null; rendre(); }));
+    const vr = racine.querySelector('[data-ven-rien]'); if (vr) vr.addEventListener('click', () => { venSel.clear(); venConfirme = null; rendre(); });
+    const vc = racine.querySelector('[data-ven-copier]');
+    if (vc) vc.addEventListener('click', () => { const l = selVentes().filter((x) => x.suivi).map((x) => String(x.suivi)); const sans = selVentes().length - l.length; copierTexte(l.join('\n')).then((okC) => { impEtat = okC ? { ton: '', texte: TU('v9_copies', { n: l.length }) + (sans ? ' · ' + TU('v9_sans_suivi', { n: sans }) : '') } : { ton: 'ambre', texte: TU('v9_copie_ko') }; rendre(); }); });
+    const vo = racine.querySelector('[data-ven-ouvrir]');
+    if (vo) vo.addEventListener('click', () => {
+      const ici = ORIGINE_ICI || 'https://www.vinted.fr', l = selVentes().filter((x) => x.conv).slice(0, 5);
+      let ouverts = 0; for (const x of l) { try { if (window.open(ici + '/inbox/' + encodeURIComponent(x.conv), '_blank', 'noopener')) ouverts++; } catch (_) {} }
+      impEtat = { ton: ouverts < l.length ? 'ambre' : '', texte: TU('v9_ouverts', { n: ouverts }) + (ouverts < l.length ? ' · ' + TU('v9_bloques', { n: l.length - ouverts }) : '') }; rendre();
+    });
+    const vk = racine.querySelector('[data-ven-commander]'); if (vk) vk.addEventListener('click', () => { venConfirme = { k: 'commander', txs: String(vk.getAttribute('data-ven-commander')).split(',').filter(Boolean) }; rendre(); });
+    const vn = racine.querySelector('[data-ven-confirme-non]'); if (vn) vn.addEventListener('click', () => { venConfirme = null; rendre(); });
+    const vy = racine.querySelector('[data-ven-confirme-ok]'); if (vy) vy.addEventListener('click', () => { if (venConfirme && venConfirme.k === 'commander') commanderBordereaux(venConfirme.txs); });
   }
   let venStatuts = null, venStatutOuvert = false, venTri = { col: 'date', sens: -1 }, venCherche = '';
+  // ══ 5.419 (Julien, 21 nov. : « dans les Commandes, je veux pouvoir sélectionner les commandes et faire des choses
+  //    dessus, par exemple sélectionner celles qui ne sont pas encore expédiées pour imprimer les bordereaux ») ════════
+  //    · une case sur CHAQUE commande (identité : son n° de transaction), « tout sélectionner » sur le filtre montré ;
+  //    · des filtres rapides : À expédier — pas de bordereau · Bordereau prêt · En route · Terminées ;
+  //    · une barre sur la sélection : « Imprimer N bordereaux » (les bordereaux DÉJÀ rangés, `bordereauCarte`, lecture
+  //      seule ; une commande sans bordereau est DITE, jamais imprimée), « Commander N bordereaux » (Vinted seulement,
+  //      à expédier sans bordereau, SON toucher confirmé, la commande d'après-vente `bordereau` — jamais eBay, §2.8),
+  //      « Copier les n° de suivi », « Ouvrir sur Vinted ».
+  let venFiltre = 'tous', venConfirme = null;
+  const FILTRES_V9 = ['tous', 'sans_bord', 'bord_pret', 'en_route', 'terminees'];
+  const filtreV9 = (x, k) => (k === 'tous' ? true : k === 'sans_bord' ? x.etat === 'a_expedier' && x.bordereau !== true : k === 'bord_pret' ? x.etat === 'a_expedier' && x.bordereau === true : k === 'en_route' ? x.etat === 'en_route' : k === 'terminees' ? x.etat === 'finalisee' || x.etat === 'annulee' : true);
+  // « Commander le bordereau » : Vinted, à expédier, sans bordereau rangé (jamais un autre site : eBay, §2.8).
+  const commandable = (x) => !!(x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false && /^\d{1,20}$/.test(String(x.tx || '')));
+  function selVentes() { const l = (listes && listes.ventes && listes.ventes.liste) || []; return l.filter((x) => venSel.has(String(x.tx))); }
+  function copierTexte(t) {
+    const repli = () => { try { const z = document.createElement('textarea'); z.value = t; z.setAttribute('readonly', ''); z.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(z); z.select(); const ok = document.execCommand('copy'); z.remove(); return ok; } catch (_) { return false; } };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => repli()); } catch (_) {}
+    return Promise.resolve(repli());
+  }
+  function barreVentesHtml(prets) {
+    const sel = selVentes(); if (!sel.length) return '';
+    const imp = sel.filter(imprimable), sans = sel.filter((x) => x.etat === 'a_expedier' && !imprimable(x)), cmd = sel.filter(commandable), suivis = sel.filter((x) => x.suivi), ouvrables = listes.plateforme === 'vinted' ? sel.filter((x) => x.conv) : [];
+    void prets;
+    const conf = venConfirme && venConfirme.k === 'commander' ? `<div class="ven6-conf" role="alertdialog" data-ven-confirme="commander"><span>${esc(TU('v9_cmd_conf', { n: venConfirme.txs.length }))}</span><button type="button" class="vu-btn vu-sec" data-ven-confirme-non>${esc(TU('v9_non'))}</button><button type="button" class="vu-btn vu-plein" data-ven-confirme-ok${impEnVol ? ' disabled' : ''}>${esc(TU('v9_cmd_oui'))}</button></div>` : '';
+    return `<div class="fav6-bas ven6-bas" data-ven-bas="${sel.length}"><span class="fav6-bas-t"><b data-ven-sel-n="${sel.length}" aria-live="polite">${esc(TU(sel.length === 1 ? 'v9_sel1' : 'v9_sel', { n: sel.length }))}</b>${sans.length ? `<small data-ven-sans-bord="${sans.length}">${esc(TU(sans.length === 1 ? 'v9_sans1' : 'v9_sans', { n: sans.length }))}</small>` : ''}</span>`
+      + `<button type="button" class="vu-btn vu-sec" data-ven-rien>${esc(TU('fl_rien'))}</button>`
+      + (suivis.length ? `<button type="button" class="vu-btn vu-sec" data-ven-copier="${suivis.length}">${esc(TU('v9_copier', { n: suivis.length }))}</button>` : '')
+      + (ouvrables.length ? `<button type="button" class="vu-btn vu-sec" data-ven-ouvrir="${ouvrables.length}">${esc(TU('v9_ouvrir'))}</button>` : '')
+      + (cmd.length ? `<button type="button" class="vu-btn vu-sec" data-ven-commander="${esc(cmd.slice(0, 6).map((x) => x.tx).join(','))}"${impEnVol ? ' disabled' : ''}>${esc(TU(cmd.length === 1 ? 'v9_cmd1' : 'v9_cmd', { n: Math.min(6, cmd.length) }))}</button>` : '')
+      + `<button type="button" class="vu-btn vu-plein" data-imprimer-n="${esc(imp.slice(0, 10).map((x) => x.tx).join(','))}" data-ven-imprimer="${imp.length}"${!imp.length || impEnVol ? ' disabled' : ''}>${esc(TU(imp.length === 1 ? 'imp_un' : 'v9_imp', { n: Math.min(10, imp.length) }))}</button></div>${conf}`;
+  }
+  function commanderBordereaux(txs) {
+    const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 6);
+    if (!ids.length || impEnVol) return;
+    impEnVol = true; venConfirme = null; impEtat = { ton: '', texte: TU('v9_cmd_en_cours') }; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'bordereauxCommander', txs: ids, confirme: true }, (r) => {
+        try { void chrome.runtime.lastError; } catch (_) {}
+        impEnVol = false;
+        if (!r || !r.ok) { impEtat = { ton: 'ambre', texte: (r && r.raison) || TU('ra_ko') }; rendre(); return; }
+        const n = (r.acceptes || []).length, k = (r.refus || []).length;
+        impEtat = { ton: k ? 'ambre' : '', texte: [n ? TU('v9_cmd_ok', { n }) : '', k ? TU('v9_cmd_ko', { n: k, r: String((r.refus[0] && r.refus[0].raison) || '') }) : ''].filter(Boolean).join(' · ') };
+        chargerListes(true);
+        rendre();
+      });
+    } catch (_) { impEnVol = false; impEtat = { ton: 'ambre', texte: TU('ra_ko') }; rendre(); }
+  }
   const ETAT_V6 = { a_expedier: ['v_action', 'ambre'], en_route: ['v_rien', ''], finalisee: ['v_terminee', ''], annulee: ['v_annulee', ''], pas_su: ['v_pas_su', ''] };
   function ventesGrandHtml(e) {
     const v = listes.ventes;
@@ -2914,18 +2983,22 @@ function vrmVerifVisible(sel) {
     const compte = Object.fromEntries(etats.map((k) => [k, v.liste.filter((x) => (x.etat || 'pas_su') === k).length]));
     const choisis = venStatuts || new Set(etats);
     const valeur = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.date) || 0 : c === 'transporteur' ? String(x.transporteur || '') : c === 'statut' ? String(x.etat || '') : String(x.titre || '').toLowerCase());
-    const vus = v.liste.filter((x) => choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
+    const nF = Object.fromEntries(FILTRES_V9.map((k) => [k, v.liste.filter((x) => filtreV9(x, k)).length]));
+    if (!FILTRES_V9.includes(venFiltre)) venFiltre = 'tous';
+    const segV = `<div class="vu-seg seg6 ven6-seg" role="group" aria-label="${esc(TU('v9_filtres'))}">${FILTRES_V9.map((k) => `<button type="button" data-ven-filtre="${k}" aria-pressed="${venFiltre === k}"><span>${esc(TU('v9_f_' + k))}</span> <b data-n="${nF[k]}">${nF[k]}</b></button>`).join('')}</div>`;
+    const vus = v.liste.filter((x) => filtreV9(x, venFiltre) && choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
     const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
     const prets = v.liste.filter(imprimable);
-    for (const t of [...venSel]) if (!prets.some((x) => x.tx === t)) venSel.delete(t);
-    const aImprimer = venSel.size ? prets.filter((x) => venSel.has(x.tx)) : prets;
+    for (const t of [...venSel]) if (!v.liste.some((x) => String(x.tx) === t)) venSel.delete(t);
+    const aImprimer = venSel.size ? [] : prets;   // 5.419 : une sélection ⇒ la barre du bas ; sinon « Imprimer les N » prêts, comme avant
     const impN = aImprimer.length ? `<button type="button" class="vu-btn vu-sec impn6" data-imprimer-n="${esc(aImprimer.slice(0, 10).map((x) => x.tx).join(','))}"${impEnVol ? ' disabled' : ''}>${esc(TU(aImprimer.length === 1 ? 'imp_un' : 'imp_n', { n: Math.min(10, aImprimer.length) }))}</button>` : '';
-    const outils = `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
+    const outils = segV + `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
     const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>` + (impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : '');
-    if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>`;
+    if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>` + barreVentesHtml(prets);
+    const toutV = vus.every((x) => venSel.has(String(x.tx)));
     const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x, true) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
-    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
-    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}">${imprimable(x) ? `<label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(x.tx) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label>` : '<span></span>'}<button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-tout${toutV ? ' checked' : ''} aria-label="${esc(TU('v9_tout'))}" title="${esc(TU('v9_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
+    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(String(x.tx)) ? ' checked' : ''} aria-label="${esc(TU('v9_choisir', { t: x.titre || x.tx }))}"></label><button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>` + barreVentesHtml(prets);
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));

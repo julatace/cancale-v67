@@ -4195,6 +4195,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       bordereauCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauxCommander') {
+      bordereauxCommanderCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'cancale-popup') && msg.action === 'carteListes') {
       carteListes(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -23625,6 +23629,39 @@ async function panneauEtatCarte(msg, sender) {
 // (projection scalaire du seul champ du PDF, jamais `select=data`, §4.4). Pas de PDF ⇒ `manque` (« pas encore de
 // bordereau »), base muette ⇒ `passu` — jamais confondus.
 const BORDEREAU_CARTE_MAX = 10;
+// ══ 5.419 (Julien, 21 nov. : « sélectionner celles qui ne sont pas encore expédiées pour imprimer les bordereaux ») ══
+// « Commander N bordereaux » depuis Commandes : SON toucher confirmé (`confirme`), onglet vinted.fr, compte de l'onglet ;
+// seulement des ventes de CE compte, À EXPÉDIER, dont le PDF n'est pas déjà rangé — vérifié ici, par le n° de
+// transaction lu dans SA liste de ventes (jamais un titre) ; puis la commande d'après-vente de toujours
+// (`executerCommande` · `bordereau` : regarde d'abord chez Vinted, puis le geste par la PAGE, plafonds, 6 par 5 min).
+// Vinted seulement : eBay n'achète jamais d'étiquette (§2.8), Leboncoin / Vestiaire gardent leur bordereau sur le site.
+async function bordereauxCommanderCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti sans ta confirmation.' };
+  const txs = [...new Set((Array.isArray(msg.txs) ? msg.txs : []).map(String).filter((x) => /^\d{1,20}$/.test(x)))];
+  if (!txs.length || txs.length > BORD_MAX_PAR_VISITE) return { ok: false, code: 'invalide', raison: `De 1 à ${BORD_MAX_PAR_VISITE} bordereaux à la fois.` };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  const u = String(uid);
+  const lv = await sbGet(`app_data?id=eq.harvest_${u}_orders_sold&select=${idxCarte('o', 'data->payload->my_orders', CARTE_LISTE_MAX)}`);
+  const bords = lv === null ? null : await sbGetTout(`app_data?id=like.harvest_${u}_label_*&select=tx:meta->>tx`);
+  if (lv === null || bords === null) return { ok: false, code: 'lecture', raison: 'VRM n’a pas relu tes ventes : rien n’est parti. Réessaie.' };
+  const r0 = (lv && lv[0]) || null;
+  const os = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['o' + i]).filter((x) => x && typeof x === 'object' && x.transaction_id != null) : [];
+  const avecPdf = new Set((bords || []).map((b) => String((b && b.tx) || '')).filter(Boolean));
+  const aExp = new Set(os.filter((x) => etatVenteCarte(x) === 'a_expedier').map((x) => String(x.transaction_id)));
+  const acceptes = [], refus = [];
+  for (const tx of txs) {
+    if (!aExp.has(tx)) { refus.push({ tx, raison: 'pas une vente à expédier de ce compte' }); continue; }
+    if (avecPdf.has(tx)) { refus.push({ tx, raison: 'bordereau déjà rangé : imprime-le' }); continue; }
+    let r = null; try { r = await executerCommande({ cmd: 'bordereau', uid: u, tx }); } catch (_) { r = null; }
+    if (r && r.accepte) acceptes.push({ tx, etape: r.etape || 'file' }); else refus.push({ tx, raison: String((r && r.raison) || 'refusé').slice(0, 200) });
+  }
+  try { noterJournal(u, 'bordereaux_commandes', { n: acceptes.length }); } catch (_) {}
+  return { ok: true, acceptes, refus };
+}
 async function bordereauCarte(msg, sender) {
   const o = ongletCarte(sender);
   if (!o || o.fenetre || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine' };
