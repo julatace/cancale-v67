@@ -309,7 +309,7 @@ export default {
   "vt.achatConnu": "Bought {prix}",
   "vt.achatConnuAria": "Bought {prix} — link to its purchase",
   "vt.relierAria": "Link “{titre}” to its purchase",
-  "vt.prixPayeCourt": "Price paid",
+  "vt.prixPayeCourt": "Paid",
   "la.chercher": "Search a purchase (model, seller…)",
   "la.filtrer": "Filter purchases",
   "la.marque": "Brand",

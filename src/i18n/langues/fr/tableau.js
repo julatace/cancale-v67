@@ -309,7 +309,7 @@ export default {
   "vt.achatConnu": "Acheté {prix}",
   "vt.achatConnuAria": "Acheté {prix} — relier à son achat",
   "vt.relierAria": "Relier « {titre} » à son achat",
-  "vt.prixPayeCourt": "Prix payé",
+  "vt.prixPayeCourt": "Payé",
   "la.chercher": "Chercher un achat (modèle, vendeur…)",
   "la.filtrer": "Filtrer les achats",
   "la.marque": "Marque",

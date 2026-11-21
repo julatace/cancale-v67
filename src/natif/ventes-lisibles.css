@@ -70,7 +70,17 @@
   .n-tt-td .n-vt-achat .n-vt-relier[data-vt-relier="libre"] .n-vt-relier-mot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .n-tt-td .n-vt-prix-champ { width: 104px; }
   .n-tt-td .n-vt-achat { gap: 6px; }
-  [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 260px; }
+  @container tt (min-width: 1161px) { [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 260px; } }
+  /* Tableau étroit (le détail ouvert à côté, un écran de 1280) : le titre garde 200 px sur deux lignes, le champ se resserre,
+     la vignette reste de 56 — le tableau tient sans glisser sous le détail (banc ventes-tableau « V »). */
+  @container tt (max-width: 1160px) {
+    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 200px; }
+    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 240px; }
+    [data-vn="ventes"] .n-tt-td-article .n-vignette, [data-ventes-tableau] .n-tt-td-article .n-vignette { width: 56px; height: 56px; }
+    .n-tt-td .n-vt-prix-champ { width: 76px; padding: 0 18px 0 8px; font: var(--n-t-legende); }
+    .n-tt-td .n-vt-prix-eur { right: 7px; font: var(--n-t-legende); }
+    .n-tt-td .n-vt-achat { gap: 4px; }
+  }
   @container tt (max-width: 1400px) {
     [data-vn="ventes"] .n-tt-transporteur > span:last-child, [data-ventes-tableau] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   }
@@ -123,3 +133,5 @@
   .n-la-oui[disabled] { opacity: .6; }
   @media (min-width: 900px) { .n-la-grille { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
 }
+/* La photo d'une case ne s'agrandit pas au toucher (la visionneuse de <PhotoVinted>) : le toucher CHOISIT l'achat. */
+@layer vrm-natif { .n-la-photo > *, .n-la-photo img { pointer-events: none; } }

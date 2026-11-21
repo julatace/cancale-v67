@@ -109,7 +109,7 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(m.squelettes === 0, `S la liste lue : aucun squelette visible (${m.squelettes})`);
       dit(m.deb <= 1, `rien ne déborde (${m.deb})`);
       if (!tel) dit(m.tab.every((x) => x.scroll <= 1), `le tableau tient sans défilement de côté (${Math.max(0, ...m.tab.map((x) => x.scroll))})`);
-      if (tel) { const h = Math.max(...m.tel.map((x) => x.haut)); dit(h <= 170, `rangées denses (la plus haute : ${h} px ≤ 170)`); }
+      if (tel) { const h = Math.max(...m.tel.map((x) => x.haut)); dit(h <= 180, `rangées denses (la plus haute : ${h} px ≤ 180 : titre sur 2 lignes + « sans bordereau » + le pied de 44)`); }
 
       // I — tout décocher : aucun « Imprimer » ne reste.
       if (tel) { for (let k = 0; k < 40; k++) { const n = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-vn-coche] input, input[data-vn-coche]')].find((x) => x.checked); if (!c) return 0; c.click(); return 1; }); if (!n) break; await pg.waitForTimeout(120); } }
