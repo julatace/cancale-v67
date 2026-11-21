@@ -52420,7 +52420,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return (
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
-                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » (celui de la coque). */}
+                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » — celui de la coque au téléphone ; à l’ordinateur (la coque n’en pose pas ici), celui-ci. */}
+                {ordiJournee ? <h1 className="vrm-fu-titre-tete sj-titre">{tr('nav.journee.court')}</h1> : null}
                 {AF.alertes || null}
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
