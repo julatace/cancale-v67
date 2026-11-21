@@ -17113,6 +17113,7 @@ async function etapeFormulaireBrute(acc, tabId, etape, d) {
 //   · au plus 2 nouveaux essais (au hasard 2 à 6 s avant chacun), dits dans la file et sur la frise ; après le 2e échec,
 //     l'élément manquant peut être APPRIS de son clic (choix n° 102), sinon arrêt avec la raison (« Reprendre »).
 const ETAPES_LECTURE_FORM = new Set(['formulairePret', 'grille', 'reponse', 'etat']);
+const SORTE_ETAPE_FILE = { ouvrirVente: 'publier', photos: 'publier', champ: 'publier', brouillon: 'publier', supprimer: 'supprimer', publier: 'publier', message: 'message', offre: 'offre', favoriOuvrir: 'favori', repondreOffre: 'reponse', masquer: 'masquer', prix: 'prix', bordereau: 'bordereau', evaluation: 'evaluation', vacances: 'vacances', ouvrir: 'message' };
 const REESSAIS_MAX = 2;
 const REESSAI_MS = [2000, 6000];
 // Les éléments qu'on peut apprendre de son clic : des boutons et des champs SANS identité (jamais une option de liste,
@@ -17191,8 +17192,15 @@ async function apprendreElement(acc, tabId, nom) {
 }
 const PHRASE_PAS_PRETE = (m, n) => `${PHRASE_ELEMENT(m)} (${n} nouveaux essais faits). « Reprendre » quand la page est chargée.`;
 async function etapeFormulaire(acc, tabId, etape, d) {
-  // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours est refusée.
-  if (!ETAPES_LECTURE_FORM.has(etape) && !_fileCourante) { noterDiag('formulaire_hors_file'); return { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }; }
+  // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours y entre elle-même (elle
+  // n'attend jamais : file occupée par un autre compte, ou en pause ⇒ refusée, rien n'est parti).
+  const uidEtape = String((acc && acc.vinted_user_id) || '');
+  const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));
+  if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {
+    noterDiag('formulaire_hors_file');
+    const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: (d && (d.id || d.draftId)) || '' }, () => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));
+    return r && r.file ? { ok: false, code: 'hors-file', file: r.file, raison: r.raison } : r;
+  }
   let appris = await apprisPour('vinted').catch(() => ({}));
   let essai = 0, appriseUneFois = false;
   for (;;) {

@@ -59,10 +59,21 @@ const envoiPage = async (f, d) => { const r = await f.ctx.fetch(`/api/v2/convers
 (async () => {
   // ── F1
   { const f = fond();
+    const et = page(f, async (etape, d) => { if (etape === 'message') { const fl = f.store.vrmFile; et.enCours = fl && Array.isArray(fl.entrees) ? fl.entrees.filter((x) => x.etat === 'cours').length : 0; return envoiPage(f, d); } return { ok: true }; });
     const r = await f.ctx.etapeFormulaire(ACC, 7, 'message', { conv: CONV, texte: 'x' });
     const lec = await f.ctx.etapeFormulaire(ACC, 7, 'formulairePret', {});
-    dit(r && r.ok === false && r.code === 'hors-file' && !(f.j.etapesPage || []).some((x) => x.etape === 'message') && !f.vus.length && lec && lec.code !== 'hors-file',
-      'F1 — une étape d’écriture sans action de la file est refusée (« hors file », la page n’est pas touchée) ; une lecture passe', JSON.stringify({ r, lec, etapes: f.j.etapesPage })); }
+    const fl = file(f);
+    dit(r && r.ok === true && et.enCours === 1 && f.vus.length === 1 && f.vus[0].enCours === 1 && lec && lec.code !== 'hors-file' && fl.faites.some((x) => x.sorte === 'message'),
+      'F1 — une étape d’écriture appelée seule entre ELLE-MÊME dans la file (« en cours » quand la page envoie) ; une lecture passe sans file', JSON.stringify({ r, enCours: et.enCours, vus: f.vus.map((x) => x.enCours), lec })); }
+  // ── F1b : la file occupée par un AUTRE compte (ou en pause) ⇒ l'étape seule est refusée, la page n'est pas touchée
+  { const f = fond();
+    const et = page(f, async (etape, d) => (etape === 'message' ? envoiPage(f, d) : { ok: true }));
+    let liberer; const pA = f.ctx.dansFile({ sorte: 'republier', uid: '999' }, () => new Promise((ok2) => { liberer = () => ok2({ ok: true }); }));
+    await nap(150);
+    const r = await f.ctx.etapeFormulaire(ACC, 7, 'message', { conv: CONV, texte: 'x' });
+    liberer(); await pA;
+    dit(r && r.ok === false && r.code === 'hors-file' && !et.filter((x) => x.etape === 'message').length && !f.vus.length,
+      'F1b — file occupée par un autre compte : l’étape seule est refusée (« rien n’est parti »), la page n’est pas touchée', JSON.stringify({ r, et: et.map((x) => x.etape) })); }
   // ── F2
   { const f = fond();
     const r = await repondre(f);
@@ -163,7 +174,9 @@ const envoiPage = async (f, d) => { const r = await f.ctx.fetch(`/api/v2/convers
   if (process.argv.includes('--prouve')) {
     const src = fs.readFileSync(SRC, 'utf8');
     const MUT = [
-      ['hors-file-permis', "  if (!ETAPES_LECTURE_FORM.has(etape) && !_fileCourante) {", "  if (false) {"],
+      ['hors-file-permis', "  if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {", "  if (false) {"],
+      ['autre-compte-dedans', "  const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));", "  const dansLaSienne = () => !!_fileCourante;"],
+      ['etape-sans-file', "() => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));", "() => etapeFormulaireBrute(acc, tabId, etape, d)); void auPassageFile;"],
       ['geste-hors-file', "  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid, itemId: x.id || x.itemId || '', num: x.num || '' }, () => requeteVinted('page', async () => {", "  return ((m, fn) => fn())({}, () => requeteVinted('page', async () => {"],
       ['retiree-part', "    if (f && !ici) return refusFile('retiree', PHRASE_FILE_RETIREE);", "    if (f && !ici) return fn();"],
       ['pause-oubliee', "    if (f.pause === 'apres') { f.pause = 'oui'; f.pauseAt = Date.now(); }", "    if (f.pause === 'apres') { f.pause = ''; }"],
