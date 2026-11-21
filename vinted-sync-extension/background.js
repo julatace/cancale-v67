@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.420.0';
+const CODE_VERSION = '5.421.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4166,6 +4166,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'voirOngletTravail') {
       etatOngletTravail().then(async (o) => { if (!o) return sendResponse({ ok: false }); try { await chrome.tabs.update(o.tabId, { active: true }); const t = await chrome.tabs.get(o.tabId); if (t && t.windowId != null) await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {} sendResponse({ ok: true }); }, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.421 : réponses rapides (lecture), lots aux favoris, relances, agent VRM — chacun sur SON toucher, compte de l'onglet.
+    if (msg && msg.from === 'vrm-badge' && ['reponsesRapides', 'lotsFavoris', 'relancesOffres', 'agentVrm'].includes(msg.action)) {
+      const f = { reponsesRapides: reponsesRapidesCarte, lotsFavoris: lotsFavorisCarte, relancesOffres: relancesCarte, agentVrm: agentCarte }[msg.action];
+      f(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rien n’est parti.' }));
       return true;
     }
     // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
@@ -13102,9 +13108,12 @@ async function offresTick() {
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
     const now = Date.now();
     const dues = Object.values(pv).filter((x) => x && x.at <= now && x.at > now - 2 * 86400000);
-    if (!dues.length) return;
+    // 5.421 : les gestes DUS de l'agent VRM passent aussi par ce minuteur (délai au hasard écoulé ; éteint ⇒ rien).
+    if (!dues.length) { const u0 = await activeUidForDomain(await domaineVintedOuvert()); if (u0) await agentTick(u0); return; }
     const uid = await activeUidForDomain(await domaineVintedOuvert());
-    if (!uid || !dues.some((x) => String(x.uid) === String(uid))) return;
+    if (!uid) return;
+    await agentTick(uid);
+    if (!dues.some((x) => String(x.uid) === String(uid))) return;
     await autoAccepterOffres(uid);
   } catch (_) {}
 }
@@ -13734,6 +13743,7 @@ async function visiteVintedUnPassage() {
     if (await prudenceDe(uid)) {
       noterDiag('visite_prudence');
       await autoAccepterOffres(uid);
+      await agentTick(uid);   // 5.421 : l'agent VRM (éteint par défaut) — mêmes gardes, prudence comprise
       await capterRetraits(uid);
       await envoyerNotifsRetrait();
       await purgeBordereaux(); await purgeBordereauxAnnules();
@@ -13767,6 +13777,9 @@ async function visiteVintedUnPassage() {
     // garde-fous du §3 gardés ; temps FIXE entre deux acceptations (jamais au
     // hasard). Rien ne part si la base n'a pas répondu (« pas su » ⇒ éteint).
     await autoAccepterOffres(uid);
+    // 5.421 : l'agent VRM puis « Relancer seul » (éteints par défaut ; mêmes garde-fous que le moteur d'offres).
+    await agentTick(uid);
+    await relanceOffresAuto(uid);
     await capterRetraits(uid);
     // 5.409 (19 nov.) : JUSTE APRÈS LES CODES, le n° de suivi des achats expédiés sans n° (l'identité qui relie
     //    le colis du point relais à son achat — lecture de colis, `suivicolis`). Avant, il passait après les
@@ -23802,6 +23815,8 @@ async function automatisationsCarte(u, owner) {
     cadence: await cadenceCompte(u).catch(() => null),
     // 5.410.4 : les réglages « comme Bleam » de CE compte (chaque section, éteinte par défaut) + la dernière sauvegarde.
     bleam: await bleamCompte(u).catch(() => null),
+    // 5.421 : SES modèles de réponses rapides (`vrm_reponses_rapides`), pour l'éditeur du panneau ; pas su ⇒ null.
+    reponsesRapides: await rrReglageLu().catch(() => null),
     sauvegarde: await (async () => { try { return ((await chrome.storage.local.get(SAUVE_ETAT))[SAUVE_ETAT] || {})[String(u)] || null; } catch (_) { return null; } })(),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
@@ -28756,12 +28771,1005 @@ const MAIN_FILE = ['vinted_account_labels', 'vinted_accounts', 'vinted_accounts_
   'vinted_accounts_hidden', 'vinted_annonce_numeros', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_numerotation', 'vrm_ville'];
 // Rend la ligne projetée (les clés absentes valent `null`), ou `null` si la base
 // n'a pas répondu — « rien lu » ne vaut pas « rien ».
+// <reponses-rapides-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-reponses-rapides.cjs --recopie).
+const RR_LANGUES = ['fr', 'en', 'es', 'it', 'de'];
+const RR_CATEGORIES = ['dispo', 'taille', 'envoi', 'lot', 'prix', 'etat', 'authenticite', 'photos', 'echange'];
+const RR_VARIABLES = ['pseudo', 'article', 'taille', 'prix', 'prix_mini'];
+const RR_TEXTE_MAX = 1000, RR_VERSIONS_MAX = 5, RR_PROPOSITIONS_MAX = 3;
+// Minuscules, sans accents, ponctuation ⇒ espace ; « größe » ⇒ « grosse ».
+function rrNormaliser(t) {
+  return ' ' + String(t == null ? '' : t).toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[’'`´]/g, ' ').replace(/[^a-z0-9½]+/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+}
+// Les mots de chaque catégorie, par langue. Un mot se repère ENTIER ; « mot* » repère le début d'un mot ; une
+// expression est une suite de mots. Liste FERMÉE : un mot trop courant (« vrai », « echt », « colis ») n'y est pas,
+// il ferait des faux positifs (comptés par l'audit sur un corpus de phrases inventées).
+const RR_MOTS = {
+  dispo: {
+    fr: ['dispo', 'disponible', 'toujours dispo*', 'encore dispo*', 'toujours en vente', 'encore en vente', 'est elle vendue', 'est il vendu', 'deja vendu*', 'tu l as encore', 'vous l avez encore'],
+    en: ['available', 'still available', 'still have', 'still for sale', 'is it sold', 'sold already', 'still got'],
+    es: ['disponible', 'sigue disponible', 'aun disponible', 'todavia disponible', 'lo tienes', 'la tienes', 'sigue a la venta', 'esta vendid*'],
+    it: ['disponibile', 'ancora disponibile', 'ce l hai ancora', 'ancora in vendita', 'gia vendut*'],
+    de: ['verfugbar', 'noch verfugbar', 'noch da', 'noch zu haben', 'noch zu verkaufen', 'schon verkauft', 'noch erhaltlich'],
+  },
+  taille: {
+    fr: ['taille*', 'pointure', 'chausse*', 'taille grand', 'taille petit', 'taille normalement'],
+    en: ['size', 'sizing', 'fit', 'fits', 'true to size', 'run small', 'run big', 'runs small', 'runs big', 'tts'],
+    es: ['talla', 'tallaje', 'horma', 'que numero', 'numero calzas'],
+    it: ['taglia', 'calzata', 'vestibilita', 'calza*', 'che numero'],
+    de: ['grosse', 'passform', 'fallt klein', 'fallt gross', 'fallen klein', 'fallen gross', 'schuhgrosse'],
+  },
+  envoi: {
+    fr: ['envoi', 'envois', 'tu envoies', 'vous envoyez', 'envoyez vous', 'expedi*', 'livraison', 'delai', 'delais', 'quand tu envoie*', 'sous combien de temps'],
+    en: ['ship', 'shipping', 'ships', 'delivery', 'dispatch*', 'when can you send', 'how long'],
+    es: ['envio', 'cuando envias', 'plazo de entrega'],
+    it: ['spedi*', 'invio', 'inviare', 'consegna'],
+    de: ['versand', 'versenden', 'verschick*', 'lieferung', 'schickst'],
+  },
+  lot: {
+    fr: ['un lot', 'en lot', 'le lot', 'lots', 'les deux', 'les 2', 'ensemble', 'plusieurs articles', 'prendre aussi', 'avec l autre'],
+    en: ['bundle', 'bundles', 'both', 'together', 'the two', 'several items', 'buy two'],
+    es: ['lote', 'los dos', 'las dos', 'juntos', 'juntas', 'ambos', 'pack'],
+    it: ['lotto', 'entrambi', 'entrambe', 'insieme', 'tutti e due', 'tutte e due'],
+    de: ['paket', 'beide', 'zusammen', 'bundle'],
+  },
+  prix: {
+    fr: ['prix', 'baisser', 'baisse', 'dernier prix', 'meilleur prix', 'negociable', 'negocier', 'reduc*', 'moins cher', 'petit geste', 'c est combien', 'combien tu', 'combien pour', 'pour combien', 'combien ca'],
+    en: ['price', 'lowest', 'best price', 'negotiable', 'discount', 'cheaper', 'last price', 'how much'],
+    es: ['precio', 'rebaja*', 'negociable', 'descuento', 'ultimo precio', 'mas barato', 'cuanto'],
+    it: ['prezzo', 'sconto', 'trattabile', 'ultimo prezzo', 'meno caro', 'quanto'],
+    de: ['preis', 'verhandelbar', 'rabatt', 'letzter preis', 'gunstiger', 'vb', 'wie viel'],
+  },
+  etat: {
+    fr: ['defaut', 'defauts', 'etat', 'abime*', 'tache', 'taches', 'usure', 'usee', 'usees', 'trou', 'rayure*', 'dechir*'],
+    en: ['defect*', 'flaw', 'flaws', 'condition', 'damage*', 'stain*', 'scuff*', 'worn', 'hole', 'scratch*'],
+    es: ['defecto*', 'estado', 'mancha*', 'desgaste', 'rotura*', 'roto', 'rota', 'aranazo*', 'usad*'],
+    it: ['difett*', 'condizion*', 'macchi*', 'usura', 'stato', 'rovinat*', 'graffi*', 'buco'],
+    de: ['mangel', 'mangeln', 'zustand', 'fleck*', 'schaden', 'gebrauchsspuren', 'kratzer', 'loch', 'beschadig*'],
+  },
+  authenticite: {
+    fr: ['authentique*', 'authenticite', 'vraie paire', 'vrai ou faux', 'contrefacon*', 'fake', 'replique', 'originale', 'originales', 'legit', 'facture', 'preuve d achat', 'ticket de caisse'],
+    en: ['authentic*', 'genuine', 'fake', 'legit', 'real or fake', 'replica', 'receipt', 'proof of purchase'],
+    es: ['autentic*', 'original', 'originales', 'falso', 'falsa', 'falsas', 'falsos', 'replica', 'factura'],
+    it: ['autentic*', 'originale', 'originali', 'falso', 'falsi', 'falsa', 'false', 'scontrino', 'fattura'],
+    de: ['echtheit', 'ist das echt', 'sind die echt', 'original', 'originale', 'falschung', 'rechnung', 'kassenbon'],
+  },
+  photos: {
+    fr: ['photo', 'photos', 'plus de photo*', 'autre photo*', 'video', 'videos'],
+    en: ['photo', 'photos', 'picture', 'pictures', 'pic', 'pics', 'video', 'videos'],
+    es: ['foto', 'fotos', 'video', 'videos'],
+    it: ['foto', 'video'],
+    de: ['foto', 'fotos', 'bild', 'bilder', 'video', 'videos'],
+  },
+  echange: {
+    fr: ['echange', 'echanges', 'echanger', 'troc', 'troquer'],
+    en: ['trade', 'swap', 'exchange'],
+    es: ['intercambio', 'intercambiar', 'intercambias', 'hacer cambio'],
+    it: ['scambio', 'scambi', 'scambiare', 'baratto'],
+    de: ['tausch', 'tauschen', 'tauscht', 'tauschst'],
+  },
+};
+// Les petits mots qui disent la langue (en plus des mots des catégories).
+const RR_OUTILS = {
+  fr: ['bonjour', 'bonsoir', 'salut', 'est', 'elle', 'il', 'encore', 'toujours', 'vous', 'merci', 'quelle', 'quel', 'svp', 'avez', 'est ce', 'je', 'oui', 'la', 'le', 'des', 'une', 'tu', 'possible'],
+  en: ['hi', 'hello', 'hey', 'is', 'still', 'the', 'you', 'what', 'thanks', 'please', 'it', 'do', 'does', 'any', 'are', 'how', 'can', 'would'],
+  es: ['hola', 'buenas', 'sigue', 'esta', 'gracias', 'que', 'tienes', 'el', 'por', 'favor', 'cual', 'hay', 'tiene', 'puedes', 'es', 'la', 'me'],
+  it: ['ciao', 'salve', 'ancora', 'grazie', 'che', 'sono', 'della', 'hai', 'quale', 'per', 'favore', 'puoi', 'il', 'e', 'la', 'ci', 'mi'],
+  de: ['hallo', 'ist', 'noch', 'danke', 'die', 'der', 'das', 'sie', 'du', 'welche', 'gibt', 'es', 'wie', 'bitte', 'kannst', 'haben', 'ich'],
+};
+const rrEchapper = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const _rrRe = new Map();
+function rrMotRe(m) {
+  if (!_rrRe.has(m)) {
+    const prefixe = m.endsWith('*');
+    const corps = rrEchapper(rrNormaliser(prefixe ? m.slice(0, -1) : m).trim());
+    _rrRe.set(m, new RegExp(' ' + corps + (prefixe ? '[a-z0-9]*' : '') + ' '));
+  }
+  return _rrRe.get(m);
+}
+const rrContient = (n, m) => rrMotRe(m).test(n);
+// La langue du message : celle qui a le plus de mots repérés. Égalité ou rien ⇒ null (la langue de l'interface).
+function rrLangue(texte) {
+  const n = rrNormaliser(texte);
+  const score = {};
+  for (const l of RR_LANGUES) {
+    let s = 0;
+    for (const m of RR_OUTILS[l]) if (rrContient(n, m)) s += 1;
+    for (const c of RR_CATEGORIES) for (const m of RR_MOTS[c][l]) if (rrContient(n, m)) s += 2;
+    score[l] = s;
+  }
+  const tri = RR_LANGUES.slice().sort((a, b) => score[b] - score[a]);
+  if (!score[tri[0]] || score[tri[0]] === score[tri[1]]) return null;
+  return tri[0];
+}
+// Les catégories repérées : [{ cat, langue }] dans l'ordre de RR_CATEGORIES (toutes langues : « dispo ? size 43 ? »).
+function rrQuestions(texte) {
+  const n = rrNormaliser(texte);
+  if (n.trim().length < 2) return [];
+  const out = [];
+  for (const cat of RR_CATEGORIES) {
+    for (const l of RR_LANGUES) {
+      if (RR_MOTS[cat][l].some((m) => rrContient(n, m))) { out.push({ cat, langue: l }); break; }
+    }
+  }
+  return out;
+}
+// Ce qui attend une réponse dans un fil : les messages de l'ACHETEUR arrivés après le dernier message du vendeur.
+// `messages` : [{ deMoi, texte }] dans l'ordre ; un message sans auteur sûr (deMoi ni vrai ni faux) arrête la lecture.
+function rrQuestionEnAttente(messages) {
+  const l = Array.isArray(messages) ? messages : [];
+  const out = [];
+  for (let i = l.length - 1; i >= 0; i--) {
+    const m = l[i]; if (!m) continue;
+    if (m.deMoi !== false) break;
+    const t = String(m.texte || '').trim(); if (t) out.unshift(t);
+    if (out.length >= 3) break;
+  }
+  return out.join(' \n ').slice(0, 1200);
+}
+// Les modèles par défaut : des mots envoyés à l'acheteur, dans SA langue. Rien n'y est promis qu'il n'ait dit
+// (aucun délai chiffré, aucun état) ; la version à {prix_mini} ne sert que s'il a choisi de dire son prix mini.
+const RR_DEFAUTS = {
+  dispo: { fr: ['Bonjour {pseudo}, oui, {article} est toujours disponible.'], en: ['Hi {pseudo}, yes, {article} is still available.'], es: ['Hola {pseudo}, sí, {article} sigue disponible.'], it: ['Ciao {pseudo}, sì, {article} è ancora disponibile.'], de: ['Hallo {pseudo}, ja, {article} ist noch verfügbar.'] },
+  taille: { fr: ['Bonjour {pseudo}, c’est une taille {taille}, celle indiquée sur l’annonce.'], en: ['Hi {pseudo}, it’s a size {taille}, as shown on the listing.'], es: ['Hola {pseudo}, es una talla {taille}, la indicada en el anuncio.'], it: ['Ciao {pseudo}, è una taglia {taille}, quella indicata nell’annuncio.'], de: ['Hallo {pseudo}, es ist Größe {taille}, wie in der Anzeige angegeben.'] },
+  envoi: { fr: ['Bonjour {pseudo}, j’envoie rapidement après l’achat, avec le suivi de la plateforme.'], en: ['Hi {pseudo}, I ship quickly after purchase, with the platform’s tracking.'], es: ['Hola {pseudo}, envío rápido tras la compra, con el seguimiento de la plataforma.'], it: ['Ciao {pseudo}, spedisco subito dopo l’acquisto, con il tracciamento della piattaforma.'], de: ['Hallo {pseudo}, ich versende schnell nach dem Kauf, mit Sendungsverfolgung der Plattform.'] },
+  lot: { fr: ['Bonjour {pseudo}, oui, je fais des lots : ajoute les articles qui te plaisent dans un lot et fais-moi une offre.'], en: ['Hi {pseudo}, yes, I do bundles: add the items you like to a bundle and send me an offer.'], es: ['Hola {pseudo}, sí, hago lotes: añade los artículos que te gusten a un lote y hazme una oferta.'], it: ['Ciao {pseudo}, sì, faccio lotti: aggiungi gli articoli che ti piacciono a un lotto e fammi un’offerta.'], de: ['Hallo {pseudo}, ja, ich mache Pakete: leg die Artikel, die dir gefallen, in ein Paket und mach mir ein Angebot.'] },
+  prix: { fr: ['Bonjour {pseudo}, je peux descendre à {prix_mini} pour {article}.', 'Bonjour {pseudo}, {article} est à {prix} : tu peux me faire une offre avec le bouton « Faire une offre ».'], en: ['Hi {pseudo}, I can go down to {prix_mini} for {article}.', 'Hi {pseudo}, {article} is {prix}: you can send me an offer with the “Make an offer” button.'], es: ['Hola {pseudo}, puedo bajar a {prix_mini} por {article}.', 'Hola {pseudo}, {article} cuesta {prix}: puedes hacerme una oferta con el botón «Hacer una oferta».'], it: ['Ciao {pseudo}, posso scendere a {prix_mini} per {article}.', 'Ciao {pseudo}, {article} costa {prix}: puoi farmi un’offerta con il pulsante «Fai un’offerta».'], de: ['Hallo {pseudo}, ich kann für {article} auf {prix_mini} runtergehen.', 'Hallo {pseudo}, {article} kostet {prix}: du kannst mir über „Preis vorschlagen“ ein Angebot machen.'] },
+  etat: { fr: ['Bonjour {pseudo}, tout est décrit dans l’annonce et visible sur les photos ; dis-moi si tu veux voir un détail.'], en: ['Hi {pseudo}, everything is described in the listing and visible in the photos; tell me if you want to see a detail.'], es: ['Hola {pseudo}, todo está descrito en el anuncio y se ve en las fotos; dime si quieres ver algún detalle.'], it: ['Ciao {pseudo}, è tutto descritto nell’annuncio e visibile nelle foto; dimmi se vuoi vedere un dettaglio.'], de: ['Hallo {pseudo}, alles ist in der Anzeige beschrieben und auf den Fotos zu sehen; sag mir, wenn du ein Detail sehen willst.'] },
+  authenticite: { fr: ['Bonjour {pseudo}, je ne vends que des articles authentiques ; tu peux aussi demander la vérification proposée par la plateforme.'], en: ['Hi {pseudo}, I only sell authentic items; you can also ask for the platform’s verification.'], es: ['Hola {pseudo}, solo vendo artículos auténticos; también puedes pedir la verificación de la plataforma.'], it: ['Ciao {pseudo}, vendo solo articoli autentici; puoi anche chiedere la verifica della piattaforma.'], de: ['Hallo {pseudo}, ich verkaufe nur echte Artikel; du kannst auch die Echtheitsprüfung der Plattform anfragen.'] },
+  photos: { fr: ['Bonjour {pseudo}, bien sûr, je t’envoie d’autres photos de {article} dès que possible.'], en: ['Hi {pseudo}, sure, I’ll send you more photos of {article} as soon as I can.'], es: ['Hola {pseudo}, claro, te mando más fotos de {article} en cuanto pueda.'], it: ['Ciao {pseudo}, certo, ti mando altre foto di {article} appena posso.'], de: ['Hallo {pseudo}, klar, ich schicke dir so bald wie möglich weitere Fotos von {article}.'] },
+  echange: { fr: ['Bonjour {pseudo}, désolé, je ne fais pas d’échange, seulement la vente.'], en: ['Hi {pseudo}, sorry, I don’t do trades, only sales.'], es: ['Hola {pseudo}, lo siento, no hago intercambios, solo venta.'], it: ['Ciao {pseudo}, mi dispiace, non faccio scambi, solo vendita.'], de: ['Hallo {pseudo}, sorry, ich tausche nicht, nur Verkauf.'] },
+};
+// Une version écrite par lui : texte non vide, borné, variables connues seulement, accolades fermées.
+function rrErreurTexte(t) {
+  const s = String(t == null ? '' : t);
+  if (!s.trim()) return 'vide';
+  if (s.length > RR_TEXTE_MAX) return 'long';
+  const sans = s.replace(/\{([a-z_]+)\}/g, (x, v) => (RR_VARIABLES.includes(v) ? '' : '\u0000'));
+  if (sans.includes('\u0000')) return 'variable';
+  if (/[{}]/.test(sans)) return 'accolade';
+  return '';
+}
+// SON réglage normalisé : { v, modeles: { cat: [texte] } (5 versions au plus), revelerMini } — éteint par défaut,
+// une version refusée par `rrErreurTexte` n'est pas gardée.
+function rrReglage(o) {
+  const x = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const m0 = x.modeles && typeof x.modeles === 'object' && !Array.isArray(x.modeles) ? x.modeles : {};
+  const modeles = {};
+  for (const c of RR_CATEGORIES) {
+    const l = (Array.isArray(m0[c]) ? m0[c] : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => !rrErreurTexte(t));
+    const u = [...new Set(l)].slice(0, RR_VERSIONS_MAX);
+    if (u.length) modeles[c] = u;
+  }
+  return { v: 1, modeles, revelerMini: x.revelerMini === true };
+}
+// « 59 € » · « 47,50 € » — un prix posé dans un message.
+function rrEuros(v) {
+  const n = Number(v); if (!(Number.isFinite(n) && n > 0)) return '';
+  const c = Math.round(n * 100);
+  return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €';
+}
+// Pose les variables. `vars` : { pseudo, article, taille, prix, prix_mini } (prix en euros, nombre) ;
+// rend { texte } ou { manque: 'nom' } — une variable pas sue, ou {prix_mini} sans SON accord, saute la version.
+function rrRemplir(texte, vars, opts) {
+  const v = vars && typeof vars === 'object' ? vars : {};
+  const o = opts && typeof opts === 'object' ? opts : {};
+  let manque = '';
+  const t = String(texte == null ? '' : texte).replace(/\{([a-z_]+)\}/g, (x, nom) => {
+    if (manque) return x;
+    if (nom === 'prix_mini' && o.revelerMini !== true) { manque = 'prix_mini_cache'; return x; }
+    const brut = nom === 'prix' || nom === 'prix_mini' ? rrEuros(v[nom]) : String(v[nom] == null ? '' : v[nom]).replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!brut) { manque = nom; return x; }
+    return brut;
+  });
+  return manque ? { manque } : { texte: t.trim() };
+}
+// LES PROPOSITIONS d'un fil : [{ cat, langue, texte, version, sienne } | { cat, langue, manque }], au plus 3.
+//  ctx : { messages | texte, reglage (rrReglage), vars, langueUi, partie (annonce prouvée partie), sur (texte → bool,
+//        la règle des mots qui font bannir), derniere ({ cat: version }), hasard }
+function rrPropositions(ctx) {
+  const c = ctx && typeof ctx === 'object' ? ctx : {};
+  const question = typeof c.texte === 'string' ? c.texte : rrQuestionEnAttente(c.messages);
+  const qs = rrQuestions(question);
+  if (!qs.length) return { question, propositions: [] };
+  const langue = rrLangue(question) || (RR_LANGUES.includes(c.langueUi) ? c.langueUi : 'fr');
+  const R = rrReglage(c.reglage);
+  const hasard = typeof c.hasard === 'function' ? c.hasard : Math.random;
+  const sur = typeof c.sur === 'function' ? c.sur : () => true;
+  const out = [];
+  for (const { cat } of qs) {
+    if (out.length >= RR_PROPOSITIONS_MAX) break;
+    if (cat === 'dispo' && c.partie === true) { out.push({ cat, langue, manque: 'partie' }); continue; }
+    const siennes = R.modeles[cat] || null;
+    const versions = siennes || RR_DEFAUTS[cat][langue] || RR_DEFAUTS[cat].fr;
+    const possibles = []; let manque = '';
+    versions.forEach((tx, i) => {
+      const r = rrRemplir(tx, c.vars, { revelerMini: R.revelerMini });
+      if (r.manque) { if (!manque) manque = r.manque; return; }
+      if (!sur(r.texte)) { if (!manque) manque = 'texte_interdit'; return; }
+      possibles.push({ i, texte: r.texte });
+    });
+    if (!possibles.length) { out.push({ cat, langue, manque: manque || 'aucune' }); continue; }
+    // Une version au hasard parmi les possibles, jamais la dernière proposée pour cette catégorie (s'il y en a une autre).
+    const dern = c.derniere && typeof c.derniere === 'object' ? c.derniere[cat] : null;
+    const pool = possibles.length > 1 && dern != null ? possibles.filter((p) => p.i !== dern) : possibles;
+    const p = pool[Math.min(pool.length - 1, Math.floor(hasard() * pool.length))];
+    out.push({ cat, langue, texte: p.texte, version: p.i, sienne: !!siennes });
+  }
+  return { question, langue, propositions: out };
+}
+// </reponses-rapides-regle>
+// <lot-relance-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-lot-relance.cjs --recopie).
+const LR_TAUX_LOT_DEFAUT = 10, LR_TAUX_LOT_MIN = 1, LR_TAUX_LOT_MAX = 50;
+const LR_JOURS_DEFAUT = 3, LR_JOURS_MIN = 1, LR_JOURS_MAX = 30;
+const LR_TAUX_RELANCE_DEFAUT = 10, LR_TAUX_RELANCE_MAX = 50;
+const LR_LOT_MAX_ARTICLES = 10;
+const lrEnt = (v, a, b, d) => { const n = Number(v); return Number.isInteger(n) && n >= a && n <= b ? n : d; };
+// Euros lus (nombre, « 45,5 », { amount }) → centimes entiers, ou null.
+function lrCentimes(v) {
+  const x = v != null && typeof v === 'object' ? v.amount : v;
+  if (x == null || x === '') return null;
+  const n = Number(String(x).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+}
+// Le plancher d'UN article, en centimes : prix mini, sinon achat + 10 % (arrondi au centime SUPÉRIEUR) ; sinon null.
+function lrPlancher(mini, achat) {
+  const m = lrCentimes(mini); if (m != null) return { c: m, de: 'mini' };
+  const a = lrCentimes(achat); if (a != null) return { c: Math.ceil(a * 110 / 100), de: 'achat' };
+  return null;
+}
+// Ses réglages (section `lotFavoris` / `relanceOffres` de vinted_bleam, par compte).
+function lrReglageLot(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: false, taux: lrEnt(x.taux, LR_TAUX_LOT_MIN, LR_TAUX_LOT_MAX, LR_TAUX_LOT_DEFAUT) }; }
+function lrReglageRelance(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: x.actif === true, jours: lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux: lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT) }; }
+// L'OFFRE LOT. `articles` : [{ itemId, prix, mini, achat }] (euros) ; `taux` en %.
+// Rend { ok: true, n, somme, plancher, prix, remontee, base } (centimes) ou { ok: false, raison, items? }.
+//   prix = somme × (1 − taux), arrondi à l'euro INFÉRIEUR ; sous la somme des planchers ⇒ REMONTÉ à cette somme ;
+//   une remontée qui atteint la somme des prix ⇒ pas d'offre (une offre lot doit être SOUS la somme).
+function lrOffreLot(articles, taux) {
+  const vus = new Set(), l = [];
+  for (const a of Array.isArray(articles) ? articles : []) {
+    const id = String(a && a.itemId != null ? a.itemId : '');
+    if (!/^\d{1,20}$/.test(id) || vus.has(id)) continue;
+    vus.add(id); l.push(a);
+  }
+  if (l.length < 2) return { ok: false, raison: 'un_seul' };
+  if (l.length > LR_LOT_MAX_ARTICLES) return { ok: false, raison: 'trop' };
+  const t = lrEnt(taux, LR_TAUX_LOT_MIN, LR_TAUX_LOT_MAX, null);
+  if (t == null) return { ok: false, raison: 'taux' };
+  let somme = 0, plancher = 0; const sansPrix = [], sansPlancher = [];
+  for (const a of l) {
+    const p = lrCentimes(a.prix), pl = lrPlancher(a.mini, a.achat);
+    if (p == null) sansPrix.push(String(a.itemId)); else somme += p;
+    if (!pl) sansPlancher.push(String(a.itemId)); else plancher += pl.c;
+  }
+  if (sansPrix.length) return { ok: false, raison: 'prix_inconnu', items: sansPrix };
+  if (sansPlancher.length) return { ok: false, raison: 'plancher_inconnu', items: sansPlancher };
+  const base = Math.floor(somme * (100 - t) / 100 / 100) * 100;
+  let prix = base, remontee = false;
+  if (prix < plancher) { prix = plancher; remontee = true; }
+  if (prix >= somme) return { ok: false, raison: 'plancher_au_prix', somme, plancher };
+  return { ok: true, n: l.length, somme, plancher, prix, base, remontee, taux: t };
+}
+// LES LOTS POSSIBLES d'une liste de favoris lus. `favoris` : [{ receiver, pseudo, itemId, prix, mini, achat, at,
+// enVente }] — un favori dont l'article n'est pas PROUVÉ en vente (`enVente !== true`) ne compte pas.
+// Rend [{ receiver, pseudo, items: [...], at }], les personnes à ≥ 2 articles DISTINCTS, du plus grand lot au plus petit.
+function lrGroupesLot(favoris) {
+  const par = new Map();
+  for (const f of Array.isArray(favoris) ? favoris : []) {
+    if (!f || f.enVente !== true) continue;
+    const r = String(f.receiver == null ? '' : f.receiver), it = String(f.itemId == null ? '' : f.itemId);
+    if (!/^\d{1,20}$/.test(r) || !/^\d{1,20}$/.test(it)) continue;
+    const g = par.get(r) || { receiver: r, pseudo: '', items: [], vus: new Set(), at: 0 };
+    if (!g.pseudo && f.pseudo) g.pseudo = String(f.pseudo).slice(0, 40);
+    if (!g.vus.has(it)) { g.vus.add(it); g.items.push({ itemId: it, prix: f.prix, mini: f.mini, achat: f.achat, titre: f.titre || '', photo: f.photo || '' }); }
+    g.at = Math.max(g.at, Number(f.at) || 0);
+    par.set(r, g);
+  }
+  return [...par.values()].filter((g) => g.items.length >= 2).map((g) => ({ receiver: g.receiver, pseudo: g.pseudo, items: g.items.slice(0, LR_LOT_MAX_ARTICLES), at: g.at }))
+    .sort((a, b) => (b.items.length - a.items.length) || (b.at - a.at) || a.receiver.localeCompare(b.receiver));
+}
+// L'heure d'un message de conversation (ms) ou 0.
+function lrHeure(m) {
+  const v = m && (m.created_at_ts != null ? m.created_at_ts : m.entity && m.entity.created_at_ts != null ? m.entity.created_at_ts : m.created_at != null ? m.created_at : m.entity && m.entity.created_at);
+  if (v == null) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : (Date.parse(v) || 0);
+}
+// LES OFFRES RATÉES d'une conversation lue (forme de `GET /conversations/{id}` : messages = [{ entity_type, entity }]).
+//  conv : { conv, opp (id de l'acheteur), login, item, tx, cap (date de la lecture), messages }
+// Rend null, ou { conv, acheteur, pseudo, item, tx, offre (centimes), etat: 'refusee'|'expiree', at, atSur, relanceVue }
+//  · la DERNIÈRE offre de l'acheteur (`offer_request_message`, `user_id` = l'acheteur) ; si elle est acceptée ou encore
+//    en attente ⇒ rien (ce n'est pas une offre ratée) ;
+//  · refusée = statut 30 ou titre « refus/reject » ; expirée = titre « expir » ; autre ⇒ rien (« pas su » ≠ « ratée ») ;
+//  · `at` = l'heure du message ; inconnue ⇒ la date de la LECTURE (l'offre est forcément d'avant : « au plus tard »,
+//    `atSur: false`) ;
+//  · `relanceVue` : une offre du VENDEUR (`offer_message` d'un autre que l'acheteur) APRÈS l'offre ratée — une relance
+//    déjà faite (par VRM, à la main ou depuis un autre navigateur) : jamais une seconde.
+function lrOffreRatee(conv) {
+  const c = conv && typeof conv === 'object' ? conv : null;
+  if (!c || !Array.isArray(c.messages)) return null;
+  const opp = c.opp != null && c.opp !== '' ? Number(c.opp) : null;
+  if (!(opp > 0)) return null;
+  let der = null, iDer = -1;
+  c.messages.forEach((m, i) => {
+    if (!m || m.entity_type !== 'offer_request_message') return;
+    const e = m.entity || {};
+    if (Number(e.user_id) !== opp) return;
+    der = { m, e }; iDer = i;
+  });
+  if (!der) return null;
+  const e = der.e, titre = String(e.status_title || '');
+  let etat = null;
+  if (/expir/i.test(titre)) etat = 'expiree';
+  else if (Number(e.status) === 30 || /refus|reject|declin/i.test(titre)) etat = 'refusee';
+  if (!etat) return null;
+  const offre = lrCentimes(e.price);
+  if (offre == null) return null;
+  const at = lrHeure(der.m), cap = Date.parse(c.cap || '') || (Number(c.cap) || 0);
+  let relanceVue = false;
+  for (let i = iDer + 1; i < c.messages.length; i++) {
+    const m = c.messages[i];
+    if (!m) continue;
+    const e2 = m.entity || {};
+    if ((m.entity_type === 'offer_message' || m.entity_type === 'offer_request_message') && Number(e2.user_id) !== opp) relanceVue = true;
+    if (m.entity_type === 'offer_request_message' && Number(e2.user_id) === opp) relanceVue = true;
+  }
+  return { conv: String(c.conv || ''), acheteur: String(opp), pseudo: String(c.login || '').slice(0, 40), item: String(c.item || ''), tx: String(e.transaction_id != null ? e.transaction_id : c.tx || ''), offre, etat, at: at || cap || 0, atSur: !!at, relanceVue };
+}
+// LA LISTE « À RELANCER ». `ratees` : sorties de lrOffreRatee ; `ctx` :
+//   { maintenant, jours, taux, deja (Set de « acheteur|item » déjà relancés), etatArticle (item → 'en_vente'|'vendu'|
+//     'pas_su'), prixArticle (item → euros|null), planchers (item → { mini, achat }) }
+// Rend [{ conv, acheteur, pseudo, item, tx, offre, prix, plancher, prixAnnonce, etat: 'pret'|'attente'|'ecarte',
+//   raison, quand }] — une seule ligne par acheteur et par article (la plus récente).
+//   prix = max(plancher, son offre, prix × (1 − taux) arrondi à l'euro inférieur) ; ≥ prix de l'annonce ⇒ écartée.
+function lrRelances(ratees, ctx) {
+  const x = ctx && typeof ctx === 'object' ? ctx : {};
+  const maintenant = Number(x.maintenant) || 0;
+  const jours = lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux = lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT);
+  const deja = x.deja && typeof x.deja.has === 'function' ? x.deja : new Set(Array.isArray(x.deja) ? x.deja : []);
+  const etatArticle = typeof x.etatArticle === 'function' ? x.etatArticle : () => 'pas_su';
+  const prixArticle = typeof x.prixArticle === 'function' ? x.prixArticle : () => null;
+  const planchers = typeof x.planchers === 'function' ? x.planchers : () => null;
+  const une = new Map();
+  for (const r of Array.isArray(ratees) ? ratees : []) {
+    if (!r || !/^\d{1,20}$/.test(String(r.acheteur)) || !/^\d{1,20}$/.test(String(r.item)) || !/^[1-9]\d{0,19}$/.test(String(r.conv))) continue;
+    const k = r.acheteur + '|' + r.item, av = une.get(k);
+    if (!av || (Number(r.at) || 0) > (Number(av.at) || 0)) une.set(k, r);
+  }
+  const out = [];
+  for (const [k, r] of une) {
+    const ligne = { conv: r.conv, acheteur: r.acheteur, pseudo: r.pseudo, item: r.item, tx: r.tx, offre: r.offre, etatOffre: r.etat, at: r.at, atSur: r.atSur, prix: null, plancher: null, prixAnnonce: null, etat: 'ecarte', raison: '', quand: null };
+    if (deja.has(k) || r.relanceVue) { ligne.raison = 'deja'; out.push(ligne); continue; }
+    const ea = etatArticle(r.item);
+    if (ea !== 'en_vente') { ligne.raison = ea === 'vendu' ? 'plus_en_vente' : 'pas_su'; out.push(ligne); continue; }
+    const pa = lrCentimes(prixArticle(r.item));
+    if (pa == null) { ligne.raison = 'prix_inconnu'; out.push(ligne); continue; }
+    ligne.prixAnnonce = pa;
+    const p0 = planchers(r.item) || {};
+    const pl = lrPlancher(p0.mini, p0.achat);
+    if (!pl) { ligne.raison = 'plancher_inconnu'; out.push(ligne); continue; }
+    ligne.plancher = pl.c;
+    const cible = Math.floor(pa * (100 - taux) / 100 / 100) * 100;
+    const prix = Math.max(pl.c, r.offre, cible);
+    if (prix >= pa) { ligne.raison = 'plancher_au_prix'; out.push(ligne); continue; }
+    ligne.prix = prix;
+    const quand = (Number(r.at) || 0) + jours * 86400000;
+    ligne.quand = quand;
+    if (!(Number(r.at) > 0)) { ligne.raison = 'date_inconnue'; out.push(ligne); continue; }
+    ligne.etat = maintenant >= quand ? 'pret' : 'attente';
+    out.push(ligne);
+  }
+  const rang = { pret: 0, attente: 1, ecarte: 2 };
+  return out.sort((a, b) => (rang[a.etat] - rang[b.etat]) || ((Number(a.quand) || 0) - (Number(b.quand) || 0)) || a.conv.localeCompare(b.conv));
+}
+// </lot-relance-regle>
+// <agent-vrm-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-agent-vrm.cjs --recopie).
+const AG_CATS_SURES = ['dispo', 'taille', 'envoi', 'lot', 'photos'];
+const AG_ESSAI_JOURS_DEFAUT = 3, AG_ESSAI_JOURS_MAX = 14;
+const agEnt = (v, a, b, d) => { const n = Number(v); return Number.isInteger(n) && n >= a && n <= b ? n : d; };
+// SON réglage. `essaiJusqua` (ms) : tant que maintenant < essaiJusqua, RIEN ne part (mode Essai).
+function agReglage(o) {
+  const x = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const hc = x.heuresCalmes && typeof x.heuresCalmes === 'object' ? x.heuresCalmes : null;
+  const de = hc ? agEnt(hc.de, 0, 23, null) : null, a = hc ? agEnt(hc.a, 0, 23, null) : null;
+  return {
+    actif: x.actif === true,
+    negocier: x.negocier !== false,
+    repondre: x.repondre !== false,
+    essaiJours: agEnt(x.essaiJours, 0, AG_ESSAI_JOURS_MAX, AG_ESSAI_JOURS_DEFAUT),
+    essaiJusqua: Number.isFinite(Number(x.essaiJusqua)) && Number(x.essaiJusqua) > 0 ? Number(x.essaiJusqua) : null,
+    heuresCalmes: de != null && a != null && de !== a ? { de, a } : { de: 22, a: 8 },
+    // l'heure de SON dernier allumage : un arrêt sur un frein d'avant ne compte plus.
+    allumeAt: Number.isFinite(Number(x.allumeAt)) && Number(x.allumeAt) > 0 ? Number(x.allumeAt) : null,
+  };
+}
+const agEnEssai = (R, maintenant) => !!(R && R.essaiJusqua && Number(maintenant) < R.essaiJusqua);
+// Heure de Paris h ∈ [de, a[ (par-dessus minuit permis).
+const agHeureCalme = (hc, h) => !!hc && (hc.de < hc.a ? h >= hc.de && h < hc.a : h >= hc.de || h < hc.a);
+// LES SIGNAUX DE RISQUE : un message qui en porte un n'est JAMAIS répondu seul (« à toi »). Liste FERMÉE, 5 langues.
+const AG_RISQUES = {
+  litige: ['litige', 'probleme', 'arnaque', 'escroc*', 'plainte', 'signaler', 'signale', 'dispute', 'scam', 'scammer', 'problem', 'complaint', 'report', 'estafa', 'reclamacion', 'truffa', 'reclamo', 'betrug', 'beschwerde', 'problema'],
+  retour: ['retour', 'rembours*', 'renvoyer', 'annuler', 'annulation', 'refund', 'return', 'cancel', 'devolucion', 'reembolso', 'cancelar', 'reso', 'rimborso', 'annullare', 'ruckgabe', 'erstattung', 'stornieren', 'zuruck'],
+  reclamation: ['pas recu', 'jamais recu', 'colis perdu', 'pas conforme', 'casse', 'cassee', 'not received', 'never arrived', 'not as described', 'broken', 'no recibido', 'roto', 'non ricevuto', 'rotto', 'nicht erhalten', 'kaputt'],
+  insulte: ['connard', 'connasse', 'conne', 'salope', 'encule', 'merde', 'idiot', 'debile', 'abruti', 'fuck', 'idiot', 'stupid', 'asshole', 'bitch', 'gilipollas', 'idiota', 'puta', 'cazzo', 'stronzo', 'arschloch', 'scheisse', 'idiot'],
+  hors_plateforme: ['whatsapp', 'whats app', 'telegram', 'snapchat', 'snap', 'instagram', 'insta', 'messenger', 'sms', 'mon numero', 'ton numero', 'telephone', 'phone number', 'numero de telefono', 'numero di telefono', 'telefonnummer', 'mail', 'email', 'e mail', 'gmail', 'main propre', 'in person', 'en mano', 'di persona', 'personlich'],
+  paiement: ['paypal', 'lydia', 'virement', 'iban', 'western union', 'cash', 'especes', 'liquide', 'bank transfer', 'transferencia', 'bonifico', 'uberweisung', 'barzahlung', 'revolut', 'wise'],
+};
+function agRisque(texte) {
+  const n = rrNormaliser(texte);
+  for (const k of Object.keys(AG_RISQUES)) for (const m of AG_RISQUES[k]) if (rrContient(n, m)) return k;
+  return '';
+}
+// Une empreinte courte d'un texte (une réponse par QUESTION : la même question n'est jamais répondue deux fois).
+function agEmpreinte(t) { let h = 2166136261; const s = rrNormaliser(t); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); }
+// LA DÉCISION SUR UN MESSAGE.
+//  ctx : { conv, messages ([{deMoi, texte}] dans l'ordre), reglageRr (SES modèles), vars ({ pseudo, article, taille, prix }),
+//        partie, photos (nombre de photos de l'annonce, null = pas su), repondues (Set d'empreintes « conv:question »),
+//        heure (heure de Paris), agent (agReglage), sur (texte → bool) }
+// Rend { geste: 'repondre', cat, texte, cle } · { geste: 'a_toi', raison, cat? } · { geste: 'rien', raison } ·
+//       { geste: 'attendre', raison: 'heures_calmes' }.
+function agDecisionMessage(ctx) {
+  const c = ctx && typeof ctx === 'object' ? ctx : {};
+  const R = c.agent || agReglage(null);
+  if (!R.repondre) return { geste: 'rien', raison: 'repondre_eteint' };
+  const l = Array.isArray(c.messages) ? c.messages.filter((m) => m && String(m.texte || '').trim()) : [];
+  if (!l.length) return { geste: 'rien', raison: 'vide' };
+  const der = l[l.length - 1];
+  // Jamais deux messages d'affilée sans réponse de l'acheteur ; un auteur pas sûr ⇒ rien (pas su ≠ acheteur).
+  if (der.deMoi === true) return { geste: 'rien', raison: 'dernier_de_moi' };
+  if (der.deMoi !== false) return { geste: 'rien', raison: 'auteur_pas_su' };
+  const question = rrQuestionEnAttente(l);
+  if (!question) return { geste: 'rien', raison: 'vide' };
+  const cle = String(c.conv || '') + ':' + agEmpreinte(question);
+  const rep = c.repondues && typeof c.repondues.has === 'function' ? c.repondues : new Set(Array.isArray(c.repondues) ? c.repondues : []);
+  if (rep.has(cle)) return { geste: 'rien', raison: 'deja_repondu' };
+  const risque = agRisque(question);
+  if (risque) return { geste: 'a_toi', raison: 'risque_' + risque, cle };
+  const qs = rrQuestions(question);
+  if (!qs.length) return { geste: 'a_toi', raison: 'question_ambigue', cle };
+  if (qs.length > 1) return { geste: 'a_toi', raison: 'plusieurs_questions', cle };
+  const cat = qs[0].cat;
+  if (!AG_CATS_SURES.includes(cat)) return { geste: 'a_toi', raison: 'categorie_' + cat, cat, cle };
+  if (cat === 'photos' && !(Number(c.photos) > 1)) return { geste: 'a_toi', raison: 'photos_absentes', cat, cle };
+  if (cat === 'dispo' && c.partie !== false) return { geste: 'a_toi', raison: c.partie === true ? 'annonce_partie' : 'dispo_pas_su', cat, cle };
+  // SES modèles, mais JAMAIS le prix mini (l'agent ne le révèle pas, même si SA réponse à la main le peut).
+  const rr = Object.assign({}, c.reglageRr || {}, { revelerMini: false });
+  const vars = Object.assign({}, c.vars || {}); delete vars.prix_mini;
+  const p = rrPropositions({ texte: question, reglage: rr, vars, partie: c.partie === true, sur: c.sur, hasard: () => 0 }).propositions[0];
+  if (!p || !p.texte) return { geste: 'a_toi', raison: 'info_manquante' + (p && p.manque ? '_' + p.manque : ''), cat, cle };
+  if (/\{prix_mini\}/.test(p.texte)) return { geste: 'a_toi', raison: 'prix_mini', cat, cle };
+  if (agHeureCalme(R.heuresCalmes, Number(c.heure))) return { geste: 'attendre', raison: 'heures_calmes', cat, texte: p.texte, cle };
+  return { geste: 'repondre', cat, texte: p.texte, cle };
+}
+// LA DÉCISION SUR UNE OFFRE REÇUE.
+//  ctx : { offre (euros), prix (de l'annonce), mini, refuse (SON seuil de refus), achat, nArticles, joues (paliers déjà
+//        joués dans CETTE négociation), paliers (SES réglages de tranches), palier (fonction = palierContreOffre),
+//        enVente (true = prouvée en vente), gardeOk (true = aucune double vente), compteBloque, faite (déjà traitée),
+//        agent (agReglage) }
+// Rend { geste: 'accepter'|'contre'|'refuser', prix?, palier?, raison } · { geste: 'a_toi'|'rien', raison }.
+function agDecisionOffre(ctx) {
+  const c = ctx && typeof ctx === 'object' ? ctx : {};
+  const R = c.agent || agReglage(null);
+  if (!R.negocier) return { geste: 'rien', raison: 'negocier_eteint' };
+  if (c.faite) return { geste: 'rien', raison: 'deja_traitee' };
+  if (c.compteBloque) return { geste: 'rien', raison: 'compte_bloque' };
+  const o = Number(c.offre), p = Number(c.prix);
+  if (!(o > 0) || !(p > 0)) return { geste: 'a_toi', raison: 'prix_inconnu' };
+  const pl = lrPlancher(c.mini, c.achat);
+  if (!pl) return { geste: 'a_toi', raison: 'plancher_inconnu' };
+  const plancher = pl.c / 100;
+  const mini = Number(c.mini) > 0 ? Number(c.mini) : null;
+  const refuse = Number(c.refuse) > 0 ? Number(c.refuse) : null;
+  const accepter = () => {
+    if (c.enVente !== true) return { geste: 'a_toi', raison: 'pas_prouvee_en_vente' };
+    if (c.gardeOk !== true) return { geste: 'a_toi', raison: 'double_vente_pas_exclue' };
+    if (o < plancher) return { geste: 'a_toi', raison: 'sous_plancher' };
+    return { geste: 'accepter', prix: o, raison: 'au_dessus_du_seuil' };
+  };
+  // 1. Au-dessus de SON seuil (le prix mini) : accepter (jamais sous le plancher).
+  if (mini != null && o >= mini) return accepter();
+  // 2. Sous SON seuil de refus : refuser (son message, s'il en a écrit un, part avec ; jamais inventé).
+  if (refuse != null && o < refuse) return { geste: 'refuser', raison: 'sous_le_refus' };
+  // 3. Entre les deux : SES tranches (palier suivant ; « rester flexible » peut accepter, au-dessus du plancher).
+  const pal = typeof c.palier === 'function' ? c.palier({ prix: p, mini: c.mini, achat: c.achat, nArticles: c.nArticles, offre: o, joues: c.joues || [], reglages: Object.assign({}, c.paliers || {}, { actif: true }) }) : null;
+  if (pal && pal.accepter) { const a = accepter(); return a.geste === 'accepter' ? Object.assign(a, { raison: 'flexible', palier: pal.i }) : a; }
+  if (pal && Number(pal.prix) > 0) {
+    const px = Math.round(Number(pal.prix) * 100) / 100;
+    if (px < plancher || px <= o || px >= p) return { geste: 'a_toi', raison: 'palier_hors_bornes' };
+    return { geste: 'contre', prix: px, palier: pal.i, finale: !!pal.finale, raison: 'palier' };
+  }
+  return { geste: 'a_toi', raison: 'paliers_epuises' };
+}
+// Le tableau de bord : décisions du jour, en attente, « à toi », taux d'acceptation (sur les offres TRANCHÉES).
+function agTableau(journal, maintenant, jourDe) {
+  const l = Array.isArray(journal) ? journal : [];
+  const jour = typeof jourDe === 'function' ? jourDe : (t) => new Date(t).toISOString().slice(0, 10);
+  const auj = jour(Number(maintenant) || 0);
+  const t = { jour: 0, essai: 0, attente: 0, aToi: 0, acceptees: 0, tranchees: 0, envoyes: 0 };
+  for (const e of l) {
+    if (!e) continue;
+    if (jour(Number(e.at) || 0) === auj) { t.jour++; if (e.essai) t.essai++; }
+    if (e.etat === 'prevu') t.attente++;
+    if (e.geste === 'a_toi' && !e.vu) t.aToi++;
+    if (!e.essai && e.etat === 'fait' && ['accepter', 'contre', 'refuser'].includes(e.geste)) { t.tranchees++; if (e.geste === 'accepter') t.acceptees++; }
+    if (!e.essai && e.etat === 'fait') t.envoyes++;
+  }
+  t.taux = t.tranchees ? Math.round(100 * t.acceptees / t.tranchees) : null;
+  return t;
+}
+// </agent-vrm-regle>
+// ══ 5.421 (21 nov., Julien, choix n° 4, 5, 6) — RÉPONSES RAPIDES SANS IA · OFFRE LOT AUX FAVORIS · RELANCE DES OFFRES ══
+// Les RÈGLES sont les blocs <reponses-rapides-regle> (src/reponsesRapides.js) et <lot-relance-regle> (src/lotRelance.js),
+// recopiés au-dessus ; ici, seulement ce qu'elles lisent (par IDENTITÉ : l'annonce de la conversation =
+// `conversation.transaction.item_id`, la personne d'un favori = le `receiver_id` du lien natif de SA notification) et
+// les gestes, chacun sur SON toucher, par l'INTERFACE de la page (`repondreCarte`, `interfaceVinted`,
+// `executerPourAppCoeur` → `gesteAppParInterface`) — aucune requête d'écriture fabriquée, aucune IA (§2.9).
+const RR_IA_RAISON = 'VRM ne garde aucune clé IA de vendeur côté serveur (seule la clé Photoroom l’est) : les réponses viennent des mots-clés, sans IA.';
+async function rrReglageLu() {
+  const m = await lireMain(['vrm_reponses_rapides']).catch(() => null);
+  return m ? rrReglage(m.vrm_reponses_rapides) : null;
+}
+// Le fil d'une conversation Vinted RANGÉE (`harvest_{uid}_conv_{id}`) : messages de l'acheteur et du vendeur, la personne,
+// l'annonce (identité : la transaction de la conversation). Pas rangée ⇒ null (« pas su », jamais une liste vide).
+async function filVintedRange(uid, conv) {
+  if (!/^\d{1,20}$/.test(String(uid || '')) || !/^[1-9]\d{0,19}$/.test(String(conv || ''))) return null;
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_conv_${conv}&select=cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,it:data->payload->conversation->transaction->>item_id,ti:data->payload->conversation->transaction->>item_title,tx:data->payload->conversation->transaction->>id,msgs:data->payload->conversation->messages`);
+  if (!Array.isArray(rows) || !rows[0] || String(rows[0].cid || '') !== String(conv)) return null;
+  const r = rows[0], opp = r.opp != null && r.opp !== '' ? Number(r.opp) : null;
+  const brut = Array.isArray(r.msgs) ? r.msgs : [];
+  const messages = brut.filter((m) => m && m.entity_type === 'message' && m.entity && typeof m.entity.body === 'string')
+    .map((m) => ({ deMoi: opp > 0 && m.entity.user_id != null ? Number(m.entity.user_id) !== opp : null, texte: String(m.entity.body).slice(0, 1000) }));
+  return { conv: String(conv), opp: opp > 0 ? String(opp) : '', login: typeof r.login === 'string' ? r.login.slice(0, 40) : '', item: /^\d{1,20}$/.test(String(r.it || '')) ? String(r.it) : '', titre: typeof r.ti === 'string' ? r.ti.slice(0, 120) : '', tx: /^\d{1,20}$/.test(String(r.tx || '')) ? String(r.tx) : '', cap: r.cap || null, messages, brut };
+}
+// Les variables d'UNE annonce de SON dressing, par identité : titre, taille, prix (euros), prix mini, et si elle est
+// prouvée partie. Rien de su ⇒ la clé est absente (la version qui la demande est sautée).
+async function rrVariablesAnnonce(uid, itemId, titreFil) {
+  const v = {}; let partie = false;
+  if (titreFil) v.article = titreFil;
+  if (!/^\d{1,20}$/.test(String(itemId || ''))) return { vars: v, partie };
+  const d = await donneesInfosPage(String(uid)).catch(() => null);
+  const it = d && d.parId ? d.parId[String(itemId)] : null;
+  if (it) {
+    if (it.title) v.article = String(it.title).slice(0, 120);
+    const t = String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '').trim(); if (t) v.taille = t.slice(0, 30);
+    const p = prixCarte(it.price); if (Number(p) > 0) v.prix = Number(p);
+  }
+  const reg = await offreAutoReglages().catch(() => null);
+  const mi = reg && reg.mins ? reg.mins[String(itemId)] : null; if (Number(mi) > 0) v.prix_mini = Number(mi);
+  const ind = await annonceIndisponibleLue(String(uid), String(itemId)).catch(() => '');
+  if (ind) partie = true;
+  return { vars: v, partie };
+}
+// LE PANNEAU demande les réponses proposées pour UNE conversation de l'onglet (lecture seule, rien n'est envoyé ici).
+async function reponsesRapidesCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const pf = plateformeDe(o.url), conv = String((msg && msg.conv) || '');
+  const reglage = await rrReglageLu();
+  if (!reglage) return { ok: false, code: 'lecture', raison: 'Tes modèles n’ont pas pu être relus : rien n’est proposé plutôt qu’une réponse fausse.' };
+  const langueUi = RR_LANGUES.includes(String((msg && msg.langue) || '')) ? String(msg.langue) : 'fr';
+  const ia = { dispo: false, raison: RR_IA_RAISON };
+  let messages = null, vars = {}, partie = false, item = '';
+  const site = pf === 'leboncoin' ? 'leboncoin' : pf === 'vestiaire' ? 'vestiaire' : 'vinted';
+  if (pf === 'vinted') {
+    let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+    const uid = await compteConnecte(dom);
+    if (!uid) return { ok: false, code: 'compte', raison: 'Aucun compte Vinted connecté dans cet onglet.' };
+    const f = await filVintedRange(String(uid), conv);
+    if (!f) return { ok: true, reglage, ia, propositions: [], fil: 'pas_lu', raison: 'La conversation n’est pas encore lue : ouvre-la une fois sur Vinted, VRM lira la question.' };
+    messages = f.messages; item = f.item;
+    const a = await rrVariablesAnnonce(String(uid), f.item, f.titre);
+    vars = Object.assign({ pseudo: f.login }, a.vars); partie = a.partie;
+  } else if (pf === 'leboncoin' || pf === 'vestiaire') {
+    const id = pf === 'leboncoin' ? `lbc_fil_${encodeURIComponent(conv)}` : `vc_fil_${encodeURIComponent(conv)}`;
+    const rows = await sbGet(`app_data?id=eq.${id}&select=titre:data->>titre,qui:data->>interlocuteur,msgs:data->messages`);
+    if (!Array.isArray(rows)) return { ok: false, code: 'lecture', raison: 'La base VRM n’a pas répondu : rien n’est proposé.' };
+    if (!rows[0]) return { ok: true, reglage, ia, propositions: [], fil: 'pas_lu', raison: 'La conversation n’est pas encore lue : ouvre-la une fois, VRM lira la question.' };
+    messages = (Array.isArray(rows[0].msgs) ? rows[0].msgs : []).map((m) => ({ deMoi: m && (m.deMoi === true || m.deMoi === false) ? m.deMoi : null, texte: String((m && (m.t || m.texte)) || '').slice(0, 1000) }));
+    // Leboncoin / Vestiaire : le titre de L'annonce de ce fil (son identité est la conversation) ; taille, prix pas sus ici.
+    if (rows[0].titre) vars.article = String(rows[0].titre).slice(0, 120);
+    if (pf === 'leboncoin' && rows[0].qui) vars.pseudo = String(rows[0].qui).slice(0, 40);
+  } else return { ok: false, code: 'site', raison: 'Site inconnu.' };
+  const r = rrPropositions({ messages, reglage, vars, langueUi, partie, sur: (t) => !MESSAGE_SUR.risquesMessage(String(t || ''), site).length });
+  return { ok: true, reglage, ia, item, fil: 'lu', question: r.question, langue: r.langue || null, propositions: r.propositions };
+}
+
+// ── OFFRE LOT AUX FAVORIS ─────────────────────────────────────────────────────────────────────────────────────────────
+// Les liens natifs des notifications de favoris (id → lien), lus en UNE fois (la règle de `lienDuFavori`) : un id qui a
+// deux liens différents n'en a aucun (ambigu ⇒ rien).
+async function liensFavorisNotif(uid) {
+  try {
+    const s = await authToken(), owner = s && s.user_id;
+    if (!owner) return null;
+    const a = await archiveNotifications(uid, { lecture: true, ownerAttendu: owner });
+    const raw = await sbGet(`app_data?id=eq.harvest_${uid}_notifications&owner=eq.${owner}&select=owner,data`);
+    if (!a || !Array.isArray(raw)) return null;
+    const ds = [a.data, ...raw.filter((r) => r && r.owner === owner).map((r) => r.data)].filter((d) => d && String(d.uid) === String(uid) && d.payload && Array.isArray(d.payload.notifications));
+    const m = new Map();
+    for (const d of ds) for (const n of d.payload.notifications.slice(0, 10000)) {
+      if (!n || typeof n.id !== 'string' || typeof n.link !== 'string' || !/favori|favourit/i.test(String(n.body || ''))) continue;
+      const av = m.get(n.id); m.set(n.id, av === undefined || av === n.link ? n.link : null);
+    }
+    return m;
+  } catch (_) { return null; }
+}
+// LES LOTS du compte de l'onglet : l'aperçu des favoris (articles ENCORE en vente, vérifiés par VRM), la personne par
+// identité (receiver_id du lien natif), les planchers (prix mini, sinon achat + 10 %), SON taux (`lotFavoris`).
+async function lotsFavorisDe(uid) {
+  const f = await apercuCarteFrais(uid);
+  if (!f.ok) return { ok: false, code: 'serveur', raison: f.raison };
+  const tous = Array.isArray(f.apercu && f.apercu.tous) ? f.apercu.tous : [];
+  const liens = await liensFavorisNotif(uid);
+  if (!liens) return { ok: false, code: 'lecture', raison: 'Les notifications de favoris n’ont pas pu être relues : aucun lot proposé.' };
+  const reg = await offreAutoReglages().catch(() => null);
+  if (!reg) return { ok: false, code: 'lecture', raison: 'Tes prix mini n’ont pas pu être relus : aucun lot proposé.' };
+  const B = await bleamCompte(uid).catch(() => null);
+  const R = lrReglageLot(B && B.lotFavoris);
+  const favs = [];
+  for (const x of tous) {
+    if (!x || !x.itemId) continue;
+    const lien = liens.get(String(x.id));
+    const page = lien ? pageFavoriNative(lien, 'www.vinted.fr') : null;
+    const receiver = page && page.itemId === String(x.itemId) ? destinataireLienFavori(page) : '';
+    if (!receiver) continue;   // personne pas prouvée : jamais regroupée
+    // `tous` ne garde que les articles ENCORE en vente (vendus, réservés, en pause, absents du dressing : retirés par le serveur).
+    favs.push({ receiver, pseudo: x.pseudo, itemId: String(x.itemId), prix: x.prix, mini: reg.mins[String(x.itemId)], achat: reg.achats[String(x.itemId)], titre: x.titre || '', photo: x.photo || '', at: Date.parse(x.date || '') || 0, enVente: true, lien: page.url });
+  }
+  const deja = (await chrome.storage.local.get(LOT_ENVOYE).catch(() => ({})))[LOT_ENVOYE] || {};
+  const lots = lrGroupesLot(favs).map((g) => {
+    const o = lrOffreLot(g.items, R.taux);
+    const t = deja[String(uid)] && deja[String(uid)][g.receiver];
+    return Object.assign({}, g, { offre: o, deja: Number(t) > 0 && Date.now() - Number(t) < 30 * 864e5 ? Number(t) : null, liens: favs.filter((v) => v.receiver === g.receiver).map((v) => [v.itemId, v.lien]) });
+  });
+  const wr = await sbGet(`app_data?id=like.harvest_${uid}_wreq_*bundle*&select=id,at:data->>capturedAt`).catch(() => null);
+  const appris = Array.isArray(wr) && wr[0] ? (Date.parse(wr[0].at || '') || true) : (wr === null ? null : false);
+  return { ok: true, uid, taux: R.taux, lots, lotAppris: appris };
+}
+const LOT_TEXTE_DEFAUT = 'Bonjour {pseudo}, tu as aimé {n} de mes articles : je te les propose ensemble à {prix_lot} au lieu de {somme}. Si ça te va, fais un lot avec ces articles et propose ce prix.';
+function texteLotFavori(modele, v) {
+  const t = String(modele || LOT_TEXTE_DEFAUT);
+  let trou = false;
+  const out = t.replace(/\{(pseudo|n|prix_lot|somme)\}/g, (x, k) => { const s = k === 'prix_lot' || k === 'somme' ? rrEuros(Number(v[k]) / 100) : String(v[k] == null ? '' : v[k]).trim(); if (!s) trou = true; return s; });
+  return trou || /[{}]/.test(out) ? '' : out.trim();
+}
+async function lotsFavorisCarte(msg, sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  if (msg && msg.uid != null && String(msg.uid) !== o.uid) return { ok: false, code: 'compte', raison: 'L’onglet est connecté sur un autre compte Vinted.' };
+  const quoi = String((msg && msg.quoi) || 'lire');
+  if (quoi === 'lire') return lotsFavorisDe(o.uid);
+  if (quoi !== 'envoyer') return { ok: false, code: 'action', raison: 'Geste inconnu.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord « Envoyer le lot ».' };
+  const receiver = String(msg.receiver || '');
+  if (!/^[1-9]\d{0,19}$/.test(receiver)) return { ok: false, code: 'identite', raison: 'La personne n’est pas reconnue : rien n’est parti.' };
+  // Pris SANS attente entre le test et la prise : deux touchers simultanés ⇒ un seul lot.
+  const vol = o.uid + '|' + receiver;
+  if (_lotsEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Ce lot est déjà en cours d’envoi : rien n’est reparti.' };
+  _lotsEnVol.add(vol);
+  try { return await envoyerLotFavori(o, msg, receiver); } finally { _lotsEnVol.delete(vol); }
+}
+const _lotsEnVol = new Set();
+async function envoyerLotFavori(o, msg, receiver) {
+  // Tout est RECALCULÉ ici (jamais le prix ni la liste du panneau) : la liste vue doit être celle d'aujourd'hui.
+  const L = await lotsFavorisDe(o.uid);
+  if (!L.ok) return L;
+  const g = L.lots.find((x) => x.receiver === receiver);
+  if (!g) return { ok: false, code: 'plus', raison: 'Ce lot n’est plus possible (un article vendu, un favori retiré) : rien n’est parti.' };
+  const vus = Array.isArray(msg.items) ? [...new Set(msg.items.map(String))].sort().join(',') : '';
+  if (vus !== g.items.map((x) => x.itemId).sort().join(',')) return { ok: false, code: 'change', raison: 'La liste du lot a changé depuis l’affichage : relis-la, rien n’est parti.' };
+  if (g.deja) return { ok: false, code: 'deja', raison: 'Un lot a déjà été proposé à cette personne ces 30 derniers jours : rien n’est reparti.' };
+  if (!g.offre || !g.offre.ok) return { ok: false, code: 'prix', raison: 'Le prix du lot ne se calcule pas (prix mini ou prix d’achat manquant) : rien n’est parti.' };
+  if (msg.prix != null && Math.round(Number(msg.prix) * 100) !== g.offre.prix) return { ok: false, code: 'change', raison: 'Le prix du lot a changé depuis l’affichage : relis-le, rien n’est parti.' };
+  const B = await bleamCompte(o.uid).catch(() => null);
+  const modele = B && B.favMessages && Array.isArray(B.favMessages.lot) ? (B.favMessages.lot.map((v) => v.texte).find((t) => /\{prix_lot\}/.test(t)) || '') : '';
+  const texte = texteLotFavori(modele, { pseudo: g.pseudo, n: g.items.length, prix_lot: g.offre.prix, somme: g.offre.somme });
+  if (!texte) return { ok: false, code: 'variable', raison: 'Le pseudo de cette personne n’est pas lu : le message aurait un trou, rien n’est parti.' };
+  if (MESSAGE_SUR.risquesMessage(texte, 'vinted').length) return { ok: false, code: 'texte_interdit', raison: 'Le message contient un mot qui fait refuser le compte : rien n’est parti.' };
+  const accts = await getStoredAccounts({ ouNull: true });
+  const acc = accts && accts.find((a) => String(a.vinted_user_id) === o.uid);
+  if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
+  const stop = await garde(o.uid, acc, { sorte: 'favori' }); if (stop) return Object.assign({ ok: false }, stop);
+  { const sc = await secuGeste('vinted', o.uid, 'favori', 'clic'); if (sc) return Object.assign({ ok: false }, sc); }
+  // Noté AVANT de partir : un worker tué en vol ne repropose jamais ce lot (jamais deux).
+  await noterLotEnvoye(o.uid, receiver);
+  const premier = g.items[0];
+  const lien = (g.liens.find((x) => x[0] === premier.itemId) || [])[1] || '';
+  const ouv = await interfaceVinted(acc, 'favoriOuvrir', { lien, itemId: premier.itemId, receiverId: receiver });
+  if (!ouv || !ouv.ok || !ouv.conv) { noterDiag('lot_ouverture_' + (ouv && (ouv.rienParti ? 'rien' : ouv.incertain ? 'incertain' : ouv.status)) ); return { ok: false, code: ouv && ouv.incertain ? 'incertain' : 'ouverture', raison: ouv && ouv.incertain ? 'La conversation ne s’est peut-être pas ouverte : regarde sur Vinted (rien ne sera renvoyé).' : 'La conversation n’a pas pu s’ouvrir : rien n’est parti.' }; }
+  const c2 = await compterAction(o.uid, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+  if (!c2.ok) return { ok: false, code: 'plafond', raison: 'Plafond d’actions de l’heure atteint : la conversation est ouverte, le message n’est pas parti.' };
+  const r = await interfaceVinted(acc, 'message', { conv: ouv.conv, texte });
+  const etat = etatGesteVinted(r);
+  noterDiag('lot_message_' + etat);
+  logActivity(etat === 'confirme' ? `🧺 Lot de ${g.items.length} proposé à ${rrEuros(g.offre.prix / 100)} (son toucher).` : `🧺 Lot de ${g.items.length} : message ${etat === 'incertain' ? 'pas confirmé' : 'refusé'}.`);
+  if (etat === 'confirme') return { ok: true, conv: ouv.conv, prix: g.offre.prix / 100, lotAppris: L.lotAppris };
+  return { ok: false, code: etat === 'incertain' ? 'incertain' : 'refus', raison: etat === 'incertain' ? 'Envoi non confirmé : regarde la conversation sur Vinted (rien ne sera renvoyé).' : 'Vinted n’a pas accepté le message.' };
+}
+
+// ── RELANCE DES OFFRES RATÉES ─────────────────────────────────────────────────────────────────────────────────────────
+const RELANCES_FAITES = 'vrmRelancesOffres', RELANCES_PREVUES = 'vrmRelancesPrevues', RELANCES_VERROU = 'vrmRelancesVerrou';
+async function relancesDeja(uid) {
+  try { const m = (await chrome.storage.local.get(RELANCES_FAITES))[RELANCES_FAITES] || {}; return m[String(uid)] && typeof m[String(uid)] === 'object' ? m[String(uid)] : {}; } catch (_) { return null; }
+}
+async function noterRelance(uid, cle) {
+  try { const m = (await chrome.storage.local.get(RELANCES_FAITES))[RELANCES_FAITES] || {}; const u = m[String(uid)] = m[String(uid)] || {}; if (u[cle]) return false; u[cle] = Date.now(); const k = Object.keys(u); if (k.length > 3000) delete u[k[0]]; await chrome.storage.local.set({ [RELANCES_FAITES]: m }); return true; } catch (_) { return false; }
+}
+// LA LISTE « À RELANCER » d'un compte : chaque conversation rangée (une lecture, projections), la règle pure.
+async function relancesDe(uid) {
+  const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,it:data->payload->conversation->transaction->>item_id,tx:data->payload->conversation->transaction->>id,msgs:data->payload->conversation->messages`);
+  if (!Array.isArray(rows)) return { ok: false, code: 'lecture', raison: 'Les conversations n’ont pas pu être relues : rien n’est proposé.' };
+  const deja = await relancesDeja(uid);
+  if (deja === null) return { ok: false, code: 'stockage', raison: 'La mémoire des relances n’a pas pu être lue : rien n’est proposé (jamais deux relances).' };
+  const reg = await offreAutoReglages().catch(() => null);
+  if (!reg) return { ok: false, code: 'lecture', raison: 'Tes prix mini n’ont pas pu être relus : rien n’est proposé.' };
+  const d = await donneesInfosPage(String(uid)).catch(() => null);
+  if (!d) return { ok: false, code: 'lecture', raison: 'Ton dressing n’a pas pu être relu : rien n’est proposé.' };
+  const B = await bleamCompte(uid).catch(() => null);
+  if (!B) return { ok: false, code: 'lecture', raison: 'Tes réglages n’ont pas pu être relus : rien n’est proposé.' };
+  const R = lrReglageRelance(B.relanceOffres);
+  const ratees = [], vus = new Set();
+  for (const r of rows.slice().sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0))) {
+    const cid = String(r.cid || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
+    const x = lrOffreRatee({ conv: cid, opp: r.opp, login: r.login, item: r.it, tx: r.tx, cap: r.cap, messages: r.msgs });
+    if (x) ratees.push(x);
+  }
+  const ind = {};
+  for (const x of ratees) if (!(x.item in ind)) ind[x.item] = d.parId[x.item] ? ((await annonceIndisponibleLue(String(uid), x.item).catch(() => 'pas_su')) ? 'vendu' : 'en_vente') : 'pas_su';
+  const liste = lrRelances(ratees, { maintenant: Date.now(), jours: R.jours, taux: R.taux, deja: new Set(Object.keys(deja)),
+    etatArticle: (it) => ind[it] || 'pas_su', prixArticle: (it) => (d.parId[it] ? prixCarte(d.parId[it].price) : null),
+    planchers: (it) => ({ mini: reg.mins[it], achat: reg.achats[it] }) });
+  for (const l of liste) { const it = d.parId[l.item]; l.titre = it && it.title ? String(it.title).slice(0, 80) : ''; }
+  return { ok: true, uid: String(uid), reglage: R, liste: liste.slice(0, 60) };
+}
+// UNE relance : la contre-offre de la ligne PRÊTE, par l'interface (`offre` dans SA conversation). Notée AVANT.
+const _relancesEnVol = new Set();
+async function envoyerRelance(uid, acc, l, source) {
+  const cle = l.acheteur + '|' + l.item, vol = String(uid) + '|' + cle;
+  // Pris SANS attente entre le test et la prise : deux touchers simultanés ⇒ un seul départ.
+  if (_relancesEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Cette relance est déjà en cours : rien n’est reparti.' };
+  _relancesEnVol.add(vol);
+  try { return await envoyerRelanceUne(uid, acc, l, source, cle); } finally { _relancesEnVol.delete(vol); }
+}
+async function envoyerRelanceUne(uid, acc, l, source, cle) {
+  if (!(await noterRelance(uid, cle))) return { ok: false, code: 'stockage', raison: 'La relance n’a pas pu être notée : rien n’est parti (jamais deux relances).' };
+  let r = null;
+  try { r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${l.tx}/offers`, conv: l.conv, body: { offer: { price: (l.prix / 100).toFixed(2), currency: 'EUR' } } }); } catch (_) { r = null; }
+  const etat = etatGesteVinted(r);
+  noterDiag('relance_offre_' + source + '_' + etat);
+  try { noterJournal(String(uid), 'relance_offre', { item: l.item, prix: l.prix / 100, etat }); } catch (_) {}
+  logActivity(etat === 'confirme' ? `↩️ Contre-offre de relance à ${rrEuros(l.prix / 100)} envoyée (${source === 'auto' ? 'relance automatique' : 'son toucher'}).` : `↩️ Relance à ${rrEuros(l.prix / 100)} : ${etat === 'incertain' ? 'pas confirmée' : 'refusée par Vinted'}.`);
+  if (etat === 'confirme') return { ok: true, prix: l.prix / 100 };
+  return { ok: false, code: etat === 'incertain' ? 'incertain' : 'refus', raison: etat === 'incertain' ? 'Vinted n’a pas répondu clairement : regarde la conversation (rien ne sera renvoyé).' : ((r && (r.error || (r.data && typeof r.data.message === 'string' && r.data.message))) || 'Vinted a refusé la contre-offre.') };
+}
+async function relancesCarte(msg, sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  if (msg && msg.uid != null && String(msg.uid) !== o.uid) return { ok: false, code: 'compte', raison: 'L’onglet est connecté sur un autre compte Vinted.' };
+  const quoi = String((msg && msg.quoi) || 'lire');
+  if (quoi === 'lire') return relancesDe(o.uid);
+  if (quoi !== 'envoyer') return { ok: false, code: 'action', raison: 'Geste inconnu.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord la relance.' };
+  const L = await relancesDe(o.uid);
+  if (!L.ok) return L;
+  const l = L.liste.find((x) => x.conv === String(msg.conv || '') && x.item === String(msg.item || ''));
+  if (!l) return { ok: false, code: 'plus', raison: 'Cette relance n’est plus proposée : rien n’est parti.' };
+  if (l.etat !== 'pret') return { ok: false, code: l.etat === 'attente' ? 'attente' : 'ecarte', raison: l.etat === 'attente' ? 'Pas encore : la relance part après le délai que tu as réglé.' : 'Cette relance est écartée : rien n’est parti.' };
+  if (msg.prix != null && Math.round(Number(msg.prix) * 100) !== l.prix) return { ok: false, code: 'change', raison: 'Le prix a changé depuis l’affichage : relis-le, rien n’est parti.' };
+  const accts = await getStoredAccounts({ ouNull: true });
+  const acc = accts && accts.find((a) => String(a.vinted_user_id) === o.uid);
+  if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
+  const stop = await garde(o.uid, acc, { sorte: 'offre' }); if (stop) return Object.assign({ ok: false }, stop);
+  { const sc = await secuGeste('vinted', o.uid, 'offre', 'clic'); if (sc) return Object.assign({ ok: false }, sc); }
+  return envoyerRelance(o.uid, acc, l, 'clic');
+}
+// « RELANCER SEUL » (éteint par défaut ; allumé = SA confirmation « Oui, allumer ») : les MÊMES garde-fous que
+// `autoAccepterOffres` — verrou (un passage à la fois), compte de l'onglet + pause (`garde`), frein Vinted, prudence,
+// délai AU HASARD depuis la première fois que la relance est prête, une seule par passage, chaque relance une fois.
+async function relanceOffresAuto(uid) {
+  const verrou = await prendreVerrouStock(RELANCES_VERROU, OFFRES_VERROU_MS);
+  if (!verrou) return 0;
+  try {
+    const B = await bleamCompte(uid).catch(() => null);
+    if (!B || !B.relanceOffres || B.relanceOffres.actif !== true) return 0;   // éteint, ou « pas su » ⇒ rien
+    const accts = await getStoredAccounts({ ouNull: true });
+    const acc = accts && accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    if (await garde(uid, acc, { compter: false, sorte: 'offre', rythme: true })) return 0;
+    if (await lireFreinRepub(uid)) { noterDiag('relance_auto_frein'); return 0; }
+    const L = await relancesDe(uid);
+    if (!L.ok) return 0;
+    const prets = L.liste.filter((l) => l.etat === 'pret');
+    if (!prets.length) return 0;
+    const pv = (await chrome.storage.local.get(RELANCES_PREVUES))[RELANCES_PREVUES] || {};
+    let change = false;
+    for (const k in pv) if (!pv[k] || pv[k].at < Date.now() - 2 * 86400000) { delete pv[k]; change = true; }
+    let due = null;
+    for (const l of prets) {
+      const k = String(uid) + '|' + l.acheteur + '|' + l.item;
+      if (!pv[k]) { pv[k] = { at: Date.now() + delaiOffreMs() * (await facteurPrudence(uid)) }; change = true; }
+      if (!due && pv[k].at <= Date.now()) due = { l, k };
+    }
+    if (change) await chrome.storage.local.set({ [RELANCES_PREVUES]: pv });
+    if (!due) return 0;
+    const stop = await garde(uid, acc, { sorte: 'offre', rythme: true });
+    if (stop) return 0;
+    if (await secuGeste('vinted', uid, 'offre', 'auto')) return 0;
+    delete pv[due.k]; await chrome.storage.local.set({ [RELANCES_PREVUES]: pv });
+    const r = await envoyerRelance(String(uid), acc, due.l, 'auto');
+    return r.ok ? 1 : 0;
+  } catch (_) { return 0; }
+  finally { await lacherVerrouStock(RELANCES_VERROU, verrou); }
+}
+
+// ══ L'AGENT VRM (`agentvrm`) — la politique est <agent-vrm-regle> ; ici, ce qu'elle lit et les gestes ══════════════
+// Chaque décision est écrite au JOURNAL de l'agent AVANT le geste (décision, raison, palier, texte) ; en mode ESSAI rien
+// ne part (« il aurait… ») ; un frein de Vinted (403/429, vérification, compte bloqué) ARRÊTE l'agent et le dit.
+// Une décision à la fois, un compte à la fois (le verrou des offres, partagé avec `autoAccepterOffres` : jamais deux
+// moteurs sur la même offre ; le mémo `vrmOffresFaites` est le même), délai AU HASARD (3–20 min, `delaiOffreMs`).
+const AGENT_JOURNAL = 'vrmAgentJournal', AGENT_ETAT = 'vrmAgentEtat', AGENT_MAX = 400;
+async function agentJournal(uid) {
+  try { const m = (await chrome.storage.local.get(AGENT_JOURNAL))[AGENT_JOURNAL] || {}; return Array.isArray(m[String(uid)]) ? m[String(uid)] : []; } catch (_) { return null; }
+}
+async function agentNoter(uid, e) {
+  try {
+    const m = (await chrome.storage.local.get(AGENT_JOURNAL))[AGENT_JOURNAL] || {};
+    const l = Array.isArray(m[String(uid)]) ? m[String(uid)] : [];
+    const i = l.findIndex((x) => x && x.id === e.id);
+    if (i >= 0) l[i] = Object.assign({}, l[i], e); else l.push(e);
+    m[String(uid)] = l.slice(-AGENT_MAX);
+    await chrome.storage.local.set({ [AGENT_JOURNAL]: m });
+    try { noterJournal(String(uid), 'agent', { g: e.geste, r: e.raison, e: e.etat, essai: !!e.essai }); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+async function agentArreter(uid, raison) {
+  try { const m = (await chrome.storage.local.get(AGENT_ETAT))[AGENT_ETAT] || {}; m[String(uid)] = { arrete: Date.now(), raison: String(raison || '').slice(0, 60) }; await chrome.storage.local.set({ [AGENT_ETAT]: m }); } catch (_) {}
+  noterDiag('agent_arrete_' + String(raison || '').slice(0, 30));
+  logActivity(`⛔ Agent VRM arrêté sur ce compte : ${raison === 'robot' ? 'Vinted demande une vérification' : raison === 'pause' ? 'Vinted a demandé de ralentir' : raison === 'compte-bloque' ? 'compte bloqué' : 'un frein de Vinted'}. Rallume-le dans le panneau quand c'est réglé.`);
+  try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-agent-' + uid, { type: 'basic', iconUrl: 'icon128.png', title: 'Agent VRM arrêté', message: 'Vinted a freiné ce compte : l’agent ne fait plus rien. Rallume-le dans le panneau quand c’est réglé.' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+}
+async function agentArrete(uid) { try { const m = (await chrome.storage.local.get(AGENT_ETAT))[AGENT_ETAT] || {}; return m[String(uid)] || null; } catch (_) { return { arrete: Date.now(), raison: 'stockage' }; } }
+const heureParisAgent = (t) => { try { return Number(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).format(new Date(t))); } catch (_) { return new Date(t).getHours(); } };
+const freinArret = (s) => (s && (s.robot || s.code === 'robot' || s.code === 'vinted-robot') ? 'robot' : s && s.code === 'compte-bloque' ? 'compte-bloque' : s && (s.pause || s.code === 'pause' || s.status === 403 || s.status === 429) ? 'pause' : '');
+// UN passage de l'agent sur le compte de l'onglet : il décide tout ce qui est à décider (journal), et fait AU PLUS UN geste dû.
+async function agentTick(uid) {
+  const verrou = await prendreVerrouStock(OFFRES_VERROU, OFFRES_VERROU_MS);
+  if (!verrou) return 0;
+  try {
+    const B = await bleamCompte(uid).catch(() => null);
+    if (!B || !B.agent || B.agent.actif !== true) return 0;                 // éteint, ou « pas su » ⇒ rien
+    const A = B.agent;
+    const st = await agentArrete(uid);
+    if (st && Number(st.arrete) > Number(A.allumeAt || 0)) return 0;           // arrêté sur un frein, jusqu'à ce qu'il le rallume
+    const accts = await getStoredAccounts({ ouNull: true });
+    const acc = accts && accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const stop0 = await garde(uid, acc, { compter: false, sorte: 'offre', rythme: true });
+    if (stop0) { const f0 = freinArret(stop0); if (f0) await agentArreter(uid, f0); return 0; }
+    if (await lireFreinRepub(uid)) { await agentArreter(uid, 'frein'); return 0; }
+    const maintenant = Date.now(), essai = agEnEssai(A, maintenant);
+    const journal = await agentJournal(uid);
+    if (journal === null) return 0;                                            // la mémoire illisible : jamais deux fois ⇒ rien
+    const connus = new Map(journal.map((e) => [e.id, e]));
+    const nouvelles = [];
+    const d = await donneesInfosPage(String(uid)).catch(() => null);
+    // ── 1. Les OFFRES reçues (les mêmes que le moteur, relues au geste) ──
+    if (A.negocier) {
+      const reg = await offreAutoReglages().catch(() => null);
+      const offres = reg ? await offresEnAttente(uid) : [];
+      const faites = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+      const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
+      const bloque = offres.length ? await pauseCompteBloqueDit(uid).catch(() => null) : null;
+      for (const o of offres) {
+        const id = 'o:' + o.oid;
+        if (connus.has(id)) continue;
+        const it = d && d.parId ? d.parId[String(o.item)] : null;
+        const ind = it ? await annonceIndisponibleLue(uid, o.item).catch(() => 'pas_su') : 'pas_su';
+        const dec = agDecisionOffre({ agent: A, offre: o.prix, prix: it ? prixCarte(it.price) : null, mini: reg.mins[o.item], refuse: reg.refuses[o.item], achat: reg.achats[o.item],
+          nArticles: o.nArticles, joues: (jouesTout[String(o.tx)] || {}).i || [], paliers: reg.paliers || {}, palier: palierContreOffre,
+          enVente: !!it && !ind, gardeOk: !offreGardeDit(reg.garde, o.item, maintenant), compteBloque: !!bloque, faite: !!faites[o.oid] });
+        if (dec.geste === 'rien') continue;
+        nouvelles.push({ id, at: maintenant, sorte: 'offre', conv: o.conv, tx: o.tx, oid: o.oid, item: o.item, offre: o.prix, geste: dec.geste, raison: dec.raison, prix: dec.prix != null ? dec.prix : null, palier: dec.palier != null ? dec.palier : null,
+          essai, etat: dec.geste === 'a_toi' ? 'a_toi' : essai ? 'essai' : 'prevu', du: maintenant + delaiOffreMs() * (await facteurPrudence(uid)) });
+      }
+    }
+    // ── 2. Les MESSAGES : les conversations de la boîte (fil RANGÉ, relu au geste) ──
+    if (A.repondre) {
+      const rr = await rrReglageLu();
+      const lm = rr ? await sbGet(`app_data?id=eq.harvest_${uid}_inbox&select=${idxCarte('c', 'data->payload->conversations', CARTE_LISTE_MAX).replace(/(c\d+:data->payload->conversations->\d+)/g, '$1->>id')}`) : null;
+      const ids = lm && lm[0] ? [...new Set(Object.values(lm[0]).map(String).filter((v) => /^[1-9]\d{0,19}$/.test(v)))].slice(0, 15) : [];
+      const rep = new Set(journal.filter((e) => e && e.sorte === 'message' && e.cle).map((e) => e.cle));
+      for (const conv of ids) {
+        const f = await filVintedRange(String(uid), conv);
+        if (!f) continue;
+        const a = await rrVariablesAnnonce(String(uid), f.item, f.titre);
+        const it = d && d.parId && f.item ? d.parId[f.item] : null;
+        const dec = agDecisionMessage({ agent: A, conv, messages: f.messages, reglageRr: rr, vars: Object.assign({ pseudo: f.login }, a.vars), partie: f.item && it ? a.partie : null,
+          photos: it && Array.isArray(it.photos) ? it.photos.length : null, repondues: rep, heure: heureParisAgent(maintenant), sur: (t) => !MESSAGE_SUR.risquesMessage(String(t || ''), 'vinted').length });
+        if (dec.geste === 'rien' || dec.geste === 'attendre' || !dec.cle) continue;
+        const id = 'm:' + dec.cle;
+        if (connus.has(id)) continue;
+        rep.add(dec.cle);
+        nouvelles.push({ id, at: maintenant, sorte: 'message', conv, cle: dec.cle, item: f.item, geste: dec.geste, raison: dec.raison || dec.cat, cat: dec.cat || '', texte: dec.texte || '',
+          essai, etat: dec.geste === 'a_toi' ? 'a_toi' : essai ? 'essai' : 'prevu', du: maintenant + delaiOffreMs() * (await facteurPrudence(uid)) });
+      }
+    }
+    // Chaque décision est ÉCRITE avant tout geste (journal illisible ⇒ rien ne part).
+    for (const e of nouvelles) if (!(await agentNoter(uid, e))) return 0;
+    if (essai) return 0;
+    // ── 3. AU PLUS UN geste dû, relu juste avant ──
+    const tous = (await agentJournal(uid)) || [];
+    const du = tous.find((e) => e && e.etat === 'prevu' && !e.essai && Number(e.du) <= Date.now());
+    if (!du) return 0;
+    await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
+    const stop = await garde(uid, acc, { compter: false, sorte: du.sorte === 'offre' ? 'offre' : 'message', rythme: true });
+    if (stop) { const f1 = freinArret(stop); if (f1) await agentArreter(uid, f1); return 0; }
+    // La SÉCURITÉ du compte (présence, robot, compte bloqué, rythme) : un geste automatique.
+    { const sc = await secuGeste('vinted', uid, du.sorte === 'offre' ? 'offre' : 'message', 'auto'); if (sc) { const f3 = freinArret(sc) || (sc.secu === 'robot' ? 'robot' : ''); if (f3) await agentArreter(uid, f3); return 0; } }
+    if (!(await agentNoter(uid, { id: du.id, etat: 'envol', envolAt: Date.now() }))) return 0;   // en vol AVANT : un worker tué ne rejoue jamais
+    let r = null;
+    if (du.sorte === 'offre') {
+      const faites = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
+      if (faites[du.oid]) { await agentNoter(uid, { id: du.id, etat: 'saute', fin: 'deja_traitee' }); return 0; }
+      const fil = await relireOffre(acc, { conv: du.conv, tx: du.tx, oid: du.oid, prix: du.offre, item: du.item });
+      if (!fil || fil.etat !== 'attend') { await agentNoter(uid, { id: du.id, etat: 'saute', fin: fil && fil.etat === 'plus' ? 'plus_en_attente' : 'relecture_pas_su' }); return 0; }
+      faites[du.oid] = Date.now(); await chrome.storage.local.set({ vrmOffresFaites: faites });
+      if (du.geste === 'contre') {
+        const jt = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
+        const j0 = jt[String(du.tx)] || { i: [] }; j0.i = [...new Set([...(j0.i || []), du.palier])]; jt[String(du.tx)] = j0; await chrome.storage.local.set({ vrmContreOffres: jt });
+        r = await contreOffreAuto({ uid, acc, o: { conv: du.conv, tx: du.tx }, prix: du.prix, messages: [] });
+      } else {
+        const reg = await offreAutoReglages().catch(() => null);
+        r = await repondreOffre({ uid, tx: du.tx, oid: du.oid, quoi: du.geste === 'accepter' ? 'accept' : 'reject', conv: du.conv, msg: du.geste === 'refuser' && reg ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null, relue: true });
+      }
+    } else {
+      // Le fil RELU : l'acheteur n'a rien écrit d'autre depuis la décision, et le dernier message est toujours le sien.
+      const f = await filVintedRange(String(uid), du.conv);
+      const q = f ? rrQuestionEnAttente(f.messages) : '';
+      const der = f && f.messages.length ? f.messages[f.messages.length - 1] : null;
+      if (!f || !der || der.deMoi !== false || du.cle !== String(du.conv) + ':' + agEmpreinte(q)) { await agentNoter(uid, { id: du.id, etat: 'saute', fin: 'fil_change' }); return 0; }
+      const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
+      if (!c2.ok) { await agentNoter(uid, { id: du.id, etat: 'prevu', du: Date.now() + 15 * 60000 }); return 0; }
+      r = await interfaceVinted(acc, 'message', { conv: du.conv, texte: du.texte });
+    }
+    const eg = r && r.ok === true && !r.data ? 'confirme' : etatGesteVinted(r);
+    const etat = eg === 'confirme' ? 'fait' : eg === 'incertain' || (r && r.incertain) ? 'incertain' : 'refuse';
+    await agentNoter(uid, { id: du.id, etat, finAt: Date.now() });
+    { const f2 = freinArret(r); if (f2) await agentArreter(uid, f2); }
+    logActivity(`🤖 Agent VRM : ${du.geste === 'accepter' ? 'offre acceptée' : du.geste === 'contre' ? `contre-offre à ${rrEuros(du.prix)}` : du.geste === 'refuser' ? 'offre refusée' : 'réponse envoyée'} — ${etat === 'fait' ? 'fait' : etat === 'incertain' ? 'pas confirmé' : 'refusé'}.`);
+    return etat === 'fait' ? 1 : 0;
+  } catch (_) { return 0; }
+  finally { await lacherVerrouStock(OFFRES_VERROU, verrou); }
+}
+// LE TABLEAU DE BORD du panneau (lecture) : réglage, état (arrêté ?), compteurs, et les 30 dernières décisions ;
+// `vu` : il a regardé une conversation « à toi ».
+async function agentCarte(msg, sender) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  const quoi = String((msg && msg.quoi) || 'lire');
+  const j = await agentJournal(o.uid);
+  if (j === null) return { ok: false, code: 'stockage', raison: 'Le journal de l’agent n’a pas pu être lu.' };
+  if (quoi === 'vu') {
+    const id = String((msg && msg.id) || ''); const e = j.find((x) => x && x.id === id && x.geste === 'a_toi');
+    if (!e) return { ok: false, code: 'plus', raison: 'Décision introuvable.' };
+    await agentNoter(o.uid, { id, vu: true }); return { ok: true };
+  }
+  const B = await bleamCompte(o.uid).catch(() => null);
+  if (!B) return { ok: false, code: 'lecture', raison: 'Les réglages de l’agent n’ont pas pu être relus.' };
+  const A = B.agent, st = await agentArrete(o.uid);
+  const jourParis = (t) => { try { return new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris' }).format(new Date(t)); } catch (_) { return new Date(t).toISOString().slice(0, 10); } };
+  return { ok: true, uid: o.uid, agent: A, essai: agEnEssai(A, Date.now()), arrete: st && Number(st.arrete) > Number(A.allumeAt || 0) ? st : null,
+    tableau: agTableau(j, Date.now(), jourParis), decisions: j.slice(-30).reverse().map((e) => ({ id: e.id, at: e.at, sorte: e.sorte, geste: e.geste, raison: e.raison, etat: e.etat, essai: !!e.essai, prix: e.prix, offre: e.offre, palier: e.palier, texte: String(e.texte || '').slice(0, 200), conv: e.conv, vu: !!e.vu })) };
+}
+
 // <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
 const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam'];
+// (21 nov., ext. 5.421) `vrm_reponses_rapides` : SES modèles de réponses rapides par catégorie (src/reponsesRapides.js,
+// `rrReglage`), lus par le panneau ET par l'écran Messages de l'app — ce n'est pas une automatisation (rien ne part seul).
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -28827,7 +29835,10 @@ function paliersPlus(o) {
 //    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
 //    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
 //    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages'];
+// (21 nov., ext. 5.421) `lotFavoris` (taux du lot proposé aux favoris, pas une automatisation : `actif` toujours faux) et
+// `relanceOffres` (jours avant la relance, taux de la contre-offre ; `actif` = « Relancer seul », éteint par défaut,
+// allumer = SA confirmation) — la règle : <lot-relance-regle> (src/lotRelance.js, `lrReglageLot`, `lrReglageRelance`).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'agent'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -28919,6 +29930,9 @@ function bleamSection(nom, v) {
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'favMessages') return fpReglage(o);
+  if (nom === 'lotFavoris') return typeof lrReglageLot === 'function' ? lrReglageLot(o) : { actif: false };
+  if (nom === 'agent') return typeof agReglage === 'function' ? agReglage(o) : { actif: actif };
+  if (nom === 'relanceOffres') return typeof lrReglageRelance === 'function' ? lrReglageRelance(o) : { actif: actif };
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }
@@ -28958,6 +29972,11 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_reponses_rapides') {
+    // SES modèles par catégorie : normalisés par la règle (une version refusée n'est pas gardée) ; rien à allumer.
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande) || typeof rrReglage !== 'function') return { ok: false, code: 'forme', raison: 'Réglage illisible.' };
+    return { ok: true, valeur: rrReglage(demande) };
   }
   if (cle === 'vrm_agent_publier') {
     let n = 0; try { n = JSON.stringify(demande).length; } catch (_) { n = Infinity; }
