@@ -35,8 +35,8 @@ function Trace({ jours, cle, libelle, attrs }) {
   const n = jours.length;
   const x = (i) => (n <= 1 ? L / 2 : (i * L) / (n - 1));
   const max = lus.length ? Math.max(...lus) : 0, min = lus.length ? Math.min(...lus) : 0;
-  const ecart = max - min || 1;
-  const y = (v) => HAUT + (H - HAUT - BAS) * (1 - (v - min) / ecart);
+  const etendue = max - min || 1;
+  const y = (v) => HAUT + (H - HAUT - BAS) * (1 - (v - min) / etendue);
   // Segments : seulement entre deux jours LUS consécutifs.
   const segs = [];
   let cur = [];
