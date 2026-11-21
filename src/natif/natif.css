@@ -663,10 +663,8 @@
   .n-onglet-icone.n-onglet-disque { width: 34px; height: 30px; border-radius: 15px; background: var(--n-plein); color: var(--n-sur-plein); }
   .n-onglet-central, .n-onglet-central[aria-current="page"] { color: var(--n-encre-2); }
   .n-onglet[aria-expanded="true"] { color: var(--n-encre); }
-  /* La barre de titre d'un écran qui écrit son propre titre et sa recherche : ni titre ni action ⇒ la zone sûre seule (pas de
-     bande vide de 44 px au-dessus de son grand titre). */
-  .n-barre-titre[data-n-vide] { min-height: calc(6px + var(--n-haut-sur)); }
-  .n-barre-titre[data-n-vide]::before { opacity: 1; }
+  /* (21 nov., audit §1.2) La barre de titre garde ses 44 px sur TOUS les écrans (« ‹ Menu » à gauche pour un écran ouvert
+     depuis le Menu) : le grand titre commence au même endroit partout. Plus de barre repliée à 6 px. */
   .n-onglet-point { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: var(--n-r-rond); background: var(--n-ambre); box-shadow: 0 0 0 2px var(--n-fond); }
 
   .n-carte-compte {
@@ -702,4 +700,17 @@
   .n-tuile-menu-valeur { flex: 0 0 auto; font: var(--n-t-legende); color: var(--n-encre-2); }
   @media (hover: hover) { .n-tuile-menu:hover, .n-carte-compte:hover { background: var(--n-appui); } .n-tuile-menu[aria-current="page"]:hover { background: var(--n-teinte); } }
   @media (min-width: 430px) { .n-grille-menu { margin-inline: 20px; } .n-carte-compte { width: calc(100% - 40px); margin-inline: 20px; } }
+}
+
+/* ── (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») Au téléphone, les écrans qui écrivent
+   LEUR grand titre (Achats, Stock, E-mails, Messages, Communauté, Paramètres) le posent juste sous la barre de 44 px, à la
+   même hauteur que celui de la coque (Aujourd'hui, Annonces, Ventes, Argent, Menu) : la marge du haut de leur en-tête est
+   ramenée à 2 px (celle de `.n-grand-titre`). `!important` dans la couche : il passe devant les `!important` hors couche des
+   feuilles d'hier (styles-systeme, styles-iphone). Banc `onglets-menu` O11. ── */
+@layer vrm-natif {
+  @media (max-width: 1023.98px) {
+    .vrm-main .vrm-market-heading { padding-top: 2px !important; }
+    .vrm-main[data-ecran="garage"] .vrm-ms-stock { padding-top: 0 !important; }
+    .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 3px !important; }
+  }
 }

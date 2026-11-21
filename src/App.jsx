@@ -21005,16 +21005,38 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
 // le titre ») LA TÊTE DU TÉLÉPHONE : le grand titre, et à droite UNE icône, la loupe (la recherche s'ouvre en haut, scanner
 // dedans ; l'appui long écoute, comme avant). Messages et « Plus » ne sont plus ici : Messages et Menu sont dans la barre du bas.
 // Le champ de recherche posé SOUS le grand titre est retiré (c'était une barre de plus sous le titre).
-function TeteNative({ tab, ordi, titre, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, gestesLoupe = null }) {
+function TeteNative({ tab, setTab, ordi, titre, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, gestesLoupe = null }) {
   useProfilVendeur();
   const natif = ECRANS_NATIFS.has(tab);
+  // ⚠️ (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») Un écran ouvert depuis le Menu (tout ce
+  // qui n'est pas une place de la barre) porte « ‹ Menu » à gauche de la barre, comme une page poussée sur iPhone : la barre
+  // garde ses 44 px sur TOUS les écrans, et le grand titre de chaque écran commence donc au même endroit. Venu du Menu ⇒ le
+  // retour du système (l'entrée a été EMPILÉE) ; sinon (lien, recherche) ⇒ ouvre le Menu.
+  const precedent = React.useRef({ tab, avant: '' });
+  if (precedent.current.tab !== tab) precedent.current = { tab, avant: precedent.current.tab };
+  const depuisMenu = !ordi && !BARRE_DU_BAS.includes(groupeBarre(tab, BAR_GROUPE)) && tab !== 'menu';
+  // Paramètres pose ses propres entrées d'historique (mesuré : deux retours avant le Menu) : si le retour n'a pas ramené au
+  // Menu, le Menu est ouvert directement — le toucher mène toujours où il dit.
+  const allerMenu = () => { revenirSurOnglet(); if (setTab) setTab('menu'); };
+  const retourMenu = () => {
+    if (precedent.current.avant === 'menu' && window.history.state && window.history.state.vrmTab === tab) {
+      try { window.history.back(); setTimeout(() => { const s = window.history.state || {}; if (s.vrmTab !== 'menu') allerMenu(); }, 350); return; } catch (_) {}
+    }
+    allerMenu();
+  };
+  const gauche = depuisMenu ? (
+    <button type="button" className="n-barre-retour" data-n-retour-menu="" onClick={retourMenu} aria-label={tr('natif.retourVers', { ecran: tr('menu.titre') })}>
+      <Natif.Glyphe nom="chevron" taille={22} className="n-barre-retour-fleche"/>
+      <span className="n-barre-retour-libelle">{tr('menu.titre')}</span>
+    </button>
+  ) : null;
   // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.
   const argentTab = tab === 'compta' || tab === 'dashboard';
   const actions = ordi || rechercheOuverte || sansRecherche ? null : (
     <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>
   );
   return (
-    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre', 'data-n-vide': (!actions && !natif && !ordi && !ECRANS_TITRE_COQUE.has(tab)) ? '' : undefined }}/>
+    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
 }
 // ⚠️⚠️ (21 nov., onglets-menu) LES GROUPES DU MENU — une source pour l'écran « Menu » du téléphone ET la barre latérale de
