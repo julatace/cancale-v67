@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., onglets-menu, Julien : « réorganise les onglets » puis « garde les onglets ») docs/passation/2026-11-21-onglets-menu.md
+  { id: 'onglets-menu', date: '2026-11-21', titre: 'Un Menu en tuiles sous ta photo', phrase: 'Stock, E-mails, l’extension, le thème et la langue en un toucher.', tab: 'menu', pour: 'tous', mode: 'tous' },
   // (21 nov., fluidité — Julien : « des écrans qui se superposent », vignettes grises au téléphone) docs/passation/2026-11-21-fluidite.md
   { id: 'photos-fluidite', date: '2026-11-21', titre: 'Photos partout et écrans sans saut', phrase: 'Annonces, Ventes, Achats montrent leurs photos au téléphone ; plus d’écran vide.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.417, Julien : « on n'a pas la possibilité de personnaliser, améliore ça ») docs/passation/2026-11-21-favoris-perso.md
