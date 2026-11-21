@@ -17189,7 +17189,7 @@ async function apprendreElement(acc, tabId, nom) {
   noterDiag('appris_' + nom.replace(/[^a-z-]/g, '').slice(0, 30));
   return { ok: true };
 }
-const PHRASE_PAS_PRETE = (m, n) => `La page de Vinted n’était pas prête (élément « ${String(m || '?')} » toujours absent après ${n} nouveaux essais) : VRM s’arrête, rien n’est parti. « Reprendre » quand la page est chargée.`;
+const PHRASE_PAS_PRETE = (m, n) => `${PHRASE_ELEMENT(m)} (${n} nouveaux essais faits). « Reprendre » quand la page est chargée.`;
 async function etapeFormulaire(acc, tabId, etape, d) {
   // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours est refusée.
   if (!ETAPES_LECTURE_FORM.has(etape) && !_fileCourante) { noterDiag('formulaire_hors_file'); return { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }; }
@@ -17216,9 +17216,9 @@ async function etapeFormulaire(acc, tabId, etape, d) {
       appriseUneFois = true;
       const a = await apprendreElement(acc, tabId, String(o.manque));
       if (a.ok) { appris = await apprisPour('vinted').catch(() => ({})); await noterReessai({ quoi: 'appris', nom: String(o.manque), b: LIBELLES_APPRIS[o.manque] || String(o.manque), texte: `Bouton « ${LIBELLES_APPRIS[o.manque] || o.manque} » appris : VRM reprend l’étape.` }); continue; }
-      return Object.assign({}, o, { essais: essai, apprendre: a.code, raison: a.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque, essai) });
+      return Object.assign({}, o, { essais: essai, apprendre: a.code, raison: a.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_PAS_PRETE(o.manque, essai) });
     }
-    return Object.assign({}, o, { essais: essai, raison: PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque || o.code, essai) });
+    return Object.assign({}, o, { essais: essai, raison: PHRASE_PAS_PRETE(o.manque || o.code, essai) });
   }
 }
 // Entre deux champs : « Tout arrêter », la vérification, la pause de Vinted, le compte de l'onglet.
@@ -21428,7 +21428,9 @@ async function executerEntree(id, uid, e0, fn) {
 // L'ACTION ENTIÈRE d'un moteur (hors de toute file de requêtes) : elle attend SON tour.
 async function dansFile(meta, fn) {
   const uid = String((meta && meta.uid) || '');
-  if (_fileCourante && (!_fileCourante.uid || (uid && _fileCourante.uid === uid))) return fn();   // une étape de l'action en cours
+  // Une action ENTIÈRE ne s'emboîte pas dans une autre : même sur le même compte, elle attend son tour (un moteur qui
+  // part pendant une republication ne se glisse pas dedans). Seule une étape DÉCLARÉE de l'action en cours (`dans`) y passe.
+  if (_fileCourante && meta && meta.dans === true) return fn();
   const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const e0 = entreeDe(meta, id, 'attente');
   const d = await modifierFile((f) => { if (f.pause) return 'pause'; if (f.entrees.length >= FILE_ENTREES_MAX) return 'pleine'; f.entrees.push(e0); return 'ok'; });
