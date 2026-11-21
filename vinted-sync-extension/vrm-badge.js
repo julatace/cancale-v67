@@ -1135,7 +1135,7 @@ function vrmVerifVisible(sel) {
   .champ6.cb6 .note5 { margin: 0; }
   .champ6.ot6 { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
   .champ6.ot6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; }
+  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; background: var(--n-carte-2); color: var(--n-encre); border: 1px solid var(--n-trait); }
   .au6-d .conf5 { margin: 12px 24px 0; }
   .conf5[data-irreversible] { display: block !important; }
   .conf5[data-irreversible] p { margin: 0 0 8px; }
