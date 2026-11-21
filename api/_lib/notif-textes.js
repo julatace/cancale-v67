@@ -132,6 +132,24 @@ export function familleActive(prefs, fam) {
   return cats.some((c) => decisionNotif(p, c));
 }
 
+// ── (21 nov., ext. 5.422, lot `pushcapte`) CE QUE L'EXTENSION CAPTE ─────────
+// Julien : « quand l'extension capte une nouvelle vente, une offre reçue, un message
+// reçu, envoie une notification à mes appareils ; réglage par type, allumé par défaut
+// pour vente et offre ». Rangé dans `push_prefs.capte = { ventes, offres, messages }`
+// (Paramètres → Notifications) ; la famille (Ventes, Offres, Messages) décide AVANT :
+// famille coupée ⇒ rien, quel que soit ce réglage (api/_lib/push-capte.js).
+export const CAPTE_TYPES = [
+  { id: 'ventes', cat: 'vente', def: true },
+  { id: 'offres', cat: 'offre', def: true },
+  { id: 'messages', cat: 'message', def: false },
+];
+export function capteActif(prefs, id) {
+  const c = prefs && typeof prefs === 'object' && prefs.capte && typeof prefs.capte === 'object' ? prefs.capte : {};
+  if (typeof c[id] === 'boolean') return c[id];
+  const t = CAPTE_TYPES.find((x) => x.id === id);
+  return t ? t.def : false;
+}
+
 // ── HEURES CALMES ET REGROUPEMENT (5 nov.) ─────────────────────────────────
 // Réglés dans Paramètres → Notifications, rangés dans la même ligne
 // `push_prefs` : `calme: { actif, debut: 'HH:MM', fin: 'HH:MM', sauf: [familles] }`

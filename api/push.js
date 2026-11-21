@@ -24,6 +24,10 @@
 //   POST { action:'prixachat', ventes }      → (11 nov.) des ventes PROUVÉES sans prix d'achat :
 //                                              chaque transaction est RELUE ici, une notification
 //                                              une fois par vente, jamais la nuit (_lib/prix-achat-demande.js)
+//   POST { action:'capte', evenements }      → (21 nov., ext. 5.422) l'extension vient de capter une vente,
+//                                              une offre ou un message NOUVEAUX : des IDENTITÉS seulement
+//                                              ({ s, p, c, id }) ; chaque objet est RELU ici, une fois par
+//                                              objet, regroupé (_lib/push-capte.js)
 // ────────────────────────────────────────────────────────────────────────────
 
 import './_lib/sans-bruit.js';
@@ -41,6 +45,7 @@ import { notifierAvisBas } from './_lib/avis-negatif.js';
 import { notifierVerificationVinted } from './_lib/verification-vinted.js';
 import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
+import { notifierCapte } from './_lib/push-capte.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -167,6 +172,13 @@ async function traiter(req, res) {
     if (body.action === 'prixachat') {
       const r = await notifierPrixAchat(body);
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (21 nov., ext. 5.422, `pushcapte`) « Vente : … · Imprimer le bordereau », « Offre de 45 € · Répondre » :
+    // le corps ne porte que des identités ; tout est relu ici, au nom de CE vendeur (api/_lib/push-capte.js).
+    if (body.action === 'capte') {
+      const r = await notifierCapte(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n || 0, ...(r.deja ? { deja: r.deja } : {}), ...(r.coupe ? { coupe: r.coupe } : {}), ...(r.rien ? { rien: r.rien } : {}), ...(r.calme ? { calme: true } : {}) } : { erreur: r.raison });
       return;
     }
     if (body.action === 'subscribe') {

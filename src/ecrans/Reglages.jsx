@@ -114,7 +114,7 @@ import { grouperAppareils, nConnexions } from '../appareilsGroupes.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme,CAPTE_TYPES,capteActif} from '../../api/_lib/notif-textes.js';
 import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -1682,6 +1682,20 @@ function PushPrefsSetting({ comptes, onMuets }) {
             </div>
           </section>
         ))}
+        {/* (21 nov., ext. 5.422, `pushcapte`) Ce que l'extension capte : un interrupteur par type, rangé dans
+            `push_prefs.capte` et lu par le serveur avant d'envoyer (api/_lib/notif-textes.js `capteActif`,
+            api/_lib/push-capte.js) ; vente et offre allumées par défaut, message éteint. La famille décide d'abord. */}
+        <section className="vrm-notif-groupe" data-notif-capte="">
+          <h4 className="vrm-notif-groupe-titre">{tr('reglages.push.capte.titre')}</h4>
+          <div className="vrm-notif-groupe-corps" style={{padding:'0 12px'}}>
+            {CAPTE_TYPES.map(t => { const on = capteActif(prefs || {}, t.id); const nom = tr(`reglages.push.capte.${t.id}`); return (
+              <div key={t.id} className="vrm-np-ligne" data-np-capte={t.id} data-np-capte-etat={on ? 'on' : 'off'}>
+                <span className="vrm-np-lib">{nom}<small>{tr(`reglages.push.capte.${t.id}Desc`)}</small></span>
+                <Interrupteur on={on} onClick={() => ecrirePrefs({ ...(prefs || {}), capte: { ...((prefs && prefs.capte) || {}), [t.id]: !on } }, `« ${nom} »`)} disabled={!prefs || busy} label={tr(on ? 'reglages.push.capte.on' : 'reglages.push.capte.off', { quoi: nom })}/>
+              </div>); })}
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.4,padding:'6px 0 2px'}} data-np-capte-note="">{tr('reglages.push.capte.note')}</div>
+          </div>
+        </section>
       </div>
     </details>
     {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant
