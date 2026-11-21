@@ -38,20 +38,20 @@ if (require.main === module && process.argv.includes('--prouve')) {
     ['sansJugementPage', 'src', "      if (!j0.ok) { await rendre(); return arret('relecture', { ecarts: j0.ecarts }); }", ''],
     ['sansCompteOnglet', 'src', "    if (vu !== compte) { await rendre(); return arret('autre-compte'); }", ''],
     ['sansCaptcha', 'depot', "        if (r.width >= 120 && r.height >= 60 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth) return true;", ''],
-    ['sansNoteAvant', 'src', "    if (fx[k]) { await rendre(); return arret('deja', { raison: 'déjà notée sur ce site : rien ne repart' }); }", ''],
+    ['sansNoteAvant', 'src', "    fx[k] = { etat: 'envol', at: Date.now(), tabId, vinted: art.id };", ''],
     ['deuxLancements', 'src', "  if (_aussiEnVol) return { accepte: false, code: 'en-cours', raison: 'Une publication est déjà en train de partir : attends-la.' };", ''],
-    ['publierDevine', 'depot', "    if (l.length !== 1) return { ok: false, clique: false, erreur: l.length ? 'champ-ambigu' : 'bouton-absent', element: 'Publier' };", "    if (!l.length) { const b = [...document.querySelectorAll('button')].filter(utile).pop(); if (b) l.push(b); }"],
-    ['aChoisirIgnore', 'src', "    if (!a.pret) return { accepte: false, code: 'a-choisir',", "    if (false) return { accepte: false, code: 'a-choisir',"],
+    ['publierDevine', 'depot', "|mettre en vente|mettre en ligne|mettre en vente mon article)$/;", "|mettre en vente|mettre en ligne|mettre en vente mon article|envoyer|valider)$/;"],
+    ['aChoisirIgnore', 'src', "    if (!a.pret) return { accepte: false, code: 'a-choisir',", "    if (false) return { accepte: false, code: 'a-choisir',", "      if (!f.ok || !f.pret) return { accepte: false, code: 'a-choisir',", "      if (!f.ok) return { accepte: false, code: 'a-choisir',"],
     ['optionApprochee', 'depot', "      const opts = Array.from(ctrl.options).filter((o) => norm(o.textContent) === v);", "      const opts = Array.from(ctrl.options).filter((o) => norm(o.textContent).startsWith(v.slice(0, 1))).slice(0, 1);"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-aussi-'));
   let tous = true;
-  for (const [nom, cle, avant, apres] of MUT) {
+  for (const [nom, cle, avant, apres, avant2, apres2] of MUT.filter((m) => !process.env.MUT || process.env.MUT.split(',').includes(m[0]))) {
     const f = cle === 'src' ? F_SRC : F_DEPOT;
     const txt = fs.readFileSync(f, 'utf8');
-    if (!txt.includes(avant)) { console.log(`❌ mutation ${nom} : texte introuvable`); tous = false; continue; }
+    if (!txt.includes(avant) || (avant2 && !txt.includes(avant2))) { console.log(`❌ mutation ${nom} : texte introuvable`); tous = false; continue; }
     const fichier = path.join(tmp, nom + '-' + path.basename(f));
-    fs.writeFileSync(fichier, txt.replace(avant, apres));
+    fs.writeFileSync(fichier, avant2 ? txt.replace(avant, apres).replace(avant2, apres2) : txt.replace(avant, apres));
     const args = [__filename, '--' + cle, fichier, '--' + (cle === 'src' ? 'depot' : 'src'), cle === 'src' ? F_DEPOT : F_SRC];
     const r = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 1500000, env: Object.assign({}, process.env, { SHOTS: '' }) });
     const rouges = ((r.stdout || '').match(/^❌/gm) || []).length;
@@ -198,6 +198,7 @@ async function scenario(nav, o = {}) {
   await ctxNav.route('https://fr.vestiairecollective.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageVc(o) }));
   await ctxNav.route(/captcha-delivery/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>vérification</body></html>' }));
   const ouverts = [];
+  const notesAuClic = [];   // la note des publications AU MOMENT du clic final (elle doit déjà dire « envol »)
   const C = F.ctx.chrome;
   C.tabs.create = async (opt = {}) => {
     const id = 100 + ouverts.length;
@@ -210,8 +211,8 @@ async function scenario(nav, o = {}) {
     const pg = await ctxNav.newPage();
     pages.set(id, pg);
     await pg.exposeFunction('__versFond', async (s) => { const m = JSON.parse(s); const r = await F.envoyer(m, { id: 'x', tab: { id, url } }); return r === undefined ? null : JSON.stringify(r); });
-    await pg.exposeFunction('__vrmCreee', async (adId) => { await F.envoyer({ from: 'cancale-lbc', action: 'lbcCatalogue', url: 'https://api.leboncoin.fr/api/adsubmit/v2/classifieds', body: JSON.stringify({ status: 'created', ad_id: Number(adId) }) }, { id: 'x', tab: { id, url } }); });
-    await pg.exposeFunction('__vrmVcCree', async (pid) => { await F.envoyer({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(pid) }, { id: 'x', tab: { id, url } }); });
+    await pg.exposeFunction('__vrmCreee', async (adId) => { notesAuClic.push(JSON.parse(JSON.stringify((F.store.vrmAussiFaits) || {}))); await F.envoyer({ from: 'cancale-lbc', action: 'lbcCatalogue', url: 'https://api.leboncoin.fr/api/adsubmit/v2/classifieds', body: JSON.stringify({ status: 'created', ad_id: Number(adId) }) }, { id: 'x', tab: { id, url } }); });
+    await pg.exposeFunction('__vrmVcCree', async (pid) => { notesAuClic.push(JSON.parse(JSON.stringify((F.store.vrmAussiFaits) || {}))); await F.envoyer({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(pid) }, { id: 'x', tab: { id, url } }); });
     await pg.addInitScript({ content: CHROME });
     await pg.goto(url);
     await pg.evaluate(DEPOT);
@@ -232,7 +233,7 @@ async function scenario(nav, o = {}) {
   const lancer = (m) => F.envoyer(Object.assign({ from: 'vrm-badge', action: 'publierAussiLancer', confirme: true }, m), vinted);
   const etat = () => F.envoyer({ from: 'vrm-badge', action: 'publierAussiEtat' }, vinted);
   const finJob = async (ms = 600000) => { for (const fin = Date.now() + ms; Date.now() < fin;) { const e = await etat(); if (e && e.job && e.job.etat === 'fini') return e.job; await new Promise((r) => setTimeout(r, 800)); } return null; };
-  return { F, store: F.store, lignes, pages, ouverts, apercu, lancer, etat, finJob, fermer: () => ctxNav.close() };
+  return { F, store: F.store, lignes, pages, ouverts, notesAuClic, apercu, lancer, etat, finJob, fermer: () => ctxNav.close() };
 }
 const shot = async (pg, nom) => { if (!SHOTS || !pg) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: true }).catch(() => {}); };
 const publ = async (pg) => (pg ? pg.evaluate(() => ({ n: window.__publications || 0, a: window.__annonce || null, f: window.__frappes || 0, fichiers: window.__fichiers || [] })).catch(() => ({ n: -1 })) : { n: 0 });
@@ -275,6 +276,8 @@ if (require.main === module) (async () => {
       dit(!!pid && B.lignes.vc_listings.liens[pid] === NUM, 'N1 — l’article Vestiaire créé relié au même N° (`vc_listings.liens`)', JSON.stringify(B.lignes.vc_listings.liens));
       dit(!!a && /^https:\/\/www\.leboncoin\.fr\/ad\/x\/\d+$/.test(a.sites.leboncoin.lien) && /vestiairecollective\.com\//.test(a.sites.vestiaire.lien), 'N1 — « Voir sur Leboncoin » / « Voir sur Vestiaire » : le lien de l’annonce créée', JSON.stringify(a && [a.sites.leboncoin.lien, a.sites.vestiaire.lien]));
       dit(!!a && a.sites.leboncoin.frise.every((x) => x.etat === 'fait') && a.sites.vestiaire.frise.every((x) => x.etat === 'fait'), 'N1 — la frise : chaque étape datée sur sa preuve (vérifié, onglet, compte, photos, champs, relu, publié, retenue)', JSON.stringify(a && a.sites.leboncoin.frise));
+      dit(B.notesAuClic.length === 2 && B.notesAuClic[0]['leboncoin:' + NUM] && B.notesAuClic[0]['leboncoin:' + NUM].etat === 'envol' && B.notesAuClic[1]['vestiaire:' + NUM] && B.notesAuClic[1]['vestiaire:' + NUM].etat === 'envol',
+        'N1 — la publication est NOTÉE (« envol ») AVANT le clic final, sur chaque site (un worker tué après le clic ne republie jamais)', JSON.stringify(B.notesAuClic));
       const actions = B.store.vrmActions || {};
       dit((actions['lbc:' + MOI] || []).length === 1 && (actions['vc:' + VC_MOI] || []).length === 1, 'N1 — UNE action comptée sur chaque compte (plafond 50/h)', JSON.stringify(actions));
       // D1 (suite) : relancé ⇒ déjà publiée.
