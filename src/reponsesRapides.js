@@ -39,7 +39,7 @@ const RR_MOTS = {
     de: ['verfugbar', 'noch verfugbar', 'noch da', 'noch zu haben', 'noch zu verkaufen', 'schon verkauft', 'noch erhaltlich'],
   },
   taille: {
-    fr: ['taille', 'tailles', 'pointure', 'chausse*', 'taille grand', 'taille petit', 'taille normalement'],
+    fr: ['taille*', 'pointure', 'chausse*', 'taille grand', 'taille petit', 'taille normalement'],
     en: ['size', 'sizing', 'fit', 'fits', 'true to size', 'run small', 'run big', 'runs small', 'runs big', 'tts'],
     es: ['talla', 'tallaje', 'horma', 'que numero', 'numero calzas'],
     it: ['taglia', 'calzata', 'vestibilita', 'calza*', 'che numero'],
@@ -60,7 +60,7 @@ const RR_MOTS = {
     de: ['paket', 'beide', 'zusammen', 'bundle'],
   },
   prix: {
-    fr: ['prix', 'baisser', 'baisse', 'dernier prix', 'meilleur prix', 'negociable', 'negocier', 'reduc*', 'moins cher', 'petit geste', 'combien'],
+    fr: ['prix', 'baisser', 'baisse', 'dernier prix', 'meilleur prix', 'negociable', 'negocier', 'reduc*', 'moins cher', 'petit geste', 'c est combien', 'combien tu', 'combien pour', 'pour combien', 'combien ca'],
     en: ['price', 'lowest', 'best price', 'negotiable', 'discount', 'cheaper', 'last price', 'how much'],
     es: ['precio', 'rebaja*', 'negociable', 'descuento', 'ultimo precio', 'mas barato', 'cuanto'],
     it: ['prezzo', 'sconto', 'trattabile', 'ultimo prezzo', 'meno caro', 'quanto'],

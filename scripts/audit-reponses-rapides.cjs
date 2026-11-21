@@ -41,7 +41,7 @@ const C = [
   ['Hola, ¿sigue disponible?', ['dispo']], ['Ciao, è ancora disponibile?', ['dispo']], ['Hallo, ist das noch verfügbar?', ['dispo']],
   ['Elles taillent normalement ? Je chausse du 43', ['taille']], ['Quelle pointure exactement ?', ['taille']], ['Do they run small or true to size?', ['taille']],
   ['¿Qué talla es?', ['taille']], ['Che taglia è? La calzata?', ['taille']], ['Welche Größe ist das?', ['taille']],
-  ['Tu envoies sous combien de temps ?', ['envoi', 'prix']], ['Quel délai de livraison ?', ['envoi']], ['When can you ship?', ['envoi']],
+  ['Tu envoies sous combien de temps ?', ['envoi']], ['C’est combien pour les deux ?', ['prix', 'lot']], ['Quel délai de livraison ?', ['envoi']], ['When can you ship?', ['envoi']],
   ['¿Cuándo haces el envío?', ['envoi']], ['Quando spedisci?', ['envoi']], ['Wann ist der Versand?', ['envoi']],
   ['Tu fais un lot si je prends les deux ?', ['lot']], ['Can I buy both together as a bundle?', ['lot']], ['¿Me haces un lote con los dos?', ['lot']],
   ['Faresti un lotto con entrambi?', ['lot']], ['Kann ich beide zusammen als Paket haben?', ['lot']],
