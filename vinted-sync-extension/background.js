@@ -21201,7 +21201,8 @@ async function atelierProgsLues() {
 async function atelierProgsEcrire(progs) { try { await chrome.storage.local.set({ [ATELIER_PROG]: { v: 1, progs } }); return true; } catch (_) { return false; } }
 function atelierProgAlarme(uid, at) { try { const r = chrome.alarms && chrome.alarms.create && chrome.alarms.create(ATELIER_PROG_ALARME + uid, { when: at }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }
 function atelierProgSansAlarme(uid) { try { const r = chrome.alarms && chrome.alarms.clear && chrome.alarms.clear(ATELIER_PROG_ALARME + uid); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }
-async function atelierProgPour(uid) { const p = await atelierProgsLues(); return p && p[String(uid)] ? JSON.parse(JSON.stringify(p[String(uid)])) : null; }
+function copieProg(x) { try { return JSON.parse(JSON.stringify(x)); } catch (_) { return null; } }
+async function atelierProgPour(uid) { const p = await atelierProgsLues(); return p && p[String(uid)] ? copieProg(p[String(uid)]) : null; }
 async function atelierProgrammer(msg, sender) {
   const o = ongletCarte(sender);
   if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
@@ -21224,7 +21225,7 @@ async function atelierProgrammer(msg, sender) {
     if (!(await atelierProgsEcrire(progs))) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
     atelierProgAlarme(String(uid), at);
     logActivity(`⏰ Republication programmée : ${prog.ids.length} paire(s) à ${new Date(at).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`);
-    return { ok: true, prog: JSON.parse(JSON.stringify(prog)) };
+    return { ok: true, prog: copieProg(prog) };
   });
 }
 // « Annuler » (une programmation en attente) ou « Effacer » (une « pas partie ») : le compte de L'ONGLET.
