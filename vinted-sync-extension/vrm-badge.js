@@ -1136,7 +1136,7 @@ function vrmVerifVisible(sel) {
   .cb10-svg { display: block; width: 100%; height: 56px; overflow: visible; }
   .cb10-base { stroke: var(--n-trait); stroke-width: 1; vector-effect: non-scaling-stroke; }
   .cb10-l { fill: none; stroke: var(--n-encre); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-  .cb10-p { fill: var(--n-encre); }
+  .cb10-p { stroke-width: 4; }
   .cb10-c { fill: transparent; } .cb10-c:hover { fill: var(--n-trait); }
   .cb10-r { display: block; width: 100%; height: 12px; }
   .cb10-rl { stroke: var(--n-encre-2); stroke-width: 1.5; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
@@ -3389,7 +3389,7 @@ function vrmVerifVisible(sel) {
     const w = L / Math.max(2, n - 1);
     return `<figure class="cb10-t" data-cb-trace="${cle}" data-cb-segments="${segs.length}" data-cb-points="${lus.length}" data-cb-ecart="${ecart == null ? '' : ecart}"><figcaption><span>${esc(lib)}</span><b>${ecart == null ? '—' : esc(TU('cb_delta', { d: (ecart > 0 ? '+' : '') + nbFr(ecart).replace(/^-/, '−'), date: dateJour10(jours[iP].j) }))}</b></figcaption>
       <svg class="cb10-svg" viewBox="-4 0 ${L + 8} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(lib)}"><line class="cb10-base" x1="0" x2="${L}" y1="${H - BA + 2}" y2="${H - BA + 2}"/>
-      ${segs.map((sg) => (sg.length > 1 ? `<polyline class="cb10-l" points="${sg.map((q) => q.join(',')).join(' ')}"/>` : '')).join('')}${segs.flat().map((q) => `<circle class="cb10-p" cx="${q[0]}" cy="${q[1]}" r="1.8"/>`).join('')}
+      ${segs.map((sg) => (sg.length > 1 ? `<polyline class="cb10-l" points="${sg.map((q) => q.join(',')).join(' ')}"/>` : '')).join('')}${segs.filter((sg) => sg.length === 1).map((sg) => `<line class="cb10-l cb10-p" x1="${sg[0][0]}" x2="${sg[0][0]}" y1="${sg[0][1]}" y2="${sg[0][1]}"/>`).join('')}
       ${jours.map((d, i) => `<rect class="cb10-c" x="${(X(i) - w / 2).toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}" data-cb-jour="${d.j}" data-cb-lu="${d.lu ? 1 : 0}"><title>${esc(d.lu ? TU('cb_jour', { date: dateJour10(d.j), vues: d.vues == null ? '—' : nbFr(d.vues), fav: d.fav == null ? '—' : nbFr(d.fav) }) : TU('cb_pas_lu', { date: dateJour10(d.j) }))}</title></rect>`).join('')}</svg></figure>`;
   }
   function courbeHtml(id) {

@@ -51,7 +51,8 @@ function Trace({ jours, cle, libelle, attrs }) {
       <svg className="n-ca-svg" viewBox={`-4 0 ${L + 8} ${H}`} preserveAspectRatio="none" role="img" aria-label={libelle}>
         <line className="n-ca-base" x1="0" x2={L} y1={H - BAS + 2} y2={H - BAS + 2}/>
         {segs.map((s, i) => (s.length > 1 ? <polyline key={i} className="n-ca-ligne" points={s.map((p) => p.join(',')).join(' ')}/> : null))}
-        {segs.flat().map((p, i) => <circle key={'p' + i} className="n-ca-point" cx={p[0]} cy={p[1]} r="1.8"/>)}
+        {/* un jour lu ISOLÉ (sans voisin lu) : un point rond (trait de longueur nulle, extrémités rondes — jamais déformé par l'étirement) */}
+        {segs.filter((s) => s.length === 1).map((s, i) => <line key={'p' + i} className="n-ca-ligne n-ca-point" x1={s[0][0]} x2={s[0][0]} y1={s[0][1]} y2={s[0][1]}/>)}
         {jours.map((d, i) => (
           <rect key={'h' + i} className="n-ca-cible" x={x(i) - L / Math.max(2, n - 1) / 2} y="0" width={L / Math.max(2, n - 1)} height={H} data-ca-jour={d.j} data-ca-lu={d.lu ? '1' : '0'}>
             <title>{d.lu ? tr('courbe.jour', { date: dateLoc(dateDuJour(d.j), { day: 'numeric', month: 'short' }), vues: d.vues == null ? '—' : nombre(d.vues), fav: d.fav == null ? '—' : nombre(d.fav) })
