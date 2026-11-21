@@ -21487,12 +21487,17 @@ async function favorisPersoCarte(msg, sender) {
     const texte = typeof msg.texte === 'string' && msg.texte.trim() ? msg.texte.trim().slice(0, 4000) : null;
     const reg = texte ? { un: [{ id: 'envoi', texte }], lot: [], regles: [] } : await favPersoCompte(String(uid));
     const anc = msg.ancien && typeof msg.ancien === 'object' ? { message: String(msg.ancien.message || ''), variantes: Array.isArray(msg.ancien.variantes) ? msg.ancien.variantes.map(String) : [], lot: '' } : null;
-    const x0 = items[0] || null, o0 = offres[0] || null;
+    // 5.420 (parcours en étapes) : l'aperçu du message pour le favori n° `index` (le 1er par défaut) — « voir les suivants ».
+    const ix = Number.isInteger(Number(msg.index)) && Number(msg.index) >= 0 && Number(msg.index) < items.length ? Number(msg.index) : 0;
+    const x0 = items[ix] || null, o0 = offres[ix] || null;
     const ap = x0 ? fpApercu(reg ? fpReglage(reg) : null, anc, { pseudo: x0.pseudo, titre: x0.titre, prix: x0.prix }, o0 && o0.offre ? { prix: o0.offre } : null, false, null) : null;
     // Le MODÈLE de la version choisie (variables comprises), pour qu'il le modifie sur place.
     let modele = texte;
     if (!modele && ap && ap.ok) { const R = reg ? fpReglage(reg) : null; const l = R && R.un.length ? R.un.concat(...R.regles.map((r) => r.textes)) : [anc ? anc.message : ''].concat(anc ? anc.variantes : []).map((t, i) => ({ id: 'a' + (i + 1), texte: t })); const v = l.find((y) => y && y.id === ap.cle); modele = v ? v.texte : null; }
-    return { ok: true, uid: String(uid), offres, message: ap, modele: modele || null, cle: ap && ap.ok ? ap.cle : null, juge: texte ? fpJugerTexte(texte) : null };
+    // 5.420 : SES versions « 1 article » (pour « Choisir une autre version » à l'étape Message) — les textes seulement, jugés.
+    let versions = [];
+    try { const Rv = await favPersoCompte(String(uid)); const Lv = Rv ? fpReglage(Rv).un : (anc ? [anc.message].concat(anc.variantes).filter(Boolean).map((t, i) => ({ id: 'a' + (i + 1), texte: t })) : []); versions = Lv.slice(0, 8).map((v) => ({ id: String(v.id).slice(0, 16), texte: String(v.texte).slice(0, 2000), sure: texteSurVinted(v.texte).ok && !fpErreurTexte(v.texte) })); } catch (_) { versions = []; }
+    return { ok: true, uid: String(uid), offres, index: ix, message: ap, modele: modele || null, cle: ap && ap.ok ? ap.cle : null, juge: texte ? fpJugerTexte(texte) : null, versions };
   }
   if (quoi === 'enregistrer') {
     const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
