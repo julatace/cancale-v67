@@ -16800,19 +16800,27 @@ async function attendreOnglet(tabId, re, ms = 45000) {
 //    FERMÉ pendant une série ⇒ arrêt propre et dit (`travail-ferme`), jamais rouvert en douce au milieu.
 const TRAVAIL_FENETRE = { width: 440, height: 680 };
 const TRAVAIL_SERIE_MS = 3 * 60000;   // utilisé il y a moins de 3 min ⇒ une série est en cours
-async function marquerOngletTravail(tabId) {
+// 5.410.7 (Julien, 21 nov. : « fais en sorte que ça ouvre un autre onglet pour travailler ») : le bandeau dit
+//    « VRM · onglet de travail — ne le ferme pas » et, quand un envoi n'a pas pu partir, la RAISON (texte reçu du
+//    fond, jamais une règle de la page) ; il est remis à jour s'il existe déjà.
+async function marquerOngletTravail(tabId, raison) {
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, func: () => {
-      if (window.top !== window || document.getElementById('vrm-travail')) return;
-      const h = document.createElement('div'); h.id = 'vrm-travail';
-      h.style.cssText = 'all:initial;position:fixed;left:0;right:0;bottom:0;z-index:2147483645;pointer-events:none;';
-      const o = h.attachShadow({ mode: 'closed' });
-      let t = 'Onglet de travail VRM — ne le ferme pas pendant les envois.';
+    await chrome.scripting.executeScript({ target: { tabId }, args: [String(raison || '').slice(0, 300)], func: (pourquoi) => {
+      if (window.top !== window) return;
+      let t = 'VRM · onglet de travail — ne le ferme pas';
       try { if (globalThis.VRM_UI && typeof globalThis.VRM_UI.T === 'function') t = globalThis.VRM_UI.T('a_onglet_travail') || t; } catch (_) {}
-      const b = document.createElement('div'); b.textContent = t;
-      b.style.cssText = 'font:600 13px/1.3 -apple-system,system-ui,sans-serif;background:#111114;color:#fff;padding:8px 12px;text-align:center;';
-      o.appendChild(b); (document.documentElement || document.body).appendChild(h);
-      try { if (!/^VRM · /.test(document.title)) document.title = 'VRM · ' + document.title; } catch (_) {}
+      let h = document.getElementById('vrm-travail');
+      if (!h) {
+        h = document.createElement('div'); h.id = 'vrm-travail';
+        h.style.cssText = 'all:initial;position:fixed;left:0;right:0;bottom:0;z-index:2147483645;pointer-events:none;';
+        const o = h.attachShadow({ mode: 'open' });
+        const b = document.createElement('div'); b.setAttribute('data-travail', '');
+        b.style.cssText = 'font:600 13px/1.35 -apple-system,system-ui,sans-serif;background:#111114;color:#fff;padding:8px 12px;text-align:center;';
+        o.appendChild(b); (document.documentElement || document.body).appendChild(h);
+      }
+      const b = h.shadowRoot && h.shadowRoot.querySelector('[data-travail]');
+      if (b) { b.textContent = t + (pourquoi ? ' · ' + pourquoi : ''); b.setAttribute('data-raison', pourquoi ? '1' : ''); }
+      try { const base = String(document.title || '').replace(/^VRM · onglet de travail( · )?/, ''); document.title = 'VRM · onglet de travail' + (base ? ' · ' + base : ''); } catch (_) {}
     } });
   } catch (_) {}
 }
@@ -16823,23 +16831,26 @@ async function ongletTravailVinted(acc, uid, opts = {}) {
   let mem = null; try { mem = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; } catch (_) { mem = null; }
   if (mem && mem.tabId != null) {
     let t = null; try { t = await chrome.tabs.get(mem.tabId); } catch (_) { t = null; }
-    if (t && ongletDuDomaine(t, domaine)) { await poserOngletTravail({ ...mem, uid: String(uid), maj: Date.now() }); marquerOngletTravail(t.id); return { tabId: t.id }; }
+    if (t && ongletDuDomaine(t, domaine)) { await poserOngletTravail({ ...mem, uid: String(uid), maj: Date.now(), fermeAt: 0, fermeDit: 0 }); marquerOngletTravail(t.id, opts.raison); return { tabId: t.id }; }
     if (!t && Number(mem.fermeAt) > 0 && !mem.fermeDit && Number(mem.fermeAt) - Number(mem.maj || 0) < TRAVAIL_SERIE_MS && opts.serie !== false) {
       // Fermé (vu par Chrome) pendant une série : on s'arrête et on le dit, une fois ; la suite (SON geste) en rouvrira un.
       await poserOngletTravail({ ...mem, fermeDit: Date.now() }); noterDiag('travail_ferme'); return { refus: 'travail-ferme' };
     }
   }
-  let fen; try { fen = (await chrome.tabs.get(pg.tabId)).windowId; } catch (_) { fen = undefined; }
+  // 5.410.7 : un ONGLET vinted.fr dans SA fenêtre, juste à droite de l'onglet d'où il a touché (sinon de son onglet
+  //    vinted.fr), épinglé, sans prendre le focus ; la petite fenêtre à part n'est plus qu'un repli.
+  let ici = null; try { ici = await chrome.tabs.get(opts.depuis != null ? opts.depuis : pg.tabId); } catch (_) { ici = null; }
+  if (!ici) { try { ici = await chrome.tabs.get(pg.tabId); } catch (_) { ici = null; } }
+  const fen = ici && ici.windowId != null ? ici.windowId : undefined;
   const url = `https://${domaine}${opts.chemin && /^\/[\w\-/]*$/.test(opts.chemin) ? opts.chemin : '/'}`;
   let t = null, fenetre = null;
-  // Une petite fenêtre à part, sans prendre le focus (comme l'onglet « tout petit » de Bleam).
-  try { if (chrome.windows && typeof chrome.windows.create === 'function') { const w = await chrome.windows.create({ url, type: 'popup', focused: false, ...TRAVAIL_FENETRE }); t = w && Array.isArray(w.tabs) && w.tabs[0] ? w.tabs[0] : null; fenetre = w && w.id != null ? w.id : null; } } catch (_) { t = null; }
-  if (!t || t.id == null) { try { t = await chrome.tabs.create({ url, active: false, ...(fen != null ? { windowId: fen } : {}) }); } catch (_) { t = null; } }
+  try { t = await chrome.tabs.create({ url, active: false, pinned: true, ...(fen != null ? { windowId: fen } : {}), ...(ici && Number.isInteger(ici.index) ? { index: ici.index + 1 } : {}) }); } catch (_) { t = null; }
+  if (!t || t.id == null) { try { if (chrome.windows && typeof chrome.windows.create === 'function') { const w = await chrome.windows.create({ url, type: 'popup', focused: false, ...TRAVAIL_FENETRE }); t = w && Array.isArray(w.tabs) && w.tabs[0] ? w.tabs[0] : null; fenetre = w && w.id != null ? w.id : null; } } catch (_) { t = null; } }
   if (!t || t.id == null) return { refus: 'onglet' };
   await poserOngletTravail({ tabId: t.id, fenetre, uid: String(uid), depuis: Date.now(), maj: Date.now() });
   if (!(await attendreOnglet(t.id))) return { refus: 'onglet' };
   noterDiag('travail_ouvert');
-  marquerOngletTravail(t.id);
+  marquerOngletTravail(t.id, opts.raison);
   return { tabId: t.id, cree: true };
 }
 try { chrome.tabs.onRemoved.addListener((tabId) => { (async () => { const m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; if (m && m.tabId === tabId) await poserOngletTravail({ ...m, fermeAt: Date.now() }); })().catch(() => {}); }); } catch (_) {}
@@ -20019,6 +20030,27 @@ function planifierFavorisCarte(ms) {
   try { if (_favorisCarteMinuteur) clearTimeout(_favorisCarteMinuteur); } catch (_) {}
   _favorisCarteMinuteur = setTimeout(() => { _favorisCarteMinuteur = null; sansRejet(tickFavorisCarte(), 'favoriscarte'); }, Math.max(0, Math.min(25000, Number(ms) || 0)));
 }
+// 5.410.7 : l'onglet de travail ouvert d'abord, à droite de l'onglet d'où il a touché (jamais un envoi ici).
+async function travailDabord(o, sender) {
+  try {
+    const acc = ((await getStoredAccounts().catch(() => [])) || []).find((a) => String(a.vinted_user_id) === String(o.uid)) || { domain: o.dom || 'www.vinted.fr', vinted_user_id: String(o.uid) };
+    return await ongletTravailVinted(acc, String(o.uid), { serie: false, depuis: sender && sender.tab && sender.tab.id != null ? sender.tab.id : undefined });
+  } catch (_) { return { refus: 'onglet' }; }
+}
+// 5.410.7 : l'état de CHAQUE favori du lot, lu dans la file du serveur (`vue.jobs`, notificationId → etat/raison) — la
+//    carte le montre sur sa rangée pendant l'envoi ; aucune règle ici, seulement une copie bornée.
+function jobsDuLot(vue, sel) {
+  if (!vue || !Array.isArray(vue.jobs)) return null;
+  const garder = Array.isArray(sel) ? new Set(sel.map(String)) : null;
+  const l = vue.jobs.filter((j) => j && j.notificationId && (vue.lot == null || j.lot === vue.lot) && (!garder || garder.has(String(j.notificationId))));
+  return l.slice(-FAVORIS_CARTE_MAX * 2).map((j) => [String(j.notificationId).slice(0, 160), String(j.etat || ''), String(j.raison || '').slice(0, 40), j.offre ? 1 : 0]);
+}
+// 5.410.7 : l'onglet de travail fermé (vu par Chrome) après le début de l'envoi ⇒ la file s'arrête, et c'est dit.
+async function travailFermeDepuis(depuis, tabId) {
+  let m = null; try { m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; } catch (_) { m = null; }
+  if (!m || tabId == null || m.tabId !== tabId) return false;
+  return Number(m.fermeAt) > Number(depuis || 0);
+}
 // Ce que la carte demande : `apercu` (lecture), `lancer` (SON clic), `arreter`.
 async function favorisCarte(msg, sender) {
   const o = await compteVintedDeLOnglet(sender);
@@ -20050,25 +20082,30 @@ async function favorisCarte(msg, sender) {
   if (quoi === 'lancer') {
     if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien ne part sans ton clic sur « Lancer ».' };
     const sel = Array.isArray(msg.selection) ? [...new Set(msg.selection.filter((x) => typeof x === 'string' && x && x.length <= 160))] : [];
-    if (!sel.length || sel.length > FAVORIS_CARTE_MAX || !msg.reglages || typeof msg.reglages !== 'object' || Array.isArray(msg.reglages)) return { ok: false, code: 'selection', raison: 'Rouvre l’aperçu : la liste n’est plus à jour. Rien n’est parti.' };
+    // 5.410.7 (Julien, 21 nov. : « fais en sorte que ça ouvre un autre onglet pour travailler ») : l'onglet de travail
+    //    s'ouvre AVANT tout le reste (son toucher « Confirmer l'envoi ») ; un refus qui suit y est DIT (bandeau) et
+    //    rendu avec les favoris concernés (`ids`) pour que la carte le dise sur leurs rangées. Il n'envoie rien.
+    const ot = await travailDabord(o, sender);
+    const refuse = async (code, raison) => { if (ot && ot.tabId != null) await marquerOngletTravail(ot.tabId, raison); return { ok: false, code, raison, ids: sel.slice(0, FAVORIS_CARTE_TOUS), travail: ot && ot.tabId != null }; };
+    if (!sel.length || sel.length > FAVORIS_CARTE_MAX || !msg.reglages || typeof msg.reglages !== 'object' || Array.isArray(msg.reglages)) return refuse('selection', 'Rouvre l’aperçu : la liste n’est plus à jour. Rien n’est parti.');
     // 5.407 : seulement des favoris COCHABLES de l'aperçu montré de CE compte (encore en vente,
     // jamais contactés, destinataire prouvé), lu il y a moins de 30 min ; sinon rien ne part.
     {
       let ap = null; try { ap = ((await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {})[o.uid] || null; } catch (_) { ap = null; }
       const ok = ap && Array.isArray(ap.cochables) && Date.now() - Number(ap.at || 0) < FAVORIS_CARTE_CHOIX_MS ? new Set(ap.cochables) : null;
-      if (!ok) return { ok: false, code: 'selection', raison: 'La liste de tes favoris doit être relue avant l’envoi : rouvre l’onglet Favoris. Rien n’est parti.' };
-      if (sel.some((id) => !ok.has(id))) return { ok: false, code: 'selection', raison: 'Un favori choisi n’est plus à contacter (article vendu, ou déjà contacté) : la liste est relue. Rien n’est parti.' };
+      if (!ok) return refuse('selection', 'La liste de tes favoris doit être relue avant l’envoi : rouvre l’onglet Favoris. Rien n’est parti.');
+      if (sel.some((id) => !ok.has(id))) return Object.assign(await refuse('selection', 'Un favori choisi n’est plus à contacter (article vendu, ou déjà contacté) : la liste est relue. Rien n’est parti.'), { ids: sel.filter((id) => !ok.has(id)) });
     }
-    if (horsLigne()) return { ok: false, code: 'hors-ligne', raison: 'Pas de réseau : rien n’est parti.' };
-    if ((await toutArreteDepuis(null)) > 0) return { ok: false, code: 'tout-arrete', raison: '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.' };
+    if (horsLigne()) return refuse('hors-ligne', 'Pas de réseau : rien n’est parti.');
+    if ((await toutArreteDepuis(null)) > 0) return refuse('tout-arrete', '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.');
     const avant = await lireEtatFavorisCarte();
-    if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
+    if (avant && avant.actif) return refuse('deja', 'Des messages partent déjà depuis cette carte.');
     // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
     // 5.410 : SA pause entre deux messages (cadence du compte), toujours une PLAGE tirée au hasard par le serveur.
     let plage = null;
     try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && (cad.poses.includes('pauseMin') || cad.poses.includes('pauseMax'))) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
     const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
-    if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
+    if (!r.ok || !r.json || !r.json.vue) return refuse('serveur', (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.');
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
     // Un TABLEAU, dans l'ordre de la sélection (l'ordre de la file) : l'écran montre les suivants.
@@ -20078,7 +20115,7 @@ async function favorisCarte(msg, sender) {
       if (!id || items.some((y) => y.id === id)) continue;
       items.push({ id, photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120) });
     }
-    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items };
+    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items, sel: sel.slice(0, FAVORIS_CARTE_MAX), jobs: jobsDuLot(r.json.vue, sel), travail: ot && ot.tabId != null ? ot.tabId : null };
     await poserEtatFavorisCarte(st);
     await noterApercuCarte(o.uid, { etat: 'encours', total: 0 });
     logActivity(`💬 Messages aux favoris lancés depuis la carte : ${sel.length}`);
@@ -20092,7 +20129,7 @@ async function favorisCarte(msg, sender) {
     await finirActionEnCours('arret');
     return { ok: !!r.ok, etat: st, raison: r.ok ? '' : ((r.json && r.json.message) || 'VRM n’a pas confirmé l’arrêt. Réessaie.') };
   }
-  if (quoi === 'reprendre') return reprendreApresVerification(sender, msg.captcha === true);
+  if (quoi === 'reprendre') { const ot = await travailDabord(o, sender); const rr = await reprendreApresVerification(sender, msg.captcha === true); if (rr && !rr.ok && ot && ot.tabId != null) await marquerOngletTravail(ot.tabId, rr.raison); return rr; }
   if (quoi === 'oublier') {
     const st = await lireEtatFavorisCarte();
     if (st && st.uid === o.uid && !st.actif) { try { await chrome.storage.local.remove(FAVORIS_CARTE_CLE); } catch (_) {} }
@@ -20661,9 +20698,20 @@ async function tickFavorisCarte() {
       let tabs = [];
       try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
       if (!(tabs || []).some((t) => ongletDuDomaine(t, st.dom || 'www.vinted.fr'))) return attendre('onglet');
+      if (st.travail != null && (await travailFermeDepuis(st.debut, st.travail))) {
+        // 5.410.7 : l'onglet de travail fermé pendant l'envoi ⇒ la file s'arrête chez VRM, rien de plus ne part, c'est dit.
+        const ar = await apiFavorisCarte(st.uid, 'arreter');
+        if (ar.json && ar.json.carte) st.file = ar.json.carte;
+        if (ar.json && ar.json.vue) st.jobs = jobsDuLot(ar.json.vue, st.sel) || st.jobs;
+        st.actif = false; st.attente = null; st.prochain = null; st.enCours = null; st.fin = { at: Date.now(), raison: 'travail_ferme' };
+        await poserEtatFavorisCarte(st);
+        logActivity('⏹ Messages aux favoris (carte) arrêtés : l’onglet de travail VRM a été fermé.');
+        return;
+      }
       const g = await apiFavorisCarte(st.uid, null);
       if (!g.ok || !g.json || !g.json.vue) return attendre('vrm');
       if (g.json.carte) st.file = g.json.carte;
+      { const jb = jobsDuLot(g.json.vue, st.sel); if (jb) st.jobs = jb; }
       if (!g.json.vue.active) {
         st.actif = false; st.attente = null; st.prochain = null;
         st.fin = { at: Date.now(), raison: g.json.vue.raison ? 'interrompu' : 'fini', texte: String(g.json.vue.raison || '').slice(0, 240), bilan: g.json.vue.bilan ? String(GARDES_APP.phraseBilanFavoris(g.json.vue.bilan) || '').slice(0, 300) : '' };
@@ -20690,10 +20738,11 @@ async function tickFavorisCarte() {
       const s = await apiFavorisCarte(st.uid, 'suivant');
       if (!s.ok || !s.json) return attendre('vrm');
       if (s.json.carte) st.file = s.json.carte;
+      if (s.json.vue) { const jb = jobsDuLot(s.json.vue, st.sel); if (jb) st.jobs = jb; }
       const t = s.json.travail;
       if (!t || typeof t.jeton !== 'string') { st.attente = null; await poserEtatFavorisCarte(st); return; }
       st.attente = null; st.prochain = null; st.quoi = ''; st.enCours = Date.now();
-      { const id = String(t.itemId || ''), it = Array.isArray(st.items) ? st.items.find((x) => x.id === id) : null; st.item = { id, photo: it ? it.photo : '', titre: it ? it.titre : '' }; st.passes = [...new Set([...(Array.isArray(st.passes) ? st.passes : []), id])].slice(-FAVORIS_CARTE_MAX); }
+      { const id = String(t.itemId || ''), it = Array.isArray(st.items) ? st.items.find((x) => x.id === id) : null; st.item = { id, photo: it ? it.photo : '', titre: it ? it.titre : '' }; st.cours = String(t.notificationId || '').slice(0, 160); st.passes = [...new Set([...(Array.isArray(st.passes) ? st.passes : []), id])].slice(-FAVORIS_CARTE_MAX); }
       await poserEtatFavorisCarte(st);
       let r = null;
       try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true }); } catch (_) { r = null; }
@@ -20702,6 +20751,7 @@ async function tickFavorisCarte() {
       const st2 = (await lireEtatFavorisCarte()) || st;
       st2.enCours = null;
       if (f.json && f.json.carte) st2.file = f.json.carte;
+      if (f.json && f.json.vue) { const jb = jobsDuLot(f.json.vue, st2.sel); if (jb) st2.jobs = jb; }
       const raison = r && r.data && r.data.raison;
       if (raison === 'vinted_robot' || (r && r.code === 'verification')) {
         // 5.407 : la file n'est plus ARRÊTÉE chez VRM — elle est EN PAUSE, et ne reprend que sur SON
@@ -23286,7 +23336,7 @@ async function executerCommande(msg) {
   // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
   // (les autres le lisent dans sa clé `vrm_securite_comptes` avant chaque geste automatique).
   if (msg && msg.cmd === 'secuArret') return await secuPoserArret(msg.arret === true, 'app');
-  if (msg && msg.cmd === 'republierVinted') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => republierVinted(msg))); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'republierVinted') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => republierVinted(msg))); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await avecActionPlein('baisse', msg, () => baisserPrixVinted({ ...msg, programme: false })); await journalCommande(msg, r); return r; }
   // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
@@ -23298,13 +23348,13 @@ async function executerCommande(msg) {
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
   // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
-  if (msg && msg.cmd === 'recreerVinted') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => recreerVinted(msg))); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'recreerVinted') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => recreerVinted(msg))); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'publierBrouillon') { const r = await avecTemoinRepub(() => publierBrouillon(msg)); await journalCommande(msg, r); return r; }
   // 11 nov. (5.367) : créer UN brouillon sur Vinted depuis une fiche VRM, sur son clic (voir `creerVintedFiche`).
   if (msg && msg.cmd === 'creerVintedFiche') { const r = await avecTemoinRepub(() => creerVintedFiche(msg)); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'refaireBrouillon') { const r = await avecTemoinRepub(() => refaireBrouillon(msg)); await journalCommande(msg, r); return r; }
   // 17 nov. (5.408) : « Reprendre » une republication interrompue, sur son clic (voir `reprendreRepub`).
-  if (msg && msg.cmd === 'reprendreRepub') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => reprendreRepub(msg))); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'reprendreRepub') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => reprendreRepub(msg))); await journalCommande(msg, r); return r; }
   // 20 nov. (5.410, `repubverif`) : le contrôle AVANT de lancer (lecture seule, sur son clic, voir `verifierRepub`).
   if (msg && msg.cmd === 'verifierRepub') return await verifierRepub(msg);
   if (msg && msg.cmd === 'lbcPause') return await pauseLbcDepuisApp(msg);

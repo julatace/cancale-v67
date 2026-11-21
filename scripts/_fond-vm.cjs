@@ -174,11 +174,11 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
       cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {}, onClicked: { addListener() {} }, setPopup() {} },
-      tabs: { onUpdated: { addListener(fn) { ecoutesOnglets.push(fn); } }, onActivated: { addListener() {} }, onRemoved: { addListener() {} }, query: async () => onglets,
+      tabs: { onUpdated: { addListener(fn) { ecoutesOnglets.push(fn); } }, onActivated: { addListener() {} }, onRemoved: { addListener(fn) { (j.surFerme = j.surFerme || []).push(fn); } }, query: async () => onglets,
         get: async (id) => { const t = onglets.find((o) => o && o.id === id); if (!t) throw new Error('No tab with id: ' + id); return copie(t); },
         sendMessage: (id, m, cb) => { if (m && m.__vmrEvt) j.evts.push(m.evt); if (typeof cb === 'function') cb(); },
         // 5.410.3 : l'onglet qui travaille (republication par le formulaire) — créé, puis mené de page en page.
-        create: async (o = {}) => { const t = { id: 100 + onglets.length, url: String(o.url || 'https://www.vinted.fr/'), status: 'complete', active: o.active !== false, windowId: 1 }; onglets.push(t); (j.ongletsCrees = j.ongletsCrees || []).push(copie(t)); return copie(t); },
+        create: async (o = {}) => { const t = { id: 100 + onglets.length, url: String(o.url || 'https://www.vinted.fr/'), status: 'complete', active: o.active !== false, windowId: 1 }; onglets.push(t); (j.ongletsCrees = j.ongletsCrees || []).push(copie(t)); (j.ongletsOptions = j.ongletsOptions || []).push(copie(o)); return copie(t); },
         update: async (id, o = {}) => { const t = onglets.find((x) => x && x.id === id); if (!t) throw new Error('No tab with id: ' + id); if (o.url) { t.url = String(o.url); (j.navigations = j.navigations || []).push({ id, url: t.url }); } if (o.active != null) t.active = !!o.active; return copie(t); } },
       storage: { local: {
         get(k, cb) { const cles = Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {})); const out = {}; for (const c of cles) if (store[c] !== undefined) out[c] = copie(store[c]); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
