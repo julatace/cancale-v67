@@ -832,7 +832,7 @@ import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js
 import { presenterCodePartenaire } from "./partenaires/presenter.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
-import { CLE_ROLES_COMPTES, comptesPersonnels } from './rolesComptes.js';   // (20 nov., lot bleam-suite) le rôle des comptes
+import { CLE_ROLES_COMPTES, comptesPersonnels, comptesHorsTotaux } from './rolesComptes.js';   // (20 nov., lot bleam-suite) le rôle des comptes
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
 import { venteHorsPlan, venteAutreHorsPlan } from "../api/_lib/plan-regle.js";
 import { VentesHorsPlan, VentesAutresHorsPlan, BandeauCompteVendeur } from "./abonnement/PlansSoloPro.jsx";
@@ -66225,7 +66225,7 @@ function AppCoeur() {
   const [masquesTick, setMasquesTick] = useState(0);
   const [datesLbcTick] = useLigneSynchro('vrm_lbc_dates', lireDatesLbc);   // une date Leboncoin saisie : le vendu se recalcule
   useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden') setMasquesTick(t => t + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if (k === 'vinted_sales_hidden' || k === 'vinted_accounts_hidden' || k === CLE_ROLES_COMPTES) setMasquesTick(t => t + 1); };
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, []);
@@ -66346,7 +66346,9 @@ function AppCoeur() {
   // écartent les ventes déjà versées que la LISTE dit encore « en cours ».
   // (6 nov.) Les ventes vues par e-mail, pas encore relues sur Vinted (src/venteEmailFraiche.js) :
   // elles entrent dans VENDU (et la liste « Tous »), jamais dans l'argent à venir ni le CA déclaré.
-  const hAccCoqueCle = [...new Set((load('vinted_accounts_hidden', []) || []).map(String))].sort().join(',');
+  // (21 nov., lot personnel-compta) + les comptes PERSONNELS (src/rolesComptes.js) : hors du VENDU comme un compte écarté —
+  // la règle de Comptabilité (« Vendu et reçu »), du bilan de la semaine et du widget (`widget_stats` est publié d'ici).
+  const hAccCoqueCle = [...comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}))].sort().join(',');
   const ventesEmailCoque = useVentesEmailFraiches(ventesCoque, ventesKO, vintedAccounts,
     (u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {}), hAccCoqueCle + '|' + JSON.stringify(panelOffCoque || {}) + '|' + masquesTick);
   const ventesCoqueEmail = useMemo(() => avecVentesEmail(ventesCoque, ventesEmailCoque), [ventesCoque, ventesEmailCoque]);
@@ -66363,7 +66365,7 @@ function AppCoeur() {
     if (!Array.isArray(ventesCoque)) return liveStats;
     try {
       const hTx = new Set(VENTES_MASQUEES_AUCUNE().map(String));
-      const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+      const hAcc = comptesHorsTotaux(load('vinted_accounts_hidden', []) || [], load(CLE_ROLES_COMPTES, {}));   // (21 nov.) + les comptes PERSONNELS
       const ecarte = (uid) => compteEcarte(uid, hAcc, panelOffCoque);
       const cachee = (o) => hTx.has(String(o && o.transaction_id)) || ecarte(o && o._acc && o._acc.vinted_user_id);
       const v = ventesFaites({ vinted: ventesCoqueEmail, lbc: lbcCoqueLu === true ? avecDatesLbc(((lbcVentes && lbcVentes.ventes) || []), lireDatesLbc()) : [], ebay: Array.isArray(ebayCommandes) ? ebayCommandes : [], vestiaire: ventesVcCoque || [], cachee, excluAutre: excluAutreCoque, importees: lireVentesImportees(), main: ventesAilleursDe(ventesCoque) });
