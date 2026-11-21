@@ -53,9 +53,15 @@ rapprochée : elle est NOMMÉE (« N ventes Vestiaire sans référence VRM-n° �
   (`vc_envoi.adresse` : oui / sans). « Ouvrir la conversation » utilise la forme apprise ; si Vestiaire ne met pas la
   conversation dans son adresse, l'envoi depuis VRM est **refusé et dit** (`adresse-sans-conv` : destinataire pas
   vérifiable) plutôt que tenté « au mieux ».
-- **App · Messages · Vestiaire** (`src/ecrans/Vestiaire.jsx`) : comptes SÉPARÉS (règle du 12 nov.) — le compte ouvert
-  dans l'onglet, puis chaque autre compte, puis « compte pas encore su » ; le plus récent en haut dans chaque groupe ;
-  un en-tête par groupe ; aucun bouton d'envoi dans l'app : « Répondre » ouvre le panneau (`BoutonExtension`).
+- **App · Messages** — ⚠️ l'écran MONTÉ est la liste mélangée `FilsTous` (`src/ecrans/FilsTous.jsx`, depuis « plus de
+  sélecteur », 20 nov.) ; `MessagesVestiaire` (`src/ecrans/Vestiaire.jsx`, où la session d'avant avait posé les groupes)
+  n'est plus rendu sur `?tab=messages` (§4.11 : vérifié par le banc, qui échouait). Fait dans `FilsTous` : les groupes
+  Vestiaire PAR COMPTE (déjà par `plateforme:compte`) portent le compte ouvert dans l'onglet Vestiaire
+  (`useCompteVcOuvert`) — « compte de l'onglet », en tête comme celui de Vinted —, l'autre compte est nommé « Autre
+  compte Vestiaire », sans compte « Vestiaire · Compte pas encore su » ; le plus récent en haut dans chaque groupe ; et
+  les conversations que la LISTE Vestiaire nomme sans fil encore lu sont MONTRÉES (avant : absentes ; le fil dit « pas
+  encore lue »). Aucun bouton d'envoi dans l'app : « Répondre dans l'extension » ouvre le panneau. Les groupes de
+  `MessagesVestiaire` restent (même règle) pour la route d'un site, s'il revient.
 
 ## 3. Personnes qui ont aimé (fait, sans envoi automatique)
 Vestiaire NOMME qui aime un article (notification « … vient d'aimer votre pièce », `productLink.meta = { type:
@@ -89,9 +95,13 @@ fond (à retirer par un lot dédié si Julien confirme que la décision vaut aus
   `audit-vc-messages`, `audit-vc-conversations`, `audit-favoris-sites`, `audit-lbc-vc-interesses`, `audit-coherence`,
   `audit-actions-gardees`, `audit-discretion`, `audit-traduction`, `audit-identite`, `audit-fonctions-api` (aucun
   fichier ajouté dans `api/`) : verts.
-- Banc `scripts/bancs/vestiaire-messages-comptes.cjs` (390 tactile clair, 1512 sombre) : Messages · Vestiaire
-  (groupes par compte, ordre, aucun bouton d'envoi) et Ventes (la vente Vestiaire avec son logo). Résultats : voir
-  le rapport de fin de session.
+- Banc `scripts/bancs/vestiaire-messages-comptes.cjs` (390 tactile clair, 1512 sombre) : **22 verts** — Messages
+  (groupes Vestiaire par compte, compte de l'onglet d'abord même si l'autre a la conversation la plus récente, la
+  conversation sans fil montrée, fil lu, « Répondre dans l'extension », aucun « Envoyer ») et Ventes (la vente
+  Vestiaire avec son logo, 390 et 1512). Captures regardées. Avec le `FilsTous.jsx` d'origin/main : rouge (voir le
+  rapport). `audit-vc-ecrire` : E1 (champ gardé après l'envoi) et E6 (arrêt AVANT de toucher le champ) resserrés —
+  les mutations « texte retenu » et « vérification d'entrée retirée » ne mordaient pas.
+- Remarque hors lot : dans le fil Vestiaire, une bulle courte se coupe au milieu d'un mot à 390 (« Bonjo / ur ! »).
 
 ## Gestes de Julien
 1. Installer la **5.412.0** (quand l'intégrateur la publie).
