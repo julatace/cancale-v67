@@ -14002,8 +14002,41 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   // ⚠️ 5.414 (`toutinterface`, « on ne fait plus les requêtes ») : PLUS de `POST item_upload/attributes` fabriqué. La
   //    liste est APPRISE quand la page de Vinted la demande elle-même (le formulaire rempli par VRM dans l'onglet de
   //    travail, ou par lui) : `rangerGrilleTailles`. Pas encore apprise ⇒ « pas su », dit — jamais devinée.
-  noterDiag('tailles_pas_apprises');
-  return { raison: "VRM ne connaît pas encore la liste de Vinted pour cette catégorie (elle s'apprend quand la page « Vendre » la montre)" };
+  //    Pas encore apprise : VRM la LIT par la page — l'onglet de travail ouvre « Vendre », y choisit CETTE catégorie
+  //    (son identifiant), et la réponse que la PAGE reçoit est rangée (`grilleParPage`). Aucune écriture : rien n'est
+  //    enregistré chez Vinted. Jamais pendant un formulaire en cours (le cache, sinon « pas su »).
+  if (opts.cacheSeul) noterDiag('tailles_cache_absent_lue');
+  const g = await gardeLecture(uid, acc, 'clic');
+  if (g) return { raison: g.error };
+  const r = await grilleParPage(uid, acc, cat);
+  if (r.raison) { noterDiag('tailles_pas_apprises'); return r; }
+  const errs = r.json && Array.isArray(r.json.errors) ? r.json.errors : [];
+  if (r.status === 400 || r.status === 422) {
+    const surCat = errs.some((e) => /^(category|catalog_id|catalog)$/.test(String((e && (e.field || e.name)) || '')));
+    return { raison: "Vinted n'a pas rendu la liste des tailles", status: r.status, ...(surCat ? { categorieRefusee: true } : {}) };
+  }
+  if (!r.ok) { noterDiag('tailles_lecture_ratee_' + (r.status || 0)); return { raison: "Vinted n'a pas rendu la liste des tailles", status: r.status || 0 }; }
+  return rangerGrilleTailles(cat, r.json);
+}
+// 5.414 : la grille LUE par la page « Vendre » de l'onglet de travail (une lecture : aucune écriture chez Vinted).
+let _grilleEnCours = null;
+async function grilleParPage(uid, acc, cat) {
+  if (_grilleEnCours) { try { await _grilleEnCours; } catch (_) {} }
+  let fin = null; _grilleEnCours = new Promise((ok) => { fin = ok; });
+  try {
+    try { const a = await lireActionEnCours(); if (a && a.actif && a.formulaire) return { raison: "VRM remplit un formulaire de Vinted en ce moment : la liste des tailles sera lue ensuite" }; } catch (_) {}
+    const ot = await ongletTravailVinted(acc, String(uid), { chemin: '/items/new' });
+    if (ot.refus) return { raison: raisonSansPage({ sansPage: ot.refus === 'travail-ferme' ? 'onglet' : ot.refus, travailFerme: ot.refus === 'travail-ferme' }) || RAISON_ONGLET_VINTED };
+    const domaine = (acc && acc.domain) || 'www.vinted.fr';
+    let chemin = ''; try { chemin = new URL(String((await chrome.tabs.get(ot.tabId)).url || '')).pathname; } catch (_) { chemin = ''; }
+    if (!/^\/items\/new\/?$/.test(chemin) && !(await naviguerTravail(ot.tabId, `https://${domaine}/items/new`, /\/items\/new/))) return { raison: RAISON_ONGLET_VINTED };
+    const fp = await etapeFormulaire(acc, ot.tabId, 'formulairePret');
+    if (!fp.ok) return { raison: fp.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_SELECTEUR(fp.manque || fp.code) };
+    const nc = await nomCategorieVinted(cat);
+    const o = await etapeFormulaire(acc, ot.tabId, 'grille', { id: cat, nom: nc && nc.nom, recherche: nc && nc.nom });
+    if (!o.ok || !o.rep) return { raison: o.code === 'captcha' ? PHRASE_CAPTCHA : o.code === 'selecteur' ? PHRASE_SELECTEUR(o.manque) : "Vinted n'a pas rendu la liste des tailles" };
+    return { status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json };
+  } finally { _grilleEnCours = null; fin(); }
 }
 // La liste des tailles que la PAGE de Vinted a reçue (réponse de SA requête, vue dans l'onglet de travail) : rangée
 // comme avant, 24 h, 30 catégories au plus. Rend la grille, ou { raison }.
@@ -14731,7 +14764,7 @@ async function republierVinted(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuP.at) await rendreActions(uid, recuP.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     // 5.414 (`toutinterface`) : la modification par la page « Modifier » de Vinted (prix — et titre s'il l'a changé —
     //    tapés lettre à lettre, « Enregistrer ») ; la page envoie SA requête, VRM lit sa réponse.
-    const r = await interfaceVinted(acc, 'prix', { id, prix: Number(built.nouveau), ...(msg.titre != null && built.nouveauTitre ? { titre: String(built.nouveauTitre) } : {}) });
+    const r = await interfaceVinted(acc, 'prix', { id, prix: Number(built.nouveau), ...(msg.titre != null && built.nouveauTitre ? { titre: String(built.nouveauTitre) } : {}), corpsPage: built.corps });
     if (r && (r.sansPage || r.pause) && r.rienParti) { if (recuP.at) await rendreActions(uid, recuP.at, 1); return { accepte: false, code: r.pause ? 'verification' : 'onglet-vinted', raison: r.raison || raisonSansPage(r) }; }
     if (r && r.incertain) return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement à la modification : regarde l'annonce sur Vinted (rien ne sera renvoyé).", ancien: built.ancien, nouveau: built.nouveau };
     if (!r || !r.ok) { await poserFreinRepub(uid, r); return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau }; }
@@ -14857,7 +14890,7 @@ async function baisserPrixVinted(msg) {
     // 2. LA MODIFICATION, en place (jamais une suppression, jamais une création).
     // 5.414 (`toutinterface`) : le nouveau prix TAPÉ dans la page « Modifier » de Vinted, puis « Enregistrer » ; la page
     //    envoie SA requête (son propre corps : rien n'est rejoué), VRM lit sa réponse puis relit le prix (plus bas).
-    const r = await interfaceVinted(acc, 'prix', { id, prix: voulu / 100 });
+    const r = await interfaceVinted(acc, 'prix', { id, prix: voulu / 100, corpsPage: built.corps });   // `corpsPage` : pour la fausse page des bancs seulement (la vraie envoie le sien)
     if (pasParti(r)) { await rendre(); return { accepte: false, code: r.pause ? 'vinted-pause' : 'onglet-vinted', raison: r.pause ? (r.raison || 'Vinted demande de ralentir') : (r.raison || raisonSansPage(r)) }; }
     if (r && r.incertain) { noterDiag('baisse_incertaine'); return { accepte: true, etape: 'incertain', ancien: lue.prix, voulu: voulu / 100, prixVu: null, raison: "Vinted n'a pas répondu clairement : regarde l'annonce (rien ne sera renvoyé)" }; }
     if (!r || !r.ok) {
@@ -17001,7 +17034,7 @@ const GESTES_INTERFACE = Object.freeze({
   ouvrir: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
   message: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
   offre: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
-  repondreOffre: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
+  'repondreOffre': { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
   favoriOuvrir: { route: () => '/inbox', re: () => /^\/inbox(\/|$)/ },
   masquer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },
   supprimer: { route: (d) => `/items/${d.id}`, re: (d) => new RegExp(`^/items/${d.id}(?:-[^/]*)?/?$`) },

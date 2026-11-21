@@ -555,6 +555,22 @@
       if (r.captcha) return Object.assign(vuCaptcha(), { parti: true });
       return { ok: true, rep: r };
     },
+    // 5.414 : LA GRILLE DES TAILLES d'une catégorie, LUE par la page « Vendre » (aucune écriture) : la catégorie choisie
+    // dans le formulaire (son identifiant, sinon son libellé exact), et la réponse que la PAGE reçoit pour elle.
+    async grille(d) {
+      const id = String((d && d.id) || '');
+      if (!/^[1-9]\d{0,9}$/.test(id)) return { ok: false, code: 'etape' };
+      ecouter();
+      const vus = (globalThis.__vrmFormVues || []).slice().reverse().find((e) => e.methode === 'POST' && /\/api\/v2\/item_upload\/attributes\/?$/.test(e.chemin) && e.status >= 200 && e.status < 300 && /"category"/.test(e.corps || '') && new RegExp(`\\[\\s*${id}\\s*\\]`).test(e.corps || ''));
+      if (vus) return { ok: true, rep: { status: vus.status, ok: true, json: vus.json, corps: vus.corps, chemin: vus.chemin } };
+      const att = reponseDe('POST', /\/api\/v2\/item_upload\/attributes\/?$/, 20000, d && d.cle);
+      const c = await ETAPES.champ({ quoi: 'categorie', id, nom: d.nom, recherche: d.recherche || d.nom });
+      if (!c.ok) return c;
+      const r = await att;
+      if (!r) return { ok: false, code: 'sans-reponse' };
+      if (r.captcha) return vuCaptcha();
+      return { ok: true, rep: r };
+    },
     // 5.414 : LE BORDEREAU d'une vente, par la conversation de CETTE vente : son bouton (nom exact, un seul), puis, si
     // Vinted ouvre une fenêtre, SA confirmation — jamais un choix fait à sa place : une fenêtre qui demande de choisir
     // (plusieurs options, aucune cochée, ou un dépôt appris qui n'y est pas) ⇒ arrêt AVANT de confirmer, nommé.
