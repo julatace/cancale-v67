@@ -3884,7 +3884,17 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
       onClick: manquent > 0 ? versSaisiePrix : () => ouvrirRepliCompta('compta-benefice'), sous: '' },
   ];
-  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // (21 nov., argent-vintex) `sur` : la population des prix (Bn.n) — la phrase « 13 prix d'achat à saisir sur 15 » vient
+  // de la MÊME source que la couverture (n − nCout sur n), plus de second chiffre à côté.
+  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, sur: Bn.n, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // (21 nov., argent-vintex) « Comptes · N › » : la même règle qu'ArgentNav (`compteEcarte`), posée en rangée sur Mois.
+  const comptesV = (() => {
+    const liste = Array.isArray(accounts) ? accounts.filter((a) => a && a.vinted_user_id != null) : null;
+    if (!liste || !liste.length) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const dedans = liste.filter((a) => !compteEcarte(String(a.vinted_user_id), hAcc, panelOff || {})).length;
+    return { dedans, texte: dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`, onClick: () => { if (onNav) onNav('vintedaccounts'); } };
+  })();
   // Les versements du mois : le livre des recettes (la lecture de « Registres »), du plus récent au plus ancien.
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
@@ -3894,7 +3904,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     [calc, ym, versements, ventesVcER]);
   const MAX = 30;
   const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
-  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
+  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }));   // « 19 nov. » (21 nov. : court, la rangée ne se coupe plus)
   // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
   // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
   const achatDe = React.useMemo(() => {
@@ -3913,7 +3923,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} note={qR.note || ''} comptes={comptesV}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
