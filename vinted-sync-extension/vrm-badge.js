@@ -994,6 +994,37 @@ function vrmVerifVisible(sel) {
   .fav6-bas .vu-btn { flex: 0 0 auto; width: auto; }
   /* 5.419 : Commandes — filtres rapides, barre de la sélection, confirmation « Commander ». */
   .ven6-seg { margin: 0 16px 10px; display: flex; flex-wrap: wrap; }
+  /* 5.425 : « À relancer » (Commandes) et le tri des conversations (Messagerie). */
+  .rl6-t { display: flex; align-items: center; gap: 12px; padding: 0 16px 8px; }
+  .rl6-t .note5 { flex: 1; margin: 0; }
+  .rl6-t .vu-btn { flex: 0 0 auto; width: auto; min-height: 44px; }
+  .rl6-g h3 b { font-weight: 600; }
+  .rl6 .rangs { max-height: none; }
+  .rl6-r { padding: 10px 16px; }
+  .rl6-r + .rl6-r { border-top: .5px solid var(--n-trait); }
+  .rl6-l { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+  .rl6-l .case5 { flex: 0 0 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .rl6-l .mil { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .rl6-l .ti { font-weight: 600; color: var(--n-encre); overflow-wrap: anywhere; }
+  .rl6 > .note5 { padding: 0 16px; }
+  .rl6-l .me { color: var(--n-encre-2); font-size: 13px; line-height: 18px; }
+  .rl6-m { margin: 8px 0 0 56px; display: flex; flex-direction: column; gap: 6px; }
+  .rl6-m small { color: var(--n-encre-2); font-size: 13px; }
+  .rl6-m textarea { width: 100%; box-sizing: border-box; min-height: 88px; border-radius: 10px; border: 1px solid var(--n-trait); padding: 8px 10px; font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; background: var(--n-carte); color: var(--n-encre); }
+  .rl6-m .ge5 .vu-btn { width: auto; min-height: 44px; }
+  .rl6-ko { margin: 6px 0 0 56px; color: var(--n-ambre, #8A4B00); }
+  .rl6-reg .champ6 input[type="number"] { max-width: 120px; min-height: 44px; }
+  .rl6-reg textarea { min-height: 88px; }
+  .rl6-reg select { min-height: 44px; }
+  .rl6-case span { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 44px; }
+  .rl6-case input[type="checkbox"] { width: 22px !important; height: 22px; min-height: 0; flex: 0 0 22px; margin: 0; padding: 0; }
+  .rl6-case b { flex: 1; }
+  .tc6-seg { margin: 0 0 8px; display: flex; flex-wrap: wrap; }
+  .tc6-seg button { flex: 1 1 auto; min-height: 44px; }
+  .tc6-r { display: block; color: var(--n-encre-2); font-size: 12px; line-height: 16px; }
+  .tc6-r[data-urgent] { color: var(--n-ambre, #8A4B00); }
+  .tc6-pt { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: middle; }
+  @media (max-width: 760px) { .rl6-m, .rl6-ko { margin-left: 0; } .rl6-t { flex-direction: column; align-items: stretch; gap: 8px; } .rl6-t .vu-btn { width: 100%; } .rl6-r { padding: 10px 8px; } .rl6-l { gap: 8px; } .rl6-l .v6 { align-self: flex-start; } }
   .ven6-seg button { flex: 1 1 auto; min-height: 44px; }
   .ven6-bas { flex-wrap: wrap; }
   @media (max-width: 760px) {
@@ -2999,8 +3030,12 @@ function vrmVerifVisible(sel) {
     const choisis = venStatuts || new Set(etats);
     const valeur = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.date) || 0 : c === 'transporteur' ? String(x.transporteur || '') : c === 'statut' ? String(x.etat || '') : String(x.titre || '').toLowerCase());
     const nF = Object.fromEntries(FILTRES_V9.map((k) => [k, v.liste.filter((x) => filtreV9(x, k)).length]));
-    if (!FILTRES_V9.includes(venFiltre)) venFiltre = 'tous';
-    const segV = `<div class="vu-seg seg6 ven6-seg" role="group" aria-label="${esc(TU('v9_filtres'))}">${FILTRES_V9.map((k) => `<button type="button" data-ven-filtre="${k}" aria-pressed="${venFiltre === k}"><span>${esc(TU('v9_f_' + k))}</span> <b data-n="${nF[k]}">${nF[k]}</b></button>`).join('')}</div>`;
+    if (!FILTRES_V9.includes(venFiltre) && !(venFiltre === 'relancer' && listes.plateforme === 'vinted')) venFiltre = 'tous';
+    // 5.425 : « À relancer » (Vinted) — le nombre de commandes à relancer, lu par le fond ; « — » tant qu'il n'est pas su.
+    if (listes.plateforme === 'vinted' && !rlEnVol && (!rlEtat || rlPour !== (Number(listesAt) || 0))) chargerRelances();
+    const nRl = rlNbOk();
+    const segV = `<div class="vu-seg seg6 ven6-seg" role="group" aria-label="${esc(TU('v9_filtres'))}">${FILTRES_V9.map((k) => `<button type="button" data-ven-filtre="${k}" aria-pressed="${venFiltre === k}"><span>${esc(TU('v9_f_' + k))}</span> <b data-n="${nF[k]}">${nF[k]}</b></button>`).join('')}${listes.plateforme === 'vinted' ? `<button type="button" data-ven-filtre="relancer" aria-pressed="${venFiltre === 'relancer'}"><span>${esc(TU('rl_filtre'))}</span> <b data-n="${nRl == null ? '' : nRl}"${nRl ? ' data-ton="ambre"' : ''}>${nRl == null ? '—' : nRl}</b></button>` : ''}</div>`;
+    if (venFiltre === 'relancer') return segV + relancesHtml();
     const vus = v.liste.filter((x) => filtreV9(x, venFiltre) && choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
     const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
     const prets = v.liste.filter(imprimable);
@@ -3014,6 +3049,172 @@ function vrmVerifVisible(sel) {
     const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x, true) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
     const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-tout${toutV ? ' checked' : ''} aria-label="${esc(TU('v9_tout'))}" title="${esc(TU('v9_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
     return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}${venSel.has(String(x.tx)) ? ' data-coche' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(String(x.tx)) ? ' checked' : ''} aria-label="${esc(TU('v9_choisir', { t: x.titre || x.tx }))}"></label><button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>` + barreVentesHtml(prets);
+  }
+  // ══ 5.425 — « À RELANCER » (Julien, 21 nov. : « acheteurs qui ne finalisent pas, ou ne vont pas chercher le colis ») ══
+  //    Deux listes LUES par le fond (`relancesCarte`, statuts PROUVÉS, litige jamais) : livrées pas confirmées · au point
+  //    relais pas retirées (ce qui reste de la garde). Un message poli prêt (SES versions, la langue de la conversation),
+  //    « Modifier », « Envoyer la relance » ; en lot : cases + « Envoyer N relances » + SA confirmation. Le fond revérifie
+  //    tout juste avant, note au registre AVANT, envoie par la page (une relance par commande et par motif).
+  let rlPour = 0, rlEtat = null, rlEnVol = false, rlConfirme = null, rlInfo = null, rlEdit = '', rlReg = null, rlRegLangue = '', rlRegEtat = null, rlAutoQ = false;
+  const rlSel = new Set(), rlTextes = {};
+  const rlCle = (x) => x.tx + ':' + x.motif;
+  function chargerRelances() {
+    if (rlEnVol) return; rlEnVol = true; rlPour = Number(listesAt) || 0;
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'relancesCarte', langue: U.langue ? U.langue() : 'fr' }, (r) => {
+        void chrome.runtime.lastError; rlEnVol = false;
+        rlEtat = r && r.ok ? r : { ko: true, raison: (r && r.raison) || TU('v_pas_su') };
+        for (const k of [...rlSel]) if (!(rlEtat.lignes || []).some((x) => rlCle(x) === k && x.eligible && x.eligible.ok)) rlSel.delete(k);
+        // Un envoi en cours : relu toutes les 4 s (l'état de chaque rangée vient du fond).
+        if (rlEtat.lot && !rlEtat.lot.fin) setTimeout(() => { if (ongletListe === 'ventes' && venFiltre === 'relancer') chargerRelances(); }, 4000);
+        rendre();
+      });
+    } catch (_) { rlEnVol = false; rlEtat = { ko: true, raison: TU('v_pas_su') }; }
+  }
+  const rlNbOk = () => (rlEtat && Array.isArray(rlEtat.lignes) ? rlEtat.lignes.filter((x) => x.eligible && x.eligible.ok).length : null);
+  const rlJour = (t) => { try { return new Date(Number(t)).toLocaleDateString(U.langue ? U.langue() : 'fr', { day: '2-digit', month: '2-digit' }); } catch (_) { return ''; } };
+  const rlHeure = (t) => { try { return new Date(Number(t)).toLocaleTimeString(U.langue ? U.langue() : 'fr', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  function rlPhrase(x) {
+    const j = x.depuis ? Math.max(0, Math.floor((Date.now() - Number(x.depuis)) / 864e5)) : null;
+    if (x.motif === 'livre') return j == null ? TU('rl_titre_livre') : TU(x.preuve === 'vu' ? 'rl_livre_depuis_vu' : 'rl_livre_depuis', { n: j });
+    const a = j == null ? TU('rl_m_relais') : TU(x.preuve === 'vu' ? 'rl_relais_depuis_vu' : 'rl_relais_depuis', { n: j });
+    const l = x.limite;
+    const b = !l ? TU('rl_limite_passu') : l.reste <= 0 ? TU('rl_reste_passe') : l.estimee ? TU('rl_reste_estime', { n: l.reste, t: U.nomTransp ? U.nomTransp(x.transporteur) : x.transporteur }) : TU('rl_reste', { n: l.reste });
+    return a + ' · ' + b;
+  }
+  function rlEtiquette(x) {
+    const e = x.eligible || {}, res = rlEtat && rlEtat.lot && rlEtat.lot.res ? rlEtat.lot.res[rlCle(x)] : null;
+    if (res && res.ok) return etiquette5('fait', TU('rl_envoyee'), '');
+    if (e.ok) return etiquette5('a_relancer', TU(e.rang === 2 ? 'rl_rang2' : 'rl_rang1'), 'ambre');
+    const der = (x.envois || [])[x.envois.length - 1];
+    if (e.raison === 'deja-deux') return etiquette5('relancee', TU('rl_deja_deux'), '');
+    if (e.raison === 'trop-tot-2') return etiquette5('relancee', TU('rl_trop_tot_2', { d: rlJour(der), n: Math.max(1, Math.ceil((Number(der) + (e.seuil || 1) * 864e5 - Date.now()) / 864e5)) }), '');
+    return etiquette5('relancee', TU('rl_deja', { d: rlJour(der) }), '');
+  }
+  function rlRangee(x) {
+    const k = rlCle(x), e = x.eligible || {}, res = rlEtat && rlEtat.lot && rlEtat.lot.res ? rlEtat.lot.res[k] : null;
+    const enCours = !!(rlEtat && rlEtat.lot && !rlEtat.lot.fin);
+    const peut = e.ok && !(res && res.ok);
+    const txt = rlTextes[k] != null ? rlTextes[k] : (x.texte || '');
+    const qui = x.pseudo ? '@' + x.pseudo : TU('rl_l_acheteur');
+    return `<li class="rl6-r" data-relance="${esc(k)}" data-rl-motif="${esc(x.motif)}" data-rl-ok="${peut ? '1' : '0'}"${rlSel.has(k) ? ' data-coche' : ''}>
+      <div class="rl6-l">${peut ? `<label class="case5"><input type="checkbox" data-rl-sel="${esc(k)}"${rlSel.has(k) ? ' checked' : ''}${enCours ? ' disabled' : ''} aria-label="${esc(TU('rl_choisir', { t: x.titre || x.tx }))}"></label>` : '<span class="case5" aria-hidden="true"></span>'}${vignette(x.photo)}
+        <span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me" data-rl-phrase>${esc((x.pseudo ? '@' + x.pseudo + ' · ' : '') + rlPhrase(x))}</span></span><span class="v6">${rlEtiquette(x)}</span></div>
+      ${res && !res.ok ? `<p class="note5 rl6-ko" role="status" data-rl-refus>${esc(res.raison || '')}</p>` : ''}
+      ${peut && txt ? `<div class="rl6-m"><small>${esc(TU('rl_message', { qui }))}${x.langueTexte && x.langueTexte !== (U.langue ? U.langue() : 'fr') ? ' · ' + esc(TU('rl_langue_conv', { l: TU('rl_lg_' + x.langueTexte) })) : ''}</small>
+        ${rlEdit === k ? `<textarea data-rl-texte="${esc(k)}" rows="4" maxlength="1000" aria-label="${esc(TU('rl_modifier'))}">${esc(txt)}</textarea>` : `<div class="bulle" data-rl-bulle>${esc(txt)}</div>`}
+        <div class="ge5"><button type="button" class="vu-btn vu-sec" data-rl-modifier="${esc(k)}"${enCours ? ' disabled' : ''}>${esc(rlEdit === k ? TU('rl_fermer') : TU('rl_modifier'))}</button><button type="button" class="vu-btn vu-sec" data-rl-un="${esc(k)}"${enCours || !txt.trim() ? ' disabled' : ''}>${esc(TU('rl_envoyer_un'))}</button></div></div>` : ''}
+    </li>`;
+  }
+  function rlReglagesHtml() {
+    if (!rlReg) return '';
+    const R = rlReg, lg = rlRegLangue || (U.langue ? U.langue() : 'fr');
+    const m = (motif) => ((R.modeles || {})[motif] || {})[lg] || [];
+    const auto = rlAutoQ ? `<div class="conf5" role="alertdialog" data-rl-auto-q><p>${esc(TU('rl_auto_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-rl-auto-oui>${esc(TU('rl_allumer'))}</button><button type="button" class="vu-btn" data-rl-auto-non>${esc(TU('rl_annuler'))}</button></div></div>` : '';
+    return `<section class="sec6 rl6-reg" data-rl-reglages role="region" aria-label="${esc(TU('rl_reglages'))}"><h3>${esc(TU('rl_reglages'))}</h3>
+      <label class="champ6"><b>${esc(TU('rl_seuil_livre'))}</b><input type="number" min="1" max="14" step="1" data-rl-champ="livreJours" value="${esc(R.livreJours)}"></label>
+      <label class="champ6"><b>${esc(TU('rl_seuil_relais'))}</b><input type="number" min="1" max="14" step="1" data-rl-champ="relaisJours" value="${esc(R.relaisJours)}"></label>
+      <label class="champ6 rl6-case"><span><input type="checkbox" data-rl-champ="deuxieme"${R.deuxieme ? ' checked' : ''}> <b>${esc(TU('rl_deuxieme'))}</b></span></label>
+      <div class="rg6"><span><b>${esc(TU('rl_auto'))}</b><small>${esc(TU('rl_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rl-auto aria-pressed="${R.actif === true}">${esc(TU(R.actif ? 'ra_eteindre' : 'ra_allumer'))}</button></div>${auto}
+      <div class="rg6"><span><b>${esc(TU('rl_modeles'))}</b><small>${esc(TU('rl_modeles_note'))}</small></span><select data-rl-langue aria-label="${esc(TU('rl_modeles'))}">${['fr', 'en', 'es', 'it', 'de'].map((l) => `<option value="${l}"${l === lg ? ' selected' : ''}>${esc(TU('rl_lg_' + l))}</option>`).join('')}</select></div>
+      <label class="champ6"><b>${esc(TU('rl_m_livre'))}</b><textarea data-rl-modele="livre" rows="3" maxlength="10000">${esc(m('livre').join('\n'))}</textarea></label>
+      <label class="champ6"><b>${esc(TU('rl_m_relais'))}</b><textarea data-rl-modele="relais" rows="3" maxlength="10000">${esc(m('relais').join('\n'))}</textarea></label>
+      ${rlRegEtat ? `<p class="note5" role="status" data-rl-reg-etat>${esc(rlRegEtat)}</p>` : ''}
+      <div class="ge5"><button type="button" class="vu-btn vu-sec" data-rl-reg-fermer>${esc(TU('rl_fermer'))}</button><button type="button" class="vu-btn vu-sec" data-rl-reg-ok>${esc(TU('rl_enregistrer'))}</button></div></section>`;
+  }
+  function relancesHtml() {
+    if (!listes || listes.plateforme !== 'vinted') return `<div class="val gris">${esc(TU('m_site', { site: NOM_SITE[listes && listes.plateforme] || '' }))}</div>`;
+    if (!rlEtat) { chargerRelances(); return `<div class="val gris" role="status" data-relances="charge">${esc(TU('rl_charge'))}</div>`; }
+    if (rlEtat.ko) return `<div class="val gris" data-relances="pas-su">${esc(rlEtat.raison)}</div>`;
+    const tout = rlEtat.lignes || [];
+    const montrees = tout.filter((x) => (x.eligible && x.eligible.ok) || (x.envois || []).length);
+    const autres = tout.length - montrees.length;
+    const lot = rlEtat.lot;
+    const enCours = !!(lot && !lot.fin);
+    const etatLot = !lot ? '' : enCours ? TU('rl_en_cours', { i: Math.min(lot.n, lot.i + 1), n: lot.n }) + (lot.prochainAt > Date.now() ? ' · ' + TU('rl_prochain', { h: rlHeure(lot.prochainAt) }) : '')
+      : lot.fin && lot.fin.raison !== 'fait' ? TU('rl_arrete', { r: lot.fin.raison }) : TU('rl_fini', { ok: Object.values(lot.res || {}).filter((y) => y.ok).length, ko: Object.values(lot.res || {}).filter((y) => !y.ok).length });
+    const groupe = (motif, titre) => { const l = montrees.filter((x) => x.motif === motif); return `<section class="sec6 rl6-g" data-rl-groupe="${motif}"><h3>${esc(TU(titre))} · <b data-n="${l.length}">${l.length}</b></h3>${l.length ? `<ul class="rangs rl6-l0">${l.map(rlRangee).join('')}</ul>` : ''}</section>`; };
+    const tete = `<div class="rl6-t"><p class="note5" data-rl-note>${esc(TU('rl_note'))}</p><button type="button" class="vu-btn vu-sec" data-rl-reg-ouvrir aria-expanded="${rlReg ? 'true' : 'false'}">${esc(TU('rl_reglages'))}</button></div>`
+      + (etatLot ? `<p class="note5 imp-etat6" role="status" data-rl-lot="${enCours ? 'en-cours' : 'fini'}">${esc(etatLot)}</p>` : '') + (rlInfo ? `<p class="note5 imp-etat6" role="status" data-ton="ambre" data-rl-info>${esc(rlInfo)}</p>` : '');
+    const pied = (rlEtat.litiges ? `<p class="note5" data-rl-litiges="${rlEtat.litiges}">${esc(TU('rl_litiges', { n: rlEtat.litiges }))}</p>` : '') + (autres ? `<p class="note5" data-rl-autres="${autres}">${esc(TU('rl_autres', { n: autres }))}</p>` : '');
+    const corps = montrees.length ? groupe('livre', 'rl_titre_livre') + groupe('relais', 'rl_titre_relais') : `<div class="val gris vide6" data-relances="0">${esc(TU('rl_vide'))}</div>`;
+    const sel = [...rlSel];
+    const cad = (listes && listes.automatisations && listes.automatisations.cadence) || {};
+    const conf = rlConfirme ? `<div class="ven6-conf" role="alertdialog" data-rl-confirme="${rlConfirme.length}"><span>${esc(TU('rl_conf', { n: rlConfirme.length, compte: (listes.compte && listes.compte.nom) || '', a: Number(cad.pauseMin) || 20, b: Number(cad.pauseMax) || 60 }))}</span><button type="button" class="vu-btn vu-sec" data-rl-non>${esc(TU('rl_annuler'))}</button><button type="button" class="vu-btn vu-plein" data-rl-oui>${esc(TU('rl_oui'))}</button></div>` : '';
+    const bas = sel.length && !enCours ? `<div class="fav6-bas ven6-bas" data-rl-bas="${sel.length}"><span class="fav6-bas-t"><b aria-live="polite">${esc(TU('rl_sel', { n: sel.length }))}</b></span><button type="button" class="vu-btn vu-sec" data-rl-rien>${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-rl-lot="${sel.length}">${esc(TU('rl_envoyer_n', { n: Math.min(10, sel.length) }))}</button></div>${conf}` : (rlConfirme ? conf : '');
+    return `<div class="rl6" data-relances="${montrees.length}">${tete}${rlReglagesHtml()}${corps}${pied}${bas}</div>`;
+  }
+  function rlEnvoyer(items) {
+    rlConfirme = null; rlInfo = null;
+    const l = items.slice(0, 10).map((k) => { const x = (rlEtat.lignes || []).find((y) => rlCle(y) === k); return x ? { tx: x.tx, motif: x.motif, ...(rlTextes[k] != null && rlTextes[k] !== x.texte ? { texte: rlTextes[k] } : {}) } : null; }).filter(Boolean);
+    if (!l.length) return;
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'relancesEnvoyer', items: l, confirme: true, langue: U.langue ? U.langue() : 'fr' }, (r) => {
+        void chrome.runtime.lastError;
+        if (!r || !r.ok) rlInfo = (r && r.raison) || TU('ra_ko'); else { rlSel.clear(); rlEdit = ''; }
+        chargerRelances(); rendre();
+      });
+    } catch (_) { rlInfo = TU('ra_ko'); rendre(); }
+  }
+  function rlEnregistrer(actif, confirme) {
+    const uid = listes && listes.compte && listes.compte.id;
+    if (!rlReg || !uid) return;
+    const valeur = { actif: actif === true, livreJours: Number(rlReg.livreJours), relaisJours: Number(rlReg.relaisJours), deuxieme: rlReg.deuxieme === true, modeles: rlReg.modeles || {} };
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vinted_bleam', valeur: { uid, section: 'relances', valeur }, confirme: confirme === true }, (r) => {
+        void chrome.runtime.lastError;
+        if (r && r.code === 'confirmation') { rlAutoQ = true; rendre(); return; }
+        rlRegEtat = r && r.ok ? TU('rl_enregistre') : ((r && r.raison) || TU('ra_ko'));
+        if (r && r.ok) { rlReg.actif = actif === true; rlEtat = null; chargerRelances(); }
+        rendre();
+      });
+    } catch (_) { rlRegEtat = TU('ra_ko'); rendre(); }
+  }
+  function brancherRelances(racine) {
+    racine.querySelectorAll('[data-rl-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-rl-sel'); if (c.checked) rlSel.add(k); else rlSel.delete(k); rlConfirme = null; rendre(); }));
+    racine.querySelectorAll('[data-rl-modifier]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-rl-modifier'); rlEdit = rlEdit === k ? '' : k; rendre(); }));
+    racine.querySelectorAll('[data-rl-texte]').forEach((t) => t.addEventListener('input', () => { rlTextes[t.getAttribute('data-rl-texte')] = t.value; }));
+    racine.querySelectorAll('[data-rl-un]').forEach((b) => b.addEventListener('click', () => { rlConfirme = [b.getAttribute('data-rl-un')]; rendre(); }));
+    const lt = racine.querySelector('button[data-rl-lot]'); if (lt) lt.addEventListener('click', () => { rlConfirme = [...rlSel].slice(0, 10); rendre(); });
+    const rn = racine.querySelector('[data-rl-rien]'); if (rn) rn.addEventListener('click', () => { rlSel.clear(); rlConfirme = null; rendre(); });
+    const no = racine.querySelector('[data-rl-non]'); if (no) no.addEventListener('click', () => { rlConfirme = null; rendre(); });
+    const oui = racine.querySelector('[data-rl-oui]'); if (oui) oui.addEventListener('click', () => { if (rlConfirme) rlEnvoyer(rlConfirme); });
+    const ro = racine.querySelector('[data-rl-reg-ouvrir]'); if (ro) ro.addEventListener('click', () => { rlReg = rlReg ? null : Object.assign({ livreJours: 2, relaisJours: 3, deuxieme: false, actif: false, modeles: {} }, JSON.parse(JSON.stringify((rlEtat && rlEtat.reglage) || {}))); rlRegEtat = null; rlAutoQ = false; rendre(); });
+    const rf = racine.querySelector('[data-rl-reg-fermer]'); if (rf) rf.addEventListener('click', () => { rlReg = null; rendre(); });
+    racine.querySelectorAll('[data-rl-champ]').forEach((c) => c.addEventListener(c.type === 'checkbox' ? 'change' : 'input', () => { if (!rlReg) return; const k = c.getAttribute('data-rl-champ'); rlReg[k] = c.type === 'checkbox' ? c.checked : c.value; }));
+    const lg = racine.querySelector('[data-rl-langue]'); if (lg) lg.addEventListener('change', () => { rlRegLangue = lg.value; rendre(); });
+    racine.querySelectorAll('[data-rl-modele]').forEach((t) => t.addEventListener('input', () => { if (!rlReg) return; const motif = t.getAttribute('data-rl-modele'), l = rlRegLangue || (U.langue ? U.langue() : 'fr'); const m = (rlReg.modeles = rlReg.modeles || {}); m[motif] = Object.assign({}, m[motif] || {}, { [l]: t.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5) }); }));
+    const ok = racine.querySelector('[data-rl-reg-ok]'); if (ok) ok.addEventListener('click', () => rlEnregistrer(rlReg && rlReg.actif === true, false));
+    const au = racine.querySelector('[data-rl-auto]'); if (au) au.addEventListener('click', () => { if (!rlReg) return; if (rlReg.actif) rlEnregistrer(false, false); else { rlAutoQ = true; rendre(); } });
+    const ao = racine.querySelector('[data-rl-auto-oui]'); if (ao) ao.addEventListener('click', () => { rlAutoQ = false; rlEnregistrer(true, true); });
+    const an = racine.querySelector('[data-rl-auto-non]'); if (an) an.addEventListener('click', () => { rlAutoQ = false; rendre(); });
+  }
+  // ══ 5.425 — LE TRI DES CONVERSATIONS (Messagerie, lecture seule) : À répondre · Offre en attente · Litige / retour ·
+  //    En attente de l'acheteur · Traité (· Pas encore lu) ; les urgentes d'abord, la raison en petit ; compte de l'onglet.
+  let tcEtat = null, tcEnVol = false, tcGroupe = 'tout', tcPour = 0;
+  const TC_GROUPES = ['repondre', 'offre', 'litige', 'attente', 'traite', 'passu'];
+  const TC_RAISON = { message: 'tc_r_message', 'non-lu': 'tc_r_non_lu', 'colis-point': 'tc_r_colis_point', 'ta-reponse': 'tc_r_ta_reponse', finie: 'tc_r_finie', 'rien-a-faire': 'tc_r_rien', 'pas-lu': 'tc_r_pas_lu', 'fil-ancien': 'tc_r_fil_ancien', 'litige-mots': 'tc_r_litige_mots' };
+  function chargerTri() {
+    if (tcEnVol) return; tcEnVol = true; tcPour = Number(listesAt) || 0;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'triConversations' }, (r) => { void chrome.runtime.lastError; tcEnVol = false; tcEtat = r && r.ok ? { par: new Map((r.lignes || []).map((x, i) => [String(x.conv), Object.assign({ rangTri: i }, x)])), compte: r.compteGroupes || {} } : { ko: true }; rendre(); }); } catch (_) { tcEnVol = false; tcEtat = { ko: true }; }
+  }
+  function tcRaison(conv) {
+    const c = tcEtat && tcEtat.par ? tcEtat.par.get(String(conv)) : null;
+    if (!c) return '';
+    const r = c.raison === 'offre' ? (c.prix ? TU('tc_r_offre', { p: eurosL(c.prix), h: c.heures != null ? c.heures : '—' }) : TU('tc_r_offre_sans')) : /^litige-/.test(c.raison || '') ? TU(c.raison === 'litige-mots' ? 'tc_r_litige_mots' : 'tc_r_litige') : TU(TC_RAISON[c.raison] || 'tc_r_rien');
+    return `<small class="tc6-r" data-tc-groupe="${esc(c.groupe)}"${c.urgent ? ' data-urgent' : ''} data-tc-raison="${esc(c.raison || '')}">${c.urgent ? '<i class="tc6-pt" aria-hidden="true"></i>' : ''}${esc(r)}</small>`;
+  }
+  function triHtml() {
+    if (!tcEtat || !tcEtat.par) return '';
+    const n = tcEtat.compte || {};
+    const tot = tcEtat.par.size;
+    const b = (k, lib, nb) => `<button type="button" data-tc-g="${k}" aria-pressed="${tcGroupe === k}"><span>${esc(lib)}</span> <b data-n="${nb}">${nb}</b></button>`;
+    return `<div class="vu-seg seg6 tc6-seg" role="group" aria-label="${esc(TU('tc_groupes'))}" data-tri-conv>${b('tout', TU('tc_tout'), tot)}${TC_GROUPES.filter((g) => g !== 'passu' || n.passu).map((g) => b(g, TU('tc_g_' + g), Number(n[g]) || 0)).join('')}</div>`;
+  }
+  function triFiltrer(vus) {
+    if (!tcEtat || !tcEtat.par) return vus;
+    const l = tcGroupe === 'tout' ? vus.slice() : vus.filter((x) => { const c = tcEtat.par.get(String(x.conv)); return c && c.groupe === tcGroupe; });
+    return l.sort((a, b) => { const ca = tcEtat.par.get(String(a.conv)), cb = tcEtat.par.get(String(b.conv)); return (ca ? ca.rangTri : 1e9) - (cb ? cb.rangTri : 1e9); });
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));
@@ -3210,15 +3411,19 @@ function vrmVerifVisible(sel) {
     const ici = ORIGINE_ICI && !LISTES ? ORIGINE_ICI : 'https://www.vinted.fr';
     const nl = m.liste.filter((x) => x.nonlu).length;
     const q = msgCherche.trim().toLowerCase();
-    const vus = m.liste.filter((x) => (!msgNonLus || x.nonlu) && (!q || String(x.qui).toLowerCase().includes(q) || String(x.texte).toLowerCase().includes(q)));
+    let vus = m.liste.filter((x) => (!msgNonLus || x.nonlu) && (!q || String(x.qui).toLowerCase().includes(q) || String(x.texte).toLowerCase().includes(q)));
+    // 5.425 : le tri des conversations (Vinted, grand panneau) — groupes, urgentes d'abord, la raison sur la rangée.
+    const triOn = !LISTES && carte.hasAttribute('data-grand') && listes.plateforme === 'vinted';
+    if (triOn && !tcEnVol && (!tcEtat || tcPour !== (Number(listesAt) || 0))) chargerTri();
+    if (triOn) vus = triFiltrer(vus);
     const lu = depuis(m.lu);
     // 5.412 : sur Vestiaire, la conversation que la PAGE montre (`/chat?id=…`) est choisie d'office — c'est d'elle que part l'envoi.
     if (!convChoisie && !LISTES && listes.plateforme === 'vestiaire') { try { const q = new URLSearchParams(location.search).get('id') || ''; if (q && m.liste.some((x) => x.conv === q)) convChoisie = q; } catch (_) {} }
     const choisie = vus.find((x) => x.conv === convChoisie) || null;
-    const outils = LISTES ? '' : `<div class="outils5"><input type="search" class="cherche5" data-msg-cherche placeholder="${esc(TU('m_chercher'))}" aria-label="${esc(TU('m_chercher'))}" value="${esc(msgCherche)}"><button type="button" class="filtre5" data-msg-nonlus aria-pressed="${msgNonLus ? 'true' : 'false'}">${esc(TU('m_filtre_nonlus', { n: nl }))}</button></div>`;
+    const outils = LISTES ? '' : (triOn ? triHtml() : '') + `<div class="outils5"><input type="search" class="cherche5" data-msg-cherche placeholder="${esc(TU('m_chercher'))}" aria-label="${esc(TU('m_chercher'))}" value="${esc(msgCherche)}"><button type="button" class="filtre5" data-msg-nonlus aria-pressed="${msgNonLus ? 'true' : 'false'}">${esc(TU('m_filtre_nonlus', { n: nl }))}</button></div>`;
     const liste = `<ul class="rangs" data-messages="${vus.length}" data-defil="messages">${vus.map((x) => LISTES
       ? `<li><a class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" href="${esc(ici + '/inbox/' + x.conv)}" target="_blank" rel="noopener">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.qui || '—')}</span><span class="me">${esc(x.texte || '')}</span></span></a></li>`
-      : `<li${x.conv === convChoisie ? ' data-ouverte' : ''}><button type="button" class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" data-conv-b="${esc(x.conv)}" aria-pressed="${x.conv === convChoisie ? 'true' : 'false'}">${avatar6(x)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.at ? depuis(x.at) : '')}${x.texte ? ' · ' + esc(x.texte) : ''}</span></span>${x.photo ? `<img class="vig6" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</button>${x.conv === convChoisie ? `<div class="conv5-sous">${convHtml(x, ici)}</div>` : ''}</li>`).join('')}</ul>`;
+      : `<li${x.conv === convChoisie ? ' data-ouverte' : ''}><button type="button" class="rang${x.nonlu ? ' nonlu' : ''}" data-conv="${esc(x.conv)}" data-conv-b="${esc(x.conv)}" aria-pressed="${x.conv === convChoisie ? 'true' : 'false'}">${avatar6(x)}<span class="mil"><span class="ti">${x.nonlu ? '<i class="pt5" aria-label="non lu"></i>' : ''}${esc(x.qui || '—')}</span><span class="me">${esc(x.at ? depuis(x.at) : '')}${x.texte ? ' · ' + esc(x.texte) : ''}</span>${triOn ? tcRaison(x.conv) : ''}</span>${x.photo ? `<img class="vig6" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</button>${x.conv === convChoisie ? `<div class="conv5-sous">${convHtml(x, ici)}</div>` : ''}</li>`).join('')}</ul>`;
     const tete = `<div class="lu" data-messages-nonlus="${nl}">${esc(nl ? TU('m_nonlus', { n: nl }) : TU('m_tous_lus'))}${lu ? ' · ' + esc(TU('c_lu', { quand: lu })) : ''}</div>`;
     if (LISTES) return tete + liste;
     const droite = `<div class="volet5" data-volet-conv="${choisie ? esc(choisie.conv) : ''}">${choisie ? offresHtml(choisie.conv) + convHtml(choisie, ici) : `<div class="vide5"><b>${esc(TU('m_choisir'))}</b><span>${esc(TU('m_choisir_note'))}</span></div>`}</div>`;
@@ -3681,6 +3886,8 @@ function vrmVerifVisible(sel) {
       if (LISTES) rendreListesSeules(); else rendre();
     }));
     brancherAnnonces(racine);
+    brancherRelances(racine);
+    racine.querySelectorAll('[data-tc-g]').forEach((b) => b.addEventListener('click', () => { tcGroupe = b.getAttribute('data-tc-g'); rendre(); }));
     { const pb = racine.querySelector('[data-vx-plus]'); if (pb) pb.addEventListener('click', () => { vxPlus = !vxPlus; rendre(); }); }
     { const pv = racine.querySelector('[data-vx-plus-voile]'); if (pv) pv.addEventListener('click', () => { vxPlus = false; rendre(); }); }
     const rd = racine.querySelector('[data-vx-reduire]'); if (rd) rd.addEventListener('click', () => { vxReduit = !vxReduit; ranger({ vrmPanneauReduit: vxReduit }); rendre(); });
