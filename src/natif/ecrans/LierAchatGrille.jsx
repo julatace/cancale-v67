@@ -8,6 +8,10 @@
 // Ce qui est proposé : les achats LIBRES (`tousAchatsLibresDetail`, la règle de la feuille d'avant : pas déjà reliés, un lot
 // jusqu'à son nombre, pas annulés) ET arrivés chez lui (`recuDe`, l'étape « Arrivé » d'`etapeAchat` — la règle de « Relier
 // achats et ventes ») ; « pas su » ⇒ pas proposé, et c'est DIT (« N achats pas encore arrivés ne sont pas montrés »).
+// (21 nov., lot relier-retires — Julien : « ça me propose des paires que je n'ai pas retirées ») « Arrivé » = CHEZ LUI
+// (`chezMoiDe`, src/achatChezMoi.js : finalisé, retiré prouvé par le suivi ou par SON toucher, livré). Un achat AU POINT
+// RELAIS pas retiré n'est jamais proposé ni dans la grille : il est rangé sous « Pas encore retirés · N », replié, et
+// devient reliable seulement après SON « Je l'ai retiré » (`onRetire`, le geste de Colis).
 // Les places des photos sont réservées (carré fixe) : rien ne saute pendant le chargement.
 //
 // (21 nov., lot relier-code — Julien : « rends relier plus facile ») EN TÊTE, la MEILLEURE proposition (celle de la règle
@@ -72,7 +76,7 @@ export function TeteSerie({ serie }) {
   );
 }
 
-export default function LierAchatGrille({ achats, liens, curTx = '', recuDe, prixDe, photoDe = () => '', marqueDe = () => '', Photo = null, onRelier, onPlus = null,
+export default function LierAchatGrille({ achats, liens, curTx = '', recuDe = null, chezMoiDe = null, onRetire = null, prixDe, photoDe = () => '', marqueDe = () => '', Photo = null, onRelier, onPlus = null,
   tres = null, pistes = null, cleArticle = '', refus = null, raisonsDe = null, couleurDe = (c) => c, onPasCelle = null, serie = null }) {
   const [q, setQ] = React.useState('');
   const [marque, setMarque] = React.useState('');
@@ -80,16 +84,18 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe, pri
   const [choisi, setChoisi] = React.useState('');
   const [nVus, setNVus] = React.useState(PAS);
   const [envoi, setEnvoi] = React.useState(false);
+  const [pointOuvert, setPointOuvert] = React.useState(false);
+  const [retireEnvoi, setRetireEnvoi] = React.useState('');
   const finRef = React.useRef(null);
   const charge = Array.isArray(achats);
-  // Arrivés chez lui seulement (la règle passée par l'app) ; « pas su » ⇒ écarté.
-  const { arrives, pasArrives } = React.useMemo(() => {
-    if (!charge) return { arrives: [], pasArrives: 0 };
-    const libres = tousAchatsLibresDetail({ achats, liens, curTx }).liste;
-    const ok = []; let non = 0;
-    for (const a of libres) { let r = false; try { r = !!recuDe(a); } catch (_) { r = false; } if (r) ok.push(a); else non++; }
-    return { arrives: ok, pasArrives: non };
-  }, [achats, liens, curTx, recuDe, charge]);
+  // CHEZ LUI seulement (la règle passée par l'app, src/achatChezMoi.js) ; « pas su » ⇒ écarté. Au point relais : à part.
+  const etatDe = React.useMemo(() => (typeof chezMoiDe === 'function' ? chezMoiDe
+    : typeof recuDe === 'function' ? (a) => ({ chez: !!recuDe(a), etat: recuDe(a) ? 'livre' : 'pas-su' }) : undefined), [chezMoiDe, recuDe]);
+  const { arrives, pasArrives, auPoint } = React.useMemo(() => {
+    if (!charge) return { arrives: [], pasArrives: 0, auPoint: [] };
+    const d = tousAchatsLibresDetail({ achats, liens, curTx, ...(etatDe ? { chezMoiDe: etatDe } : {}) });
+    return { arrives: d.liste, pasArrives: (d.pasChez || 0) + (d.auPoint || []).length, auPoint: d.auPoint || [] };
+  }, [achats, liens, curTx, etatDe, charge]);
   // Les propositions de la règle pondérée, seulement parmi les achats MONTRÉS (libres et arrivés).
   const arrivesTx = React.useMemo(() => new Set(arrives.map((a) => String(a.transaction_id))), [arrives]);
   const rang = React.useMemo(() => rangerPropositions({ tres: tres || [], pistes: pistes || [], montrable: (a) => arrivesTx.has(String(a && a.transaction_id)), refus, key: cleArticle }),
@@ -101,7 +107,7 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe, pri
   }, [arrives, marqueDe]);
   const tranche = TRANCHES_PRIX.find((t) => t[0] === prix) || null;
   const liste = React.useMemo(() => tousAchatsLibresDetail({ achats: arrives, liens, curTx, q, marqueDe, marque, prixAchat: prixDe,
-    prixMin: tranche ? tranche[1] : null, prixMax: tranche ? tranche[2] : null }).liste, [arrives, liens, curTx, q, marque, tranche, prixDe, marqueDe]);
+    prixMin: tranche ? tranche[1] : null, prixMax: tranche ? tranche[2] : null, chezMoiDe: () => ({ chez: true }) }).liste, [arrives, liens, curTx, q, marque, tranche, prixDe, marqueDe]);
   React.useEffect(() => { setNVus(PAS); }, [q, marque, prix]);
   React.useEffect(() => { if (choisi && !arrives.some((a) => String(a.transaction_id) === choisi)) setChoisi(''); }, [arrives, choisi]);
   React.useEffect(() => {
@@ -114,7 +120,7 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe, pri
   const relier = async () => { if (!achatChoisi || envoi) return; setEnvoi(true); try { await onRelier(achatChoisi); } finally { setEnvoi(false); } };
   const optionsPrix = TRANCHES_PRIX.map(([cle, a, b]) => ({ cle, libelle: b == null ? tr('la.prix.plus', { a: String(a) }) : tr('la.prix.entre', { a: String(a), b: String(b) }) }));
   return (
-    <div className="n-la" data-la-grille-corps="" data-la-n={charge ? String(liste.length) : ''} data-la-arrives={charge ? String(arrives.length) : ''} data-la-pas-arrives={String(pasArrives)}>
+    <div className="n-la" data-la-grille-corps="" data-la-n={charge ? String(liste.length) : ''} data-la-arrives={charge ? String(arrives.length) : ''} data-la-pas-arrives={String(pasArrives)} data-la-au-point={charge ? String(auPoint.length) : ''}>
       <TeteSerie serie={serie}/>
       <div className="n-la-haut">
         <div className="n-la-recherche">
@@ -190,6 +196,30 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe, pri
             })}
           </div>}
       {charge && liste.length > nVus ? <div ref={finRef} className="n-la-fin"><button type="button" className="n-la-plus" data-la-suite="" onClick={() => setNVus((n) => n + PAS)}>{tr('la.suite', { n: String(liste.length - nVus) })}</button></div> : null}
+      {charge && auPoint.length ? (
+        <section className="n-la-point" data-la-point={String(auPoint.length)} data-la-point-ouvert={pointOuvert ? '1' : '0'}>
+          <button type="button" className="n-la-point-tete" aria-expanded={pointOuvert ? 'true' : 'false'} data-la-point-bascule="" onClick={() => setPointOuvert((v) => !v)}>
+            <span>{tr('la.point.titre', { n: String(auPoint.length) })}</span>
+            <svg className="n-la-point-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" data-ouvert={pointOuvert ? '1' : '0'}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          {pointOuvert ? (
+            <div className="n-la-point-corps">
+              <div className="n-la-point-phrase">{tr('la.point.phrase')}</div>
+              {auPoint.map((a) => {
+                const tx = String(a.transaction_id), ph = photoDe(a);
+                return (
+                  <div key={tx} className="n-la-point-rangee" data-la-point-achat={tx}>
+                    <span className="n-rf-autre-photo">{ph ? (Photo ? <Photo src={ph} alt="" loading="lazy" decoding="async"/> : <img src={ph} alt="" loading="lazy" decoding="async"/>) : null}</span>
+                    <span className="n-rf-autre-txt"><span className="n-rf-autre-titre">{a.title || '—'}</span><span className="n-rf-raison">{prixCourt(prixDe(a))}{jourCourt(a.date) ? ' · ' + tr('la.commande', { date: jourCourt(a.date) }) : ''}</span></span>
+                    {onRetire ? <button type="button" className="n-la-plus" data-la-retire={tx} disabled={retireEnvoi === tx}
+                      onClick={async () => { setRetireEnvoi(tx); try { await onRetire(a); } finally { setRetireEnvoi(''); } }}>{tr('la.point.retire')}</button> : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {achatChoisi ? (
         <div className="n-la-confirme" role="region" aria-label={tr('la.confirmer')} data-la-confirme={String(achatChoisi.transaction_id)}>
           <div className="n-la-confirme-txt">
