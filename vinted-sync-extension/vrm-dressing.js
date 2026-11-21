@@ -49,11 +49,11 @@
         const d = document.createElement('div'); d.setAttribute('data-vrm-dp', id);
         d.style.cssText = 'position:absolute;top:6px;left:6px;z-index:5;display:flex;gap:6px;align-items:center;pointer-events:auto';
         const num = etat.nums && etat.nums[id];
-        d.innerHTML = `<button type="button" role="checkbox" data-vrm-dp-case="${esc(id)}" aria-checked="false" aria-label="${esc(T('dp_choisir'))}" style="appearance:none;border:0;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:rgb(255 255 255/.92);box-shadow:0 1px 3px rgb(0 0 0/.25);cursor:pointer;font:700 18px/1 system-ui;color:#0C1D30"></button>${num ? `<span data-vrm-dp-num="${esc(num)}" style="font:700 13px/1 -apple-system,Inter,system-ui,sans-serif;padding:6px 8px;border-radius:8px;background:#0C1D30;color:#fff;letter-spacing:.02em"><small style="font-weight:500;opacity:.8;margin-right:2px">N°</small>${esc(num)}</span>` : ''}`;
+        d.innerHTML = `<button type="button" role="checkbox" data-vrm-dp-case="${esc(id)}" aria-checked="false" aria-label="${esc(T('dp_choisir'))}" style="appearance:none;border:0;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:rgb(255 255 255/.92);box-shadow:0 1px 3px rgb(0 0 0/.25);cursor:pointer;font:700 18px/1 system-ui;color:#111114"></button>${num ? `<span data-vrm-dp-num="${esc(num)}" style="font:700 13px/1 -apple-system,Inter,system-ui,sans-serif;padding:6px 8px;border-radius:8px;background:#111114;color:#fff;letter-spacing:.02em"><small style="font-weight:500;opacity:.8;margin-right:2px">N°</small>${esc(num)}</span>` : ''}`;
         el.appendChild(d);
         // Une case À NOUS (un bouton) : le toucher ne suit pas le lien de l'annonce (on l'arrête ici, rien n'est envoyé).
         const c = d.querySelector('button');
-        const peindre = () => { const on = choisis.has(id); c.setAttribute('aria-checked', String(on)); c.textContent = on ? '✓' : ''; c.style.background = on ? '#0068D6' : 'rgb(255 255 255/.92)'; c.style.color = on ? '#fff' : '#0C1D30'; };
+        const peindre = () => { const on = choisis.has(id); c.setAttribute('aria-checked', String(on)); c.textContent = on ? '✓' : ''; c.style.background = on ? '#0F6B4C' : 'rgb(255 255 255/.92)'; c.style.color = on ? '#fff' : '#111114'; };
         peindre();
         c.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); if (choisis.has(id)) choisis.delete(id); else choisis.add(id); peindre(); rendreBarre(); }, true);
         d.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); });

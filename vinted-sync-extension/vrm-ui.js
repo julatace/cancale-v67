@@ -517,7 +517,59 @@
     m_choisir: { fr: 'Choisis une conversation', en: 'Choose a conversation', es: 'Elige una conversación', it: 'Scegli una conversazione', de: 'Wähle eine Unterhaltung' },
     m_choisir_note: { fr: 'Touche une conversation dans la liste pour la voir ici.', en: 'Tap a conversation in the list to see it here.', es: 'Toca una conversación de la lista para verla aquí.', it: 'Tocca una conversazione nell’elenco per vederla qui.', de: 'Tippe auf eine Unterhaltung in der Liste, um sie hier zu sehen.' },
     m_aucun_filtre: { fr: 'Aucune conversation ne correspond.', en: 'No conversation matches.', es: 'Ninguna conversación coincide.', it: 'Nessuna conversazione corrisponde.', de: 'Keine Unterhaltung passt.' },
-    fr_rythme_normal: { fr: 'Au hasard · 40 à 90 s', en: 'Random · 40 to 90 s', es: 'Al azar · 40 a 90 s', it: 'A caso · da 40 a 90 s', de: 'Zufällig · 40 bis 90 s' },
+    e9_taux: { fr: "Réduction sur chaque article", en: "Discount on each item", es: "Descuento en cada artículo", it: "Sconto su ogni articolo", de: "Rabatt auf jeden Artikel" },
+    e9_autre: { fr: "Autre", en: "Other", es: "Otro", it: "Altro", de: "Andere" },
+    e9_autre_aria: { fr: "Autre taux de réduction, en %", en: "Other discount rate, in %", es: "Otro porcentaje de descuento", it: "Altra percentuale di sconto", de: "Anderer Rabatt in %" },
+    e9_autre_mode: { fr: "Ton offre est réglée en euros : choisis un taux pour la remplacer, ou laisse-la.", en: "Your offer is set in euros: pick a rate to replace it, or keep it.", es: "Tu oferta está en euros: elige un porcentaje para cambiarla o déjala.", it: "La tua offerta è in euro: scegli una percentuale per sostituirla o lasciala.", de: "Dein Angebot ist in Euro: wähle einen Satz, um es zu ersetzen, oder lass es." },
+    e9_sans_taux: { fr: "Aucune offre réglée : choisis un taux pour faire une offre à chacun.", en: "No offer set: pick a rate to make each person an offer.", es: "Sin oferta: elige un porcentaje para hacer una oferta a cada uno.", it: "Nessuna offerta: scegli una percentuale per fare un'offerta a ciascuno.", de: "Kein Angebot: wähle einen Satz, um jedem ein Angebot zu machen." },
+    e9_plancher: { fr: "Jamais sous ton prix mini (sinon achat + 10 %) : l’offre est remontée et c’est dit. Ce taux est gardé pour ce compte.", en: "Never below your minimum price (or purchase + 10 %): the offer is raised and it says so. This rate is kept for this account.", es: "Nunca por debajo de tu precio mínimo (o compra + 10 %): la oferta se sube y se indica. Este porcentaje se guarda para esta cuenta.", it: "Mai sotto il tuo prezzo minimo (o acquisto + 10 %): l'offerta viene alzata e viene detto. Questa percentuale resta per questo account.", de: "Nie unter deinem Mindestpreis (sonst Einkauf + 10 %): das Angebot wird angehoben und es wird gesagt. Dieser Satz bleibt für dieses Konto." },
+    e9_message: { fr: "Message · ce que recevra {qui}", en: "Message · what {qui} will receive", es: "Mensaje · lo que recibirá {qui}", it: "Messaggio · cosa riceverà {qui}", de: "Nachricht · was {qui} erhält" },
+    e9_modifie: { fr: "modifié pour cet envoi", en: "changed for this send", es: "cambiado para este envío", it: "modificato per questo invio", de: "für diesen Versand geändert" },
+    e9_charge: { fr: "Préparation du message…", en: "Preparing the message…", es: "Preparando el mensaje…", it: "Preparazione del messaggio…", de: "Nachricht wird vorbereitet…" },
+    e9_msg_variable: { fr: "Ton message demande une information que VRM ne connaît pas pour ce favori : modifie-le pour cet envoi.", en: "Your message needs information VRM doesn't have for this favourite: change it for this send.", es: "Tu mensaje pide un dato que VRM no conoce para este favorito: cámbialo para este envío.", it: "Il tuo messaggio chiede un'informazione che VRM non conosce per questo preferito: modificalo per questo invio.", de: "Deine Nachricht braucht eine Angabe, die VRM für diesen Favoriten nicht kennt: ändere sie für diesen Versand." },
+    e9_msg_aucun: { fr: "Aucun message écrit pour ce compte : écris-en un (« Modifier pour cet envoi »).", en: "No message written for this account: write one (“Change for this send”).", es: "Ningún mensaje para esta cuenta: escribe uno («Cambiar para este envío»).", it: "Nessun messaggio per questo account: scrivine uno («Modifica per questo invio»).", de: "Keine Nachricht für dieses Konto: schreib eine („Für diesen Versand ändern“)." },
+    e9_msg_refuse: { fr: "Ce message serait refusé par Vinted : modifie-le pour cet envoi.", en: "Vinted would refuse this message: change it for this send.", es: "Vinted rechazaría este mensaje: cámbialo para este envío.", it: "Vinted rifiuterebbe questo messaggio: modificalo per questo invio.", de: "Vinted würde diese Nachricht ablehnen: ändere sie für diesen Versand." },
+    e9_modele: { fr: "Le message de cet envoi", en: "The message for this send", es: "El mensaje de este envío", it: "Il messaggio di questo invio", de: "Die Nachricht für diesen Versand" },
+    e9_vars: { fr: "{prénom}, {article} et {prix} sont remplacés pour chaque personne.", en: "{prénom}, {article} and {prix} are filled in for each person.", es: "{prénom}, {article} y {prix} se rellenan para cada persona.", it: "{prénom}, {article} e {prix} vengono compilati per ogni persona.", de: "{prénom}, {article} und {prix} werden für jede Person ausgefüllt." },
+    e9_garder: { fr: "Enregistrer comme modèle", en: "Save as template", es: "Guardar como plantilla", it: "Salva come modello", de: "Als Vorlage speichern" },
+    e9_mes_messages: { fr: "Revenir à mes messages", en: "Back to my messages", es: "Volver a mis mensajes", it: "Torna ai miei messaggi", de: "Zurück zu meinen Nachrichten" },
+    e9_modifier: { fr: "Modifier pour cet envoi", en: "Change for this send", es: "Cambiar para este envío", it: "Modifica per questo invio", de: "Für diesen Versand ändern" },
+    e9_garde_ok: { fr: "Enregistré dans tes messages.", en: "Saved to your messages.", es: "Guardado en tus mensajes.", it: "Salvato nei tuoi messaggi.", de: "In deinen Nachrichten gespeichert." },
+    e9_a_lenvoi: { fr: "Offre calculée à l’envoi (jamais sous ton plancher)", en: "Offer worked out when sending (never below your floor)", es: "Oferta calculada al enviar (nunca bajo tu mínimo)", it: "Offerta calcolata all'invio (mai sotto il tuo minimo)", de: "Angebot wird beim Senden berechnet (nie unter deiner Untergrenze)" },
+    e9_calcul: { fr: "Calcul de l’offre…", en: "Working out the offer…", es: "Calculando la oferta…", it: "Calcolo dell'offerta…", de: "Angebot wird berechnet…" },
+    e9_sans_plancher: { fr: "Pas d’offre : ton plancher atteint le prix.", en: "No offer: your floor reaches the price.", es: "Sin oferta: tu mínimo alcanza el precio.", it: "Nessuna offerta: il tuo minimo raggiunge il prezzo.", de: "Kein Angebot: deine Untergrenze erreicht den Preis." },
+    e9_sans_prix: { fr: "Pas d’offre : prix de l’annonce pas lu.", en: "No offer: listing price not read.", es: "Sin oferta: precio del anuncio no leído.", it: "Nessuna offerta: prezzo dell'annuncio non letto.", de: "Kein Angebot: Preis der Anzeige nicht gelesen." },
+    e9_remontee_mini: { fr: "Remontée à ton prix mini : {p} (au lieu de {b})", en: "Raised to your minimum price: {p} (instead of {b})", es: "Subida a tu precio mínimo: {p} (en vez de {b})", it: "Alzata al tuo prezzo minimo: {p} (invece di {b})", de: "Auf deinen Mindestpreis angehoben: {p} (statt {b})" },
+    e9_remontee_achat: { fr: "Remontée à achat + 10 % : {p} (au lieu de {b})", en: "Raised to purchase + 10 %: {p} (instead of {b})", es: "Subida a compra + 10 %: {p} (en vez de {b})", it: "Alzata ad acquisto + 10 %: {p} (invece di {b})", de: "Auf Einkauf + 10 % angehoben: {p} (statt {b})" },
+    v9_filtres: { fr: "Filtrer les commandes", en: "Filter orders", es: "Filtrar pedidos", it: "Filtra gli ordini", de: "Bestellungen filtern" },
+    v9_f_tous: { fr: "Toutes", en: "All", es: "Todos", it: "Tutti", de: "Alle" },
+    v9_f_sans_bord: { fr: "À expédier · sans bordereau", en: "To ship · no label", es: "Por enviar · sin etiqueta", it: "Da spedire · senza etichetta", de: "Zu versenden · ohne Etikett" },
+    v9_f_bord_pret: { fr: "Bordereau prêt", en: "Label ready", es: "Etiqueta lista", it: "Etichetta pronta", de: "Etikett bereit" },
+    v9_f_en_route: { fr: "En route", en: "On the way", es: "En camino", it: "In viaggio", de: "Unterwegs" },
+    v9_f_terminees: { fr: "Terminées", en: "Finished", es: "Terminados", it: "Concluse", de: "Abgeschlossen" },
+    v9_tout: { fr: "Tout sélectionner (commandes montrées)", en: "Select all (orders shown)", es: "Seleccionar todo (pedidos mostrados)", it: "Seleziona tutto (ordini mostrati)", de: "Alle auswählen (angezeigte Bestellungen)" },
+    v9_choisir: { fr: "Choisir la commande {t}", en: "Select order {t}", es: "Elegir el pedido {t}", it: "Scegli l'ordine {t}", de: "Bestellung {t} wählen" },
+    v9_sel1: { fr: "1 commande choisie", en: "1 order selected", es: "1 pedido elegido", it: "1 ordine scelto", de: "1 Bestellung gewählt" },
+    v9_sel: { fr: "{n} commandes choisies", en: "{n} orders selected", es: "{n} pedidos elegidos", it: "{n} ordini scelti", de: "{n} Bestellungen gewählt" },
+    v9_sans1: { fr: "1 sans bordereau : elle ne sera pas imprimée", en: "1 without a label: it won't be printed", es: "1 sin etiqueta: no se imprimirá", it: "1 senza etichetta: non verrà stampata", de: "1 ohne Etikett: wird nicht gedruckt" },
+    v9_sans: { fr: "{n} sans bordereau : elles ne seront pas imprimées", en: "{n} without a label: they won't be printed", es: "{n} sin etiqueta: no se imprimirán", it: "{n} senza etichetta: non verranno stampate", de: "{n} ohne Etikett: werden nicht gedruckt" },
+    v9_imp: { fr: "Imprimer {n} bordereaux", en: "Print {n} labels", es: "Imprimir {n} etiquetas", it: "Stampa {n} etichette", de: "{n} Etiketten drucken" },
+    v9_copier: { fr: "Copier {n} n° de suivi", en: "Copy {n} tracking no.", es: "Copiar {n} n.º de seguimiento", it: "Copia {n} n. di tracciamento", de: "{n} Sendungsnr. kopieren" },
+    v9_ouvrir: { fr: "Ouvrir sur Vinted", en: "Open on Vinted", es: "Abrir en Vinted", it: "Apri su Vinted", de: "Auf Vinted öffnen" },
+    v9_cmd1: { fr: "Commander le bordereau", en: "Order the label", es: "Pedir la etiqueta", it: "Richiedi l'etichetta", de: "Etikett anfordern" },
+    v9_cmd: { fr: "Commander {n} bordereaux", en: "Order {n} labels", es: "Pedir {n} etiquetas", it: "Richiedi {n} etichette", de: "{n} Etiketten anfordern" },
+    v9_cmd_conf: { fr: "Demander {n} bordereau(x) à Vinted pour ces ventes ? Vinted les prépare ; VRM ne paie rien.", en: "Ask Vinted for {n} label(s) for these sales? Vinted prepares them; VRM pays nothing.", es: "¿Pedir {n} etiqueta(s) a Vinted para estas ventas? Vinted las prepara; VRM no paga nada.", it: "Chiedere a Vinted {n} etichetta/e per queste vendite? Vinted le prepara; VRM non paga nulla.", de: "{n} Etikett(en) bei Vinted für diese Verkäufe anfordern? Vinted bereitet sie vor; VRM zahlt nichts." },
+    v9_cmd_oui: { fr: "Commander", en: "Order", es: "Pedir", it: "Richiedi", de: "Anfordern" },
+    v9_non: { fr: "Annuler", en: "Cancel", es: "Cancelar", it: "Annulla", de: "Abbrechen" },
+    v9_cmd_en_cours: { fr: "Demande des bordereaux à Vinted…", en: "Asking Vinted for the labels…", es: "Pidiendo las etiquetas a Vinted…", it: "Richiesta delle etichette a Vinted…", de: "Etiketten werden bei Vinted angefordert…" },
+    v9_cmd_ok: { fr: "{n} demandé(s) : le PDF arrive dans un instant", en: "{n} requested: the PDF arrives shortly", es: "{n} pedida(s): el PDF llega en un momento", it: "{n} richiesta/e: il PDF arriva a breve", de: "{n} angefordert: das PDF kommt gleich" },
+    v9_cmd_ko: { fr: "{n} pas demandé(s) : {r}", en: "{n} not requested: {r}", es: "{n} no pedida(s): {r}", it: "{n} non richiesta/e: {r}", de: "{n} nicht angefordert: {r}" },
+    v9_copies: { fr: "{n} n° de suivi copiés", en: "{n} tracking no. copied", es: "{n} n.º de seguimiento copiados", it: "{n} n. di tracciamento copiati", de: "{n} Sendungsnr. kopiert" },
+    v9_sans_suivi: { fr: "{n} sans n° de suivi", en: "{n} without tracking no.", es: "{n} sin n.º de seguimiento", it: "{n} senza n. di tracciamento", de: "{n} ohne Sendungsnr." },
+    v9_copie_ko: { fr: "Copie refusée par le navigateur", en: "The browser refused to copy", es: "El navegador rechazó copiar", it: "Il browser ha rifiutato la copia", de: "Der Browser hat das Kopieren verweigert" },
+    v9_ouverts: { fr: "{n} ouverte(s) dans un onglet", en: "{n} opened in a tab", es: "{n} abierta(s) en una pestaña", it: "{n} aperta/e in una scheda", de: "{n} in einem Tab geöffnet" },
+    v9_bloques: { fr: "{n} bloquée(s) par le navigateur : autorise les fenêtres pour vinted.fr", en: "{n} blocked by the browser: allow pop-ups for vinted.fr", es: "{n} bloqueada(s) por el navegador: permite ventanas para vinted.fr", it: "{n} bloccata/e dal browser: consenti le finestre per vinted.fr", de: "{n} vom Browser blockiert: erlaube Pop-ups für vinted.fr" },
+    fr_rythme_normal: { fr: 'Au hasard · 20 à 60 s', en: 'Random · 20 to 60 s', es: 'Al azar · 20 a 60 s', it: 'A caso · da 20 a 60 s', de: 'Zufällig · 20 bis 60 s' },
     fr_rythme_prudent: { fr: 'Plus prudent · 2 à 4 min', en: 'More careful · 2 to 4 min', es: 'Más prudente · 2 a 4 min', it: 'Più prudente · da 2 a 4 min', de: 'Vorsichtiger · 2 bis 4 Min.' },
     // 5.409 — le grand panneau (Messages · Annonces · Favoris · Ventes · Paramètres), la fiche dépliée, le parcours des favoris
     c_messages: { fr: 'Messages', en: 'Messages', es: 'Mensajes', it: 'Messaggi', de: 'Nachrichten' },
@@ -595,6 +647,7 @@
     // ── les messages aux favoris ──
     f_titre: { fr: 'Messages aux favoris', en: 'Messages to favourites', es: 'Mensajes a favoritos', it: 'Messaggi ai preferiti', de: 'Nachrichten an Favoriten' },
     f_sur: { fr: '{n} sur {total}', en: '{n} of {total}', es: '{n} de {total}', it: '{n} su {total}', de: '{n} von {total}' },
+    f_a_heure: { fr: '(à {h})', en: '(at {h})', es: '(a las {h})', it: '(alle {h})', de: '(um {h})' },
     f_prochain: { fr: 'prochain dans {dans}', en: 'next in {dans}', es: 'siguiente en {dans}', it: 'prossimo tra {dans}', de: 'nächste in {dans}' },
     f_part: { fr: 'un message part', en: 'a message is being sent', es: 'se envía un mensaje', it: 'un messaggio sta partendo', de: 'eine Nachricht wird gesendet' },
     f_pas: { fr: '{n} pas envoyé(s)', en: '{n} not sent', es: '{n} no enviado(s)', it: '{n} non inviato/i', de: '{n} nicht gesendet' },
@@ -879,22 +932,26 @@
   // Les jetons vivent sur `:host` (une shadow root) ET sur `.vu-racine` (un élément de page) :
   // la même feuille sert les deux. Le JOUR par défaut ; la NUIT par le système, ou par le choix
   // fait dans VRM (`data-theme` « sombre » / « clair » posé sur l'hôte, 5.351).
-  const JOUR = `--vu-coque-uni:#174C88;--vu-coque:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240/.16) 0%,rgb(120 180 240/0) 55%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
-    --vu-sur:#FFFFFF;--vu-sur-2:#E6EFF9;--vu-plaque:#FFFFFF;--vu-plaque-2:#F4F8FC;--vu-encre:#0C1D30;--vu-muet:#4A5B6D;--vu-filet:rgb(18 52 96/.12);
-    --vu-ombre:0 .5px 0 rgb(18 52 96/.06),0 1px 2px rgb(18 52 96/.08),0 10px 24px -14px rgb(18 52 96/.32);
-    --vu-plein:#FFFFFF;--vu-plein-appui:#DCE6F1;--vu-plein-encre:#0C1D30;--vu-plein-sur-plaque:#0C1D30;--vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:rgb(0 96 204/.10);--vu-teinte-appui:rgb(0 96 204/.18);--vu-teinte-encre:#0050A8;--vu-lien:#0050A8;--vu-anneau:0 0 0 3px rgb(0 96 204/.45);
-    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E3ECF5;--vu-barre:#0060CC;
+  // 5.419 (Julien, 21 nov. : « on a un style assez simple et après des couleurs bleu vif qui ne vont pas ensemble ») :
+  //    la palette SOBRE « façon Vintex » — fond gris clair / noir, plaques blanches / #1C1C1E, filets gris fins, l'ENCRE
+  //    pour le bouton plein, liens à l'encre, un accent VERT SAPIN rare (onglet actif, interrupteurs, cases), ambre =
+  //    geste à faire. Plus aucun bleu (audit-couleur-panneau).
+  const JOUR = `--vu-coque-uni:#F2F2F7;--vu-coque:#F2F2F7;
+    --vu-sur:#111114;--vu-sur-2:#6C6C70;--vu-plaque:#FFFFFF;--vu-plaque-2:#F7F7F8;--vu-encre:#111114;--vu-muet:#6C6C70;--vu-filet:rgb(60 60 67/.16);
+    --vu-ombre:0 .5px 0 rgb(0 0 0/.05),0 1px 2px rgb(0 0 0/.06),0 10px 24px -14px rgb(0 0 0/.22);
+    --vu-plein:#111114;--vu-plein-appui:#2C2C2E;--vu-plein-encre:#FFFFFF;--vu-plein-sur-plaque:#111114;--vu-plein-sur-plaque-encre:#FFFFFF;
+    --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
+    --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#E9DCC4;--vu-kraft-encre:#2A2116;--vu-kraft-doux:#6B5A40;--vu-kraft-bord:rgb(42 33 22/.22);
-    --vu-voile:rgb(10 22 40/.55);--vu-toast:#0C1D30;--vu-toast-encre:#F2F7FD;`;
-  const NUIT = `--vu-coque-uni:#0C2848;--vu-coque:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220/.14) 0%,rgb(90 150 220/0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
-    --vu-sur:#F2F7FD;--vu-sur-2:#C9D8E8;--vu-plaque:#16273C;--vu-plaque-2:#1C2F47;--vu-encre:#F2F7FD;--vu-muet:#A7B8CB;--vu-filet:rgb(255 255 255/.10);
+    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;`;
+  const NUIT = `--vu-coque-uni:#000000;--vu-coque:#000000;
+    --vu-sur:#F2F2F7;--vu-sur-2:#98989F;--vu-plaque:#1C1C1E;--vu-plaque-2:#2C2C2E;--vu-encre:#F2F2F7;--vu-muet:#98989F;--vu-filet:rgb(84 84 88/.55);
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
-    --vu-plein:#EAF2FB;--vu-plein-appui:#C9D9EA;--vu-plein-encre:#06111F;--vu-plein-sur-plaque:#EAF2FB;--vu-plein-sur-plaque-encre:#06111F;
-    --vu-teinte:rgb(74 163 255/.16);--vu-teinte-appui:rgb(74 163 255/.26);--vu-teinte-encre:#8CC4FF;--vu-lien:#8CC4FF;--vu-anneau:0 0 0 3px rgb(140 196 255/.55);
-    --vu-ambre:#F2B65E;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#24384F;--vu-barre:#8CC4FF;
+    --vu-plein:#F2F2F7;--vu-plein-appui:#D1D1D6;--vu-plein-encre:#111114;--vu-plein-sur-plaque:#F2F2F7;--vu-plein-sur-plaque-encre:#111114;
+    --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
+    --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#3A3226;--vu-kraft-encre:#F3E9D6;--vu-kraft-doux:#CDBB9C;--vu-kraft-bord:rgb(243 233 214/.22);
-    --vu-voile:rgb(2 8 18/.66);--vu-toast:#EAF2FB;--vu-toast-encre:#06111F;`;
+    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -902,8 +959,8 @@
   :host, .vu-racine { --vu-police: "Inter VRM", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
     --vu-e-appui: 100ms cubic-bezier(.2,.9,.25,1); --vu-e-retour: 200ms cubic-bezier(.32,1.25,.5,1); }
   .vu-racine, .vu-racine * , .vu-coque, .vu-coque * { box-sizing: border-box; }
-  .vu-coque { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14); border-radius: 22px;
-    box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(8 26 50/.7); font: 400 14px/1.4 var(--vu-police); -webkit-font-smoothing: antialiased; }
+  .vu-coque { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid var(--vu-filet); border-radius: 22px;
+    box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(0 0 0/.7); font: 400 14px/1.4 var(--vu-police); -webkit-font-smoothing: antialiased; }
   .vu-plaque { background: var(--vu-plaque); color: var(--vu-encre); border-radius: 18px; box-shadow: var(--vu-ombre); }
   .vu-muet { color: var(--vu-muet); }
   .vu-sur-muet { color: var(--vu-sur-2); }
@@ -921,12 +978,12 @@
   .vu-plaque .vu-plein { background: var(--vu-plein-sur-plaque); color: var(--vu-plein-sur-plaque-encre); }
   .vu-sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); }
   .vu-sec:active:not(:disabled) { background: var(--vu-teinte-appui); }
-  .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: rgb(255 255 255/.16); color: var(--vu-sur); }
+  .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: var(--vu-teinte); color: var(--vu-sur); }
   .vu-lien { appearance: none; border: 0; background: transparent; padding: 0 4px; min-height: 44px; display: inline-flex; align-items: center; color: var(--vu-lien); font: 600 14px/1.2 var(--vu-police); cursor: pointer; text-decoration: none; }
   .vu-sur-coque .vu-lien { color: var(--vu-sur); text-decoration: underline; text-underline-offset: 3px; }
   /* Le contrôle segmenté : une piste, l'onglet choisi en porcelaine. */
   .vu-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 2px; padding: 3px; border-radius: 14px; background: var(--vu-socle); }
-  .vu-sur-coque .vu-seg, .vu-coque > .vu-seg { background: rgb(0 0 0/.22); }
+  .vu-sur-coque .vu-seg, .vu-coque > .vu-seg { background: var(--vu-teinte); }
   .vu-seg button { appearance: none; border: 0; min-height: 44px; padding: 0 8px; border-radius: 11px; background: transparent; color: var(--vu-muet);
     font: 600 14px/1.2 var(--vu-police); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; touch-action: manipulation; position: relative; }
   .vu-sur-coque .vu-seg button, .vu-coque > .vu-seg button { color: var(--vu-sur-2); }
@@ -942,7 +999,7 @@
   .vu-n.vu-grand::before { left: 8px; width: 6px; height: 6px; margin-top: -3px; }
   /* La progression : un trait fin. */
   .vu-barre { height: 4px; border-radius: 999px; background: var(--vu-socle); overflow: hidden; }
-  .vu-sur-coque .vu-barre { background: rgb(255 255 255/.18); }
+  .vu-sur-coque .vu-barre { background: var(--vu-teinte-appui); }
   .vu-barre > i { display: block; height: 100%; border-radius: 999px; background: var(--vu-barre); transition: width .4s cubic-bezier(.32,.72,0,1); }
   .vu-sur-coque .vu-barre > i { background: var(--vu-sur); }
   /* Le point d'état : neutre quand tout va bien (§7), ambre pour un geste, creux pour une pause. */
@@ -950,7 +1007,7 @@
   .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(224 138 18/.25); }
   .vu-point[data-k="pause"], .vu-point[data-k="prudence"], .vu-point[data-k="attente"], .vu-point[data-k="reseau"], .vu-point[data-k="arrete"] { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
   /* Le bandeau fin (une nouvelle version) et la ligne secondaire. */
-  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: rgb(255 255 255/.12); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
+  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: var(--vu-teinte); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
   .vu-bandeau > span { flex: 1; min-width: 0; }
   .vu-sous { font: 500 13px/1.4 var(--vu-police); color: var(--vu-sur-2); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
   .vu-sous b { color: var(--vu-sur); font-weight: 600; }
@@ -971,24 +1028,24 @@
     font: 600 14px/1.4 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.25), 0 16px 36px -12px rgb(0 0 0/.55); transition: opacity .2s ease; }
   [data-vrm-ui="bandeau"] { position: fixed !important; left: 16px !important; bottom: 16px !important; z-index: 2147483645 !important; display: block;
     width: max-content; max-width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px; border-radius: 18px;
-    background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14);
-    font: 400 14px/1.45 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(8 26 50/.7); }
+    background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid var(--vu-filet);
+    font: 400 14px/1.45 var(--vu-police); box-shadow: 0 1px 2px rgb(0 0 0/.18), 0 30px 60px -24px rgb(0 0 0/.7); }
   [data-vrm-ui] b, [data-vrm-ui] strong { font-weight: 700; }
   [data-vrm-ui] a { color: inherit; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
   [data-vrm-ui] button { all: initial; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; margin: 8px 8px 0 0; padding: 0 16px;
     border-radius: 14px; background: var(--vu-plein); color: var(--vu-plein-encre); font: 600 14px/1.2 var(--vu-police); cursor: pointer; }
   [data-vrm-ui] button:focus-visible { box-shadow: var(--vu-anneau); }
-  [data-vrm-ui] button + button { background: rgb(255 255 255/.16); color: var(--vu-sur); }
+  [data-vrm-ui] button + button { background: var(--vu-teinte); color: var(--vu-sur); }
   [data-vrm-ui] div, [data-vrm-ui] p, [data-vrm-ui] span, [data-vrm-ui] ul, [data-vrm-ui] li { font: inherit; color: inherit; }
   [data-vrm-ui] div + div, [data-vrm-ui] p { display: block; margin-top: 4px; }
   /* Les anciens gabarits portaient leurs couleurs en ligne (gris sur noir) : sur la coque bleue,
      la feuille commune les reprend (contraste ≥ 4,5:1), sans toucher au texte. */
   [data-vrm-ui="bandeau"] [style*="color:#8A93A3"], [data-vrm-ui="bandeau"] [style*="color:#6B7485"], [data-vrm-ui="bandeau"] [style*="color:#8b95a5"] { color: var(--vu-sur-2) !important; }
   [data-vrm-ui="bandeau"] [style*="color:#E8ECF2"] { color: var(--vu-sur) !important; }
-  [data-vrm-ui="bandeau"] [style*="color:#F5A524"] { color: #FFE2A8 !important; }
+  [data-vrm-ui="bandeau"] [style*="color:#F5A524"] { color: var(--vu-ambre) !important; }
   [data-vrm-ui] button[style] { border: 0 !important; min-height: 44px !important; padding: 0 16px !important; border-radius: 14px !important; font: 600 14px/1.2 var(--vu-police) !important; }
   [data-vrm-ui] button[style]:first-of-type { background: var(--vu-plein) !important; color: var(--vu-plein-encre) !important; }
-  [data-vrm-ui] button[style] ~ button[style] { background: rgb(255 255 255/.16) !important; color: var(--vu-sur) !important; }
+  [data-vrm-ui] button[style] ~ button[style] { background: var(--vu-teinte) !important; color: var(--vu-sur) !important; }
   @media (prefers-reduced-motion: reduce) { [data-vrm-ui] { transition: none !important; } }
   `;
   // Pose la feuille dans une shadow root (ou un élément), une fois.

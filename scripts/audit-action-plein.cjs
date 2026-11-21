@@ -118,17 +118,20 @@ const lireSt = (f) => f.store.vrmFavorisCarte || {};
 
 (async () => {
   // ── W1 : Vinted vient d'être ouvert ──────────────────────────────────────────
-  console.log('\nW1. Vinted vient d’être ouvert (attente de la discrétion : 4 min)');
+  // 5.419 (Julien, 21 nov. : « dès qu'on appuie sur Valider ça doit partir ») : l'attente « Vinted vient d'être ouvert » ne
+  //    retient plus SON envoi (audit-favoris-envoi-immediat I1/I4). La garde qui fait encore attendre un envoi de la carte,
+  //    et dont le VRAI temps est annoncé : « un autre compte vient d'agir dans ce navigateur » (verrou de 10 min).
+  console.log('\nW1. Un autre compte vient d’agir dans ce navigateur (verrou de la discrétion : 4 min restantes)');
   {
     const t = Date.now();
-    const { f, sv, vinted } = await monde({ store: { vrmOuverture: { [UID]: { depuis: t, attente: 4 * MIN, vu: t } } } });
+    const { f, sv, vinted } = await monde({ store: { vrmVerrouCompte: { uid: '999', jusqua: t + 4 * MIN, at: t } } });
     await f.ctx.tickFavorisCarte();
     const st = lireSt(f);
     const carte = st.prochain ? st.prochain - Date.now() : null;
     const serveurMs = sv.prochain();
     console.log(`     mesuré : carte « prochain dans ${mn(carte)} » · serveur ${mn(serveurMs)} · réservations ${sv.reservations} · requêtes Vinted ${vinted.length}`);
     dit(carte != null && carte <= 6 * MIN + 2000 && carte >= 3.5 * MIN, 'la carte annonce le VRAI temps de la garde (≈ 4 min, jamais 10)', mn(carte));
-    dit(st.quoi === 'ouverture', 'la raison est dite (« ouverture »)', st.quoi);
+    dit(st.quoi === 'autre-compte', 'la raison est dite (« autre compte »)', st.quoi);
     dit(sv.reservations === 0, 'rien n’est réservé chez VRM tant qu’une garde ferait attendre', sv.reservations);
     dit(!(serveurMs > 6 * MIN), 'le serveur ne repousse pas la suite de 10 min', mn(serveurMs));
     dit(vinted.length === 0, 'aucune requête Vinted', vinted.length);
@@ -206,12 +209,12 @@ const lireSt = (f) => f.store.vrmFavorisCarte || {};
   console.log('\nO1. L’état « action en cours » suit la file, « Tout arrêter » l’éteint');
   {
     const t = Date.now();
-    const { f } = await monde({ store: { vrmOuverture: { [UID]: { depuis: t, attente: 3 * MIN, vu: t } } } });
+    const { f } = await monde({ store: { vrmVerrouCompte: { uid: '999', jusqua: t + 3 * MIN, at: t } } });
     dit(!f.store.vrmActionEnCours || f.store.vrmActionEnCours.actif !== true, 'aucun état avant la file');
     await f.ctx.tickFavorisCarte();
     const a = f.store.vrmActionEnCours || {};
     dit(a.actif === true && a.sorte === 'favoris' && a.uid === UID && Number(a.total) === 3, 'pendant la file : actif, favoris, ce compte, sur 3', JSON.stringify(a).slice(0, 200));
-    dit(Number(a.prochain) > Date.now() && a.quoi === 'ouverture', 'le prochain pas et sa raison sont dans l’état', `${a.prochain} ${a.quoi}`);
+    dit(Number(a.prochain) > Date.now() && a.quoi === 'autre-compte', 'le prochain pas et sa raison sont dans l’état', `${a.prochain} ${a.quoi}`);
     const r = await f.envoyer({ from: 'vrm-action', action: 'arreter' }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
     const b = f.store.vrmActionEnCours || {};
     dit(b.actif === false && b.fin && b.fin.raison === 'arret', '« Tout arrêter » : l’état s’éteint aussitôt, fin « arrêté » dite', JSON.stringify(b.fin));

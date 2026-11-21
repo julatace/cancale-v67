@@ -6,21 +6,21 @@
   <style>
     /* 5.415 (21 nov.) — LA FENÊTRE DE CONNEXION « VRM NATIF » (docs/design/NATIF.md) :
        fond gris très clair, UN groupe blanc arrondi (rayon 12), rangées de 44 px au moins,
-       une phrase d'état, UN bouton plein bleu (#0068D6), les autres gestes en texte bleu.
+       une phrase d'état, UN bouton plein bleu (#0F6B4C), les autres gestes en texte bleu.
        Pas de dégradé, pas d'ombre, pas de violet ; ambre = un geste à faire. Clair / sombre
        suivent le système, ou la teinte choisie dans VRM (`data-theme`, posé par le script de la fenêtre). */
     :root { color-scheme: light dark;
       --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
-      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0068D6; --n-plein: #0068D6; --n-sur-plein: #FFFFFF;
-      --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(0 104 214 / .12); }
+      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-plein: #0F6B4C; --n-sur-plein: #FFFFFF;
+      --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
     @media (prefers-color-scheme: dark) {
       :root { --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
-        --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #409CFF; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(64 156 255 / .20); }
+        --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     }
     :root[data-theme="clair"] { color-scheme: light; --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
-      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0068D6; --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(0 104 214 / .12); }
+      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
     :root[data-theme="sombre"] { color-scheme: dark; --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
-      --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #409CFF; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(64 156 255 / .20); }
+      --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     * { box-sizing: border-box; }
     html { background: var(--n-fond); }
     body { width: 340px; margin: 0; padding: 16px 16px 20px; background: var(--n-fond); color: var(--n-encre);

@@ -110,38 +110,38 @@ function vrmVerifVisible(sel) {
      qu'avant (5.328) : toute la carte suit. Avant : un verre blanc à 88 % posé sur la page
      sombre de Vinted, qui la rendait GRISE (capture de Julien, 15 nov.). */
   :host { all: initial;
-    --fond: #060E19; --carte: #122135; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #EAF2FB; --doux: #9CB0C6; --pale: #7F93AA;
-    --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(20 35 54 / .9); --verre: #122135;
-    --champ: rgb(0 0 0 / .22); --anneau: rgba(74,163,255,.35);
+    --fond: #000000; --carte: #1C1C1E; --bord: rgba(255,255,255,.10); --filet: rgba(255,255,255,.08); --texte: #F2F2F7; --doux: #98989F; --pale: #8E8E93;
+    --accent: #3FD49A; --ambre: #F2B65E; --survol: rgba(255,255,255,.06); --remplir: rgb(28 28 30 / .9); --verre: #1C1C1E;
+    --champ: rgb(0 0 0 / .22); --anneau: rgba(63,212,154,.35);
     --ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
-    --fond-carte: linear-gradient(180deg, #15263D 0%, #0C1829 100%);
-    --plan: rgb(20 35 54 / .9); --plan-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
-    --touche-fond: linear-gradient(180deg, #1D3049, #172840); --touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+    --fond-carte: linear-gradient(180deg, #1C1C1E 0%, #141416 100%);
+    --plan: rgb(28 28 30 / .9); --plan-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+    --touche-fond: linear-gradient(180deg, #2C2C2E, #242426); --touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
     --enfonce: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
-    --plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #EAF2FB 60%); --plein-encre: #0C1D30; --plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9); }
+    --plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, #F2F2F7 60%); --plein-encre: #111114; --plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9); }
   /* 5.351 : la teinte CHOISIE dans VRM (Réglages → Apparence, recopiée par le pont
      de vrm.center : data-theme sur l'hôte) passe avant celle du système ; sans
      choix connu, le système décide, comme avant. */
   @media (prefers-color-scheme: light) {
-    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
-      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
-      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
-      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
-      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
-      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
-      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
-      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
+    :host(:not([data-theme="sombre"])) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
+      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
+      --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .07), 0 1px 2px rgb(60 60 67 / .07), 0 12px 26px -14px rgb(60 60 67 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F7F7F8); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .14), 0 1px 1.5px rgb(60 60 67 / .08), 0 4px 9px -5px rgb(60 60 67 / .26);
+      --enfonce: inset 0 1px 2px rgb(60 60 67 / .20), inset 0 0 0 .5px rgb(60 60 67 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   }
-  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(18,52,96,.12); --filet: rgba(18,52,96,.10); --texte: #0C1D30; --doux: #3F5468; --pale: #6B7F94;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.05); --remplir: rgb(255 255 255 / .82); --verre: #E6F1FA;
-      --champ: #FFFFFF; --anneau: rgba(0,96,204,.25);
-      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .10), 0 2px 5px rgb(18 52 96 / .08), 0 34px 60px -26px rgb(18 52 96 / .48);
-      --fond-carte: linear-gradient(180deg, #EEF6FD 0%, #D6E8F5 100%);
-      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .07), 0 1px 2px rgb(18 52 96 / .07), 0 12px 26px -14px rgb(18 52 96 / .30);
-      --touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(18 52 96 / .14), 0 1px 1.5px rgb(18 52 96 / .08), 0 4px 9px -5px rgb(18 52 96 / .26);
-      --enfonce: inset 0 1px 2px rgb(18 52 96 / .20), inset 0 0 0 .5px rgb(18 52 96 / .12);
-      --plein-fond: radial-gradient(120% 90% at 50% 0%, #4A5A6E 0%, #0C1D30 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(18 52 96 / .25), 0 12px 22px -10px rgb(18 52 96 / .6); }
+  :host([data-theme="clair"]) { --carte: #FFFFFF; --bord: rgba(60,60,67,.12); --filet: rgba(60,60,67,.10); --texte: #111114; --doux: #3C3C43; --pale: #6C6C70;
+      --accent: #0F6B4C; --ambre: #764300; --survol: rgba(60,60,67,.05); --remplir: rgb(255 255 255 / .82); --verre: #F2F2F7;
+      --champ: #FFFFFF; --anneau: rgba(15,107,76,.25);
+      --ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .10), 0 2px 5px rgb(60 60 67 / .08), 0 34px 60px -26px rgb(60 60 67 / .48);
+      --fond-carte: linear-gradient(180deg, #F7F7F8 0%, #EDEDF0 100%);
+      --plan: rgb(255 255 255 / .82); --plan-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .07), 0 1px 2px rgb(60 60 67 / .07), 0 12px 26px -14px rgb(60 60 67 / .30);
+      --touche-fond: linear-gradient(180deg, #FFFFFF, #F7F7F8); --touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(60 60 67 / .14), 0 1px 1.5px rgb(60 60 67 / .08), 0 4px 9px -5px rgb(60 60 67 / .26);
+      --enfonce: inset 0 1px 2px rgb(60 60 67 / .20), inset 0 0 0 .5px rgb(60 60 67 / .12);
+      --plein-fond: radial-gradient(120% 90% at 50% 0%, #2C2C2E 0%, #111114 55%); --plein-encre: #FFFFFF; --plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(60 60 67 / .25), 0 12px 22px -10px rgb(60 60 67 / .6); }
   * { box-sizing: border-box; font-family: "Inter VRM", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .btn { position: relative; width: 44px; height: 44px; padding: 0; border: .5px solid rgba(255,255,255,.14); border-radius: 12px;
     background: #000; cursor: pointer; display: block;
@@ -335,9 +335,9 @@ function vrmVerifVisible(sel) {
   /* 5.377 : Favoris · Annonces · Ventes — la direction « bleu clair, porcelaine » (Julien, 14 nov.) :
      quatre formes de bouton (ici la TOUCHE et le LIEN ; un seul plein, « Envoyer le message ») ;
      l'actif est ENFONCÉ + DIODE, jamais une autre couleur de fond ; une rangée n'a pas de bouton. */
-  :host { --porc1: #16273C; --porc2: #122135; --creux: #091320; --diode: #4AA3FF; --o: 0 0 0; --plaque-t: #EAF2FB; }
-  @media (prefers-color-scheme: light) { :host(:not([data-theme="sombre"])) { --porc1: #FFFFFF; --porc2: #F7FAFD; --creux: #E4EEF7; --diode: #0060CC; --o: 18 52 96; --plaque-t: #0C1D30; } }
-  :host([data-theme="clair"]) { --porc1: #FFFFFF; --porc2: #F7FAFD; --creux: #E4EEF7; --diode: #0060CC; --o: 18 52 96; --plaque-t: #0C1D30; }
+  :host { --porc1: #1C1C1E; --porc2: #1C1C1E; --creux: #000000; --diode: #3FD49A; --o: 0 0 0; --plaque-t: #F2F2F7; }
+  @media (prefers-color-scheme: light) { :host(:not([data-theme="sombre"])) { --porc1: #FFFFFF; --porc2: #F7F7F8; --creux: #E5E5EA; --diode: #0F6B4C; --o: 18 52 96; --plaque-t: #111114; } }
+  :host([data-theme="clair"]) { --porc1: #FFFFFF; --porc2: #F7F7F8; --creux: #E5E5EA; --diode: #0F6B4C; --o: 18 52 96; --plaque-t: #111114; }
   .listes { margin-top: 8px; }
   .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; }
   .touche { position: relative; min-height: 44px; padding: 0 10px; border: 0; border-radius: 13px; color: var(--texte); font-size: 14px; font-weight: 600; cursor: pointer;
@@ -477,27 +477,27 @@ function vrmVerifVisible(sel) {
      mesuré sur les couleurs calculées, sur la partie la plus sombre du dégradé pour le verre
      et la plus claire pour le blanc (banc verre-extension-site). Accent rare, ambre = geste,
      jamais violet ni rouge. Sans flou possible (ou transparence réduite) : verre opaque. */
-  :host { --vb-fond-uni: #0C2848;
-    --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-    --vb-verre: rgb(8 18 33 / .72); --vb-verre-o: #0E2139; --vb-verre-bord: rgb(255 255 255 / .12);
+  :host { --vb-fond-uni: #000000;
+    --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 60%), linear-gradient(170deg, #141416 0%, #000000 50%, #000000 100%);
+    --vb-verre: rgb(28 28 30 / .72); --vb-verre-o: #1C1C1E; --vb-verre-bord: rgb(255 255 255 / .12);
     --vb-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
-    --vb-sur: #FFFFFF; --vb-sur-2: #D6E4F3; --pale: #8FA3B9;
+    --vb-sur: #FFFFFF; --vb-sur-2: #C7C7CC; --pale: #8E8E93;
     --plan: rgb(255 255 255 / .05); --plan-ombre: inset 0 0 0 .5px rgb(255 255 255 / .07);
-    --vb-plein-sur-bleu: #FFFFFF; --vb-plein-sur-bleu-t: #0C1D30; }
+    --vb-plein-sur-bleu: #FFFFFF; --vb-plein-sur-bleu-t: #111114; }
   @media (prefers-color-scheme: light) {
-    :host(:not([data-theme="sombre"])) { --vb-fond-uni: #174C88;
-      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
-      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
-      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+    :host(:not([data-theme="sombre"])) { --vb-fond-uni: #F2F2F7;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 70%), linear-gradient(170deg, #F2F2F7 0%, #F2F2F7 45%, #E5E5EA 100%);
+      --vb-verre: rgb(255 255 255 / .9); --vb-verre-o: #E5E5EA; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(0 0 0 / .6);
+      --vb-sur: #111114; --vb-sur-2: #6C6C70; --pale: #6C6C70;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(60 60 67 / .08); }
   }
-  :host([data-theme="clair"]) { --vb-fond-uni: #174C88;
-      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
-      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
-      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+  :host([data-theme="clair"]) { --vb-fond-uni: #F2F2F7;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(0 0 0 / 0) 0%, rgb(0 0 0 / 0) 70%), linear-gradient(170deg, #F2F2F7 0%, #F2F2F7 45%, #E5E5EA 100%);
+      --vb-verre: rgb(255 255 255 / .9); --vb-verre-o: #E5E5EA; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(0 0 0 / .6);
+      --vb-sur: #111114; --vb-sur-2: #6C6C70; --pale: #6C6C70;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(60 60 67 / .08); }
   /* Le panneau : le dégradé, opaque (une couleur unie dessous, au cas où). */
   .carte, .question { background-color: var(--vb-fond-uni); background-image: var(--vb-fond); border: 1px solid rgb(255 255 255 / .14); padding: 14px 12px 12px; }
   .carte .tete, .question .tete { padding: 0 4px; margin-bottom: 4px; min-height: 30px; }
@@ -542,7 +542,7 @@ function vrmVerifVisible(sel) {
      (jauge, capté), un bandeau fin pour la version, un contrôle segmenté. Les plaques de porcelaine
      remplacent les quatre boîtes grises. Les jetons sont ceux de vrm-ui.js (--vu-*). */
   .carte, .question { background-color: var(--vu-coque-uni); background-image: var(--vu-coque); color: var(--vu-sur); border: 1px solid rgb(255 255 255/.14);
-    border-radius: 22px; padding: 12px; width: min(380px, calc(100vw - 24px)); box-shadow: 0 1px 2px rgb(0 0 0/.2), 0 30px 60px -24px rgb(8 26 50/.75); }
+    border-radius: 22px; padding: 12px; width: min(380px, calc(100vw - 24px)); box-shadow: 0 1px 2px rgb(0 0 0/.2), 0 30px 60px -24px rgb(0 0 0/.75); }
   .carte:has(.q4), .carte:has(.listes), .carte:has(.apercu) { width: min(380px, calc(100vw - 24px)); }
   .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err {
     background: var(--vu-plaque); color: var(--vu-encre); border: 0; border-radius: 18px; box-shadow: var(--vu-ombre); -webkit-backdrop-filter: none; backdrop-filter: none; margin: 8px 0 0; }
@@ -682,20 +682,37 @@ function vrmVerifVisible(sel) {
   .fl-pied { padding-top: 2px; }
   .fl-pied .fl-note { margin-top: 0; }
   .fl-recap .fl-retour { display: flex; justify-content: center; margin-top: 2px; }
+  /* 5.419 : la feuille « Confirmer l'envoi » — le taux (5/10/15/20 % ou un autre), le message pré-rempli modifiable. */
+  .env6-taux { margin: 2px 0 12px; }
+  .env6-l { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .env6-seg { flex: 1 1 240px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .env6-seg button { min-height: 44px; font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .env6-libre { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: 500 15px/1 -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2, var(--vu-muet)); }
+  .env6-libre input { width: 76px; min-height: 44px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid var(--n-trait, var(--vu-filet)); background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); font: 600 16px/1 -apple-system, Inter, system-ui, sans-serif; text-align: right; }
+  .env6-libre b { color: var(--n-encre, var(--vu-encre)); font-weight: 600; }
+  .env6-taux .fl-note { margin: 6px 2px 0; }
+  .env6-msg { margin-top: 4px; }
+  .env6-msg .bulle { margin: 0 0 6px; max-height: 180px; background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 14px 14px 14px 6px; padding: 10px 14px; font-size: 15px; line-height: 21px; }
+  .env6-msg textarea { display: block; width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--n-trait, var(--vu-filet)); background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); font: 400 16px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .env6-msg > .vu-lien { min-height: 44px; }
+  .env6-g { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 4px; }
+  .env6-g .vu-btn, .env6-g .vu-lien { min-height: 44px; }
+  .fl-r-l .fl-px s { color: var(--n-encre-2, var(--vu-muet)); font-weight: 400; margin-right: 2px; }
+  .fl-r-l .fl-etat.ambre { color: var(--n-ambre, var(--vu-ambre)); }
 
   /* ══ 5.409 — LE GRAND PANNEAU (Julien, 19 nov. : « je veux que l'extension prenne tout l'écran, ou une très
      grosse partie de l'écran sur Vinted, beaucoup plus visuel et compréhensible ») : sur vinted.fr, connecté,
      la carte devient un panneau de 76 % de la largeur (1100 px au plus) à l'ordinateur, PLEIN ÉCRAN au
      téléphone ; design natif (docs/design/NATIF.md : fond #F2F2F7 / #000, cartes blanches / #1C1C1E, accent
-     #0068D6 rare). Les jetons --vu-* sont redéfinis DANS le panneau : les pièces existantes le suivent. */
-  .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0068D6; --n-teinte:rgb(0 104 214/.12);
+     accent rare). 5.419 : accent vert sapin (#0F6B4C / nuit #3FD49A), plein = encre, plus aucun bleu. Les jetons --vu-* sont redéfinis DANS le panneau : les pièces existantes le suivent. */
+  .carte[data-grand] { --n-fond:#F2F2F7; --n-carte:#FFFFFF; --n-carte-2:#F2F2F7; --n-trait:rgb(60 60 67/.18); --n-encre:#111114; --n-encre-2:#6C6C70; --n-accent:#0F6B4C; --n-teinte:rgb(15 107 76/.10); --n-neutre:rgb(118 118 128/.12); --n-vert:#1F7A3A; --n-vert-fond:#E6F4EA; --n-teal:#2C6E73; --n-teal-fond:#E3F1F1;
     --vu-coque-uni:var(--n-fond); --vu-coque:none; --vu-sur:var(--n-encre); --vu-sur-2:var(--n-encre-2); --vu-plaque:var(--n-carte); --vu-plaque-2:var(--n-carte-2); --vu-encre:var(--n-encre); --vu-muet:var(--n-encre-2);
-    --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#0068D6; --vu-plein-appui:#0058B6; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#0068D6; --vu-plein-sur-plaque-encre:#FFFFFF;
-    --vu-teinte:var(--n-teinte); --vu-teinte-encre:#0058B6; --vu-lien:#0068D6; --vu-socle:#E5E5EA; --vu-barre:#0068D6; --vu-ambre:#8A4B00;
+    --vu-filet:var(--n-trait); --vu-ombre:none; --vu-plein:#111114; --vu-plein-appui:#2C2C2E; --vu-plein-encre:#FFFFFF; --vu-plein-sur-plaque:#111114; --vu-plein-sur-plaque-encre:#FFFFFF;
+    --vu-teinte:var(--n-neutre); --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#E5E5EA; --vu-barre:var(--n-accent); --vu-ambre:#8A4B00;
     position: fixed; top: 4vh; bottom: 4vh; right: 2vw; left: auto; width: min(1100px, 76vw) !important; max-height: none; height: auto; border-radius: 16px; border: 0;
     padding: 12px 20px 20px; background: var(--n-fond) !important; color: var(--n-encre); box-shadow: 0 8px 30px rgb(0 0 0/.12), 0 0 0 100vmax rgb(0 0 0/.28); overflow-y: auto; overscroll-behavior: contain; }
-  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-plein:#0068D6; --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; } }
-  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#409CFF; --n-teinte:rgb(64 156 255/.20); --vu-teinte-encre:#8CC4FF; --vu-lien:#409CFF; --vu-socle:#2C2C2E; --vu-barre:#409CFF; --vu-ambre:#FFB340; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#000000; --n-carte:#1C1C1E; --n-carte-2:#2C2C2E; --n-trait:rgb(84 84 88/.6); --n-encre:#FFFFFF; --n-encre-2:#98989F; --n-accent:#3FD49A; --n-teinte:rgb(63 212 154/.16); --n-neutre:rgb(118 118 128/.24); --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.16); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.16); --vu-plein:#F2F2F7; --vu-plein-appui:#D1D1D6; --vu-plein-encre:#111114; --vu-plein-sur-plaque:#F2F2F7; --vu-plein-sur-plaque-encre:#111114; --vu-teinte-encre:var(--n-encre); --vu-lien:var(--n-encre); --vu-socle:#2C2C2E; --vu-barre:var(--n-accent); --vu-ambre:#FFB340; }
   @media (max-width: 760px) { .carte[data-grand] { top: 0; bottom: 0; right: 0; left: 0; width: 100vw !important; height: 100dvh; border-radius: 0; padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); box-shadow: none; } }
   /* 5.410.2 : l'ambre (un geste à faire) défini dans les deux teintes — en sombre, #8A4B00 sur #1C1C1E ne se lisait pas. */
   .carte[data-grand] { --n-ambre: #8A4B00; --n-ambre-fond: #FFF4DD; }
@@ -722,8 +739,8 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .rang .px { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .carte[data-grand] .rang .px.quand { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .carte[data-grand] .rang.nonlu .ti { font-weight: 700; }
-  .pt5 { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--n-accent, #0068D6); margin-right: 6px; vertical-align: middle; }
-  .carte[data-grand] li[data-ouverte] > .rang { background: var(--n-teinte); }
+  .pt5 { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--n-accent, #0F6B4C); margin-right: 6px; vertical-align: middle; }
+  .carte[data-grand] li[data-ouverte] > .rang { background: var(--n-neutre); }
   .fiche5 { padding: 4px 16px 16px; }
   .ph5 { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 0; }
   .ph5 img { flex: none; height: 240px; max-width: 80%; border-radius: 12px; object-fit: cover; scroll-snap-align: start; background: var(--n-carte-2); }
@@ -755,7 +772,7 @@ function vrmVerifVisible(sel) {
     .carte[data-grand] .listes5 { display: grid; grid-template-columns: 210px minmax(0,1fr); gap: 16px; align-items: start; }
     .carte[data-grand] .seg5 { grid-template-columns: none; grid-auto-flow: row; grid-auto-rows: 44px; background: transparent; padding: 0; gap: 2px; top: 0; }
     .carte[data-grand] .seg5 button { justify-content: flex-start; text-align: left; padding: 0 12px; border-radius: 10px; color: var(--n-encre); display: flex; align-items: center; }
-    .carte[data-grand] .seg5 button[aria-selected="true"] { background: var(--n-teinte); color: var(--n-accent); box-shadow: none; }
+    .carte[data-grand] .seg5 button[aria-selected="true"] { background: var(--n-carte); color: var(--n-encre); box-shadow: 0 1px 2px rgb(0 0 0/.12); }
     .carte[data-grand] .panneau { margin-top: 0; }
     .carte[data-grand] .reg5 { justify-content: flex-start !important; }
     .deux5 { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0,1fr); min-height: 60vh; }
@@ -766,7 +783,7 @@ function vrmVerifVisible(sel) {
   .outils5 { display: flex; gap: 8px; padding: 8px 12px; align-items: center; }
   .cherche5 { flex: 1; min-width: 0; min-height: 44px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); padding: 0 12px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; }
   .filtre5 { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; cursor: pointer; }
-  .filtre5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
+  .filtre5[aria-pressed="true"] { background: var(--n-neutre); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait); }
   .volet5 { padding: 16px; }
   .vide5 { display: grid; place-content: center; text-align: center; gap: 6px; min-height: 50vh; color: var(--n-encre-2); font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .vide5 b { color: var(--n-encre); font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
@@ -807,7 +824,7 @@ function vrmVerifVisible(sel) {
   .chips5 { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
   .chip5 { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 0; background: var(--n-carte-2); color: var(--n-encre); font: 600 14px/1 -apple-system, Inter, system-ui, sans-serif; cursor: pointer; position: relative; }
   .chip5::after { content: ''; position: absolute; inset: -4px 0; }
-  .chip5[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-accent); }
+  .chip5[aria-pressed="true"] { background: var(--n-neutre); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait); }
   .tr5 { display: grid; grid-template-columns: 44px minmax(220px, 2fr) minmax(0, 5fr); align-items: center; gap: 0 8px; padding: 0 8px; }
   .tr5 .cels5 { display: grid; grid-template-columns: repeat(var(--n5, 4), minmax(56px, 1fr)); gap: 0 8px; align-items: center; }
   .th5 { min-height: 36px; font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); border-bottom: .5px solid var(--n-trait); }
@@ -818,8 +835,8 @@ function vrmVerifVisible(sel) {
   .cel5 { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
   .lc5 { display: none; }
   .st5 { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; }
-  .st5[data-statut="nouveau"] { background: var(--n-teinte); color: var(--n-accent); }
-  li[data-coche] > .tr5, li[data-coche] > .case5 { background: var(--n-teinte); }
+  .st5[data-statut="nouveau"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  li[data-coche] > .tr5, li[data-coche] > .case5 { background: var(--n-neutre); }
   @media (max-width: 760px) {
     .th5 { display: none; }
     .tr5 { grid-template-columns: 44px minmax(0, 1fr); }
@@ -841,7 +858,7 @@ function vrmVerifVisible(sel) {
   .au5-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .au5-t h3 { margin: 8px 0; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); text-transform: none; letter-spacing: 0; }
   .et5 { padding: 2px 10px; border-radius: 6px; font: 600 13px/20px -apple-system, Inter, system-ui, sans-serif; background: var(--n-carte-2); color: var(--n-encre-2); }
-  .et5[data-etat="on"] { background: var(--n-teinte); color: var(--n-accent); }
+  .et5[data-etat="on"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .rg5-l b { font-weight: 600; color: var(--n-encre); text-align: right; }
   .rg5-l span { color: var(--n-encre); }
   .trn5 { grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) 24px; min-height: 52px; text-decoration: none; color: var(--n-encre); }
@@ -912,7 +929,7 @@ function vrmVerifVisible(sel) {
   .table6 .rangs > li + li { border-top: .5px solid var(--n-trait); }
   .corps6 .table5 { margin: 0 16px; border: .5px solid var(--n-trait); border-radius: 12px; overflow: hidden; }
   .corps6 .table5 .rangs > li, .table6 .rangs > li, .corps6 .gauche5 .rangs > li, .corps6 .gauche5 .rang { background: var(--n-carte) !important; }
-  .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-teinte) !important; }
+  .corps6 .gauche5 .rang[aria-current="true"], .corps6 .gauche5 li[data-ouverte] > .rang { background: var(--n-neutre) !important; }
   .table6 .rangs > li:hover { background: rgb(127 127 127 / .05) !important; }
   .tr6 { display: grid; grid-template-columns: 44px minmax(220px, 1fr) minmax(0, max-content) 44px; align-items: center; gap: 0 12px; padding: 0 8px; min-height: 64px; }
   .tr6 .cels6 { display: grid; grid-template-columns: var(--g6, repeat(var(--n6, 4), minmax(92px, auto))); gap: 0 12px; align-items: center; }
@@ -937,8 +954,8 @@ function vrmVerifVisible(sel) {
   .cel6 .tr-l6 + .suivi6, .env6 .suivi6 { display: block; margin-top: 2px; font: 400 12px/16px ui-monospace, "SF Mono", Menlo, monospace; color: var(--n-encre-2); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .lim6 { font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .gris6 { color: var(--n-encre-2); }
-  .imp6 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--n-teinte); color: var(--n-accent); font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, transform .12s ease; }
-  .imp6:hover { background: rgb(0 104 214 / .18); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
+  .imp6 { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, transform .12s ease; }
+  .imp6:hover { background: var(--n-neutre); } .imp6:active { transform: scale(.97); } .imp6:disabled { opacity: .55; cursor: default; }
   .imp6:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .pas6 { font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .imp-etat6 { padding: 8px 16px; } .imp-etat6[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
@@ -950,10 +967,12 @@ function vrmVerifVisible(sel) {
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
   .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
-  .et6[data-statut="en_vente"] { background: var(--n-teinte); color: var(--n-accent); }
+  .et6[data-statut="en_vente"] { background: var(--n-vert-fond); color: var(--n-vert); }
+  .et6[data-statut="en_route"] { background: var(--n-teal-fond); color: var(--n-teal); }
+  .et6[data-statut="finalisee"] { background: var(--n-vert-fond); color: var(--n-vert); }
   /* 5.410.7 — les favoris en tableau (mêmes pièces que Commandes) ; l'état en étiquette, l'accent seulement pour « en cours ». */
-  .et6[data-ton="accent"] { background: var(--n-teinte); color: var(--n-accent); }
-  .et6[data-statut="envoye"], .et6[data-statut="offre"] { background: var(--n-teinte); color: var(--n-encre); }
+  .et6[data-ton="accent"] { background: var(--n-teal-fond); color: var(--n-teal); }
+  .et6[data-statut="envoye"], .et6[data-statut="offre"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .fav6-barre .seg6 { flex: 0 1 auto; min-width: 0; }
   .fav6-barre .seg6 button { padding: 0 12px; white-space: nowrap; }
   .fav6-barre .seg6 b { font-weight: 600; opacity: .72; margin-left: 2px; }
@@ -973,6 +992,19 @@ function vrmVerifVisible(sel) {
   .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
   .fav6 > .note5 { padding: 0 16px; margin: 4px 0 8px; }
   .fav6-bas .vu-btn { flex: 0 0 auto; width: auto; }
+  /* 5.419 : Commandes — filtres rapides, barre de la sélection, confirmation « Commander ». */
+  .ven6-seg { margin: 0 16px 10px; display: flex; flex-wrap: wrap; }
+  .ven6-seg button { flex: 1 1 auto; min-height: 44px; }
+  .ven6-bas { flex-wrap: wrap; }
+  @media (max-width: 760px) {
+    .fav6-bas.ven6-bas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fav6-bas.ven6-bas .fav6-bas-t, .fav6-bas.ven6-bas .vu-plein { grid-column: 1 / -1; }
+    .fav6-bas.ven6-bas .vu-btn { width: 100%; min-width: 0; white-space: normal; padding: 0 10px; font-size: 15px; line-height: 18px; }
+    .ven6-conf { bottom: 8px; margin: 8px 8px 0; }
+  }
+  .ven6-conf { position: sticky; bottom: 76px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 16px 0; padding: 12px 14px; border-radius: 14px; background: var(--n-carte); border: 1px solid var(--n-trait); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .ven6-conf > span { flex: 1 1 220px; }
+  .ven6-conf .vu-btn { min-height: 44px; width: auto; }
   .tout6 { display: none; min-height: 44px; }
   .fav6 .err6 { color: var(--n-ambre); }
   .fav6-bas { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-carte); box-shadow: 0 -1px 0 var(--n-trait), 0 8px 28px rgb(0 0 0 / .16); }
@@ -1008,7 +1040,7 @@ function vrmVerifVisible(sel) {
   .fp-al:empty { display: none; }
   .fp-ins { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
   .fp-ins button, .fp-ajout { appearance: none; min-height: 44px; padding: 0 12px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 14px/18px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
-  .fp-ajout { border-style: dashed; color: var(--n-accent, #0068D6); margin: 8px 0 0; }
+  .fp-ajout { border-style: dashed; color: var(--n-encre, #111114); margin: 8px 0 0; }
   .fp-r { padding: 4px 0 8px; border-top: .5px solid var(--n-trait); }
   .fp-rt { display: flex; align-items: center; gap: 4px; min-height: 44px; }
   .fp-rt b { font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); margin-right: 6px; }
@@ -1049,7 +1081,7 @@ function vrmVerifVisible(sel) {
   }
   .plus6 { appearance: none; border: 0; background: transparent; width: 44px; height: 44px; border-radius: 10px; color: var(--n-encre-2); font-size: 20px; cursor: pointer; }
   .plus6:hover { background: rgb(127 127 127 / .10); }
-  .table6 li[data-coche] > .tr6 { background: var(--n-teinte); }
+  .table6 li[data-coche] > .tr6 { background: var(--n-neutre); }
   .vide6 { margin: 24px 16px; text-align: center; }
   .av6 { width: 40px; height: 40px; border-radius: 50%; flex: none; object-fit: cover; display: inline-grid; place-items: center; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 16px/1 -apple-system, Inter, system-ui, sans-serif; }
   .vig6 { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: none; margin-left: auto; background: var(--n-carte-2); }
@@ -1077,7 +1109,7 @@ function vrmVerifVisible(sel) {
   .pied6 .vu-plein { flex: none !important; width: auto !important; min-width: 140px; min-height: 44px; padding: 0 22px; border-radius: 12px; }
   .pied6 .vu-lien { white-space: nowrap; }
   .acc6 { padding: 8px 0; max-width: 980px; }
-  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-accent); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
+  .au6-retour { display: none; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px; border: 0; background: transparent; color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; cursor: pointer; }
   .geste6 { margin: 12px 16px; padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
   .carte[data-grand] .geste6 .vu-btn:not(.vu-plein) { background: var(--n-carte-2); color: var(--n-encre); box-shadow: none; }
   .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
@@ -1098,12 +1130,12 @@ function vrmVerifVisible(sel) {
   .champ6 textarea, .champ6 input { font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); background: var(--n-carte); border: .5px solid var(--n-trait); border-radius: 10px; padding: 10px 12px; min-height: 44px; box-sizing: border-box; width: 100%; max-width: 520px; }
   /* 5.410.3 : un choix (rond ou case) À GAUCHE de son libellé, la ligne entière se touche (44 px). */
   .champ6.cb6 { flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; }
-  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0068D6); }
+  .champ6.cb6 input[type="radio"], .champ6.cb6 input[type="checkbox"] { width: 22px; height: 22px; min-height: 0; max-width: none; flex: none; margin: 1px 0 0; padding: 0; accent-color: var(--n-accent, #0F6B4C); }
   .champ6.cb6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .champ6.cb6 .note5 { margin: 0; }
   .champ6.ot6 { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
   .champ6.ot6 > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; }
+  .champ6.ot6 .vu-btn { flex: none; min-height: 44px; background: var(--n-carte-2); color: var(--n-encre); border: 1px solid var(--n-trait); }
   .au6-d .conf5 { margin: 12px 24px 0; }
   .conf5[data-irreversible] { display: block !important; }
   .conf5[data-irreversible] p { margin: 0 0 8px; }
@@ -1241,7 +1273,7 @@ function vrmVerifVisible(sel) {
   .verif6[hidden] { display: none !important; }
   .verif6 .pv { width: 8px; height: 8px; border-radius: 4px; background: #B26A00; flex: none; }
   .verif6[data-verif="faite"] { background: #FFFFFF; color: #111114; }
-  .verif6[data-verif="faite"] .pv { background: #0068D6; }
+  .verif6[data-verif="faite"] .pv { background: var(--n-accent, #0F6B4C); }
   @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
   :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }
 </style>
@@ -1577,7 +1609,7 @@ function vrmVerifVisible(sel) {
       const dans = !st.enCours && Number(st.prochain) > Date.now() ? dansFav(st.prochain) : '';
       const att = st.attente && ATTENTES_FAV[st.attente];
       const pour = QUOI_FAV[st.quoi] ? TU(QUOI_FAV[st.quoi]) : '';
-      const etat = st.enCours ? `<span class="p-dans">· ${esc(TU('f_part'))}</span>` : dans ? `<span class="p-dans">· ${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(st.prochain)}">${esc(dans)}</span>`)}</span>` : '';
+      const etat = st.enCours ? `<span class="p-dans">· ${esc(TU('f_part'))}</span>` : dans ? `<span class="p-dans">· ${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(st.prochain)}">${esc(dans)}</span>`)}${['sorte', 'heure', 'jour'].includes(String(st.quoi || '')) || Number(st.prochain) - Date.now() > 120000 ? ` <span class="p-h" data-fav-heure="${Number(st.prochain)}">${esc(TU('f_a_heure', { h: heureFl(st.prochain) }))}</span>` : ''}</span>` : '';   // 5.419 : un plafond qui bloque dit l'HEURE du prochain envoi
       return `<section class="fav principal" data-fav="encours" data-fav-envoyes="${faits}" data-fav-total="${total}"${st.attente ? ` data-fav-attente="${esc(st.attente)}"` : ''}${st.quoi ? ` data-fav-quoi="${esc(st.quoi)}"` : ''}>
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
@@ -1779,11 +1811,152 @@ function vrmVerifVisible(sel) {
     m = m || {};
     const lo = Number(m.intervalleMinutes) || 0, hi = Number(m.intervalleMaxMinutes) || lo;
     const ry = rythmeDe(m);
-    const ecart = ry === 'normal' ? 65 / 60 : ry === 'prudent' ? 3 : lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
+    const ecart = ry === 'normal' ? 40 / 60 : ry === 'prudent' ? 3 : lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
     let min = n * 0.75 + (n - 1) * ecart;
     const HEURE = 15;
     if (n > HEURE) min = Math.max(min, Math.floor((n - 1) / HEURE) * 60 + ((n - 1) % HEURE) * Math.max(ecart, 0.75) + 0.75);
     return Math.max(60000, Math.round(min * 60000));
+  }
+  // ══ 5.419 (Julien, 21 nov. : « avant, je veux un message pré-rempli et je veux pouvoir choisir le taux de réduction
+  //    que j'applique à mes articles ») — LA FEUILLE « CONFIRMER L'ENVOI » DU GRAND PANNEAU ═══════════════════════════
+  //    · le TAUX : 5 / 10 / 15 / 20 % ou un autre (1 à 90), l'aperçu « 59 € → 53 € » par article coché, l'offre REMONTÉE
+  //      au plancher (prix mini, sinon achat + 10 %) dite sur sa ligne — tout calculé par le FOND (`favorisPerso · envoi`,
+  //      la règle de l'envoi, `offreFavoriDetail`) ; le taux choisi est gardé pour CE compte (son réglage, réécrit au
+  //      lancement par le chemin gardé) ;
+  //    · le MESSAGE PRÉ-REMPLI : la version qui partira, remplie pour le 1er favori (`choisirMessageFavori`, même règle
+  //      que l'envoi, rien inventé) ; « Modifier pour cet envoi » ouvre SON modèle (variables comprises), jugé par le fond
+  //      pendant la frappe ; « Enregistrer comme modèle » le range dans ses messages (`favorisPerso · enregistrer`).
+  let favEnv = null, favEnvT = null, favEnvN = 0;
+  const ENV_TAUX = [5, 10, 15, 20];
+  function envInit(a) {
+    const of = (a && a.message && a.message.offre) || null;
+    const t0 = of && of.mode === 'pct' && Number.isInteger(Number(of.valeur)) ? Number(of.valeur) : null;
+    favEnv = { taux: t0, taux0: t0, autreMode: of && of.mode !== 'pct' ? of.mode : null, arrondi: !!(of && of.arrondi), texte: null, edition: false, info: null, juge: null, etat: null, enVol: false, relire: false };
+  }
+  function envAncien() {
+    const f = (listes && listes.automatisations && listes.automatisations.favoris) || null;
+    return f ? { message: (f.textes || [])[0] || '', variantes: (f.textes || []).slice(1) } : null;
+  }
+  function envDemander(a, vite) {
+    clearTimeout(favEnvT);
+    favEnvT = setTimeout(() => {
+      if (!favEnv || !a) return;
+      const n = ++favEnvN;
+      const items = envoiFl(a).envoi.map((x) => ({ itemId: String(x.itemId || ''), prix: x.prix, pseudo: x.pseudo || '', titre: x.titre || '' }));
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'envoi', taux: favEnv.taux, arrondi: favEnv.arrondi, items, ancien: envAncien(), texte: favEnv.texte }, (r) => {
+        void chrome.runtime.lastError; if (n !== favEnvN || !favEnv) return;
+        favEnv.info = r && r.ok ? r : { ok: false, raison: (r && r.raison) || '' };
+        favEnv.juge = r && r.ok ? r.juge : null;
+        if (favFeuille === 'confirmer') envMajSurPlace(a);
+      }); } catch (_) {}
+    }, vite ? 0 : 240);
+  }
+  // L'offre d'UN article coché, telle que le fond l'a calculée (null tant qu'il n'a pas répondu).
+  const envOffre = (x) => (favEnv && favEnv.info && favEnv.info.ok && Array.isArray(favEnv.info.offres) ? favEnv.info.offres.find((o) => o.itemId === String(x.itemId)) || null : null);
+  function envJugeTexte() {
+    const j = favEnv && favEnv.juge;
+    if (!j) return '';
+    if (j.erreur) return TU(FP_ERR[j.erreur] || 'fp_err_variable');
+    if (j.motifs && j.motifs.length) return TU('fp_risque', { quoi: TU(FP_RISQUE[j.motifs[0].code] || 'fp_r_lien'), mot: j.motifs[0].mot });
+    return '';
+  }
+  function envTauxHtml() {
+    const t = favEnv ? favEnv.taux : null;
+    const libre = t != null && !ENV_TAUX.includes(t) ? String(t) : '';
+    return `<div class="env6-taux" data-fav-env-taux="${t == null ? '' : t}"><div class="fl-lbl">${esc(TU('e9_taux'))}</div>`
+      + `<div class="env6-l"><div class="vu-seg env6-seg" role="group" aria-label="${esc(TU('e9_taux'))}">${ENV_TAUX.map((k) => `<button type="button" data-fav-env-pct="${k}" aria-pressed="${t === k}">−${k} %</button>`).join('')}</div>`
+      + `<label class="env6-libre"><span>${esc(TU('e9_autre'))}</span><input type="number" min="1" max="90" step="1" inputmode="numeric" data-fav-env-libre value="${esc(libre)}" aria-label="${esc(TU('e9_autre_aria'))}"><b>%</b></label></div>`
+      + `<p class="fl-note" data-fav-env-note>${esc(t == null ? TU(favEnv && favEnv.autreMode ? 'e9_autre_mode' : 'e9_sans_taux') : TU('e9_plancher'))}</p></div>`;
+  }
+  function envMessageHtml(a) {
+    const info = favEnv && favEnv.info, m = info && info.ok ? info.message : null, x0 = envoiFl(a).envoi[0] || null;
+    const qui = x0 ? (x0.pseudo || TU('fl_acheteur')) : '';
+    // Le fond n'a pas répondu en détail (extension d'avant, fond muet) : le texte que le SERVEUR a préparé pour ce favori.
+    const repli = (!info || !info.ok || !info.message) && favEnv && favEnv.texte == null ? ((x0 && x0.texte) || (favCochables(a).find((x) => x.texte) || {}).texte || '') : '';
+    const bulle = m && m.ok ? m.texte : repli ? repli : (!info ? '' : null);
+    const raisonKo = m && !m.ok ? TU(m.raison === 'variable' ? 'e9_msg_variable' : m.raison === 'aucun_message' ? 'e9_msg_aucun' : 'e9_msg_refuse') : '';
+    const ed = favEnv && favEnv.edition;
+    return `<div class="env6-msg" data-fav-env-msg="${ed ? 'edition' : 'apercu'}"${favEnv && favEnv.texte != null ? ' data-fav-env-modifie' : ''}>`
+      + `<div class="fl-lbl">${esc(TU('e9_message', { qui }))}${favEnv && favEnv.texte != null ? ' · ' + esc(TU('e9_modifie')) : ''}</div>`
+      + (bulle == null ? `<p class="note5 ambre6" data-fav-env-ko>${esc(raisonKo || TU('e9_msg_refuse'))}</p>` : `<div class="bulle" data-fav-message${bulle === '' ? ' data-fav-env-charge' : ''}>${esc(bulle || TU('e9_charge'))}</div>`)
+      + (ed ? `<textarea data-fav-env-texte maxlength="2000" rows="4" aria-label="${esc(TU('e9_modele'))}">${esc(favEnv.texte != null ? favEnv.texte : (info && info.modele) || '')}</textarea>`
+        + `<p class="fl-note">${esc(TU('e9_vars'))}</p><p class="fp-al" data-fav-env-juge role="alert">${esc(envJugeTexte())}</p>`
+        + `<div class="env6-g"><button type="button" class="vu-btn vu-sec" data-fav-env-garder${favEnv.enVol || favEnv.texte == null || envJugeTexte() ? ' disabled' : ''}>${esc(TU('e9_garder'))}</button><button type="button" class="vu-lien" data-fav-env-annuler>${esc(TU('e9_mes_messages'))}</button></div>`
+        + (favEnv.etat ? `<p class="fl-note${favEnv.etat.ok ? '' : ' ambre'}" data-fav-env-etat role="status">${esc(favEnv.etat.texte)}</p>` : '')
+        : `<button type="button" class="vu-lien" data-fav-env-modifier>${esc(TU('e9_modifier'))}</button>`
+          + (favEnv && favEnv.etat ? `<p class="fl-note${favEnv.etat.ok ? '' : ' ambre'}" data-fav-env-etat role="status">${esc(favEnv.etat.texte)}</p>` : ''))
+      + '</div>';
+  }
+  // Les lignes des articles cochés : « 59 € → 53 € », la remontée au plancher dite (jamais sous le prix mini / achat + 10 %).
+  function envLigneOffre(x) {
+    if (!favEnv || favEnv.taux == null) return { px: esc(eurosFav(x.prix)), note: '' };
+    const o = envOffre(x), info = favEnv.info;
+    if (!o) {
+      const muet = info && (!info.ok || !Array.isArray(info.offres) || !info.offres.length);
+      // Fond muet : l'offre préparée par le serveur au taux réglé ; un autre taux ⇒ recalculée à l'envoi (dit).
+      if (muet && favEnv.taux === favEnv.taux0 && x.offre != null) return { px: `<s>${esc(eurosFav(x.prix))}</s> → ${esc(eurosFav(x.offre))}`, note: '', offre: x.offre };
+      return { px: esc(eurosFav(x.prix)), note: TU(muet ? 'e9_a_lenvoi' : 'e9_calcul') };
+    }
+    if (o.offre == null) return { px: esc(eurosFav(x.prix)), note: TU(o.raison === 'offre_sous_plancher' ? 'e9_sans_plancher' : 'e9_sans_prix'), sans: true };
+    return { px: `<s>${esc(eurosFav(x.prix))}</s> → ${esc(eurosFav(o.offre))}`, note: o.remontee ? TU(o.de === 'achat' ? 'e9_remontee_achat' : 'e9_remontee_mini', { p: eurosFav(o.offre), b: eurosFav(o.base) }) : '', remontee: !!o.remontee, offre: o.offre };
+  }
+  function recapLignes(a) {
+    const choisis = envoiFl(a).envoi;
+    const parAnnonce = new Map();
+    for (const x of choisis) { const k = String(x.itemId); const o = parAnnonce.get(k) || { x, n: 0 }; o.n++; parAnnonce.set(k, o); }
+    return [...parAnnonce.values()].map(({ x, n: k }) => { const L = envLigneOffre(x);
+      return `<li data-fav-recap-item="${esc(x.itemId)}"${L.offre != null ? ` data-fav-env-offre="${L.offre}"` : ''}${L.remontee ? ' data-fav-env-remontee' : ''}${L.sans ? ' data-fav-env-sans' : ''}>${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${L.note ? `<span class="fl-etat${L.remontee || L.sans ? ' ambre' : ''}" data-fav-env-note-l>${esc(L.note)}</span>` : ''}</span><span class="fl-px">${L.px}</span></li>`; }).join('');
+  }
+  // Rien ne part tant que le texte modifié serait refusé (ou vide).
+  const envBloque = () => !!(favEnv && favEnv.texte != null && (envJugeTexte() || !favEnv.texte.trim()));
+  // Sur place (le curseur et le champ du taux gardent leur place) : les lignes, la bulle, le jugement, les boutons.
+  function envMajSurPlace(a) {
+    const f = carte.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'); if (!f || !favEnv) return;
+    const l = f.querySelector('[data-fav-recap-annonces]'); if (l) poserHtml(l, recapLignes(a));
+    const m = f.querySelector('.env6-msg');
+    if (m) {
+      const b = m.querySelector('[data-fav-message], [data-fav-env-ko]'), d = document.createElement('div'); d.innerHTML = envMessageHtml(a);
+      const nb = d.querySelector('[data-fav-message], [data-fav-env-ko]'); if (b && nb) b.replaceWith(nb);
+      const j = m.querySelector('[data-fav-env-juge]'); if (j) j.textContent = envJugeTexte();
+      const g = m.querySelector('[data-fav-env-garder]'); if (g) g.disabled = !!(favEnv.enVol || favEnv.texte == null || envJugeTexte());
+      const t = m.querySelector('[data-fav-env-texte]'); if (t && !t.value && favEnv.texte == null && favEnv.info && favEnv.info.modele) t.value = favEnv.info.modele;
+    }
+    const lc = f.querySelector('[data-fav-lancer]'); if (lc) lc.disabled = !!(favOccupe || envBloque() || !envoiFl(a).envoi.length || piedFl(a).attente);
+  }
+  function brancherEnv(a) {
+    const f = carte.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'); if (!f || !favEnv) return;
+    f.querySelectorAll('[data-fav-env-pct]').forEach((b) => b.addEventListener('click', () => { favEnv.taux = Number(b.getAttribute('data-fav-env-pct')); rendre(); envDemander(a, true); }));
+    const li = f.querySelector('[data-fav-env-libre]');
+    if (li) li.addEventListener('input', () => {
+      const v = Number(li.value);
+      if (!(Number.isInteger(v) && v >= 1 && v <= 90)) return;
+      favEnv.taux = v;
+      f.querySelectorAll('[data-fav-env-pct]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-fav-env-pct')) === v)));
+      const tx = f.querySelector('.env6-taux'); if (tx) tx.setAttribute('data-fav-env-taux', String(v));
+      const no = f.querySelector('[data-fav-env-note]'); if (no) no.textContent = TU('e9_plancher');
+      envDemander(a, false);
+    });
+    const mo = f.querySelector('[data-fav-env-modifier]'); if (mo) mo.addEventListener('click', () => { favEnv.edition = true; favEnv.etat = null; if (!listes || !listes.automatisations) chargerListes(true); rendre(); const t = carte.querySelector('[data-fav-env-texte]'); if (t) { try { t.focus({ preventScroll: true }); } catch (_) {} } });
+    const tx = f.querySelector('[data-fav-env-texte]');
+    if (tx) tx.addEventListener('input', () => { favEnv.texte = tx.value.slice(0, 2000); favEnv.etat = null; const ms = f.querySelector('.env6-msg'); if (ms) ms.setAttribute('data-fav-env-modifie', ''); const lc = f.querySelector('[data-fav-lancer]'); if (lc && envBloque()) lc.disabled = true; envDemander(a, false); });
+    const an = f.querySelector('[data-fav-env-annuler]'); if (an) an.addEventListener('click', () => { favEnv.texte = null; favEnv.edition = false; favEnv.juge = null; favEnv.etat = null; rendre(); envDemander(a, true); });
+    const ga = f.querySelector('[data-fav-env-garder]'); if (ga) ga.addEventListener('click', () => envGarderModele(a));
+  }
+  // « Enregistrer comme modèle » : SON texte remplace la version qui allait partir (ou devient sa 1re version), par le
+  //    même chemin gardé que l'éditeur (`favorisPerso · enregistrer`) ; l'aperçu sera relu au lancement (`relire`).
+  function envGarderModele(a) {
+    if (!favEnv || favEnv.enVol || favEnv.texte == null || !favEnv.texte.trim()) return;
+    const br = fpInit(), cle = favEnv.info && favEnv.info.cle, t = favEnv.texte.trim();
+    let mis = false;
+    for (const l of [br.un, ...br.regles.map((r) => r.textes)]) { const v = l.find((y) => y.id === cle); if (v) { v.texte = t; mis = true; break; } }
+    if (!mis) br.un.unshift({ id: fpNouvelId('u'), texte: t });
+    favEnv.enVol = true; favEnv.etat = null; rendre();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'enregistrer', reglage: { un: br.un, lot: br.lot, regles: br.regles } }, (r) => {
+      void chrome.runtime.lastError; if (!favEnv) return; favEnv.enVol = false;
+      if (r && r.ok) { favEnv.etat = { ok: true, texte: TU('e9_garde_ok') }; favEnv.texte = null; favEnv.edition = false; favEnv.relire = true; chargerListes(true); envDemander(a, true); }
+      else favEnv.etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+      rendre();
+    }); } catch (_) { favEnv.enVol = false; favEnv.etat = { ok: false, texte: TU('ra_ko') }; rendre(); }
   }
   function recapFavHtml(a) {
     const m = a.message || {}, choisis = envoiFl(a).envoi;
@@ -1798,16 +1971,17 @@ function vrmVerifVisible(sel) {
     const nSous = choisis.filter(sous).length;
     return `<section class="fav fl-recap" data-fav="pret" data-fav-vue="recap" data-fav-n="${n}">
       <div class="fl-r-t">${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
-      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${offreR(x) != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(offreR(x)) })) : m.offre && grand6() ? ' · ' + esc(TU((offreFav6(x, a) || {}).sans || 'f6_sans_offre')) : ''}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${sous(x) ? `<span class="fl-etat ambre" data-fav-sous-mini="${esc(x.itemId)}">${esc(TU('fr_sous_mini', { o: eurosFav(x.offre), m: eurosFav(x.mini) }))}</span>` : ''}</span><span class="fl-px">${offreR(x) != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(offreR(x)))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      ${grand6() && favEnv ? envTauxHtml() : ''}
+      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${grand6() && favEnv ? recapLignes(a) : [...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${offreR(x) != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(offreR(x)) })) : m.offre && grand6() ? ' · ' + esc(TU((offreFav6(x, a) || {}).sans || 'f6_sans_offre')) : ''}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${sous(x) ? `<span class="fl-etat ambre" data-fav-sous-mini="${esc(x.itemId)}">${esc(TU('fr_sous_mini', { o: eurosFav(x.offre), m: eurosFav(x.mini) }))}</span>` : ''}</span><span class="fl-px">${offreR(x) != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(offreR(x)))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
       ${nSous ? `<div class="fl-alerte" data-fav-sous="${nSous}"><div>${esc(TU('fr_sous_n', { n: nSous }))}</div><div class="fl-alerte-g"><button class="vu-btn vu-sec" data-fav-decocher-sous>${esc(TU('fr_decocher'))}</button><a class="vu-lien" href="${FIXER_MINI_URL}" target="_blank" rel="noopener">${esc(TU('fl_fixer'))}</a></div></div>` : ''}
-      <div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
+      ${grand6() && favEnv ? envMessageHtml(a) : `<div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
       <div class="fl-lbl">${esc(TU('fr_message'))}${Number(m.versions) > 1 ? ' · ' + esc(TU('fr_versions', { n: Number(m.versions) })) : ''}</div>
-      ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}
+      ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}`}
       <div class="vu-seg fl-rythme" role="group" aria-label="${esc(TU('f5_rythme'))}" data-fav-rythme="${esc(rythmeDe(m))}">${['normal', 'prudent'].map((k) => `<button type="button" data-fav-rythme-b="${k}" aria-pressed="${rythmeDe(m) === k ? 'true' : 'false'}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div>
       <div class="fl-duree" data-fav-duree="${dureeFavMs(n, m)}">${esc(TU('fr_duree', { d: U.duree(dureeFavMs(n, m)), h: 15 }))}</div>
       <p class="fl-note">${esc(TU('fr_rien_avant'))}</p>
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
-      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) || piedFl(a).attente ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
+      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) || piedFl(a).attente || (grand6() && envBloque(a)) ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
       <div class="fl-retour"><button class="vu-lien" data-fav-retour>${esc(TU('fr_retour'))}</button></div>
     </section>`;
   }
@@ -2196,8 +2370,9 @@ function vrmVerifVisible(sel) {
     const su = racine.querySelector('[data-fav-suite]'); if (su) su.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
     const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); fpOuvrir(apercuFav); rendre(); });
     if (favFeuille === 'reglages') brancherFp(apercuFav);   // 5.417
-    const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; rendre(); });
-    const fermer = () => { favFeuille = null; vueFav = null; rendre(); };
+    const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; envInit(apercuFav); if (!listes || !listes.automatisations) chargerListes(true); rendre(); envDemander(apercuFav, true); });
+    if (favFeuille === 'confirmer') brancherEnv(apercuFav);   // 5.419
+    const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
     const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
@@ -2293,10 +2468,12 @@ function vrmVerifVisible(sel) {
       favOccupe = true; favErreur = ''; favRefus = null; rendre();
       // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
       const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
-      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
+      // 5.419 : le taux qu'il a choisi dans la feuille (gardé pour ce compte), le message modifié POUR CET ENVOI.
+      const env9 = grand6() && favEnv ? Object.assign({}, favEnv.taux != null && favEnv.taux !== favEnv.taux0 ? { taux: favEnv.taux, arrondi: favEnv.arrondi } : {}, favEnv.texte != null && favEnv.texte.trim() ? { texte: favEnv.texte.trim() } : {}, favEnv.relire ? { relire: true } : {}) : {};
+      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...env9, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
         favOccupe = false;
         if (r && r.ok) {
-          if (grand6()) { garderDernier(uid, a); favFeuille = null; }
+          if (grand6()) { garderDernier(uid, a); favFeuille = null; favEnv = null; }
           const suite = () => { vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); };
           if (!avecListe(a)) return suite();
           // Les envoyés quittent le choix ; les AUTRES restent cochés pour l'heure suivante, et l'heure du lot est gardée
@@ -2747,9 +2924,71 @@ function vrmVerifVisible(sel) {
   function brancherImpression(racine) {
     racine.querySelectorAll('[data-imprimer]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); imprimerBordereaux([b.getAttribute('data-imprimer')]); }));
     const tous = racine.querySelector('[data-imprimer-n]'); if (tous) tous.addEventListener('click', () => imprimerBordereaux(String(tous.getAttribute('data-imprimer-n')).split(',')));
-    racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); rendre(); }));
+    racine.querySelectorAll('[data-ven-sel]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ven-sel'); if (c.checked) venSel.add(k); else venSel.delete(k); venConfirme = null; rendre(); }));
+    // 5.419 : tout sélectionner (les commandes MONTRÉES), filtres rapides, la barre de la sélection.
+    const vt = racine.querySelector('[data-ven-tout]'); if (vt) vt.addEventListener('change', () => { racine.querySelectorAll('[data-ven-sel]').forEach((c) => { const k = c.getAttribute('data-ven-sel'); if (vt.checked) venSel.add(k); else venSel.delete(k); }); venConfirme = null; rendre(); });
+    racine.querySelectorAll('[data-ven-filtre]').forEach((b) => b.addEventListener('click', () => { venFiltre = b.getAttribute('data-ven-filtre'); venConfirme = null; rendre(); }));
+    const vr = racine.querySelector('[data-ven-rien]'); if (vr) vr.addEventListener('click', () => { venSel.clear(); venConfirme = null; rendre(); });
+    const vc = racine.querySelector('[data-ven-copier]');
+    if (vc) vc.addEventListener('click', () => { const l = selVentes().filter((x) => x.suivi).map((x) => String(x.suivi)); const sans = selVentes().length - l.length; copierTexte(l.join('\n')).then((okC) => { impEtat = okC ? { ton: '', texte: TU('v9_copies', { n: l.length }) + (sans ? ' · ' + TU('v9_sans_suivi', { n: sans }) : '') } : { ton: 'ambre', texte: TU('v9_copie_ko') }; rendre(); }); });
+    const vo = racine.querySelector('[data-ven-ouvrir]');
+    if (vo) vo.addEventListener('click', () => {
+      const ici = ORIGINE_ICI || 'https://www.vinted.fr', l = selVentes().filter((x) => x.conv).slice(0, 5);
+      let ouverts = 0; for (const x of l) { try { if (window.open(ici + '/inbox/' + encodeURIComponent(x.conv), '_blank', 'noopener')) ouverts++; } catch (_) {} }
+      impEtat = { ton: ouverts < l.length ? 'ambre' : '', texte: TU('v9_ouverts', { n: ouverts }) + (ouverts < l.length ? ' · ' + TU('v9_bloques', { n: l.length - ouverts }) : '') }; rendre();
+    });
+    const vk = racine.querySelector('[data-ven-commander]'); if (vk) vk.addEventListener('click', () => { venConfirme = { k: 'commander', txs: String(vk.getAttribute('data-ven-commander')).split(',').filter(Boolean) }; rendre(); });
+    const vn = racine.querySelector('[data-ven-confirme-non]'); if (vn) vn.addEventListener('click', () => { venConfirme = null; rendre(); });
+    const vy = racine.querySelector('[data-ven-confirme-ok]'); if (vy) vy.addEventListener('click', () => { if (venConfirme && venConfirme.k === 'commander') commanderBordereaux(venConfirme.txs); });
   }
   let venStatuts = null, venStatutOuvert = false, venTri = { col: 'date', sens: -1 }, venCherche = '';
+  // ══ 5.419 (Julien, 21 nov. : « dans les Commandes, je veux pouvoir sélectionner les commandes et faire des choses
+  //    dessus, par exemple sélectionner celles qui ne sont pas encore expédiées pour imprimer les bordereaux ») ════════
+  //    · une case sur CHAQUE commande (identité : son n° de transaction), « tout sélectionner » sur le filtre montré ;
+  //    · des filtres rapides : À expédier — pas de bordereau · Bordereau prêt · En route · Terminées ;
+  //    · une barre sur la sélection : « Imprimer N bordereaux » (les bordereaux DÉJÀ rangés, `bordereauCarte`, lecture
+  //      seule ; une commande sans bordereau est DITE, jamais imprimée), « Commander N bordereaux » (Vinted seulement,
+  //      à expédier sans bordereau, SON toucher confirmé, la commande d'après-vente `bordereau` — jamais eBay, §2.8),
+  //      « Copier les n° de suivi », « Ouvrir sur Vinted ».
+  let venFiltre = 'tous', venConfirme = null;
+  const FILTRES_V9 = ['tous', 'sans_bord', 'bord_pret', 'en_route', 'terminees'];
+  const filtreV9 = (x, k) => (k === 'tous' ? true : k === 'sans_bord' ? x.etat === 'a_expedier' && x.bordereau !== true : k === 'bord_pret' ? x.etat === 'a_expedier' && x.bordereau === true : k === 'en_route' ? x.etat === 'en_route' : k === 'terminees' ? x.etat === 'finalisee' || x.etat === 'annulee' : true);
+  // « Commander le bordereau » : Vinted, à expédier, sans bordereau rangé (jamais un autre site : eBay, §2.8).
+  const commandable = (x) => !!(x && listes && listes.plateforme === 'vinted' && x.etat === 'a_expedier' && x.bordereau === false && /^\d{1,20}$/.test(String(x.tx || '')));
+  function selVentes() { const l = (listes && listes.ventes && listes.ventes.liste) || []; return l.filter((x) => venSel.has(String(x.tx))); }
+  function copierTexte(t) {
+    const repli = () => { try { const z = document.createElement('textarea'); z.value = t; z.setAttribute('readonly', ''); z.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(z); z.select(); const ok = document.execCommand('copy'); z.remove(); return ok; } catch (_) { return false; } };
+    try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => repli()); } catch (_) {}
+    return Promise.resolve(repli());
+  }
+  function barreVentesHtml(prets) {
+    const sel = selVentes(); if (!sel.length) return '';
+    const imp = sel.filter(imprimable), sans = sel.filter((x) => x.etat === 'a_expedier' && !imprimable(x)), cmd = sel.filter(commandable), suivis = sel.filter((x) => x.suivi), ouvrables = listes.plateforme === 'vinted' ? sel.filter((x) => x.conv) : [];
+    void prets;
+    const conf = venConfirme && venConfirme.k === 'commander' ? `<div class="ven6-conf" role="alertdialog" data-ven-confirme="commander"><span>${esc(TU('v9_cmd_conf', { n: venConfirme.txs.length }))}</span><button type="button" class="vu-btn vu-sec" data-ven-confirme-non>${esc(TU('v9_non'))}</button><button type="button" class="vu-btn vu-plein" data-ven-confirme-ok${impEnVol ? ' disabled' : ''}>${esc(TU('v9_cmd_oui'))}</button></div>` : '';
+    return `<div class="fav6-bas ven6-bas" data-ven-bas="${sel.length}"><span class="fav6-bas-t"><b data-ven-sel-n="${sel.length}" aria-live="polite">${esc(TU(sel.length === 1 ? 'v9_sel1' : 'v9_sel', { n: sel.length }))}</b>${sans.length ? `<small data-ven-sans-bord="${sans.length}">${esc(TU(sans.length === 1 ? 'v9_sans1' : 'v9_sans', { n: sans.length }))}</small>` : ''}</span>`
+      + `<button type="button" class="vu-btn vu-sec" data-ven-rien>${esc(TU('fl_rien'))}</button>`
+      + (suivis.length ? `<button type="button" class="vu-btn vu-sec" data-ven-copier="${suivis.length}">${esc(TU('v9_copier', { n: suivis.length }))}</button>` : '')
+      + (ouvrables.length ? `<button type="button" class="vu-btn vu-sec" data-ven-ouvrir="${ouvrables.length}">${esc(TU('v9_ouvrir'))}</button>` : '')
+      + (cmd.length ? `<button type="button" class="vu-btn vu-sec" data-ven-commander="${esc(cmd.slice(0, 6).map((x) => x.tx).join(','))}"${impEnVol ? ' disabled' : ''}>${esc(TU(cmd.length === 1 ? 'v9_cmd1' : 'v9_cmd', { n: Math.min(6, cmd.length) }))}</button>` : '')
+      + `<button type="button" class="vu-btn vu-plein" data-imprimer-n="${esc(imp.slice(0, 10).map((x) => x.tx).join(','))}" data-ven-imprimer="${imp.length}"${!imp.length || impEnVol ? ' disabled' : ''}>${esc(TU(imp.length === 1 ? 'imp_un' : 'v9_imp', { n: Math.min(10, imp.length) }))}</button></div>${conf}`;
+  }
+  function commanderBordereaux(txs) {
+    const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 6);
+    if (!ids.length || impEnVol) return;
+    impEnVol = true; venConfirme = null; impEtat = { ton: '', texte: TU('v9_cmd_en_cours') }; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'bordereauxCommander', txs: ids, confirme: true }, (r) => {
+        try { void chrome.runtime.lastError; } catch (_) {}
+        impEnVol = false;
+        if (!r || !r.ok) { impEtat = { ton: 'ambre', texte: (r && r.raison) || TU('ra_ko') }; rendre(); return; }
+        const n = (r.acceptes || []).length, k = (r.refus || []).length;
+        impEtat = { ton: k ? 'ambre' : '', texte: [n ? TU('v9_cmd_ok', { n }) : '', k ? TU('v9_cmd_ko', { n: k, r: String((r.refus[0] && r.refus[0].raison) || '') }) : ''].filter(Boolean).join(' · ') };
+        chargerListes(true);
+        rendre();
+      });
+    } catch (_) { impEnVol = false; impEtat = { ton: 'ambre', texte: TU('ra_ko') }; rendre(); }
+  }
   const ETAT_V6 = { a_expedier: ['v_action', 'ambre'], en_route: ['v_rien', ''], finalisee: ['v_terminee', ''], annulee: ['v_annulee', ''], pas_su: ['v_pas_su', ''] };
   function ventesGrandHtml(e) {
     const v = listes.ventes;
@@ -2759,18 +2998,22 @@ function vrmVerifVisible(sel) {
     const compte = Object.fromEntries(etats.map((k) => [k, v.liste.filter((x) => (x.etat || 'pas_su') === k).length]));
     const choisis = venStatuts || new Set(etats);
     const valeur = (x, c) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Number(x.date) || 0 : c === 'transporteur' ? String(x.transporteur || '') : c === 'statut' ? String(x.etat || '') : String(x.titre || '').toLowerCase());
-    const vus = v.liste.filter((x) => choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
+    const nF = Object.fromEntries(FILTRES_V9.map((k) => [k, v.liste.filter((x) => filtreV9(x, k)).length]));
+    if (!FILTRES_V9.includes(venFiltre)) venFiltre = 'tous';
+    const segV = `<div class="vu-seg seg6 ven6-seg" role="group" aria-label="${esc(TU('v9_filtres'))}">${FILTRES_V9.map((k) => `<button type="button" data-ven-filtre="${k}" aria-pressed="${venFiltre === k}"><span>${esc(TU('v9_f_' + k))}</span> <b data-n="${nF[k]}">${nF[k]}</b></button>`).join('')}</div>`;
+    const vus = v.liste.filter((x) => filtreV9(x, venFiltre) && choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
     const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
     const prets = v.liste.filter(imprimable);
-    for (const t of [...venSel]) if (!prets.some((x) => x.tx === t)) venSel.delete(t);
-    const aImprimer = venSel.size ? prets.filter((x) => venSel.has(x.tx)) : prets;
+    for (const t of [...venSel]) if (!v.liste.some((x) => String(x.tx) === t)) venSel.delete(t);
+    const aImprimer = venSel.size ? [] : prets;   // 5.419 : une sélection ⇒ la barre du bas ; sinon « Imprimer les N » prêts, comme avant
     const impN = aImprimer.length ? `<button type="button" class="vu-btn vu-sec impn6" data-imprimer-n="${esc(aImprimer.slice(0, 10).map((x) => x.tx).join(','))}"${impEnVol ? ' disabled' : ''}>${esc(TU(aImprimer.length === 1 ? 'imp_un' : 'imp_n', { n: Math.min(10, aImprimer.length) }))}</button>` : '';
-    const outils = `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
+    const outils = segV + `<div class="barre5 barre6">${impN}<input type="search" class="cherche5" data-ven-cherche placeholder="${esc(TU('v_chercher'))}" aria-label="${esc(TU('v_chercher'))}" value="${esc(venCherche)}">${menu}</div>`;
     const ligneN = `<div class="n6"><span data-ven-n="${vus.length}">${esc(TU('v_n_commandes', { n: vus.length }))}</span></div>` + (impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : '');
-    if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>`;
+    if (!vus.length) return outils + ligneN + `<div class="val gris vide6" data-ventes-filtre="0">${esc(TU('a_aucune'))}</div>` + barreVentesHtml(prets);
+    const toutV = vus.every((x) => venSel.has(String(x.tx)));
     const cellule = (x, c) => (c === 'prix' ? `<b>${esc(eurosL(x.prix))}</b>` : c === 'date' ? esc(jourCourt5(x.date)) : c === 'transporteur' ? transpHtml6(x) : c === 'limite' ? limiteHtml6(x) : c === 'bordereau' ? boutonImp6(x, true) : etiquette5(x.etat || 'pas_su', TU(ETAT_V6[x.etat || 'pas_su'] ? ETAT_V6[x.etat || 'pas_su'][0] : 'v_pas_su'), (ETAT_V6[x.etat] || [])[1] || ''));
-    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><span></span>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
-    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}">${imprimable(x) ? `<label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(x.tx) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label>` : '<span></span>'}<button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>`;
+    const enTete = `<div class="tr6 th6r" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-tout${toutV ? ' checked' : ''} aria-label="${esc(TU('v9_tout'))}" title="${esc(TU('v9_tout'))}"></label>${enTeteTri5('titre', TU('c5_article'), 'data-ven-tri')}<span class="cels6">${COLS_V6.map((c) => (c === 'limite' || c === 'bordereau' ? `<span class="th6 th6-fixe">${esc(TU('c6_' + c))}</span>` : enTeteTri5(c, TU('c6_' + c), 'data-ven-tri'))).join('')}</span><span></span></div>`;
+    return outils + offresHtml() + ligneN + `<div class="table6" data-ventes="${vus.length}" data-tri="${venTri.col}:${venTri.sens}">${enTete}<ul class="rangs" data-defil="ventes">${vus.map((x) => `<li${ficheOuverte === 'v:' + x.tx ? ' data-ouverte' : ''}${venSel.has(String(x.tx)) ? ' data-coche' : ''}><div class="tr6" style="--n6:${COLS_V6.length};--g6:${COLS_V6.map((c) => W6V[c] || '96px').join(' ')}"><label class="case5"><input type="checkbox" data-ven-sel="${esc(x.tx)}"${venSel.has(String(x.tx)) ? ' checked' : ''} aria-label="${esc(TU('v9_choisir', { t: x.titre || x.tx }))}"></label><button type="button" class="art6" data-vente="${esc(x.tx)}" data-vente-etat="${esc(x.etat || 'pas_su')}"${x.bordereau != null ? ` data-bordereau="${x.bordereau ? 'pret' : 'manque'}"` : ''} data-fiche-b="v:${esc(x.tx)}">${vignette(x.photo)}<span class="ti">${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || '')}<small class="st6">${esc(x.statutVinted || '')}</small></span></button><span class="cels6">${COLS_V6.map((c) => `<span class="cel6" data-col="${c}"><i class="lc5">${esc(TU('c6_' + c))}</i>${cellule(x, c)}</span>`).join('')}</span><button type="button" class="plus6" data-fiche-b="v:${esc(x.tx)}" aria-label="${esc(TU('a_plus'))}">⋯</button></div>${ficheOuverte === 'v:' + x.tx ? ficheVenteHtml(x, ici) : ''}</li>`).join('')}</ul></div>` + barreVentesHtml(prets);
   }
   function brancherAnnonces(racine) {
     racine.querySelectorAll('[data-ann-statut]').forEach((c) => c.addEventListener('change', () => { const k = c.getAttribute('data-ann-statut'); const base = annStatuts || new Set(STATUTS5); if (c.checked) base.add(k); else base.delete(k); annStatuts = base; rendre(); }));
@@ -3486,7 +3729,7 @@ function vrmVerifVisible(sel) {
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
     const cadO = racine.querySelector('[data-cad-oui]'); if (cadO) cadO.addEventListener('click', () => cadEnvoyer(true));
     const cadN = racine.querySelector('[data-cad-non]'); if (cadN) cadN.addEventListener('click', () => { cadConfirme = false; rendre(); });
-    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 40, pauseMax: 90 }; cadConfirme = false; cadEtat = null; rendre(); });
+    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 20, pauseMax: 60 }; cadConfirme = false; cadEtat = null; rendre(); });
     // 5.410 : régler une automatisation ici. Rien ne part sans SON toucher ; allumer passe par « Oui, allumer ».
     const raValeur = (auto, actif) => {
       const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};

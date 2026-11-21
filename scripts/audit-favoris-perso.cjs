@@ -116,7 +116,7 @@ async function verifier(SRC, BG) {
   dit(S.u2 && S.u2.mesure === false && S.u2.vendus === 0 && S.u2.vendusSansDate === 1 && S.a3 && S.a3.vendus === 1, 'P9 statistiques de u2 / a3 fausses : ' + JSON.stringify([S.u2, S.a3]));
   // P8 / P10 — sur le vrai moteur
   try {
-    const off = fonction(BG, 'offreAvecPlancher'), pof = fonction(BG, 'prixOffreFavori');
+    const off = fonction(BG, 'offreAvecPlancher') + '\n' + (fonction(BG, 'offreFavoriDetail') || ''), pof = fonction(BG, 'prixOffreFavori');   // 5.419 : offreAvecPlancher passe par offreFavoriDetail (la même règle, détaillée)
     const base = { plancher: null };
     const c = { Math, Number, String, noterDiag: () => {}, plancherFavori: async () => base.plancher };
     vm.runInNewContext(pof + '\n' + off + '\n;globalThis.__o = offreAvecPlancher;', c);
