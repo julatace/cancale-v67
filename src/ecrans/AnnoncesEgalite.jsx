@@ -32,8 +32,9 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm } from '../App.jsx';
-import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov.) la pause Leboncoin : dans l'extension
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted } from '../App.jsx';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';
+import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -54,27 +55,74 @@ const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
 // Toutes les annonces de tous ses sites, dans la forme commune. Rend { annonces, manque: [site] } ou null (rien lu).
-export async function lireAnnoncesEgalite(accounts) {
+// (21 nov., Julien : « quand un compte est ban je veux quand même pouvoir voir les annonces qu'il y avait dessus »)
+// Mesuré sur la base (lecture seule, 21 nov.) : deux comptes en pause ; le dressing de l'un, recapté APRÈS le blocage, ne porte
+// plus que ses 3 ventes (ses 2 annonces en vente ont disparu de la capture), l'autre n'a plus de dressing ; aucune lecture publique.
+// Elles disparaissaient pour TROIS raisons : (1) le compte en pause était retiré de la liste des comptes lus ; (2) un compte
+// « retiré pour de bon » (`vrm_annonces_retirees`) ou masqué était écarté par `comptesStockEcartes` ; (3) la règle « en ligne »
+// rend absentes celles que Vinted ne montre plus — et la capture d'après le blocage ne les porte plus du tout.
+// Désormais un compte BLOQUÉ (« banni » lu, ou SON choix « pause », ou retiré pour de bon), lié et pas supprimé, est lu :
+//   · en pause / retiré ⇒ toutes ses annonces passent « bloque » (hors de « en ligne » et des totaux, comme la pause le dit) ;
+//   · « banni » lu sans pause ⇒ la règle « en ligne » décide de ce que Vinted montre encore ; le reste devient « bloque » ;
+//   · la DERNIÈRE TRACE : ce que sa lecture ne montre plus sans vente (`autres`), puis SES FICHES (`vinted_annonce_numeros`,
+//     même `accountId`) qu'aucune lecture ne porte, qu'aucune preuve ne dit vendues (dressing, transactions, bordereaux,
+//     `vinted_annonces_vendues`) et qu'il n'a pas déclarées perdues. Preuves de vente pas lues ⇒ aucune fiche (on ne montre pas
+//     une paire peut-être vendue). Datées : « lu le » (sa lecture), « vue en ligne le » (`vrm_vus_en_ligne`), « N° posé le ».
+// Aucune règle « en ligne » n'est touchée : « bloque » n'entre dans aucun segment, aucun total, aucune action.
+export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis = new Set() } = {}) {
   const horsCompte = comptesStockEcartes();
-  const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
+  const retirees = (() => { try { const m = load(ANNONCES_RETIREES, {}); return new Set(m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m).map(String) : []); } catch (_) { return new Set(); } })();
+  const supprimes = (() => { try { return new Set([...(lireSupprimes() || [])].map(String)); } catch (_) { return new Set(); } })();
+  const bloqueDe = (uid) => (pause.has(uid) || retirees.has(uid) ? 'horsLigne' : bannis.has(uid) ? 'banni' : '');
+  const accs = (accounts || []).filter((a) => { if (!a || a.vinted_user_id == null) return false; const u = String(a.vinted_user_id);
+    return !horsCompte({ accountId: u }) || (!!bloqueDe(u) && !supprimes.has(u)); });
   const manque = [];
-  const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const aTracer = accs.some((a) => bloqueDe(String(a.vinted_user_id)));
+  const [vinted, ls, vr, eb, vc, annu, preuves] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
-      if (!r || !r.ok) return { uid, ok: false };
-      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
+      const bl = bloqueDe(uid);
+      if (!r || !r.ok) return { uid, pseudo: String(acc.login || acc.username || ''), ok: false, bloque: bl };
+      return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [],
+        bloque: bl, autres: r.autres || [], capte: Number.isFinite(r.capte) ? r.capte : null, soldIds: r.soldIds || [] };
     })),
     lbcListingsSession().catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
     lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`).catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).catch(() => null),
+    // Les preuves de vente (la règle partagée) : seulement s'il y a un compte bloqué dont il faut chercher les fiches.
+    aTracer ? lirePreuvesVenteVinted().catch(() => null) : Promise.resolve(null),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
-  if (vinted.some((c) => !c.ok)) manque.push('vinted');
-  out.push(...annoncesVinted(vinted));
+  if (vinted.some((c) => !c.ok && !c.bloque)) manque.push('vinted');
+  const vendusSur = preuves && preuves.vendus instanceof Set ? preuves.vendus : null;
+  const vendusMain = new Set((load('vinted_annonces_vendues', []) || []).map(String));
+  const perdues = load('vinted_pairs_lost', {}) || {};
+  const vusEnLigne = load('vrm_vus_en_ligne', {}) || {};
+  out.push(...annoncesVinted(vinted.map((c) => {
+    if (!c.bloque) return c;
+    const t = (ms) => (Number.isFinite(ms) ? ms : null);
+    const traces = [];
+    // (1) ce que sa lecture porte encore mais ne montre plus (absente, fermée sans vente) ;
+    for (const it of c.autres || []) traces.push({ it, le: t(c.lu) != null ? c.lu : t(c.capte), par: 'lecture' });
+    // (2) SES fiches qu'aucune lecture ne porte, sans preuve de vente.
+    if (vendusSur) {
+      const deja = new Set([...(c.enLigne || []), ...(c.aConfirmer || []), ...(c.masquees || []), ...(c.brouillons || []), ...(c.autres || [])].map((x) => String(x && x.id)));
+      const vendus = new Set((c.soldIds || []).map(String));
+      for (const [id, f] of Object.entries(fiches)) {
+        if (!f || typeof f !== 'object' || String(f.accountId || '') !== c.uid) continue;
+        if (deja.has(id) || vendus.has(id) || vendusSur.has(id) || vendusMain.has(id) || perdues[id]) continue;
+        const vu = Date.parse(String(vusEnLigne[id] || '')), pose = Date.parse(String(f.numberedAt || ''));
+        traces.push({ it: { id, title: f.title || '', photo: f.photo || null, price: f.price != null ? Number(String(f.price).replace(',', '.')) : null, size: f.size || '', brand: '', createdTs: null },
+          le: Number.isFinite(vu) ? vu : Number.isFinite(pose) ? pose : null, par: Number.isFinite(vu) ? 'vu' : 'numero' });
+      }
+    }
+    return { ...c, ok: c.ok, horsLigne: c.bloque === 'horsLigne', traces };
+  })));
   // Leboncoin
   if (ls && ls.items && Array.isArray(vr)) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
@@ -120,8 +168,11 @@ export async function lireAnnoncesEgalite(accounts) {
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
-  const { pause: pauseCB } = useComptesBloques();
-  const accounts = React.useMemo(() => (accountsTous || []).filter((a) => !(a && pauseCB && pauseCB.has(String(a.vinted_user_id)))), [accountsTous, pauseCB]);
+  // (21 nov.) Plus retirées : elles restent lisibles sous « Comptes bloqués » (dernière lecture connue, datée), hors de « en ligne »
+  // et des totaux (`lireAnnoncesEgalite` : en pause ⇒ « bloque »), aucune action proposée.
+  const { pause: pauseCB, bloques: bannisCB } = useComptesBloques();
+  const accounts = accountsTous || [];
+  const cleBloques = [...(pauseCB || [])].sort().join(',') + '|' + [...(bannisCB || [])].sort().join(',');
   const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
@@ -134,10 +185,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
+    lireAnnoncesEgalite(accounts, { pause: pauseCB || new Set(), bannis: bannisCB || new Set() }).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cleComptes, tic]);
+  }, [cleComptes, cleBloques, tic]);
   React.useEffect(() => {
     const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };

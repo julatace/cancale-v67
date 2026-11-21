@@ -13345,6 +13345,11 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
                brouillons: (Array.isArray(h._vrmBrouillons) ? h._vrmBrouillons : h.items.filter((x) => x && x.is_draft && !x.is_closed)).map((x) => ({ ...mapWardrobeItem(x), _vrmBrLu: x._vrmBrLu != null ? x._vrmBrLu : null })),
                brLecture: h._vrmBrLecture || null,
+               // (21 nov., compte bloqué) Ce que la règle ne montre plus et qui n'est PAS une vente : absentes d'une lecture plus
+               // récente, fermées sans « sold », retirées par son choix — lu seulement par Annonces pour un compte BLOQUÉ (la
+               // dernière trace connue). Jamais en ligne, jamais compté ailleurs.
+               autres: h.items.filter((x) => x && !isOnlineListing(x) && !venduChezVinted(x) && !x.is_draft && !x.is_hidden).map(mapWardrobeItem),
+               capte: Number.isFinite(h._vrmMasqueesLu) ? h._vrmMasqueesLu : null,   // l'heure de capture de son dressing (`capturedAt`)
                lu: Number.isFinite(h._vrmLu) ? h._vrmLu : null, complet: h._vrmComplet === true,
                pagination: h.pagination || null, source: 'harvest' };
     }
