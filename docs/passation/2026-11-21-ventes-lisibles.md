@@ -49,13 +49,19 @@ Aucun fichier de `vinted-sync-extension/`.
 - Textes : `tr()` en 5 langues (`vt.*`, `vn.acces.*`, `vn.o.*`, `la.*`) ; « Quoi de neuf » : `ventes-lisibles`.
 
 ## Preuves
-- Banc `scripts/bancs/ventes-lisibles.cjs` (390 tactile et 1512, base inventée de design-passe + photos inventées sur les
-  achats) : **47 verts** ; sur le build d'`origin/main` **20 rouges** (vignette 56/48, titres rognés, aucun « Relier »/champ sur la
-  rangée, pilule stock et rangée bordereaux sur la liste, « Imprimer » sans sélection au téléphone, aucune grille).
-- `ventes-tableau` : seuil de hauteur ajusté pour une rangée qui porte l'achat au pied (≤ 180) ; le détail à 1512 était rouge
-  après la 1re passe (tableau trop large sous le détail), vert après le resserrement.
+- Banc `scripts/bancs/ventes-lisibles.cjs` (390 tactile et 1512, clair et sombre, base inventée de design-passe + photos
+  inventées sur les achats) : **94 verts, 0 rouge**. Sur le build d'`origin/main` : **20 rouges** (vignette 56/48, titres rognés,
+  aucun « Relier »/champ sur la rangée, pilule stock et rangée bordereaux sur la liste, « Imprimer » sans sélection au
+  téléphone, aucune grille). Mutation : remettre « Imprimer » sans sélection ⇒ « I » rouge.
+- `ventes-tableau` 180 verts (seuil de hauteur ≤ 180 pour une rangée qui porte l'achat au pied ; le détail ouvert à 1512 était
+  rouge après la 1re passe — tableau trop large — vert après le resserrement en requêtes de conteneur) ; `ventes-retours`
+  102 verts (au téléphone : la ligne d'accès puis la feuille, ouverte ; Échap la referme) ; `natif-ventes` 58 verts (le prix
+  lu sur la ligne sous le titre, hauteur ≤ 180 avec le pied) ; `relier-achats` 68 verts.
+- `relier-achat-filtres`, `relier-tout-achat`, `relier-taille` : rouges ET sur `origin/main` (ils cherchent
+  `[data-cout-vente-relier]`, l'ancien écran Ventes, plus rendu par Ventes natif) — pas touchés ici.
 - `audit-traduction`, `audit-identite`, `audit-quoi-de-neuf`, `audit-tdz`, `audit-variables` verts ; build vert.
-- Captures regardées (scratchpad) : liste 390, grille, case choisie + « Oui », reliée + pilule « Annuler », tableau 1512.
+- Captures regardées : liste 390 (clair, sombre), Terminées 390, grille, case choisie + « Non · Oui », reliée + pilule
+  « Annuler », tableau 1512 et détail ouvert.
 
 ## Ce qui reste
 - La hauteur d'une rangée au téléphone : 136 px (titre sur une ligne) à 174 px (deux lignes + « sans bordereau ») — le pied
