@@ -53,7 +53,7 @@ if (process.argv.includes('--prouve')) {
     ['prixNonRelu', 'ecrire', "        if (vuPage == null || Math.round(vuPage * 100) !== Math.round(avantE * 100)) return arret('prix-page-different', { prixPage: vuPage });", ''],
     ['brouillon', 'ecrire', "      if (contenu(champ)) return arret('champ-pas-vide');", ''],
     ['apprendSynthetique', 'ecrire', "      if (!e.isTrusted) return;\n      const t = e.target", "      const t = e.target"],
-    ['apprendTitre', 'ecrire', "    if (avecMot) { const t = propre(el.textContent).slice(0, 40); if (t && !/\\d/.test(t)) s.mot = t; }", "    if (avecMot) { const t = propre(el.textContent).slice(0, 40); if (t) s.mot = t; s.html = el.outerHTML.slice(0, 200); }"],
+    ['apprendTitre', 'ecrire', "    if (avecMot) { const t = propre(el.textContent).slice(0, 40); if (t && !/\\d/.test(t)) s.mot = t; }", "    if (avecMot) { const t = propre(el.parentElement ? el.parentElement.textContent : el.textContent).slice(0, 60); if (t) s.mot = t; }"],
     ['preuveSansId', 'inject', "        versRelais({ kind: 'lbcgestevu', quoi, ids, statut: st, moi, defi });", "        versRelais({ kind: 'lbcgestevu', quoi, ids: [String(j && j.list_ids && j.list_ids[0] || '')].concat(ids), statut: 200, moi, defi });"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-lbc-interface-'));
@@ -123,11 +123,12 @@ function pageConv(o, conv) {
 window.__clicsFaux = 0; document.addEventListener('click', (e) => { if (!e.isTrusted) window.__clicsFaux++; }, true);
 window.__frappes = 0; document.addEventListener('input', () => { window.__frappes++; }, true);
 const base = 'https://api.leboncoin.fr/api/messaging/proxy/api/hal/${o.moi || MOI}/conversations/';
-fetch('https://api.leboncoin.fr/api/account/v1/members/me/account').then((r) => r.text()).then(() => fetch(base + ${JSON.stringify(conv)} + '/messages').then((r) => r.text()));
+const charge = ${JSON.stringify(o.charge || conv)};
+fetch('https://api.leboncoin.fr/api/account/v1/members/me/account').then((r) => r.text()).then(() => fetch(base + charge + '/messages').then((r) => r.text()));
 document.querySelector('.envoyer').addEventListener('click', () => {
   const ta = document.querySelector('textarea'); const t = ta.value;
   if (${o.muet ? 'true' : 'false'} || !t.trim()) return;
-  fetch(base + ${JSON.stringify(conv)} + '/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, type: 'text' }) }).then((r) => r.text());
+  fetch(base + charge + '/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, type: 'text' }) }).then((r) => r.text());
   ta.value = '';
 });
 </script></body></html>`;
@@ -310,6 +311,10 @@ const shot = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recu
       const r3 = await D.ordre({ quoi: 'message', conv: C1, texte: 'Bien reçu', compte: MOI });
       dit(r3 && r3.erreur === 'pas-ouverte' && D.ecrits.length === 0 && (await D.pg.evaluate(() => document.querySelector('textarea').value)) === '', 'M3 — la page est sur une AUTRE conversation : rien n’est tapé', JSON.stringify(r3));
       await D.fin();
+      const D2 = await ouvrir(nav, 'https://www.leboncoin.fr/messages/id/' + C1, { charge: C2 });
+      const r3b = await D2.ordre({ quoi: 'message', conv: C1, texte: 'Bien reçu', compte: MOI });
+      dit(r3b && r3b.erreur === 'autre-conversation' && D2.ecrits.length === 0 && (await D2.pg.evaluate(() => document.querySelector('textarea').value)) === '', 'M3 — l’adresse dit la conversation, mais la page en a chargé une AUTRE : rien n’est tapé', JSON.stringify(r3b));
+      await D2.fin();
       const E = await ouvrir(nav, 'https://www.leboncoin.fr/messages/id/' + C1, { brouillon: true });
       const r4 = await E.ordre({ quoi: 'message', conv: C1, texte: 'Bien reçu', compte: MOI });
       dit(r4 && r4.erreur === 'champ-pas-vide' && E.ecrits.length === 0 && (await E.pg.evaluate(() => document.querySelector('textarea').value)) === 'mon brouillon', 'M3 — un brouillon dans le champ : VRM n’y touche pas', JSON.stringify(r4));
