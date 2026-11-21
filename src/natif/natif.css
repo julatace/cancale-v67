@@ -663,6 +663,10 @@
   .n-onglet-icone.n-onglet-disque { width: 34px; height: 30px; border-radius: 15px; background: var(--n-plein); color: var(--n-sur-plein); }
   .n-onglet-central, .n-onglet-central[aria-current="page"] { color: var(--n-encre-2); }
   .n-onglet[aria-expanded="true"] { color: var(--n-encre); }
+  /* La barre de titre d'un écran qui écrit son propre titre et sa recherche : ni titre ni action ⇒ la zone sûre seule (pas de
+     bande vide de 44 px au-dessus de son grand titre). */
+  .n-barre-titre[data-n-vide] { min-height: calc(6px + var(--n-haut-sur)); }
+  .n-barre-titre[data-n-vide]::before { opacity: 1; }
   .n-onglet-point { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: var(--n-r-rond); background: var(--n-ambre); box-shadow: 0 0 0 2px var(--n-fond); }
 
   .n-carte-compte {
@@ -686,12 +690,14 @@
     margin: 0; padding: 8px 12px; border: 0; border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre);
     text-align: start; font: var(--n-t-corps); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
+  /* Les vieilles règles hors couche de `.vrm-main button` reposent un min-height de 44 : la hauteur de 56 tient par ce cale. */
+  .n-tuile-menu::before { content: ""; flex: 0 0 0; align-self: stretch; width: 0; min-height: 40px; margin-inline-end: -10px; }
   .n-tuile-menu:active { background: var(--n-appui); }
   .n-tuile-menu:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .n-tuile-menu[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
   .n-tuile-menu-icone { flex: 0 0 22px; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; color: var(--n-accent); line-height: 0; }
   .n-tuile-menu[aria-current="page"] .n-tuile-menu-icone { color: var(--n-sur-teinte); }
-  .n-tuile-menu-libelle { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .n-tuile-menu-libelle { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .n-tuile-menu-pastille { flex: 0 0 auto; }
   .n-tuile-menu-valeur { flex: 0 0 auto; font: var(--n-t-legende); color: var(--n-encre-2); }
   @media (hover: hover) { .n-tuile-menu:hover, .n-carte-compte:hover { background: var(--n-appui); } .n-tuile-menu[aria-current="page"]:hover { background: var(--n-teinte); } }

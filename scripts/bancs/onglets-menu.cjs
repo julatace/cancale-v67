@@ -13,7 +13,9 @@ require('./_porte-banc.cjs');
 //        CHAQUE tuile d'écran ouvre son écran, et Menu reste allumé ; la carte ouvre Paramètres ;
 //    O5  les tuiles « Dans l'extension » ouvrent le panneau de l'extension (`?vrm=panneau&page=…`), rien d'autre ;
 //    O6  aucun écran perdu : tout écran que l'ancienne navigation ouvrait (barre + « Plus ») est joignable (barre + Menu) ;
-//    O7  rien en double : un écran n'a qu'UNE entrée entre la barre et le Menu.
+//    O7  rien en double : un écran n'a qu'UNE entrée entre la barre et le Menu ;
+//    O9  sur chaque écran : un seul titre en haut (jamais petit titre centré + grand titre), ≤ 1 action, une seule recherche ;
+//    O10 les pastilles de la barre ne changent pas d'un écran à l'autre (une source par compteur).
 //  Ordinateur 1512 (clair ET sombre) :
 //    O8  la barre latérale suit les mêmes groupes (en tête, Gestion, Dans l'extension, Aide), Paramètres en pied ;
 //        chaque entrée d'écran ouvre son écran et s'allume ; aucune barre du bas.
@@ -64,7 +66,8 @@ async function telephone(nav, b, sombre, erreursTout) {
     const o2 = await pg.evaluate(() => {
       const tete = [...document.querySelectorAll('[data-n-tete]')].find((x) => x.getClientRects().length);
       const droite = tete ? [...tete.querySelectorAll('.n-barre-droite button, .n-barre-droite a')].filter((x) => x.getClientRects().length).length : 0;
-      const champ = [...document.querySelectorAll('.vrm-main [data-n-recherche]')].filter((x) => x.getClientRects().length && !x.closest('[data-n-recherche-ouverte]')).length;
+      // le champ de la COQUE (`data-recherche-zone`) ; la recherche propre d'un écran de liste (Annonces) est son contenu.
+      const champ = [...document.querySelectorAll('.vrm-main [data-n-recherche][data-recherche-zone], .vrm-main [data-n-recherche] [data-recherche-zone]')].filter((x) => x.getClientRects().length && !x.closest('[data-n-recherche-ouverte]')).length;
       return { tete: !!tete, droite, champ };
     });
     dit(o2.droite <= 1 && o2.champ === 0, `O2 ${t} · ${id} : en-tête simple (${o2.droite} action à droite, ${o2.champ} champ sous le titre)`, o2);
@@ -113,6 +116,38 @@ async function telephone(nav, b, sombre, erreursTout) {
   await pg.locator('[data-n-onglet="menu"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'menu'); await pg.waitForTimeout(600);
   await pg.locator('[data-n-menu] .n-carte-compte').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'settings'); await pg.waitForTimeout(800);
   dit((await ecranVu(pg)) === 'settings', `O4 ${t} : la carte du compte ouvre Paramètres`, await ecranVu(pg));
+  // O9 + O10 (captures de Julien du 21 nov., audit du 20 nov. §1.2–1.3) — sur CHAQUE écran : un seul titre en haut (jamais le
+  // petit titre centré de la barre au-dessus du grand titre de l'écran), au plus une action à droite, aucune recherche de
+  // la coque si l'écran a la sienne ; les pastilles de la barre sont les MÊMES d'un écran à l'autre (une source chacune).
+  const pastilles = {};
+  for (const id of ['journee', 'annonces', 'messages', 'menu', 'ventes', 'achats', 'garage', 'compta', 'emails', 'settings', 'extension']) {
+    await pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: x })), id);
+    await attendreEcran(pg, id); await pg.waitForTimeout(1200);
+    const r = await pg.evaluate(async () => {
+      const m = document.querySelector('.vrm-main'); m.scrollTop = 0; await new Promise((ok) => setTimeout(ok, 300));
+      const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && +getComputedStyle(e).opacity > 0.4;
+      const tete = [...document.querySelectorAll('[data-n-tete]')].find((x) => x.getClientRects().length);
+      const centre = tete && tete.querySelector('.n-barre-centre');
+      const h1 = [...m.querySelectorAll('h1')].filter((h) => vis(h) && h.getBoundingClientRect().top < 360 && h.textContent.trim());
+      m.scrollTop = 200; await new Promise((ok) => setTimeout(ok, 500));
+      const centreBas = centre && vis(centre) ? centre.textContent.trim() : '';
+      const h1Bas = [...m.querySelectorAll('h1')].filter((h) => vis(h) && h.getBoundingClientRect().top > 0 && h.getBoundingClientRect().top < 300).map((h) => h.textContent.trim());
+      m.scrollTop = 0;
+      const pas = {}; for (const o of document.querySelectorAll('[data-n-onglets] .n-onglet')) { const p = o.querySelector('.n-onglet-pastille, .n-onglet-point'); pas[o.getAttribute('data-n-onglet')] = p ? (p.textContent || '•') : ''; }
+      return { ecran: m.getAttribute('data-ecran'), h1: h1.length, double: !!centreBas && h1Bas.some((x) => x === centreBas), centreBas, h1Bas,
+        droite: tete ? [...tete.querySelectorAll('.n-barre-droite button')].filter(vis).length : 0,
+        champs: [...m.querySelectorAll('[data-n-recherche], input[type="search"]')].filter(vis).length,
+        loupe: !!(tete && [...tete.querySelectorAll('[data-n-tete-loupe]')].some(vis)), pas };
+    });
+    pastilles[id] = r.pas;
+    // Ma journée : le « Ma journée » de son CONTENU est le second titre que l'audit retire (§2.6) — chantier de l'écran
+    // Ma journée, en cours en parallèle ; la coque, elle, ne double rien (`double`).
+    dit(r.ecran === id && !r.double && (r.h1 <= 1 || id === 'journee') && r.droite <= 1 && !(r.loupe && r.champs > 0), `O9 ${t} · ${id} : un seul titre, ${r.droite} action à droite, ${r.loupe ? 'la loupe' : 'pas de loupe'} et ${r.champs} champ de l’écran`, r);
+    if (!sombre && ['achats', 'compta', 'garage', 'settings'].includes(id)) await pg.screenshot({ path: path.join(SHOTS, `390-${id}.png`) });
+  }
+  const formes = [...new Set(Object.values(pastilles).map((x) => JSON.stringify(x)))];
+  dit(formes.length === 1, `O10 ${t} : les pastilles de la barre sont les mêmes sur les ${Object.keys(pastilles).length} écrans`, pastilles);
+  await pg.locator('[data-n-onglet="menu"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'menu'); await pg.waitForTimeout(600);
   // O5
   await pg.locator('[data-n-onglet="menu"]').first().tap({ timeout: 30000 }).catch(() => {}); await attendreEcran(pg, 'menu'); await pg.waitForTimeout(600);
   await espionnerOuvertures(pg);

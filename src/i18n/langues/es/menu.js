@@ -10,7 +10,7 @@ export default {
   "menu.parametres": "Ajustes",
   "menu.compte": "Mi cuenta",
   "menu.favoris": "Mensajes a favoritos",
-  "menu.automatisations": "Automatizaciones",
+  "menu.automatisations": "Automatismos",
   "menu.actives": {
     "one": "{n} activa",
     "other": "{n} activas"

@@ -18861,6 +18861,9 @@ const ENTREES_PAIRES=[
 ];
 // La place du disque « + » dans la barre : après Aujourd'hui · Annonces · Achats.
 const POS_DISQUE=3;
+// (21 nov., onglets-menu) Les écrans que porte la barre du bas du téléphone (Publier est une feuille, pas un écran) :
+// de l'un à l'autre l'historique REMPLACE ; tout le reste (les tuiles du Menu) EMPILE.
+const BARRE_DU_BAS=['journee',ID_PAIRES,'messages','menu'];
 // Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 // (15 nov., refonte-journee) Paramètres au pied du rail de l'ordinateur (la maquette validée).
@@ -20952,6 +20955,13 @@ const ECRANS_NATIFS = new Set(['annonces', 'ventes', 'automatisations']);
 // (le tableau ne tient pas dans une colonne de 520) ; sa fiche s'ouvre en panneau à droite (`.n-tt-fiche`).
 const ECRANS_TABLEAU = new Set(['annonces', 'automatisations', 'ventes']);   // (20 nov.) Ventes : tableau, détail posé par l'écran au toucher
 const CONTEXTE_COQUE_NATIVE = Object.freeze({ titreRendu: true, voletDetail: null });
+// (21 nov., onglets-menu — audit du 20 nov. §1.3 « deux recherches sur le même écran ») Les écrans qui portent LEUR recherche :
+// la coque n'y pose pas sa loupe (une seule recherche à l'écran).
+const ECRANS_AVEC_RECHERCHE = new Set(['annonces', 'messages', 'achats', 'emails', 'settings', 'garage']);
+// (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») La coque dessine le GRAND TITRE de ces
+// écrans (au téléphone) ; les autres écrivent le leur juste sous la barre — la barre ne double alors jamais leur titre
+// (plus de petit titre centré au-dessus de leur grand titre, plus de recherche entre les deux).
+const ECRANS_TITRE_COQUE = new Set(['journee', 'compta', 'dashboard', 'menu', 'extension']);
 // (19 nov. soir) Les sites présents (ceux des filtres de la coque), lus par les tableaux de travail pour leur filtre « Site » ;
 // un choix y passe par `vrm:site-tache` (le MÊME `setPlatSub` + `retenirFiltre` que le menu de plateforme).
 const SITES_COQUE = { v: ['vinted'] };
@@ -21004,7 +21014,7 @@ function TeteNative({ tab, ordi, titre, rechercheOuverte = false, sansRecherche 
     <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>
   );
   return (
-    <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || ((tab === 'journee' || argentTab || tab === 'menu') && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
+    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre', 'data-n-vide': (!actions && !natif && !ordi && !ECRANS_TITRE_COQUE.has(tab)) ? '' : undefined }}/>
   );
 }
 // ⚠️⚠️ (21 nov., onglets-menu) LES GROUPES DU MENU — une source pour l'écran « Menu » du téléphone ET la barre latérale de
@@ -21191,7 +21201,7 @@ function BottomBar({tab,setTab,sites,badges,nonLus=0}) {
   const ongletDe=(t,extra={})=>{ const n=nb(t.id); return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?tr('menu.aFaire',{n}):'', attrs:{ 'data-nav-entree':t.id }, ...extra }; };
   const ongletsNatifs=[
     ongletDe(BOTTOM_TABS.find(t=>t.id==='journee')),
-    ongletDe(ONGLET_PAIRES),
+    { ...ongletDe(ONGLET_PAIRES), pastille:undefined, libellePastille:'' },   // (audit du 20 nov. §2.5) le nombre d'annonces n'est pas un geste
     { cle:'publier', libelle:tr('creer.onglet'), central:true, icone:<Icon name="plus" size={22}/>, attrs:{ 'data-n-publier':'', 'aria-haspopup':'dialog' } },
     { ...ongletDe(ONGLET_MESSAGES), pastille:nMsg||undefined, libellePastille:nMsg?`${tr('nav.messages')} · ${nMsg}`:'' },
     { cle:'menu', libelle:tr('menu.onglet'), icone:<Icon name="grid" size={24}/>, pastille:pointMenu||undefined, libellePastille:pointMenu?tr('menu.ouvrir'):'', attrs:{ 'data-nav-entree':'menu', 'data-n-coque-plus':'' } },
@@ -64008,7 +64018,7 @@ function AppCoeur() {
         // D'un onglet de la barre à un autre, l'entrée est REMPLACÉE (src/navHistorique.js) : le retour du
         // système (bord gauche sur iPhone) n'a plus d'onglet voisin à montrer. Feuilles et écrans du menu empilent.
         const st=window.history.state||{};
-        const geste=entreeHistorique(st, { tab:h.tab, sub:h.sub }, (t)=>groupeBarre(t,BAR_GROUPE), BOTTOM_TABS.map(x=>x.id));
+        const geste=entreeHistorique(st, { tab:h.tab, sub:h.sub }, (t)=>groupeBarre(t,BAR_GROUPE), BARRE_DU_BAS);   // (21 nov., onglets-menu) un écran ouvert depuis le Menu EMPILE : le retour ramène au Menu
         if(geste==='rien') return;
         if(geste==='remplacer') window.history.replaceState({ vrmTab:h.tab, vrmSub:h.sub }, '');
         else window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
@@ -66986,6 +66996,11 @@ function AppCoeur() {
   const badgesNav={ ventes: plusRegler('ventes',colisBadge), achats: plusRegler('achats',retraitsBadge), annonces: plusRegler('annonces',nAnnonces), garage: plusRegler('stock',undefined),
     messages: pastilleMsg || msgNonLus>0, ...(designV2App&&pubRegler&&ajoutPastille('sante',pubRegler.groupes)>0 ? { settings: true } : {}) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
+  // ⚠️ (21 nov., onglets-menu — captures de Julien : « Annonces 5 puis 7, Ventes 3 puis 8 » d'un écran à l'autre) LES PASTILLES DE
+  // LA NAVIGATION n'ont qu'UNE source chacune, la même sur tous les écrans : le nombre publié par l'écran propriétaire
+  // (`vrm_colis_aposter` ⇒ Ventes, `vrm_colis_retirer` ⇒ Achats). Les « À régler » que l'écran COURANT ajoute (`plusRegler`,
+  // lus seulement quand cet écran est monté) restent dans l'écran ; Annonces ne porte plus le nombre d'annonces (pas un geste).
+  const badgesStables={ ventes: colisBadge, achats: retraitsBadge, messages: msgNonLus>0 ? msgNonLus : undefined };
   // (9 nov., lot AC) Le geste d'une ligne d'« À trancher » : il OUVRE l'écran propriétaire
   // (la vue d'Annonces, l'onglet de Colis) et va au bloc où il tranche — il n'écrit rien.
   const allerTrancher=(l)=>{ const g=l&&l.geste; if(!g) return; if(g.vue) demanderVue(g.vue); if(g.tab==='cat_bord'&&g.onglet) choisirOngletColis(g.onglet); setTab(g.tab); if(g.clic||g.cible) suivreCibleTrancher(g.clic,g.cible); };
@@ -68109,7 +68124,7 @@ function AppCoeur() {
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}
+      {ordi ? <LateraleNative reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}
         outils={<>
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
@@ -68210,7 +68225,7 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || tab === 'annonces' || tab === 'messages'} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
@@ -68611,7 +68626,7 @@ function AppCoeur() {
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
         {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
-        {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
+        {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesStables} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
@@ -68680,7 +68695,7 @@ function AppCoeur() {
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
           (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
-      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}/>}
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesStables} nonLus={msgNonLus}/>}
       {/* (21 nov., onglets-menu) La feuille « Publier » : la place du milieu de la barre, l'entrée « Publier » de la barre latérale. */}
       <FeuillePublier gestes={gestesDisque}/>
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
