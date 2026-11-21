@@ -31,7 +31,7 @@ function conv({ item, tx, oid, price, user = 500 }) {
     capturedAt: nowISO(),
     payload: { conversation: {
       id: '8' + oid, description: 'Nike Air',
-      opposite_user: { id: user, login: 'acheteur' },
+      opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 },   // 5.430 : la vraie forme (★ 4,8 · 40)
       transaction: { item_id: String(item) },
       messages: [{
         entity_type: 'offer_request_message',

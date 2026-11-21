@@ -68,12 +68,16 @@ dit(F.agDecisionMessage({ agent: F.agReglage({ actif: true, repondre: false }), 
 
 // ── A3 : offres ──
 const P = { tranches: [], paliers: [50, 80, 100] };
-const dof = (x) => F.agDecisionOffre(Object.assign({ agent: A, offre: 70, prix: 100, mini: 85, refuse: 60, paliers: P, palier: F.palierContreOffre, enVente: true, gardeOk: true, compteBloque: false, joues: [] }, x));
+const dof = (x) => F.agDecisionOffre(Object.assign({ agent: A, offre: 70, prix: 100, mini: 85, refuse: 60, paliers: P, palier: F.palierContreOffre, enVente: true, gardeOk: true, compteBloque: false, joues: [], note: 'ok' }, x));
 let d = dof({});
 dit(d.geste === 'contre' && d.prix === 93 && d.palier === 0, 'A3 offre 70 (mini 85) ⇒ contre-offre au 1er palier, 93 €', JSON.stringify(d));
 d = dof({ joues: [0] }); dit(d.geste === 'contre' && d.prix === 88 && d.palier === 1, 'A3 palier déjà joué ⇒ le suivant (88 €), une par palier', JSON.stringify(d));
 dit(dof({ offre: 86 }).geste === 'accepter' && dof({ offre: 55 }).geste === 'refuser', 'A3 au-dessus du seuil ⇒ accepter ; sous le refus ⇒ refuser');
 dit(dof({ offre: 90, enVente: false }).geste === 'a_toi' && dof({ offre: 90, gardeOk: false }).geste === 'a_toi', 'A3 acceptation seulement prouvée en vente et sans double vente');
+// 5.430 (Julien : « tu n'acceptes pas les comptes 1 étoile ») : la note de l'acheteur, décidée par <note-acheteur-regle>.
+dit(dof({ offre: 90, note: 'basse' }).geste === 'a_toi' && dof({ offre: 90, note: 'basse' }).raison === 'note_basse' && dof({ note: 'basse' }).geste === 'a_toi', 'A3 acheteur noté ≤ son seuil ⇒ ni acceptation ni contre-offre : « à toi »');
+dit(dof({ offre: 90, note: 'pas-su' }).geste === 'rien' && dof({ note: undefined }).geste === 'rien' && dof({ offre: 90, note: 'neuf-refuse' }).geste === 'a_toi', 'A3 note pas lue (ou absente) ⇒ rien (relue plus tard) ; compte neuf refusé par son réglage ⇒ à toi');
+dit(dof({ offre: 90, note: 'neuf' }).geste === 'accepter' && dof({ offre: 55, note: 'basse' }).geste === 'refuser', 'A3 compte neuf qu’il accepte ⇒ accepté ; le refus sous son seuil reste permis quelle que soit la note');
 dit(dof({ compteBloque: true }).geste === 'rien' && dof({ faite: true }).geste === 'rien', 'A3 compte bloqué ou offre déjà traitée ⇒ rien');
 dit(dof({ mini: null, achat: null }).geste === 'a_toi' && dof({ mini: null, achat: null }).raison === 'plancher_inconnu', 'A3 sans prix mini ni achat ⇒ il ne négocie pas cette paire, et le dit');
 let viole = 0, ex = '';
@@ -101,7 +105,7 @@ dit(tb.jour === 5 && tb.attente === 1 && tb.aToi === 1 && tb.taux === 50 && tb.e
       ['harvest_' + UID + '_listings']: { payload: { items: [{ id: 7001, title: 'Nike Dunk', size_title: '42', price: { amount: '100.0' }, photos: [{}, {}] }, { id: 7002, title: 'Adidas Samba', size_title: '40', price: { amount: '60.0' }, photos: [{}, {}] }] } },
       ['harvest_' + UID + '_inbox']: { payload: { conversations: Object.keys(convs).map((c) => ({ id: Number(c) })) } },
       vrm_reglages_auto: { v: 1, cles: { vinted_bleam: { v: 1, comptes: { [UID]: { agent } } } } } };
-    for (const [c, x] of Object.entries(convs)) L['harvest_' + UID + '_conv_' + c] = { capturedAt: new Date(T).toISOString(), payload: { conversation: { id: Number(c), opposite_user: { id: 999, login: 'lea_33' }, transaction: { id: x.tx || 55, item_id: x.item }, messages: x.msgs } } };
+    for (const [c, x] of Object.entries(convs)) L['harvest_' + UID + '_conv_' + c] = { capturedAt: new Date(T).toISOString(), payload: { conversation: { id: Number(c), opposite_user: { id: 999, login: 'lea_33', feedback_reputation: 0.96, review_count: 40 }, transaction: { id: x.tx || 55, item_id: x.item }, messages: x.msgs } } };
     return L;
   };
   const monter = (agent, convs, opts = {}) => {

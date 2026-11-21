@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.430, Julien : traduire les messages étrangers ; « tu n'acceptes pas les comptes 1 étoile ») docs/passation/2026-11-21-ext-5430.md
+  { id: 'ext-5430', date: '2026-11-21', titre: 'Traduction sur l’appareil, note des acheteurs', phrase: 'Messages étrangers traduits ; jamais d’offre acceptée seule d’un acheteur 1 étoile.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
   { id: 'ext-5421', date: '2026-11-21', titre: 'Agent VRM, réponses rapides, lots, relances', phrase: 'Réponses prêtes, lots aux favoris, offres relancées, agent en essai.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md

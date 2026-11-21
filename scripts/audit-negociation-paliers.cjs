@@ -113,7 +113,8 @@ const T0 = Date.now(), iso = (t) => new Date(t).toISOString();
     };
     const f = faireFond({ src: BG, connecte: '111', lignes, store, vinted: () => ({ status: 200, body: { code: 0 } }) });
     let offre = { conv: '9001', prix: 70, tx: '777', oid: '901', item: '4242', pseudo: 'acheteuse', article: 'Paire' };
-    f.ctx.offresEnAttente = async () => (offre ? [offre] : []);
+    // 5.430 : l'acheteur et la note que la conversation rangée porte (la vraie forme : feedback_reputation, review_count) — ★ 4,8 · 40.
+    f.ctx.offresEnAttente = async () => (offre ? [Object.assign({ acheteur: '555', noteBrute: { rep: '0.96', rc: '40', cap: new Date().toISOString() } }, offre)] : []);
     f.ctx.relireOffre = async () => ({ etat: 'attend' });
     f.ctx.secuGeste = async () => null;
     f.ctx.porteDiscretion = async () => null;

@@ -2718,13 +2718,14 @@ function vrmVerifVisible(sel) {
   }
   // Les OFFRES en attente (Messagerie, Commandes) : accepter (vend la paire : confirmation, garde anti double-vente),
   // contre-offre (au-dessus de son offre, jamais sous ton plancher), refuser.
+  const etoiles6 = (e) => { try { return new Intl.NumberFormat(U.langue ? U.langue() : 'fr', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Number(e)); } catch (_) { return String(e); } };
   function offresHtml(conv) {
     const l = listes && Array.isArray(listes.offres) ? listes.offres.filter((o) => !conv || String(o.conv) === String(conv)) : [];
     if (!l.length) return '';
     const etat = offreEtat ? `<p class="note5" role="status" data-offre-etat="${offreEtat.ok ? 'ok' : 'ko'}">${esc(offreEtat.texte)}</p>` : '';
     return `<section class="geste6" data-offres="${l.length}"><h3>${esc(TU('g6_offres', { n: l.length }))}</h3>${etat}${l.map((o) => { const k = o.tx + ':' + o.oid; const c = offreConf && offreConf.k === k ? offreConf : null;
-      return `<div class="rg6 offre6" data-offre="${esc(k)}"><span><b>${esc(euroTxt(o.prix))} · ${esc(o.pseudo || '')}</b><small>${esc(o.titre || '')}</small></span><span class="outils">`
-        + (c ? `<span class="conf5" role="alertdialog" data-offre-confirme="${esc(c.quoi)}"><span>${esc(c.avis || TU(c.quoi === 'accept' ? 'g6_accepter_q' : 'g6_refuser_q', { p: euroTxt(o.prix) }))}</span>${c.bloque ? '' : `<button type="button" class="vu-btn vu-plein" data-offre-oui${geste6EnVol ? ' disabled' : ''}>${esc(TU(c.avis ? 'g6_verifie_accepter' : c.quoi === 'accept' ? 'g6_accepter' : 'g6_refuser'))}</button>`}<button type="button" class="vu-btn" data-offre-non>${esc(TU('ra_annuler'))}</button></span>`
+      return `<div class="rg6 offre6" data-offre="${esc(k)}"><span><b>${esc(euroTxt(o.prix))} · ${esc(o.pseudo || '')}</b>${U.noteAcheteur && o.note ? U.noteAcheteur(o.note) : ''}<small>${esc(o.titre || '')}</small></span><span class="outils">`
+        + (c ? `<span class="conf5" role="alertdialog" data-offre-confirme="${esc(c.quoi)}"><span>${esc(c.avis || TU(c.quoi === 'accept' ? 'g6_accepter_q' : 'g6_refuser_q', { p: euroTxt(o.prix) }))}</span>${c.bloque ? '' : `<button type="button" class="vu-btn vu-plein" data-offre-oui${c.noteAvis ? ' data-offre-note-avis' : ''}${geste6EnVol ? ' disabled' : ''}>${esc(TU(c.noteAvis ? 'na_accepter_quand_meme' : c.avis ? 'g6_verifie_accepter' : c.quoi === 'accept' ? 'g6_accepter' : 'g6_refuser'))}</button>`}<button type="button" class="vu-btn" data-offre-non>${esc(TU('ra_annuler'))}</button></span>`
           : `<button type="button" class="vu-btn" data-offre-quoi="accept">${esc(TU('g6_accepter'))}</button><input type="text" inputmode="decimal" class="prix6" data-offre-contre-prix="${esc(k)}" value="${esc(offreContre[k] || '')}" placeholder="${esc(TU('g6_contre_prix'))}" aria-label="${esc(TU('g6_contre_prix'))}"><button type="button" class="vu-btn" data-offre-quoi="contre">${esc(TU('g6_contre'))}</button><button type="button" class="vu-btn" data-offre-quoi="reject">${esc(TU('g6_refuser'))}</button>`)
         + `</span></div>`; }).join('')}</section>`;
   }
@@ -2793,9 +2794,11 @@ function vrmVerifVisible(sel) {
       offreConf = { k, quoi }; offreEtat = null; rendre(); }));
     const on = R.querySelector('[data-offre-non]'); if (on) on.addEventListener('click', () => { offreConf = null; rendre(); });
     const oo = R.querySelector('[data-offre-oui]'); if (oo) oo.addEventListener('click', () => { const c = offreConf; if (!c) return; const [tx, oid] = c.k.split(':');
-      envoyer6({ action: 'offreCarte', quoi: c.quoi, tx, oid, confirme: true, ...(c.avis ? { avisVu: true } : {}) }, (r) => {
+      envoyer6({ action: 'offreCarte', quoi: c.quoi, tx, oid, confirme: true, ...(c.avisGarde ? { avisVu: true } : {}), ...(c.noteAvis ? { noteVue: true } : {}) }, (r) => {
         if (r && r.ok) { offreConf = null; offreEtat = { ok: true, texte: TU(c.quoi === 'accept' ? 'g6_accepte_ok' : 'g6_refuse_ok') }; chargerListes(true); }
-        else if (r && r.code === 'avis') { offreConf = Object.assign({}, c, { avis: r.avis || r.raison }); }
+        else if (r && r.code === 'avis') { offreConf = Object.assign({}, c, { avis: r.avis || r.raison, avisGarde: true, noteAvis: false }); }
+        // 5.430 : la note de l'acheteur (≤ SON seuil, compte neuf qu'il n'accepte pas, ou pas lue) — SON second toucher accepte quand même.
+        else if (r && r.code === 'note') { const n = r.note || {}; offreConf = Object.assign({}, c, { noteAvis: true, avis: TU(r.decision === 'basse' ? 'na_avis_basse' : r.decision === 'neuf-refuse' ? 'na_avis_neuf' : 'na_avis_pas_su', { e: etoiles6(n.etoiles), n: n.n, s: etoiles6(r.seuil) }) }); }
         else if (r && r.code === 'vendue-ailleurs') { offreConf = Object.assign({}, c, { avis: r.avis || r.raison, bloque: true }); }
         else { offreConf = null; offreEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; } }); });
   }
@@ -3187,18 +3190,29 @@ function vrmVerifVisible(sel) {
     const ms = f.data.messages;
     const ouvrir = f.data.ouverte ? '' : `<a class="vu-btn vu-sec" href="${esc(f.data.url)}" target="_top" data-vc-ouvrir="${esc(x.conv)}">${esc(TU('vc_ouvrir_conv'))}</a>`;
     if (!ms) return `<div class="val gris" data-vc-fil="jamais">${esc(TU('vc_fil_jamais'))}</div>` + ouvrir;
-    return `<div class="fil5" data-vc-fil="lu" data-vc-fil-n="${ms.length}">${ms.map((m) => `<div class="bulle${m.deMoi === true ? ' moi' : ''}" data-vc-msg="${m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu'}"><small>${esc(m.deMoi === true ? TU('vc_toi') : m.deMoi === false ? TU('vc_lui') : TU('vc_auteur_passu'))}${m.at ? ' · ' + esc(depuis(m.at)) : ''}${m.vrm ? ' · ' + esc(TU('vc_depuis_vrm')) : ''}</small>${esc(m.t)}</div>`).join('')}</div>`
+    const clesVc = ms.map((m, i) => (m.deMoi === true ? '' : x.conv + ':vc' + i)).filter(Boolean);
+    return `<div class="fil5" data-vc-fil="lu" data-vc-fil-n="${ms.length}">${ms.map((m, i) => `<div class="bulle${m.deMoi === true ? ' moi' : ''}" data-vc-msg="${m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu'}"><small>${esc(m.deMoi === true ? TU('vc_toi') : m.deMoi === false ? TU('vc_lui') : TU('vc_auteur_passu'))}${m.at ? ' · ' + esc(depuis(m.at)) : ''}${m.vrm ? ' · ' + esc(TU('vc_depuis_vrm')) : ''}</small>${esc(m.t)}${m.deMoi === true ? '' : tradBulle(x.conv + ':vc' + i, m.t || '', '')}</div>`).join('')}</div>` + tradAbsente(clesVc)
       + (f.data.ouverte ? '' : `<p class="note5" data-vc-pas-ouverte>${esc(TU('vc_pas_ouverte'))}</p>${ouvrir}`);
   }
   function convHtml(x, ici) {
     const vc = listes && listes.plateforme === 'vestiaire';
-    return `<div class="conv5" data-conv-ouverte="${esc(x.conv)}">${x.photo ? `<img class="conv5-ph" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<div class="conv5-t"><b>${esc(x.qui || '—')}</b><span>${esc(x.at ? depuis(x.at) : '')}</span></div>`
-      + (vc ? filVcHtml(x) : `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>`)
+    return `<div class="conv5" data-conv-ouverte="${esc(x.conv)}">${x.photo ? `<img class="conv5-ph" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<div class="conv5-t"><b>${esc(x.qui || '—')}</b><span>${esc(x.at ? depuis(x.at) : '')}</span></div>` + noteConvHtml(x)
+      + (vc ? filVcHtml(x) : (() => {
+        // 5.430 : la question de l'acheteur repérée par la règle des réponses rapides (sinon le dernier message), sa langue.
+        const rr = rrParConv[x.conv] && rrParConv[x.conv].data, q = rr && rr.question ? String(rr.question) : '';
+        const cle = x.conv + ':d', ind = rr && rr.langue ? rr.langue : '';
+        const h = `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>` + tradBulle(cle, x.texte || '', ind);
+        if (q && q !== x.texte) { langueTexte(x.conv + ':q', q, ind); }
+        // La langue reconnue par le navigateur choisit SES versions dans cette langue (une seule relecture).
+        const lq = trads[x.conv + ':q'] && trads[x.conv + ':q'].lang || trads[cle] && trads[cle].lang;
+        if (rr && lq && ['fr', 'en', 'es', 'it', 'de'].includes(lq) && lq !== rr.langue && rrParConv[x.conv].langueAcheteur !== lq) rrCharger(x.conv, lq);
+        return h + tradAbsente([cle, x.conv + ':q']);
+      })())
       // 5.409 : répondre ICI, sur SON toucher — le même chemin que la réponse depuis l'app (garde stricte, 50/h, réserve,
       // pause, compte de l'onglet ; `repondreCarte` dans le fond). Le fil complet reste sur Vinted (« Ouvrir »).
       // 5.421 : SES réponses rapides, reconnues dans la question de l'acheteur (mots-clés, sans IA), remplies par identité.
       + rrHtml(x)
-      + `<div class="rep5"><textarea data-rep-texte="${esc(x.conv)}" rows="3" maxlength="1000" placeholder="${esc(TU('m_ecrire'))}" aria-label="${esc(TU('m_ecrire'))}">${esc(brouillons.get(x.conv) || '')}</textarea>`
+      + `<div class="rep5"><textarea data-rep-texte="${esc(x.conv)}" rows="3" maxlength="1000" placeholder="${esc(TU('m_ecrire'))}" aria-label="${esc(TU('m_ecrire'))}">${esc(brouillons.get(x.conv) || '')}</textarea>` + tradRepHtml(x.conv)
       + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>${repConv[x.conv].url ? `<a class="vu-btn vu-sec" href="${esc(repConv[x.conv].url)}" target="_top" data-vc-ouvrir="${esc(x.conv)}">${esc(TU('vc_ouvrir_conv'))}</a>` : ''}` : ''}`
       + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button>${listes && listes.plateforme === 'leboncoin' ? `<a class="vu-btn vu-sec" href="https://www.leboncoin.fr/messages" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_site'))}</a>` : listes && listes.plateforme === 'vestiaire' ? '' : `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a>`}</div></div></div>`;
   }
@@ -3335,6 +3349,7 @@ function vrmVerifVisible(sel) {
     }
     for (const k of ['heures', 'noteMin', 'parArticle', 'periodeJours', 'apresMin', 'reecrireJours', 'repeter', 'plafondPct', 'jours', 'taux', 'essaiJours']) if (out[k] != null && out[k] !== '') out[k] = Number(out[k]);
     // 5.421 : l'Agent VRM — oui/non en booléens, heures calmes ; au PREMIER allumage, le mode Essai (proposé par défaut).
+    if (s === 'noteAcheteurs') { out.seuil = Number(out.seuil); out.neufAccepter = !(out.neufAccepter === false || out.neufAccepter === 'non'); delete out.actif; }
     if (s === 'agent') {
       for (const k of ['negocier', 'repondre']) if (out[k] === 'oui' || out[k] === 'non') out[k] = out[k] === 'oui';
       const lu = bmLu('agent') || {};
@@ -3413,9 +3428,76 @@ function vrmVerifVisible(sel) {
   const RR_LIB = { dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', prix: 'rr_c_prix', etat: 'rr_c_etat', authenticite: 'rr_c_authenticite', photos: 'rr_c_photos', echange: 'rr_c_echange' };
   const RR_MANQUE = { taille: 'rr_m_taille', prix: 'rr_m_prix', article: 'rr_m_article', pseudo: 'rr_m_pseudo', partie: 'rr_m_partie', prix_mini_cache: 'rr_m_mini', texte_interdit: 'rr_m_interdit' };
   const rrParConv = {}; const rrEnvoi = {};
-  function rrCharger(conv) {
-    rrParConv[conv] = { charge: true };
-    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reponsesRapides', conv, langue: U.langue ? U.langue() : 'fr' }, (r) => { void chrome.runtime.lastError; rrParConv[conv] = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('rr_pas_su') }; rendre(); }); } catch (_) { rrParConv[conv] = { raison: TU('rr_pas_su') }; }
+  function rrCharger(conv, langueAcheteur) {
+    rrParConv[conv] = { charge: true, langueAcheteur: langueAcheteur || '' };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reponsesRapides', conv, langue: U.langue ? U.langue() : 'fr', ...(langueAcheteur ? { langueAcheteur } : {}) }, (r) => { void chrome.runtime.lastError; rrParConv[conv] = r && r.ok ? { data: r, langueAcheteur: langueAcheteur || '' } : { raison: (r && r.raison) || TU('rr_pas_su') }; rendre(); }); } catch (_) { rrParConv[conv] = { raison: TU('rr_pas_su') }; }
+  }
+  // ══ 5.430 (choix n° 69) — TRADUIRE, SUR L'APPAREIL : la langue d'un message reconnue par le navigateur (LanguageDetector
+  //    de Chrome ; sinon l'indice simple que la règle des réponses rapides a lu dans la question), « Traduire » l'affiche
+  //    traduit SOUS l'original (Translator de Chrome). Aucun service en ligne, aucune clé (§2.9). Navigateur sans ces API ⇒
+  //    pas de bouton, UNE ligne qui dit pourquoi. Sa réponse peut être traduite vers la langue de l'acheteur : il voit les
+  //    deux textes, met la traduction dans le champ, et elle ne part que sur SON toucher « Envoyer ».
+  const UI_LANGUE = U.langue ? U.langue() : 'fr';
+  const TRAD = U.traduction || { presente: () => false, detecter: async () => null, traduire: async () => ({ ok: false, code: 'absente' }) };
+  const nomL = (c) => (U.nomLangue ? U.nomLangue(c) : c);
+  const trads = {};      // clé (conv:bulle) → { lang: undefined (en cours) | '' (pas reconnue) | code, etat, texte }
+  const tradsRep = {};   // conv → { etat, texte, original, lang }
+  function langueTexte(cle, texte, indice) {
+    let t = trads[cle];
+    if (!t) {
+      t = trads[cle] = { lang: undefined, etat: 'idle' };
+      TRAD.detecter(texte).then((l) => { t.lang = l || (indice || ''); rendre(); }, () => { t.lang = indice || ''; rendre(); });
+    } else if (t.lang === '' && indice) t.lang = indice;
+    return t;
+  }
+  const etrangere = (t) => !!(t && t.lang && t.lang !== UI_LANGUE);
+  function tradBulle(cle, texte, indice) {
+    const t = langueTexte(cle, texte, indice);
+    if (!etrangere(t) || !TRAD.presente()) return '';
+    if (t.etat === 'fait') return `<div class="vu-trad" data-traduit="${esc(t.lang)}">${esc(t.texte)}<small>${esc(TU('tr_depuis', { l: nomL(t.lang) }))}</small></div>`;
+    if (t.etat === 'ko') return `<p class="note5" data-traduction="ko">${esc(TU('tr_ko'))}</p>`;
+    return `<button type="button" class="vu-lien" data-traduire="${esc(cle)}"${t.etat === 'charge' ? ' disabled aria-busy="true"' : ''}>${esc(TU(t.etat === 'charge' ? 'tr_charge' : 'tr_traduire'))}</button>`;
+  }
+  // La ligne « pourquoi pas de bouton » : une fois par conversation, seulement si un message étranger est reconnu.
+  function tradAbsente(cles) {
+    if (TRAD.presente()) return '';
+    const t = cles.map((k) => trads[k]).find(etrangere);
+    return t ? `<p class="note5" data-traduction="absente" data-traduction-langue="${esc(t.lang)}">${esc(TU('tr_absente', { l: nomL(t.lang) }))}</p>` : '';
+  }
+  function traduireBulle(cle, texte) {
+    const t = trads[cle]; if (!t || !etrangere(t) || t.etat === 'charge') return;
+    t.etat = 'charge'; rendre();
+    TRAD.traduire(texte, t.lang, UI_LANGUE).then((r) => { if (r && r.ok) { t.etat = 'fait'; t.texte = r.texte; } else t.etat = 'ko'; rendre(); });
+  }
+  // La langue de l'ACHETEUR d'une conversation : sa question repérée (règle des réponses rapides), sinon son dernier message.
+  function langueAcheteurConv(conv) { const k = Object.keys(trads).find((x) => x.startsWith(conv + ':') && etrangere(trads[x])); return k ? trads[k].lang : ''; }
+  function tradRepHtml(conv) {
+    const l = langueAcheteurConv(conv);
+    if (!l || !TRAD.presente()) return '';
+    const r = tradsRep[conv];
+    if (r && r.etat === 'fait') return `<div class="vu-trad" data-trad-rep="fait" data-trad-rep-langue="${esc(r.lang)}"><b>${esc(TU('tr_ton_texte'))}</b><span data-trad-rep-original>${esc(r.original)}</span></div>`
+      + `<div class="vu-trad" data-trad-rep-texte><b>${esc(TU('tr_ta_reponse', { l: nomL(r.lang) }))}</b><span>${esc(r.texte)}</span><small>${esc(TU('tr_verifie'))}</small></div>`
+      + `<div class="ge5"><button type="button" class="vu-btn vu-sec" data-trad-rep-utiliser="${esc(conv)}">${esc(TU('tr_utiliser'))}</button></div>`;
+    if (r && r.etat === 'ko') return `<p class="note5" data-trad-rep="ko">${esc(TU('tr_ko'))}</p>`;
+    return `<button type="button" class="vu-lien" data-trad-rep-lancer="${esc(conv)}"${r && r.etat === 'charge' ? ' disabled aria-busy="true"' : ''}>${esc(TU(r && r.etat === 'charge' ? 'tr_charge' : 'tr_ma_reponse', { l: nomL(l) }))}</button>`;
+  }
+  function traduireReponse(conv) {
+    const texte = String(brouillons.get(conv) || '').trim(), l = langueAcheteurConv(conv);
+    if (!texte || !l) return;
+    tradsRep[conv] = { etat: 'charge', original: texte, lang: l }; rendre();
+    TRAD.traduire(texte, UI_LANGUE, l).then((r) => { tradsRep[conv] = r && r.ok ? { etat: 'fait', texte: r.texte, original: texte, lang: l } : { etat: 'ko' }; rendre(); });
+  }
+  // ══ 5.430 (choix n° 75) — LA NOTE DE L'ACHETEUR d'une conversation ouverte : déjà sue (la liste), sinon lue par le fond
+  //    sur SON toucher (budget de lecture, une requête à la fois).
+  const notesConv = {};
+  function noteConvHtml(x) {
+    if (!U.noteAcheteur || !listes || listes.plateforme === 'leboncoin' || listes.plateforme === 'vestiaire') return '';
+    let et = notesConv[x.conv] && notesConv[x.conv].note ? notesConv[x.conv].note : x.note || null;
+    if ((!et || et.k === 'pas-su') && !notesConv[x.conv]) {
+      notesConv[x.conv] = { charge: true };
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'noteAcheteur', conv: x.conv }, (r) => { void chrome.runtime.lastError; notesConv[x.conv] = { note: r && r.ok && r.note ? r.note : null }; rendre(); }); } catch (_) {}
+    }
+    return et ? `<div class="conv5-note" data-conv-note>${U.noteAcheteur(et)}</div>` : '';
   }
   function rrHtml(x) {
     const conv = String(x.conv || '');
@@ -3517,7 +3599,7 @@ function vrmVerifVisible(sel) {
   const AG_RAISON = { palier: 'ag_r_palier', flexible: 'ag_r_flexible', au_dessus_du_seuil: 'ag_r_seuil', sous_le_refus: 'ag_r_refus', plancher_inconnu: 'ag_r_plancher', prix_inconnu: 'ag_r_prix',
     pas_prouvee_en_vente: 'ag_r_en_vente', double_vente_pas_exclue: 'ag_r_double', sous_plancher: 'ag_r_sous_plancher', palier_hors_bornes: 'ag_r_paliers', paliers_epuises: 'ag_r_paliers',
     question_ambigue: 'ag_r_ambigue', plusieurs_questions: 'ag_r_plusieurs', photos_absentes: 'ag_r_photos', annonce_partie: 'ag_r_partie', dispo_pas_su: 'ag_r_partie', prix_mini: 'ag_r_mini',
-    dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', photos: 'rr_c_photos' };
+    dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', photos: 'rr_c_photos', note_basse: 'ag_r_note', compte_neuf: 'ag_r_neuf' };
   const agRaison = (c) => { const k = String(c || ''); if (AG_RAISON[k]) return TU(AG_RAISON[k]); if (/^risque_/.test(k)) return TU('ag_r_risque'); if (/^categorie_/.test(k)) return TU('ag_r_categorie'); if (/^info_manquante/.test(k)) return TU('ag_r_info'); return TU('ag_r_autre'); };
   const AG_GESTE = { accepter: 'ag_g_accepter', contre: 'ag_g_contre', refuser: 'ag_g_refuser', repondre: 'ag_g_repondre', a_toi: 'ag_g_a_toi' };
   const AG_ETAT = { prevu: 'ag_e_prevu', envol: 'ag_e_envol', fait: 'ag_e_fait', essai: 'ag_e_essai', a_toi: 'ag_e_a_toi', saute: 'ag_e_saute', refuse: 'ag_e_refuse', incertain: 'ag_e_incertain' };
@@ -3544,11 +3626,33 @@ function vrmVerifVisible(sel) {
       + `<div class="rg6"><span><b>${esc(TU('ag_essai'))}</b><small>${esc(TU('ag_essai_note'))}</small></span>${on ? '' : `<button type="button" class="vu-btn ra6" data-bm-choix="agent.essaiDemarrer" data-bm-v="${v.essaiDemarrer === 'non' ? 'oui' : 'non'}" aria-pressed="${v.essaiDemarrer !== 'non'}">${esc(TU(v.essaiDemarrer === 'non' ? 'ag_non' : 'ag_oui'))}</button>`}</div>`
       + bmNombre('agent', 'essaiJours', 'ag_essai_jours', 0, 14)
       + `<label class="champ6"><b>${esc(TU('ag_calme'))}</b><small>${esc(TU('ag_calme_note'))}</small><span class="cd6-l"><input type="number" min="0" max="23" data-bm-champ="agent.hcDe" value="${esc(v.hcDe != null ? v.hcDe : hc.de)}" aria-label="de"> – <input type="number" min="0" max="23" data-bm-champ="agent.hcA" value="${esc(v.hcA != null ? v.hcA : hc.a)}" aria-label="à"></span></label>`
-      + `<p class="note5">${esc(TU('ag_gardes'))}</p>`, 'ag_titre', 'ag_etat_note') + agentTableauHtml();
+      + `<p class="note5">${esc(TU('ag_gardes'))}</p>`, 'ag_titre', 'ag_etat_note') + noteReglageHtml() + agentTableauHtml();
+  }
+  // 5.430 : SON seuil (1,5 ★ par défaut) et « compte sans évaluation » — écrits dans `vinted_bleam.comptes[uid].noteAcheteurs`.
+  function noteReglageHtml() {
+    if (!listes || !listes.automatisations || !listes.automatisations.bleam) return '';
+    const v = bmVal('noteAcheteurs'), seuil = Number(v.seuil) > 0 ? Number(v.seuil) : 1.5, neuf = !(v.neufAccepter === false || v.neufAccepter === 'non');
+    const choix = [1, 1.5, 2, 2.5, 3, 3.5, 4];
+    if (!choix.includes(seuil)) choix.push(seuil);
+    return `<section class="sec6" data-na-reglage data-na-seuil-lu="${seuil}" data-na-neuf-lu="${neuf ? 'oui' : 'non'}"><h3>${esc(TU('na_titre'))}</h3><p class="note5">${esc(TU('na_expl'))}</p>`
+      + `<label class="champ6"><b>${esc(TU('na_seuil'))}</b><select class="act5" data-na-seuil>${choix.sort((a, b) => a - b).map((x) => `<option value="${x}"${x === seuil ? ' selected' : ''}>${esc(TU('na_seuil_opt', { s: etoiles6(x) }))}</option>`).join('')}</select></label>`
+      + `<div class="rg6"><span><b>${esc(TU('na_neuf_r'))}</b><small>${esc(TU('na_neuf_r_note'))}</small></span><div class="vu-seg vue5" role="group"><button type="button" data-na-neuf="oui" aria-pressed="${neuf}">${esc(TU('ag_oui'))}</button><button type="button" data-na-neuf="non" aria-pressed="${!neuf}">${esc(TU('ag_non'))}</button></div></div></section>`;
   }
   function relanceDetailHtml() {
     return bmSectionHtml('relanceOffres', `<p class="note5">${esc(TU('rel_note'))}</p>` + bmNombre('relanceOffres', 'jours', 'rel_jours', 1, 30) + bmNombre('relanceOffres', 'taux', 'rel_taux', 0, 50), 'rel_titre', 'rel_auto_note')
       + `<section class="sec6" data-rel-liste><h3>${esc(TU('rel_liste'))}</h3>${relancesHtml()}</section>`;
+  }
+  function brancher5430(racine) {
+    racine.querySelectorAll('[data-traduire]').forEach((b) => b.addEventListener('click', () => { const cle = b.getAttribute('data-traduire'); const conv = cle.split(':')[0];
+      const x = listes && listes.messages && listes.messages.liste ? listes.messages.liste.find((y) => y.conv === conv) : null;
+      let texte = '';
+      if (/:d$/.test(cle)) texte = x ? x.texte || '' : '';
+      else { const m = /:vc(\d+)$/.exec(cle); const f = filsVc[conv]; texte = m && f && f.data && f.data.messages && f.data.messages[Number(m[1])] ? f.data.messages[Number(m[1])].t || '' : ''; }
+      if (texte) traduireBulle(cle, texte); }));
+    racine.querySelectorAll('[data-trad-rep-lancer]').forEach((b) => b.addEventListener('click', () => traduireReponse(b.getAttribute('data-trad-rep-lancer'))));
+    racine.querySelectorAll('[data-trad-rep-utiliser]').forEach((b) => b.addEventListener('click', () => { const conv = b.getAttribute('data-trad-rep-utiliser'), r = tradsRep[conv]; if (r && r.etat === 'fait') { brouillons.set(conv, r.texte); delete tradsRep[conv]; rendre(); } }));
+    { const sel = racine.querySelector('[data-na-seuil]'); if (sel) sel.addEventListener('change', () => { bmBrouillon.noteAcheteurs = Object.assign({}, bmVal('noteAcheteurs'), { seuil: Number(sel.value) }); bmEnvoyer('noteAcheteurs', false, false); }); }
+    racine.querySelectorAll('[data-na-neuf]').forEach((b) => b.addEventListener('click', () => { bmBrouillon.noteAcheteurs = Object.assign({}, bmVal('noteAcheteurs'), { neufAccepter: b.getAttribute('data-na-neuf') === 'oui' }); bmEnvoyer('noteAcheteurs', false, false); }));
   }
   function brancher5421(racine) {
     racine.querySelectorAll('[data-rr-envoyer]').forEach((b) => b.addEventListener('click', () => rrEnvoyer(b.getAttribute('data-rr-conv'), Number(b.getAttribute('data-rr-envoyer')))));
@@ -3640,7 +3744,7 @@ function vrmVerifVisible(sel) {
         const t = b0.refus != null ? b0.refus : (o && o.refusTexte) || '';
         corpsR = section('au6_regle', ligne('au_minis', o ? TU('au_minis_n', { n: o.minis }) : null, 'au6_minis_note'))
           + section('au6_messages', `<label class="champ6"><b>${esc(TU('ra_refus_msg'))}</b><small>${esc(TU('ra_refus_note'))}</small><textarea data-ra-champ="refus" maxlength="1000" rows="3">${esc(t)}</textarea></label>`)
-          + section('au6_delais', ligne('au_attente', TU('au6_offres_delai')));
+          + section('au6_delais', ligne('au_attente', TU('au6_offres_delai'))) + noteReglageHtml();
       } else if (autoChoisie === 'paliers') {
         const pcts = b0.paliers != null ? b0.paliers : (pa ? pa.paliers.join(', ') : '50, 80, 100');
         const rem = b0.remise != null ? b0.remise : (pa && pa.remiseMax ? String(pa.remiseMax) : '');
@@ -4002,6 +4106,7 @@ function vrmVerifVisible(sel) {
     const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
     brancherBleam(racine);   // 5.410.4
     brancher5421(racine);   // 5.421 : réponses rapides, lots, relances, agent
+    brancher5430(racine);   // 5.430 : traduction sur l'appareil, note des acheteurs
     racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
