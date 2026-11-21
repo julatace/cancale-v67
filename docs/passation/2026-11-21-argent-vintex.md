@@ -48,6 +48,15 @@ Sur l'ancien code il rapporte exactement les défauts de ses captures : « Saisi
 saisis » (deux éléments), un plein, phrase sur deux lignes, 0/6 mois chiffrés, Comptes hors carte, « acheté 10 € → +1 »
 coupé. Mutations (branche) : `sur: Bn.n - 1` ⇒ P rouge ; `.n-arg-l-val` à 40 px rognés ⇒ M rouge.
 
+## Autres contrôles (21 nov.)
+
+- `argent-natif` : 612 verts, 0 rouge (les rangées de chiffre portent `data-arg-rangee` : « Voir les 27 » est une rangée de
+  liste, pas un bouton pleine largeur).
+- `argent-mois` : 88 verts, 16 rouges, **les mêmes 16 sur origin/main** (« Argent à venir » de Ventes : à venir sur 2 ventes,
+  une ligne par site et par compte, date Vestiaire, date Vinted) — hors de Mois, pas touché ici.
+- audit-urssaf, audit-traduction (45/0), audit-quoi-de-neuf, audit-coherence, audit-icones : verts ; build vert.
+- Le gros chiffre du reçu est en chiffres proportionnels : avec `tabular-nums` en gras, « 1 841 » se lisait « 1841 ».
+
 ## Reste / pour la suite
 
 - Le bloc « Tes seuils de l'année » (DAC7) au-dessus de Mois et la liste des replis dessous (« Ton bénéfice »,
