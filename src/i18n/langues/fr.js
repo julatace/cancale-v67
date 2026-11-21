@@ -18,6 +18,7 @@ import ecran_argent_v2 from './fr/argentV2.js';   // (17 nov., phase 2) Argent e
 import ecran_v2_ventes from './fr/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_depot from './fr/depot.js';   // (21 nov., ext. 5.429) brouillons préparés, descriptions types, boost
 import ecran_avenir from './fr/avenir.js';
 import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -2349,6 +2350,7 @@ export default {
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,
+  ...ecran_depot,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,

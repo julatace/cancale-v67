@@ -75,7 +75,7 @@ export function verdictBoost({ serie, periode, venteAt = null, offres = null, co
   const S = Array.isArray(serie) ? serie : [];
   const p = periode;
   const base = { verdict: 'pas-assez', pendant: null, avant: null, semblables: null, vendue: false, offres: offres && typeof offres === 'object' ? offres : null, cout: Number(cout) > 0 ? Math.round(Number(cout) * 100) / 100 : null, raison: '' };
-  if (!p || !Number.isFinite(p.debut) || !Number.isFinite(p.fin)) return { ...base, raison: 'aucun boost relevé' };
+  if (!p || !Number.isFinite(p.debut) || !Number.isFinite(p.fin)) return { ...base, raison: 'aucun boost relevé', code: 'aucun' };
   // Pendant : du relevé de la veille du début jusqu'au dernier jour boosté ; avant : la MÊME durée (`n`, en ms), juste avant.
   const debut0 = p.debut - JOUR;
   const n = p.fin - debut0;
@@ -95,14 +95,14 @@ export function verdictBoost({ serie, periode, venteAt = null, offres = null, co
   }
   if (sp.length >= SEUILS_BOOST.semblablesMin) semb = { n: sp.length, vuesJourPendant: mediane(sp), vuesJourAvant: mediane(sa) };
   const out = { ...base, pendant, avant, semblables: semb, vendue };
-  if (vendue) return { ...out, verdict: 'a-servi', raison: 'vendue pendant le boost' };
-  if (!pendant || !avant) return { ...out, raison: !pendant ? 'pas de relevé assez proche pendant le boost' : 'pas de relevé assez long avant le boost' };
-  if (pendant.vues + avant.vues < SEUILS_BOOST.vuesMin) return { ...out, raison: `moins de ${SEUILS_BOOST.vuesMin} vues en tout` };
+  if (vendue) return { ...out, verdict: 'a-servi', raison: 'vendue pendant le boost', code: 'vente' };
+  if (!pendant || !avant) return { ...out, raison: !pendant ? 'pas de relevé assez proche pendant le boost' : 'pas de relevé assez long avant le boost', code: !pendant ? 'pendant' : 'avant' };
+  if (pendant.vues + avant.vues < SEUILS_BOOST.vuesMin) return { ...out, raison: `moins de ${SEUILS_BOOST.vuesMin} vues en tout`, code: 'vues' };
   const ratio = avant.vuesJour > 0 ? pendant.vuesJour / avant.vuesJour : (pendant.vuesJour > 0 ? Infinity : 1);
   const ratioS = semb && semb.vuesJourPendant > 0 ? pendant.vuesJour / semb.vuesJourPendant : null;
-  if (ratio >= SEUILS_BOOST.servi && (ratioS == null || ratioS >= SEUILS_BOOST.servi)) return { ...out, verdict: 'a-servi', ratio, ratioS, raison: 'plus de vues par jour' };
-  if (ratio < SEUILS_BOOST.pasServi && (ratioS == null || ratioS < SEUILS_BOOST.pasServi)) return { ...out, verdict: 'pas-servi', ratio, ratioS, raison: 'pas plus de vues par jour' };
-  return { ...out, ratio, ratioS, raison: 'écart trop faible pour conclure' };
+  if (ratio >= SEUILS_BOOST.servi && (ratioS == null || ratioS >= SEUILS_BOOST.servi)) return { ...out, verdict: 'a-servi', ratio, ratioS, raison: 'plus de vues par jour', code: 'plus' };
+  if (ratio < SEUILS_BOOST.pasServi && (ratioS == null || ratioS < SEUILS_BOOST.pasServi)) return { ...out, verdict: 'pas-servi', ratio, ratioS, raison: 'pas plus de vues par jour', code: 'pas-plus' };
+  return { ...out, ratio, ratioS, raison: 'écart trop faible pour conclure', code: 'ecart' };
 }
 
 // « BOOSTS DU MOIS » : chaque boost relevé qui touche le mois [de, a[ (ms). `annonces` : [{ id, uid, serie, venteAt, cout,

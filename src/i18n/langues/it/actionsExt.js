@@ -4,6 +4,8 @@ export default {
   "actionsExt.changerPrix": "Cambia il prezzo nell’estensione",
   "actionsExt.baisser": "Abbassa nell’estensione",
   "actionsExt.remettrePrix": "Ripristina i prezzi nell’estensione",
+  "actionsExt.republierMaintenant": "Ripubblica ora",
+  "actionsExt.deposer": "Deposita dall’estensione",
   "actionsExt.republier": "Ripubblica nell’estensione",
   "actionsExt.mettreEnLigne": "Metti online nell’estensione",
   "actionsExt.versBrouillon": "Metti in bozza nell’estensione",

@@ -16,6 +16,11 @@ export const ACTIONS_EXTENSION = {
   baisser:         { page: 'prix', action: 'baisser', cle: 'actionsExt.baisser' },
   remettrePrix:    { page: 'prix', action: 'remettre', cle: 'actionsExt.remettrePrix' },
   republier:       { page: 'republier', action: 'republier', cle: 'actionsExt.republier' },
+  // 5.429 (Julien, 21 nov. : « la republication à la main ») : « Republier » d'une annonce ou d'une sélection ⇒ la feuille
+  //    Avant | Après de CES paires dans le panneau, puis SON « Republier maintenant » (le chemin de l'atelier).
+  republierMaintenant: { page: 'republier', action: 'republier-direct', cle: 'actionsExt.republierMaintenant' },
+  // 5.429 : « Déposer N sur Vinted » — les fiches PRÉPARÉES dans VRM (ids = identifiants des fiches, jamais des annonces).
+  deposer:         { page: 'publier', action: 'deposer', cle: 'actionsExt.deposer' },
   mettreEnLigne:   { page: 'republier', action: 'mettre-en-ligne', cle: 'actionsExt.mettreEnLigne' },
   versBrouillon:   { page: 'republier', action: 'brouillon', cle: 'actionsExt.versBrouillon' },
   creerVinted:     { page: 'publier', action: 'creer', cle: 'actionsExt.creerVinted' },
@@ -30,7 +35,7 @@ export const ACTIONS_EXTENSION = {
 };
 
 // Les actions de la feuille « Actions » des annonces (src/annoncesActions.js) → l'action du panneau.
-export const PANNEAU_DE_SELECTION = { recreer: 'republier', modifier: 'changerPrix', versBrouillon: 'versBrouillon', enLigne: 'mettreEnLigne', baisser: 'baisser' };
+export const PANNEAU_DE_SELECTION = { recreer: 'republierMaintenant', modifier: 'changerPrix', versBrouillon: 'versBrouillon', enLigne: 'mettreEnLigne', baisser: 'baisser' };
 
 export const NOMS_SITES = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective' };
 

@@ -2866,6 +2866,17 @@ function vrmVerifVisible(sel) {
   function lignesMasquer6(c) {
     return c.ids.map((id) => { const x = deAnn6(id); return { id, sorte: c.k, titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { statut: c.k === 'masquer' ? 'masque' : 'en_vente' } }; });
   }
+  // 5.429 (Julien, 21 nov. : « la republication à la main, je veux aussi qu'il y ait ») — UN geste DIRECT : sur une annonce
+  //    (la fiche « ⋯ ») ou la sélection, « Republier » ouvre TOUT DE SUITE la feuille Avant | Après de CETTE paire (le contrôle
+  //    avant départ lancé en même temps), puis « Republier maintenant » (SON 2e toucher) lance le MÊME chemin que l'atelier
+  //    (`atelierLancer` : contrôle, ordre coffre → brouillon relu → suppression → mise en ligne, onglet de travail, plafonds,
+  //    jamais deux en ligne). Espacement par défaut (au hasard 2 à 6 min) ; « Retour » montre les réglages de l'atelier.
+  function republierDirect6(ids) {
+    const l = [...new Set((ids || []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, 50);
+    if (!l.length) return;
+    geste6 = { k: 'atelier', ids: l, mode: 'aleatoire', min: 2, max: 6, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false, quand: 'maintenant', at: atDefaut6(), progConf: false, aa: true, direct: true };
+    geste6Etat = null; rendre(); atelierVerifier6(null, null);
+  }
   function geste6Html() {
     if (!geste6) return '';
     const toutes = (listes && listes.annonces && listes.annonces.toutes) || [];
@@ -2882,7 +2893,8 @@ function vrmVerifVisible(sel) {
     if (geste6.k === 'atelier' && geste6.aa) {
       const g = geste6, lp = g.verif && g.verif.lancer;
       const L = lignesAtelier6();
-      return `<section class="geste6" data-geste="atelier" data-aa-vue><h3>${esc(TU('m3_feuille'))}</h3>${etat}<p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}<div class="pied6"><button type="button" class="vu-btn" data-aa-retour>${esc(TU('m3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || !L.length || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('m3_lancer'))}</button></div></section>`;
+      const lpN = lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : '';
+      return `<section class="geste6" data-geste="atelier" data-aa-vue${g.direct ? ' data-repub-direct' : ''}><h3>${esc(g.direct ? TU(g.ids.length === 1 ? 'rd_titre_un' : 'rd_titre', { n: g.ids.length }) : TU('m3_feuille'))}</h3>${etat}<p class="note5">${esc(TU('g6_atelier_ordre'))}</p>${g.verifEnCours ? `<p class="note5" data-atelier-recap="cours">${esc(TU('g6_verif_cours'))}</p>` : ''}${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}${lpN}<div class="pied6">${g.direct ? fermer : ''}<button type="button" class="vu-btn" data-aa-retour>${esc(TU(g.direct ? 'rd_reglages' : 'm3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || !L.length || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU(g.direct ? 'rd_maintenant' : 'm3_lancer'))}</button></div></section>`;
     }
     if (geste6.k === 'prix') {
       const lignes = geste6.ids.map((id) => { const x = de(id); const pl = plancher6(x); const v = geste6.prix[id] != null ? geste6.prix[id] : '';
@@ -3050,6 +3062,7 @@ function vrmVerifVisible(sel) {
     const R = racine;
     try { brancherLbcInt(R); } catch (_) {}
     try { const dv = depotVue(); if (dv) dv.lier(R); } catch (_) {}   // 5.429
+    R.querySelectorAll('[data-repub-direct-b]').forEach((b) => b.addEventListener('click', () => republierDirect6([b.getAttribute('data-repub-direct-b')])));   // 5.429
     try { brancherModif6(R); } catch (_) {}
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
@@ -3180,7 +3193,7 @@ function vrmVerifVisible(sel) {
     const nSel = [...annSel].length;
     const cols = COLS6.filter((c) => annCols.has(c));
     const site = (e && e.plateforme) || 'vinted';
-    const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'publier', 'masquer', 'afficher', 'favoris', 'ouvrir'];
+    const gestes = site === 'leboncoin' ? ['baisser', 'supprimer', 'ouvrir'] : site === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier_direct', 'republier', 'baisser', 'publier', 'masquer', 'afficher', 'favoris', 'ouvrir'];
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
       + gestes.map((k) => `<option value="${k}"${((k === 'ouvrir' || k === 'supprimer' || k === 'publier') && nSel !== 1) || ((k === 'masquer' || k === 'afficher') && nSel > 10) ? ' disabled' : ''}${annActionPre === k ? ' selected' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
     const statutMenu = `<details class="cols5 statut6" data-ann-statut-menu${annStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${annStatuts ? ` · ${annStatuts.size}` : ''}</summary><div class="cols5-l">${STATUTS5.filter((k) => k !== 'a_confirmer' || (st && st.a_confirmer)).map((k) => `<label><input type="checkbox" data-ann-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(k === 'a_confirmer' ? 's_pas_revues' : 's_' + k))}</span><b>${st ? Number(st[k] || 0).toLocaleString('fr-FR') : '—'}</b></label>`).join('')}</div></details>`;
@@ -3444,6 +3457,7 @@ function vrmVerifVisible(sel) {
       if (!k || !ids.length) return;
       // Les gestes en série passent par leurs chemins GARDÉS : l'atelier Republier et la baisse de VRM (sur SON
       // clic là-bas), le parcours des favoris de la carte. Jamais de suppression en série.
+      if (k === 'republier_direct') { republierDirect6(ids); return; }   // 5.429 : « Republier maintenant », sans passer par l'atelier
       if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false, quand: 'maintenant', at: atDefaut6(), progConf: false }; geste6Etat = null; rendre(); atelierVerifier6(null, null); return; }
       if (k === 'baisser') { geste6 = { k: 'prix', ids: ids.slice(0, 20), prix: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'publier' && ids.length === 1) { geste6 = { k: 'publier', id: ids[0], site: 'leboncoin', questions: [], problemes: [], reponses: {} }; geste6Etat = null; rendre(); return; }
@@ -3506,7 +3520,7 @@ function vrmVerifVisible(sel) {
       + `${fait5('p_ecart', ecart5(x.prix, x.achat), 'ecart')}${fait5('p_taille', x.taille, 'taille')}${fait5('p_marque', x.marque, 'marque')}${fait5('p_etat', x.etat, 'etat')}`
       + `${fait5('p_depuis', x.jours != null ? TU('p_jours', { n: x.jours }) : null, 'depuis')}${fait5('p_favoris', x.favoris != null ? String(x.favoris) : null, 'favoris')}${fait5('p_vues', x.vues != null ? String(x.vues) : null, 'vues')}${fait5('p_place', x.place || null, 'place')}</div>`
       + (x.description ? `<p class="desc5" data-desc>${esc(x.description)}</p>` : '')
-      + `<div class="ge5"><a class="vu-btn vu-sec" href="${esc(lien)}" target="_top" data-geste="ouvrir">${esc(TU('p_ouvrir_vinted'))}</a><a class="vu-btn vu-sec" href="https://vrm.center/?tab=annonces&site=vinted" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
+      + `<div class="ge5">${/^\d{4,15}$/.test(String(x.id)) && /(^|\.)vinted\./.test(String(location.hostname || '')) && x.statut !== 'vendu' && x.statut !== 'brouillon' ? `<button type="button" class="vu-btn vu-sec" data-repub-direct-b="${esc(x.id)}">${esc(TU('rd_bouton'))}</button>` : ''}<a class="vu-btn vu-sec" href="${esc(lien)}" target="_top" data-geste="ouvrir">${esc(TU('p_ouvrir_vinted'))}</a><a class="vu-btn vu-sec" href="https://vrm.center/?tab=annonces&site=vinted" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
   }
   function ficheVenteHtml(x, ici) {
     const conv = /^[1-9]\d{0,19}$/.test(String(x.conv || '')) ? x.conv : '';
@@ -5295,7 +5309,7 @@ function vrmVerifVisible(sel) {
   // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
   // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
   const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
-  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier-direct', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
   // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
   const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
   function lireLienPanneau() {
@@ -5321,6 +5335,7 @@ function vrmVerifVisible(sel) {
     ongletListe = lienPanneau.page;
     // Un lien « Déposer » porte des FICHES de l'app (jamais des annonces) : elles sont pré-cochées dans « Brouillons préparés ».
     if ((lienPanneau.action === 'deposer' || lienPanneau.action === 'creer') && depotVue()) depotVue().ouvrir(lienPanneau.ids);
+    else if (lienPanneau.action === 'republier-direct' && lienPanneau.ids.length) { for (const id of lienPanneau.ids) annSel.add(id); setTimeout(() => { try { republierDirect6(lienPanneau.ids); } catch (_) {} }, 450); }
     else for (const id of lienPanneau.ids) annSel.add(id);
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
