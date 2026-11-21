@@ -18,6 +18,7 @@ import { Pastille } from '../Pastille.jsx';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) tout est mélangé : le logo du site de chaque vente
 import { celluleAchat, GestesAchat } from './celluleAchat.jsx';
+import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
@@ -30,7 +31,9 @@ const morceaux = (...x) => x.filter(Boolean).map((t, i) => <React.Fragment key={
 const vignette = (r, Photo, taille = 56) => <Vignette src={r.photo || ''} alt="" taille={taille} image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
 // (21 nov., Julien : « les icônes devant […] beaucoup trop petit, il n'y a même pas le nom de la paire en entier avec la taille »)
 // « Marque · T42 » sous le titre : la marque LUE (ou écrite dans le titre, pour l'affichage seulement — jamais une identité) et la taille.
-const marqueTaille = (r) => joint(r.marque, r.taille ? tr('vv.taille', { t: r.taille }) : '');
+// « rien en double » : ce que le titre dit déjà (la marque, la taille) ne se répète pas (src/ventes/marqueTaille.js).
+const marqueTailleM = (r) => morceauxMarqueTaille(r, (t) => tr('vv.taille', { t }));
+const marqueTaille = (r) => joint(...marqueTailleM(r));
 
 // La date limite en mots : LUE ⇒ « avant le 22 nov. · dans 3 j » ; ESTIMÉE ⇒ « vers le 22 nov. » (jamais « en retard », §5).
 function texteEcheance(e) {
@@ -80,8 +83,11 @@ function RangeeColis({ r, g, Icon, Photo, choisie, onOuvrir }) {
       vignette={vignette(r, Photo, 64)}
       titre={r.titre} lignes={2}
       plaque={avecSite(r, r.num ? <Plaque numero={r.num} doublon={r.numDouble}/> : null)}
-      sousTitre={sansBordereau(r) ? morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', marqueTaille(r), tr('vt.sansBordMeta')) : joint(!r.num && r.numAttendu ? tr('vn.numAttente') : '', marqueTaille(r))} sousLignes={sansBordereau(r) ? 2 : 1}
-      note={ligneTel(r, ech ? <span className="n-vt-limite" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : null)}
+      // (21 nov., 2e passe) Dense : la date limite rejoint la ligne du N° (chaque morceau reste entier, la ligne passe à la ligne
+      // seulement s'il le faut) ; dessous, prix · étiquette · transporteur ; au pied, l'achat.
+      sousTitre={morceaux(!r.num && r.numAttendu ? tr('vn.numAttente') : '', ...marqueTailleM(r), sansBordereau(r) ? tr('vt.sansBordMeta') : '',
+        ech ? <span className="n-vt-limite" data-vt-limite-rangee="" data-vt-ambre={r.echeance && r.echeance.ambre ? '1' : undefined}>{ech}</span> : '')} sousLignes={2}
+      note={ligneTel(r, null)}
       pied={piedAchat(r, Icon)}
       selection={{ cochee: r.coche.on, indisponible: !r.coche.possible, libelle: tr(r.coche.possible ? 'vv.coche.label' : 'vv.coche.sansBordereau', { titre: r.titre }),
         onChange: () => g.basculer(r.coche.cle), attrs: { 'data-vn-coche': r.cle } }}
@@ -100,9 +106,9 @@ function RangeeRoute({ r, Icon, Photo, choisie, onOuvrir }) {
       vignette={vignette(r, Photo, 64)}
       titre={r.titre} lignes={2}
       plaque={avecSite(r, r.num ? <Plaque numero={r.num}/> : null)}
-      sousTitre={marqueTaille(r)}
+      sousTitre={morceaux(...marqueTailleM(r), texteEtape(r.etapes))} sousLignes={2}
       ton={r.etat.ambre ? 'ambre' : 'neutre'}
-      note={ligneTel(r, texteEtape(r.etapes))}
+      note={ligneTel(r, null)}
       pied={piedAchat(r, Icon)}
       selectionnee={choisie} fin="chevron" onClick={() => onOuvrir(r.cle)}
       actions={r.lienSuivi ? [{ cle: 'suivre', libelle: tr('vn.b.suivre'), icone: <Icon name="truck" size={20}/>, onClick: () => { try { window.open(r.lienSuivi, '_blank', 'noopener'); } catch (_) {} }, franc: true }] : null}

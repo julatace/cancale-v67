@@ -365,6 +365,8 @@ const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArriv
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 // (21 nov., ventes-lisibles) Terminées au téléphone : la rangée native de Ventes (vignette 64, titre entier, l'achat en un toucher).
 const VentesListeTel = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.VentesListeTel })));
+// (21 nov., ventes-lisibles) « Lier à un achat » façon Bleam : la grille des achats arrivés, SON toucher puis « Oui ».
+const LierAchatGrille = aLaDemande(() => import('./natif/ecrans/LierAchatGrille.jsx'));
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
 const RetoursVentes = aLaDemande(() => import('./natif/ecrans/RetoursVentes.jsx'));   // (20 nov.) Retours et litiges, une présentation
@@ -45806,9 +45808,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return true;
   };
-  const choisirAchatVente = (l, propose, opts = {}) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined; const _triArrivee = opts.triArrivee ? true : undefined;
+  const choisirAchatVente = (l, propose, opts = {}) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined; const _triArrivee = opts.triArrivee ? true : undefined; const _bleam = opts.bleam ? true : undefined;
     const size = typeof o.size_title === 'string' && o.size_title ? o.size_title : undefined;
-    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size }); };
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam }); };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -49084,7 +49086,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       return 'ok';
     } : null;
     return { relie, prix: p != null ? montant(p) : '', titre: (o && o.title) || '', saisir,
-      ouvrir: () => { let idf = null; try { idf = identiteAnnonce(o); } catch (_) { idf = null; } choisirAchatVente({ o, idf }, null, { triArrivee: true }); } };
+      ouvrir: () => { let idf = null; try { idf = identiteAnnonce(o); } catch (_) { idf = null; } choisirAchatVente({ o, idf }, null, { triArrivee: true, bleam: true }); } };
   };
   // (21 nov.) L'ACHAT d'une vente des AUTRES sites, avec les règles de CHAQUE site :
   //  · eBay : le bilan de la ligne eBay (`bilanCommandeEbay` + `vrm_ebay_couts[[compte, commande]]`, la clé de `sauverCouts`,
@@ -58816,12 +58818,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             </div>
             <div data-relier-achat-corps className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
               <AccAvant geste="achat.relier"/>
-              <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
+              {/* (21 nov., ventes-lisibles) Depuis une vente (cellule « Achat » de Ventes) : la grille façon Bleam, tant que la vente n'a
+                  pas d'achat relié ; « Plus de choix » rend la feuille d'avant (suggestions, déjà reliés, lots, tous les filtres). */}
+              {pickerFor._bleam && !pickerFor._plus && !pickerFor._autre && !achatRelie(entreePicker(pickerFor)) ? <LierAchatGrille achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
+                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} recuDe={(a)=>achatStage(a, trackForBuy(a)).step === 4} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''}
+                marqueDe={extractBrand} Photo={PhotoVinted} onRelier={relierAchat} onPlus={()=>setPickerFor((p)=>(p ? { ...p, _plus: true } : p))}/>
+              : <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
-                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>
+                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>}
             </div>
           </div>
         </div>, document.body)}

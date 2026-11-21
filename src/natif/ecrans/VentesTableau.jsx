@@ -17,11 +17,13 @@ import { Rangee, Vignette } from '../Rangee.jsx';
 import { Pastille } from '../Pastille.jsx';
 import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
+import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 
 const TON = { envoyer: 'ambre', route: 'accent', terminee: 'encre', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // (21 nov.) « Marque · T42 » : la marque de la ligne (lue, ou écrite dans le titre — pour l'affichage seulement) et sa taille.
-const marqueTaille = (l) => joint(l.marque, l.taille ? tr('vv.taille', { t: l.taille }) : '');
+// Ce que le titre dit déjà ne se répète pas (src/ventes/marqueTaille.js).
+const marqueTaille = (l) => joint(...morceauxMarqueTaille(l, (t) => tr('vv.taille', { t })));
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function VentesTableau({ lignes, haut = null, pied = '', majLe, onRafraichir = null, rafraichit = false, compte = '', filtres = [],
