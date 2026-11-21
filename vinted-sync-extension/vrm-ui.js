@@ -1109,6 +1109,7 @@
   .vu-frise [data-etat="erreur"] .vu-fr-t { color: var(--vu-ambre); }
   .vu-fr-t small { display: block; font-size: 11px; font-weight: 500; }
   @keyframes vu-fr-pouls { 0%, 100% { box-shadow: 0 0 0 2px var(--vu-barre); } 50% { box-shadow: 0 0 0 5px rgb(15 107 76/.12); } }
+  .vu-aa, .vu-bl { max-width: 880px; }
   .vu-aa { display: grid; gap: 10px; font: 400 14px/1.35 var(--vu-police); color: var(--n-encre, var(--vu-encre)); }
   .vu-aa-tot { font: 650 15px/1.3 var(--vu-police); }
   .vu-aa-note { margin: 0; font-size: 13px; color: var(--n-encre-2, var(--vu-muet)); }
@@ -1122,7 +1123,7 @@
   .vu-aa-ti { min-width: 0; display: grid; gap: 2px; }
   .vu-aa-ti b { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
   .vu-aa-ti small { display: flex; gap: 6px; align-items: center; color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; }
-  .vu-aa-d { font: 600 13px/1.2 var(--vu-police); white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: var(--vu-chg); color: var(--vu-chg-encre); font-variant-numeric: tabular-nums; }
+  .vu-aa-d { font: 600 13px/1.2 var(--vu-police); white-space: normal; max-width: 48vw; text-align: center; justify-self: end; padding: 3px 8px; border-radius: 6px; background: var(--vu-chg); color: var(--vu-chg-encre); font-variant-numeric: tabular-nums; }
   .vu-aa-d[data-ton="ambre"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); }
   .vu-aa-t { display: grid; grid-template-columns: minmax(78px, .7fr) minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--n-trait, var(--vu-filet)); font-variant-numeric: tabular-nums; }
   .vu-aa-t > div { padding: 8px 10px; min-width: 0; border-top: 1px solid var(--n-trait, var(--vu-filet)); overflow-wrap: anywhere; }
