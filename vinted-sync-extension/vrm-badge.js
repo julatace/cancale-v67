@@ -1195,7 +1195,8 @@ function vrmVerifVisible(sel) {
   .q7-pause { gap: 10px; }
   .q7-pause .vu-btn { min-height: 44px; white-space: nowrap; }
   .q7-acc { width: 100%; appearance: none; background: none; border: 0; border-bottom: .5px solid var(--n-trait); font: inherit; color: inherit; text-align: left; cursor: pointer; }
-  @media (max-width: 760px) { .q7-r { flex-wrap: wrap; } .q7-g { flex-basis: 100%; justify-content: flex-end; } .q7-pause { flex-wrap: wrap; } }
+  .q7-g .rond6 { font-size: 20px; }
+  @media (max-width: 760px) { .q7-g { gap: 0; } .q7-pause { flex-wrap: wrap; } .q7-pause .v6 { margin-left: auto; } }
   .cd6-l { display: flex; align-items: center; gap: 12px; max-width: 520px; }
   .cd6-l input[type=range] { flex: 1; min-height: 44px; accent-color: var(--n-accent); padding: 0; border: 0; background: transparent; }
   .cd6-l output { min-width: 88px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -4303,13 +4304,15 @@ function vrmVerifVisible(sel) {
     const nom = compteQ7(l);
     const quand = l.etat === 'cours' ? (Number(l.debut) > 0 ? TU('q7_depuis', { h: heureFl(Number(l.debut)) }) : '') : Number(l.prevu) > Date.now() + 30000 ? TU('q7_a', { h: heureFl(Number(l.prevu)) }) : l.etat === 'prevue' ? TU('q7_ensuite') : '';
     const titre = l.source === 'programme' ? TU(Number(l.n) === 1 ? 'q7_prog_1' : 'q7_prog', { n: Number(l.n) || 0 }) : sorteQ7(l.sorte);
-    const etq = etiquette5(l.etat, TU('q7_e_' + (['cours', 'attente', 'prevue'].includes(l.etat) ? l.etat : 'attente')), l.etat === 'cours' ? '' : '');
+    // L'étiquette douce seulement pour celle qui passe ; l'état des autres est dit dans la ligne grise (« En attente · … »).
+    const etq = l.etat === 'cours' ? etiquette5('cours', TU('q7_e_cours'), '') : '';
+    const etatTxt = l.etat === 'cours' ? '' : TU('q7_e_' + (l.etat === 'prevue' ? 'prevue' : 'attente'));
     const bouge = l.etat !== 'cours';
     const essai = l.essai && U.MODIF && U.MODIF.essaiTxt ? U.MODIF.essaiTxt(l.essai) : '';
     return `<li class="rg6 q7-r" data-q7="${esc(l.id)}" data-q7-etat="${esc(l.etat)}" data-q7-sorte="${esc(l.sorte)}" data-q7-site="${esc(l.site)}">
       <span class="q7-p" aria-hidden="true">${i + 1}</span>
-      <span class="q7-c"><b>${l.num ? plaque(l.num) + ' ' : ''}${esc(titre)}</b><small>${esc([site, nom, quand].filter(Boolean).join(' · '))}</small>${l.titre ? `<small class="q7-t">${esc(l.titre)}</small>` : ''}${essai ? `<small class="q7-essai" role="status" data-q7-essai>${esc(essai)}</small>` : ''}</span>
-      <span class="q7-g">${etq}${bouge ? `${l.source === 'programme' ? '' : `<button type="button" class="rond6" data-q7-geste="monter" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_monter'))}" title="${esc(TU('q7_monter'))}"${i <= bornes.premier ? ' disabled' : ''}>↑</button><button type="button" class="rond6" data-q7-geste="descendre" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_descendre'))}" title="${esc(TU('q7_descendre'))}"${i >= bornes.dernier[l.source] ? ' disabled' : ''}>↓</button>`}<button type="button" class="vu-btn" data-q7-geste="retirer" data-q7-id="${esc(l.id)}"${fileEnVol ? ' disabled' : ''}>${esc(TU('q7_retirer'))}</button>` : ''}</span>
+      <span class="q7-c"><b>${l.num ? plaque(l.num) + ' ' : ''}${esc(titre)}</b><small>${esc([etatTxt, site, nom, quand].filter(Boolean).join(' · '))}</small>${l.titre ? `<small class="q7-t">${esc(l.titre)}</small>` : ''}${essai ? `<small class="q7-essai" role="status" data-q7-essai>${esc(essai)}</small>` : ''}</span>
+      <span class="q7-g">${etq}${bouge ? `${l.source === 'programme' ? '' : `<button type="button" class="rond6" data-q7-geste="monter" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_monter'))}" title="${esc(TU('q7_monter'))}"${i <= bornes.premier ? ' disabled' : ''}>↑</button><button type="button" class="rond6" data-q7-geste="descendre" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_descendre'))}" title="${esc(TU('q7_descendre'))}"${i >= bornes.dernier[l.source] ? ' disabled' : ''}>↓</button>`}<button type="button" class="rond6 q7-x" data-q7-geste="retirer" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_retirer'))}" title="${esc(TU('q7_retirer'))}"${fileEnVol ? ' disabled' : ''}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ''}</span>
     </li>`;
   }
   function pauseQ7Html(f) {
@@ -4329,10 +4332,10 @@ function vrmVerifVisible(sel) {
     const bornesAt = { premier: L.findIndex((l) => l.source === 'atelier'), dernier };
     const faites = Array.isArray(f.faites) ? f.faites : [];
     return `<div class="q7" data-q7-page="lu" data-q7-pause-etat="${esc(f.pause || '')}" data-q7-n="${L.length}">
-      <section class="sec6"><h3>${esc(TU('q7_titre'))}</h3>${pauseQ7Html(f)}${fileEtat ? `<p class="note5" role="status" data-q7-etat-geste="${fileEtat.ok ? 'ok' : 'ko'}">${esc(fileEtat.texte)}</p>` : ''}
+      <section class="sec6" aria-label="${esc(TU('q7_titre'))}">${pauseQ7Html(f)}${fileEtat ? `<p class="note5" role="status" data-q7-etat-geste="${fileEtat.ok ? 'ok' : 'ko'}">${esc(fileEtat.texte)}</p>` : ''}
         ${L.length ? `<ol class="q7-l" aria-label="${esc(TU('q7_titre'))}">${L.map((l, i) => ligneQ7(l, i, l.source === 'atelier' ? bornesAt : bornesFile)).join('')}</ol>` : `<p class="note5" data-q7-vide>${esc(TU('q7_vide'))}</p>`}
       </section>
-      ${faites.length ? `<section class="sec6"><h3>${esc(TU('q7_faites'))}</h3>${faites.map((x) => `<div class="rg6" data-q7-faite="${esc(x.issue)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(sorteQ7(x.sorte))}</b><small>${esc([NOM_SITE[x.site] || '', Number(x.fin) > 0 ? heureFl(Number(x.fin)) : ''].filter(Boolean).join(' · '))}${x.raison && x.issue !== 'faite' ? ' · ' + esc(x.raison) : ''}</small></span><span class="v6">${etiquette5(x.issue, TU('q7_i_' + String(x.issue || 'erreur').replace('-', '')), x.issue === 'incertaine' ? 'ambre' : '')}</span></div>`).join('')}</section>` : ''}
+      ${faites.length ? `<section class="sec6"><h3>${esc(TU('q7_faites'))}</h3>${faites.map((x) => `<div class="rg6" data-q7-faite="${esc(x.issue)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(sorteQ7(x.sorte))}</b><small>${esc([NOM_SITE[x.site] || '', Number(x.fin) > 0 ? heureFl(Number(x.fin)) : ''].filter(Boolean).join(' · '))}${x.raison && !['faite', 'retiree'].includes(x.issue) ? ' · ' + esc(x.raison) : ''}</small></span><span class="v6">${etiquette5(x.issue, TU('q7_i_' + String(x.issue || 'erreur').replace('-', '')), x.issue === 'incertaine' ? 'ambre' : '')}</span></div>`).join('')}</section>` : ''}
     </div>`;
     void premier;
   }

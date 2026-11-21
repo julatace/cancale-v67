@@ -100,7 +100,7 @@
       const hote = document.createElement('div'); hote.id = 'vrm-appris'; hote.setAttribute('data-vrm-hote', 'appris');
       hote.style.cssText = 'all:initial;position:fixed;left:0;right:0;top:0;z-index:2147483647;display:block;pointer-events:none;';
       const om = hote.attachShadow({ mode: 'open' });
-      om.innerHTML = '<style>:host{all:initial}.b{pointer-events:auto;margin:12px auto 0;max-width:560px;width:calc(100% - 24px);box-sizing:border-box;background:#16181d;color:#f4f4f5;border-radius:16px;padding:14px 16px;box-shadow:0 14px 40px rgb(0 0 0/.35);font:14px/1.4 -apple-system,system-ui,sans-serif}'
+      om.innerHTML = '<style>:host{all:initial}.b{position:relative;z-index:2;pointer-events:auto;margin:12px auto 0;max-width:560px;width:calc(100% - 24px);box-sizing:border-box;background:#16181d;color:#f4f4f5;border-radius:16px;padding:14px 16px;border:1px solid rgb(255 255 255/.14);box-shadow:0 14px 40px rgb(0 0 0/.35);font:14px/1.4 -apple-system,system-ui,sans-serif}'
         + '.b b{display:block;font-weight:650;font-size:15px;margin-bottom:4px}.b small{display:block;color:#b8bcc4;font-size:12.5px}.g{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}'
         + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 16px;border-radius:12px;background:#2a2d34;color:#fff;font:600 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button.p{background:#fff;color:#111}button:focus-visible{outline:2px solid #fff;outline-offset:2px}'
         + '.cadre{position:fixed;pointer-events:none;border:3px solid #d97706;border-radius:10px;box-shadow:0 0 0 9999px rgb(12 16 22/.35)}</style>'

@@ -257,7 +257,8 @@
   try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch.vrmFile) lireFilePause(); }); } catch (_) {}
   const pauseBoutonHtml = () => (filePause ? '' : `<button class="vu-btn vu-sec" data-pause-apres${pauseEnVol ? ' disabled' : ''}>${esc(T('q7_pause_apres'))}</button>`);
   const pauseDitHtml = () => (filePause === 'apres' ? `<div class="dit" role="status" data-pause-dit="apres">${esc(T('q7_pause_attente'))}</div>` : filePause === 'oui' ? `<div class="dit" role="status" data-pause-dit="oui">${esc(T('q7_pause_oui'))}</div>` : '');
-  const essaiHtml = (a) => { const e = (a && a.modif && a.modif.essai) || (a && a.essai); return e && M && M.essaiTxt && Date.now() - Number(e.at || 0) < 10 * 60000 ? `<div class="dit" role="status" data-action-essai="${esc(String(e.quoi || ''))}">${esc(M.essaiTxt(e))}</div>` : ''; };
+  // (une modification d'annonce dit la phrase dans SA frise : jamais deux fois)
+  const essaiHtml = (a) => { if (modifDe(a)) return ''; const e = a && a.essai; return e && M && M.essaiTxt && Date.now() - Number(e.at || 0) < 10 * 60000 ? `<div class="dit" role="status" data-action-essai="${esc(String(e.quoi || ''))}">${esc(M.essaiTxt(e))}</div>` : ''; };
   const modifHtml = (a) => { const m = modifDe(a); return m ? `<div class="modif" data-modif="${esc(m.sorte)}">${M.friseHtml(m)}<div class="vu-sous" data-modif-temps>${esc(tempsTxt(a, m))}</div></div>` : ''; };
   // L'après : le bilan de la série (avant | après, « Voir sur Vinted » ; ce qui s'est arrêté, en ambre, avec « Reprendre »).
   // Une modification AUTOMATIQUE (baisse par règle, cycle de vie) ne pose pas de bilan à fermer sur Vinted (le panneau et le journal le disent).
