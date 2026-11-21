@@ -10,6 +10,8 @@
 import { REGLE_CLE } from './reglesAuto.js';
 import { CLE_PALIERS, reglagesPaliers } from './negociationPaliers.js';
 
+// (21 nov., lot journee-stats) Combien de types sont comptés ici : « N sur 3 » dans Statistiques · Pilotage (la même règle).
+export const AUTOMATISATIONS_COMPTEES = 3;
 export function automatisationsActives(load) {
   let n = 0;
   try { if (load('vinted_offres_auto', false) === true) n++; } catch (_) {}
