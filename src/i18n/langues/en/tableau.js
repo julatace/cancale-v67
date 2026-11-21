@@ -308,5 +308,6 @@ export default {
   "vt.prixPose": "Purchase price saved: {prix}",
   "vt.achatConnu": "Bought {prix}",
   "vt.achatConnuAria": "Bought {prix} — link to its purchase",
-  "vt.relierAria": "Link “{titre}” to its purchase"
+  "vt.relierAria": "Link “{titre}” to its purchase",
+  "vt.prixPayeCourt": "Price paid"
 };

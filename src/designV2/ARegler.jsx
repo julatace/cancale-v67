@@ -18,7 +18,7 @@ export { useARegler };
 
 const VISIBLES = 3;
 
-export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) {
+export default function ARegler({ onglet, Icon, Photo = null, groupes = null, ouvertDefaut = false }) {
   if (Icon && !iconePosee()) poserIcone(Icon);   // les glyphes natifs (chevron) = les tracés de l'app
   const pub = useARegler();
   const source = groupes || (pub ? pub.groupes : null);
@@ -26,7 +26,7 @@ export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) 
   const presse = liste.some((g) => g.ambre);
   const [choix, setChoix] = React.useState(null);        // null = le défaut (ouvert seulement si ça presse)
   const [tout, setTout] = React.useState(false);
-  const ouvert = choix == null ? presse : choix;
+  const ouvert = choix == null ? (presse || !!ouvertDefaut) : choix;   // (21 nov.) `ouvertDefaut` : dans la feuille d'accès de Ventes au téléphone
   if (!liste.length || onglet === 'messages') return null;
   const montres = tout ? liste : liste.slice(0, VISIBLES);
   return (

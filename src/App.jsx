@@ -35372,7 +35372,7 @@ const indexBordsItem = (list, txnItem) => {
 };
 const _indexBordsVide = {};
 const _indexBordsListeVide = [];
-function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null }) {
+function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null, completer = null, onCompleterFermer = null, sectionsAutres = null }) {
   // (20 nov., bugs-terrain) LES LECTURES ASYNCHRONES DU MOTEUR, RENDUES PAR VAGUES. Mesuré (12 comptes, processeur ×4) : ~40
   // rendus par moteur en 42 s, un par lecture qui arrive. Dans ce moteur, un `setState` appelé HORS d'un geste (réponse
   // d'une lecture, minuterie) part en transition (`useStateVague`) : React regroupe les mises à jour arrivées avant son
@@ -45807,7 +45807,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return true;
   };
   const choisirAchatVente = (l, propose, opts = {}) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined; const _triArrivee = opts.triArrivee ? true : undefined;
-    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee }); };
+    const size = typeof o.size_title === 'string' && o.size_title ? o.size_title : undefined;
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size }); };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -57179,7 +57180,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
                       relire: voitSite('vinted') ? () => loadOrders('sold', setSales, true) : null,
                       format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot,
-                      scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
+                      scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes'),
+                      // (21 nov., ventes-lisibles — capture iPhone de Julien : pilule « Où est cet article dans le stock » posée sur la liste,
+                      // rangée « 56 bordereaux déjà traités · Les voir » collée bord à bord, groupe « EBAY » au milieu de Ventes) Ces gestes
+                      // sont rangés dans le menu « ⋯ » de l'écran : les MÊMES fonctions (la recherche du Stock par les N° des colis à faire,
+                      // l'historique des bordereaux faits, les sections d'eBay). Rien n'est retiré.
+                      stock: (() => { const nums = [...new Set(rangsNV.map((r) => String(r.num || '').trim()).filter(Boolean))]; return nums.length ? { n: nums.length, ouvrir: () => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); } } : null; })(),
+                      bordsFaits: (() => { const n = Array.isArray(emailBords) && voitSite('vinted') ? emailBords.filter((b) => !isBordHidden(b) && isBordDone(b)).length : 0; return n ? { n, ouvert: !!showBordDone, basculer: () => setShowBordDone((v) => !v) } : null; })(),
+                      sections: Array.isArray(sectionsAutres) && sectionsAutres.length ? sectionsAutres : null } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
                   // rendues pour Ventes (leurs blocs rendent `null`) ; les feuilles (papier, impression, scanner, préparer…) restent.
                   if (VENTES_NATIF) {
@@ -57188,10 +57196,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (`CartesRetourRecu` + `RetoursEnCoursBloc`) au-dessus de « En route » : UN groupe « Retours et litiges · N »
                     // (src/natif/ecrans/RetoursVentes.jsx), replié sous « À régler », les mêmes lignes et les mêmes gestes.
                     const avantRouteN = null;
-                    const retoursN = !baseKO ? <RetoursVentes rangs={retoursNatif()} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted}/> : null;
+                    const retoursRangsN = !baseKO ? retoursNatif() : [];
+                    const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
-                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>{retoursN}</> : null}/>
+                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}</> : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
                   }
@@ -57541,6 +57550,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {voitSite('vinted') && emailBordsKO && emailBords===null && <div data-bords-ko style={{marginBottom:10}}><EtatPanne compact quoi="Tes bordereaux reçus par e-mail" raison="Rien n’est perdu : un colis sans bordereau ci-dessous a peut-être déjà le sien. L’écran réessaie tout seul."/></div>}
         {voitSite('vinted') && (()=>{
           // (17 nov., nouveau design) Pendant la lecture : le squelette de la forme des rangées (signature), jamais une phrase seule.
+          // (21 nov., ventes-lisibles) Ventes natif a son propre chargement (src/natif/ecrans/Ventes.jsx) : plus de second squelette sous la liste.
+          if (VENTES_NATIF && colisDans === 'ventes' && sales.loading && emailBords===null) return null;
           if (sales.loading && emailBords===null) return designV2 && colisDans === 'ventes' ? <div className="v2v-corps" data-v2v-corps="lecture"><SqueletteRangeesV2 variante="A" n={6} label={tr('v2v.vide.lecture')}/></div> : <div style={{fontSize:12,color:C.muted,marginBottom:10}}>Chargement des colis à envoyer…</div>;
           const ex = expeditions();
           const aPoster = ex.filter(e=>!(e.o && isShipDone(e.o)));
@@ -58537,7 +58548,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   les postés), lus sur la ligne elle-même — jamais devinés. */}
               {(() => {
                 const nums = [...new Set(ex.filter(x => !estPoste(x)).map(x => (x.b ? numForBord(x.b) : '') || (x.o ? (effEntry(x.o)?.numero || '') : '')).map(n => String(n || '').trim()).filter(Boolean))];
-                if (!nums.length) return null;
+                if (!nums.length || (VENTES_NATIF && colisDans === 'ventes')) return null;   // (21 nov.) Ventes natif : dans son menu « ⋯ »
                 return (
                   /* (5 nov., chantier D) La forme commune (`Bouton` secondaire, texte à l'encre : le « discret » bleu tombe à 4,2:1 sur le gris de la page). */
                   <Bouton variante="secondaire" icone="home" data-colis-stock={nums.length} style={{alignSelf:'flex-start',marginTop:6}} onClick={() => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); }}>
@@ -58564,7 +58575,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (12 nov., finitions) Les bordereaux des e-mails sont ceux de Vinted : rien à en dire sur Ventes · eBay. */}
         {Array.isArray(emailBords) && voitSite('vinted') && (()=>{
           const faits = emailBords.filter(b=>!isBordHidden(b) && isBordDone(b));
-          if (!faits.length) return null;
+          if (!faits.length || (VENTES_NATIF && colisDans === 'ventes')) return null;   // (21 nov.) Ventes natif : dans son menu « ⋯ »
           return (
             /* (revue du 19 oct.) Neutre : plus le vert de l'ancienne palette
                menthe (§7, rien à rattraper ici), et un autre mot que le groupe
@@ -58780,23 +58791,28 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 dire laquelle : il fallait se souvenir de la carte sur laquelle
                 on venait de taper. Avec 35 annonces dont beaucoup d'Adidas
                 Spezial, c'est exactement là qu'on relie le mauvais achat. */}
-            <div style={{padding:'12px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:11}}>
-              <div style={{width:46,height:46,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {/* (21 nov., ventes-lisibles — Julien : « inspire-toi de Bleam », sa feuille « Lier à un achat ») En haut, le titre de la feuille,
+                « Glisser » et ×. Dessous, LA VENTE qu'on relie, en grand : sa photo (64), son titre ENTIER, « Marque · taille », son prix en
+                gras — on voit d'un coup d'œil laquelle (avec 35 Spezial, c'est là qu'on relie le mauvais achat). */}
+            <div style={{padding:'6px 8px 0 16px',display:'flex',alignItems:'center',gap:8}}>
+              <span style={{flex:1,minWidth:0,fontSize:17,fontWeight:600,color:C.text}}>{tr('relierTout.titreFeuille')}</span>
+              <button type="button" data-glisser-ouvrir="feuille" onClick={()=>ouvrirGlisser()} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:15,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 8px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
+              <button type="button" data-relier-fermer onClick={()=>setPickerFor(null)} aria-label={tr('relierTout.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+            </div>
+            <div data-relier-cible="" style={{margin:'4px 16px 8px',padding:12,borderRadius:14,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:12}}>
+              <div data-relier-cible-photo="" style={{width:64,height:64,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 {pickerFor.photo && !imgMortes.has(pickerFor.photo)
                   ? <PhotoVinted src={pickerFor.photo} alt="" onError={()=>noterImgMorte(pickerFor.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
+                  : <span style={{fontSize:20}}><Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  {numeros[pickerFor.id]?.numero && <span style={{fontSize:12,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'2px 7px',flexShrink:0}}>N°{numeros[pickerFor.id].numero}</span>}
-                  <span data-relier-cible-titre style={{fontSize:13,fontWeight:600,color:C.text,overflowWrap:'anywhere',lineHeight:1.3,minWidth:0}}>{pickerFor.title}</span>
-                </div>
-                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
-                  {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
+                <div data-relier-cible-titre style={{fontSize:17,fontWeight:600,color:C.text,overflowWrap:'anywhere',lineHeight:1.3,minWidth:0}}>{pickerFor.title}</div>
+                <div data-relier-cible-sous="" style={{fontSize:15,color:C.muted,marginTop:2,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  {numeros[pickerFor.id]?.numero ? <Natif.Plaque numero={numeros[pickerFor.id].numero}/> : null}
+                  <span>{[pickerFor.brand || extractBrand(String(pickerFor.title || '')) || '', pickerFor.size ? tr('vv.taille', { t: pickerFor.size }) : ''].filter(Boolean).join(' · ')}</span>
                 </div>
               </div>
-              <button type="button" data-glisser-ouvrir="feuille" onClick={()=>ouvrirGlisser()} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 6px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
-              <button type="button" data-relier-fermer onClick={()=>setPickerFor(null)} aria-label={tr('relierTout.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+              {pickerFor.price!=null && Number.isFinite(Number(pickerFor.price)) ? <div data-relier-cible-prix="" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{eur(pickerFor.price).toFixed(2).replace('.',',')}{'\u00a0€'}</div> : null}
             </div>
             <div data-relier-achat-corps className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
               <AccAvant geste="achat.relier"/>
@@ -67087,6 +67103,9 @@ function AppCoeur() {
     if(t==='ventes') return (
       <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} data-vv-toutes={ongletColis==='toutes' ? '1' : undefined} aria-label={L.aEnvoyer}>
         <AFaireHote><GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
+          /* (21 nov., ventes-lisibles — capture iPhone de Julien : un groupe « EBAY · Tableau · À traiter · Offres » au milieu de Ventes)
+             Ce qu'eBay a EN PLUS est rangé dans le menu « ⋯ » de Ventes (rien n'est perdu, chacune ouvre sa section). */
+          sectionsAutres={site==='toutes' && (SITES_RELIES_COQUE.v||[]).includes('ebay') && sousSections('ventes','ebay') ? sousSections('ventes','ebay').filter(([id])=>id!=='ventes').map(([id,l])=>({ cle: id, site: 'ebay', libelle: aCleTr('nav.sous.ebay.'+id) ? tr('nav.sous.ebay.'+id) : l, onClick: ()=>{ setEbayCible(null); setPlatSub(subDeTache('ebay',id)); } })) : null}
           /* (20 nov.) La plateforme de Ventes natif est le sélecteur global : plus de filtre local (`filtreNatif` nul). */
           filtreNatif={null}
           siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
@@ -67212,10 +67231,7 @@ function AppCoeur() {
             offres, argent, santé) est un groupe de rangées sous la liste, chacune ouvre sa section (rien n'est perdu, §4.11). */}
         {/* (20 nov. soir) Tous les sites mélangés : ce qu'eBay a EN PLUS (tableau, à traiter, offres, argent, santé) est un
             groupe de rangées sous la liste quand un compte eBay est relié — chacune ouvre sa section. */}
-        {t==='ventes' && natifV && site==='toutes' && !baseKO && (SITES_RELIES_COQUE.v||[]).includes('ebay') && sousSections('ventes','ebay') ? <Natif.Groupe titre={nomPlateforme('ebay')} attrs={{ 'data-tache-sections': 'ebay' }}>
-          {sousSections('ventes','ebay').filter(([id])=>id!=='ventes').map(([id,l])=><Natif.Rangee key={id} titre={aCleTr('nav.sous.ebay.'+id) ? tr('nav.sous.ebay.'+id) : l} fin="chevron"
-            onClick={()=>{ setEbayCible(null); setPlatSub(subDeTache('ebay',id)); }} attrs={{ 'data-tache-section-entree': id }}/>)}
-        </Natif.Groupe> : null}
+        {/* (21 nov., ventes-lisibles) Le groupe « eBay » (tableau, à traiter, offres…) n'est plus sous la liste : il est dans le menu « ⋯ » de Ventes (`sectionsAutres`). */}
         {/* (19 nov., Ventes « comme avant ») La bande du mois est de nouveau à l'écran, en tête de « Toutes » ; sous « À envoyer »
             et « En route » elle reste MONTÉE, cachée (ce qu'elle publie), jamais posée sous les colis. */}
         {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={natifV || (designV2App && v2VentesColis && ongletColis !== 'toutes')}><div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div></CacheSiV2>}

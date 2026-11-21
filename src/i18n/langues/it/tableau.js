@@ -308,5 +308,6 @@ export default {
   "vt.prixPose": "Prezzo d'acquisto salvato: {prix}",
   "vt.achatConnu": "Acquistato {prix}",
   "vt.achatConnuAria": "Acquistato {prix} — collega al suo acquisto",
-  "vt.relierAria": "Collega «{titre}» al suo acquisto"
+  "vt.relierAria": "Collega «{titre}» al suo acquisto",
+  "vt.prixPayeCourt": "Pagato"
 };

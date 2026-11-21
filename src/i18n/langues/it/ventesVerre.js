@@ -136,5 +136,14 @@ export default {
   "vn.lbc.suivre": "Traccia",
   "vn.lbc.rien": "Nessun pacco Leboncoin da spedire.",
   "vn.lbc.pasLu": "Pacchi Leboncoin: non ancora letti.",
-  "vn.lbc.limite": "L’etichetta si genera su leboncoin.fr: toccare la vendita la apre lì."
+  "vn.lbc.limite": "L’etichetta si genera su leboncoin.fr: toccare la vendita la apre lì.",
+  "vn.acces.titre": "Da sistemare e resi",
+  "vn.acces.regler": {"one": "{n} da sistemare", "other": "{n} da sistemare"},
+  "vn.acces.retours": {"one": "{n} reso o controversia", "other": "{n} resi e controversie"},
+  "vn.retourEtiquette": "Etichetta di reso",
+  "vn.o.stock1": "Dov'è questo articolo in magazzino",
+  "vn.o.stockN": "Dove sono questi articoli in magazzino",
+  "vn.o.bordsFaits": {"one": "{n} etichetta già trattata", "other": "{n} etichette già trattate"},
+  "vn.o.voir": "Vederle",
+  "vn.o.masquer": "Nascondi"
 };

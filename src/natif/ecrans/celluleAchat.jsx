@@ -18,7 +18,7 @@ import { prixAchatSaisi } from '../../prixAuNumerotage.js';
 
 const stop = (e) => e.stopPropagation();
 
-function ChampPrix({ a, onPose }) {
+function ChampPrix({ a, onPose, court = false }) {
   const [txt, setTxt] = React.useState('');
   const [faux, setFaux] = React.useState(false);
   const fait = React.useRef(false);
@@ -34,7 +34,7 @@ function ChampPrix({ a, onPose }) {
   const aide = faux ? tr('vt.prixIllisible') : '';
   return (
     <form className="n-vt-prix" data-vt-prix-achat="" data-vt-faux={faux ? '1' : undefined} onSubmit={(e) => { e.preventDefault(); valider(); }} onClick={stop} onPointerDown={stop} onKeyDown={stop}>
-      <input className="n-vt-prix-champ" type="text" inputMode="decimal" enterKeyHint="done" autoComplete="off" value={txt} placeholder={tr('vt.prixAchatChamp')}
+      <input className="n-vt-prix-champ" type="text" inputMode="decimal" enterKeyHint="done" autoComplete="off" value={txt} placeholder={tr(court ? 'vt.prixPayeCourt' : 'vt.prixAchatChamp')}
         aria-label={tr('vt.prixAchatAria', { titre: a.titre || '' })} aria-invalid={faux ? 'true' : undefined} title={aide || undefined}
         onChange={(e) => { setTxt(e.target.value); if (faux) setFaux(false); }} onBlur={valider}
         onKeyDown={(e) => { if (e.key === 'Escape') { setTxt(''); setFaux(false); e.currentTarget.blur(); } }} data-vt-prix-champ=""/>
@@ -45,7 +45,7 @@ function ChampPrix({ a, onPose }) {
 }
 
 // Les gestes de l'achat (cellule « Achat » du tableau, pied de la rangée au téléphone).
-export function GestesAchat({ a, Icon = null }) {
+export function GestesAchat({ a, Icon = null, court = false }) {
   const [pose, setPose] = React.useState('');   // le prix qu'il vient de taper, montré tout de suite (la relecture suit)
   if (!a) return null;
   const maillons = (n = 18) => (Icon ? <Icon name="relier" size={n}/> : null);
@@ -68,7 +68,7 @@ export function GestesAchat({ a, Icon = null }) {
         onClick={(e) => { e.stopPropagation(); a.ouvrir(); }} onKeyDown={stop}>
         <span className="n-vt-relier-rond" aria-hidden="true">{maillons(16)}</span><span className="n-vt-relier-mot">{tr('vt.relierCourt')}</span>
       </button> : null}
-      {a.saisir ? <ChampPrix a={a} onPose={setPose}/> : null}
+      {a.saisir ? <ChampPrix a={a} onPose={setPose} court={court}/> : null}
     </span>
   );
 }
@@ -76,5 +76,5 @@ export function GestesAchat({ a, Icon = null }) {
 // La cellule « Achat » d'un tableau de Ventes (VentesBureau, VentesTableau).
 export function celluleAchat(a, Icon) {
   if (!a) return null;
-  return <GestesAchat a={a} Icon={Icon}/>;
+  return <GestesAchat a={a} Icon={Icon} court/>;
 }

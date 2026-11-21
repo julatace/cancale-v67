@@ -136,5 +136,14 @@ export default {
   "vn.lbc.suivre": "Suivre",
   "vn.lbc.rien": "Aucun colis Leboncoin à envoyer.",
   "vn.lbc.pasLu": "Colis Leboncoin : pas encore lus.",
-  "vn.lbc.limite": "Le bordereau se génère sur leboncoin.fr : toucher la vente l’y ouvre."
+  "vn.lbc.limite": "Le bordereau se génère sur leboncoin.fr : toucher la vente l’y ouvre.",
+  "vn.acces.titre": "À régler et retours",
+  "vn.acces.regler": {"one": "{n} à régler", "other": "{n} à régler"},
+  "vn.acces.retours": {"one": "{n} retour ou litige", "other": "{n} retours et litiges"},
+  "vn.retourEtiquette": "Étiquette retour",
+  "vn.o.stock1": "Où est cet article dans le stock",
+  "vn.o.stockN": "Où sont ces articles dans le stock",
+  "vn.o.bordsFaits": {"one": "{n} bordereau déjà traité", "other": "{n} bordereaux déjà traités"},
+  "vn.o.voir": "Les voir",
+  "vn.o.masquer": "Masquer"
 };
