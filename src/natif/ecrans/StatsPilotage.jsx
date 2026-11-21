@@ -131,7 +131,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             sousTitre={Do && Do.valeur != null ? tr('v2.st.dorment.sous') : (Do && Do.raison) || tr('v2.jour.pasSu')} fin={onDorment ? 'chevron' : null} onClick={onDorment} attrs={{ 'data-ps-dorment': Do && Do.valeur != null ? String(Do.valeur) : '' }}/>
         </Carte>
       </Colonne>
-      <Colonne>
+      <Colonne pleine>
         <Carte titre={tr('v2.ps.sites.titre')} sousTitre={sur} attrs={{ 'data-ps-bloc': 'sites', 'data-ps-sites': M && M.plateformes ? M.plateformes.map((x) => x.cle + ':' + cents(x.v) + ':' + (x.n == null ? '' : x.n)).join(',') : '' }}>
           {M && M.plateformes && M.plateformes.length ? M.plateformes.map((x) => (
             <Rangee key={x.cle} titre={x.nom} sousTitre={x.n != null ? tr('v2.comptes.ventes', { n: x.n }) : ''} valeur={x.v == null ? '—' : (x.vp ? tr('journee.moins') + ' ' : '') + montant(x.v)} valeurForte onClick={ouvrirVentes}/>

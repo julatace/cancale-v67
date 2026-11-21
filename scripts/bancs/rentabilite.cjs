@@ -95,7 +95,6 @@ async function stats(nav, port, W, sombre) {
     await pg.goto(`http://localhost:${port}/?vue=stats&base=lu&seg=finances&f=30${sombre ? '&theme=dark' : ''}`, { waitUntil: 'load' });
     await pg.waitForSelector('[data-ps-bloc="mieux"]', { timeout: 15000 }).catch(() => {});
     await pg.waitForTimeout(400);
-    if (MUT === 'regroupe') await pg.evaluate(() => { const r = document.querySelector('[data-ps-regroupe-ouvrir]'); if (r) r.remove(); });
     await pg.locator('[data-ps-bloc="mieux"]').first().scrollIntoViewIfNeeded().catch(() => {});
     await pg.screenshot({ path: path.join(SHOTS, `stats-mieux-${W}-${th}.png`), fullPage: true });
     const lire = () => pg.evaluate(() => {
@@ -146,6 +145,7 @@ async function stats(nav, port, W, sombre) {
     // M5 : ce qui a été regroupé.
     const o = pg.locator('[data-ps-regroupe-ouvrir]');
     if (await o.count()) { if (tel) await o.first().tap(); else await o.first().click(); await pg.waitForTimeout(250); }
+    if (MUT === 'regroupe') await pg.evaluate(() => { for (const x of document.querySelectorAll('[data-ps-regroupe-k]')) x.setAttribute('data-variantes', '1'); });
     const rg = await pg.evaluate(() => [...document.querySelectorAll('[data-ps-regroupe-k]')].map((x) => ({ k: x.getAttribute('data-ps-regroupe-k'), v: x.getAttribute('data-variantes'), t: x.innerText })));
     const nike = rg.find((x) => x.k === 'nike air max');
     dit(nike && nike.v === '3' && /air max 90/.test(nike.t) && /NIKE AIR MAX/.test(nike.t), `M5 ${ou} : « Ce qui a été regroupé » montre les 3 écritures du titre rassemblées sous Nike Air Max`, rg);

@@ -70,7 +70,7 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
             onClick={() => setVoirRegroupe((x) => !x)} attrs={{ 'aria-expanded': voirRegroupe ? 'true' : 'false', 'data-ps-regroupe-ouvrir': '' }}/> : null}
           {A && voirRegroupe ? <div data-ps-regroupe={String(A.regroupes.length)}>
             {A.regroupes.map((r) => (
-              <Rangee key={r.k} titre={r.nom} sousLignes={3}
+              <Rangee key={r.k} titre={r.nom} sousLignes={2}
                 sousTitre={r.titres.map((x) => '« ' + x.t + ' »' + (x.n > 1 ? ' × ' + x.n : '')).join(' · ') + (r.reste ? ' · ' + tr('rt.regroupe.reste', { n: nombre(r.reste) }) : '')}
                 valeur={nombre(r.n)} attrs={{ 'data-ps-regroupe-k': r.k, 'data-variantes': String(r.variantes) }}/>
             ))}
