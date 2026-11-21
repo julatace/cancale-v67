@@ -27,6 +27,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const { metaVersData } = require('./bancs/_meta.cjs');
+// 5.414 (`toutinterface`) : la FAUSSE PAGE vinted.fr des audits (étapes de `vrm-formulaire.js`), partagée avec les audits à banc propre.
+const { fabriquerFaussePage } = require('./_fausse-page-vinted.cjs');
 // (1er nov., X4) Un segment numérique NU est un INDEX de tableau pour PostgREST.
 const { appliquerSegment, erreurProjection } = require('./_chemin-json.cjs');
 
@@ -77,7 +79,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   // 20 nov. (ext. 5.410.3) : la republication par le FORMULAIRE et la séquence des favoris « comme Bleam » sont la méthode
   // par défaut ; les audits d'avant jugent la méthode DIRECTE (toujours choisissable) — sauf ceux qui demandent le défaut.
-  if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'directe', favoris: false };
+  if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'formulaire', favoris: false };   // 5.414 : le formulaire est la seule méthode
   delete store.__commeBleamDefaut;
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -191,6 +193,17 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
         const t = onglets.find((o) => o && target && o.id === target.tabId) || onglets[0];
         j.injections++;
         // 5.410.3 : un fichier injecté (vrm-formulaire.js) est NOTÉ ; l'audit sert lui-même la page (`globalThis.__vrmFormulaire`).
+        // 5.414 (`toutinterface`) : sans page servie par l'audit, une FAUSSE PAGE vinted.fr minimale répond aux étapes
+        //    (`__vrmFormulaire`) : c'est ELLE qui envoie ses requêtes à faux Vinted (origine « page », la forme que la vraie
+        //    page envoie), comme le fait Vinted quand VRM clique. Le service worker n'en fabrique aucune. Les audits
+        //    d'avant gardent ainsi leurs juges (ordre, corps, refus, plafonds) sur ce que la page envoie.
+        //    `ctx.__vrmPage` (réglable par l'audit) : { vu:false } (le message/l'offre n'apparaît pas), { manque:'nom' }
+        //    (un élément introuvable), { captcha:true }, { favoriConv: id } (conversation déjà là, aucune création).
+        if (Array.isArray(files) && files.includes('vrm-formulaire.js') && (!ctx.__vrmFormulaire || ctx.__vrmFormulaire.__emule)) {
+          const emule = fabriquerFaussePage({ ctx, j, tab: t });
+          emule.__emule = true;
+          ctx.__vrmFormulaire = emule;
+        }
         if (Array.isArray(files)) { (j.fichiers = j.fichiers || []).push({ tabId: t && t.id, files: files.slice() }); return [{ result: undefined }]; }
         try { ctx.location = new URL((t && t.url) || 'https://www.vinted.fr/'); } catch (_) { ctx.location = undefined; }
         return [{ result: await func(...(args || [])) }];

@@ -42,11 +42,16 @@ const ONGLET = { tab: { id: 7, url: "https://www.vinted.fr/inbox" } };
 const OFFRE = { conv: "301", prix: 40, tx: "900", oid: "901", item: "5001", titre: "Paire synthétique", pseudo: "acheteur_banc" };
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:\\'"`])\/\/[^\n]*/g, "$1");
 
+// (5.414, intégration 5.418) Depuis `toutinterface`, accepter / refuser part de la PAGE (fausse page de `_fond-vm.cjs`)
+// après relecture du fil : le faux Vinted rend la conversation où CETTE offre attend (forme captée).
+const lecture = (e) => (new RegExp(`^/api/v2/conversations/${OFFRE.conv}$`).test(e.chemin)
+  ? { status: 200, body: { conversation: { id: Number(OFFRE.conv), opposite_user: { id: 77 }, messages: [{ entity_type: "offer_request_message", entity: { status: 10, offer_request_id: Number(OFFRE.oid), transaction_id: Number(OFFRE.tx), user_id: 77, price: { amount: String(OFFRE.prix) } } }] } } }
+  : { status: 200, body: {} });
 // Un fond : le compte 111 dans l'onglet ; `vinted(e)` répond aux écritures (peut rendre une promesse : requête tenue).
 function monde(repondre, store) {
   let compte = "111";
   const f = faireFond({ src: SRC, connecte: "111", lignes: { main: { vinted_annonce_numeros: {} } }, ...(store ? { store } : {}),
-    vinted: (e) => (e.methode === "GET" ? { status: 200, body: {} } : repondre(e)) });
+    vinted: (e) => (e.methode === "GET" ? lecture(e) : repondre(e)) });
   f.ctx.compteConnecte = async () => compte;
   f.ctx.offresEnAttente = async () => [Object.assign({}, OFFRE)]; // la relecture des conversations : l'offre y est encore
   f.basculer = (u) => { compte = u; };

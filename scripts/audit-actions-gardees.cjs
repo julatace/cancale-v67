@@ -40,7 +40,8 @@ const MUTATIONS = {
   pauseLbcSecu: ["const secuP = await secuGeste('leboncoin', compte, 'autre', 'clic');", 'const secuP = null;'],
   favoriReprise: ['const non = await arretAvantMessageFavori(e.uid, acc);', 'const non = "";'],
   gardeAuto: ["if (opts && opts.compter === false) return null;\n  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);", "if (opts && opts.compter === false) return null;\n  const c = { ok: true };"],
-  bordereauFile: ["const r = await vintedSend(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`", "const r = await fetch(acc, 'PUT', `/api/v2/transactions/${tx}/shipment/order`"],
+  bordereauFile: ["const ri = await interfaceVinted(acc, 'bordereau',", "const ri = await etapeFormulaire(acc, 0, 'bordereau',"],
+  interfaceFile: ["  return requeteVinted('page', async () => {\n    const pg = await pageVintedPour(acc);\n    if (pg.refus) { noterDiag('interface_' + pg.refus);", "  return (async (_k, f) => f())('page', async () => {\n    const pg = await pageVintedPour(acc);\n    if (pg.refus) { noterDiag('interface_' + pg.refus);"],
   baisseVc: ["const secuBp = await secuGeste('vestiaire', ot.compte, 'baisse', 'serie');", 'const secuBp = null;'],
   repondreLbc: ["const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);\n    if (!cpt.ok && cpt.code === 'stockage')", "const cpt = { ok: true };\n    if (!cpt.ok && cpt.code === 'stockage')"],
   favoriVc: ["const sg = await secuGeste('vestiaire', ot.compte, 'favori', 'serie');", 'const sg = null;'],
@@ -77,9 +78,8 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++
 const EXCEPTIONS = {
   // « Ce qui EST autorisé et automatique : générer un bordereau » (§3) — pas un geste vers un
   // acheteur ; il garde la file une-à-la-fois et la pause 429/403 (`vintedSend` → `requeteVinted`).
-  genererBordereau: { raison: 'bordereau : autorisé et automatique (§3), file Vinted + pause 429/403', avant: [], mots: ['vintedSend'] },
-  // Une LECTURE faite en POST (la page de dépôt de Vinted fait la même) : budget de LECTURE.
-  grilleTailles: { raison: 'lecture de la grille des tailles (POST de lecture), budget de lecture', avant: ['gardeLecture'], mots: [] },
+  genererBordereau: { raison: 'bordereau : autorisé et automatique (§3), par l’interface (file Vinted + pause 429/403)', avant: [], mots: ['interfaceVinted'] },
+  // (5.414) `grilleTailles` n'écrit plus rien : la grille est LUE par la page « Vendre » (`grilleParPage`, aucun POST du fond).
   // La mise en ligne d'une republication : sa place a été RÉSERVÉE au départ de la paire (3 gestes
   // d'un coup, `tRes`), rendue si rien ne part ; « Tout arrêter » / vérification revus juste avant.
   finRepubBrouillon: { raison: 'place réservée au départ de la paire, rendue si rien ne part', avant: ['secuGeste', 'gardeStricte'], mots: ['tRes', 'rendreActions'] },
@@ -109,8 +109,14 @@ const RE_ECRITURE = [
   { re: /\bvintedPagePhoto\s*\(/g, filtre: () => true },
   { re: /action\s*:\s*'(lbcRepondre|lbcPauseAnnonce|lbcPrixAnnonce|lbcSupprimeAnnonce|vcRepondre|vcOffre|vcPrix)'/g, filtre: () => true },
   { re: /vrm\s*:\s*'favoriPage'/g, filtre: () => true },
+  // 5.414 (`toutinterface`) : les écritures passent par l'INTERFACE de vinted.fr — un geste de page qui écrit
+  // (`interfaceVinted(acc, '<geste>'`, sauf l'ouverture d'une conversation), une étape d'écriture du formulaire
+  // (`etapeFormulaire(…, 'brouillon' | 'supprimer' | 'publier')`), ou la mise en ligne d'un brouillon par sa page.
+  { re: /\binterfaceVinted\s*\(\s*[\w.]+\s*,\s*'([a-zA-Z]+)'/g, filtre: (m) => m[1] !== 'ouvrir' },
+  { re: /\betapeFormulaire\s*\([^)]*?'(brouillon|supprimer|publier)'/g, filtre: () => true },
+  { re: /\bmiseEnLigneParPage\s*\(/g, filtre: () => true },
 ];
-const PRIMITIVES = new Set(['vintedPage', 'vintedSend', 'vintedPagePhoto']);
+const PRIMITIVES = new Set(['vintedPage', 'vintedSend', 'vintedPagePhoto', 'interfaceVinted', 'etapeFormulaire', 'miseEnLigneParPage']);
 const ecritures = [];
 for (const [n, b] of corps) {
   if (PRIMITIVES.has(n)) continue;
@@ -198,7 +204,7 @@ for (const [n, x] of Object.entries(EXCEPTIONS)) {
 }
 // L'exception « bordereau » garde quand même la file et la pause : `vintedSend` → `requeteVinted`.
 // 3. Pause 429/403 et file une-à-la-fois.
-for (const p of ['vintedPage', 'vintedSend']) dit(/requeteVinted\s*\(/.test(corps.get(p) || ''), `${p} passe par requeteVinted (une requête à la fois, pause 429/403)`);
+for (const p of ['vintedPage', 'vintedSend', 'interfaceVinted']) dit(/requeteVinted\s*\(/.test(corps.get(p) || ''), `${p} passe par requeteVinted (une requête / un geste à la fois, pause 429/403)`);
 dit(/pauseVinted|vrmPauseVinted/.test(corps.get('requeteVinted') || '') || /vrmPauseVinted/.test(source), 'requeteVinted connaît la pause posée sur un 429/403');
 
 // 4. EXÉCUTÉ : « Tout arrêter » + compteur plein ⇒ aucune écriture.

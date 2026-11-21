@@ -157,7 +157,10 @@ const MESSAGES = [
     const compter = (s) => (sansCommentaires(s).match(/\brequeteVinted\s*\(/g) || []).length;
     let base = null;
     try { const { execFileSync } = require('child_process'); base = execFileSync('git', ['-C', path.join(__dirname, '..'), 'show', 'origin/main:vinted-sync-extension/background.js'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); } catch (_) {}
-    if (base != null) dit(compter(bg) === compter(base), `111 · appels de requeteVinted dans background.js : ${compter(bg)} (origin/main : ${compter(base)}) — aucun ajouté`);
+    // 5.414 (`toutinterface`) : la file des GESTES d'interface (`interfaceVinted`, une écriture faite par la page à la place
+    //    d'une requête du fond) n'est pas une requête de plus — elle remplace celles qui partaient par `vintedPage`.
+    const sansGestes = (s) => { const i = s.indexOf('async function interfaceVinted('); if (i < 0) return s; const k = s.indexOf('\nasync function ', i + 10); return s.slice(0, i) + s.slice(k < 0 ? s.length : k); };
+    if (base != null) dit(compter(sansGestes(bg)) <= compter(sansGestes(base)), `111 · appels de requeteVinted dans background.js : ${compter(sansGestes(bg))} hors file des gestes (origin/main : ${compter(sansGestes(base))}) — aucun ajouté`);
     // Le chemin de l'encart, EXÉCUTÉ dans le vrai fond (`_fond-vm.cjs`) : la page d'une
     // annonce d'un AUTRE vendeur, sa liste de recherche et ses achats dans la base VRM.
     let FV = null; try { FV = require(path.join(RACINE, 'scripts', '_fond-vm.cjs')); } catch (_) {}

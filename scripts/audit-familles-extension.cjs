@@ -42,7 +42,7 @@ const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'j' };
 // ── Une conversation avec une offre en attente (même forme que audit-offres-sures) ──
 function conv({ item, tx, oid, price, user = 500 }) {
   return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }
@@ -153,14 +153,14 @@ async function auditer(S) {
       return f;
     };
     const f = monter(200);
-    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', msg: 'Merci, trop bas' });
+    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', relue: true, msg: 'Merci, trop bas' });
     const env = f.j.vinted.find((v) => /\/conversations\/555\/replies$/.test(v.chemin));
     let corps = null; try { corps = JSON.parse(env && env.corps); } catch (_) {}
     dit(r && r.ok && corps && corps.reply && corps.reply.body === 'Merci, trop bas' && corps.message === undefined,
-      'R21a le message de refus part à la forme RELEVÉE `{ reply: { body } }` (jamais `{ message }`)', JSON.stringify(corps));
+      'R21a le message de refus part à la forme RELEVÉE `{ reply: { body } }` (jamais `{ message }`) — écrit par la page (5.414)', JSON.stringify(corps));
     const nOk = ((f.store.vrmActions || {})[UID] || []).length;
     const g = monter(400);
-    const r2 = await g.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', msg: 'Merci, trop bas' });
+    const r2 = await g.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', relue: true, msg: 'Merci, trop bas' });
     const nKo = ((g.store.vrmActions || {})[UID] || []).length;
     dit(r2 && r2.messagePasParti === true && nKo === nOk - 1, 'R21b message refusé par Vinted : sa place est RENDUE et c’est dit (`messagePasParti`)', JSON.stringify({ r2, nOk, nKo }));
   });
@@ -397,7 +397,7 @@ async function auditer(S) {
 
 // ── Mutations : la règle réaffaiblie doit rendre un rouge ──
 const MUTATIONS = [
-  ['bg', 'le refus part en { message }', 'corpsReponseVinted(msg), { timeoutMs: 12000 });', '{ message: String(msg) }, { timeoutMs: 12000 });', 'R21a'],
+  ['bg', 'le refus ne passe plus par l’interface', "const rm = await interfaceVinted(acc, 'message', { conv: String(conv), texte: texteRefus });", "const rm = { ok: true, status: 200, json: { code: 0 } };", 'R21a'],   // 5.414 : la page écrit le message
   ['bg', 'la place du message refusé n’est pas rendue', 'if (!parti) { if (c2.at) await rendreActions(String(uid), c2.at, 1);', 'if (!parti) { if (false) await rendreActions(String(uid), c2.at, 1);', 'R21b'],
   ['content', 'n’importe quel onglet prend la boîte', '        if (monOnglet == null || req.tab !== monOnglet) return;', '', 'R23'],
   ['bg', 'un relais qui a répondu est rejoué', "          if (err) demandeParStockage(req, fin); else fin(null);", '          demandeParStockage(req, fin);', 'R24b'],

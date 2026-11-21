@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.414, Julien : « elle ne doit pas se tromper […] on ne fait plus les requêtes ») docs/passation/2026-11-21-extension-interface.md
+  { id: 'extension-interface', date: '2026-11-21', titre: 'L’extension clique et tape : plus aucune requête', phrase: 'Messages, offres, republication : tout passe par la page Vinted, vérifié.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.413.0, Julien : « je veux que ce soit dans ce style-là, surtout sur le téléphone ») docs/passation/2026-11-21-panneau-telephone.md
   { id: 'panneau-telephone', date: '2026-11-21', titre: 'Le panneau de l’extension sur iPhone', phrase: 'Cinq onglets en bas, rangées lisibles, titres complets, menus en feuille.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.412.0, Julien : « au moins lire les messages et écrire aux personnes ») docs/passation/2026-11-21-vestiaire-messages.md

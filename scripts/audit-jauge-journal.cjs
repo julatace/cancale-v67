@@ -51,14 +51,17 @@ function monter(src, { store = {}, lignes = {}, connecte = UID, refus = () => fa
     if (refus(e)) return { status: 422, body: { message: 'refus' } };
     if (e.methode === 'GET' && e.chemin === `/api/v2/item_upload/items/${ID}`) return { status: 200, body: LU(prix) };
     if (e.methode === 'PUT' && e.chemin === `/api/v2/item_upload/items/${ID}`) { try { prix = Number(JSON.parse(e.corps).item.price.amount); } catch (_) {} return { status: 200, body: {} }; }
+    // 5.414 : le fil d'une offre RELU par la page avant « Accepter / Refuser » (CETTE offre en attente).
+    { const m = /^\/api\/v2\/conversations\/9(\d+)$/.exec(e.chemin); if (e.methode === 'GET' && m && TX_DE[m[1]]) return { status: 200, body: { conversation: { id: Number('9' + m[1]), opposite_user: { id: 77, login: 'acheteuse_camille' }, messages: [{ entity_type: 'offer_request_message', entity: { status: 10, offer_request_id: Number(m[1]), transaction_id: Number(TX_DE[m[1]]), user_id: 77, price: { amount: '40' } } }] } } }; }
     if (e.methode === 'GET' && /^\/api\/v2\/conversations\/\d+$/.test(e.chemin)) return { status: 200, body: { conversation: { id: 5, opposite_user: { login: 'acheteuse_camille' }, messages: [] } } };
     return { status: 200, body: { ok: true } };
   };
   return faireFond({ src, lignes: l, store, vinted, connecte, comptes: [{ vinted_user_id: UID, login: 'compte_banc', domain: 'www.vinted.fr', access_token: 'jeton' }] });
 }
 const repondre = (c, texte = 'Bonjour Camille, merci pour ton message') => ({ uid: UID, method: 'POST', endpoint: `/api/v2/conversations/${c}/replies`, body: { reply: { body: texte } } });
-const accepter = (tx, oid) => ({ uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, confirme: true, avisVu: true });   // 5.410 : son second toucher après « vérifie » (garde anti double-vente pas sûre ici)
-const refuser = (tx, oid) => ({ uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/reject` });
+const TX_DE = {};   // 5.414 : la conversation d'une offre (donnée par le panneau), son fil relu par la page
+const accepter = (tx, oid) => { TX_DE[oid] = tx; return { uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/accept`, conv: '9' + oid, confirme: true, avisVu: true }; };   // 5.410 : son second toucher après « vérifie » (garde anti double-vente pas sûre ici)
+const refuser = (tx, oid) => { TX_DE[oid] = tx; return { uid: UID, method: 'PUT', endpoint: `/api/v2/transactions/${tx}/offer_requests/${oid}/reject`, conv: '9' + oid }; };
 const lire = (c) => ({ uid: UID, method: 'GET', endpoint: `/api/v2/conversations/${c}` });
 const lignesDe = (f, prefixe) => Object.keys(f.lignes).filter((k) => k.startsWith(prefixe)).map((k) => ({ id: k, ...f.lignes[k] }));
 const actionsLocales = (f) => ((f.store.vrmActions || {})[UID] || []).filter((x) => Date.now() - x < 3600000).length;

@@ -30,7 +30,7 @@ function conv({ item, tx, oid, price, user = 500 }) {
   return {
     capturedAt: nowISO(),
     payload: { conversation: {
-      id: 'c' + oid, description: 'Nike Air',
+      id: '8' + oid, description: 'Nike Air',
       opposite_user: { id: user, login: 'acheteur' },
       transaction: { item_id: String(item) },
       messages: [{
@@ -60,7 +60,7 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
     src, lignes, connecte, store, lectureKO,
     // Le faux Vinted accepte tout ce qu'on lui demande (200) — on mesure ce qui PART.
     // (5.398) Il rend aussi le FIL tel qu'il est chez lui (le moteur le relit juste avant le geste).
-    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(c\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
+    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(8\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
   });
 }
 

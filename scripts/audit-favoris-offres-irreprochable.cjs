@@ -104,7 +104,7 @@ if (process.argv.includes('--avant')) {
 const nowISO = () => new Date().toISOString();
 const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
 function convOffre({ item = 444, tx = 9001, oid = 7001, price = 45, user = 500, status = 10, titre = '' } = {}) {
-  return { id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+  return { id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status, status_title: titre, price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }] };
 }
 // Le moteur d'offres : `fil(e)` = ce que Vinted rend quand on relit la conversation.
@@ -116,7 +116,7 @@ function monterMoteur({ offre = { item: 444, tx: 9001, oid: 7001, price: 45 }, m
   if (listings) lignes[`harvest_${UID}_listings`] = { capturedAt: nowISO(), payload: { items: listings } };
   return faireFond({ src: SRC, lignes, connecte: UID, store,
     vinted: (e) => {
-      if (e.methode === 'GET' && /^\/api\/v2\/conversations\/c\d+$/.test(e.chemin)) { const r = fil ? fil(e) : null; return r || { status: 200, body: { conversation: convOffre(offre) } }; }
+      if (e.methode === 'GET' && /^\/api\/v2\/conversations\/8\d+$/.test(e.chemin)) { const r = fil ? fil(e) : null; return r || { status: 200, body: { conversation: convOffre(offre) } }; }
       return { status: 200, body: {} };
     } });
 }
@@ -221,7 +221,7 @@ const corpsReponse = (j) => { const r = j.vinted.find((v) => /replies$/.test(v.c
   {
     const f = monterMoteur({});
     await deuxPassages(f);
-    const L = f.j.vinted.findIndex((v) => v.methode === 'GET' && /\/conversations\/c7001$/.test(v.chemin)), P = f.j.vinted.findIndex((v) => v.methode === 'PUT');
+    const L = f.j.vinted.findIndex((v) => v.methode === 'GET' && /\/conversations\/87001$/.test(v.chemin)), P = f.j.vinted.findIndex((v) => v.methode === 'PUT');
     dit(L >= 0 && P > L && puts(f.j).length === 1 && f.j.vinted.every((v) => v.origine === 'page' && !Object.keys(v.entetes || {}).some((k) => /authorization/i.test(k))),
       'E7 — chemin normal : le fil est relu (GET) PUIS l’offre acceptée (PUT), tout depuis l’onglet vinted.fr, aucun Authorization', f.j.vinted.map((v) => v.methode + ' ' + v.chemin + ' ' + v.origine).join(' | '));
   }

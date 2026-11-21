@@ -113,8 +113,10 @@ const places = (f) => ((f.store.vrmActions || {})[UID] || []).length;
     const e = ecr(f);
     dit(r && r.json && r.json.resultat === 'envoye' && JSON.stringify(replies(f)) === JSON.stringify(['Bonjour pseudo_banc !']), "une seule version : le texte d'avant, personnalisé comme avant", JSON.stringify([r && r.json, replies(f)]));
     dit(e.length === 1 && e[0][0] === 'ecriture:serie' && e[0][1] >= 5000 && e[0][1] <= 45000 && e[0][2] === 'Bonjour pseudo_banc !'.length, "favori : un temps d'écriture sur la longueur du texte envoyé, 5–45 s", JSON.stringify(e));
-    const avantR = f.injections.filter((x) => x.n === 1);
-    dit(avantR.length === 1 && avantR.every((x) => !/KeyboardEvent|dispatchEvent|keydown|keypress|\.click\(/.test(x.code)), "pendant et après l'attente : UNE injection, la requête du message (aucune touche, aucun clic)", avantR.length);
+    // ⚠️ 5.414 (`toutinterface`, Julien : « on ne fait plus les requêtes ») : le message est TAPÉ et envoyé par l'interface
+    //    (l'étape de page « message », une seule) — plus aucune requête du message fabriquée par VRM.
+    const etM = ((f.j && f.j.etapesPage) || []).filter((x) => x.etape === 'message');
+    dit(etM.length === 1 && replies(f).length === 1, "pendant et après l'attente : UNE étape de page « message » (tapé, « Envoyer »), un seul message parti", JSON.stringify(etM));
     dit(places(f) === 2, 'favori sans offre : 2 actions réservées, comme avant (rien de plus pour l’attente)', places(f));
   }
   { const f = monterFavori({ message: 'Version un', variantes: ['Version deux', 'Version trois'] });
@@ -145,22 +147,22 @@ const places = (f) => ((f.store.vrmActions || {})[UID] || []).length;
   { const f = monterRefus();
     const vs = typeof f.ctx.versionsMessage === 'function' ? f.ctx.versionsMessage('Merci, trop bas', ['Pas à ce prix, désolé', 'Un peu plus haut ?']) : 'Merci, trop bas';
     const rs = [];
-    for (let i = 0; i < 6; i++) rs.push(await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: String(7000 + i), quoi: 'reject', prix: 10, conv: '555', msg: vs }));
+    for (let i = 0; i < 6; i++) rs.push(await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: String(7000 + i), quoi: 'reject', prix: 10, conv: '555', relue: true, msg: vs }));
     const txt = replies(f);
     dit(txt.length === 6 && txt.every((x, i) => i === 0 || x !== txt[i - 1]), 'refus auto : jamais la même version que le refus précédent', JSON.stringify(txt));
     dit(ecr(f).length === 6 && ecr(f).every((x) => x[0] === 'ecriture:serie' && x[1] >= 5000 && x[1] <= 45000), "refus auto : un temps d'écriture avant chaque message", JSON.stringify(ecr(f)));
     dit(rs.every((r, i) => r && r.ok && Number.isInteger(r.variante) && vs[r.variante - 1 >= 0 ? vs.findIndex((v) => v.n === r.variante) : 0].texte === txt[i]), 'refus auto : le n° de version rendu est celui du texte parti', JSON.stringify(rs.map((r) => r && r.variante)));
   }
   { const f = monterRefus();
-    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', msg: 'Merci, trop bas' });
+    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', relue: true, msg: 'Merci, trop bas' });
     dit(r && r.ok && JSON.stringify(replies(f)) === JSON.stringify(['Merci, trop bas']), "refus auto, un seul texte (forme d'avant) : ce texte, mot pour mot", JSON.stringify(replies(f))); }
   { const ordre = [];
     const f = monterRefus((g) => { const p0 = g.ctx.pauseVinted; let pose = false; g.ctx.pauseVinted = async () => { if (ecr(g).length && !pose) { pose = true; g.ctx.avecVinted(async () => { ordre.push('autre:' + replies(g).length); }); } return p0(); }; });
-    await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', msg: 'Merci, trop bas' });
+    await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', relue: true, msg: 'Merci, trop bas' });
     await new Promise((r) => setTimeout(r, 30));
     dit(ordre.length === 1 && ordre[0] === 'autre:1', "refus auto : l'attente est DANS la file une-à-la-fois (une demande arrivée pendant passe après le message)", JSON.stringify(ordre)); }
   { const f = monterRefus((g) => { const p0 = g.ctx.pauseVinted; g.ctx.pauseVinted = async () => (ecr(g).length ? { jusqua: Date.now() + 3600000, status: 403 } : p0()); });
-    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', msg: 'Merci, trop bas' });
+    const r = await f.ctx.repondreOffre({ uid: UID, tx: '9001', oid: '7001', quoi: 'reject', prix: 10, conv: '555', relue: true, msg: 'Merci, trop bas' });
     dit(ecr(f).length === 1 && replies(f).length === 0 && r && r.messagePasParti === true && places(f) === 1, "refus auto : pause de Vinted PENDANT l'attente ⇒ aucun message, sa place rendue", JSON.stringify([r, replies(f), places(f)])); }
 
   // ── 6. sa réponse sur clic ──
