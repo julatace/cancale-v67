@@ -23,7 +23,37 @@ require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lect
 const { faireFond } = require('./_fond-vm.cjs');
 
 let ok = 0, ko = 0;
-const dit = (c, msg, det) => { if (c) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
+// ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : la méthode « directe » (photos,
+//    brouillon, suppression, mise en ligne par requêtes du service worker, mise en ligne PLANIFIÉE 1–3 min plus tard,
+//    réparations à la mise en ligne : photos dédoublonnées, taille corrigée et renvoyée) est RETIRÉE. Ces contrôles
+//    jugeaient ce chemin-là ; ils sont NOMMÉS ici un par un, avec leur raison, et rapportés « retiré » (jamais en silence).
+//    Leurs garanties, sur le formulaire : audit-comme-bleam (R1–R18), audit-republication-parfaite (A–I, reprise à chaque
+//    étape), audit-repub-copie-fidele (G1–G5), audit-tout-interface (T1–T8), banc interface-vinted (I1–I13).
+const RETIRES = [
+  ["brouillon VRM aux photos en double", "la page « Ajouter » envoie le brouillon tel que Vinted le garde : VRM ne réécrit plus ses photos"],
+  ["grille PAS en cache : lue AVANT la mise en ligne", "pendant une republication, aucune page de plus : le formulaire choisit la taille par son identifiant (absente ⇒ arrêt nommé)"],
+  ["la grille lue n'est pas redemandée", "idem : plus de lecture de grille pendant une republication"],
+  ["grille PAS en cache, taille de la paire inconnue", "idem"],
+  ["le brouillon tel que Vinted le montre l'emporte : taille changée", "la mise en ligne est le bouton « Ajouter » de la page du brouillon : c'est Vinted qui envoie ce qu'il montre"],
+  ["republier (« comme Vintex », délais mesurés)", "les pauses du formulaire (5 à 15 s entre deux champs, au hasard) remplacent celles des requêtes : audit-comme-bleam R4"],
+  ["republier, mise en ligne refusée : UN essai", "un refus à la mise en ligne s'arrête et dit le geste (« Reprendre ») : audit-comme-bleam, republication-parfaite A4"],
+  ["Refaire annonce ses étapes", "Refaire passe par le formulaire : ses étapes sont celles du formulaire (formulaire, photos, brouillon, attente, en ligne)"],
+  ["Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS (5.408) sa relecture", "la page du brouillon est ouverte (elle se lit elle-même) : plus de relecture par le fond"],
+  ["suppression de l'ancienne PAS confirmée : le brouillon est refait", "Refaire par le formulaire : l'ancienne non prouvée supprimée ⇒ brouillon seulement (republication-parfaite D)"],
+  ["brouillon disparu de Vinted (dressing complet lu après)", "republication-parfaite D1 (par le formulaire)"],
+  ["à la suite : brouillon et suppression faits, la mise en ligne est planifiée", "plus de mise en ligne planifiée : « Ajouter » dans la même passe, dans l'onglet de travail (republication-parfaite A1, B10)"],
+  ["la mise en ligne à faire est rangée dans chrome.storage.local", "idem : rien n'est laissé en attente"],
+  ["à l'heure : lecture du brouillon, mise en ligne", "idem"],
+  ["faite une seule fois : retirée de l'attente", "idem"],
+  ["mise en ligne planifiée refusée", "idem"],
+  ["42 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée", "les 3 gestes de la paire sont réservés d'un coup (audit-comme-bleam R7)"],
+  ["réveil et planification en même temps", "plus de planification"],
+  ["mise en ligne interrompue par Chrome", "reprise à chaque étape : republication-parfaite B"],
+  ["un brouillon déjà planifié ne se met pas en ligne une seconde fois", "plus de planification ; « jamais deux en ligne » : republication-parfaite C"],
+  ["brouillon déjà en ligne : la mise en ligne planifiée n'envoie rien", "idem"],
+];
+let retires = 0;
+const dit = (c, msg, det) => { const rt = RETIRES.find(([p]) => String(msg).startsWith(p)); if (rt) { retires++; console.log(`⏭ retiré (5.414, méthode directe) — ${msg.slice(0, 90)} : ${rt[1]}`); return; } if (c) { ok++; console.log('✅ ' + msg); } else { ko++; console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
 const nowISO = () => new Date().toISOString();
 const MODELE = JSON.stringify({ item: { id: 9101, title: 'Nike Air Max 1', description: 'nickel', price: '60.0', currency: 'EUR', catalog_id: 1234, brand_id: 53, color_ids: [1], item_attributes: [{ code: 'size', ids: [56] }, { code: 'condition', ids: [2] }], package_size_id: 1, assigned_photos: [{ id: 1 }] } });
 const PHOTOS = ['https://images1.vinted.net/t/01_0121e_hsUzFGeDP3Vk/f800/1.jpeg', 'https://images1.vinted.net/t/02_02248_Ka3jojtDMin8/f800/2.jpeg'];
@@ -536,13 +566,13 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
   { const sansDesc = { coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: 'q', photos: PHOTOS } };
     const { f, r } = await run({ coffre: false, extra: sansDesc, viaBrouillon: true });
     dit(suppressions(f.j).length === 0 && brouillonsP(f.j).length === 0 && r.code === 'description-absente', "description vide (la lettre seule) et introuvable : refusé AVANT de supprimer, rien créé", JSON.stringify({ s: suppressions(f.j).length, b: brouillonsP(f.j).length, code: r.code, e: r.etape }));
-    const g = await run({ coffre: false, extra: sansDesc, viaBrouillon: true, lettre: true, lecture: { status: 200, body: { item: { id: 9101, description: 'Très bon état, boîte d’origine', catalog_id: 88, brand_id: 9, color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2 } } } });
+    const g = await run({ coffre: false, extra: sansDesc, viaBrouillon: true, lettre: true, lecture: { status: 200, body: { item: { id: 9101, description: 'Très bon état, boîte d’origine', catalog_id: 88, brand_id: 9, color_ids: [1], item_attributes: [{ code: 'size', ids: [55] }, { code: 'condition', ids: [2] }], package_size_id: 2 } } } });   // 5.414 : l'état connu (le formulaire l'exige)
     let b = {}; try { b = JSON.parse(brouillonsP(g.f.j)[0].corps); } catch (_) {}
     const d = (b.draft && b.draft.description) || '';
     dit(g.r.etape === 'fait' && /^Très bon état, boîte d’origine/.test(d) && !/^q\b/.test(d), "description vide : reprise sur l'annonce Vinted, le brouillon part avec elle (et la lettre en bas)", JSON.stringify({ e: g.r.etape, d, raison: g.r.raison || g.r.erreur })); }
   // D2 — « Refaire le brouillon » d'un passage enregistré avec la lettre seule
   //      comme description (les Air Max 1 et zoom fly du 28 oct.).
-  { const corps = JSON.stringify({ draft: { id: null, title: 'Nike Air Max 1', price: '54', catalog_id: 88, brand_id: 9, color_ids: [1], description: '\n\nq', item_attributes: [{ code: 'size', ids: [55] }], package_size_id: 2, assigned_photos: [] }, parcel: null, upload_session_id: 'x' });
+  { const corps = JSON.stringify({ draft: { id: null, title: 'Nike Air Max 1', price: '54', catalog_id: 88, brand_id: 9, color_ids: [1], description: '\n\nq', item_attributes: [{ code: 'size', ids: [55] }, { code: 'condition', ids: [2] }], package_size_id: 2, assigned_photos: [] }, parcel: null, upload_session_id: 'x' });
     const coffreVb = (extraDesc) => ({ coffre_111_9101: { id: '9101', title: 'Nike Air Max 1', price: 60, desc: extraDesc, photos: PHOTOS, versBrouillon: { etat: 'a-refaire', supprime: true, corps, majAt: new Date(Date.now() - 3600e3).toISOString() } } });
     const f1 = monter({ src: process.env.BG_SRC || undefined, coffre: false, extra: coffreVb('q') });
     let r1 = {}; if (typeof f1.ctx.refaireBrouillon === 'function') { try { r1 = await f1.ctx.refaireBrouillon({ cmd: 'refaireBrouillon', uid: '111', id: '9101', confirme: true }); } catch (e) { r1 = { erreur: e.message }; } }
