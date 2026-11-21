@@ -22,6 +22,8 @@ import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from
 import { trierSerie, resumeSerie, csvDe, clesSelectionnables, portee } from './selectionSerie.js';
 import { estCommandePlateforme, estEcriturePlateforme, refusPanneau, ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from './actionsExtension.js';   // (20 nov., décision de Julien) aucun geste de plateforme dans l'app
 import { poserExtensionIci, ouvrirPanneau } from './ouvrirPanneau.js';
+import { automatisationsActives } from './automatisationsEtat.js';   // (21 nov., onglets-menu) « N actives » sur la tuile du Menu
+import { GrilleMenu, CarteCompte } from './natif/GrilleMenu.jsx';   // (21 nov., onglets-menu) l'écran « Menu » en tuiles
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from './BoutonExtension.jsx';   // (20 nov.) « … dans l'extension »
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
@@ -18948,6 +18950,7 @@ const BAR_GROUPE={
 function titreEcran(tab) {
   if (tab === 'journee') return tr('nav.journee');
   if (tab === 'semaine') return tr('ecran.semaine');
+  if (tab === 'menu') return tr('menu.titre');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
   const cle = { settings: 'ecran.settings', dashboard: 'nav.compta', litiges: 'ecran.litiges', cat_expedition: 'nav.cat_bord', masques: 'ecran.masques', automatisations: 'auto.titre', organisation: 'ecran.organisation', catalog: 'ecran.catalog', stockvinted: 'ecran.stockvinted', vintedaccounts: 'ecran.vintedaccounts', sales: 'nav.ventes', inventory: 'ecran.inventory' }[tab];
@@ -18968,7 +18971,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['extension',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['menu','extension',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -20970,71 +20973,117 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const actif = BAR_GROUPE[tab] || tab;
   const parrainage = groupesVisibles(sites, () => true, true).some((g) => g.items.some((t) => t.id === 'parrainage'));
   const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges);
-  const groupes = [
-    { entrees: [{ ...e('journee'), libelle: tr('nav.journee.court') }, e('annonces'), e('ventes'), e('achats'), e('compta')].filter(Boolean) },
-    { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    // (20 nov. soir, Julien : « les onglets tu les dégages, tu dégages l'onglet Vinted ») plus de rangées par plateforme ;
-    // le filtre « Site » des tableaux reste, les réglages de chaque site restent dans Paramètres.
-    { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={20}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
-      // (19 nov.) L'île du haut n'existe plus à l'ordinateur : sa cloche et son état des actions sont ici (les mêmes feuilles).
-      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
-      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={20}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
-      e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
-  ].filter(Boolean);
+  // ⚠️⚠️ (21 nov., onglets-menu — Julien : « totalement réorganiser les onglets », « simplifiée et ergonomique ») LES MÊMES
+  // GROUPES que l'écran « Menu » du téléphone (`groupesMenu`) : en tête ce que porte la barre du bas (Aujourd'hui, Annonces,
+  // Publier, Messages), puis Gestion, Dans l'extension, Aide ; Paramètres = la carte du compte, en pied. Rien en double.
+  const groupes = groupesMenu({ tab, setTab, badges, sites, taille: 20, ordi: true }).map((g) => ({ titre: g.titre, entrees: g.tuiles.map((t) => ({ ...t, icone: t.icone, pastille: t.pastille || (t.valeur ? undefined : t.point) })) }));
   const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
     <Natif.BarreLaterale groupes={groupes} actif={actif} libelle={tr('coque.navigationPrincipale')} attrs={{ 'data-rail-natif': '' }} reduite={reduite} onReduire={onReduire} icone={<Icon name="menu" size={20}/>}
       tete={<div className="n-coque-marque" data-n-marque=""><VrmLogo size={30} anim={false}/><NomEntrepriseCoque entreprise={entreprise} className="n-coque-entreprise"/></div>}
       pied={uid ? (<>
         {boiteOutils}
-        <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="profil" aria-haspopup="dialog" title={tr('coque.monProfil')}
-          aria-label={`${nomCoque.texte} — ${tr('coque.ouvrirProfil')}`} onClick={() => ouvrirMenuProfil()}>
+        <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
+          aria-label={`${nomCoque.texte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
-          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span></span>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous">{tr('menu.parametres')}</span></span>
         </button>
       </>) : boiteOutils}/>
   );
 }
-function TeteNative({ tab, setTab, ordi, titre, sites, badges, nonLus = 0, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, scanner, streamVisible = false, etats = null, gestesLoupe = null }) {
-  useProfilVendeur(); useEcransVusTick();
-  const [plus, setPlus] = React.useState(false);
-  const montants = useMontantsCaches();
-  const stream = useStream();
-  const etat = useEtatActionsVu();
-  const uid = (AUTH.user && AUTH.user.id) || '';
+// ⚠️⚠️ (21 nov., onglets-menu — Julien : « en-tête de page simple, au plus une action à droite, pas de barres empilées sous
+// le titre ») LA TÊTE DU TÉLÉPHONE : le grand titre, et à droite UNE icône, la loupe (la recherche s'ouvre en haut, scanner
+// dedans ; l'appui long écoute, comme avant). Messages et « Plus » ne sont plus ici : Messages et Menu sont dans la barre du bas.
+// Le champ de recherche posé SOUS le grand titre est retiré (c'était une barre de plus sous le titre).
+function TeteNative({ tab, ordi, titre, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, gestesLoupe = null }) {
+  useProfilVendeur();
   const natif = ECRANS_NATIFS.has(tab);
-  // (20 nov., lot argent-natif) Argent (ses quatre segments : `compta`, `dashboard`) a son GRAND TITRE au téléphone, comme
-  // Aujourd'hui — Julien, captures du 20 nov. : pas de grand titre « Argent » visible en haut. L'écran ne pose plus le sien.
+  // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.
   const argentTab = tab === 'compta' || tab === 'dashboard';
-  React.useEffect(() => { setPlus(false); }, [tab]);
-  const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges, 22);
-  const parrainage = groupesVisibles(sites, () => true).some((g) => g.items.some((t) => t.id === 'parrainage'));
-  const groupes = plus ? [
-    { entrees: [e('garage'), e('messages'), e('emails')].filter(Boolean) },
-    // (20 nov. soir, Julien : « les onglets tu les dégages, tu dégages l'onglet Vinted ») plus de rangées par plateforme ;
-    // le filtre « Site » des tableaux reste, les réglages de chaque site restent dans Paramètres.
-    { entrees: [{ cle: 'sante', libelle: tr('tvb.titre'), icone: <Icon name="pulse" size={22}/>, onChoisir: () => ouvrirSanteNative(tab, setTab), attrs: { 'data-nav-entree': 'sante' } },
-      { cle: 'notifications', libelle: tr('parametres.cat.notifications'), icone: <Icon name="bell2" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} }, attrs: { 'data-n-notifs': '' } },
-      e('settings'), e('communaute'), parrainage ? e('parrainage') : null].filter(Boolean) },
-    { entrees: [uid ? { cle: 'profil', libelle: tr('coque.monProfil'), icone: <Icon name="users" size={22}/>, onChoisir: () => ouvrirMenuProfil(), attrs: { 'data-profil-tete': '' } } : null,
-      MULTI_USER ? { cle: 'etat-actions', libelle: tr('natif.plus.etat'), icone: <Icon name="shield" size={22}/>, onChoisir: () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} } } : null,
-      { cle: 'montants', libelle: tr('coque.cacherMontants'), icone: <Icon name="eyeOff" size={22}/>, interrupteur: { actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } } },
-      streamVisible || stream ? { cle: 'stream', libelle: tr('natif.plus.stream'), icone: <Icon name="stream" size={22}/>, interrupteur: { actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } } } : null].filter(Boolean) },
-  ].filter(Boolean) : [];
-  const actions = ordi ? null : (
-    <Natif.ActionsCoque plusOuvert={plus} onPlus={() => setPlus(true)} pointPlus={!!(etat && etat.ton === 'ambre')}
-      messages={{ n: nonLus > 0 ? nonLus : undefined, libelle: tr('nav.messages'), libellePastille: nonLus > 0 ? `${tr('nav.messages')} · ${nonLus}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
-      avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
+  const actions = ordi || rechercheOuverte || sansRecherche ? null : (
+    <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>
   );
   return (
-    <>
-      <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || ((tab === 'journee' || argentTab) && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}
-        recherche={ordi || rechercheOuverte || sansRecherche ? null : <Natif.ChampRecherche onOuvrir={ouvrirRecherche} onScanner={scanner} placeholder={tr('natif.recherche.nom')} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', ...(gestesLoupe || {}) }}/>}/>
-      {ordi ? null : <Natif.FeuillePlus ouverte={plus} onFermer={() => setPlus(false)} groupes={groupes} actif={BAR_GROUPE[tab] || tab} pied={etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}/>}
-    </>
+    <Natif.TetePage titre={tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || ((tab === 'journee' || argentTab || tab === 'menu') && !ordi)} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
 }
-function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
+// ⚠️⚠️ (21 nov., onglets-menu) LES GROUPES DU MENU — une source pour l'écran « Menu » du téléphone ET la barre latérale de
+// l'ordinateur. Règles : rien en double entre la barre du bas, le Menu et Paramètres (Paramètres = la carte du compte ; la
+// langue, le thème, « Tout va bien ? », les comptes reliés, l'état des actions et la déconnexion sont DANS Paramètres) ;
+// aucune rangée par plateforme (décision du 20 nov.) ; les automatisations vivent dans le panneau de l'extension (§3,
+// plafond d'actions) : leurs tuiles ouvrent ce panneau (`ouvrirPanneau`), rien ne part d'ici.
+// Une pastille n'est qu'un NOMBRE CONNU publié par l'écran propriétaire (`badges`), jamais un 0 deviné.
+const ouvrirCentreNotifs = () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} };
+const ouvrirPublier = () => { try { window.dispatchEvent(new Event('vrm:publier-ouvrir')); } catch (_) {} };
+function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) {
+  const vus = new Set(groupesVisibles(sites, () => true, ordi).flatMap((g) => g.items.map((t) => t.id)));
+  const actif = (cle) => cle === tab || (cle === 'compta' && tab === 'dashboard');
+  const tuile = (id, extra = {}) => { const t = ENTREE_NAV(id); if (!t) return null; const v = badges ? badges[cleEntree(t)] : undefined;
+    return { cle: id, libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: typeof v === 'number' && v > 0 ? v : undefined, point: v === true || undefined,
+      libellePastille: typeof v === 'number' && v > 0 ? tr('menu.aFaire', { n: v }) : '', actif: actif(id),
+      onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': id, 'data-n-plus-entree': id }, ...extra }; };
+  const n = automatisationsActives(load);
+  const tete = ordi ? [{ titre: '', tuiles: [{ ...tuile('journee'), libelle: tr('nav.journee.court') }, tuile('annonces'),
+    { cle: 'publier', libelle: tr('creer.onglet'), icone: <Icon name="tag" size={taille}/>, onChoisir: ouvrirPublier, attrs: { 'data-n-publier': '' } }, tuile('messages')].filter(Boolean) }] : [];
+  return [...tete,
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [tuile('ventes'), tuile('achats'), vus.has('garage') || tab === 'garage' ? tuile('garage') : null, tuile('compta'), tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
+      { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
+      { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
+    { titre: tr('menu.groupe.aide'), cle: 'aide', tuiles: [
+      { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } },
+      tuile('extension'), vus.has('communaute') || tab === 'communaute' ? tuile('communaute') : null, vus.has('parrainage') ? tuile('parrainage') : null].filter(Boolean) },
+  ].filter((g) => g.tuiles.length);
+}
+// ⚠️⚠️ (21 nov., onglets-menu) L'ÉCRAN « MENU » (téléphone : la 5ᵉ place de la barre du bas, comme Bleam) : la carte du
+// compte (⇒ Paramètres), puis Gestion · Dans l'extension · Aide en tuiles de deux colonnes, puis les deux interrupteurs
+// rapides (cacher les montants, mode stream) et l'état de la synchronisation. Tout ce qu'il y avait dans « Plus » y est,
+// sauf ce qui est déjà dans la barre (Messages) ou dans Paramètres (Tout va bien ?, Mon profil, État des actions).
+function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null }) {
+  useProfilVendeur(); useEcransVusTick();
+  const montants = useMontantsCaches();
+  const stream = useStream();
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const mail = String((AUTH.user && AUTH.user.email) || '').trim();
+  const nomCompte = (entreprise && entreprise.nom) || '';
+  const nomCoque = useNomCoque({ owner: uid, headers: enTeteSession, nom: nomCompte, email: mail });
+  const groupes = groupesMenu({ tab, setTab, badges, sites, taille: 22 });
+  return (
+    <div className="n-menu" data-n-menu="" data-n-feuille-plus="">
+      <CarteCompte avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={40} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }} taille={40}/>}
+        nom={<span className="vrm-sensible">{uid ? nomCoque.texte : tr('menu.compte')}</span>} sousTitre={tr('menu.parametres')}
+        onChoisir={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }} attrs={{ 'data-n-plus-entree': 'settings', 'data-nav-entree': 'settings', 'data-profil-tete': '' }}/>
+      {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
+      <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
+        <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
+        {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
+      </Natif.Groupe>
+      {etats ? <div className="n-coque-etats" data-n-etats="">{etats}</div> : null}
+    </div>
+  );
+}
+// ⚠️⚠️ (21 nov., onglets-menu) LA FEUILLE « PUBLIER » — la place du milieu de la barre (et l'entrée « Publier » de la barre
+// latérale). Les gestes du disque d'hier, chacun branché sur le geste qui EXISTE (`gestesDisque`) : « Publier une paire »
+// (`vrm:publier-ailleurs`), « Scanner un colis » (le scanner pour retrouver), « Imprimer N bordereaux » (la feuille Tout
+// imprimer : rien ne part avant SON clic ; N = `vrm_colis_prets.lot`, pas su ⇒ sans nombre). La recherche est la loupe.
+function FeuillePublier({ gestes }) {
+  const [ouverte, setOuverte] = React.useState(false);
+  React.useEffect(() => { const o = () => setOuverte(true); window.addEventListener('vrm:publier-ouvrir', o); return () => window.removeEventListener('vrm:publier-ouvrir', o); }, []);
+  const [colisPrets] = useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
+  const nImprimer = colisPrets && Number.isFinite(colisPrets.lot) ? colisPrets.lot : undefined;
+  const faire = (f) => () => { setOuverte(false); if (f) setTimeout(() => { try { f(); } catch (_) {} }, 0); };
+  if (!gestes) return null;
+  return (
+    <Natif.Feuille ouverte={ouverte} onFermer={() => setOuverte(false)} titre={tr('creer.titre')} attrs={{ 'data-n-feuille-publier': '' }}>
+      <Natif.Groupe>
+        <Natif.Rangee titre={tr('creer.publier')} icone={<Icon name="tag" size={22}/>} fin="chevron" onClick={faire(gestes.publier)} attrs={{ 'data-geste-disque': 'publier' }}/>
+        <Natif.Rangee titre={tr('creer.scanner')} icone={<Icon name="scan" size={22}/>} fin="chevron" onClick={faire(gestes.scanner)} attrs={{ 'data-geste-disque': 'scanner' }}/>
+        <Natif.Rangee titre={nImprimer > 0 ? tr('creer.imprimerN', { n: nImprimer }) : tr('creer.imprimer')} icone={<Icon name="printer" size={22}/>} fin="chevron" onClick={faire(gestes.imprimer)} attrs={{ 'data-geste-disque': 'imprimer', 'data-imprimer-n': nImprimer == null ? '' : String(nImprimer) }}/>
+      </Natif.Groupe>
+    </Natif.Feuille>
+  );
+}
+function BottomBar({tab,setTab,sites,badges,nonLus=0}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
@@ -21127,16 +21176,32 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // `BarreOnglets` (src/natif/) ; la logique reste celle d'avant (l'onglet touché s'allume tout de suite, l'écran se calcule
   // en tâche interruptible, un écran gardé revient tel quel, l'onglet allumé retouché remonte en haut, cachée au clavier).
   // « Annonces » ouvre Annonces (le Stock est dans « Plus », par la photo du profil). Plus d'ondulation, plus de pastille qui glisse.
-  const ORDRE_NATIF=['journee',ID_PAIRES,'ventes','achats','compta'];
-  const groupeMontre=tabMontre==='garage'?'':groupeBarre(tabMontre,BAR_GROUPE);
-  const ongletsNatifs=ORDRE_NATIF.map(id=>BOTTOM_TABS.find(t=>t.id===id)).filter(Boolean).map(t=>{
-    const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0;
-    return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?`${n} à faire`:'', attrs:{ 'data-nav-entree':t.id } }; });
+  // ⚠️⚠️ (21 nov., onglets-menu — Julien : « totalement réorganiser les onglets », « inspire-toi de Bleam ») LA BARRE DU BAS :
+  //   Aujourd'hui · Annonces · [Publier] · Messages · Menu — cinq places de MÊME largeur ; Publier (le disque plein du milieu)
+  //   ouvre la feuille « Publier » ; Menu ouvre l'écran « Menu » (Ventes, Achats, Stock, Argent, E-mails, l'extension, l'aide,
+  //   Paramètres) et reste ALLUMÉ sur chacun de ces écrans (l'onglet allumé dit toujours où l'on est). Messages porte le
+  //   nombre de non-lus (lu par la coque, `msgNonLus`) ; Menu un POINT ambre quand une de ses tuiles a un geste à faire
+  //   (son nombre est sur la tuile : le même nombre ne s'écrit jamais deux fois).
+  const groupeMontre=groupeBarre(tabMontre,BAR_GROUPE);
+  const DANS_BARRE=['journee',ID_PAIRES,'messages'];
+  const allume=DANS_BARRE.includes(groupeMontre)?groupeMontre:'menu';
+  const nb=(id)=>badgesBarre&&typeof badgesBarre[id]==='number'&&badgesBarre[id]>0?badgesBarre[id]:0;
+  const pointMenu=['ventes','achats','garage','compta','emails'].some((id)=>nb(id)>0||(badgesBarre&&badgesBarre[id]===true));
+  const nMsg=Number(nonLus)>0?Number(nonLus):0;
+  const ongletDe=(t,extra={})=>{ const n=nb(t.id); return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?tr('menu.aFaire',{n}):'', attrs:{ 'data-nav-entree':t.id }, ...extra }; };
+  const ongletsNatifs=[
+    ongletDe(BOTTOM_TABS.find(t=>t.id==='journee')),
+    ongletDe(ONGLET_PAIRES),
+    { cle:'publier', libelle:tr('creer.onglet'), central:true, icone:<Icon name="plus" size={22}/>, attrs:{ 'data-n-publier':'', 'aria-haspopup':'dialog' } },
+    { ...ongletDe(ONGLET_MESSAGES), pastille:nMsg||undefined, libellePastille:nMsg?`${tr('nav.messages')} · ${nMsg}`:'' },
+    { cle:'menu', libelle:tr('menu.onglet'), icone:<Icon name="grid" size={24}/>, pastille:pointMenu||undefined, libellePastille:pointMenu?tr('menu.ouvrir'):'', attrs:{ 'data-nav-entree':'menu', 'data-n-coque-plus':'' } },
+  ];
   const choisirNatif=(id)=>{ setPlusOuvert(false);
+    if(id==='publier'){ ouvrirPublier(); return; }
     const cible=id===ID_PAIRES?'annonces':id;
-    if(!vise&&(id===ID_PAIRES?tab==='annonces':groupeBarre(tab,BAR_GROUPE)===id)) remonterEnHaut(); else { revenirSurOnglet(); allerA(cible); } };
+    if(!vise&&(id===ID_PAIRES?tab==='annonces':tab===cible)) remonterEnHaut(); else { revenirSurOnglet(); allerA(cible); } };
   return (
-    <Natif.BarreOnglets onglets={ongletsNatifs} actif={BOTTOM_TABS.some(t=>t.id===groupeMontre)?groupeMontre:''} onChoisir={choisirNatif}
+    <Natif.BarreOnglets onglets={ongletsNatifs} actif={allume} onChoisir={choisirNatif}
       libelle={tr('coque.navigationPrincipale')} attrs={{ ref:navRef, hidden:kbOpen||undefined, 'data-en-cours':enCours?'1':undefined, 'data-barre-native':'' }}/>
   );
 }
@@ -68545,6 +68610,8 @@ function AppCoeur() {
         {/* (5 nov., chantier G, revue 2.24) UN seul écran « E-mails » : son onglet « Relier ma boîte » porte
             l'ancien sous-écran de Paramètres (`EmailsSetting` : aperçu, journal, adresses, à rattacher) sous
             l'accompagnement animé. Une demande venue d'ailleurs (`DEMANDE_ADRESSES`) l'ouvre directement. */}
+        {/* (21 nov., onglets-menu) L'écran « Menu » : la 5ᵉ place de la barre du bas (téléphone). */}
+        {tab==='menu'&&<GardeEcran nom="menu"><EcranMenu tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents} entreprise={entreprise} streamVisible={!!reglesStream.bouton} etats={<span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>}/></GardeEcran>}
         {tab==='extension'&&<GardeEcran nom="extension"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranExtension comptesVinted={!accountsLoaded ? undefined : baseKO ? [] : vintedAccounts} ecarte={(u) => compteEcarte(u, new Set(hAccCoqueCle ? hAccCoqueCle.split(',') : []), panelOffCoque || {})}/></Suspense></GardeEcran>}
         {tab==='emails'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="emails"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><EcranEmails comptes={vintedAccounts} headers={sbAuth} delies={load('vrm_recus_delies',{})||{}} FermeAuRetour={FermeAuRetour} photoDe={photoEmailParTx}
           ecrireLus={(g)=>ecrireEmailsLus(g,{url:SUPABASE_URL,entetes:sbAuth,avecOwner:withOwner,owner:AUTH.user&&AUTH.user.id,cloisonne:CLOISONNE})}
@@ -68613,7 +68680,9 @@ function AppCoeur() {
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
           (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
-      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}/>}
+      {/* (21 nov., onglets-menu) La feuille « Publier » : la place du milieu de la barre, l'entrée « Publier » de la barre latérale. */}
+      <FeuillePublier gestes={gestesDisque}/>
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
