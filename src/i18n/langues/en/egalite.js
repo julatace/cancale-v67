@@ -114,5 +114,6 @@ export default {
   "egalite.d.bloque.phraseDate": "Last known listings ({d}). Not in totals, no actions.",
   "egalite.d.bloque.aucunGeste": "Blocked account: nothing is done on it. You can open the item sheet.",
   "egalite.d.regler.relier": "{n} to link",
-  "egalite.d.regler.achat": "{n} purchase prices"
+  "egalite.d.regler.achat": "{n} purchase prices",
+  "egalite.d.aReglerN": {"one": "{n} to sort out", "other": "{n} to sort out"}
 };

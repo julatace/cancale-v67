@@ -114,5 +114,6 @@ export default {
   "egalite.d.bloque.phraseDate": "Dernières annonces connues ({d}). Hors des totaux, aucun geste.",
   "egalite.d.bloque.aucunGeste": "Compte bloqué : rien n’est fait sur ce compte. Tu peux ouvrir la fiche.",
   "egalite.d.regler.relier": "{n} à relier",
-  "egalite.d.regler.achat": "{n} prix d’achat"
+  "egalite.d.regler.achat": "{n} prix d’achat",
+  "egalite.d.aReglerN": {"one": "{n} à régler", "other": "{n} à régler"}
 };

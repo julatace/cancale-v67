@@ -45,7 +45,7 @@ import './annonces.css';
 import AnnoncesTableau from './AnnoncesTableau.jsx';   // (19 nov. soir) l'ordinateur : le tableau de travail
 import { Glyphe } from '../icones.jsx';
 import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
-import { CarteAnnonce, Stats, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
+import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
 
 const PAR_PAGE = 60;
@@ -136,7 +136,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '', liaison = null,
   euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null,
-  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, Photo = null }) {   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
+  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, Photo = null, formeRangee = 'a' }) {   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
   const ordinateur = useOrdinateur();
   // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
   // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
@@ -215,26 +215,6 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
     </div>
   );
 
-  const rangee = (a, cleCompte = '', sur = null) => {
-    const grise = A && !cochable(a);
-    const l = A ? null : lienDe(a);
-    const aRelierL = !!(l && l.etat === 'aRelier');
-    // Balayage d'une annonce « à relier » : ⇠ Autre… (le parcours) · Relier N° (la proposition, geste principal, `franc`).
-    const gestesLiaison = !aRelierL ? null : l.prop
-      ? [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), ton: l.prop.niveau === 'sur' ? 'ambre' : 'accent', onClick: () => liaison.relier(l), franc: true }]
-      : [{ cle: 'autre', libelle: tr('liaL.autre'), ton: 'neutre', onClick: () => liaison.autre(l) }, { cle: 'propre', libelle: tr('liaL.propreCourt'), onClick: () => liaison.propre(l) }];
-    return <React.Fragment key={a.cle + (cleCompte ? '|' + cleCompte : '')}><Rangee vignette={<Vignette src={a.photo || ''} alt=""/>} titre={a.titre || tr('egalite.sansTitre')}
-      plaque={<>{a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}{a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}</>} sousTitre={sur && sur.sousTitre !== undefined ? sur.sousTitre : sousDe(a, nomSite, filtre.site, euros)} lignes={2} ton="neutre"
-      valeur={a.prix != null ? euros(a.prix) : null} valeurForte
-      detailValeur={sur && sur.detailValeur !== undefined ? sur.detailValeur : (a.prixMini != null ? tr('egalite.mini', { p: euros(a.prixMini) }) : '')}
-      fin={A ? (sel.has(a.cle) ? 'coche' : <span className="n-eg-case" aria-hidden="true"/>) : 'chevron'} selectionnee={A ? sel.has(a.cle) : ouvert === a.cle}
-      indisponible={!!grise} raison={grise ? tr('egalite.selection.pasPour', { site: nomSite(a.annonces[0].site) }) : ''} onClick={() => ouvrir(a)}
-      actions={A || seulementBloque(a) ? null : (gestesLiaison || [{ cle: 'mini', libelle: tr('egalite.col.prixMini'), ton: 'neutre', onClick: () => saisir(a, 'min') }, { cle: 'achat', libelle: tr('egalite.col.achat'), onClick: () => saisir(a, 'buyPrice') }])}
-      attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, ...(cleCompte ? { 'data-eg-compte': cleCompte } : {}) }}/>
-      {/* (20 nov., « même rangée sur chaque site ») La proposition n'est plus posée sous chaque rangée : le balayage la garde
-          (« Relier N° »), la tête du groupe dit « N à relier › » et ouvre le parcours. */}</React.Fragment>;
-  };
-
   // Une cellule du tableau : la valeur, ou « — » qui se touche et ouvre SA saisie.
   const cellule = (a, cle, valeur, onModifier) => (
     <td className="n-eg-td" data-eg-col={cle} data-eg-vide={valeur == null ? '1' : undefined}>
@@ -309,7 +289,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       onClick: () => { const j = x.juger ? x.juger([a]) : { ok: true }; if (j && j.ok) onAction(x.cle, [a]); else setDit({ id: Date.now(), message: (j && j.raison) || tr('egalite.selection.aucune') }); } }));
     out.push({ cle: 'mini', libelle: tr('egalite.saisie.min'), icone: 'tag', onClick: () => saisir(a, 'min') });
     out.push({ cle: 'achat', libelle: tr('egalite.saisie.buyPrice'), icone: 'pencil', onClick: () => saisir(a, 'buyPrice') });
-    if (l && l.etat === 'aRelier' && liaison) out.push({ cle: 'relier', libelle: l.prop ? tr('liaL.relierN', { numero: l.prop.numero }) : tr('liaL.autre'), icone: 'link', ambre: true, onClick: () => (l.prop ? liaison.relier(l) : liaison.autre(l)) });
+    // (le balayage d'avant : « Relier N° » · « Autre… » · « Que sur ce site ») — les mêmes gestes, dans la feuille.
+    if (l && l.etat === 'aRelier' && liaison) {
+      if (l.prop) out.push({ cle: 'relier', libelle: tr('liaL.relierN', { numero: l.prop.numero }), icone: 'link', ambre: true, onClick: () => liaison.relier(l) });
+      out.push({ cle: 'autre', libelle: tr('liaL.autre'), icone: 'link', onClick: () => liaison.autre(l) });
+      if (!l.prop) out.push({ cle: 'propre', libelle: tr('liaL.propreCourt'), icone: 'check', onClick: () => liaison.propre(l) });
+    }
     else if (a.aRelier && onRelier) out.push({ cle: 'relier', libelle: tr('egalite.relier.titre'), icone: 'link', ambre: true, onClick: () => onRelier(a) });
     return out;
   };
@@ -321,17 +306,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
       attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
   );
-  // La liste « Articles » au téléphone : la rangée de 72 (vignette, titre complet, « logos · N° », prix ; dessous taille · vues · favoris · jours).
-  const rangeeTel = (a, cleCompte) => {
-    const t0 = a.etat === 'bloque' ? traceDe(a) : null;
-    const b = bandeauDe(a);
-    // La 2e ligne garde UNE ligne : logos · N° · taille (ou la trace d'un compte bloqué) ; sous le prix : l'état s'il n'est pas
-    // « en ligne », sinon vues · favoris (les jours sont sur la carte et dans la colonne Date de l'ordinateur).
-    return rangee(a, cleCompte, {
-      sousTitre: t0 ? <span className="n-ad-trace" data-ad-trace={t0.par}>{texteTrace(t0)}</span> : [a.taille && !tailleDansTitre(a.titre, a.taille) ? tr('egalite.taille', { t: a.taille }) : '', a.prixMini != null ? tr('egalite.mini', { p: euros(a.prixMini) }) : ''].filter(Boolean).join(' · '),
-      detailValeur: b ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : <Stats a={{ ...a, depuis: null }} depuisTexte={depuisTexte} Icon={Icon}/>,
-    });
-  };
+  // La liste « Articles » au téléphone (21 nov., 2e passe) : `RangeeArticle`, forme A ou B (`formeRangee`), pleine largeur, filets fins.
+  const rangeeTel = (a, cleCompte) => (
+    <RangeeArticle key={a.cle + '|' + cleCompte} a={a} forme={formeRangee} onOuvrir={ouvrir} onGestes={(x) => setGestesDe(x.cle)} euros={euros} depuisTexte={depuisTexte}
+      nomSite={nomSite} Icon={Icon} Photo={Photo} selection={A ? { cochee: sel.has(a.cle), cochable: cochable(a), onBascule: () => basculer(a) } : null}
+      attrs={{ 'data-eg-article': a.cle, 'data-eg-sites': a.sites.join(','), 'data-eg-numero': a.numero || '', 'data-eg-coche': A ? (sel.has(a.cle) ? '1' : '0') : undefined, 'data-eg-compte': cleCompte }}/>
+  );
   const enTeteCompte = (g, n) => {
     const titre = g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte));
     const ouvertG = !replis.has(g.cle);
@@ -358,11 +338,12 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   if (aRelTous.length) sujets.push({ cle: 'relier', n: aRelTous.length, libelle: tr('egalite.groupe.aRelier', { n: aRelTous.length }),
     go: () => { const l0 = lienDe(aRelTous[0]); if (l0 && liaison) liaison.autre(l0); else if (onRelier) onRelier(aRelTous[0]); } });
   if (sansAchatTous) sujets.push({ cle: 'achat', n: sansAchatTous, libelle: tr('egalite.groupe.achats', { n: sansAchatTous }), go: () => onCompleter('achat') });
+  // (21 nov., 2e passe) « À régler » et « Mis à jour » sur UNE ligne fine : « Mis à jour il y a 18 min · ● 24 à régler › · ⟳ ».
+  const nRegler = sujets.reduce((t, x) => t + x.n, 0);
   const aReglerTel = sujets.length ? (
-    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(sujets.reduce((t, x) => t + x.n, 0))} onClick={() => (sujets.length === 1 ? sujets[0].go() : setReglerTel(true))}>
-      <span className="n-ad-point" aria-hidden="true"/>
-      <span className="n-ad-afaire-texte"><span className="n-ad-aregler-titre">{tr('egalite.aRegler')}</span>{' · ' + sujets.map((x) => tr('egalite.d.regler.' + x.cle, { n: x.n })).join(' · ')}</span>
-      <Glyphe nom="chevron" taille={14}/>
+    <button type="button" className="n-ad-afaire n-ad-aregler" data-ad-aregler={String(nRegler)} aria-label={tr('egalite.aRegler') + ' · ' + sujets.map((x) => x.libelle).join(' · ')}
+      onClick={() => (sujets.length === 1 ? sujets[0].go() : setReglerTel(true))}>
+      <span className="n-ad-point" aria-hidden="true"/><span className="n-ad-afaire-texte">{tr('egalite.d.aReglerN', { n: nRegler })}</span><Glyphe nom="chevron" taille={14}/>
     </button>) : null;
   const barreHaut = (
     <div className="n-eg-recherche">
@@ -378,10 +359,10 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
       <Page titre={tr('egalite.titre')} plein={plein} attrs={{ 'data-eg-ecran': '', 'data-eg-site': filtre.site, 'data-eg-etat': filtre.etat, 'data-eg-selection': A ? A.cle : undefined, 'data-eg-vue': ordinateur ? 'tableau' : 'liste', 'data-ad-vue': vueG ? 'grille' : 'liste' }}
         recherche={barreHaut}>
         {tete}
-        {aReglerTel}
-        {travail && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
-          <span>{depuisMaj(majLe, maintenantMaj)}</span>
-          {travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
+        {(travail || aReglerTel) && !A && !ordinateur ? <div className="n-ad-maj" data-ad-maj={!travail ? 'aucun' : majLe === undefined ? 'lecture' : majLe == null ? 'passu' : 'lu'}>
+          <span className="n-ad-maj-texte">{travail ? depuisMaj(majLe, maintenantMaj) : ''}</span>
+          {aReglerTel}
+          {travail && travail.onRafraichir ? <BoutonIcone libelle={tr('tableau.rafraichir')} indisponible={!!travail.rafraichit} icone={Icon ? <Icon name="sync" size={18}/> : null}
             onClick={() => { if (!travail.rafraichit) travail.onRafraichir(); }} className="n-ad-rafraichir" attrs={{ 'data-ad-rafraichir': '', 'aria-busy': travail.rafraichit ? 'true' : undefined }}/> : null}
         </div> : null}
         {aRegler.length && !A ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
@@ -401,7 +382,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
                     {vueG ? <div className="n-ad-grille">{g.articles.slice(0, max).map((a) => carte(a, g.cle))}</div>
-                      : <Groupe>{g.articles.slice(0, max).map((a) => rangeeTel(a, g.cle))}</Groupe>}
+                      : <div className="n-ar-liste" data-ad-forme={formeRangee}>{g.articles.slice(0, max).map((a) => rangeeTel(a, g.cle))}</div>}
                   </> : null}
                 </section>);
             })}</div>}

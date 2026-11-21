@@ -6,9 +6,10 @@
 //  Construit outils/annonces-dressing/ (esbuild, hors paquet de prod) : l'écran natif nourri par les VRAIES règles
 //  (src/articles/sources.js, src/articles/modele.js) sur une base INVENTÉE — dont un compte Vinted BLOQUÉ (en pause).
 //  Mesures (data-* et nombres, jamais un libellé) — 390 × 844 tactile (DPR 3), 1512 × 900, clair et sombre :
-//   G. téléphone : grille par défaut, 2 colonnes, photo à taille RÉSERVÉE (4:5, mesurée AVANT l'arrivée des photos),
-//      chaque carte dit son prix, un seul « ⋯ » 44 × 44, aucun plein dans une carte, 1re carte ≤ 50 % de 844 ;
-//      aucun saut de mise en page (CLS) quand les photos arrivent ; la bascule liste ⇄ grille est mémorisée ;
+//   G. téléphone (2e passe du 21 nov., « je n'aime pas du tout l'affichage sur iPhone ») : la LISTE « Articles » par défaut, formes
+//      A et B : rangées 64–72, vignette 52 réservée, ≥ 8 rangées par écran, prix, « ⋯ » 44 au doigt, aucun plein, liste pleine
+//      largeur, « À régler » sur la ligne de « Mis à jour », pas de capitales, taille non répétée ; CLS ≈ 0 à l'arrivée des
+//      photos ; la grille (photo carrée, « ⋯ » à côté du prix) choisissable et mémorisée ;
 //   K. compte bloqué : un segment « Bloqués » avec SES 3 annonces ; « En ligne » ne les compte pas ; chaque carte dit sa
 //      trace datée ; l'en-tête du compte dit « Compte bloqué » ; « ⋯ » n'offre aucun geste ; « Actions » ne les coche pas ;
 //   R. le rouge n'est porté que par la Plaque d'un doublon ; C. contrastes ≥ 4,5:1 ; T. cibles ≥ 44 ; D. aucun débordement ;
@@ -78,28 +79,34 @@ const MESURE = () => {
   const rouge = (s) => { const c = lire(s); return c && c.a > 0.5 && c.r > 180 && c.g < 90 && c.b < 90; };
   for (const el of document.querySelectorAll('body *')) { const cs = getComputedStyle(el); if ((rouge(cs.color) && el.textContent.trim()) || rouge(cs.backgroundColor)) { if (!el.closest('.n-plaque[data-n-doublon]')) r.rouges.push(el.className || el.tagName); } }
   const cartes = [...document.querySelectorAll('[data-ad-carte]')];
-  r.nCartes = cartes.length;
+  const rangees = [...document.querySelectorAll('[data-ad-rangee]')];
+  const items = cartes.length ? cartes : rangees;
+  r.nCartes = cartes.length; r.nRangees = rangees.length; r.nItems = items.length;
   r.colonnes = new Set(cartes.slice(0, 8).map((c) => Math.round(c.getBoundingClientRect().left))).size;
-  r.premiere = cartes.length ? Math.round(cartes[0].getBoundingClientRect().top) : (document.querySelector('[data-eg-article]') ? Math.round(document.querySelector('[data-eg-article]').getBoundingClientRect().top) : null);
-  r.photos = cartes.slice(0, 12).map((c) => { const p = c.querySelector('.n-ad-photo'); const b = p ? p.getBoundingClientRect() : { width: 0, height: 0 }; return { w: Math.round(b.width), h: Math.round(b.height) }; });
-  r.prix = cartes.slice(0, 40).every((c) => /€/.test(c.textContent));
-  r.ronds = cartes.slice(0, 40).map((c) => { const b = c.querySelector('[data-ad-gestes]'); if (!b) return 0; const x = b.getBoundingClientRect(); return x.width >= 44 && x.height >= 44 ? 1 : -1; });
-  r.pleinsCarte = document.querySelectorAll('[data-ad-carte] [data-n-variante="plein"]').length;
+  r.premiere = items.length ? Math.round(items[0].getBoundingClientRect().top) : null;
+  r.photos = items.slice(0, 12).map((c) => { const p = c.querySelector('.n-ad-photo, .n-ar-photo'); const b = p ? p.getBoundingClientRect() : { width: 0, height: 0 }; return { w: Math.round(b.width), h: Math.round(b.height) }; });
+  r.hauteurs = rangees.slice(0, 30).map((e) => Math.round(e.getBoundingClientRect().height));
+  r.prix = items.slice(0, 40).every((c) => /€/.test(c.textContent));
+  r.ronds = items.slice(0, 40).map((c) => { const b = c.querySelector('[data-ad-gestes]'); if (!b) return 0; const x = b.getBoundingClientRect(); return x.width >= 44 && x.height >= 44 ? 1 : -1; });
+  r.pleinsCarte = document.querySelectorAll('[data-ad-carte] [data-n-variante="plein"], [data-ad-rangee] [data-n-variante="plein"]').length;
   r.pleins = document.querySelectorAll('[data-n-variante="plein"]').length;
   r.vue = document.querySelector('[data-eg-ecran]') ? document.querySelector('[data-eg-ecran]').getAttribute('data-ad-vue') : null;
   r.segBloque = (() => { const s = document.querySelector('[data-eg-segment="bloque"]'); return s ? Number(s.getAttribute('data-eg-segment-n') || (s.querySelector('.n-segmente-n') || {}).textContent || 0) : null; })();
   r.segEnLigne = (() => { const s = document.querySelector('[data-eg-segment="enligne"]'); return s ? Number(s.getAttribute('data-eg-segment-n') || (s.querySelector('.n-segmente-n') || {}).textContent || 0) : null; })();
   r.coupes = [...document.querySelectorAll('.n-segmente-libelle')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent);
-  r.traces = document.querySelectorAll('[data-ad-carte] [data-ad-trace], [data-eg-article] [data-ad-trace]').length;
+  r.traces = document.querySelectorAll('[data-eg-article] [data-ad-trace]').length;
   r.teteBloque = document.querySelectorAll('[data-ad-bloque="1"]').length;
   r.noeuds = document.querySelectorAll('[data-eg-liste] *').length;
-  // (21 nov., captures de Julien) « À régler » UNE fois pour l'écran, jamais en tête de chaque compte ; aucun intertitre en capitales ;
-  // aucun plein « Publier » au téléphone ; la taille déjà dans le titre ne se répète pas.
+  // « À régler » UNE fois, sur la MÊME ligne fine que « Mis à jour » ; aucun intertitre en capitales ; aucun plein « Publier » au
+  // téléphone ; la taille déjà dans le titre ne se répète pas ; aucune carte arrondie autour de la liste (pas de carte dans une carte).
   r.aregler = document.querySelectorAll('[data-ad-aregler]').length;
+  r.areglerLigne = document.querySelectorAll('.n-ad-maj [data-ad-aregler]').length;
   r.manqueParCompte = document.querySelectorAll('[data-eg-groupe] [data-eg-manque]').length;
   r.capitales = [...document.querySelectorAll('[data-eg-liste] *')].filter((e) => getComputedStyle(e).textTransform === 'uppercase' && e.textContent.trim()).length;
   r.pleinPublier = document.querySelectorAll('[data-n-variante="plein"][data-eg-publier]').length;
-  r.tailleRepetee = [...document.querySelectorAll('[data-ad-carte]')].filter((c) => { const t = (c.querySelector('.n-ad-titre') || {}).textContent || ''; const m = /T\. ([0-9]+(?:[.,][0-9])?)/.exec((c.querySelector('.n-ad-meta') || {}).textContent || ''); return m && new RegExp('taille ' + m[1].replace(/[.,]/, '[.,]')).test(t); }).length;
+  r.tailleRepetee = items.filter((c) => { const t = (c.querySelector('.n-ad-titre, .n-ar-titre') || {}).textContent || ''; const m = /T\. ([0-9]+(?:[.,][0-9])?)/.exec((c.querySelector('.n-ad-ligne, .n-ar-meta') || {}).textContent || ''); return m && new RegExp('taille ' + m[1].replace(/[.,]/, '[.,]')).test(t); }).length;
+  r.etiquettesCoupees = [...document.querySelectorAll('[data-ad-rangee] .n-ad-etiquette')].filter((e) => { const p = e.closest('.n-ar-texte'); return p && e.getBoundingClientRect().right > p.getBoundingClientRect().right + 0.5; }).length;
+  r.listeArrondie =[...document.querySelectorAll('.n-ar-liste')].filter((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius) > 0 || e.getBoundingClientRect().left > 0.5).length;
   return r;
 };
 const TEL = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true };
@@ -114,63 +121,66 @@ async function ouvrir(nav, opts, q, { garder = null } = {}) {
   await pg.waitForTimeout(120); return { ctx, pg, tRendu };
 }
 const MUT = {
-  photo: '.n-ad-photo{aspect-ratio:auto !important}',
-  rond: '.n-ad-rond{width:24px !important;height:24px !important}',
-  rouge: '.n-ad-prix{color:#d70015 !important}',
-  contraste: '.n-ad-titre,.n-rangee-titre{color:#c8c8c8 !important}',
+  photo: '.n-ar-photo{height:auto !important;min-height:0 !important}.n-ad-photo{aspect-ratio:auto !important}',
+  rond: '.n-ar-plus,.n-ad-plus{width:24px !important;height:24px !important;align-self:center !important}',
+  rouge: '.n-ar-prix,.n-ad-prix{color:#d70015 !important}',
+  contraste: '.n-ar-titre,.n-ad-titre{color:#c8c8c8 !important}',
+  carte: '.n-ar-liste{margin:0 16px !important;border-radius:12px !important}',
 };
 async function juger(nav, mutant = '') {
-  for (const sombre of [false, true]) {
-    // ── G. le téléphone, grille par défaut ──
-    { const { ctx, pg } = await ouvrir(nav, TEL, `?v=tous${sombre ? '&theme=dark' : ''}`);
+  for (const forme of ['a', 'b']) for (const sombre of [false, true]) {
+    // ── G. le téléphone : la LISTE « Articles » par défaut, forme A ou B ──
+    { const { ctx, pg } = await ouvrir(nav, TEL, `?v=tous&forme=${forme}${sombre ? '&theme=dark' : ''}`);
       if (mutant) await pg.addStyleTag({ content: MUT[mutant] });
       const r0 = await pg.evaluate(MESURE);   // AVANT l'arrivée des photos (700 ms de retard)
       await pg.waitForTimeout(1300);
       const r = await pg.evaluate(MESURE); const cls = await pg.evaluate(() => window.__cls);
-      const ou = `390${sombre ? ' · sombre' : ''}`;
-      dit(r.vue === 'grille' && r.nCartes > 0 && r.colonnes === 2, `G ${ou} : grille par défaut, ${r.nCartes} cartes sur 2 colonnes`, { vue: r.vue, n: r.nCartes, col: r.colonnes });
-      dit(r0.photos.length > 0 && r0.photos.every((p) => p.w > 100 && Math.abs(p.h - p.w * 1.25) <= 2), `G ${ou} : photo à taille réservée (4:5) avant son arrivée`, r0.photos.slice(0, 4));
+      const ou = `390 ${forme.toUpperCase()}${sombre ? ' · sombre' : ''}`;
+      dit(r.vue === 'liste' && r.nRangees > 0 && r.nCartes === 0, `G ${ou} : la LISTE par défaut, ${r.nRangees} rangées`, { vue: r.vue, n: r.nRangees });
+      dit(r0.photos.length > 0 && r0.photos.every((p) => p.w === 52 && p.h === 52), `G ${ou} : vignette 52 × 52 réservée avant son arrivée`, r0.photos.slice(0, 4));
+      dit(r.hauteurs.length > 0 && r.hauteurs.every((h) => h >= 64 && h <= 72), `G ${ou} : rangées de ${Math.min(...r.hauteurs)}–${Math.max(...r.hauteurs)} px (64–72)`, r.hauteurs);
       dit(cls < 0.01, `G ${ou} : aucun saut quand les photos arrivent (CLS ${cls.toFixed(4)})`, cls);
-      dit(r.prix && r.ronds.length > 0 && r.ronds.every((x) => x === 1) && r.pleinsCarte === 0 && r.pleins <= 1, `G ${ou} : chaque carte dit son prix, un « ⋯ » 44 × 44, aucun plein dans une carte (${r.pleins} plein à l'écran)`, { prix: r.prix, ronds: r.ronds, pleins: r.pleins });
-      dit(r.aregler === 1 && r.manqueParCompte === 0, `G ${ou} : « À régler » une seule fois pour l'écran, rien en tête des comptes`, { aregler: r.aregler, parCompte: r.manqueParCompte });
-      dit(r.capitales === 0 && r.pleinPublier === 0 && r.tailleRepetee === 0, `G ${ou} : aucun intertitre en capitales, aucun plein « Publier » au téléphone, la taille du titre jamais répétée`, { cap: r.capitales, publier: r.pleinPublier, taille: r.tailleRepetee });
-      dit(r.premiere != null && r.premiere <= 422, `G ${ou} : 1re carte à ${r.premiere} px (≤ 50 % de 844)`, r.premiere);
+      dit(r.prix && r.ronds.length > 0 && r.ronds.every((x) => x === 1) && r.pleinsCarte === 0 && r.pleins === 0, `G ${ou} : chaque rangée dit son prix, un « ⋯ » 44 au doigt, aucun plein à l'écran`, { prix: r.prix, ronds: r.ronds, pleins: r.pleins });
+      dit(r.aregler === 1 && r.areglerLigne === 1 && r.manqueParCompte === 0, `G ${ou} : « À régler » une fois, sur la ligne de « Mis à jour »`, { aregler: r.aregler, ligne: r.areglerLigne, parCompte: r.manqueParCompte });
+      dit(r.capitales === 0 && r.pleinPublier === 0 && r.tailleRepetee === 0 && r.listeArrondie === 0, `G ${ou} : pas de capitales, pas de plein « Publier », taille du titre jamais répétée, liste pleine largeur`, { cap: r.capitales, publier: r.pleinPublier, taille: r.tailleRepetee, arrondie: r.listeArrondie });
+      dit(r.premiere != null && r.premiere <= 422, `G ${ou} : 1re rangée à ${r.premiere} px (≤ 50 % de 844)`, r.premiere);
       dit(r.cibles.length === 0, `T ${ou} : cibles ≥ 44 × 44`, r.cibles.slice(0, 6));
       dit(r.contrastes.length === 0, `C ${ou} : contrastes ≥ 4,5:1`, r.contrastes.slice(0, 6));
       dit(r.rouges.length === 0, `R ${ou} : le rouge seulement sur la Plaque d'un doublon`, r.rouges.slice(0, 6));
-      dit(r.debord <= 0, `D ${ou} : aucun débordement horizontal`, r.debord);
-      dit(r.coupes.length === 0, `D ${ou} : aucun segment coupé (« À publ… »)`, r.coupes);
-      // K. le compte bloqué
-      dit(r.segBloque === 3 && r.segEnLigne != null, `K ${ou} : segment « Bloqués » · ${r.segBloque} (les 3 annonces du compte bloqué), « En ligne » · ${r.segEnLigne}`, { bloque: r.segBloque, enligne: r.segEnLigne });
-      if (!mutant) await pg.screenshot({ path: path.join(SHOTS, `grille-390${sombre ? '-sombre' : ''}.png`) });
+      dit(r.debord <= 0 && r.coupes.length === 0 && r.etiquettesCoupees === 0, `D ${ou} : aucun débordement, aucun segment ni état coupé`, { d: r.debord, c: r.coupes, e: r.etiquettesCoupees });
+      dit(r.segBloque === 3 && r.segEnLigne != null, `K ${ou} : segment « Bloqués » · ${r.segBloque}, « En ligne » · ${r.segEnLigne}`, { bloque: r.segBloque, enligne: r.segEnLigne });
+      if (!mutant) await pg.screenshot({ path: path.join(SHOTS, `liste-${forme}-390${sombre ? '-sombre' : ''}.png`) });
+      if (!mutant && !sombre) { await pg.evaluate(() => { const l = document.querySelector('[data-eg-liste]'); if (l) window.scrollTo(0, l.getBoundingClientRect().top + window.scrollY - 100); }); await pg.waitForTimeout(300);
+        await pg.screenshot({ path: path.join(SHOTS, `liste-${forme}-390-defile.png`) }); await pg.evaluate(() => window.scrollTo(0, 0)); }
       if (r.segBloque) {
         await pg.click('[data-eg-segment="bloque"]'); await pg.waitForTimeout(1200);
         const k = await pg.evaluate(MESURE);
         const enLigneSansBloque = await pg.evaluate(() => window.__banc.comptes.tous.enligne);
-        dit(k.nCartes === 3 && k.traces === 3 && k.teteBloque === 1, `K ${ou} : « Bloqués » montre 3 cartes, chacune sa trace datée, l'en-tête « Compte bloqué »`, { n: k.nCartes, traces: k.traces, tete: k.teteBloque });
+        dit(k.nItems === 3 && k.traces === 3 && k.teteBloque === 1, `K ${ou} : « Bloqués » montre 3 annonces, chacune sa trace datée, l'en-tête « Compte bloqué »`, { n: k.nItems, traces: k.traces, tete: k.teteBloque });
         dit(r.segEnLigne === enLigneSansBloque && enLigneSansBloque === 7, `K ${ou} : « En ligne » ne compte pas le compte bloqué (${r.segEnLigne})`, { seg: r.segEnLigne, regle: enLigneSansBloque });
-        await pg.click('[data-ad-carte] [data-ad-gestes]'); await pg.waitForTimeout(500);
+        if (!mutant) await pg.screenshot({ path: path.join(SHOTS, `bloque-${forme}-390${sombre ? '-sombre' : ''}.png`) });
+        await pg.click('[data-eg-article] [data-ad-gestes]'); await pg.waitForTimeout(500);
         const g = await pg.evaluate(() => ({ aucun: !!document.querySelector('[data-ad-aucun-geste]'), gestes: [...document.querySelectorAll('[data-ad-geste]')].map((x) => x.getAttribute('data-ad-geste')) }));
         dit(g.aucun && g.gestes.every((x) => x === 'fiche'), `K ${ou} : « ⋯ » d'une annonce bloquée n'offre aucun geste (seulement ouvrir)`, g);
-        if (!mutant) await pg.screenshot({ path: path.join(SHOTS, `bloque-feuille-390${sombre ? '-sombre' : ''}.png`) });
-        await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
-        if (!mutant) await pg.screenshot({ path: path.join(SHOTS, `bloque-390${sombre ? '-sombre' : ''}.png`) });
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
       }
       await ctx.close(); }
   }
   if (mutant) return;
-  // ── La bascule liste ⇄ grille, mémorisée ; la liste « Articles » ──
+  // ── La grille, choisissable et mémorisée : sobre (photo carrée, une ligne, « ⋯ » discret) ──
   { const ctx = await nav.newContext(TEL);
     let { pg } = await ouvrir(nav, TEL, '?v=tous', { garder: ctx });
     const b = await pg.$('[data-ad-bascule]');
     if (dit(!!b, 'G 390 : une bascule liste ⇄ grille')) {
-      await b.click(); await pg.waitForTimeout(400);
-      await pg.close(); ({ pg } = await ouvrir(nav, TEL, '?v=tous', { garder: ctx })); await pg.waitForTimeout(1200);
+      await b.click(); await pg.waitForTimeout(300);
+      await pg.close(); ({ pg } = await ouvrir(nav, TEL, '?v=tous', { garder: ctx }));
+      const r0 = await pg.evaluate(MESURE); await pg.waitForTimeout(1300);
       const r = await pg.evaluate(MESURE);
-      const rang = await pg.evaluate(() => [...document.querySelectorAll('[data-eg-liste] [data-eg-article]')].slice(0, 30).map((e) => ({ h: Math.round(e.getBoundingClientRect().height), prix: /€/.test(e.textContent) })));
-      dit(r.vue === 'liste' && r.nCartes === 0 && rang.length > 0 && rang.every((x) => x.prix && x.h >= 64 && x.h <= 96), `G 390 : la vue LISTE est gardée au rechargement, rangées de ${rang.length ? rang[0].h : '?'} px avec leur prix`, { vue: r.vue, rang: rang.slice(0, 3) });
-      dit(r.cibles.length === 0 && r.contrastes.length === 0 && r.debord <= 0, 'T C D 390 liste : cibles, contrastes, débordement', { c: r.cibles.slice(0, 4), k: r.contrastes.slice(0, 4), d: r.debord });
-      await pg.screenshot({ path: path.join(SHOTS, 'liste-390.png') });
+      dit(r.vue === 'grille' && r.nCartes > 0 && r.colonnes === 2, `G 390 grille : gardée au rechargement, ${r.nCartes} cartes sur 2 colonnes`, { vue: r.vue, n: r.nCartes, col: r.colonnes });
+      dit(r0.photos.length > 0 && r0.photos.every((p) => p.w > 100 && Math.abs(p.h - p.w) <= 1), 'G 390 grille : photo CARRÉE réservée avant son arrivée', r0.photos.slice(0, 4));
+      dit(r.prix && r.ronds.every((x) => x === 1) && !(await pg.$('.n-ad-photo [data-ad-gestes]')), 'G 390 grille : prix, « ⋯ » discret à côté du prix (pas sur la photo)', r.ronds);
+      dit(r.cibles.length === 0 && r.contrastes.length === 0 && r.debord <= 0, 'T C D 390 grille', { c: r.cibles.slice(0, 4), k: r.contrastes.slice(0, 4), d: r.debord });
+      await pg.screenshot({ path: path.join(SHOTS, 'grille-390.png') });
     }
     await ctx.close(); }
   // ── Actions : le compte bloqué ne se coche pas ──
@@ -201,11 +211,15 @@ async function juger(nav, mutant = '') {
   { RETARD = 0;
     const { ctx, pg, tRendu } = await ouvrir(nav, TEL, '?v=volume'); await pg.waitForTimeout(600);
     const r = await pg.evaluate(MESURE);
-    const visibles = await pg.evaluate(() => [...document.querySelectorAll('[data-ad-carte]')].filter((c) => { const b = c.getBoundingClientRect(); return b.top < innerHeight && b.bottom > 0; }).length);
+    const visibles = await pg.evaluate(() => [...document.querySelectorAll('[data-ad-rangee]')].filter((c) => { const b = c.getBoundingClientRect(); return b.top < innerHeight && b.bottom > 0; }).length);
     await pg.evaluate(async () => { for (let y = 0; y < document.scrollingElement.scrollHeight; y += 700) { window.scrollTo(0, y); await new Promise((f) => setTimeout(f, 30)); } });
     const cls = await pg.evaluate(() => window.__cls);
     dit(tRendu < 6000 && r.noeuds < 12000, `V 1 000 annonces : premier rendu ${tRendu} ms, ${r.noeuds} nœuds dans la liste (60 par compte, puis « Voir N de plus »)`, { tRendu, noeuds: r.noeuds });
-    dit(visibles >= 4, `V 390 : ${visibles} cartes visibles sur le premier écran (grille photo ; la vue liste en montre plus)`, visibles);
+    dit(visibles >= 6, `V 390 : ${visibles} rangées sur le premier écran (sous le titre, la recherche et les segments)`, visibles);
+    await pg.evaluate(() => { const l = document.querySelector('[data-ad-rangee]'); window.scrollTo(0, l.getBoundingClientRect().top + window.scrollY - 120); }); await pg.waitForTimeout(300);
+    const entieres = await pg.evaluate(() => [...document.querySelectorAll('[data-ad-rangee]')].filter((c) => { const b = c.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight - 83; }).length);
+    dit(entieres >= 8, `V 390 : ${entieres} rangées entières sur un écran d'iPhone une fois dans la liste (≥ 8)`, entieres);
+    await pg.screenshot({ path: path.join(SHOTS, 'volume-liste-390.png') });
     dit(cls < 0.05, `V défilement jusqu'en bas sans saut (CLS ${cls.toFixed(4)})`, cls);
     await ctx.close(); RETARD = 700; }
 }

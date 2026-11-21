@@ -114,5 +114,6 @@ export default {
   "egalite.d.bloque.phraseDate": "Últimos anuncios conocidos ({d}). Fuera de los totales, sin acciones.",
   "egalite.d.bloque.aucunGeste": "Cuenta bloqueada: no se hace nada en ella. Puedes abrir la ficha.",
   "egalite.d.regler.relier": "{n} por vincular",
-  "egalite.d.regler.achat": "{n} precios de compra"
+  "egalite.d.regler.achat": "{n} precios de compra",
+  "egalite.d.aReglerN": {"one": "{n} por resolver", "other": "{n} por resolver"}
 };

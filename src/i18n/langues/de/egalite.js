@@ -114,5 +114,6 @@ export default {
   "egalite.d.bloque.phraseDate": "Letzte bekannte Anzeigen ({d}). Nicht in den Summen, keine Aktionen.",
   "egalite.d.bloque.aucunGeste": "Gesperrtes Konto: Hier wird nichts gemacht. Du kannst das Blatt öffnen.",
   "egalite.d.regler.relier": "{n} zu verknüpfen",
-  "egalite.d.regler.achat": "{n} Einkaufspreise"
+  "egalite.d.regler.achat": "{n} Einkaufspreise",
+  "egalite.d.aReglerN": {"one": "{n} zu erledigen", "other": "{n} zu erledigen"}
 };
