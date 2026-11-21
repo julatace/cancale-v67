@@ -2888,36 +2888,65 @@ function vrmVerifVisible(sel) {
     return '<span class="gris6">—</span>';
   }
   function pdfDepuisB64(b64) { const bin = atob(String(b64 || '')); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return new Blob([u8], { type: 'application/pdf' }); }
+  // 5.420 (`bordereauxunpdf`, Julien, 21 nov.) : deux bordereaux ou plus ⇒ UN fichier (une étiquette par page, l'ordre de la
+  // sélection), ouvert dans un onglet pour l'impression. Le fond rend les PDF déjà rangés et charge la bibliothèque PDF
+  // (`vrm-pdf.js`, pdf-lib) dans CET onglet ; un bordereau illisible n'entre pas dans le fichier : il s'ouvre seul, dit.
+  // Bibliothèque absente (navigateur qui refuse) ⇒ les fichiers un par un, comme avant, et c'est dit.
+  async function unSeulPdf(r) {
+    const A = globalThis.__vrmAssemblerPdf;
+    if (!r || r.assembler !== true || typeof A !== 'function') return null;
+    try { const x = await A((r.pdfs || []).map((p) => ({ tx: String(p.tx), b64: p.b64 }))); return x && (x.ok || x.code === 'illisibles') ? x : null; } catch (_) { return null; }
+  }
   function imprimerBordereaux(txs) {
     const ids = [...new Set(txs.map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 10);
     if (!ids.length || impEnVol) return;
-    impEnVol = true; impEtat = { ton: '', texte: TU('imp_en_cours') }; rendre();
+    impEnVol = true; impEtat = { ton: '', texte: TU(ids.length > 1 ? 'imp_un_pdf_en_cours' : 'imp_en_cours', { n: ids.length }) }; rendre();
     // Ouvert DANS le geste (un onglet vide d'abord : le navigateur ne bloque pas la fenêtre), rempli à la réponse.
-    let fen = null; if (ids.length === 1) { try { fen = window.open('', '_blank'); } catch (_) { fen = null; } }
+    let fen = null; try { fen = window.open('', '_blank'); } catch (_) { fen = null; }
     const nomDe = (tx) => { const v = listes && listes.ventes && (listes.ventes.liste || []).find((y) => y.tx === tx); return `bordereau-${v && v.num ? String(v.num).replace(/[^\w-]/g, '') : tx}.pdf`; };
+    let premierPris = false;
+    const ouvrir = (blob, nom) => {
+      let url = ''; try { url = URL.createObjectURL(blob); } catch (_) { return ''; }
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
+      if (!premierPris && fen) { premierPris = true; try { fen.location.href = url; return 'ouvert'; } catch (_) {} }
+      try { const a = document.createElement('a'); a.href = url; a.download = nom; a.rel = 'noopener'; a.click(); return 'telecharge'; } catch (_) { return ''; }
+    };
+    const fini = (r, un) => {
+      impEnVol = false;
+      const pdfs = Array.isArray(r.pdfs) ? r.pdfs : [];
+      let ouverts = 0, telecharges = 0, dansUn = 0, pages = 0, unOuvert = false;
+      // Les bordereaux qui ne sont PAS dans le fichier unique : illisibles, ou tous si le fichier n'a pas pu être fait.
+      const seuls = un ? new Set((un.illisibles || []).map(String)) : null;
+      if (un && un.ok) {
+        const o = ouvrir(new Blob([un.octets], { type: 'application/pdf' }), `bordereaux-${un.inclus.length}.pdf`);
+        if (o) { dansUn = un.inclus.length; pages = un.pages; unOuvert = o === 'ouvert'; }
+      }
+      for (const p of pdfs) {
+        if (un && un.ok && dansUn && !seuls.has(String(p.tx))) continue;
+        let blob = null; try { blob = pdfDepuisB64(p.b64); } catch (_) { continue; }
+        const o = ouvrir(blob, nomDe(p.tx));
+        if (o === 'ouvert') ouverts++; else if (o === 'telecharge') telecharges++;
+      }
+      if (fen && !premierPris) { try { fen.close(); } catch (_) {} }
+      const manque = (r.manque || []).length, passu = (r.passu || []).length, illisibles = un && dansUn ? seuls.size : 0;
+      const parts = [];
+      if (dansUn) parts.push(TU(unOuvert ? 'imp_un_pdf' : 'imp_un_pdf_telecharge', { n: dansUn, p: pages }));
+      else if (ouverts) parts.push(TU('imp_ouvert'));
+      if (telecharges) parts.push(TU('imp_telecharges', { n: telecharges }));
+      if (illisibles) parts.push(TU('imp_illisibles', { n: illisibles }));
+      if (pdfs.length > 1 && !dansUn) parts.push(TU('imp_un_pdf_absent'));
+      if (manque) parts.push(TU('imp_manque', { n: manque }));
+      if (passu) parts.push(TU('imp_passu'));
+      impEtat = { ton: manque || passu || illisibles ? 'ambre' : '', texte: parts.filter(Boolean).join(' · ') || TU('imp_passu'), un: dansUn, pages };
+      for (const p of pdfs) venSel.delete(String(p.tx));
+      rendre();
+    };
     try {
-      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'bordereauCarte', txs: ids }, (r) => {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: ids.length > 1 ? 'bordereauxUnPdf' : 'bordereauCarte', txs: ids }, (r) => {
         try { void chrome.runtime.lastError; } catch (_) {}
-        impEnVol = false;
-        if (!r || !r.ok) { try { if (fen) fen.close(); } catch (_) {} impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); return; }
-        const pdfs = Array.isArray(r.pdfs) ? r.pdfs : [];
-        let ouverts = 0, telecharges = 0;
-        pdfs.forEach((p, i) => {
-          let url = ''; try { url = URL.createObjectURL(pdfDepuisB64(p.b64)); } catch (_) { return; }
-          setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
-          if (i === 0 && fen) { try { fen.location.href = url; ouverts++; return; } catch (_) {} }
-          try { const a = document.createElement('a'); a.href = url; a.download = nomDe(p.tx); a.rel = 'noopener'; a.click(); telecharges++; } catch (_) {}
-        });
-        if (fen && !ouverts) { try { fen.close(); } catch (_) {} }
-        const manque = (r.manque || []).length, passu = (r.passu || []).length;
-        const parts = [];
-        if (ouverts) parts.push(TU('imp_ouvert'));
-        if (telecharges) parts.push(TU('imp_telecharges', { n: telecharges }));
-        if (manque) parts.push(TU('imp_manque', { n: manque }));
-        if (passu) parts.push(TU('imp_passu'));
-        impEtat = { ton: manque || passu ? 'ambre' : '', texte: parts.join(' · ') || TU('imp_passu') };
-        for (const p of pdfs) venSel.delete(String(p.tx));
-        rendre();
+        if (!r || !r.ok) { impEnVol = false; try { if (fen) fen.close(); } catch (_) {} impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); return; }
+        if (ids.length > 1 && (r.pdfs || []).length > 1) unSeulPdf(r).then((un) => fini(r, un), () => fini(r, null));
+        else fini(r, null);
       });
     } catch (_) { impEnVol = false; impEtat = { ton: 'ambre', texte: TU('imp_passu') }; rendre(); }
   }
@@ -3495,6 +3524,42 @@ function vrmVerifVisible(sel) {
       });
     } catch (_) { cbEnVol = false; cbMsg = { ok: false, texte: TU('ra_ko') }; rendre(); }
   }
+  // ══ 5.420 (`vacancesinterface`, Julien, 21 nov.) — LE MODE VACANCES DU COMPTE DE L'ONGLET, PAR L'INTERFACE ═══════════
+  // L'état LU (profil capté : en vacances · ouvert · « — » pas su) ; « Mettre en vacances » / « Rouvrir » ⇒ SA
+  // confirmation ⇒ le fond ouvre les réglages de Vinted dans l'onglet de travail et touche l'interrupteur (`vacancesCarte`).
+  // Le résultat est dit : fait (vu à l'écran), déjà dans cet état, élément introuvable NOMMÉ, refus, incertain.
+  let vacEtat, vacConfirme = null, vacMsg = null, vacEnVol = false;
+  function lireVacances() {
+    if (vacEtat !== undefined) return;
+    vacEtat = null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'vacancesCarte', quoi: 'lire' }, (r) => { void chrome.runtime.lastError; vacEtat = r && r.ok ? r : { ok: false }; if (ongletListe === 'parametres') rendre(); }); } catch (_) { vacEtat = { ok: false }; }
+  }
+  function vacancesHtml(e) {
+    if (!e || e.plateforme !== 'vinted') return '';
+    lireVacances();
+    const v = vacEtat && vacEtat.ok ? vacEtat.vacances : undefined;
+    const etat = vacEtat == null ? '…' : v === true ? TU('va_on') : v === false ? TU('va_off') : '—';
+    const cible = v === true ? false : true;
+    const conf = vacConfirme != null ? `<div class="conf5" role="alertdialog" data-vac-confirme="${vacConfirme ? 'on' : 'off'}"><span>${esc(TU(vacConfirme ? 'va_q_on' : 'va_q_off'))}</span><div class="outils"><button type="button" class="vu-btn vu-plein" data-vac-oui${vacEnVol ? ' disabled' : ''}>${esc(TU(vacConfirme ? 'va_oui_on' : 'va_oui_off'))}</button><button type="button" class="vu-btn" data-vac-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    return `<section class="grp5" data-vacances="${v === true ? 'on' : v === false ? 'off' : 'pas-su'}"><h3>${esc(TU('va_titre'))}</h3>
+      <div class="rg6"><span><b>${esc(TU('va_etat'))}</b><small>${esc(TU('va_note'))}</small></span><span class="v6" data-vac-etat>${esc(etat)}</span></div>
+      ${conf}
+      ${vacMsg ? `<p class="note5" role="status" data-vac-msg="${esc(vacMsg.code)}"${vacMsg.ton ? ` data-ton="${vacMsg.ton}"` : ''}>${esc(vacMsg.texte)}</p>` : ''}
+      ${vacConfirme == null ? `<div class="outils"><button type="button" class="vu-btn" data-vac-poser="${cible ? 'on' : 'off'}"${vacEnVol || vacEtat == null ? ' disabled' : ''}>${esc(TU(cible ? 'va_mettre' : 'va_rouvrir'))}</button></div>` : ''}
+    </section>`;
+  }
+  function vacEnvoyer() {
+    if (vacConfirme == null || vacEnVol) return;
+    const voulu = vacConfirme; vacEnVol = true; vacMsg = { code: 'en-cours', ton: '', texte: TU('va_en_cours') }; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'vacancesCarte', quoi: 'poser', vacances: voulu, confirme: true }, (r) => {
+        void chrome.runtime.lastError; vacEnVol = false; vacConfirme = null;
+        if (r && r.ok) { vacEtat = Object.assign({}, vacEtat || {}, { ok: true, vacances: r.vacances }); vacMsg = { code: r.deja ? 'deja' : 'fait', ton: '', texte: TU(r.deja ? 'va_deja' : (voulu ? 'va_fait_on' : 'va_fait_off')) }; }
+        else vacMsg = { code: (r && r.code) || 'ko', ton: 'ambre', texte: (r && r.code === 'element' && r.manque ? TU('va_manque', { m: r.manque }) : (r && r.raison)) || TU('ra_ko') };
+        rendre();
+      });
+    } catch (_) { vacEnVol = false; vacMsg = { code: 'ko', ton: 'ambre', texte: TU('ra_ko') }; rendre(); }
+  }
   let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
@@ -3727,6 +3792,10 @@ function vrmVerifVisible(sel) {
       } catch (_) { cadEnVol = false; cadEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
     };
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
+    // 5.420 : le mode vacances (SA confirmation d'abord).
+    { const vp = racine.querySelector('[data-vac-poser]'); if (vp) vp.addEventListener('click', () => { vacConfirme = vp.getAttribute('data-vac-poser') === 'on'; vacMsg = null; rendre(); }); }
+    { const vo = racine.querySelector('[data-vac-oui]'); if (vo) vo.addEventListener('click', () => vacEnvoyer()); }
+    { const vn = racine.querySelector('[data-vac-non]'); if (vn) vn.addEventListener('click', () => { vacConfirme = null; rendre(); }); }
     const cadO = racine.querySelector('[data-cad-oui]'); if (cadO) cadO.addEventListener('click', () => cadEnvoyer(true));
     const cadN = racine.querySelector('[data-cad-non]'); if (cadN) cadN.addEventListener('click', () => { cadConfirme = false; rendre(); });
     const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 20, pauseMax: 60 }; cadConfirme = false; cadEtat = null; rendre(); });
@@ -4186,6 +4255,7 @@ function vrmVerifVisible(sel) {
       </details>`;
     const lienVrm = (q, k) => `<a class="rg5" href="https://vrm.center/${q}" target="_blank" rel="noopener" data-reglage-vrm="${esc(k)}"><span>${esc(TU(k))}</span><i aria-hidden="true">›</i></a>`;
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
+      ${vacancesHtml(e)}
       ${commeBleamHtml()}
       ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
@@ -4837,6 +4907,7 @@ function vrmVerifVisible(sel) {
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
+    if (lienPanneau.action === 'vacances') hote.setAttribute('data-lien-vacances', '');   // 5.420 : la section « Mode vacances » de Paramètres
     // (21 nov., ci-offres-panneau) La carte d'offre de l'app (`BoutonExtension action="offres" ids={[conv]}`) ouvre
     // CETTE conversation : son offre et la conversation dans le volet (avant : la page Messages sans rien de choisi).
     if (lienPanneau.page === 'messages' && lienPanneau.ids.length === 1 && /^\d{1,20}$/.test(lienPanneau.ids[0])) convChoisie = lienPanneau.ids[0];

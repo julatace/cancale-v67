@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 2) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 3) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -191,6 +191,10 @@
   const RE_MASQUER = /^(masquer|masquer l'article|masquer l'annonce|hide|hide item|nascondi|nascondi l'articolo|ocultar|ocultar articulo|ausblenden|artikel ausblenden)$/;
   const RE_AFFICHER = /^(afficher|afficher l'article|afficher l'annonce|rendre visible|show|show item|unhide|mostra|mostra l'articolo|mostrar|mostrar articulo|einblenden|anzeigen|artikel einblenden)$/;
   const RE_ENVOYER = /^(envoyer|envoyer le message|send|send message|invia|enviar|senden)$/;
+  // 5.420 (`vacancesinterface`) : l'interrupteur du mode vacances (nom accessible EXACT, 5 langues) et sa confirmation.
+  const RE_VACANCES = /^(mode vacances|activer le mode vacances|holiday mode|vacation mode|turn on holiday mode|modalita vacanza|modalita vacanze|modo vacaciones|modo vacaciones activado|urlaubsmodus|urlaubsmodus aktivieren)$/;
+  const RE_CONFIRMER_VACANCES = /^(confirmer|activer|desactiver|valider|oui|ok|confirm|turn on|turn off|activate|deactivate|yes|conferma|attiva|disattiva|si|confirmar|activar|desactivar|bestatigen|aktivieren|deaktivieren|ja)$/;
+
   const RE_BORDEREAU = /^(obtenir le bordereau|generer le bordereau|imprimer le bordereau|obtenir l'etiquette|generer l'etiquette|obtenir le bordereau d'envoi|get shipping label|get label|generate label|print shipping label|ottieni l'etichetta|genera l'etichetta|obtener la etiqueta|generar etiqueta|versandetikett erhalten|versandetikett erstellen)$/;
   const RE_CONFIRMER_BORDEREAU = /^(confirmer|continuer|valider|obtenir le bordereau|generer le bordereau|confirm|continue|get label|conferma|continua|confirmar|continuar|bestatigen|weiter)$/;
   const RE_EVALUER = /^(laisser une evaluation|evaluer|laisser un avis|leave feedback|leave a review|rate|lascia un feedback|valuta|dejar una valoracion|valorar|bewertung abgeben|bewerten)$/;
@@ -541,6 +545,48 @@
       const v = await attendre(() => (parNom(voulu ? RE_AFFICHER : RE_MASQUER, document, null, null).el ? true : null), 10000);
       return { ok: true, rep: r, vu: v.el === true };
     },
+    // 5.420 (`vacancesinterface`) : LE MODE VACANCES du compte de l'onglet, par la page des réglages de Vinted. Un SEUL
+    // interrupteur au nom « Mode vacances » (5 langues ; case, `role="switch"` ou bouton à `aria-pressed`) — absent ou en
+    // double ⇒ arrêt nommé, rien n'est touché. Déjà dans l'état voulu ⇒ rien n'est cliqué (`deja`). Sinon : clic, la
+    // confirmation de Vinted si elle s'ouvre (jamais « Annuler »), la RÉPONSE que la page reçoit (écriture du profil),
+    // puis l'état RELU à l'écran (l'interrupteur montre l'état voulu) — sinon `vu: false` (jamais rejoué).
+    async vacances(d) {
+      const voulu = !!(d && d.voulu), page = String((d && d.page) || '');
+      if (!/^\/settings(?:\/[a-z_-]{1,40}){0,2}\/?$/.test(page)) return { ok: false, code: 'etape' };
+      if (location.pathname.replace(/\/$/, '') !== page.replace(/\/$/, '')) return { ok: false, code: 'identite', chemin: location.pathname };
+      const etatDe = (el) => { if (!el) return null; if (el instanceof HTMLInputElement && el.type === 'checkbox') return !!el.checked; const a = el.getAttribute('aria-checked') || el.getAttribute('aria-pressed'); return a === 'true' ? true : a === 'false' ? false : null; };
+      const nomInterrupteur = (el) => { let n = nomAcc(el); if (!n && el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`); if (l) n = l.textContent || ''; } if (!n) { const l = el.closest('label'); if (l) n = l.textContent || ''; } return norm(n); };
+      const trouver = () => {
+        const c = [...document.querySelectorAll('input[type="checkbox"], [role="switch"], button[aria-pressed], [role="checkbox"]')]
+          .filter((el) => (visible(el) || (el instanceof HTMLInputElement && el.closest('label') && visible(el.closest('label')))) && !el.closest('[role="dialog"],[aria-modal="true"]') && !(el.disabled || el.getAttribute('aria-disabled') === 'true'))
+          .filter((el) => RE_VACANCES.test(nomInterrupteur(el)) || /(^|[-_])(holiday|vacation)([-_]|$)/i.test(el.getAttribute('data-testid') || '') || /(^|[-_])(holiday|vacation)([-_]|$)/i.test(el.getAttribute('name') || el.id || ''));
+        const fin = c.filter((el) => !c.some((x) => x !== el && el.contains(x)));
+        return fin.length === 1 ? { el: fin[0] } : { el: null, ambigu: fin.length > 1 };
+      };
+      const t = await attendre(() => { const x = trouver(); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 20000);
+      if (t.captcha) return vuCaptcha(); if (t.absent) return manque('vacances-interrupteur'); if (t.el === 'AMBIGU') return manque('vacances-interrupteur-ambigu');
+      const avant = etatDe(t.el);
+      if (avant === null) return manque('vacances-etat');
+      if (avant === voulu) return { ok: true, deja: true, vu: true, etat: avant };
+      if (captcha()) return vuCaptcha();
+      ecouter();
+      const att = new Promise((ok) => {
+        const liste = globalThis.__vrmFormAttentes = globalThis.__vrmFormAttentes || [];
+        let fini = false;
+        const fin = (x) => { if (fini) return; fini = true; const i = liste.indexOf(f); if (i >= 0) liste.splice(i, 1); clearTimeout(tm); try { if (d && d.cle && x) sessionStorage.setItem('vrm_form_' + d.cle, JSON.stringify(x)); } catch (_) {} ok(x); };
+        const f = (e) => { if (e && ['PUT', 'POST', 'PATCH'].includes(e.methode) && /^\/api\/v2\/users\/(current|\d{1,15})(\/[a-z_]{1,40}){0,3}\/?$/.test(e.chemin)) fin({ status: e.status, ok: e.status >= 200 && e.status < 300, json: e.json, corps: e.corps, texte: e.texte || '', dd: !!e.dd, ra: String(e.ra || '').slice(0, 40), chemin: e.chemin }); };
+        liste.push(f);
+        const tm = setTimeout(() => fin(null), 30000);
+      });
+      clic(t.el);
+      const c = await attendre(() => { const dl = dialogue(); if (!dl) return null; const x = parNom(RE_CONFIRMER_VACANCES, dl, /confirm|submit|primary/i, /cancel|close|annul|dismiss/i, true); return x.el || null; }, 3000);
+      if (c.el) clic(c.el);
+      const r = await att;
+      if (!r) return { ok: false, code: 'sans-reponse', parti: true };
+      if (!r.ok) return { ok: true, rep: r, vu: false };
+      const v = await attendre(() => { const x = trouver(); return x.el && etatDe(x.el) === voulu ? true : null; }, 10000);
+      return { ok: true, rep: r, vu: v.el === true, etat: v.el === true ? voulu : etatDe(trouver().el) };
+    },
     async prix(d) {
       const id = String((d && d.id) || ''), prix = Number(d && d.prix);
       if (!/^\d{4,15}$/.test(id) || !(prix > 0)) return { ok: false, code: 'etape' };
@@ -645,7 +691,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 2;   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace)
+  globalThis.__vrmFormulaireV = 3;   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

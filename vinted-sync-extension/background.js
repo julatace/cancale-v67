@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.419.0';
+const CODE_VERSION = '5.420.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4193,6 +4193,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauCarte') {
       bordereauCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    // 5.420 (`vacancesinterface`) : le mode vacances du compte de l'onglet, lu ou posé par l'interface sur SON toucher confirmé.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'vacancesCarte') {
+      vacancesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    // 5.420 (`bordereauxunpdf`) : « Imprimer N bordereaux » en UN fichier (lecture seule, les PDF déjà rangés).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauxUnPdf') {
+      bordereauxUnPdf(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauxCommander') {
@@ -15360,7 +15370,10 @@ function apprendreVacances(msg, sender, domain) {
       const at = new Date().toISOString();
       if (r.rejouable) recettes[r.valeur ? 'on' : 'off'] = { methode: r.methode, chemin: r.chemin, corps: r.corps, cle: r.cle, at, uid: String(uid), ver: CODE_VERSION };
       const dernier = { at, rejouable: !!r.rejouable, raison: r.raison || '', chemin: r.chemin, methode: r.methode, sens: r.rejouable ? (r.valeur ? 'on' : 'off') : '' };
-      const ok = await supabaseUpsert('app_data', [{ id: VACANCES_RECETTE, data: { recettes, dernier, ver: CODE_VERSION } }], 'id');
+      // 5.420 : la PAGE des réglages où il l'a fait (l'adresse de SON onglet, jamais devinée) — l'interface y retournera.
+      let page = typeof cur.page === 'string' ? cur.page : '';
+      try { const pg = new URL(String(sender.tab.url || '')).pathname.replace(/\/$/, ''); if (RE_PAGE_VACANCES.test(pg)) page = pg; } catch (_) {}
+      const ok = await supabaseUpsert('app_data', [{ id: VACANCES_RECETTE, data: { recettes, dernier, ver: CODE_VERSION, ...(page ? { page } : {}) } }], 'id');
       noterDiag(r.rejouable ? 'vacances_appris_' + (r.valeur ? 'on' : 'off') : 'vacances_pas_rejouable');
       if (r.rejouable) await noterEtatVacances(uid, r.valeur, 'geste');
       try { notifierApp({ type: 'maj', quoi: 'vacances', uid: String(uid) }); } catch (_) {}
@@ -15369,6 +15382,61 @@ function apprendreVacances(msg, sender, domain) {
   });
   _chaineRecetteVacances = suite.then(() => {}, () => {});
   return suite;
+}
+// ══ 5.420 (`vacancesinterface`, Julien, 21 nov.) — LE MODE VACANCES PAR L'INTERFACE, SUR SON TOUCHER DANS LE PANNEAU ══════
+// Activer / couper le mode vacances du COMPTE DE L'ONGLET par l'interrupteur de la page des réglages de Vinted (onglet de
+// travail, clic `isTrusted:false` assumé, aucun maquillage, aucune requête fabriquée) :
+//   · SON toucher CONFIRMÉ (`confirme`), depuis l'onglet vinted.fr (jamais une fenêtre, jamais l'app) ;
+//   · l'état LU d'abord (profil capté) : déjà dans cet état ⇒ rien ne part ; la page le revérifie (l'interrupteur) ;
+//   · la page : celle où il l'a fait à la main (apprise, `vinted_vacances_recette.page`), sinon « Paramètres → profil »
+//     (`/settings/profile`) ; l'interrupteur doit y être, UN seul, au nom exact — sinon VRM s'arrête et le NOMME ;
+//   · garde stricte (compte de l'onglet, sécurité, plafond 50/h + réserve, pause 403/429, une à la fois), une action ;
+//   · « fait » seulement si la page a reçu la réponse de Vinted ET montre l'état voulu (preuve à l'écran) ; sinon
+//     « incertain », jamais rejoué. Journal (`vacances_on` / `vacances_off`), état rangé pour l'app.
+const RE_PAGE_VACANCES = /^\/settings(?:\/[a-z_-]{1,40}){0,2}$/;
+const PAGE_VACANCES_DEFAUT = '/settings/profile';
+function pageVacancesSure(p) { const x = String(p || '').replace(/\/$/, ''); return RE_PAGE_VACANCES.test(x) ? x : PAGE_VACANCES_DEFAUT; }
+async function pageVacancesApprise() {
+  let rows = null; try { rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=p:data->>page`); } catch (_) { rows = null; }
+  const p = Array.isArray(rows) && rows[0] && typeof rows[0].p === 'string' ? rows[0].p : '';
+  return RE_PAGE_VACANCES.test(p) ? { page: p, appris: true } : { page: PAGE_VACANCES_DEFAUT, appris: false };
+}
+async function vacancesCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine', raison: 'Le mode vacances se règle depuis l’onglet vinted.fr.' };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'vinted-absent', raison: 'Aucun compte Vinted connecté dans cet onglet : rien n’est parti.' };
+  const u = String(uid);
+  const lu = await vacancesVues(u);   // true · false · null (pas su)
+  if (String((msg && msg.quoi) || 'lire') === 'lire') { const pg = await pageVacancesApprise(); return { ok: true, uid: u, vacances: lu, page: pg.page, appris: pg.appris }; }
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
+  if (typeof msg.vacances !== 'boolean') return { ok: false, code: 'invalide', raison: 'Demande incomplète : rien n’est parti.' };
+  const voulu = msg.vacances;
+  if (lu === voulu) return { ok: true, deja: true, uid: u, vacances: lu };
+  const accts = await getStoredAccounts({ ouNull: true });
+  const acc = Array.isArray(accts) ? accts.find((a) => String(a.vinted_user_id) === u) : null;
+  if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable dans cette extension : rien n’est parti.' };
+  const pg = await pageVacancesApprise();
+  const recu = {};
+  const stop = await gardeStricte(u, acc, { recu, secu: { sorte: 'vacances', mode: 'clic' } });
+  if (stop) return { ok: false, code: stop.code || 'garde', raison: stop.error || 'VRM attend : rien n’est parti.' };
+  const r = await avecVinted(async () => {
+    { const s2 = await gardeStricte(u, acc, { lecture: true }); if (s2) return { pasParti: true, raison: s2.error }; }
+    return await interfaceVinted(acc, 'vacances', { voulu, page: pg.page });
+  });
+  if (!r || r.pasParti || pasParti(r) || r.rienParti) {
+    if (recu.at) await rendreActions(u, recu.at, 1);
+    return { ok: false, code: r && r.pause ? 'pause' : r && r.sansPage === 'element' ? 'element' : r && r.sansPage === 'identite' ? 'identite' : 'onglet', manque: (r && r.manque) || '', page: pg.page, appris: pg.appris, raison: (r && r.raison) || 'L’onglet de Vinted n’a pas pu ouvrir les réglages : rien n’est parti.' };
+  }
+  if (r.deja) { if (recu.at) await rendreActions(u, recu.at, 1); await noterVacancesVues(u, voulu); await noterEtatVacances(u, voulu, 'relu'); return { ok: true, deja: true, uid: u, vacances: voulu }; }
+  if (r.incertain) return { ok: false, code: 'incertain', raison: "Vinted n'a pas répondu clairement : regarde tes réglages sur vinted.fr (rien ne sera renvoyé)." };
+  if (!r.ok) return { ok: false, code: 'refus', status: r.status || 0, raison: `Vinted a refusé (${r.status || '—'}) : rien n’a changé.` };
+  if (r.vu !== true) return { ok: false, code: 'pas-vu', raison: "Vinted a répondu, mais l'interrupteur ne montre pas encore le nouvel état : regarde tes réglages sur vinted.fr (rien ne sera renvoyé)." };
+  await noterVacancesVues(u, voulu);
+  await noterEtatVacances(u, voulu, 'interface');
+  await noterJournal(u, voulu ? 'vacances_on' : 'vacances_off', {});
+  return { ok: true, fait: true, uid: u, vacances: voulu };
 }
 async function mettreVacancesVinted(msg) {
   const uid = String((msg && msg.uid) || '');
@@ -17298,6 +17366,8 @@ const GESTES_INTERFACE = Object.freeze({
   prix: { route: (d) => `/items/${d.id}/edit`, re: (d) => new RegExp(`^/items/${d.id}/edit/?$`) },
   bordereau: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
   evaluation: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
+  // 5.420 (`vacancesinterface`) : la page des réglages de Vinted où vit l'interrupteur (apprise de SON geste, sinon le profil).
+  vacances: { route: (d) => pageVacancesSure(d.page), re: (d) => new RegExp(`^${pageVacancesSure(d.page)}/?$`) },   // lettres, tirets et / seulement (RE_PAGE_VACANCES)
 });
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
@@ -17311,8 +17381,8 @@ function cleInterface(geste) { _cleInterface = (_cleInterface + 1) % 1e6; return
 function resultatInterface(o, geste) {
   const base = { viaPage: true, interface: true, geste };
   if (!o || typeof o !== 'object') return { ...base, status: 0, ok: false, json: null, incertain: true };
-  if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', envoye: o.envoye !== false, autre: !!o.autre };
-  if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false };
+  if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', envoye: o.envoye !== false, autre: !!o.autre, ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
+  if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false, ...(o.deja === true ? { deja: true } : {}), ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
   const avant = !o.parti && AVANT_LE_GESTE.has(String(o.code || ''));
   if (o.code === 'captcha') return { ...base, status: 0, ok: false, json: null, captcha: true, robot: true, ...(avant ? { pause: true, rienParti: true } : { incertain: true }), raison: PHRASE_CAPTCHA };
   if (avant) return { ...base, status: 0, ok: false, json: null, rienParti: true, sansPage: o.code === 'identite' ? 'identite' : 'element', manque: o.manque || o.code, raison: o.code === 'identite' ? PHRASE_IDENTITE : PHRASE_ELEMENT(o.manque || o.code) };
@@ -23686,6 +23756,26 @@ async function bordereauCarte(msg, sender) {
   }
   try { noterDiag(`bordereau_carte_${pdfs.length ? 'ok' : manque.length ? 'manque' : 'passu'}`); } catch (_) {}
   return { ok: true, pdfs, manque, passu };
+}
+// ══ 5.420 (`bordereauxunpdf`, Julien, 21 nov.) — « IMPRIMER N BORDEREAUX » EN UN SEUL PDF ═════════════════════════════
+// Les PDF sont ceux de `bordereauCarte` (les MÊMES gardes : onglet vinted.fr, compte de l'onglet, base relue par
+// projection scalaire, une page d'erreur n'est pas un bordereau, un e-mail d'un autre compte jamais) ; puis la
+// bibliothèque PDF embarquée (`pdf-lib.min.js`, MIT) et l'assembleur (`vrm-pdf.js`) sont injectés À LA DEMANDE dans le
+// monde isolé de l'extension de CET onglet — le panneau assemble, ouvre UN fichier pour l'impression. Aucune requête
+// vers Vinted, rien d'acheté, rien d'écrit. Bibliothèque pas chargée (navigateur qui refuse l'injection) ⇒ `assembler:
+// false` : le panneau ouvre les fichiers un par un, comme avant, et le dit.
+const FICHIERS_PDF = ['pdf-lib.min.js', 'vrm-pdf.js'];
+async function bordereauxUnPdf(msg, sender) {
+  const r = await bordereauCarte(msg, sender);
+  if (!r || !r.ok) return r || { ok: false, code: 'erreur' };
+  const pdfs = Array.isArray(r.pdfs) ? r.pdfs : [];
+  if (!pdfs.length) return Object.assign({}, r, { assembler: false });
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (!Number.isInteger(tabId)) return Object.assign({}, r, { assembler: false });
+  let charge = false;
+  try { await chrome.scripting.executeScript({ target: { tabId, frameIds: [Number(sender.frameId) || 0] }, files: FICHIERS_PDF }); charge = true; } catch (_) { charge = false; }
+  try { noterDiag(charge ? 'bordereaux_un_pdf' : 'bordereaux_un_pdf_sans_lib'); } catch (_) {}
+  return Object.assign({}, r, { assembler: charge });
 }
 async function carteListes(msg, sender) {
   const o = ongletCarte(sender);
