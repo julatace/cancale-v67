@@ -251,28 +251,44 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
   let b;
   try {
     b = await chromium.launch({ executablePath:process.env.VRM_CHROMIUM_PATH||process.env.CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'), args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    // ⚠️ (21 nov., ci-offres-panneau) Messages s'ouvre TOUJOURS sur le fil « Tous » (src/ecrans/FilsTous.jsx, décision
+    //    du 20 nov. « sans sélecteur » : un lien `&site=vinted` ne fige plus rien) : l'ancienne messagerie Vinted
+    //    (`[data-messagerie]`, `#vrm-sel-compte`, « À répondre ») n'est plus montée et ces deux modes du workflow
+    //    attendaient ses sélecteurs. Les MÊMES garanties sont jugées sur l'écran qui existe, par ses data-* :
+    //    `data-fil` = « vinted:{compte}:{conv} » (l'identité, jamais le titre), `data-msg-groupe` (le compte),
+    //    `data-fil-num`, `data-nonlu`, `data-fil-at`, `data-msg-vue`, `data-fils-rien`, `[data-msg-recherche]`.
+    const FIL = (u, c) => `[data-fil="vinted:${u}:${c}"]`;
+    const filsVus = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-fil]')].map((x) => x.getAttribute('data-fil')));
     if(process.env.VRM_MESSAGES_SEARCH_ONLY==='1'){
       for(const tel of [false,true]){
         const r=await rendre(b,{version:'5.135.0',tel});
         try{
-          const champ=r.pg.getByRole('searchbox',{name:'Rechercher une conversation'});
-          await r.pg.selectOption('#vrm-sel-compte','111');await r.pg.waitForTimeout(250);
-          await champ.fill('acheteur_2');await r.pg.locator('[data-conv="402"]').waitFor({ state: 'visible' }); await r.pg.waitForFunction(() => ((document.querySelector('[data-conv="402"]') || {}).innerText || '').trim().length > 0, null, { timeout: 5000 }).catch(() => {});   // (16 nov.) la rangée porte `content-visibility: auto` : tant qu'elle n'est pas peinte, son texte (innerText) est vide — on attend qu'elle le soit, la règle jugée reste la même
-          dit(await r.pg.locator('#vrm-sel-compte').inputValue()==='111','recherche sur un autre compte : le sélecteur reste inchangé');
-          dit((await r.pg.locator('[data-conv="402"]').innerText()).includes('compte_b'),'le compte du résultat est nommé même quand il est seul');
-          await champ.fill('N°7');await r.pg.locator('[data-conv="301"]').waitFor();
-          dit(await r.pg.locator('[data-conv]').count()===1,'N°7 retrouve uniquement la conversation reliée à cet article');
-          await champ.fill('N°70');await r.pg.locator('[data-msg-sans-resultat]').waitFor();   // (8 nov.) l'état « aucun résultat » jugé par son attribut, plus par sa phrase (réécrite le 5 nov., chantier G)
-          dit(await r.pg.locator('[data-conv]').count()===0,'N°70 ne retrouve pas N°7');
-          await champ.fill('gazelle');await r.pg.locator('[data-conv="303"]').waitFor();
-          dit(await r.pg.locator('[data-conv]').count()===1,'le titre natif de l’article est recherché même s’il manque dans la boîte');
-          await r.pg.getByRole('button',{name:/^Non lues/}).click();await r.pg.getByRole('button',{name:'Afficher tous les résultats'}).click();
-          dit(await r.pg.locator('[data-conv="303"]').count()===1,'un filtre restant appliqué peut être levé sans changer de compte');
-          await champ.fill('');await r.pg.waitForTimeout(100);
-          dit(await r.pg.locator('[data-conv="402"]').count()===0&&await r.pg.locator('#vrm-sel-compte').inputValue()==='111','effacer la recherche rétablit le compte choisi');
-          dit(r.execs.every(x=>x.method==='GET'),'la recherche n’envoie aucun message ni offre');
+          const champ=r.pg.locator('input[data-msg-recherche]');
+          await r.pg.locator(FIL('111','301')).waitFor({state:'attached'});
+          const tous=await filsVus(r.pg);
+          dit(tous.length===3,'sans recherche : les fils des DEUX comptes',JSON.stringify(tous));
+          await champ.fill('acheteur_2');await r.pg.waitForFunction(()=>document.querySelectorAll('[data-fil]').length===1,null,{timeout:5000}).catch(()=>{});
+          const seul=await filsVus(r.pg);
+          dit(seul.length===1&&seul[0]==='vinted:222:402','recherche sur un autre compte : son fil seul, par son identité',JSON.stringify(seul));
+          const groupe=await r.pg.evaluate((sel)=>{const f=document.querySelector(sel);const g=f&&f.closest('[data-msg-groupe]');return g?{cle:g.getAttribute('data-msg-groupe'),nom:(g.querySelector('h3')||{}).textContent||''}:null;},FIL('222','402'));
+          dit(!!groupe&&/222/.test(groupe.cle)&&/compte_b/.test(groupe.nom),'le compte du résultat est nommé (son groupe) même quand il est seul',JSON.stringify(groupe));
+          await champ.fill('N°7');await r.pg.waitForFunction(()=>document.querySelectorAll('[data-fil]').length===1,null,{timeout:5000}).catch(()=>{});
+          const n7=await r.pg.evaluate(()=>[...document.querySelectorAll('[data-fil]')].map((x)=>[x.getAttribute('data-fil'),x.getAttribute('data-fil-num')]));
+          dit(n7.length===1&&n7[0][0]==='vinted:111:301'&&n7[0][1]==='7','N°7 retrouve uniquement la conversation reliée à cet article',JSON.stringify(n7));
+          await champ.fill('N°70');await r.pg.locator('[data-fils-rien]').waitFor({timeout:5000}).catch(()=>{});
+          dit((await r.pg.locator('[data-fil]').count())===0&&(await r.pg.locator('[data-fils-rien]').count())===1,'N°70 ne retrouve pas N°7');
+          await champ.fill('gazelle');await r.pg.waitForFunction(()=>document.querySelectorAll('[data-fil]').length===1,null,{timeout:5000}).catch(()=>{});
+          dit(JSON.stringify(await filsVus(r.pg))==='["vinted:111:303"]','le titre natif de l’article est recherché même s’il manque dans la boîte',JSON.stringify(await filsVus(r.pg)));
+          // Un filtre resté posé (« Non lues ») cache le résultat ; il se lève sans perdre la recherche.
+          await r.pg.locator('[data-msg-vue="nonlues"]').click();await r.pg.waitForTimeout(250);
+          const cache=(await r.pg.locator(FIL('111','303')).count())===0;
+          await r.pg.locator('[data-msg-vue="toutes"]').click();await r.pg.waitForTimeout(250);
+          dit(cache&&(await r.pg.locator(FIL('111','303')).count())===1&&(await champ.inputValue())==='gazelle','un filtre restant appliqué peut être levé sans perdre la recherche');
+          await champ.fill('');await r.pg.waitForFunction(()=>document.querySelectorAll('[data-fil]').length===3,null,{timeout:5000}).catch(()=>{});
+          dit((await filsVus(r.pg)).length===3,'effacer la recherche rétablit tous les fils');
+          dit(r.execs.every(x=>x.method==='GET'),'la recherche n’envoie aucun message ni offre',JSON.stringify(r.execs.filter(x=>x.method!=='GET')));
           dit(await r.pg.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'recherche sans débordement horizontal');
-          dit(r.errs.length===0,'aucune erreur de recherche');
+          dit(r.errs.length===0,'aucune erreur de recherche',r.errs.join(' | '));
         }finally{await r.ctx.close();}
       }
       process.exitCode=ko?1:0;return;
@@ -281,19 +297,26 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
       for(const tel of [false,true]){
         const r=await rendre(b,{version:'5.135.0',tel});
         const boite=rows.find(x=>x.id==='harvest_111_inbox').data.payload.conversations.find(x=>x.id===301);
-        const avant={updated:boite.updated_at,description:boite.description,n:FIL_OFFRE.messages.length};
+        const avant={updated:boite.updated_at,description:boite.description,unread:boite.unread,n:FIL_OFFRE.messages.length};
+        const ligne=()=>r.pg.evaluate((sel)=>{const f=document.querySelector(sel);return f?{at:f.getAttribute('data-fil-at'),nonlu:f.getAttribute('data-nonlu'),txt:f.textContent}:null;},FIL('111','301'));
         try{
-          dit(await r.pg.locator('[data-a-repondre]').getAttribute('data-a-repondre')==='1','capture initiale : un acheteur attend');
-          let date=new Date().toISOString();boite.updated_at=date;boite.description='Réponse déjà envoyée';FIL_OFFRE.messages.push({id:9991,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:111,body:'Réponse déjà envoyée'}});
+          await r.pg.locator(FIL('111','301')).waitFor({state:'attached'});
+          await r.pg.evaluate(()=>{window.__sansRechargement=1;});
+          const l0=await ligne();
+          dit(!!l0&&l0.nonlu==='1','capture initiale : un acheteur attend (non lu)',JSON.stringify(l0));
+          // Le vendeur répond sur Vinted : la capture porte SA réponse, Vinted marque le fil lu.
+          let date=new Date().toISOString();boite.updated_at=date;boite.description='Réponse déjà envoyée';boite.unread=false;FIL_OFFRE.messages.push({id:9991,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:111,body:'Réponse déjà envoyée'}});
           await r.pg.evaluate(()=>window.postMessage({__vmr:'evt',evt:{type:'maj',quoi:'messages',uid:'111',conv:'301'}},'*'));
-          await r.pg.waitForFunction(()=>document.querySelector('[data-a-repondre]')?.getAttribute('data-a-repondre')==='0',null,{timeout:10000});
-          dit(true,'capture vendeur reçue : le fil sort de À répondre sans rechargement');
-          await r.pg.waitForTimeout(1100);date=new Date().toISOString();boite.updated_at=date;boite.description='Nouvelle question ?';FIL_OFFRE.messages.push({id:9992,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:5301,body:'Nouvelle question ?'}});
+          const t1=Date.parse(date);
+          const vu1=await r.pg.waitForFunction(([sel,t])=>{const f=document.querySelector(sel);return !!f&&Number(f.getAttribute('data-fil-at'))>=t-1000&&!f.hasAttribute('data-nonlu');},[FIL('111','301'),t1],{timeout:10000}).then(()=>true,()=>false);
+          dit(vu1&&await r.pg.evaluate(()=>window.__sansRechargement===1),'capture vendeur reçue : le fil est à jour (date de sa réponse, lu) sans rechargement',JSON.stringify(await ligne()));
+          await r.pg.waitForTimeout(1100);date=new Date().toISOString();boite.updated_at=date;boite.description='Nouvelle question ?';boite.unread=true;FIL_OFFRE.messages.push({id:9992,created_at_ts:Math.floor(Date.parse(date)/1000),entity_type:'message',entity:{user_id:5301,body:'Nouvelle question ?'}});
           await r.pg.evaluate(()=>window.postMessage({__vmr:'evt',evt:{type:'maj',quoi:'messages',uid:'111',conv:'301'}},'*'));
-          await r.pg.waitForFunction(()=>document.querySelector('[data-a-repondre]')?.getAttribute('data-a-repondre')==='1',null,{timeout:10000});
-          dit(true,'nouvelle capture acheteur : le fil revient dans À répondre sans attendre une minute');
+          const t2=Date.parse(date);
+          const vu2=await r.pg.waitForFunction(([sel,t])=>{const f=document.querySelector(sel);return !!f&&Number(f.getAttribute('data-fil-at'))>=t-1000&&f.getAttribute('data-nonlu')==='1';},[FIL('111','301'),t2],{timeout:10000}).then(()=>true,()=>false);
+          dit(vu2&&await r.pg.evaluate(()=>window.__sansRechargement===1),'nouvelle capture acheteur : le fil revient « non lu » sans attendre une minute ni recharger',JSON.stringify(await ligne()));
           dit(r.execs.every(x=>x.method==='GET'),'aucune mutation Vinted pendant la mise à jour de la boîte');
-        }finally{boite.updated_at=avant.updated;boite.description=avant.description;FIL_OFFRE.messages.splice(avant.n);await r.ctx.close();}
+        }finally{boite.updated_at=avant.updated;boite.description=avant.description;boite.unread=avant.unread;FIL_OFFRE.messages.splice(avant.n);await r.ctx.close();}
       }
       process.exitCode=ko?1:0;return;
     }
