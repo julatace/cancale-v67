@@ -4540,7 +4540,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let ok = false;
           if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme, msg.source === 'stream' || msg.source === 'page' ? msg.source : 'users/me');   // 5.374 : 'page' (`__NEXT_DATA__`)
           else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcCapture(tabId, msg.moi)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
-          else ok = await noterRecetteVc(msg.recette);
+          // (21 nov., « on ne fait plus les requêtes » pour les écritures) : une recette de REQUÊTE n'est plus rangée ;
+          // `vc_envoi` dit seulement l'interface apprise (`vcUiAppris`).
+          else ok = false;
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();

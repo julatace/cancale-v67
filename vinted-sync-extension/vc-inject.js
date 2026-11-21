@@ -1410,55 +1410,11 @@
       if (r) post({ kind: 'vcenvoiappris', recette: r });
     } catch (_) {}
   }
-  // ── L'ENVOI, SUR SON CLIC (l'ordre vient du fond de l'extension par vc.js) ──
-  let envoiEnCours = false;
+  // ── L'ENVOI PAR REQUÊTE : RETIRÉ (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les
+  //    écritures). L'ordre « repondre » qui rejouait une recette n'existe plus : un message part par l'INTERFACE de
+  //    la page (vc-ecrire.js : champ, saisie lettre à lettre, « Envoyer », vérifié). Ne pas le remettre.
+  // `poser` reste : les offres et les prix (5.319, 5.364) bâtissent encore leur corps avec lui.
   const poser = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'repondre') return;
-    const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
-    const r = d.recette;
-    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
-    const fin = (o) => post(Object.assign({ kind: 'vcenvoiresultat', jeton }, o));
-    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
-    if (!ID_CONV.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
-    if (!r || r.rejouable !== true || !/^(POST|PUT)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
-      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1
-      || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
-    if (envoiEnCours) return fin({ statut: 0, erreur: 'en-cours' });
-    // 5.299 — au nom du compte OUVERT DANS CETTE PAGE seulement (le fond dit
-    // lequel il attend) : un onglet où l'on vient de changer de compte, ou qui
-    // n'a pas encore lu `/users/me`, ne parle pour personne.
-    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
-    const h = {};
-    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
-      const k = String(n).toLowerCase();
-      if (ENTETES_INTERDITS.test(k)) continue;
-      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
-      h[k] = entetesApi[k];
-    }
-    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
-    const corps = {};
-    try {
-      for (const [ch, v, t] of r.fixes) poser(corps, ch.map(String), v === '{conv}' ? (t === 'number' ? Number(conv) : conv) : v);
-      poser(corps, r.cleTexte.map(String), texte);
-    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
-    const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
-    envoiEnCours = true;
-    try {
-      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
-      try {
-        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
-        statut = Number(res.status) || 0;
-        try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
-        defi = defiDe(res, rep); ra = raDe(res);
-      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
-      let cles = [], idMsg = '';
-      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
-      fin({ statut, cles, idMsg, erreur, defi, ra });
-    } finally { envoiEnCours = false; }
-  }); } catch (_) {}
-
 
   // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
   // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.
