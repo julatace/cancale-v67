@@ -15,7 +15,7 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
+import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
@@ -81,6 +81,17 @@ function useAutresSites() {
           deMoi: x.ap ? x.dm === 'true' : v.apercuDeMoi === true ? true : null, nonLu: v.nonLu === true ? true : v.nonLu === false ? false : null,
           titre: (f && f.titre) || String(v.titre || ''), photo: (f && f.photo) || urlPhotoVc(v.photo || '') || null, n: Number(x.n) || 0 };
       }).filter((x) => x.conv && x.n > 0);
+      // (21 nov., lot vestiaire-messages) Les conversations que la LISTE Vestiaire nomme mais dont le fil n'est pas
+      // encore lu : montrées aussi (avant, absentes : « lire les messages » perdait celles qu'il n'avait pas ouvertes).
+      // Le fil dit « pas encore lue » à l'ouverture ; rien n'est inventé (aperçu et date de la liste seulement).
+      const vus = new Set(fils.map((x) => x.conv));
+      for (const [conv, v] of Object.entries(convs)) {
+        if (!v || typeof v !== 'object' || vus.has(conv) || !/^[\w-]{3,40}$/.test(conv) || !(v.apercu || v.date)) continue;
+        const pid = String(v.productId || ''); const num = cleNum((pid && liens[pid]) || v.ref || '');
+        const f = num ? ficheDuNumero(num) : null;
+        fils.push({ conv, pid, num, compte: v.compte || '', apercu: v.apercu || '', date: v.date || '', deMoi: v.apercuDeMoi === true ? true : v.apercuDeMoi === false ? false : null,
+          nonLu: v.nonLu === true ? true : v.nonLu === false ? false : null, titre: (f && f.titre) || String(v.titre || ''), photo: (f && f.photo) || urlPhotoVc(v.photo || '') || null, n: 0 });
+      }
       vc = { fils, envoi: Array.isArray(ve) ? (ve[0] ? { appris: ve[0].appris === true, raison: /^\/chat\/channel\/?$/.test(String(ve[0].chemin || '')) ? '' : (ve[0].raison || '') } : { appris: false, raison: '' }) : null };
     }
     setD({ lbc, vc });
@@ -250,6 +261,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // (12 nov., Julien, CLAUDE.md §3 « Messages, comptes ») LES COMPTES SÉPARÉS : le compte de l'onglet d'abord, puis
   // chaque autre compte (le plus récent d'abord) ; DANS chaque compte, du plus récent au plus ancien. Le compte d'un
   // fil est celui de son DERNIER message (un fil relié de deux sites se range une fois). Rien n'est mélangé.
+  const vcOuvert = useCompteVcOuvert();
   const groupesFils = (() => {
     const m = new Map();
     for (const f of filsMontres) {
@@ -260,7 +272,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
       g.fils.push(f); m.set(k, g);
     }
     const t = (f) => (Number.isFinite(Number(f.at)) ? Number(f.at) : -Infinity);
-    const L = [...m.values()].map((g) => ({ ...g, onglet: g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet), fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
+    // (21 nov.) Vestiaire aussi : le compte ouvert dans l'onglet Vestiaire d'abord (règle du 12 nov., comptes SÉPARÉS) ;
+    // Vestiaire ne donne pas de nom de compte : « Autre compte Vestiaire », « compte pas encore su ».
+    const nomVc = (g) => (!g.compte ? `${NOM_SITE.vestiaire} · ${tr('vcMsg.sansCompte')}` : vcOuvert && g.compte === String(vcOuvert) ? NOM_SITE.vestiaire : tr('vcMsg.autreCompte'));
+    const L = [...m.values()].map((g) => ({ ...g, ...(g.plateforme === 'vestiaire' ? { nom: nomVc(g) } : {}),
+      onglet: (g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet)) || (g.plateforme === 'vestiaire' && !!vcOuvert && g.compte === String(vcOuvert)),
+      fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
     L.sort((a, b) => (b.onglet - a.onglet) || (t(b.fils[0]) - t(a.fils[0])) || a.cle.localeCompare(b.cle));
     return L;
   })();

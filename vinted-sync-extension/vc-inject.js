@@ -1134,6 +1134,15 @@
   //     titre et la photo de l'ARTICLE (jamais ceux de la personne).
   // Aucune permission ajoutée : c'est la page qui parle à Stream, on regarde ses
   // réponses ; le fond de l'extension n'appelle jamais Stream.
+  // 5.412 — LA CONVERSATION OUVERTE dans cette page : la dernière que la page a chargée chez sa messagerie
+  // (`…/channels/{type}/{id}/query`) ou ouverte chez Vestiaire (`POST /chat/channel/`). vc-ecrire.js la demande
+  // avant d'écrire (le bon destinataire, par identifiant) ; rien ne sort de ce navigateur.
+  let convOuverte = '', convOuverteAt = 0;
+  try { window.addEventListener('message', (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'convouverte' || typeof d.jeton !== 'string') return;
+    post({ kind: 'vcconvouverte', jeton: d.jeton.slice(0, 64), conv: convOuverte, at: convOuverteAt, moi: moiId });
+  }); } catch (_) {}
   const DE_STREAM = (url) => { try { const u = new URL(url, location.origin); return u.protocol === 'https:' && /(^|\.)(stream-chat\.com|stream-io-api\.com)$/i.test(u.hostname); } catch (_) { return false; } };
   let moiSource = '';
   function noteMoiStream(url) {
@@ -1219,6 +1228,10 @@
         const conv = ID_CONV.test(envoi[1]) ? envoi[1] : '';
         const m = messageStream(obj.message);
         if (conv && m && convsVues.has(conv)) post({ kind: 'vcfil', conv, productId: '', ref: '', messages: [m], lus: 1, forme: [], moi: moiId, page: pageIci() });
+        // 5.412 (21 nov., « on ne fait plus les requêtes ») : un message que LA PAGE vient d'envoyer — la preuve que
+        // l'envoi par l'interface (vc-ecrire.js) est parti, ou la leçon de SON envoi à la main. Seulement un message
+        // DU COMPTE OUVERT ; il ne quitte pas ce navigateur (vc-ecrire.js le compare, rien ne part au fond).
+        if (conv && m && m.deMoi === true) post({ kind: 'vcenvoivu', conv, t: m.t, id: m.id });
         return;
       }
       if (liste) {
@@ -1230,6 +1243,7 @@
         return;
       }
       const s = etatCanalStream(obj);
+      if (s && une) { convOuverte = s.conv; convOuverteAt = Date.now(); }
       if (!s) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj), page: pageIci(), moi: moiId }); return; }
       postConvsStream([s], 1, formeStream(obj));
     } catch (_) {}
@@ -1312,6 +1326,7 @@
       const conv = String(d.id == null ? '' : d.id);
       if (!ID_CONV.test(conv)) return;
       convsVues.add(conv);
+      convOuverte = conv; convOuverteAt = Date.now();
       post({ kind: 'vcmessages', conversations: [{ id: conv, productId: articleCanal(d, conv), ref: '', nonLu: null, date: '', apercu: '', apercuDeMoi: null, source: 'canal' }], offset: 0, total: null, lus: 1, forme: [], page: '/chat/', moi: moiId });
     } catch (_) {}
   }
@@ -1382,62 +1397,24 @@
     const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
     return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', cleTexte: textes[0][0], fixes, entetes: noms };
   }
+  // 5.412 (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les ÉCRITURES) : aucune requête
+  // d'envoi n'est plus apprise pour être REJOUÉE — un message part par l'INTERFACE de la page (vc-ecrire.js, qui
+  // apprend le champ et le bouton de SON envoi à la main). `recetteEnvoi` reste lisible pour l'histoire ; plus rien
+  // ne part au fond (`vc_envoi` est désormais écrit par l'apprentissage de l'interface).
+  const RECETTES_REQUETE = false;
   function noteEnvoi(url, methode, statut, corps, entetes) {
     try {
+      if (!RECETTES_REQUETE) return;
       if (!(statut >= 200 && statut < 300)) return;
       const r = recetteEnvoi(url, methode, corps, entetes);
       if (r) post({ kind: 'vcenvoiappris', recette: r });
     } catch (_) {}
   }
-  // ── L'ENVOI, SUR SON CLIC (l'ordre vient du fond de l'extension par vc.js) ──
-  let envoiEnCours = false;
+  // ── L'ENVOI PAR REQUÊTE : RETIRÉ (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les
+  //    écritures). L'ordre « repondre » qui rejouait une recette n'existe plus : un message part par l'INTERFACE de
+  //    la page (vc-ecrire.js : champ, saisie lettre à lettre, « Envoyer », vérifié). Ne pas le remettre.
+  // `poser` reste : les offres et les prix (5.319, 5.364) bâtissent encore leur corps avec lui.
   const poser = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'repondre') return;
-    const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
-    const r = d.recette;
-    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
-    const fin = (o) => post(Object.assign({ kind: 'vcenvoiresultat', jeton }, o));
-    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
-    if (!ID_CONV.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
-    if (!r || r.rejouable !== true || !/^(POST|PUT)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
-      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1
-      || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
-    if (envoiEnCours) return fin({ statut: 0, erreur: 'en-cours' });
-    // 5.299 — au nom du compte OUVERT DANS CETTE PAGE seulement (le fond dit
-    // lequel il attend) : un onglet où l'on vient de changer de compte, ou qui
-    // n'a pas encore lu `/users/me`, ne parle pour personne.
-    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
-    const h = {};
-    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
-      const k = String(n).toLowerCase();
-      if (ENTETES_INTERDITS.test(k)) continue;
-      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
-      h[k] = entetesApi[k];
-    }
-    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
-    const corps = {};
-    try {
-      for (const [ch, v, t] of r.fixes) poser(corps, ch.map(String), v === '{conv}' ? (t === 'number' ? Number(conv) : conv) : v);
-      poser(corps, r.cleTexte.map(String), texte);
-    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
-    const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
-    envoiEnCours = true;
-    try {
-      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
-      try {
-        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
-        statut = Number(res.status) || 0;
-        try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
-        defi = defiDe(res, rep); ra = raDe(res);
-      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
-      let cles = [], idMsg = '';
-      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
-      fin({ statut, cles, idMsg, erreur, defi, ra });
-    } finally { envoiEnCours = false; }
-  }); } catch (_) {}
-
 
   // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
   // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.

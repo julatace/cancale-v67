@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.412.0, Julien : « au moins lire les messages et écrire aux personnes ») docs/passation/2026-11-21-vestiaire-messages.md
+  { id: 'vestiaire-ecrire', date: '2026-11-21', titre: 'Vestiaire : lire et répondre depuis l’extension', phrase: 'Le fil dans le panneau ; ton message tapé sur la page.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.411, Julien : « prévoir les colis à aller chercher pour chaque point relais ») docs/passation/2026-11-21-relais-prevision.md
   { id: 'relais-prevision', date: '2026-11-21', titre: 'À retirer : chaque point relais, ce qui arrive', phrase: 'Les colis arrivés et en route, rangés par point, avec leur date.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.8, Julien : « je ne peux pas sélectionner les favoris », « l'onglet doit être bloqué », « pas d'offre en plus ») docs/passation/2026-11-21-favoris-corrections.md

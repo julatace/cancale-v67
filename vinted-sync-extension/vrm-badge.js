@@ -777,6 +777,11 @@ function vrmVerifVisible(sel) {
   .conv5-t span { color: var(--n-encre-2); font-size: 13px; }
   .conv5 .bulle { background: var(--n-carte-2); color: var(--n-encre); border-radius: 16px; padding: 10px 14px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; max-width: 520px; }
   .conv5-sous { padding: 0 16px 12px; }
+  /* 5.412 : le fil Vestiaire (bulles de la personne à gauche, les tiennes à droite, la plus récente en bas). */
+  .fil5 { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; padding: 4px 0; }
+  .fil5 .bulle { max-height: none; align-self: flex-start; }
+  .fil5 .bulle.moi { align-self: flex-end; }
+  .fil5 .bulle small { display: block; color: var(--n-encre-2); font-size: 12px; line-height: 16px; margin-bottom: 2px; }
 
   .carte[data-grand] .reg5 .lib5 { display: none; }
   @media (min-width: 1024px) { .carte[data-grand] .reg5 { gap: 10px; } .carte[data-grand] .reg5 .lib5 { display: inline; } }
@@ -2581,20 +2586,51 @@ function vrmVerifVisible(sel) {
     try {
       chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'repondreCarte', conv, texte, confirme: true }, (r) => {
         void chrome.runtime.lastError; repEnVol = false;
-        if (r && r.ok) { brouillons.delete(conv); repConv[conv] = { ok: true, texte: TU('m_parti') }; }
-        else repConv[conv] = { ok: false, texte: (r && r.raison) || TU('m_pas_parti') };
+        if (r && r.ok) { brouillons.delete(conv); repConv[conv] = { ok: true, texte: listes && listes.plateforme === 'vestiaire' ? TU('vc_parti') : TU('m_parti') }; if (filsVc[conv]) delete filsVc[conv]; }
+        else repConv[conv] = { ok: false, texte: (r && r.raison) || TU('m_pas_parti'), url: r && r.code === 'ouvrir' && /^https:\/\/([\w-]+\.)*vestiairecollective\.com\/[\w/?=.%-]{1,150}$/.test(String(r.url || '')) && String(r.url).includes(conv) ? String(r.url) : '' };
         rendre();
       });
     } catch (_) { repEnVol = false; repConv[conv] = { ok: false, texte: TU('m_pas_parti') }; rendre(); }
   }
+  // 5.412 — VESTIAIRE : le FIL de la conversation (ce que l'extension a rangé, `filVcCarte`), et l'envoi par l'interface
+  // de la page (le message est tapé dans le champ de Vestiaire puis « Envoyer », vérifié dans le fil) : il part de
+  // l'onglet qui MONTRE cette conversation — sinon « Ouvrir la conversation » (rien n'est tapé avant).
+  const filsVc = {};
+  function filVcHtml(x) {
+    const f = filsVc[x.conv];
+    if (!f) { filsVc[x.conv] = { charge: true }; try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'filVcCarte', conv: x.conv }, (r) => { void chrome.runtime.lastError; filsVc[x.conv] = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('vc_fil_pas_su') }; rendre(); }); } catch (_) {} return `<div class="val gris" role="status" data-vc-fil="charge">${esc(TU('m_charge'))}</div>`; }
+    if (f.charge) return `<div class="val gris" role="status" data-vc-fil="charge">${esc(TU('m_charge'))}</div>`;
+    if (!f.data) return `<div class="val gris" data-vc-fil="pas-su">${esc(f.raison)}</div>`;
+    const ms = f.data.messages;
+    const ouvrir = f.data.ouverte ? '' : `<a class="vu-btn vu-sec" href="${esc(f.data.url)}" target="_top" data-vc-ouvrir="${esc(x.conv)}">${esc(TU('vc_ouvrir_conv'))}</a>`;
+    if (!ms) return `<div class="val gris" data-vc-fil="jamais">${esc(TU('vc_fil_jamais'))}</div>` + ouvrir;
+    return `<div class="fil5" data-vc-fil="lu" data-vc-fil-n="${ms.length}">${ms.map((m) => `<div class="bulle${m.deMoi === true ? ' moi' : ''}" data-vc-msg="${m.deMoi === true ? 'moi' : m.deMoi === false ? 'autre' : 'passu'}"><small>${esc(m.deMoi === true ? TU('vc_toi') : m.deMoi === false ? TU('vc_lui') : TU('vc_auteur_passu'))}${m.at ? ' · ' + esc(depuis(m.at)) : ''}${m.vrm ? ' · ' + esc(TU('vc_depuis_vrm')) : ''}</small>${esc(m.t)}</div>`).join('')}</div>`
+      + (f.data.ouverte ? '' : `<p class="note5" data-vc-pas-ouverte>${esc(TU('vc_pas_ouverte'))}</p>${ouvrir}`);
+  }
   function convHtml(x, ici) {
+    const vc = listes && listes.plateforme === 'vestiaire';
     return `<div class="conv5" data-conv-ouverte="${esc(x.conv)}">${x.photo ? `<img class="conv5-ph" src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<div class="conv5-t"><b>${esc(x.qui || '—')}</b><span>${esc(x.at ? depuis(x.at) : '')}</span></div>`
-      + `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>`
+      + (vc ? filVcHtml(x) : `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>`)
       // 5.409 : répondre ICI, sur SON toucher — le même chemin que la réponse depuis l'app (garde stricte, 50/h, réserve,
       // pause, compte de l'onglet ; `repondreCarte` dans le fond). Le fil complet reste sur Vinted (« Ouvrir »).
       + `<div class="rep5"><textarea data-rep-texte="${esc(x.conv)}" rows="3" maxlength="1000" placeholder="${esc(TU('m_ecrire'))}" aria-label="${esc(TU('m_ecrire'))}">${esc(brouillons.get(x.conv) || '')}</textarea>`
-      + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>` : ''}`
+      + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>${repConv[x.conv].url ? `<a class="vu-btn vu-sec" href="${esc(repConv[x.conv].url)}" target="_top" data-vc-ouvrir="${esc(x.conv)}">${esc(TU('vc_ouvrir_conv'))}</a>` : ''}` : ''}`
       + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button>${listes && listes.plateforme === 'leboncoin' ? `<a class="vu-btn vu-sec" href="https://www.leboncoin.fr/messages" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_site'))}</a>` : listes && listes.plateforme === 'vestiaire' ? '' : `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a>`}</div></div></div>`;
+  }
+  // 5.412 — VESTIAIRE · FAVORIS : les personnes qui ont AIMÉ les articles de CE compte (Vestiaire les nomme sur ses
+  // notifications ; VRM ne garde que leur identifiant, dans CE navigateur). « Leur écrire » : ouvrir SA conversation
+  // sur Vestiaire (dans cet onglet), puis écrire dans Messages — sur SON toucher, par l'interface de la page, une
+  // personne à la fois. Aucun envoi automatique, aucun nom affiché.
+  let aimesVc = null;
+  function aimesVcHtml() {
+    if (!aimesVc) { aimesVc = { charge: true }; try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'aimesVcCarte' }, (r) => { void chrome.runtime.lastError; aimesVc = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('vc_fil_pas_su') }; rendre(); }); } catch (_) {} }
+    if (aimesVc.charge) return `<div class="val gris" role="status" data-vc-aimes="charge">${esc(TU('m_charge'))}</div>`;
+    if (!aimesVc.data) return `<div class="val gris" data-vc-aimes="pas-su">${esc(aimesVc.raison)}</div>`;
+    const d = aimesVc.data;
+    const tete = `<p class="note5" data-vc-aimes-note>${esc(TU('vc_aimes_note'))}</p>` + (d.appris ? '' : `<p class="note5" data-vc-aimes-appris="non">${esc(TU('vc_pas_appris'))}</p>`);
+    if (!d.articles.length) return tete + `<div class="val gris" data-vc-aimes="0">${esc(TU(d.sansArticle ? 'vc_aimes_sans_article' : 'vc_aimes_aucun'))}</div>`;
+    return tete + `<ul class="rangs" data-vc-aimes="${d.articles.length}">${d.articles.map((a) => `<li data-vc-aime-article="${esc(a.produit)}"><div class="rang">${a.photo ? `<img class="vig" src="${esc(a.photo)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '<span class="vig" aria-hidden="true"></span>'}<span class="mil"><span class="ti">${esc(a.titre || '—')}</span><span class="me">${esc(TU('vc_aimes_n', { n: a.n, e: a.ecrits }))}</span></span></div>`
+      + `<div class="ge5">${a.gens.map((g, i) => `<a class="vu-btn vu-sec" href="${esc(g.url)}" target="_top" data-vc-aime="${g.ecrit ? 'ecrit' : 'a-ecrire'}">${esc(TU(g.ecrit ? 'vc_aime_ecrit' : 'vc_aime_ecrire', { n: i + 1 }))}${g.at ? ' · ' + esc(depuis(g.at)) : ''}</a>`).join('')}</div></li>`).join('')}</ul>`;
   }
   // 5.410 (comme Vintex) : l'avatar de l'acheteur (sa photo Vinted, sinon son initiale sur un rond neutre).
   const avatar6 = (x) => (x.avatar ? `<img class="av6" src="${esc(x.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="av6" aria-hidden="true">${esc(String(x.qui || '?').trim().charAt(0).toUpperCase() || '?')}</span>`);
@@ -2609,6 +2645,8 @@ function vrmVerifVisible(sel) {
     const q = msgCherche.trim().toLowerCase();
     const vus = m.liste.filter((x) => (!msgNonLus || x.nonlu) && (!q || String(x.qui).toLowerCase().includes(q) || String(x.texte).toLowerCase().includes(q)));
     const lu = depuis(m.lu);
+    // 5.412 : sur Vestiaire, la conversation que la PAGE montre (`/chat?id=…`) est choisie d'office — c'est d'elle que part l'envoi.
+    if (!convChoisie && !LISTES && listes.plateforme === 'vestiaire') { try { const q = new URLSearchParams(location.search).get('id') || ''; if (q && m.liste.some((x) => x.conv === q)) convChoisie = q; } catch (_) {} }
     const choisie = vus.find((x) => x.conv === convChoisie) || null;
     const outils = LISTES ? '' : `<div class="outils5"><input type="search" class="cherche5" data-msg-cherche placeholder="${esc(TU('m_chercher'))}" aria-label="${esc(TU('m_chercher'))}" value="${esc(msgCherche)}"><button type="button" class="filtre5" data-msg-nonlus aria-pressed="${msgNonLus ? 'true' : 'false'}">${esc(TU('m_filtre_nonlus', { n: nl }))}</button></div>`;
     const liste = `<ul class="rangs" data-messages="${vus.length}" data-defil="messages">${vus.map((x) => LISTES
@@ -3024,7 +3062,7 @@ function vrmVerifVisible(sel) {
     const nomSite = (e && NOM_SITE[e.plateforme]) || 'ce site';
     let panneau;
     if (ongletListe === 'accueil' && !LISTES && carte.hasAttribute('data-grand')) panneau = accueilHtml(e);
-    else if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`
+    else if (ongletListe === 'favoris') panneau = !vinted ? (e.plateforme === 'vestiaire' && !LISTES ? aimesVcHtml() : `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`)
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
     else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations' && listes && listes.automatisations && listes.automatisations.baisse) panneau = `<p class="note5" data-auto-site="${esc(e.plateforme)}">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p>` + automatisationsHtml();

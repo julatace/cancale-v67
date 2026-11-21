@@ -11,7 +11,7 @@ export default {
   "aimesVc.vide": "Nadie por ahora: los «me gusta» llegan cuando abres tus notificaciones de Vestiaire en este navegador.",
   "aimesVc.extAbsente": "Necesitas la extensión VRM {v} en este navegador para ver a quién le gustan tus artículos.",
   "aimesVc.extRetard": "Actualiza la extensión ({v}) para ver a quién le gustan tus artículos.",
-  "aimesVc.aide": "Vestiaire te dice a quién le gusta un artículo y te deja hacerle una oferta. VRM la envía cuando tocas, una vez por persona, y solo guarda números.",
+  "aimesVc.aide": "Vestiaire te dice a quién le gusta un artículo. Para escribirles: en el panel de la extensión (Favoritos), abre la conversación de una persona y escríbele — cuando tú pulses, una persona cada vez.",
   "aimesVc.feuilleTitre": "Hacer una oferta",
   "aimesVc.montant": "Tu oferta",
   "aimesVc.regle": "Una oferta por persona, una sola vez; {n} personas como máximo por envío. Vestiaire se la muestra.",

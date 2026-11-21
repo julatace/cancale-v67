@@ -11,7 +11,7 @@ export default {
   "aimesVc.vide": "Personne pour l’instant : les « j’aime » arrivent quand tu ouvres tes notifications Vestiaire dans ce navigateur.",
   "aimesVc.extAbsente": "Il faut l’extension VRM {v} dans ce navigateur pour voir qui aime tes articles.",
   "aimesVc.extRetard": "Mets l’extension à jour ({v}) pour voir qui aime tes articles.",
-  "aimesVc.aide": "Vestiaire te dit qui aime un article et te laisse lui faire une offre. VRM l’envoie sur ton toucher, une fois par personne, et ne garde que des nombres.",
+  "aimesVc.aide": "Vestiaire te dit qui aime un article. Pour leur écrire : dans le panneau de l’extension (Favoris), ouvre la conversation d’une personne, puis écris-lui — sur ton toucher, une personne à la fois.",
   "aimesVc.feuilleTitre": "Faire une offre",
   "aimesVc.montant": "Ton offre",
   "aimesVc.regle": "Une offre par personne, une seule fois ; {n} personnes au plus par envoi. Vestiaire la leur montre.",

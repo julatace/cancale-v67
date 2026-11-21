@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.411.0';
+const CODE_VERSION = '5.412.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4057,6 +4057,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
+    // 5.412 : le FIL d'une conversation Vestiaire et les personnes qui ont aimé (lecture seule, compte de l'onglet).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'filVcCarte') {
+      filVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'aimesVcCarte') {
+      aimesVcCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'repondreCarte') {
       repondreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
@@ -4513,6 +4522,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     // 5.295 : le compte Vestiaire ouvert dans cet onglet, un fil de conversation,
     // et la recette d'un envoi fait par lui sur la page.
+    // 5.412 : le champ et le bouton de SON envoi à la main sont appris (dans CE navigateur) — la base ne reçoit que « appris ».
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcUiAppris') {
+      (async () => {
+        let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+        if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+        sendResponse({ ok: (await noterUiVc(msg.mode, msg.adresse).catch(() => false)) === true });
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcMoi' || msg.action === 'vcFil' || msg.action === 'vcEnvoiAppris')) {
       (async () => {
         try {
@@ -4522,7 +4540,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let ok = false;
           if (msg.action === 'vcMoi') ok = await noterSessionVc(msg.id, tabId, msg.forme, msg.source === 'stream' || msg.source === 'page' ? msg.source : 'users/me');   // 5.374 : 'page' (`__NEXT_DATA__`)
           else if (msg.action === 'vcFil') { ok = await rangerVcFil(msg, await compteVcCapture(tabId, msg.moi)); await noterVcCapte('fils', ok === true, Array.isArray(msg.messages) ? msg.messages.length : 0); }
-          else ok = await noterRecetteVc(msg.recette);
+          // (21 nov., « on ne fait plus les requêtes » pour les écritures) : une recette de REQUÊTE n'est plus rangée ;
+          // `vc_envoi` dit seulement l'interface apprise (`vcUiAppris`).
+          else ok = false;
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }
       })();
@@ -22631,8 +22651,8 @@ async function repondreCarte(msg, sender) {
       const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations');
       const x = Array.isArray(m) && m[0] && m[0].c ? Object.values(m[0].c).find((y) => y && String(y.ref) === conv) : null;
       if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
-      const r = await repondreVestiaire({ conv, texte });
-      return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.' };
+      const r = await repondreVestiaire({ conv, texte, tabId: sender && sender.tab ? sender.tab.id : null });
+      return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && adresseConvVcSure(r.url, conv) ? { url: String(r.url) } : {}) };
     }
     const f = await sbGet(`app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
     if (!Array.isArray(f) || !f[0] || cleCompteCapte(f[0].compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
@@ -22657,6 +22677,59 @@ async function repondreCarte(msg, sender) {
   if (etat === 'confirme') return { ok: true };
   if (etat === 'incertain') return { ok: false, code: 'incertain', raison: 'Envoi non confirmé par Vinted : regarde la conversation sur Vinted avant de renvoyer, le message est peut-être arrivé.' };
   return { ok: false, code: (r && r.code) || 'refus', raison: (r && (r.error || (r.data && typeof r.data.message === 'string' && r.data.message))) || 'Vinted n’a pas accepté le message : rien n’est confirmé.' };
+}
+// 5.412 (21 nov., Julien : « au moins pouvoir lire les messages et écrire aux personnes ») — VESTIAIRE DANS LE PANNEAU.
+//  · `filVcCarte` : le FIL d'une conversation (ce que l'extension a rangé dans `vc_fil_{conv}` : texte, date, « de toi »,
+//    jamais un nom) — seulement si la conversation est rangée sous le compte de L'ONGLET ; dit aussi si l'onglet MONTRE
+//    déjà cette conversation (l'envoi par l'interface part de là) et l'adresse pour l'ouvrir.
+//  · `aimesVcCarte` : les personnes qui ont aimé les articles de CE compte (gardées dans CE navigateur, `vrmVcAimes`),
+//    par article ; pour chacune, l'adresse de SA conversation sur Vestiaire (`{personne}-{article}`, la forme que
+//    Vestiaire met sur sa notification) et « déjà écrit depuis VRM ». Jamais un nom, jamais un envoi automatique :
+//    « Leur écrire » = ouvrir la conversation, puis écrire dans le panneau sur SON toucher (même chemin gardé).
+async function filVcCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vestiaire') return { ok: false, code: 'origine', raison: 'Le fil se lit depuis l’onglet vestiairecollective.com.' };
+  const conv = String((msg && msg.conv) || '');
+  if (!/^[\w-]{3,40}$/.test(conv)) return { ok: false, code: 'invalide' };
+  const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
+  const moi = oc && oc.id ? String(oc.id) : '';
+  if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu.' };
+  const rows = await sbGet(`app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte,messages:data->messages`);
+  if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu.' };
+  const ouverte = String(o.url || '').includes(conv);
+  let ui = null; try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { ui = null; }
+  const url = adresseConvVc(o.url, conv, ui);
+  if (!rows.length) return { ok: true, messages: null, ouverte, url };
+  if (String((rows[0] && rows[0].compte) || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet.' };
+  const messages = (Array.isArray(rows[0].messages) ? rows[0].messages : []).slice(-60).map((x) => ({ t: String((x && x.t) || '').slice(0, 1000), deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, at: Date.parse((x && x.at) || '') || null, vrm: !!(x && x.envoyeParVrm) })).filter((x) => x.t);
+  return { ok: true, messages, ouverte, url };
+}
+const AIMES_CARTE_MAX = 30;
+async function aimesVcCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vestiaire') return { ok: false, code: 'origine', raison: 'Les personnes qui ont aimé se voient depuis l’onglet vestiairecollective.com.' };
+  const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
+  const moi = oc && oc.id ? String(oc.id) : '';
+  if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : recharge la page Vestiaire.' };
+  let aimes = {}, ecrits = {}, faits = {}, ui = null;
+  try { const l = await chrome.storage.local.get([VC_AIMES, VC_AIMES_ECRITS, VC_AIMES_FAITS, VC_UI]); aimes = l[VC_AIMES] || {}; ecrits = l[VC_AIMES_ECRITS] || {}; faits = l[VC_AIMES_FAITS] || {}; ui = l[VC_UI] || null; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
+  if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu.' };
+  const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
+  const articles = []; let sansArticle = 0;
+  for (const [p, par] of Object.entries(aimes)) {
+    if (!/^\d{3,15}$/.test(p) || !par || typeof par !== 'object') continue;
+    const it = items[p];
+    if (!it || typeof it !== 'object') { sansArticle++; continue; }   // article jamais lu : on ne sait pas à quel compte il est
+    if (String(it.compte || '') !== moi) continue;                     // un autre compte : jamais montré ici
+    const gens = Object.keys(par).filter((k) => /^\d{3,15}$/.test(k) && k !== moi)
+      .map((k) => ({ url: adresseConvVc(o.url, `${k}-${p}`, ui), conv: `${k}-${p}`, at: Date.parse(par[k] || '') || null, ecrit: !!ecrits[p + '|' + k], offre: !!faits[p + '|' + k] }))
+      .sort((a, b) => (b.at || 0) - (a.at || 0));
+    if (!gens.length) continue;
+    articles.push({ produit: p, titre: String(it.titre || '').slice(0, 120), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : '', n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at });
+  }
+  articles.sort((a, b) => (b.dernier || 0) - (a.dernier || 0));
+  return { ok: true, compte: moi, appris: !!(ui && ui.champ && ui.envoi), articles, sansArticle };
 }
 // 5.409 — LEBONCOIN ET VESTIAIRE DANS LE GRAND PANNEAU. Le compte est celui de L'ONGLET (`compteOngletCapte` :
 // la session Leboncoin, l'onglet Vestiaire) ; une annonce ou une vente n'est montrée que si elle porte CE compte
@@ -32237,28 +32310,89 @@ async function ongletVestiaire(compteFil) {
   // Aucun onglet dont on SAIT le compte : on ne parle pas au nom d'un compte inconnu.
   return { ok: false, code: 'session', raison: "je ne sais pas encore quel compte Vestiaire est ouvert dans ce Chrome — recharge la page Vestiaire (ta messagerie), puis réessaie" };
 }
+// ══════════════════════════════════════════════════════════════════════════
+// 5.412 (21 nov.) — ÉCRIRE SUR VESTIAIRE PAR L'INTERFACE DE LA PAGE
+// ══════════════════════════════════════════════════════════════════════════
+// Décision de Julien : « on ne fait plus les requêtes » pour les ÉCRITURES. Un message part par la page
+// vestiairecollective.com elle-même (vc-ecrire.js : clic dans le champ, saisie lettre à lettre, clic sur
+// « Envoyer », puis VÉRIFICATION que la page a envoyé CE texte dans CETTE conversation). Ici, le fond garde
+// tout ce qui vient AVANT et APRÈS le geste :
+//  · une écriture Vestiaire à la fois (`VC_REPONSE_EN_VOL`), pause 429/403 (`vrmPauseVc`), arrêt anti-robot ;
+//  · la conversation doit être LUE et rangée sous le compte de l'onglet (identité : `vc_fil_{conv}.compte`) ;
+//  · l'onglet Vestiaire de CE compte (`ongletVestiaire`) doit montrer CETTE conversation (son adresse la
+//    porte) — sinon rien n'est tapé et l'adresse à ouvrir est rendue (`code: 'ouvrir'`) : VRM ne mène jamais
+//    l'onglet ailleurs tout seul ;
+//  · le champ et le bouton APPRIS de SON envoi à la main (`vrmVcUi`, posé par vc-ecrire.js ; `vc_envoi` pour
+//    l'app : appris oui/non) — jamais devinés ;
+//  · la sécurité du compte (sorte « reponse », sur SON clic), les 50 actions/h (`vc:{id}`), place rendue si rien
+//    n'est parti ; « fait » seulement si la page a ENVOYÉ ce texte (vu) ; tapé mais pas vu ⇒ « incertain »
+//    (jamais « fait », jamais relancé) ; vérification visible ⇒ arrêt et pause.
+const VC_UI = 'vrmVcUi';
+const VC_AIMES_ECRITS = 'vrmVcAimesEcrits';   // LOCAL : { 'article|personne': date } — un message écrit depuis VRM
+async function noterUiVc(mode, adresse) {
+  const at = new Date().toISOString();
+  // `adresse` : « oui » (la conversation est dans l'adresse de la page, forme apprise), « sans » (elle n'y est pas :
+  // l'envoi depuis VRM est alors refusé, dit), '' (pas su) — un mot, jamais l'adresse.
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_envoi', data: { appris: true, raison: '', mode: 'interface', geste: mode === 'entree' ? 'entree' : 'bouton', adresse: adresse === 'oui' || adresse === 'sans' ? adresse : '', chemin: '', methode: '', at, dernierEssai: { at, rejouable: true, raison: '', chemin: 'interface' }, ver: CODE_VERSION } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+// L'adresse d'une conversation : la forme APPRISE de son envoi à la main (`vrmVcUi.adresse.modele`, vc-ecrire.js) ;
+// tant qu'elle n'est pas apprise, la forme supposée `/chat?id={conv}` (la page `/chat/` est mesurée, le paramètre
+// ne l'est pas : un mauvais lien n'ouvre simplement pas la conversation, et rien n'est tapé tant que la page ne
+// montre pas CETTE conversation — vérifié par identifiant dans vc-ecrire.js).
+const MODELE_CONV_VC = /^\/[\w/{}.-]{0,100}(\?[\w-]{1,20}=\{conv\})?$/;
+const adresseConvVc = (url, conv, ui = null) => {
+  let h = 'fr.vestiairecollective.com'; try { const u = new URL(url || ''); if (/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) h = u.hostname; } catch (_) {}
+  const m = ui && ui.adresse && typeof ui.adresse.modele === 'string' ? ui.adresse.modele : '';
+  if (m && MODELE_CONV_VC.test(m) && m.split('{conv}').length === 2) return `https://${h}${m.replace('{conv}', encodeURIComponent(conv))}`;
+  return `https://${h}/chat?id=${encodeURIComponent(conv)}`;
+};
+// L'adresse rendue au panneau : sur vestiairecollective.com, et elle porte la conversation.
+const adresseConvVcSure = (url, conv) => { try { const u = new URL(String(url || '')); return u.protocol === 'https:' && /(^|\.)vestiairecollective\.com$/i.test(u.hostname) && String(url).includes(String(conv)) && String(url).length <= 200; } catch (_) { return false; } };
+const RAISONS_UI_VC = {
+  'pas-appris': "VRM n'a pas encore appris où écrire sur Vestiaire — envoie UNE réponse toi-même sur vestiairecollective.com, dans ce Chrome (VRM retient le champ et le bouton, jamais ton texte), puis réessaie",
+  'pas-ouverte': "cette conversation n'est pas ouverte dans l'onglet Vestiaire — ouvre-la, puis touche « Envoyer »",
+  'autre-conversation': "la page Vestiaire montre une AUTRE conversation que celle choisie — rien n'a été tapé",
+  'page-muette': "la page Vestiaire n'a pas encore chargé cette conversation — attends qu'elle s'affiche, puis réessaie (rien n'a été tapé)",
+  'autre-compte': "l'onglet Vestiaire n'est pas sur le compte de cette conversation — rien n'a été tapé",
+  'compte-pas-su': "je ne sais pas encore quel compte Vestiaire est ouvert dans cet onglet — recharge la messagerie Vestiaire, puis réessaie (rien n'a été tapé)",
+  'champ-introuvable': "le champ de message appris n'est pas sur cette page — Vestiaire a peut-être changé : envoie une réponse toi-même une fois pour que VRM réapprenne (rien n'a été tapé)",
+  'champ-ambigu': "plusieurs champs de message sur la page : VRM ne choisit pas au hasard (rien n'a été tapé)",
+  'champ-pas-vide': "le champ de message de la page contient déjà du texte : vide-le d'abord (VRM ne mélange pas les deux, rien n'a été tapé)",
+  'bouton-introuvable': "le texte est tapé dans le champ, mais le bouton « Envoyer » appris est introuvable : envoie-le toi-même sur la page (rien n'est parti)",
+  'bouton-ambigu': "le texte est tapé dans le champ, mais plusieurs boutons ressemblent à « Envoyer » : envoie-le toi-même sur la page (rien n'est parti)",
+  'saisie-differente': "le texte tapé dans la page n'est pas exactement le tien : rien n'est envoyé, regarde le champ sur la page",
+  'adresse-sans-conv': "Vestiaire n'affiche pas l'identifiant de la conversation dans l'adresse de sa page : VRM ne peut pas vérifier à qui il écrirait — réponds directement sur Vestiaire (rien n'a été tapé)",
+  'stockage': RAISON_STOCKAGE,
+};
 async function repondreVestiaire(msg) {
   const conv = String((msg && msg.conv) || '');
   const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
   if (!/^[\w-]{3,40}$/.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
-  if (!texte || texte.length > 2000) return { accepte: false, code: 'invalide', raison: texte ? 'message trop long (2 000 caractères au plus)' : 'message vide' };
+  if (!texte || texte.length > 1000) return { accepte: false, code: 'invalide', raison: texte ? 'message trop long (1 000 caractères au plus)' : 'message vide' };
   if (VC_REPONSE_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'un autre message Vestiaire part en ce moment — un à la fois' };
   VC_REPONSE_EN_VOL = true;
   try {
     const pause = await pauseVc();
     if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
-    let rec;
-    try { rec = (await chrome.storage.local.get(VC_RECETTE))[VC_RECETTE] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
-    const recette = rec && rec.recette;
-    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Vestiaire envoie un message — envoie UNE réponse toi-même sur vestiairecollective.com, dans ce Chrome : elle apprend la forme, et VRM pourra ensuite répondre" };
-    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire envoie un message n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — réponds sur Vestiaire, rien n'est parti` };
+    let ui;
+    try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: RAISONS_UI_VC['pas-appris'] };
     const rows = await sbGet(`app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
     if (!rows.length) return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette conversation — ouvre-la une fois sur Vestiaire, rien n'est parti" };
     const compteFil = String((rows[0] && rows[0].compte) || '');
+    if (!compteFil) return { accepte: false, code: 'session', raison: "je ne sais pas sur quel compte Vestiaire est cette conversation — recharge la messagerie Vestiaire, puis réessaie (rien n'est parti)" };
     const o = await ongletVestiaire(compteFil);
     if (!o.ok) return { accepte: false, code: o.code, raison: o.raison };
-    // (5.366) La sécurité du compte Vestiaire (la même règle que Vinted) AVANT le plafond de 50/h, inchangé.
+    // L'onglet d'où il a touché « Envoyer » (le panneau), s'il est sur CE compte.
+    if (msg.tabId != null && msg.tabId !== o.tabId && (await compteVcOnglet(msg.tabId)) === compteFil) o.tabId = msg.tabId;
+    let tab = null; try { tab = await chrome.tabs.get(o.tabId); } catch (_) { tab = null; }
+    // Vestiaire ne met pas la conversation dans son adresse (appris de SON envoi) : le destinataire ne se vérifie pas
+    // par l'adresse ⇒ rien n'est tapé, et c'est dit (jamais « au mieux »).
+    if (ui.adresse && ui.adresse.sansConv === true) return { accepte: false, code: 'adresse-sans-conv', raison: RAISONS_UI_VC['adresse-sans-conv'] };
+    if (!tab || !String(tab.url || '').includes(conv)) return { accepte: false, code: 'ouvrir', url: adresseConvVc(tab && tab.url, conv, ui), raison: RAISONS_UI_VC['pas-ouverte'] };
     { const rbVc = await secuRobotDit('vestiaire', o.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
     const secuVc = await secuGeste('vestiaire', o.compte, 'reponse', 'clic');
     if (secuVc) return { accepte: false, code: secuVc.code, raison: secuVc.error };
@@ -32267,32 +32401,25 @@ async function repondreVestiaire(msg) {
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Vestiaire cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);   // SES places (X8)
     let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcRepondre', conv, texte, recette, compte: o.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
-    const statut = (rep && Number(rep.statut)) || 0;
-    if (!rep || rep.ok !== true) {
-      if (rep && rep.code === 'invalide') { await rendreActions('vc:' + o.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
-      noterDiag('vc_repondre_muet');
-      return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" };
+    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'vcEcrireUI', conv, texte, compte: o.compte }, { frameId: 0 }), 45000 + texte.length * 250, null); } catch (_) { rep = null; }
+    if (!rep || rep.ok !== true) { noterDiag('vc_ecrire_muet'); return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" }; }
+    const e = String(rep.erreur || '');
+    if (rep.defi === true || e === 'verification') {
+      await secuObserver('vestiaire', o.compte, { status: 403, defi: true, retryAfter: null });
+      await poserPauseVc(403, null);
+      if (!(rep.envoye || rep.tape)) await rendreActions('vc:' + o.compte, depuis, 1);
+      return { accepte: true, etape: rep.envoye || rep.tape ? 'incertain' : 'refuse', raison: secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')) };
     }
-    if (!statut) {
-      // Arrêté AVANT de partir (en-têtes absents, recette refusée, déjà un envoi) : rien n'est parti.
-      await rendreActions('vc:' + o.compte, depuis, 1);
-      const e = String(rep.erreur || '');
-      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Vestiaire n'est plus (ou pas encore) sur le compte de cette conversation — recharge la page Vestiaire sur le bon compte, puis réessaie (rien n'est parti)" };
-      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Vestiaire n'a pas encore parlé à son serveur depuis son ouverture — recharge ta messagerie Vestiaire, puis réessaie (rien n'est parti)" };
-      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
-      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Vestiaire avant de renvoyer" };
+    if (rep.confirme === true) {
+      await rangerVcFil({ conv, messages: [{ id: '', t: texte, deMoi: true, at: new Date().toISOString() }] }, o.compte, true);
+      await noterJournal('vc:' + o.compte, 'reponse', {});   // jamais le texte : une sorte, une heure
+      { const m = /^(\d{3,15})-(\d{3,15})$/.exec(conv); if (m) { try { const x = (await chrome.storage.local.get(VC_AIMES_ECRITS))[VC_AIMES_ECRITS] || {}; x[m[2] + '|' + m[1]] = new Date().toISOString(); await chrome.storage.local.set({ [VC_AIMES_ECRITS]: x }); } catch (_) {} } }
+      return { accepte: true, etape: 'fait', statut: 200 };
     }
-    noterDiag('vc_repondre_' + statut);
-    // (5.366) Contrôle anti-robot (défi DataDome vu par la page) ⇒ ce compte s'arrête ; refus ⇒ prudence.
-    if (await secuObserver('vestiaire', o.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire')) }; }
-    if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a refusé (${statut}) — VRM se met en pause 30 min sur Vestiaire` }; }
-    if (statut >= 200 && statut < 300) {
-      await rangerVcFil({ conv, messages: [{ id: rep.idMsg || '', t: texte, deMoi: true, at: new Date().toISOString() }] }, o.compte, true);
-      await noterJournal('vc:' + o.compte, 'reponse', {});   // (5.366) jamais le texte : une sorte, une heure
-      return { accepte: true, etape: 'fait', statut };
-    }
-    return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — le message n'est pas parti` };
+    if (rep.envoye === true || e === 'pas-vu') { noterDiag('vc_ecrire_pas_vu'); return { accepte: true, etape: 'incertain', raison: "« Envoyer » a été touché sur la page, mais VRM n'a pas vu le message partir — regarde la conversation sur Vestiaire avant de renvoyer" }; }
+    // Rien n'est parti (arrêté avant le clic) : la place est rendue.
+    await rendreActions('vc:' + o.compte, depuis, 1);
+    return { accepte: false, code: e || 'arrete', raison: RAISONS_UI_VC[e] || `rien n'est parti (${e || 'arrêté'})` };
   } finally { VC_REPONSE_EN_VOL = false; }
 }
 
