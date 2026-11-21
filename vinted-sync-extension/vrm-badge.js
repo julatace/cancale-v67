@@ -3403,7 +3403,7 @@ function vrmVerifVisible(sel) {
     const etat = rpEtat ? `<p class="note5" role="status" data-rp-etat-envoi="${rpEtat.ok ? 'ok' : 'ko'}">${esc(rpEtat.texte)}</p>` : '';
     const ligneSite = (site, note, droite) => `<div class="rg6" data-rp-reglage="${site}"><span><b>${esc(NOM_SITE[site])}</b><small>${esc(TU(note))}</small></span>${droite}</div>`;
     const bascule = (site) => `<button type="button" class="vu-btn ra6" data-rp-bascule="${site}" aria-pressed="${rg[site] === true}"${rpEnVol ? ' disabled' : ''}>${esc(TU(rg[site] === true ? 'ra_eteindre' : 'ra_allumer'))}</button>`;
-    return conf + etat + `<section class="sec6"><h3>${esc(TU('rp_titre'))}</h3>`
+    return conf + etat + `<section class="sec6" data-rp-reglages>`
       + ligneSite('vinted', 'rp_vinted_note', pastilleEtat(true))
       + ligneSite('leboncoin', 'rp_lbc_note', bascule('leboncoin'))
       + ligneSite('vestiaire', 'rp_vc_note', bascule('vestiaire'))
