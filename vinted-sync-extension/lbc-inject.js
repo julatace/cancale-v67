@@ -658,11 +658,15 @@
   // n'en savait rien : l'annonce restait « en ligne » jusqu'à une liste complète.
   // On relaie, SEULEMENT sur une réponse 2xx de Leboncoin, les identifiants et
   // ce qui a été fait — jamais autre chose. Le fond ne marque que SES annonces.
-  const RETRAIT_PAGE = /^https:\/\/api\.leboncoin\.fr\/api\/pintad\/v\d+\/public\/manual\/(delete|pause)\/ads\/?(?:\?.*)?$/i;
+  // 5.426 (`retirerpartout`) : + la RÉACTIVATION d'une annonce en pause. ⚠️ SUPPOSÉE (jamais vue d'ici, 403) : la même famille
+  // que la pause (`…/manual/{verbe}/ads`, corps `{list_ids}`) avec un verbe de remise en ligne. Une autre forme ⇒ rien n'est
+  // reconnu, le geste n'est jamais appris, et VRM dit « réactive-la toi-même » (jamais un « fait » deviné).
+  const RETRAIT_PAGE = /^https:\/\/api\.leboncoin\.fr\/api\/pintad\/v\d+\/public\/manual\/(delete|pause|unpause|resume|reactivate|activate)\/ads\/?(?:\?.*)?$/i;
   const noterRetraitPage = (url, methode, corps, statut) => {
     try {
       const m = RETRAIT_PAGE.exec(String(url || ''));
       if (!m || !(statut >= 200 && statut < 300)) return;
+      if (!/^(delete|pause)$/i.test(m[1])) return;   // 5.426 : une réactivation n'est pas un retrait (le relais ne la note pas)
       const quoi = m[1].toLowerCase() === 'delete' ? 'supprime' : 'pause';
       if ((quoi === 'supprime' && !/^DELETE$/i.test(methode || '')) || (quoi === 'pause' && !/^PUT$/i.test(methode || ''))) return;
       let j; try { j = typeof corps === 'string' ? JSON.parse(corps) : null; } catch (_) { return; }
@@ -1218,8 +1222,9 @@
       const st = Number(statut) || 0, moi = moiLbc(), defi = defiDeLbc(st, hd || (() => ''));
       const m = RETRAIT_PAGE.exec(u.href);
       if (m) {
-        const quoi = m[1].toLowerCase() === 'delete' ? 'supprime' : 'pause';
-        if ((quoi === 'supprime' && !/^DELETE$/i.test(methode)) || (quoi === 'pause' && !/^PUT$/i.test(methode))) return;
+        const verbe = m[1].toLowerCase();
+        const quoi = verbe === 'delete' ? 'supprime' : verbe === 'pause' ? 'pause' : 'reprise';
+        if ((quoi === 'supprime' && !/^DELETE$/i.test(methode)) || (quoi === 'pause' && !/^PUT$/i.test(methode)) || (quoi === 'reprise' && !/^(PUT|POST)$/i.test(methode))) return;
         let j; try { j = JSON.parse(corps); } catch (_) { return; }
         const ids = (j && Array.isArray(j.list_ids) ? j.list_ids : []).map(String).filter((x) => ID_AD_GESTE.test(x));
         if (!ids.length || ids.length > 50) return;

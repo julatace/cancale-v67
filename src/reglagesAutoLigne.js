@@ -19,7 +19,7 @@ const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam'];
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_retirer_partout_reglage'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -254,6 +254,15 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };
+  }
+  if (cle === 'vrm_retirer_partout_reglage') {
+    // (21 nov., ext. 5.426 — « une paire vendue est retirée partout ») { site, actif } : UN site (Leboncoin, Vestiaire) ;
+    // Vinted (masquer) ne se règle pas ici, eBay a son propre réglage. Allumer (éteint → allumé) exige `confirme`.
+    const d = demande && typeof demande === 'object' ? demande : {};
+    if (!['leboncoin', 'vestiaire'].includes(d.site) || typeof d.actif !== 'boolean') return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
+    const avantV = actuelle && typeof actuelle === 'object' && !Array.isArray(actuelle) ? actuelle : {};
+    if (allume(avantV[d.site] === true, d.actif) && confirme !== true) return refus;
+    return { ok: true, valeur: { v: 1, leboncoin: d.site === 'leboncoin' ? d.actif : avantV.leboncoin === true, vestiaire: d.site === 'vestiaire' ? d.actif : avantV.vestiaire === true, at: Number(maintenant) || 0 } };
   }
   // vinted_baisse_regle : { uid, actif, pct, jours } pour UN compte ; les autres comptes ne bougent pas.
   const d = demande && typeof demande === 'object' ? demande : {};

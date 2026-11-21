@@ -12176,7 +12176,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -23459,7 +23459,8 @@ async function carteListesSite(plateforme, o, sender) {
   const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
   // 5.410 : la baisse par règle de CE compte (Leboncoin `lbc:{id}`, Vestiaire `vc:{id}`), réglée dans le panneau.
   const automatisations = await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const cle = (plateforme === 'leboncoin' ? 'lbc:' : 'vc:') + moi; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[cle]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], cle); return { site: plateforme, cle, baisse: r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null } }; })().catch(() => null);
-  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, autres: null, fenetre: o.fenetre };
+  const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages, automatisations, notifications, retraits, autres: null, fenetre: o.fenetre };
 }
 // 5.409 — MASQUER / AFFICHER DEPUIS LE PANNEAU, sur SON clic (`confirme`), par le geste APPRIS de la règle « vendue
 // ailleurs » (`PUT /api/v2/items/{id}/is_hidden`, `masquerAppris` sur SES gestes rangés : jamais appris ⇒ rien ne part,
@@ -23833,7 +23834,8 @@ async function carteListes(msg, sender) {
   const offres = await offresEnAttente(u).then((l) => offresCarteVisibles(u, l)).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40), ...(x.incertaine ? { incertaine: true } : {}) }))).catch(() => null);
   // ── 5.410 : l'atelier Republier en cours (état local).
   const atelier = await atelierEtat().catch(() => null);
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, autres, fenetre: o.fenetre };
+  const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, retraits, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -25566,6 +25568,316 @@ async function masquerAilleursTickUn() {
   return { lu: true, envoye: id, voulu };
 }
 
+// ══ 5.426.0 (21 nov., choix 49 de Julien — « c'est la force de l'app ») — UNE PAIRE VENDUE EST RETIRÉE PARTOUT ══════
+// (`retirerpartout`) L'app publie (`vrm_retirer_partout` de `main`, src/retirerPartout.js) chaque annonce dont la paire est
+// VENDUE (preuve, par identité seulement — jamais le titre) sur un AUTRE site. Ici, l'extension :
+//   · Vinted    : rien de neuf — `masquerAilleursTick` masque (liste `vinted_masquer_ailleurs`, toujours allumé) ;
+//   · Leboncoin : MET EN PAUSE par l'interface de la page (le geste appris de SA pause faite à la main, `gesteLbcInterface`),
+//                 si SON réglage est allumé (`vrm_retirer_partout_reglage.leboncoin`, éteint par défaut, allumer = une
+//                 confirmation), sur le compte de l'ONGLET leboncoin.fr ouvert (aucun onglet de ce compte ⇒ EN ATTENTE, dit
+//                 dans le panneau « N retraits en attente : ouvre Leboncoin », fait à l'ouverture) ; une action à la fois,
+//                 dans les plafonds (50/h du compte Leboncoin moins la réserve de 5, sécurité du compte, « Tout arrêter »,
+//                 pause 403/429) ; « fait » seulement quand la page a ENVOYÉ cette pause (sinon « je ne sais pas », jamais relancé) ;
+//   · Vestiaire : aucune pause PAR ANNONCE mesurée ⇒ RIEN n'est cliqué ; « à retirer toi-même », dit et sonné ;
+//   · eBay      : le chemin existant (retrait automatique de VRM par l'API officielle, s'il est allumé) — rien ici.
+// Vente annulée / retour (l'annonce n'est plus dans une liste COMPLÈTE) ⇒ ce que VRM a mis en pause est RÉACTIVÉ par le même
+// chemin (geste appris de SA réactivation à la main), jamais une annonce qu'il a mise en pause lui-même. Jamais une suppression.
+// Le registre `vrm_retraits_partout` (ligne dédiée de l'extension — jamais `main`) : par annonce, l'état, l'heure où le
+// retrait a été vu à faire (`depuis`) ; un retrait pas fait depuis 30 min sonne UNE fois (`/api/push`, action `retraits` :
+// le serveur relit le registre, rien du corps).
+// <retirer-partout-regle> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-retirer-partout.cjs --recopie).
+const RP_V = 1;
+const RP_AGE_MAX_MS = 48 * 3600000;        // une liste plus vieille ne fait plus rien (ni retirer, ni remettre)
+const RP_ALERTE_MS = 30 * 60000;           // un retrait pas fait depuis 30 min : risque de double vente, on sonne
+const RP_REFUS_ATTENTE_MS = 24 * 3600000;  // un refus du site : pas de nouvel essai avant 24 h
+const RP_SITES = ['vinted', 'leboncoin', 'vestiaire', 'ebay'];
+// Les sites où l'EXTENSION retire par l'interface de la page, et ceux qui ont un réglage (allumer = une confirmation).
+const RP_SITES_EXTENSION = ['leboncoin'];
+const RP_SITES_REGLABLES = ['leboncoin', 'vestiaire'];
+const RP_ETATS_FAITS = ['retiree', 'hors-ligne'];
+const rpCle = (site, id) => String(site) + ':' + String(id);
+// Le réglage, toujours complet : éteint par défaut, sauf ce qu'il a allumé lui-même (`true` exact).
+function rpReglageDe(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  return { leboncoin: o.leboncoin === true, vestiaire: o.vestiaire === true };
+}
+// La liste publiée par l'app : null si elle peut servir, sinon pourquoi (rien ne bouge).
+function rpListeDit(liste, maintenant) {
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (!liste || typeof liste !== 'object' || liste.v !== RP_V || !Array.isArray(liste.items)) return 'absente';
+  const at = Number(liste.at);
+  if (!Number.isFinite(at) || t - at > RP_AGE_MAX_MS || at > t + 120000) return 'perimee';
+  return null;
+}
+// Ce qu'il y a à faire sur UN site, pour UN compte (celui de l'ONGLET du site) : { retirer: [id], remettre: [id] }.
+//   `etats` : id → { compte, enLigne, enPause } tels que la DERNIÈRE lecture du site les dit (la base, jamais la liste) ;
+//   retirer  : dans la liste (vente PROUVÉE ailleurs, par identité), de CE compte d'après le site, EN LIGNE, ni déjà
+//              retirée / en cours / « je ne sais pas » (jamais relancé seul), ni refusée il y a moins de 24 h ;
+//   remettre : retirée PAR VRM (registre), plus dans une liste COMPLÈTE, toujours en pause sur le site, de CE compte.
+function rpPlan({ liste, registre, site, compte, etats, maintenant }) {
+  const out = { retirer: [], remettre: [] };
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (rpListeDit(liste, t) || !RP_SITES.includes(site)) return out;
+  const c = String(compte || '');
+  if (!c) return out;
+  const ets = etats && typeof etats === 'object' ? etats : {};
+  const reg = registre && typeof registre === 'object' ? registre : {};
+  const dans = new Set();
+  for (const e of liste.items) {
+    if (!e || typeof e !== 'object' || e.site !== site || e.id == null || !/^[\w-]{3,40}$/.test(String(e.id))) continue;
+    const id = String(e.id);
+    dans.add(id);
+    const et = ets[id];
+    if (!et || String(et.compte || '') !== c || et.enLigne !== true) continue;
+    const r = reg[rpCle(site, id)];
+    if (r && (r.etat === 'retiree' || r.etat === 'envoye' || r.etat === 'incertain')) continue;
+    if (r && r.etat === 'refuse' && t - Number(r.at || 0) < RP_REFUS_ATTENTE_MS) continue;
+    out.retirer.push(id);
+  }
+  if (liste.complet === true) {
+    for (const k of Object.keys(reg)) {
+      const r = reg[k];
+      if (!r || r.site !== site || r.etat !== 'retiree' || r.voulu === false) continue;
+      const id = String(r.id || '');
+      if (!id || dans.has(id) || rpCle(site, id) !== k) continue;
+      const et = ets[id];
+      if (!et || String(et.compte || '') !== c || et.enPause !== true) continue;
+      out.remettre.push(id);
+    }
+  }
+  return out;
+}
+// L'état d'UN site d'une paire, en un mot (le tableau « Vendue → retirée sur ») :
+//   retiree    — fait et RELU (masquée, en pause) ;          hors-ligne — le site ne la montre plus en vente ;
+//   attente    — VRM va le faire (onglet du site fermé, plafond, autre compte…) ; envoye / incertain — à vérifier ;
+//   refuse     — le site a refusé ;  pas-appris — fais le geste une fois à la main ;  eteint — réglage éteint ;
+//   a-faire    — VRM ne sait pas le faire sur ce site (Vestiaire) : à retirer toi-même ;  ebay — retrait eBay de VRM.
+function rpEtatSite({ item, registre, masquees, reglage }) {
+  const reg = rpReglageDe(reglage);
+  if (!item || typeof item !== 'object') return 'attente';
+  if (item.site === 'vinted') {
+    const m = masquees && typeof masquees === 'object' ? masquees[String(item.id)] : null;
+    if (m && m.etat === 'masquee') return 'retiree';
+    if (item.enLigne === false) return 'hors-ligne';
+    if (m && (m.etat === 'envoye' || m.etat === 'ecart')) return 'envoye';
+    if (m && m.etat === 'refuse') return 'refuse';
+    return 'attente';
+  }
+  const r = registre && typeof registre === 'object' ? registre[rpCle(item.site, item.id)] : null;
+  if (r && r.etat === 'retiree') return 'retiree';
+  if (item.enLigne === false) return 'hors-ligne';
+  if (item.site === 'ebay') return 'ebay';
+  if (r && ['envoye', 'incertain', 'refuse', 'pas-appris'].includes(r.etat)) return r.etat;
+  if (item.site === 'vestiaire') return reg.vestiaire ? 'a-faire' : 'eteint';
+  if (item.site === 'leboncoin' && !reg.leboncoin) return 'eteint';
+  return 'attente';
+}
+// Le tableau : une rangée par PAIRE (N°), une case par AUTRE site, et ce qui est en retard (> 30 min, risque de double
+// vente). `depuis` : la 1re fois que l'extension a vu ce retrait à faire (registre), sinon rien (pas de retard inventé).
+function rpTableau({ liste, registre, masquees, reglage, maintenant }) {
+  const t = Number.isFinite(maintenant) ? maintenant : Date.now();
+  if (rpListeDit(liste, t)) return { lignes: [], enRetard: 0, attente: {}, lu: false };
+  const parNum = new Map();
+  const attente = {};
+  let enRetard = 0;
+  for (const e of liste.items) {
+    if (!e || typeof e !== 'object' || !RP_SITES.includes(e.site) || e.id == null) continue;
+    const num = String(e.num || '');
+    if (!parNum.has(num)) parNum.set(num, { num, venduSur: String(e.venduSur || ''), sites: [] });
+    const etat = rpEtatSite({ item: e, registre, masquees, reglage });
+    const r = registre && typeof registre === 'object' ? registre[rpCle(e.site, e.id)] : null;
+    const depuis = r && Number(r.depuis) > 0 ? Number(r.depuis) : null;
+    const retard = !RP_ETATS_FAITS.includes(etat) && etat !== 'eteint' && etat !== 'ebay' && depuis != null && t - depuis > RP_ALERTE_MS;
+    if (retard) enRetard++;
+    if (etat === 'attente' && RP_SITES_EXTENSION.includes(e.site)) attente[e.site] = (attente[e.site] || 0) + 1;
+    parNum.get(num).sites.push({ site: e.site, id: String(e.id), etat, depuis, retard, raison: r && r.raison ? String(r.raison).slice(0, 40) : '' });
+  }
+  const lignes = [...parNum.values()].sort((a, b) => a.num.localeCompare(b.num, 'fr', { numeric: true }));
+  return { lignes, enRetard, attente, lu: true };
+}
+// </retirer-partout-regle>
+const RP_LISTE_CLE = 'vrm_retirer_partout';
+const RP_REGISTRE = 'vrm_retraits_partout';
+const RP_REGLAGE_CLE = 'vrm_retirer_partout_reglage';
+const RP_PROCHAIN = 'vrmRetirerProchain';
+const RP_ATTENTE_CODES = /^(onglet|autre-compte|plafond|en-cours|lbc-pause|stockage|lecture|session|canal|tout-arrete|secu-[\w-]+|reglages)$/;
+// Ce que dit la dernière lecture de Leboncoin (la base, `lbc_listings`) : id → { compte, enLigne, enPause }.
+// En pause = mise en pause (par la page, ou notée par VRM) sans réactivation plus récente ; en ligne = active, pas en pause.
+function etatsLbcRetrait(items) {
+  const out = {};
+  for (const [id, ad] of Object.entries(items && typeof items === 'object' ? items : {})) {
+    if (!ad || typeof ad !== 'object' || !/^\d{6,12}$/.test(String(id))) continue;
+    const st = String(ad.status || '');
+    const pauseMs = Date.parse(String(ad.pauseAt || '')), repriseMs = Date.parse(String(ad.repriseAt || ''));
+    const pausee = st === 'paused' || (Number.isFinite(pauseMs) && ['active', 'paused', 'inactive'].includes(st) && !(Number.isFinite(repriseMs) && repriseMs > pauseMs));
+    out[String(id)] = { compte: idCompteLbc(ad.account || ad.lbcUser || ''), enLigne: st === 'active' && !pausee, enPause: pausee && st !== 'deleted' && st !== 'sold' };
+  }
+  return out;
+}
+async function rpRegistreLu() {
+  const rows = await sbGet(`app_data?id=eq.${RP_REGISTRE}&select=items:data->items`);
+  if (rows === null) return null;
+  const it = rows[0] && rows[0].items;
+  return it && typeof it === 'object' && !Array.isArray(it) ? it : {};
+}
+// Une écriture du registre par comparer-et-échanger : `majs` { cle: objet | null } (null = retirée du registre).
+async function rpNoter(majs) {
+  if (!majs || !Object.keys(majs).length) return true;
+  const r = await modifierLigneCas(RP_REGISTRE, (d) => {
+    const items = Object.assign({}, d && d.items && typeof d.items === 'object' ? d.items : {});
+    for (const [k, v] of Object.entries(majs)) { if (v === null) delete items[k]; else items[k] = Object.assign({}, items[k] || {}, v); }
+    return { v: 1, at: Date.now(), items };
+  });
+  return r === true;
+}
+let _rpEnVol = null;
+function retirerPartoutTick(source) {
+  if (_rpEnVol) return _rpEnVol;
+  _rpEnVol = retirerPartoutTickUn(source).catch(() => ({ erreur: true })).finally(() => { _rpEnVol = null; });
+  return _rpEnVol;
+}
+async function retirerPartoutTickUn() {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  const t = Date.now();
+  const m = await lireMain([RP_LISTE_CLE, RP_REGLAGE_CLE]);
+  if (m === null) return { lu: false };
+  const liste = m[RP_LISTE_CLE];
+  const dit = rpListeDit(liste, t);
+  if (dit) return { saute: 'liste-' + dit };
+  const reglage = rpReglageDe(m[RP_REGLAGE_CLE]);
+  const registre = await rpRegistreLu();
+  if (registre === null) return { lu: false };
+  // 1. LE REGISTRE SUIT LA LISTE : chaque retrait à faire (Leboncoin, Vestiaire) est noté avec l'heure où il a été vu ;
+  //    sur une liste COMPLÈTE, ce qui n'est plus à faire (et que VRM n'a pas retiré) en sort.
+  const majs = {};
+  const dans = new Set();
+  for (const e of liste.items) {
+    if (!e || (e.site !== 'leboncoin' && e.site !== 'vestiaire') || e.id == null) continue;
+    const k = rpCle(e.site, e.id); dans.add(k);
+    if (registre[k] && e.enLigne === false && registre[k].etat !== 'retiree' && registre[k].etat !== 'hors-ligne') { majs[k] = { etat: 'hors-ligne', at: t }; continue; }
+    if (!registre[k] && e.enLigne !== false) majs[k] = { site: e.site, id: String(e.id), num: String(e.num || '').slice(0, 24), venduSur: String(e.venduSur || '').slice(0, 20), depuis: t, etat: e.site === 'vestiaire' ? 'a-faire' : 'attente' };
+  }
+  if (liste.complet === true) for (const [k, r] of Object.entries(registre)) if (r && !dans.has(k) && r.etat !== 'retiree') majs[k] = null;
+  if (Object.keys(majs).length && !(await rpNoter(majs))) return { lu: true, ecrit: false };
+  const reg = Object.assign({}, registre);
+  for (const [k, v] of Object.entries(majs)) { if (v === null) delete reg[k]; else reg[k] = Object.assign({}, reg[k] || {}, v); }
+  // 2. LE RETARD : un retrait pas fait depuis 30 min (risque de double vente) sonne UNE fois.
+  const tard = Object.entries(reg).filter(([, r]) => r && !RP_ETATS_FAITS.includes(r.etat) && Number(r.depuis) > 0 && t - Number(r.depuis) > RP_ALERTE_MS && !r.alerteAt && !(r.site === 'leboncoin' && !reglage.leboncoin));
+  if (tard.length) {
+    const marques = {}; for (const [k] of tard) marques[k] = { alerteAt: t };
+    if (await rpNoter(marques)) { for (const [k] of tard) reg[k] = Object.assign({}, reg[k], { alerteAt: t }); signalerRetraitsRetard().catch(() => {}); }
+  }
+  // 3. LEBONCOIN : le geste, sur le compte de l'onglet, un par passage, s'il est allumé.
+  if (!reglage.leboncoin) return { lu: true, saute: 'lbc-eteint', tard: tard.length };
+  const la = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items');
+  if (la === null) return { lu: false };
+  const etats = etatsLbcRetrait((la[0] && la[0].it) || {});
+  const comptes = [...new Set(Object.values(etats).map((x) => x.compte).filter((x) => /^[0-9a-f-]{8,64}$/i.test(x)))];
+  const attente = {};
+  for (const compte of comptes) {
+    const plan = rpPlan({ liste, registre: reg, site: 'leboncoin', compte, etats, maintenant: t });
+    const id = plan.retirer[0] || plan.remettre[0];
+    if (!id) continue;
+    const quoi = plan.retirer[0] === id ? 'pause' : 'reprise';
+    const o = await ongletLbcDuCompte(compte);
+    if (!o.ok) {
+      const code = o.code || (o.autres && o.autres.length ? 'autre-compte' : 'onglet');
+      for (const x of plan.retirer.concat(plan.remettre)) attente[rpCle('leboncoin', x)] = { raison: code };
+      continue;
+    }
+    const p = await prochainPasse(RP_PROCHAIN, 'lbc:' + compte, t);
+    if (p === null) return { lu: true, saute: 'stockage' };
+    if (p > t) return { lu: true, saute: 'espace' };
+    if (!(await poserProchain(RP_PROCHAIN, 'lbc:' + compte, t + tirerEntre(60000, 3 * 60000)))) return { lu: true, saute: 'stockage' };
+    const r = await retraitLbcAuto(id, quoi);
+    const k = rpCle('leboncoin', id);
+    const base = reg[k] || { site: 'leboncoin', id, depuis: t };
+    let maj;
+    if (r && r.accepte === false) maj = r.code === 'pas-appris' ? { etat: 'pas-appris', raison: 'pas-appris', at: Date.now() } : RP_ATTENTE_CODES.test(String(r.code || '')) ? { raison: String(r.code).slice(0, 40), at: Date.now() } : { etat: 'refuse', raison: String(r.code || 'refus').slice(0, 40), at: Date.now() };
+    else if (r && r.etape === 'fait') maj = quoi === 'pause' ? { etat: 'retiree', voulu: true, compte, relu: true, raison: '', at: Date.now(), retireeLe: Date.now() } : null;
+    else if (r && r.etape === 'incertain') maj = { etat: 'incertain', voulu: quoi === 'pause', raison: '', at: Date.now() };
+    else maj = { etat: 'refuse', raison: 'statut-' + String((r && r.statut) || 0), at: Date.now() };
+    if (quoi === 'reprise' && maj && maj.etat !== 'incertain' && maj.etat !== 'refuse') maj = maj.etat ? Object.assign({}, maj, { etat: 'retiree' }) : maj;   // pas remise : elle reste « retirée par VRM »
+    await rpNoter({ [k]: maj === null ? null : Object.assign({}, base, maj) });
+    if (r && r.etape === 'fait') logActivity(quoi === 'pause' ? `⏸ Annonce mise en pause sur Leboncoin : vendue ailleurs (N°${String(base.num || '?')})` : `▶️ Annonce réactivée sur Leboncoin : la vente ailleurs est annulée (N°${String(base.num || '?')})`);
+    try { notifierApp({ type: 'maj', quoi: 'retraits' }); } catch (_) {}
+    return { lu: true, fait: r && r.etape === 'fait' ? id : null, quoi, r };
+  }
+  // Rien n'a pu partir : la raison (onglet fermé, autre compte) est notée pour le panneau, une fois.
+  const notes = {};
+  for (const [k, v] of Object.entries(attente)) if (reg[k] && reg[k].raison !== v.raison) notes[k] = v;
+  if (Object.keys(notes).length) await rpNoter(notes);
+  return { lu: true, attente: Object.keys(attente).length, tard: tard.length };
+}
+// Pause / réactivation AUTOMATIQUE d'UNE annonce Leboncoin (le chemin de `pauseLbcDepuisApp`, mais : onglet leboncoin.fr
+// OUVERT sur le compte de l'annonce exigé, sécurité du compte en mode « auto », « Tout arrêter », réserve de 5 gestes).
+async function retraitLbcAuto(id, quoi) {
+  if (!/^\d{6,12}$/.test(String(id || '')) || !['pause', 'reprise'].includes(quoi)) return { accepte: false, code: 'invalide' };
+  if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours' };
+  PAUSE_LBC_EN_VOL = true;
+  try {
+    const rows = await sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->"${id}"`);
+    if (rows === null) return { accepte: false, code: 'lecture' };
+    const ad = rows[0] && rows[0].a;
+    if (!ad || typeof ad !== 'object') return { accepte: false, code: 'inconnue' };
+    const compte = idCompteLbc(ad.account || ad.lbcUser);
+    if (!/^[0-9a-f-]{8,64}$/i.test(compte)) return { accepte: false, code: 'compte' };
+    if (quoi === 'pause' && ad.pauseAt && Date.now() - Date.parse(ad.pauseAt) < 600000) return { accepte: false, code: 'deja' };
+    const o = await ongletLbcDuCompte(compte);
+    if (!o.ok) return { accepte: false, code: o.code || (o.autres && o.autres.length ? 'autre-compte' : 'onglet') };
+    try { if ((await toutArreteDepuis(null)) > 0) return { accepte: false, code: 'tout-arrete' }; } catch (_) { return { accepte: false, code: 'stockage' }; }
+    { const rb = await secuRobotDit('leboncoin', compte); if (rb) return { accepte: false, code: rb.code }; }
+    if (await pauseLbcMsg()) return { accepte: false, code: 'lbc-pause' };
+    const ui = await uiLbc(quoi);
+    if (ui === undefined) return { accepte: false, code: 'stockage' };
+    const url = ui ? adresseUiLbc(ui, { ad: id }) : null;
+    if (!url) return { accepte: false, code: 'pas-appris' };
+    const secu = await secuGeste('leboncoin', compte, 'autre', 'auto');
+    if (secu) return { accepte: false, code: secu.code || 'secu' };
+    const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+    if (!cpt.ok) return { accepte: false, code: cpt.code === 'stockage' ? 'stockage' : 'plafond' };
+    const depuisLbc = Number(cpt.at) || (Date.now() - 5);
+    const g = await gesteLbcInterface(quoi, compte, url, { id }, 60000);
+    return await issueRetraitLbc(quoi, g, { id, compte, depuisLbc, autreCompte: () => ({ accepte: false, code: 'autre-compte' }) });
+  } finally { PAUSE_LBC_EN_VOL = false; }
+}
+async function noterRepriseLbc(id, statut) {
+  return enChaineLbcListings(async () => {
+    try {
+      const rows = await sbGetLbc('app_data?id=eq.lbc_listings&select=data');
+      if (rows === null) return false;
+      const data = (rows[0] && rows[0].data) || {};
+      const items = Object.assign({}, data.items || {});
+      if (!items[id]) return false;
+      items[id] = Object.assign({}, items[id], { repriseAt: new Date().toISOString(), repriseStatut: statut });
+      const ok = await supabaseUpsert('app_data', [{ id: 'lbc_listings', data: Object.assign({}, data, { items, updatedAt: new Date().toISOString() }) }], 'id');
+      return ok !== false;
+    } catch (_) { return false; }
+  });
+}
+// « Un retrait n'a pas pu se faire depuis 30 min » : le serveur relit le registre au nom du vendeur (rien du corps).
+async function signalerRetraitsRetard() {
+  try {
+    const session = await authToken();
+    if (!session || !session.access_token) return false;
+    const r = await fetch('https://vrm.center/api/push', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'retraits' }), signal: signalDelai(SB_DELAI_ECRITURE_MS) });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+}
+// Le tableau « Vendue → retirée sur » du panneau (lecture seule : la liste, le registre, les masquées Vinted, le réglage).
+async function retraitsPourPanneau() {
+  const m = await lireMain([RP_LISTE_CLE, RP_REGLAGE_CLE, 'vrm_ebay_retrait_auto']);
+  if (m === null) return null;
+  const registre = await rpRegistreLu();
+  if (registre === null) return null;
+  const mq = await sbGet(`app_data?id=eq.${MASQ_REGISTRE}&select=items:data->items`);
+  if (mq === null) return null;
+  const t = Date.now();
+  const tab = rpTableau({ liste: m[RP_LISTE_CLE], registre, masquees: (mq[0] && mq[0].items) || {}, reglage: m[RP_REGLAGE_CLE], maintenant: t });
+  const ebay = m.vrm_ebay_retrait_auto === true || m.vrm_ebay_retrait_auto === 'true' ? true : m.vrm_ebay_retrait_auto == null ? null : false;
+  return { lu: tab.lu, lignes: tab.lignes.slice(0, 60), n: tab.lignes.length, enRetard: tab.enRetard, attente: tab.attente, reglage: Object.assign(rpReglageDe(m[RP_REGLAGE_CLE]), { vinted: true, ebay }) };
+}
 // Renvoie null si l'action peut partir, sinon l'objet d'erreur à renvoyer tel quel.
 async function garde(uid, acc, opts = {}) {
   { const rb = await secuRobotDit('vinted', uid); if (rb) return rb; }   // (5.366) vérification anti-robot en cours : rien
@@ -28468,7 +28780,7 @@ const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam'];
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_retirer_partout_reglage'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -28703,6 +29015,15 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };
+  }
+  if (cle === 'vrm_retirer_partout_reglage') {
+    // (21 nov., ext. 5.426 — « une paire vendue est retirée partout ») { site, actif } : UN site (Leboncoin, Vestiaire) ;
+    // Vinted (masquer) ne se règle pas ici, eBay a son propre réglage. Allumer (éteint → allumé) exige `confirme`.
+    const d = demande && typeof demande === 'object' ? demande : {};
+    if (!['leboncoin', 'vestiaire'].includes(d.site) || typeof d.actif !== 'boolean') return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
+    const avantV = actuelle && typeof actuelle === 'object' && !Array.isArray(actuelle) ? actuelle : {};
+    if (allume(avantV[d.site] === true, d.actif) && confirme !== true) return refus;
+    return { ok: true, valeur: { v: 1, leboncoin: d.site === 'leboncoin' ? d.actif : avantV.leboncoin === true, vestiaire: d.site === 'vestiaire' ? d.actif : avantV.vestiaire === true, at: Number(maintenant) || 0 } };
   }
   // vinted_baisse_regle : { uid, actif, pct, jours } pour UN compte ; les autres comptes ne bougent pas.
   const d = demande && typeof demande === 'object' ? demande : {};
@@ -34841,11 +35162,12 @@ async function noterPauseLbc(id, statut) {
 // avec lui). Les garde-fous d'avant restent tous : son clic / sa confirmation, compte de l'onglet, une action
 // à la fois, plafonds (50/h par compte, réserve 5), sécurité du compte, pause 30 min sur 403/429.
 const LBC_UI = 'vrmLbcUi';
-const LBC_UI_QUOI = ['pause', 'supprime', 'prix', 'message'];
+const LBC_UI_QUOI = ['pause', 'supprime', 'prix', 'message', 'reprise'];   // 5.426 : + « reprise » (réactiver une annonce mise en pause)
 const LBC_UI_PRET_MS = 15000;
 const GESTE_MAIN_LBC = {
   pause: 'mets UNE annonce en pause toi-même sur leboncoin.fr (« Mes annonces »), dans ce Chrome',
   supprime: 'supprime UNE annonce toi-même sur leboncoin.fr (« Mes annonces »), dans ce Chrome',
+  reprise: 'réactive UNE annonce en pause toi-même sur leboncoin.fr (« Mes annonces »), dans ce Chrome',
   prix: 'change UN prix toi-même sur leboncoin.fr, dans ce Chrome',
   message: 'envoie UNE réponse toi-même dans une conversation sur leboncoin.fr, dans ce Chrome',
 };
@@ -34944,7 +35266,7 @@ async function issueRetraitLbc(quoi, g, { id, compte, depuisLbc, autreCompte }) 
   // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
   if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
   if (statut >= 200 && statut < 300) {
-    const note = quoi === 'pause' ? await noterPauseLbc(id, statut) : await noterSuppressionLbc(id, statut);
+    const note = quoi === 'pause' ? await noterPauseLbc(id, statut) : quoi === 'reprise' ? await noterRepriseLbc(id, statut) : await noterSuppressionLbc(id, statut);
     try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
     return { accepte: true, etape: 'fait', statut, note };
   }

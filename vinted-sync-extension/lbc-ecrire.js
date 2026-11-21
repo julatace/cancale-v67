@@ -198,7 +198,7 @@
   async function apprendre(g) {
     const t = Date.now();
     const recents = actes.filter((a) => t - a.at <= 30000);
-    if (g.quoi === 'pause' || g.quoi === 'supprime') {
+    if (g.quoi === 'pause' || g.quoi === 'supprime' || g.quoi === 'reprise') {
       if (g.ids.length !== 1) return garder(g.quoi, null, { raison: 'plusieurs-annonces' });
       const id = g.ids[0];
       const clics = recents.filter((a) => a.type === 'clic');
@@ -322,7 +322,7 @@
 
   async function executer(msg) {
     const quoi = String(msg.quoi || '');
-    if (!['pause', 'supprime', 'prix', 'message'].includes(quoi)) return arret('invalide');
+    if (!['pause', 'supprime', 'prix', 'message', 'reprise'].includes(quoi)) return arret('invalide');   // 5.426 : + reprise (réactiver)
     if (ordreEnCours) return arret('en-cours');
     ordreEnCours = true;
     try {
@@ -339,7 +339,7 @@
       if (!ui) return arret('pas-appris');
       const moiOk = (g) => g.moi === et.moi;
 
-      if (quoi === 'pause' || quoi === 'supprime') {
+      if (quoi === 'pause' || quoi === 'supprime' || quoi === 'reprise') {
         const id = String(msg.id || '');
         if (!ID_AD.test(id)) return arret('invalide');
         // Aucune double action : la même écriture vue il y a moins de 2 min ⇒ rien.
