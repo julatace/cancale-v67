@@ -19892,7 +19892,52 @@ async function offreAvecPlancher(itemId, prixAnnonce, offre) {
 }
 // Un texte qui ANNONCE une offre (« je te propose une offre », {prix}) : l'offre part AVANT lui (jamais une offre annoncée
 // qui n'existe pas, audit X2) ; les autres textes suivent l'ordre de Bleam (message, puis l'offre 8 à 15 s après).
-const annonceOffreFavori = (t) => /\{prix\}|\boffr|\boffer|\boferta|\bangebot|\br[ée]duc|\bremise\b|\bdiscount\b|\bsconto\b|\brabatt|\bdescuento\b/i.test(String(t || ''));
+const annonceOffreFavori = (t) => /\{prix\}|\{prix_offre\}|\boffr|\boffer|\boferta|\bangebot|\br[ée]duc|\bremise\b|\bdiscount\b|\bsconto\b|\brabatt|\bdescuento\b/i.test(String(t || ''));
+// ══ 5.417 (`favorisperso2`) — LE RACCORD ENTRE LE MOTEUR ET LA RÈGLE DU TEXTE ══════════════════════════════════════
+// `choixMessageFavori` rassemble ce que la règle pure lit (le fil relu : pseudo, titre ; le prix de l'annonce ; la marque
+// et la taille de SON dressing par identité d'annonce, lues seulement si un texte ou une règle les demande ; l'offre que
+// `offreAvecPlancher` ferait ; l'heure de Paris ; les dernières versions de cet acheteur et du compte) et appelle
+// `choisirMessageFavori`. `noterChoixFavori` note l'envoi PARTI (clé de version, offre faite) pour les statistiques.
+const FAV_VERSION_CLE = 'vrmFavVersionCle';
+async function versionCleDerniere(uid, acheteur) {
+  try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; return { compte: m[String(uid)] || null, acheteur: acheteur ? m[String(uid) + '|' + String(acheteur)] || null : null }; } catch (_) { return {}; }
+}
+async function noterVersionCle(uid, acheteur, cle) {
+  if (typeof cle !== 'string' || !cle) return;
+  try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; m[String(uid)] = cle; if (acheteur) { delete m[String(uid) + '|' + String(acheteur)]; m[String(uid) + '|' + String(acheteur)] = cle; } const k = Object.keys(m); if (k.length > 3000) for (const x of k.slice(0, k.length - 3000)) delete m[x]; await chrome.storage.local.set({ [FAV_VERSION_CLE]: m }); } catch (_) {}
+}
+// Ses versions personnalisées de CE compte (null = rien d'écrit, ou pas su : les textes d'avant servent).
+async function favPersoCompte(uid) {
+  const b = await bleamCompte(uid).catch(() => null);
+  if (!b) { noterDiag('favori_perso_pas_lu'); return null; }
+  return b.favMessages && b.favMessages.un && b.favMessages.un.length ? b.favMessages : null;
+}
+// La marque et la taille d'une annonce de SON dressing, par identité d'annonce ('' = pas su).
+async function ficheAnnonceFavori(uid, itemId) {
+  const lu = await dressingLu(String(uid)).catch(() => null);
+  const it = lu && Array.isArray(lu.items) ? lu.items.find((x) => x && String(x.id) === String(itemId)) : null;
+  if (!it) return { marque: '', taille: '' };
+  return { marque: String(it.brand_title || (typeof it.brand === 'string' ? it.brand : '') || '').slice(0, 40), taille: String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '').slice(0, 30) };
+}
+async function choixMessageFavori(x) {
+  const { uid, body, c, prixAnnonce, offre, tx, perso, lotPermis, lotTexte, refusees } = x;
+  const besoins = fpBesoins(perso);
+  const fiche = besoins.marque || besoins.taille ? await ficheAnnonceFavori(uid, body.itemId) : { marque: '', taille: '' };
+  const fav = { pseudo: String((c && c.opposite_user && c.opposite_user.login) || ''), article: String((c && c.transaction && c.transaction.item_title) || ''), prix: Number(prixAnnonce) > 0 ? Number(prixAnnonce) : null, marque: fiche.marque, taille: fiche.taille };
+  const op = offre && /^[1-9]\d{0,19}$/.test(String(tx || '')) ? await offreAvecPlancher(body.itemId, prixAnnonce, offre) : null;
+  const derniere = await versionCleDerniere(uid, body.recipientId);
+  if (!derniere.compte) { const n = await varianteDerniere(uid, 'favori'); if (Number.isInteger(n)) derniere.compte = 'a' + n; }
+  const r = choisirMessageFavori({ reglage: perso, ancien: { message: body.message, variantes: body.variantes, lot: lotTexte }, fav, offre: op && op.prix ? { prix: Number(op.prix) } : null,
+    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere });
+  if (r.ok) noterDiag('favori_perso_' + r.source + '_' + r.cas);
+  return Object.assign(r, { op });
+}
+async function noterChoixFavori(uid, body, conv, version, offreFaite) {
+  if (!version) return;
+  if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
+  await noterVersionCle(uid, body.recipientId, version.cle);
+  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true });
+}
 async function sequenceFavoriBleam(x) {
   const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit } = x;
   const id = (v) => typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v);
@@ -19918,7 +19963,7 @@ async function sequenceFavoriBleam(x) {
   if (r.sansPage) return { resultat: 'refuse', raison: 'onglet_vinted' };
   if (r.pause) return { resultat: 'refuse', raison: 'pause_vinted' };
   if (!(r.ok && r.json && r.json.code === 0)) {
-    if (!r.ok && [400, 422].includes(r.status) && !freinFavoriAuto(r)) { if (!version.lot) await noterVersionRefusee(uid, version.texte); noterDiag('favori_message_refuse_' + r.status); return { resultat: 'refuse', status: r.status, raison: 'texte_refuse' }; }
+    if (!r.ok && [400, 422].includes(r.status) && !freinFavoriAuto(r)) { if (!version.lot) await noterVersionRefusee(uid, version.modele || version.texte); noterDiag('favori_message_refuse_' + r.status); return { resultat: 'refuse', status: r.status, raison: 'texte_refuse' }; }
     return { resultat: !r.ok && r.status >= 400 && r.status < 500 ? 'refuse' : 'incertain', status: r.status };
   }
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); noterDiag('favori_lot_envoye'); }
@@ -19942,6 +19987,7 @@ async function sequenceFavoriBleam(x) {
   const o = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { currency: devise, price: String(prix).replace(/\.00$/, '') } }, { timeoutMs: 12000 });
   if (partie(o)) compterEcrit();
   noterDiag(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0) ? 'favori_offre_ok' : 'favori_offre_refusee_' + ((o && o.status) || 'reseau'));
+  fini.offreFaite = !!(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0));   // 5.417 : pour les statistiques par version
   return fini;
 }
 async function executerMessageFavori(uid,acc,body){
@@ -19985,8 +20031,10 @@ async function executerMessageFavori(uid,acc,body){
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
   // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
   const refuseesIci=await versionsRefusees(uid);
-  const envoyables=versionsEnvoyables(versionsMessage(body.message,body.variantes),refuseesIci);
-  if(!envoyables.length){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
+  // 5.417 (`favorisperso2`) : SES versions personnalisées (`favMessages`, panneau → Favoris → Réglages), sinon les textes
+  //    d'avant ; au moins une qui peut partir, jugée AVANT toute écriture chez Vinted (`fpUneEnvoyable`).
+  const persoF=await favPersoCompte(uid);
+  if(!fpUneEnvoyable(persoF,{message:body.message,variantes:body.variantes},t=>texteSurVinted(t).ok,m=>refuseesIci.has(empreinteMessage(m)))){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
   // L'offre native de Vinted, si une réduction est choisie.
   // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
@@ -20107,12 +20155,18 @@ async function executerMessageFavori(uid,acc,body){
   // après (réglable), jamais sous le plancher (prix mini, sinon achat + 10 %) — pas de plancher connu ⇒ pas d'offre.
   // Un message qui DIT le prix de l'offre ({prix}) garde l'ordre d'avant (offre puis message) : jamais un prix annoncé
   // pour une offre pas faite (audit X2).
+  // 5.417 (`favorisperso2`) — LE POINT DE RACCORD : le texte de CE favori est choisi UNE fois, par la règle pure
+  //    <favoris-perso-regle> (`choixMessageFavori`) : lot · règle conditionnelle la plus précise · « 1 article », variables
+  //    sues seulement, jamais la dernière version de cet acheteur ni du compte. La séquence d'envoi ne change pas :
+  //    elle reçoit `version` ({ cle, n, lot, modele, texte }) comme avant.
+  const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
+  if(!choixP.ok){noterDiag('favori_perso_'+choixP.raison);return rep('refuse',0,choixP.raison==='variable'?(choixP.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
   if(cbF.favoris){
-    const lot=Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId));
-    const versionB=lot&&texteSurVinted(cbF.messageLot).ok?{n:0,texte:cbF.messageLot,lot:true}:choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
-    if(versionB&&!(offre&&(prixRequisFavori(versionB.texte)||annonceOffreFavori(versionB.texte)))){
+    const versionB=choixP.version;
+    if(versionB&&!(offre&&(prixRequisFavori(versionB.modele)||annonceOffreFavori(versionB.modele)))){
       const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes});
       if(r.variante!=null)variante=r.variante;
+      if(r.resultat==='envoye')await noterChoixFavori(uid,body,convId,versionB,r.offreFaite===true);
       return rep(r.resultat,r.status||0,r.raison);
     }
   }
@@ -20120,7 +20174,7 @@ async function executerMessageFavori(uid,acc,body){
   if(offre){
     // 5.410.8 : le prix de SA règle, REMONTÉ au plancher s'il tombe dessous (jamais sous le prix mini / achat + 10 %) ;
     //    sans plancher connu, au % réglé. Plancher au prix de l'annonce ⇒ ni offre ni message (le texte l'annonçait).
-    const op=id(tx)?await offreAvecPlancher(body.itemId,prixAnnonce,offre):{raison:'offre_prix_inconnu'};
+    const op=choixP.op||(id(tx)?await offreAvecPlancher(body.itemId,prixAnnonce,offre):{raison:'offre_prix_inconnu'});
     if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
     if(!op.prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
     const prix=op.prix;
@@ -20138,7 +20192,7 @@ async function executerMessageFavori(uid,acc,body){
   }
   // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
   // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
-  const version=choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
+  const version=choixP.version;   // 5.417 : la version choisie plus haut (la même, pas un second tirage)
   if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
@@ -20178,10 +20232,10 @@ async function executerMessageFavori(uid,acc,body){
   // (qui arrêtait toutes les files).
   if(r.sansPage)return rep('refuse',0,'onglet_vinted');
   if(r.pause)return rep('refuse',0,'pause_vinted');
-  if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterEnvoiFavori(uid,convId,variante,body.itemId,body.recipientId);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
+  if(r.ok&&r.json?.code===0){variante=Number.isInteger(version.n)&&version.n>0?version.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,convId,version,prixOffreFait!=null);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
   // (5.410) Vinted REFUSE le message lui-même (400/422, sans frein) : CETTE version n'est plus jamais tirée sur ce compte.
   // La forme du refus (clés, code — jamais le texte) est notée pour la passe suivante.
-  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
+  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.modele||version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
 }
@@ -36456,9 +36510,9 @@ function sauvegardeAutoTick() {
 // ── ANALYSE DES RÉPONSES AUX FAVORIS (lecture seule) : par version de message, combien d'envois, combien de
 //    conversations relues, combien de réponses de l'acheteur APRÈS l'envoi. « Pas relue » n'est pas « pas de réponse ».
 const FAV_ENVOIS = 'vrmFavorisEnvois';
-async function noterEnvoiFavori(uid, conv, variante, item, acheteur) {
+async function noterEnvoiFavori(uid, conv, variante, item, acheteur, plus) {
   try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
-    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
+    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
 }
 function analyseFavoris(envois, convs) {
   const parConv = new Map((Array.isArray(convs) ? convs : []).map((c) => [String(c.cid), c]));
