@@ -86,6 +86,13 @@ function brancherPageVinted(ctx, { onglets = [{ id: 7, url: 'https://www.vinted.
       return [{ result: undefined }];
     }
     if (typeof func === 'function' && /__vrmFormulaire/.test(String(func))) return [{ result: await func(...(args || [])) }];
+    // Une lecture de la PAGE (`vintedPage` GET : une fonction injectée qui fait `fetch('/api/…')`) : servie par `fetchPage`.
+    if (typeof func === 'function' && fetchPage && /\bfetch\s*\(/.test(String(func))) {
+      try { ctx.location = new URL((t && t.url) || 'https://www.vinted.fr/'); } catch (_) {}
+      const f0 = ctx.fetch;
+      ctx.fetch = (u, o) => (/^\//.test(String(u)) ? Promise.resolve(fetchPage(String(u), o || {})).then((r) => Object.assign({ headers: { get: () => 'application/json' }, text: async () => JSON.stringify(r && r.json ? await r.json() : null), clone() { return this; } }, r)) : f0(u, o));
+      try { return [{ result: await func(...(args || [])) }]; } finally { ctx.fetch = f0; }
+    }
     if (typeof avant.exec === 'function') return avant.exec(x);
     try { ctx.location = new URL((t && t.url) || 'https://www.vinted.fr/'); } catch (_) {}
     return [{ result: typeof func === 'function' ? await func(...(args || [])) : undefined }];
