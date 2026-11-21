@@ -80,13 +80,37 @@ La carte « À retirer » d'Aujourd'hui porte une rangée de prévision (`data-j
 RELAIS X » seulement sur une date LUE ; sinon « En route : N colis vers X » ; rien sans point lu. La carte paraît aussi
 quand rien n'est à retirer mais qu'un achat arrive.
 
-## 4. Preuves
-(complété en fin de session — voir §5)
+## 4. La liste des achats (fda7a8e6)
+Les rangées d'Achats au téléphone, comme Vintex (`src/designV2/achats-v2.css`, couche `vrm-v2`) : vignette 52, titre
+complet (2 lignes) et prix sur la même ligne, la phrase grise « compte · date · depuis » sur UNE ligne (avant : cassée
+en deux, « · 19 nov. » seul sur sa ligne), l'étiquette d'état douce, « ⋯ » discret ; rangée de 72 px. Mêmes éléments,
+mêmes gestes, aucune règle touchée. À l'ordinateur la liste reste le tableau de travail (`AchatsTableau`).
 
-## 5. Ce qui reste / limites
-- La liste des achats elle-même (fda7a8e6) : voir §4 (ce qui a été fait ou non).
-- Les vignettes vides de la liste viennent de photos Vinted expirées sur iPhone (pas d'extension pour les relire) : le
-  système `PhotoVinted` n'a pas été touché.
+## 5. Preuves (21 nov.)
+- `node scripts/audit-relais-dest.cjs` : 28 verts ; `--src` (background.js d'origin/main) : 10 rouges ; mutations
+  `plate`, `destinataire`, `identite`, `sansEtape`, `actif` : rouges.
+- `node scripts/audit-relais-prevision.cjs` (nouveau, EXÉCUTE `src/relaisPrevision.js`) : 10 verts ; mutations `dateLue`,
+  `periode`, `devine`, `inconnu` : rouges.
+- Banc `scripts/bancs/relais-prevision.cjs` (nouveau ; base inventée de `design-passe.cjs` : 3 points, 4 achats en route
+  dont 3 sous un point, 50 achats au même titre, Vestiaire relié sans commande) : 390 clair, 390 sombre, 1512 clair +
+  Aujourd'hui : **52 verts** ; sur le dist d'origin/main (`BANC_DIST`, 390) : **9 rouges** (E ×3, X ×4, G, J).
+- Bancs existants : `retraits-parfaits` vert ; `retraits-visuel` mis aux décisions du 21 nov. (plus de plan des points
+  ni de « Copier » : le code s'ouvre en grand ; « Tout le détail » ouvert avant d'être jugé) ; `arrivee-scan` 236 verts
+  et `scan-achat` (ouvrent la feuille « ⋯ » d'abord) ; `achats-retraits` (6), `achats-retirer-site` (7),
+  `scan-achat` (2 « Ranger »), `achats-en-route-ordre` (1) : rouges IDENTIQUES sur origin/main (déjà là).
+- Audits : `audit-identite`, `audit-traduction`, `audit-quoi-de-neuf`, `audit-coherence`, `audit-icones`,
+  `audit-pluriels-croises`, `audit-retraits-parfaits`, `audit-retraits-visuel`, `audit-aujourdhui`, `audit-suivi-vinted`,
+  `audit-fonctions-api` verts. `audit-boutons-natifs` rouge AUSSI sur origin/main (AchatsTableau, Reglages).
+  `audit-extension-zip` : rouge attendu (5.411.0 sans zip : l'intégrateur régénère).
+- Build vert. Captures (exemple inventé) : scratchpad de la session, `relais-a4d5/shots*`.
+
+## 6. Ce qui reste / limites
+- Les vignettes vides de la LISTE viennent de photos Vinted expirées sur iPhone (aucune extension pour les relire) : le
+  système `PhotoVinted` n'a pas été touché (les rangées « À régler » d'Achats, elles, ne posent plus de photo).
+- La date d'arrivée n'est dite que si Vinted la donne (`estimated_detail`), jamais estimée par VRM.
+- Le point d'arrivée n'est lu que pour les achats en route dont la transaction est rangée (son `order.id`) : un achat
+  jamais ouvert par l'extension reste dans « point pas encore dit ».
+- À l'ordinateur, le tableau des achats (titres coupés à une colonne étroite) n'a pas été repris ici.
 
 Geste de Julien : installer l'extension 5.411.0 (après l'intégration), passer sur Vinted : les points d'arrivée se
 remplissent seuls.
