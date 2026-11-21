@@ -82,7 +82,8 @@ async function charger() {
   const SV = await import(path.join(dir, 'src/statsVentes.js'));
   // statsTransporteurs.js : sa dépendance (transporteursVisuels.js et ses règles serveur) est celle du DÉPÔT, par URL absolue.
   const ft = path.join(dir, FICHIERS.transp);
-  fs.writeFileSync(ft, fs.readFileSync(ft, 'utf8').replace("from './transporteursVisuels.js'", "from '" + require('url').pathToFileURL(path.join(RACINE, 'src/transporteursVisuels.js')).href + "'"));
+  // (21 nov., transp-depenses) + ses règles serveur (`../api/_lib/…`) : toute importation relative pointe le DÉPÔT.
+  fs.writeFileSync(ft, fs.readFileSync(ft, 'utf8').replace(/from '(\.\.?\/[^']+)'/g, (m0, rel) => "from '" + require('url').pathToFileURL(path.join(RACINE, 'src', rel)).href + "'"));
   const TR = await import(ft);
   return { P, M, T, SV, TR };
 }
