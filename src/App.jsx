@@ -235,7 +235,7 @@ import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chev
 // ⟦→ ecrans/Ebay.jsx #4⟧
 import {cibleEbay, bilanCommandeEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges,poserForfaitEmballage,forfaitEmballagePose} from "./beneficePaire.js";
-import { coutReelVente, netDeVenteRangee } from "./coutReel.js";   // (21 nov., lot rentabilite) le coût réel de chaque vente
+import { coutReelVente, netDeVenteRangee, ficheDeLaRegle } from "./coutReel.js";   // (21 nov., lot rentabilite) le coût réel de chaque vente
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles = UNE vente, chaque article à sa place.
 import { resumeVenteLot, titreDitLot } from "./venteLot.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
@@ -10388,9 +10388,11 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
     let a = lignes.length ? 0 : null; const nE = [];
     for (const li of lignes) { const k = numEbayLigne(o, li); if (k) nE.push(String(k)); const x = achatDuNum(k); if (x == null) { a = null; continue; } if (a != null) a += x; }
-    // (21 nov., lot rentabilite) frais eBay = la règle sur une fiche VIDE (`frais({}, 'eBay')`) : le seul forfait d'emballage qu'il a
-    // réglé, jamais le port (§2.8) ni un frais noté — 0 sans forfait (comme avant).
-    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: typeof frais === 'function' ? (Number(frais({}, 'eBay')) || 0) : 0, num: nE.join(' + ') });
+    // (21 nov., lot rentabilite) frais eBay = les frais notés sur la fiche de CHAQUE ligne (par son SKU), par la règle du site
+    // (`ficheDeLaRegle` : JAMAIS le port, §2.8) — boost, emballage saisi ou forfait, autres ; avant : 0, alors que la fiche
+    // de l'article les retirait (deux bénéfices pour la même vente).
+    let fr = 0; for (const li of lignes) fr += fraisDuNum(numEbayLigne(o, li), 'eBay');
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: Math.round(fr * 100) / 100, num: nE.join(' + ') });
   }
   // (1er nov., audit A2) VESTIAIRE : une vente terminée ou versée, au montant
   // REÇU sûr (commission déjà retirée : frais = 0), reliée à SA paire par
@@ -44351,7 +44353,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     try {
       const liens = load('vrm_lbc_liens', {}) || {};
       // (11 nov.) les frais saisis sur la fiche, comme Vinted ; Vestiaire verse DÉJÀ sans sa commission (pas comptée deux fois).
-      const fraisFicheAutres = (f, pl) => (pl === 'eBay' ? coutsVente({}).total : pl === 'Vestiaire' ? coutsVente(Object.assign({}, f, { commission: '' })).total : chargesVente(f));
+      const fraisFicheAutres = (f, pl) => coutsVente(ficheDeLaRegle(pl, f)).total;   // (21 nov., lot rentabilite) eBay : jamais le port ; Vestiaire : jamais la commission notée (src/coutReel.js)
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
         frais: fraisFicheAutres,

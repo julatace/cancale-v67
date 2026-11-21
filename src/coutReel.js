@@ -14,8 +14,8 @@
 //       · eBay       : l'argent reçu = `totalDueSeller` − `totalMarketplaceFee` (`montantRecuEbay`) : la commission est LUE
 //                      sur la commande ; pas lue ⇒ la vente n'a pas de net (« — », jamais 0). Le PORT n'est ni une recette
 //                      ni une charge (§2.8 : l'acheteur le paie à eBay, VRM n'achète jamais d'étiquette) : il n'est JAMAIS
-//                      compté, même noté sur la fiche ; boost et frais notés sur la fiche ne sont pas comptés non plus
-//                      (la règle du bénéfice eBay) — seul l'emballage (saisi ou forfait) l'est ;
+//                      compté, même noté sur la fiche ; les autres frais notés (boost, emballage saisi ou forfait,
+//                      remboursement, autres) le sont, comme sur les autres sites (`ficheDeLaRegle`) ;
 //       · Vestiaire  : le montant versé ; la commission LUE = prix affiché − versé (`fraisVc`) quand les deux sont lus, sinon
 //                      « pas lue » (dit) — le net reste celui du versé (la commission n'est pas comptée deux fois).
 //  Par construction : vente − commission − boost − emballage − port − autres − achat === le bénéfice de la règle, au
@@ -29,6 +29,16 @@ import { beneficePaire, centimes, coutsVente } from './beneficePaire.js';
 
 export const SITES_COUT_REEL = ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'];
 const vide = (v) => v == null || String(v).trim() === '';
+// LA FICHE QUE LA RÈGLE DU BÉNÉFICE COMPTE pour une vente de ce site — UNE définition pour la règle de l'app
+// (src/App.jsx `ventesAutresBenefice` via `fraisFicheAutres`), la fiche de l'article (src/beneficeArticle.js) et ce module :
+//   eBay : jamais le port (§2.8 : l'acheteur le paie à eBay) ni une commission notée (elle est lue) ; Vestiaire : jamais la
+//   commission notée (le versé l'a déjà retirée) ; Vinted, Leboncoin : la fiche telle quelle.
+export function ficheDeLaRegle(site, f) {
+  const e = f || {};
+  if (site === 'eBay') return { ...e, transportVendeur: '', commission: '' };   // la commission eBay est LUE (`totalMarketplaceFee`)
+  if (site === 'Vestiaire') return { ...e, commission: '' };
+  return e;
+}
 const saisi = (f, k) => { const v = f && f[k]; if (vide(v)) return { c: null, src: 'aucun' }; const c = centimes(v); return c == null ? { c: null, src: 'illisible' } : { c, src: 'saisi' }; };
 
 // `plateforme` ; `prix` : le prix de vente affiché (euros, texte ou nombre ; eBay : le dû au vendeur `totalDueSeller`) ;
@@ -43,19 +53,18 @@ export function coutReelVente({ plateforme = 'Vinted', prix, recu = null, fiche,
   const entier = (x) => (Number.isSafeInteger(x) && x >= 0 ? x : null);
   const lue = entier(commissionLue), recuC = entier(recu);
   const vente = autreDevise ? null : centimes(prix);
-  // La fiche que la règle du site compte (src/App.jsx `ventesAutresBenefice` / Ventes) — jamais une autre :
-  // eBay ne compte que le prix d'achat (et le forfait d'emballage) ; Vestiaire, la fiche sans commission notée.
-  const ficheRegle = site === 'eBay' ? { buyPrice: f.buyPrice } : site === 'Vestiaire' ? { ...f, commission: '' } : f;
+  // La fiche que la règle du site compte (`ficheDeLaRegle`) — jamais une autre.
+  const ficheRegle = ficheDeLaRegle(site, f);
   const C = coutsVente(ficheRegle);
-  const boost = site === 'eBay' ? { c: 0, src: 'ebay' } : saisi(f, 'fees');
+  const boost = saisi(f, 'fees');
   const port = site === 'eBay' ? { c: 0, src: 'ebay' } : saisi(f, 'transportVendeur');
-  const embS = site === 'eBay' ? { c: null, src: 'aucun' } : saisi(f, 'emballage');
+  const embS = saisi(f, 'emballage');
   const emballage = embS.src !== 'aucun' ? embS : C.emballageForfait != null ? { c: C.emballageForfait, src: 'forfait' } : { c: null, src: 'aucun' };
   const comNote = site === 'Vinted' || site === 'Leboncoin' ? saisi(f, 'commission') : { c: null, src: 'aucun' };
   const commission = autre
     ? (lue != null ? { c: lue, src: 'lu' } : { c: null, src: 'pasLu' })
     : comNote.src === 'saisi' || comNote.src === 'illisible' ? comNote : { c: 0, src: 'regle' };
-  const autresC = site === 'eBay' ? null : ['remboursement', 'autresFrais'].reduce((t, k) => { const x = saisi(f, k); return x.c == null ? t : (t ?? 0) + x.c; }, null);
+  const autresC = ['remboursement', 'autresFrais'].reduce((t, k) => { const x = saisi(f, k); return x.c == null ? t : (t ?? 0) + x.c; }, null);
   const achat = centimes(f.buyPrice);
   const lignes = [
     { cle: 'vente', c: vente, src: vente == null ? 'pasLu' : 'lu' },
@@ -73,7 +82,6 @@ export function coutReelVente({ plateforme = 'Vinted', prix, recu = null, fiche,
   if (base == null) etat = autre && !autreDevise && (site === 'eBay' ? vente != null : true) ? 'commission' : 'prix';
   else if (!C.valid) etat = 'illisible';
   else if (achat == null) etat = 'achat';
-  else if (site === 'eBay') etat = emballage.src === 'aucun' ? 'partiel' : 'ok';
   else etat = C.complet ? 'ok' : 'partiel';
   const net = B && B.benefice != null && etat !== 'illisible' ? Math.round(B.benefice * 100) : null;
   return { site, etat, lignes, net, vente, base };

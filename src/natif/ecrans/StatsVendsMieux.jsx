@@ -24,8 +24,9 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
   const parK = A ? new Map(A.groupes.map((g) => [g.k, g])) : null;
   const ordre = A ? A.ordre[tri].map((k) => parK.get(k)).filter(Boolean) : [];
   const jours = (j) => tr('v2.st.jours', { n: Math.round(j), j: nombre(Math.round(j)) });
-  const sous = (g) => [tr('v2.comptes.ventes', { n: g.n }), g.prixMoyen != null ? tr('rt.prixMoyen', { p: montant(g.prixMoyen) }) : '',
-    g.mediane != null ? tr('rt.delai', { d: jours(g.mediane) }) : '', g.taux != null ? tr('rt.taux', { t: nombre(g.taux) }) : ''].filter(Boolean).join(' · ');
+  // Le chiffre du tri est à droite ; il ne se redit pas dessous (le même nombre jamais deux fois sur une rangée).
+  const sous = (g) => [tri !== 'volume' ? tr('v2.comptes.ventes', { n: g.n }) : '', g.prixMoyen != null ? tr('rt.prixMoyen', { p: montant(g.prixMoyen) }) : '',
+    tri !== 'vitesse' && g.mediane != null ? tr('rt.delai', { d: jours(g.mediane) }) : '', g.taux != null ? tr('rt.taux', { t: nombre(g.taux) }) : ''].filter(Boolean).join(' · ');
   const valeur = (g) => (tri === 'vitesse' ? (g.mediane != null ? jours(g.mediane) : '—')
     : tri === 'volume' ? nombre(g.n)
       : g.moyen != null ? (g.moyen >= 0 ? '+' : '−') + montant(Math.abs(g.moyen)) : '—');
@@ -50,7 +51,7 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
           <div data-ps-racheter={A ? A.aRacheter.map((g) => g.k).join('|') : ''}>
             {!A ? <Rangee titre={attente ? tr('v2.jour.lecture') : (raison || tr('v2.st.raison.releve'))}/>
               : A.aRacheter.length ? A.aRacheter.map((g) => (
-                <Rangee key={g.k} titre={g.nom} sousTitre={[tr('rt.parPaire', { p: montant(g.moyen) }), tr('rt.delai', { d: jours(g.mediane) }), tr('v2.comptes.ventes', { n: g.n })].join(' · ')}
+                <Rangee key={g.k} titre={g.nom} sousLignes={2} sousTitre={[tr('rt.parPaire', { p: montant(g.moyen) }), tr('rt.delai', { d: jours(g.mediane) }), tr('rt.reliees', { n: nombre(g.n) })].join(' · ')}
                   valeur={tr('rt.parJour', { p: montant(g.score) })} valeurForte attrs={{ 'data-ps-racheter-k': g.k, 'data-ps-score': cents(g.score) }}/>
               )) : <Rangee titre={tr('rt.racheter.peu', { n: A.min })}/>}
           </div>
@@ -65,7 +66,7 @@ export default function StatsVendsMieux({ mieux, sur = '', montant = (x) => Stri
             A.taux ? tr('rt.couv.taux', { n: nombre(A.taux.datees) }) : tr('rt.couv.tauxPasSu'),
             A.autres && A.autres.n ? tr('rt.couv.autres', { n: nombre(A.autres.n) }) : '',
           ].filter(Boolean).join(' · ')}</p> : null}
-          {A && A.regroupes.length ? <Rangee titre={tr('rt.regroupe')} sousTitre={tr('rt.regroupe.sous', { n: nombre(A.regroupes.length) })} fin="chevron"
+          {A && A.regroupes.length ? <Rangee titre={tr('rt.regroupe')} sousLignes={2} sousTitre={tr('rt.regroupe.sous', { n: nombre(A.regroupes.length) })} fin="chevron"
             onClick={() => setVoirRegroupe((x) => !x)} attrs={{ 'aria-expanded': voirRegroupe ? 'true' : 'false', 'data-ps-regroupe-ouvrir': '' }}/> : null}
           {A && voirRegroupe ? <div data-ps-regroupe={String(A.regroupes.length)}>
             {A.regroupes.map((r) => (

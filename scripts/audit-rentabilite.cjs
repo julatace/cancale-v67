@@ -28,8 +28,8 @@ const T = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-rent-'));
 fs.cpSync(path.join(R, 'src'), path.join(T, 'src'), { recursive: true, filter: (s) => !/\.(png|jpe?g|webp|mp4|onnx|woff2?)$/i.test(s) });
 fs.writeFileSync(path.join(T, 'package.json'), '{"type":"module"}');
 const MUTS = {
-  'port-ebay': ['src/coutReel.js', "const ficheRegle = site === 'eBay' ? { buyPrice: f.buyPrice }", "const ficheRegle = site === 'eBay' ? { buyPrice: f.buyPrice, transportVendeur: f.transportVendeur }"],
-  'commission-vc': ['src/coutReel.js', "site === 'Vestiaire' ? { ...f, commission: '' } : f;", "f;"],
+  'port-ebay': ['src/coutReel.js', "if (site === 'eBay') return { ...e, transportVendeur: '', commission: '' };", "if (site === 'eBay') return { ...e, commission: '' };"],
+  'commission-vc': ['src/coutReel.js', "  if (site === 'Vestiaire') return { ...e, commission: '' };\n", ""],
   'forfait-defaut': ['src/beneficePaire.js', 'let FORFAIT_EMBALLAGE=null;', 'let FORFAIT_EMBALLAGE=80;'],
   'forfait-ecrase': ['src/beneficePaire.js', "const embVide=e?.emballage==null || String(e.emballage).trim()==='';", 'const embVide=true;'],
   'net-recopie': ['src/coutReel.js', 'Math.round(B.benefice * 100) : null;', '(base - (achat || 0)) : null;'],
@@ -39,7 +39,7 @@ const MUTS = {
   'date-devinee': ['src/vendsMieux.js', "if (x.enLigne == null || !Number.isFinite(Number(x.enLigne))) { sansDate += 1; continue; }\n    if (!dans(x.enLigne)) continue;", "if (x.enLigne != null && !dans(x.enLigne)) continue;"],
   identite: ['src/repriseNumero.js', '', "import { vendsMieux } from './vendsMieux.js';\n"],
   connu: ['src/App.jsx', 'aPayerUrssaf(v.caCouvert, taux)', 'aPayerUrssaf(v.ca, taux)'],
-  'ebay-app': ['src/App.jsx', "pl === 'eBay' ? coutsVente({}).total", "pl === 'eBay' ? chargesVente(f)"],
+  'ebay-app': ['src/App.jsx', "const fraisFicheAutres = (f, pl) => coutsVente(ficheDeLaRegle(pl, f)).total;", "const fraisFicheAutres = (f, pl) => chargesVente(f);"],
   vue: ['src/natif/ecrans/StatsVendsMieux.jsx', "const ordre = A ? A.ordre[tri]", "const ordre = A ? A.groupes.slice().sort((x, y) => y.n - x.n).map((g) => g.k).filter(() => true) && A.ordre[tri]"],
 };
 if (MUT) {
@@ -85,10 +85,10 @@ const c = (v) => { if (v == null || String(v).trim() === '') return null; const 
       // ni port ni boost ni frais notés ; Vestiaire, pas la commission notée).
       const base = site === 'eBay' || site === 'Vestiaire' ? recu : c(prix);
       const achat = c(fiche.buyPrice);
-      const champs = site === 'eBay' ? [] : site === 'Vestiaire' ? ['fees', 'transportVendeur', 'remboursement', 'autresFrais', 'emballage'] : ['fees', 'transportVendeur', 'commission', 'remboursement', 'autresFrais', 'emballage'];
+      const champs = site === 'eBay' ? ['fees', 'remboursement', 'autresFrais', 'emballage'] : site === 'Vestiaire' ? ['fees', 'transportVendeur', 'remboursement', 'autresFrais', 'emballage'] : ['fees', 'transportVendeur', 'commission', 'remboursement', 'autresFrais', 'emballage'];
       let frais = 0, lisible = true;
       for (const k of champs) { const v = fiche[k]; if (v == null || String(v).trim() === '') continue; const x = c(v); if (x == null) lisible = false; else frais += x; }
-      const embVide = site === 'eBay' || fiche.emballage == null || String(fiche.emballage).trim() === '';
+      const embVide = fiche.emballage == null || String(fiche.emballage).trim() === '';
       if (embVide) frais += F;
       const attendu = base == null || achat == null || !lisible ? null : base - achat - frais;
       if (r.net !== attendu) ecarts.push({ site, prix, fiche, com, recu, net: r.net, attendu });
@@ -106,10 +106,13 @@ const c = (v) => { if (v == null || String(v).trim() === '') return null; const 
   // eBay : le port n'est jamais compté.
   const eb = CR.coutReelVente({ plateforme: 'eBay', prix: '100', recu: 8800, commissionLue: 1200, fiche: { buyPrice: '50', transportVendeur: '9', fees: '3', emballage: '' } });
   const portEb = eb.lignes.find((l) => l.cle === 'port');
-  dit(eb.net === 3800 && portEb && portEb.c === 0 && portEb.src === 'ebay', 'A3 eBay : le port noté (9 €) n’est ni une charge ni dans le net (§2.8) — net = reçu 88 € − achat 50 €', eb);
+  dit(eb.net === 3500 && portEb && portEb.c === 0 && portEb.src === 'ebay', 'A3 eBay : le port noté (9 €) n’est ni une charge ni dans le net (§2.8) — net = reçu 88 € − boost noté 3 € − achat 50 €', eb);
   const app = sansCommentaires('src/App.jsx');
-  dit(/pl === 'eBay' \? coutsVente\(\{\}\)\.total/.test(app) && /frais: typeof frais === 'function' \? \(Number\(frais\(\{\}, 'eBay'\)\) \|\| 0\) : 0/.test(app),
-    'A3b la règle du bénéfice de l’app compte eBay sur une fiche VIDE (le seul forfait) : jamais le port, jamais un frais noté');
+  dit(/const fraisFicheAutres = \(f, pl\) => coutsVente\(ficheDeLaRegle\(pl, f\)\)\.total;/.test(app) && /for \(const li of lignes\) fr \+= fraisDuNum\(numEbayLigne\(o, li\), 'eBay'\);/.test(app),
+    'A3b la règle du bénéfice de l’app compte eBay par `ficheDeLaRegle` (jamais le port), ligne par ligne');
+  const BA = await imp('src/beneficeArticle.js');
+  const fa = BA.beneficeArticle ? BA.beneficeArticle({ plateforme: 'eBay', vente: '100', recu: 88, entree: { buyPrice: '50', transportVendeur: '9', fees: '3', fraisComplets: true } }) : null;
+  dit(fa && fa.benefice === 3500, 'A3c la fiche de l’article (beneficeArticle) : le même net eBay, port jamais compté (une seule règle)', fa);
   // Vestiaire : la commission lue n'est pas comptée deux fois.
   const vc = CR.coutReelVente({ plateforme: 'Vestiaire', prix: '120', recu: 10000, commissionLue: 2000, fiche: { buyPrice: '50', commission: '5' } });
   dit(vc.net === 5000 && vc.lignes.find((l) => l.cle === 'commission').c === 2000, 'A4 Vestiaire : net = versé 100 € − achat 50 € ; la commission lue (20 €) est dite, la commission notée n’est pas recomptée', vc);

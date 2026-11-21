@@ -162,16 +162,18 @@ async function stats(nav, port, W, sombre) {
     await A.pg.waitForTimeout(300);
     await A.pg.screenshot({ path: path.join(SHOTS, `stats-finances-${W}-${th}.png`), fullPage: true });
     const fz = await A.pg.evaluate(() => { const a = (k) => { const x = document.querySelector(`[data-ps-${k}]`); return x ? x.getAttribute(`data-ps-${k}`) : null; };
-      return { blocs: [...document.querySelectorAll('[data-ps-bloc]')].map((x) => x.getAttribute('data-ps-bloc')), vendu: a('vendu'), ventes: a('ventes'), panier: a('panier'), taux: a('taux'), marques: a('marques'), modeles: a('modeles') }; });
+      // (21 nov., lot rentabilite) les modèles : les rangées de « Ce que tu vends le mieux » sur l'axe Modèle (clé : le nom normalisé).
+      const mod = [...document.querySelectorAll('[data-ps-bloc="mieux"][data-ps-mieux-axe="modele"] [data-ps-mieux-ligne]')].map((x) => x.getAttribute('data-ps-mieux-ligne') + ':' + x.getAttribute('data-n')).join(',');
+      return { blocs: [...document.querySelectorAll('[data-ps-bloc]')].map((x) => x.getAttribute('data-ps-bloc')), vendu: a('vendu'), ventes: a('ventes'), panier: a('panier'), taux: a('taux'), modeles: mod }; });
     const L30 = w.L.filter((x) => x.ts >= de.getTime() && x.ts < fin.getTime());
     const ca = Math.round(L30.reduce((t, x) => t + x.eur * 100, 0));
     // Les modèles : seuls Nike et Adidas en portent un (la ligne sans modèle ne s'invente rien) ; recomptés ici.
     const nMod = (m) => L30.filter((x) => x.marque === m).length;
-    const modAttendu = [['Nike Air Max', nMod('Nike')], ['Adidas Samba', nMod('Adidas')]].filter((x) => x[1] > 0);
+    const modAttendu = [['nike air max', nMod('Nike')], ['adidas samba', nMod('Adidas')]].filter((x) => x[1] > 0);
     const modLu = String(fz.modeles || '').split(',').filter(Boolean).map((x) => x.split(':')).sort();
     const modOk = modLu.length === modAttendu.length && modAttendu.slice().sort().every((x, i) => modLu[i][0] === x[0] && Number(modLu[i][1]) === x[1]);
-    dit(fz.blocs.join() === 'ventes,stock,sites,marques,modeles,tailles' && modOk && fz.vendu === String(ca) && fz.ventes === String(L30.length) && fz.panier === String(Math.round(ca / L30.length)) && fz.taux === String(Math.round(L30.length / 142 * 100)),
-      `S1b ${ou} : Finances — ventes, stock, par site, marques, modèles, tailles ; CA ${ca / 100} €, ${L30.length} ventes, panier, taux de vente recomptés`, fz);
+    dit(fz.blocs.join() === 'ventes,stock,sites,mieux' && modOk && fz.vendu === String(ca) && fz.ventes === String(L30.length) && fz.panier === String(Math.round(ca / L30.length)) && fz.taux === String(Math.round(L30.length / 142 * 100)),
+      `S1b ${ou} : Finances — ventes, stock, par site, ce que tu vends le mieux (modèles recomptés) ; CA ${ca / 100} €, ${L30.length} ventes, panier, taux de vente recomptés`, fz);
     const n = await A.pg.evaluate(NATIF);
     dit(!n.empilees && !n.deborde && !n.petites && !n.nan, `N ${ou} : aucune carte dans une carte, aucun débordement, cibles ≥ 44, ni NaN`, n);
     dit(!A.erreurs.length, `${ou} : aucune erreur de page`, A.erreurs);

@@ -41,6 +41,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import { beneficeLigneVente } from './beneficeLigne.js';
 import { coutsVente, centimes } from './beneficePaire.js';
+import { ficheDeLaRegle } from './coutReel.js';   // (21 nov., lot rentabilite) la fiche que la règle compte, par site
 
 export const SITES_SANS_COMMISSION = ['Vinted', 'Leboncoin'];
 const cts = (x) => { if (x == null || x === '') return null; const c = centimes(String(typeof x === 'number' ? (Math.round(x * 100) / 100).toFixed(2) : x).replace(',', '.')); return c; };
@@ -50,7 +51,9 @@ const cts = (x) => { if (x == null || x === '') return null; const c = centimes(
 //           ignoré pour Vinted et Leboncoin (versé = prix) ;
 // `entree` : la fiche de l'article (prix d'achat résolu, frais saisis).
 export function beneficeArticle({ plateforme = 'Vinted', vente = null, recu = null, raisonRecu = '', entree = null, annulee = false, autreDevise = false } = {}) {
-  const e = entree || {};
+  // (21 nov., lot rentabilite) La fiche que LA règle du bénéfice compte pour ce site (src/coutReel.js `ficheDeLaRegle`) :
+  // eBay jamais le port (§2.8), Vestiaire jamais la commission notée (le versé l'a retirée) — la même que la compta.
+  const e = ficheDeLaRegle(plateforme, entree || {});
   const venteC = autreDevise ? null : cts(vente);
   const sansCommission = SITES_SANS_COMMISSION.includes(plateforme);
   const recuC = sansCommission ? venteC : (autreDevise ? null : cts(recu));
