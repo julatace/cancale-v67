@@ -1119,6 +1119,84 @@ function vrmVerifVisible(sel) {
     .au6-retour { display: inline-flex !important; }
     .sec6, .au6-t, .pied6 { padding-left: 16px; padding-right: 16px; }
   }
+  /* ══ 5.413 — LE PANNEAU AU TÉLÉPHONE (Julien, 21 nov. : « dans ce style-là, surtout sur le téléphone ») ═══════════
+     À l'ordinateur : la barre latérale garde ses huit entrées (la feuille « Plus » s'y fond : display: contents).
+     Au téléphone / Orion (≤ 760 px) : cinq onglets égaux en bas, « Plus » ouvre une feuille du bas ; en-tête « Titre ·
+     compte » puis « Mis à jour … ⟳ » ; recherche sur toute la largeur, la barre d'outils sur UNE ligne qui défile ;
+     les menus Statut / Colonnes deviennent des feuilles du bas ; chaque rangée : case · vignette 48 · titre complet +
+     phrase d'état grise · ⋯, puis la ligne méta « prix · date · étiquette » sans libellés ; champs à 16 px (pas de
+     zoom de Safari/Orion à la saisie). Seulement la présentation : aucun geste, aucune règle ne change. */
+  .plusb6, .plus6t, .voile6 { display: none; }
+  .plus6g { display: contents; }
+  @media (max-width: 760px) {
+    .vx6 { grid-template-rows: minmax(0, 1fr) auto; }
+    .side6 { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; gap: 0; padding: 2px 4px max(4px, env(safe-area-inset-bottom)); border-top: .5px solid var(--n-trait); border-bottom: 0; background: var(--n-carte); position: relative; z-index: 6; }
+    .side6 > .nav6, .side6 .plusb6 { min-width: 0; width: 100%; min-height: 50px; padding: 4px 0 2px; border-radius: 10px; gap: 2px; font: 500 10px/13px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; letter-spacing: .01em; }
+    .side6 > .nav6 span, .side6 .plusb6 span { display: block !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .side6 .nav6[aria-current="page"] { background: transparent; }
+    .plusb6 { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .plusb6[aria-current="page"], .plusb6[aria-expanded="true"] { color: var(--n-accent); font-weight: 600; }
+    .plus6g { display: none; }
+    .vx6[data-plus] .plus6g { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 41; margin: 0; padding: 8px 8px 10px; border-radius: 18px 18px 0 0; background: var(--n-carte); box-shadow: 0 -10px 40px rgb(0 0 0 / .22); }
+    .vx6[data-plus] .plus6t { display: block; padding: 6px 12px 8px; font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+    .vx6[data-plus] .plus6g .nav6 { flex-direction: row; justify-content: flex-start; gap: 14px; width: 100%; min-height: 52px; padding: 0 12px; font: 500 17px/22px -apple-system, Inter, system-ui, sans-serif; }
+    .vx6[data-plus] .plus6g .bas6 { margin: 4px 0 0; padding: 4px 0 0; border-top: .5px solid var(--n-trait); }
+    .voile6 { display: block; position: fixed; inset: 0; z-index: 5; background: rgb(0 0 0 / .32); }
+    /* En-tête : « Titre · compte ⋯ × », puis « Mis à jour à l'instant ⟳ » en gris (le texte reste dit). */
+    .tete6 { flex-wrap: wrap; gap: 0 8px; min-height: 0; padding: max(6px, env(safe-area-inset-top)) 8px 0 16px; }
+    .tete6 h1 { font: 700 22px/28px -apple-system, "SF Pro Display", Inter, system-ui, sans-serif; letter-spacing: -.01em; }
+    .compte6 { max-width: 38vw; }
+    .tete6 .maj6 { order: 5; flex: 0 0 auto; margin: -4px 0 0 -8px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--n-encre-2); font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; gap: 6px; }
+    .tete6 .maj6 span { display: inline !important; }
+    .tete6 .maj6 svg { width: 14px; height: 14px; }
+    /* La barre d'outils : la recherche sur toute la largeur, puis UNE ligne d'outils qui défile (action, Statut…). */
+    .barre6 { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px 10px; align-items: center; }
+    .barre6 .cherche5 { order: -1; flex: 1 1 100%; max-width: none; }
+    .barre6 > .cols5, .barre6 > .impn6, .barre6 > .vu-btn { flex: 0 0 auto; min-width: 0; }
+    .barre6 > .act5 { flex: 1 1 0; min-width: 0; }
+    .carte[data-grand] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .carte[data-grand] select, .carte[data-grand] textarea { font-size: 16px !important; }
+    /* Les menus Statut / Colonnes : une feuille du bas, un voile derrière (le toucher sur le voile la referme). */
+    .carte[data-grand] details.cols5[open] > summary::before { content: ''; position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .32); cursor: default; }
+    .carte[data-grand] details.cols5 > .cols5-l { position: fixed; left: 0; right: 0; top: auto; bottom: 0; z-index: 41; min-width: 0; max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; border-radius: 18px 18px 0 0; padding: 10px 8px max(12px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .22); }
+    .carte[data-grand] details.cols5 > .cols5-l label { min-height: 52px; font-size: 17px; }
+    .n6 { padding: 10px 16px 6px; font-size: 13px; }
+    /* Les rangées empilées : case · vignette 48 · titre complet (et la phrase d'état grise) · ⋯ ; la ligne méta dessous. */
+    .table6 { margin: 0 8px; }
+    .tr6, .fav6-table .tr6 { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 0 4px; padding: 6px 0 0; min-height: 0; align-items: start; }
+    .tr6 > .case5 { width: 44px; height: 48px; }
+    .tr6 > .plus6 { grid-column: 3; grid-row: 1; height: 48px; }
+    .tr6 .art6, .fav6-table .art6 { min-height: 48px; padding: 0; gap: 12px; align-items: flex-start; }
+    .tr6 .art6 .vig { width: 48px; height: 48px; }
+    .tr6 .art6 .ti, .fav6-table .art6 .ti { display: block; -webkit-line-clamp: none; overflow: visible; font: 400 15px/20px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; padding-top: 2px; overflow-wrap: anywhere; }
+    .tr6 .art6 .st6 { white-space: normal; margin-top: 1px; }
+    .tr6 .cels6, .fav6-table .tr6 .cels6 { grid-column: 2 / 4; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; padding: 4px 8px 10px 60px; }
+    .tr6 .cels6 .cel6 { display: inline-flex; align-items: center; gap: 4px; font: 400 14px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); white-space: nowrap; overflow: visible; }
+    .tr6 .cels6 .cel6 b { color: var(--n-encre); font-weight: 600; }
+    .tr6 .cels6 .cel6[data-col="date"]::before, .tr6 .cels6 .cel6[data-col="statut"]::before, .tr6 .cels6 .cel6[data-col="limite"]::before { content: '·'; margin: 0 6px; color: var(--n-encre-2); }
+    .tr6 .cels6::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
+    .tr6 .cels6 .cel6[data-col="vues"], .tr6 .cels6 .cel6[data-col="favoris"], .tr6 .cels6 .cel6[data-col="mini"], .tr6 .cels6 .cel6[data-col="achat"], .tr6 .cels6 .cel6[data-col="place"] { margin-right: 14px; }
+    .tr6 .cels6 .lc5 { display: none !important; }
+    .tr6 .cels6 .cel6[data-col="vues"] .lc5, .tr6 .cels6 .cel6[data-col="favoris"] .lc5, .tr6 .cels6 .cel6[data-col="mini"] .lc5, .tr6 .cels6 .cel6[data-col="achat"] .lc5, .tr6 .cels6 .cel6[data-col="place"] .lc5 { display: inline !important; margin: 0; font-size: 14px; }
+    .tr6 .cels6 .cel6:has(> .gris6:only-of-type) { display: none; }
+    .tr6 .cels6 .cel6[data-col="statut"] { order: 3; }
+    .tr6 .cels6 .cel6[data-col="statut"] .et6 { padding: 0 8px; font-size: 12px; line-height: 20px; }
+    .tr6 .cels6 .cel6[data-col="transporteur"], .tr6 .cels6 .cel6[data-col="bordereau"] { order: 6; flex: 0 0 100%; margin-top: 4px; white-space: normal; }
+    .tr6 .cels6 .cel6[data-col="transporteur"] .tr-l6 { color: var(--n-encre); }
+    .tr6 .cels6 .cel6[data-col="limite"] { order: 3; }
+    .tr6 .cels6 .cel6[data-col="vues"], .tr6 .cels6 .cel6[data-col="favoris"], .tr6 .cels6 .cel6[data-col="mini"], .tr6 .cels6 .cel6[data-col="achat"], .tr6 .cels6 .cel6[data-col="place"] { order: 5; }
+    .tr6 .cels6 .cel6[data-col="prix"] { order: 1; } .tr6 .cels6 .cel6[data-col="date"] { order: 2; }
+    /* Notifications : les mêmes rangées fines, l'heure en gris, l'étiquette douce. */
+    .trn5 { grid-template-columns: minmax(0, 1fr) auto auto 16px; gap: 0 8px; min-height: 52px; padding: 0 12px 0 16px; }
+    .trn5 .cel5 { font-size: 13px; color: var(--n-encre-2); white-space: nowrap; }
+    .corps6 .table5 { margin: 0 8px; }
+    .corps6 .panneau > .barre5:not(.barre6) { padding: 8px 12px; gap: 8px; }
+    .corps6 .panneau > .barre5:not(.barre6) > .act5 { flex: 1 1 100%; }
+    .corps6 .panneau > .barre5:not(.barre6) > .vue5 { flex: 1 1 100%; display: flex; }
+    .corps6 .panneau > .barre5:not(.barre6) > .vue5 > button { flex: 1 1 0; }
+    /* Accueil : « Nouvelle vente · <titre> » en entier (deux lignes s'il le faut), le bouton dessous. */
+    .vte6 { flex-wrap: wrap; } .vte6 > span:first-child { flex: 1 1 100%; } .vte6 > span:first-child b { white-space: normal; overflow: visible; }
+    .corps6 .lu { padding: 8px 16px 6px; font-size: 13px; }
+  }
   /* 5.410.5 — une vérification de Vinted AFFICHÉE sur la page : le panneau s'écarte en une pastille, en HAUT, petite,
      qui ne recouvre jamais le centre de la vérification ; la toucher rouvre le panneau. */
   .verif6 { position: fixed; top: var(--verif-haut, 12px); right: 12px; max-width: min(320px, calc(100vw - 24px)); min-height: 44px; padding: 10px 14px;
@@ -2987,6 +3065,10 @@ function vrmVerifVisible(sel) {
   //    et « Mis à jour il y a … ⟳ » à droite, la page dessous. Au téléphone / Orion : la même chose empilée (la barre
   //    devient une rangée d'onglets défilante en haut).
   let vxReduit = false;
+  // 5.413 (téléphone) : la barre du bas a CINQ onglets égaux (Accueil · Articles · Commandes · Messagerie · Plus) ; « Plus »
+  // ouvre une feuille du bas avec les quatre autres pages. À l'ordinateur, rien ne change (la feuille est la barre latérale).
+  let vxPlus = false;
+  const PLUS6 = ['favoris', 'notifications', 'automatisations', 'parametres'];
   try { chrome.storage.local.get(['vrmPanneauReduit'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} vxReduit = !!(g && g.vrmPanneauReduit === true); }); } catch (_) {}
   const ICO6 = {
     accueil: '<path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/>',
@@ -3035,18 +3117,24 @@ function vrmVerifVisible(sel) {
           : `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`; }).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
     </div>`;
   }
+  // 5.413 (`panneautelephone`) : la fin de la barre — au téléphone « Plus » + sa feuille du bas (les quatre autres pages) ;
+  // à l'ordinateur la feuille se fond dans la barre latérale (display: contents) et « Plus » ne se montre pas.
+  function barreTelephone6(cle, nav) {
+    return `<button type="button" class="nav6 plusb6" data-vx-plus aria-expanded="${vxPlus ? 'true' : 'false'}" aria-current="${PLUS6.includes(cle) ? 'page' : 'false'}" title="${esc(TU('v6_plus'))}"><svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg><span>${esc(TU('v6_plus'))}</span></button>
+        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}
+        <div class="bas6">${nav('parametres')}</div></div>
+      </nav>${vxPlus ? '<div class="voile6" data-vx-plus-voile aria-hidden="true"></div>' : ''}`;
+  }
   function vxHtml(e, corps, extras) {
     const cle = PAGES6[ongletListe] ? ongletListe : 'accueil';
     const nav = (k) => `<button type="button" class="nav6" data-onglet-b="${k}" aria-current="${ongletListe === k ? 'page' : 'false'}" title="${esc(TU(PAGES6[k]))}">${ico6(k)}<span>${esc(TU(PAGES6[k]))}</span></button>`;
     const nom = (listes && listes.compte && listes.compte.nom) || (e && e.site && e.site.nom) || '';
     const lu = luDeLaPage(e);
-    return `<div class="vx6"${vxReduit ? ' data-reduit' : ''} data-vx data-page="${cle}">
+    return `<div class="vx6"${vxReduit ? ' data-reduit' : ''}${vxPlus ? ' data-plus' : ''} data-vx data-page="${cle}">
       <nav class="side6" aria-label="VRM">
         <div class="marque6"><img src="${esc(chrome.runtime.getURL('logo-vrm-96.png'))}" alt="" width="24" height="24"><b>VRM</b></div>
         <div class="grp6">${esc(TU('v6_general'))}</div>${nav('accueil')}
-        <div class="grp6">${esc(NOM_SITE[e.plateforme] || TU('v6_plateforme'))}</div>${nav('annonces')}${nav('ventes')}${nav('messages')}${nav('favoris')}${nav('notifications')}${nav('automatisations')}
-        <div class="bas6">${nav('parametres')}</div>
-      </nav>
+        <div class="grp6">${esc(NOM_SITE[e.plateforme] || TU('v6_plateforme'))}</div>${nav('annonces')}${nav('ventes')}${nav('messages')}${barreTelephone6(cle, nav)}
       <div class="main6">
         <header class="tete6"><button type="button" class="rond6" data-vx-reduire aria-label="${esc(TU('v6_reduire'))}" title="${esc(TU('v6_reduire'))}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
           <h1 data-vx-titre>${esc(TU(PAGES6[cle]))}</h1>${nom ? `<span class="compte6" data-vx-compte><i aria-hidden="true">${esc(nom.charAt(0).toUpperCase())}</i>${esc(nom)}</span>` : ''}
@@ -3090,7 +3178,7 @@ function vrmVerifVisible(sel) {
     brancherImpression(racine);
     try { brancherGestes6(racine); } catch (_) {}
     racine.querySelectorAll('[data-onglet-b]').forEach((b) => b.addEventListener('click', () => {
-      ongletListe = b.getAttribute('data-onglet-b'); ranger({ vrmCarteOnglet: ongletListe });
+      ongletListe = b.getAttribute('data-onglet-b'); vxPlus = false; ranger({ vrmCarteOnglet: ongletListe });
       if (ongletListe !== 'favoris' || grand6()) chargerListes(false);
       if (LISTES) rendreListesSeules(); else rendre();
     }));
@@ -3104,6 +3192,8 @@ function vrmVerifVisible(sel) {
       if (LISTES) rendreListesSeules(); else rendre();
     }));
     brancherAnnonces(racine);
+    { const pb = racine.querySelector('[data-vx-plus]'); if (pb) pb.addEventListener('click', () => { vxPlus = !vxPlus; rendre(); }); }
+    { const pv = racine.querySelector('[data-vx-plus-voile]'); if (pv) pv.addEventListener('click', () => { vxPlus = false; rendre(); }); }
     const rd = racine.querySelector('[data-vx-reduire]'); if (rd) rd.addEventListener('click', () => { vxReduit = !vxReduit; ranger({ vrmPanneauReduit: vxReduit }); rendre(); });
     const mj = racine.querySelector('[data-vx-maj]'); if (mj) mj.addEventListener('click', () => { chargerListes(true); });
     const nt = racine.querySelector('[data-notif-type]'); if (nt) nt.addEventListener('change', () => { notifType = nt.value; rendre(); });
@@ -4266,7 +4356,7 @@ function vrmVerifVisible(sel) {
   }
 
   // 5.409 : Échap ferme le grand panneau (le ✕ aussi) ; jamais quand on tape dans un champ du site.
-  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && favFeuille && carte.classList.contains('on')) { favFeuille = null; vueFav = null; ev.stopPropagation(); rendre(); return; } if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
+  try { document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && vxPlus && carte.classList.contains('on')) { vxPlus = false; ev.stopPropagation(); rendre(); return; } if (ev.key === 'Escape' && favFeuille && carte.classList.contains('on')) { favFeuille = null; vueFav = null; ev.stopPropagation(); rendre(); return; } if (ev.key === 'Escape' && carte.classList.contains('on') && carte.hasAttribute('data-grand')) { let dedans = false; try { dedans = ev.composedPath().includes(hote); } catch (_) {} const t = ev.target; let site = false; try { site = !dedans && !!(t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="dialog"],[aria-modal="true"]')); } catch (_) {} if (!site) fermerCarte(); } }, true); } catch (_) {}
   function ouvrirConnexion() { doigt = true; formulaireDemande = true; carte.classList.add('on'); rendre(); }
   function fermerCarte() { if (LISTES) return; if (carte.hasAttribute('data-grand')) oublierPanneau(); doigt = false; justeConnecte = false; vueFav = null; favErreur = ''; if (changerCompte) { changerCompte = false; formulaireDemande = false; rendre(); } carte.classList.remove('on'); }
 
