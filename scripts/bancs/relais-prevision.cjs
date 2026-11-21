@@ -156,7 +156,8 @@ async function cas(nav, { W, sombre }) {
   dit(!r.logosSites && !r.vcPasLus, `X ${th} : aucun grand logo de site vide ni « Achats Vestiaire : pas encore lus »`, { l: r.logosSites, v: r.vcPasLus });
   dit(!r.menuCompte && r.ronds <= 1 && r.plus === 1, `X ${th} : l'en-tête n'a plus qu'un rond « ⋯ » (ni +, ni loupe, ni cube, ni menu de compte)`, { menu: r.menuCompte, ronds: r.ronds, plus: r.plus });
   // A — la liste des achats en rangées fines
-  dit(r.achats.n >= 5 && !r.achats.metaCassee && !r.achats.hautes.length, `A ${th} : les achats en rangées fines, la phrase grise sur une ligne`, r.achats);
+  // (à l'ordinateur, la liste est le tableau de travail, src/natif/ecrans/AchatsTableau.jsx : la règle A est celle du téléphone)
+  if (W < 600) dit(r.achats.n >= 5 && !r.achats.metaCassee && !r.achats.hautes.length, `A ${th} : les achats en rangées fines, la phrase grise sur une ligne`, r.achats);
   dit(!r.reglerPhotos, `A ${th} : « À régler » d'Achats sans photo d'un seul élément (jamais une case vide)`, r.reglerPhotos);
   // G — aucun geste perdu : la feuille « ⋯ »
   const g = await pg.evaluate(async () => {

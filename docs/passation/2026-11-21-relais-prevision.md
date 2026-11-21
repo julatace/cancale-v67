@@ -65,7 +65,7 @@ plus la photo d'un seul élément).
 |---|---|---|
 | Ajouter un achat | rond « + » de l'en-tête | feuille « ⋯ » → « Ajouter un achat » (`data-v2-principal="ajouter-achat"`, même évènement) |
 | Retrouver un colis (scanner) | rond loupe de l'en-tête | feuille « ⋯ » → « Retrouver un colis » (`data-scan-retrouver-bouton`) ; aussi le scanner du champ de recherche |
-| Arrivée d'un colis (scanner) | rond cube de l'en-tête | feuille « ⋯ » → « Un colis arrivé : scanner son étiquette » (`data-arv-bouton`) |
+| Arrivée d'un colis (scanner) | rond cube de l'en-tête | feuille « ⋯ » → « Scanner un colis arrivé » (`data-arv-bouton`) |
 | Choisir le compte Vinted | menu « Vinted shop_cancale ⌄ » | feuille « ⋯ » → le même `SelecteurCompte` |
 | Aide de l'écran (« ? ») | à côté du menu | feuille « ⋯ » → la même `PhraseEcran` |
 | Scanner un colis à retirer | rond du grand chiffre | rond à droite de « À retirer » (mêmes `data-colis-scanner`) |
