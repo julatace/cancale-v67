@@ -39,21 +39,31 @@ probable », `pistesArticle` = les autres, l'affectation globale `affecterPropos
   suivant ») ; le prix de CHAQUE article est demandé par l'écriture d'avant, jamais divisé (§2.5).
 - `audit-relier-glisser` T4 suit la feuille inverse (qui porte « Glisser » vers le mode d'avant).
 
-## B. « Améliore le design du carré où il y a le code de retrait »
+## B. Le colis à retirer : un billet compact (trois passes le 21 nov.)
 
-`src/natif/RetraitsPoints.jsx` + `src/natif/retraits.css` (fin du fichier). Aucune règle des colis touchée.
-- En tête du point : logo du transporteur en couleur sur une pastille blanche, nom du point, transporteur en petit ; l'étiquette
-  d'état « Au point · à retirer avant le 25 nov. » (vert pastel ; AMBRE à moins de 2 j ; la date vient des jours restants de
-  la limite LUE, jamais d'une estimation ; « délai dépassé » sinon), « Comptoir · code à donner… », adresse (passe à la ligne)
-  et « Itinéraire » en touche.
-- Chaque colis = un BILLET séparé (contour fin, fond `--n-carte-2`) : la paire (vignette, titre complet jusqu'à 3 lignes +
-  taille, N°, prix), la frise fine (points 9 px, trait 1 px), une ligne de coupe pointillée à deux encoches, puis le panneau du
-  CODE sur fond BLANC même en sombre : « Code de retrait », le code en chasse fixe 32–40 px, encre noire, chiffres groupés
-  (« 978 216 », « 45 21 », « AB12 CD34 EF » ; le texte du code reste entier dans le DOM), le QR à droite 116 px (160 à
-  l'ordinateur) sur blanc ; dessous « Plein écran » (le guichet d'avant, `openQrView`) et « Copier » (« Copié »).
-  ⚠️ Le code est rendu en `<code>` : la règle globale `n-anciens` (`html body :where(*):not(code, pre…) { font-family … !important }`)
+Julien : « améliore le design du carré où il y a le code de retrait », puis « enlève Copier sur les retraits », puis « tu peux faire
+mieux sur le visuel du colis à retirer ». `src/natif/RetraitsPoints.jsx` + `src/natif/retraits.css` (fin du fichier). Aucune règle
+des colis touchée.
+- **Bandeau du point, une fois** : la teinte douce de son transporteur (`data-rp-teinte`), logo sur pastille blanche, nom du point,
+  « Chronopost · comptoir » (la phrase « Comptoir · code à donner… » reste pour le lecteur d'écran), l'échéance à droite « à retirer
+  avant le 25 nov. » (neutre ; AMBRE à moins de 2 j ; date tirée de la limite LUE seulement ; « délai dépassé » sinon), dessous
+  adresse · horaires et « Itinéraire ».
+- **Un billet par colis**, compact (188–2xx px au téléphone, banc ≤ 240), UN seul niveau de carte : vignette 48 (la PHOTO de la paire,
+  place réservée ; « Contenu pas encore lu » devient une petite ligne), titre complet sur 2 lignes, N° en plaque, prix ; la zone du
+  CODE sur BLANC même en sombre : « Code de retrait », le code en chasse fixe 32–38 px, encre noire, groupé (« 978 216 », texte
+  entier dans le DOM), le QR à droite (112 px, 160 à l'ordinateur), une petite icône « plein écran » (44 px) dans son coin ; toucher
+  la zone = plein écran pour le guichet (`openQrView`, le geste d'avant) ; la frise COMPACTE au pied : cinq traits (franchis en encre,
+  courant en vert sapin, jamais de bleu) + « Au point · 21 nov. » ; le nom et la date de chaque étape restent pour le lecteur d'écran.
+- **Plus de « Copier »** (retiré à sa demande ; `retraits-visuel` K exige de nouveau son absence ; `retrait-billet` le vérifie aussi
+  au guichet).
+- **Deux dessins** : B (défaut) une carte par point, billets séparés par une ligne de coupe à encoches ; A le bandeau posé sur la
+  page, chaque billet sa carte (`localStorage.vrm_banc_retrait_variante = 'a'`, réservé aux captures de comparaison). B est gardé :
+  plus « billet / Wallet », l'en-tête et ses colis forment un seul objet.
+- ⚠️ Le code est rendu en `<code>` : la règle globale `n-anciens` (`html body :where(*):not(code, pre…) { font-family … !important }`)
   écrase toute police sur les autres balises.
-- « Copier » revient (Julien le redemande) : `retraits-visuel` K exige maintenant un « Copier » par code.
+- **Bug corrigé** : le lien d'évitement « Aller au contenu » se montrait en haut de l'écran après un focus donné par le code (il
+  s'affichait sur `:focus`) ; il ne paraît plus qu'au focus CLAVIER (`:focus-visible`), sinon rogné et transparent
+  (`src/design/accessibilite.css`).
 
 ## Preuves
 
@@ -64,9 +74,9 @@ probable », `pistesArticle` = les autres, l'affectation globale `affecterPropos
 - Banc `scripts/bancs/relier-facile.cjs` (base inventée : un titre de modèle distinct par vente et SON achat arrivé, une vente
   sur cinq à 3 achats identiques, une sur sept servie par un lot de 2) : 390/1512 clair/sombre **84 verts** ; sur le build
   d'avant (`BANC_DIST`, 390) : rouge (aucune meilleure, aucun « Relier »).
-- Banc `scripts/bancs/retrait-billet.cjs` (3 colis inventés, 2 au même point, un QR inventé) : **80 verts** ; sur le build
-  d'avant : **12 rouges** (pas groupé, pas en chasse fixe, pas sur blanc, pas de logo, pas d'état daté, pas de gestes, billets
-  collés).
+- Banc `scripts/bancs/retrait-billet.cjs` (3 colis inventés reliés à leurs achats, 2 au même point, un VRAI QR du code par
+  qrcode-generator) : code, QR, bandeau, photo, un seul niveau, hauteur ≤ 240, aucun bleu, aucun « Copier », plein écran — voir le
+  compte rendu de fin pour les chiffres ; sur le build d'avant : rouge.
 - `audit-identite`, `audit-traduction`, `audit-quoi-de-neuf`, `audit-icones`, `audit-tdz`, `audit-variables`,
   `audit-relier-glisser` (75), `audit-liaison-achat` (37), `audit-retraits-visuel`, `audit-retraits-parfaits`,
   `audit-pluriels-croises` verts. `audit-boutons-natifs` rouge AUSSI avant (AchatsTableau ligne 30, Reglages) : pas touché.
