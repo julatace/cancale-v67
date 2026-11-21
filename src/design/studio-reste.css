@@ -22,15 +22,15 @@
 /* ══ 0. JETONS PROPRES À CE CHANTIER (la fondation, studio.css, porte tous les autres — les copies
    « provisoire » d'avant la fusion sont retirées, 14 nov., version studio). `:where` : spécificité nulle. */
 :where(:root) { --sb-sur-encre: #FFFFFF;  }
-:where(:root[data-theme="dark"]) { --sb-sur-encre: #0C1D30;  }
+:where(:root[data-theme="dark"]) { --sb-sur-encre: #1C1C20;  }
 @media (prefers-color-scheme: dark) {
-  :where(:root:not([data-theme="light"])) { --sb-sur-encre: #0C1D30;  }
+  :where(:root:not([data-theme="light"])) { --sb-sur-encre: #1C1C20;  }
 }
 /* L'aplat de chaque espace : ±2 points, jamais une autre teinte. */
-:where([data-espace="argent"]) { --sb-aplat: #D6E8F5; }
-[data-espace="autres"] { --sb-aplat: #D7E9F6; }
-:where(:root[data-theme="dark"] [data-espace="argent"]) { --sb-aplat: #0D192A; }
-:root[data-theme="dark"] [data-espace="autres"] { --sb-aplat: #0D1A2C; }
+:where([data-espace="argent"]) { --sb-aplat: #E1E5EA; }
+[data-espace="autres"] { --sb-aplat: #E3E6EA; }
+:where(:root[data-theme="dark"] [data-espace="argent"]) { --sb-aplat: #1A1A1D; }
+:root[data-theme="dark"] [data-espace="autres"] { --sb-aplat: #1B1B1E; }
 
 /* ══ 3 bis. LES JETONS D'AVANT LISENT CEUX DU STUDIO (dans ce chantier seulement) ══
    Le système d'avant (`--d-*`, styles-systeme.css) est lu par toutes les autres familles :
@@ -102,7 +102,7 @@
   background-color: var(--sb-aplat) !important;
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root body .vrm-cx[data-espace="autres"] { background-image: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important; }
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-cx[data-espace="autres"] { background-image: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-marque { background: transparent !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-aurore { display: none !important; }
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-logo { min-height: 44px !important; }
@@ -147,7 +147,7 @@
 :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu { display: none; }
 @media (min-width: 1180px) {
   :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu { display: block; position: absolute; right: 20px; top: 50%; transform: translateY(-46%); width: 204px; margin: 0; }
-  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu > span { display: block; background: #0C1D30; padding: 6px; border-radius: 40px; box-shadow: var(--sb-ombre-avant); }
+  :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu > span { display: block; background: #1C1C20; padding: 6px; border-radius: 40px; box-shadow: var(--sb-ombre-avant); }
   :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu img { display: block; width: 100%; height: auto; border-radius: 34px; }
   :root:root:root:root:root:root body .vrm-cx .vrm-cx-apercu figcaption { margin-top: 12px; font-size: 12px; line-height: 1.4; color: var(--sb-encre-2) !important; text-align: center; }
 }
@@ -175,7 +175,7 @@
 }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(110, 110, 115)"], [style*="color: rgb(152, 152, 157)"], [style*="color:#6E6E73"]):not(svg *) { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(29, 29, 31)"], [style*="color: rgb(245, 245, 247)"]):not(svg *) { color: var(--sb-encre) !important; }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(0, 102, 204)"], [style*="color: rgb(64, 156, 255)"]):not(svg *) { color: var(--sb-lien) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(11, 81, 57)"], [style*="color: rgb(63, 212, 154)"]):not(svg *) { color: var(--sb-lien) !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is([style*="color: rgb(178, 80, 0)"], [style*="color: rgb(255, 179, 64)"]):not(svg *) { color: var(--sb-ambre) !important; }
 
 /* Le grand titre d'écran : Urbanist 34 (38 à l'ordinateur), 400, serré. */
@@ -415,7 +415,7 @@
   background: rgb(255 255 255 / .80) !important; border: 0 !important; border-radius: var(--sb-r-plan) !important; overflow: hidden !important;
   box-shadow: inset 0 .5px 0 rgb(255 255 255 / .95), 0 0 0 .5px rgb(var(--sb-o) / .10), 0 12px 26px -14px rgb(var(--sb-o) / .25) !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root body [data-tache="messages"] .vrm-msg-list { background: rgb(20 35 54 / .82) !important; box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06), 0 0 0 .5px rgb(0 0 0 / .5) !important; }
+:root[data-theme="dark"]:root:root:root:root:root body [data-tache="messages"] .vrm-msg-list { background: rgb(35 35 39 / .82) !important; box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06), 0 0 0 .5px rgb(0 0 0 / .5) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-inbox-row {
   background: transparent !important; border: 0 !important; box-shadow: none !important; min-height: 72px !important; padding: 0 16px 0 12px !important; gap: 12px !important;
   color: var(--sb-encre) !important; border-radius: 0 !important; position: relative !important; content-visibility: auto; contain-intrinsic-size: auto 72px;
@@ -425,9 +425,9 @@
 }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-inbox-row:active { background: rgb(var(--sb-o) / .05) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-inbox-row :is(.vrm-msg-av, .vrm-msg-av img) {
-  width: 48px !important; height: 48px !important; border-radius: 12px !important; background: #F1F5F9 !important; box-shadow: none !important; object-fit: cover !important;
+  width: 48px !important; height: 48px !important; border-radius: 12px !important; background: #F3F5F7 !important; box-shadow: none !important; object-fit: cover !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root body [data-tache="messages"] .vrm-inbox-row :is(.vrm-msg-av, .vrm-msg-av img) { background: #1C2E46 !important; }
+:root[data-theme="dark"]:root:root:root:root:root body [data-tache="messages"] .vrm-inbox-row :is(.vrm-msg-av, .vrm-msg-av img) { background: #2E2E34 !important; }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-msg-l1 { font: 600 15px/1.2 var(--sb-police-texte) !important; letter-spacing: -.008em !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] .vrm-msg-l1 :is(time, small, .vrm-msg-heure, span:last-child) { font: 500 12.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body [data-tache="messages"] :is(.vrm-msg-article, .vrm-msg-paire) { font: 500 12.5px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
@@ -481,7 +481,7 @@
   background-image: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root[data-theme="dark"]:root:root:root:root:root body .vrm-chat-panel {
-  background-image: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
+  background-image: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root:root:root:root:root:root body .vrm-chat-panel :is(.vrm-chat-tete, .vrm-chat-pied, .vrm-chat-entete, header, footer) { background: transparent !important; border-color: rgb(var(--sb-o) / .10) !important; }
 /* La barre d'outils de Messages : pas de bandeau derrière le champ. */
@@ -543,7 +543,7 @@
    Porcelaine, rayon 28 en haut, ombre de premier plan ; le voile est un bleu à 60 %
    (l'écran derrière recule). Partout dans l'app : ce sont des feuilles communes. */
 :root:root:root:root:root:root body .vrm-fs-voile { background: rgb(var(--sb-o) / .28) !important; -webkit-backdrop-filter: blur(1.5px) !important; backdrop-filter: blur(1.5px) !important; }
-:root[data-theme="dark"]:root:root:root:root:root body .vrm-fs-voile { background: rgb(2 8 16 / .62) !important; }
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-fs-voile { background: rgb(8 8 10 / .62) !important; }
 :root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) {
   background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important;
   border: 0 !important; box-shadow: var(--sb-ombre-avant) !important; border-top-left-radius: var(--sb-r-plan) !important; border-top-right-radius: var(--sb-r-plan) !important;

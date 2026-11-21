@@ -221,7 +221,7 @@ function PhotoStockHl({ src, style, initiale }) {
   if (!a || ko) return <span className="vrm-s2d-sansphoto" aria-hidden="true" data-photo-hl="absente" data-sans-photo=""><Icon name="box" size={18} /></span>;
   return <img src={a} alt="" decoding="async" style={style} data-photo-hl="gardee" onError={() => setKo(true)} />;
 }
-function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
+function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false, aEcrire = null } = {}) {
   const motsStock = useMotsArticle();
   const designV2 = useDesignV2();   // (17 nov., lot stock-rangement) éteint : l'écran d'avant, à l'identique   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
   const exemplesStock = useExemplesVendeur();   // (11 nov., lot DJ2) le nom d’emballage proposé
@@ -946,7 +946,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <div><div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform:'none' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.depuisGauche')}</span></div>; })()}
           {!m && !sold && (() => { const c = caseProposeeDe(modal.cle); return c ? <div data-fiche-case-proposee={c.meubleId + ':' + c.i} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 6 }}>{tr('stock.caseProposee', { meuble: c.meuble, rangee: c.rangee, colonne: c.colonne })}</div> : null; })()}
@@ -1525,7 +1525,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
     </div> } : null;
   const sV2 = designV2 ? {
-    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2,
+    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2, aEcrire,   // (21 nov.) « À écrire sur tes cartons » : SOUS le titre
     versAnnonces: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} },
     Icon, Photo: PhotoVinted, Mic: MicDictee, Feuille: SheetShell, dicteeOk: DICTEE_OK, mots: motsStock,
     nombres: { etat: lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu'), attente: lecture === undefined,
@@ -1782,7 +1782,7 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   </div>);
 }
 
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false,aEcrire=null}) {
   const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
   const designV2 = useDesignV2();   // (17 nov., lot stock-rangement)
   const [searchInput,setSearchInput]=useState('');
@@ -2004,7 +2004,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // (17 nov., lot stock-rangement) Nouveau design (essai) : la tête est celle de src/stockV2/StockV2.jsx (grand titre, deux ronds).
   if (designV2) return (
     <div className="vrm-ms-stock sr-hote sm-hote" data-refonte-ms="stock" data-sr-garage="">
-      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
+      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus} aEcrire={aEcrire}/>
     </div>
   );
   return (
@@ -2016,7 +2016,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           <BoutonIcone label={tr('stock.trouverPhoto')} data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} title={`Photographie ${motsStock.le} : VRM montre les annonces qui lui ressemblent`}><Icon name="camera" size={22}/></BoutonIcone>
           <BoutonIcone label={tr('stock.faireInventaire')} data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}><Icon name="scan" size={22}/></BoutonIcone>
         </div>}/>
-
+      {aEcrire}
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
       {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus
@@ -2574,7 +2574,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>N°</div>
                 <div style={{fontSize:20,fontWeight:700,color:C.text,lineHeight:1}}>{p.numero}</div>
               </div>
               <div style={{flex:1,minWidth:0}}>

@@ -418,18 +418,18 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet 
             la vente passe dans « Prêts à poster ». */}
         {aGenerer.length > 0 && (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px 2px' }}>
-            <div style={{ flex: 1, fontSize: 11, color: C.warn, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Bordereau à générer ({aGenerer.length})</div>
+            <div style={{ flex: 1, fontSize: 11, color: C.warn, textTransform:'none', letterSpacing:'normal', fontWeight: 700 }}>Bordereau à générer ({aGenerer.length})</div>
             {aGenerer.length > 1 && <button type="button" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`Ouvrir ${aGenerer.length} ventes Leboncoin pour générer leurs bordereaux ?`)) return; aGenerer.forEach(o => { try { window.open(lbcUrl(o), '_blank', 'noopener'); } catch (_) {} }); }}
               style={{ flexShrink: 0, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Générer tous ↗</button>}
           </div>
           {aGenerer.map(o => carte(o, { principal: 'generer' }))}
         </>)}
         {/* ── PRÊTS À POSTER : bordereau dispo → imprimer + étiquette N° + QR ──── */}
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: (aGenerer.length ? '16px' : '2px') + ' 0 8px 2px' }}>Prêts à poster ({prets.length})</div>
+        <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, margin: (aGenerer.length ? '16px' : '2px') + ' 0 8px 2px' }}>Prêts à poster ({prets.length})</div>
         {prets.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 13, color: C.muted }}>{aGenerer.length ? 'Génère les bordereaux ci-dessus, ils arriveront ici.' : 'Rien à poster — tout est parti. 👌'}</div></Card>
           : prets.map(o => carte(o, { principal: 'imprimer' }))}
         {postes.length > 0 && (<>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>En livraison ({postes.length})</div>
+          <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, margin: '16px 0 8px 2px' }}>En livraison ({postes.length})</div>
           <Card>
             {postes.map((o, i) => { const n = numDe(o); const lbl = o.label || {}; return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>

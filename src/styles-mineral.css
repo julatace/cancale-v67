@@ -1,11 +1,11 @@
 /* Direction claire Minéral. Chargée après la feuille historique.
    La classe de bouton est opt-in : aucune modification du display des rails,
    mini-actions, chiffres cliquables ou menus historiques. */
-:root[data-theme="light"] { --vrm-focus:#0071E3; }
+:root[data-theme="light"] { --vrm-focus:#0F6B4C; }
 :root[data-theme="light"] body { background:#FFFFFF; }
 :root[data-theme="light"] body::before { content:none; }
 :root[data-theme="light"] ::selection { background:rgba(0,0,0,.16); }
-:root[data-theme="light"] :focus-visible { outline:2px solid #0071E3; outline-offset:3px; }
+:root[data-theme="light"] :focus-visible { outline:2px solid #0F6B4C; outline-offset:3px; }
 .vrm-button {
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
   min-height:44px; max-width:100%; padding:11px 18px; border-radius:12px;
@@ -17,7 +17,7 @@
 .vrm-button svg { flex-shrink:0; }
 .vrm-button:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
 .vrm-button:active:not(:disabled) { transform:translateY(1px); }
-.vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#0071E3); outline-offset:3px; }
+.vrm-button:focus-visible { outline:2px solid var(--vrm-focus,#0F6B4C); outline-offset:3px; }
 
 /* Une navigation par plateforme et des pages composées dans le même gabarit. */
 .vrm-screen-head .vrm-tete-row > div:first-child > span[aria-hidden] { display:none; }
@@ -146,7 +146,7 @@
 .vrm-message-workspace { display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:14px; align-items:start; }
 .vrm-inbox-column { min-width:0; }
 .vrm-chat-column { min-width:0; position:sticky; top:0; }
-.vrm-inbox-row.is-current { background:var(--vrm-bg) !important; box-shadow:inset 3px 0 #0071E3; }
+.vrm-inbox-row.is-current { background:var(--vrm-bg) !important; box-shadow:inset 3px 0 #0F6B4C; }
 .vrm-chat-inline { position:static !important; inset:auto !important; background:transparent !important; z-index:auto !important; align-items:stretch !important; }
 .vrm-chat-inline .vrm-chat-panel { width:100% !important; max-width:none !important; height:620px; max-height:calc(100dvh - 150px) !important; border:1px solid var(--vrm-line); border-radius:12px !important; }
 .vrm-chat-history { min-height:0; overscroll-behavior:contain; }
@@ -298,7 +298,7 @@
 .vrm-inbox-feedback { color:var(--vrm-muted); font-size:12px; padding:12px 0; }
 .vrm-inbox-row { border-radius:0 !important; padding:14px 12px !important; }
 .vrm-inbox-row > img { width:46px !important; height:58px !important; border-radius:6px !important; }
-.vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#0071E3); }
+.vrm-inbox-row.is-current { background:var(--vrm-surface) !important; box-shadow:inset 3px 0 var(--vrm-focus,#0F6B4C); }
 .vrm-inbox-column input[type="search"] { border-radius:12px !important; background:var(--vrm-surface) !important; }
 .vrm-chat-empty { border-style:dashed; background:transparent; min-height:320px; }
 @media(hover:hover) and (pointer:fine) {
@@ -410,7 +410,7 @@
 
 /* Commandes : cible claire, focus visible et états explicites. */
 .vrm-app-shell button { touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-.vrm-app-shell button:focus-visible, .vrm-app-shell summary:focus-visible, .vrm-app-shell a:focus-visible { outline:2px solid var(--vrm-focus,#0071E3); outline-offset:3px; }
+.vrm-app-shell button:focus-visible, .vrm-app-shell summary:focus-visible, .vrm-app-shell a:focus-visible { outline:2px solid var(--vrm-focus,#0F6B4C); outline-offset:3px; }
 .vrm-app-shell button:disabled { cursor:not-allowed; }
 .vrm-icon-control { min-width:36px; min-height:36px; }
 @media(hover:hover) and (pointer:fine) {
@@ -445,7 +445,7 @@
 }
 .vrm-setting-switch { min-width:46px; min-height:44px; height:44px !important; background:transparent !important; border:0 !important; }
 .vrm-setting-switch::before { content:''; position:absolute; left:0; top:calc(50% - 13.5px); width:46px; height:27px; border:1px solid var(--vrm-line); border-radius:999px; background:var(--vrm-bg); }
-.vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#0071E3); border-color:var(--vrm-focus,#0071E3); }
+.vrm-setting-switch[aria-checked="true"]::before { background:var(--vrm-focus,#0F6B4C); border-color:var(--vrm-focus,#0F6B4C); }
 .vrm-setting-switch > span { top:calc(50% - 10.5px) !important; }
 .vrm-pickup-point { position:relative; overflow:visible !important; }
 .vrm-pickup-point > div:first-child { padding-right:54px !important; border-radius:12px 12px 0 0; }
@@ -498,7 +498,7 @@
 .vrm-day-top { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-bottom:16px; }
 .vrm-day-card { border-radius:12px; padding:18px; box-sizing:border-box; min-width:0; }
 .vrm-day-head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:20px; }
-.vrm-day-k { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; line-height:1.3; }
+.vrm-day-k { font-size:11px; font-weight:600; letter-spacing: normal; text-transform: none; line-height:1.3; }
 .vrm-day-lien { border:0; background:transparent; padding:0; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; min-height:0; white-space:nowrap; }
 .vrm-day-hero-n { font-size:44px; font-weight:700; letter-spacing:-.035em; line-height:1; margin-top:12px; font-variant-numeric:tabular-nums; }
 .vrm-day-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; font-size:13px; margin-top:10px; line-height:1.4; }
@@ -726,14 +726,14 @@
 .vrm-msg-search { display:flex; align-items:center; gap:8px; padding:0 12px; margin:0 0 12px; border-radius:12px; background:var(--vrm-surface,#fff); border:1px solid var(--vrm-line,#E5E5EA); box-sizing:border-box; cursor:text; }
 .vrm-msg-search > svg { flex-shrink:0; }
 .vrm-msg-search input, .vrm-inbox-column .vrm-msg-search input[type="search"] { flex:1; min-width:0; height:44px; min-height:44px !important; border:0 !important; border-radius:0 !important; background:transparent !important; padding:0 !important; outline:none; font:400 15px Inter,system-ui,sans-serif; box-shadow:none !important; }
-.vrm-msg-search:focus-within { border-color:var(--vrm-focus,#0071E3); }
+.vrm-msg-search:focus-within { border-color:var(--vrm-focus,#0F6B4C); }
 .vrm-achats .vrm-reception-sum { min-height:44px; box-sizing:border-box; padding:0 !important; font-size:12px !important; }
 
 /* ── ACHATS ──────────────────────────────────────────────────────────── */
 .vrm-achats-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-radius:12px; overflow:hidden; margin:0 0 16px; }
 .vrm-achats-kpi { padding:14px 16px; min-width:0; border:0 solid; border-left-width:1px; }
 .vrm-achats-kpi:first-child { border-left-width:0; }
-.vrm-achats-kpi-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; line-height:1.3; }
+.vrm-achats-kpi-k { font-size:11px; font-weight:600; letter-spacing: normal; text-transform: none; line-height:1.3; }
 .vrm-achats-kpi-v { font-size:22px; font-weight:700; letter-spacing:-.02em; line-height:1.15; margin-top:6px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .vrm-achats-kpi-s { font-size:12px; line-height:1.35; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media(max-width:767px){
@@ -834,7 +834,7 @@
 /* Le ticket du code : le libellé et « Copier » sur une ligne, le code dessous,
    en grand, jamais coupé. */
 .vrm-achats .vrm-pickup-code { display:grid !important; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"lab copie" "code code"; align-items:center !important; justify-items:start; gap:2px 12px !important; min-height:56px !important; padding:8px 14px !important; border-radius:12px !important; box-sizing:border-box; text-align:left; }
-.vrm-achats .vrm-pickup-code > span { grid-area:lab; font-size:11px !important; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--vrm-muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.vrm-achats .vrm-pickup-code > span { grid-area:lab; font-size:11px !important; font-weight:600; letter-spacing: normal; text-transform: none; color:var(--vrm-muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vrm-achats .vrm-pickup-code > strong { grid-area:code; font-size:22px; letter-spacing:.08em !important; white-space:nowrap; }
 .vrm-achats .vrm-pickup-code > small { grid-area:copie; font-size:11px !important; white-space:nowrap; }
 .vrm-achats .vrm-pickup-collect { flex:0 0 auto; align-self:stretch; min-height:44px !important; padding:0 14px !important; font-size:13px !important; border-radius:12px !important; }
@@ -868,7 +868,7 @@
 .vrm-msg-bar > .vrm-inbox-filters button span { font-size:12px !important; font-weight:400; }
 .vrm-msg-refresh { margin-left:auto; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:0; border-radius:12px; background:transparent; color:var(--vrm-muted); cursor:pointer; flex-shrink:0; }
 .vrm-msg-list { border-radius:12px; overflow:hidden; }
-.vrm-msg-section { display:flex; align-items:center; gap:8px; padding:10px 16px 8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+.vrm-msg-section { display:flex; align-items:center; gap:8px; padding:10px 16px 8px; font-size:11px; font-weight:600; letter-spacing: normal; text-transform: none; }
 .vrm-msg-section-ro { display:block; padding:12px 16px 10px; }
 .vrm-msg-section-t { display:flex; align-items:center; gap:7px; }
 .vrm-msg-section-p { font-size:13px; font-weight:400; letter-spacing:0; text-transform:none; line-height:1.45; margin-top:4px; }
@@ -887,7 +887,7 @@
 .vrm-inbox-row[data-nonlu] .vrm-msg-extrait { font-weight:400; }
 .vrm-msg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 .vrm-msg-more { display:block; width:100%; min-height:44px; margin:8px 0 0; border:0; border-radius:12px; background:transparent; font:600 13px Inter,system-ui,sans-serif; cursor:pointer; }
-.vrm-inbox-row.is-current { box-shadow:inset 3px 0 var(--vrm-focus,#0071E3) !important; }
+.vrm-inbox-row.is-current { box-shadow:inset 3px 0 var(--vrm-focus,#0F6B4C) !important; }
 @media(max-width:767px){
   .vrm-msg-list { border-radius:0 !important; border-left:0 !important; border-right:0 !important; margin:0 -14px; }
   .vrm-main .vrm-msg-bar > .vrm-inbox-filters button { min-height:44px !important; }
@@ -910,7 +910,7 @@
 .vrm-chat-link { display:inline-flex; align-items:center; min-height:44px; margin:-8px 4px -10px; font-size:13px; font-weight:600; text-decoration:none; }
 .vrm-chat-event { align-self:center; max-width:88%; text-align:center; font-size:12px; line-height:1.4; margin:10px 0 4px; }
 .vrm-chat-event-colis { border-radius:12px; padding:10px 14px; }
-.vrm-chat-event-k { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; margin-bottom:4px; }
+.vrm-chat-event-k { font-size:11px; font-weight:600; letter-spacing: normal; text-transform: none; margin-bottom:4px; }
 .vrm-chat-foot { flex-shrink:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); box-sizing:border-box; }
 .vrm-chat-note { display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.45; margin:0 0 10px; }
 .vrm-chat-offre { border-radius:12px; padding:12px; margin:0 0 10px; }
@@ -1085,7 +1085,7 @@
   vertical-align:middle; overflow-wrap:anywhere;
 }
 .vrm-input { transition:border-color .14s ease,box-shadow .14s ease; }
-.vrm-input:focus-visible { outline:2px solid var(--vrm-focus,#0071E3); outline-offset:2px; }
+.vrm-input:focus-visible { outline:2px solid var(--vrm-focus,#0F6B4C); outline-offset:2px; }
 @media(hover:hover) and (pointer:fine) {
   .vrm-button--secondary:hover:not(:disabled) {
     background:color-mix(in srgb,currentColor 5%,transparent) !important;
@@ -1348,4 +1348,4 @@
 /* (5 nov.) Achats : un titre long tient sur deux lignes ; le message d'une liste vide. */
 .vrm-main .vrm-buy-title { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
 .vrm-achats-vide { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; min-height:44px; margin:4px 0 14px; font-size:15px; }
-.vrm-achats-vide .vrm-lien-action { min-height:44px; border:0; background:transparent; padding:0; font:inherit; font-weight:600; color:var(--fu-lien, #0066cc); cursor:pointer; }
+.vrm-achats-vide .vrm-lien-action { min-height:44px; border:0; background:transparent; padding:0; font:inherit; font-weight:600; color:var(--fu-lien, #0B5139); cursor:pointer; }

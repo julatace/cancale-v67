@@ -1835,9 +1835,9 @@ const THEMES = {
     // Version claire de l'identité « Menthe » : accent menthe profonde (bon
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
     bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
-    accent:"#0071E3", accentSoft:"#8DB8F2", onAccent:"#FFFFFF",
+    accent:"#0F6B4C", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
-    blue:"#0071E3", purple:"#5B4B9E", text:"#000000", muted:"#636366",
+    blue:"#0F6B4C", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
     // du papier n'ont plus de sens ici.
@@ -1850,7 +1850,7 @@ const THEMES = {
     shadow:"0 1px 2px rgba(0,0,0,.04), 0 3px 8px rgba(0,0,0,.05)",
     shadowMd:"0 1px 2px rgba(0,0,0,.05), 0 8px 22px rgba(0,0,0,.07)",
     shadowLg:"0 2px 6px rgba(0,0,0,.06), 0 22px 50px rgba(0,0,0,.13)",
-    ring:"rgba(36,88,230,.16)",
+    ring:"rgba(15,107,76,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
@@ -1858,7 +1858,7 @@ const THEMES = {
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#8E8E93", chromeLine:"#1D1D1F",
-    s1:"#0071E3", s2:"#8DB8F2",
+    s1:"#0F6B4C", s2:"#B5BDCA",
     // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
     // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
     // filet fin (`hair`) et le verre des barres de la coque (`bar`).
@@ -1882,16 +1882,16 @@ const THEMES = {
     // On garde la règle §7 (UN accent, rare) et la hiérarchie du sombre :
     // rail (chrome) < page (bg) < cartes (card), marches bien écartées.
     bg:"#000000", surface:"#1C1C1E", card:"#1C1C1E", card2:"#1C1C1E", border:"#2C2C2E",
-    accent:"#8DB8F2", accentSoft:"#8DB8F2", onAccent:"#FFFFFF",
+    accent:"#B5BDCA", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
     danger:"#FF6B6B", warn:"#FFB23E", gold:"#C9AE78",
-    blue:"#8DB8F2", purple:"#A99AF0", text:"#F2F2F7", muted:"#8E8E93",
+    blue:"#B5BDCA", purple:"#A99AF0", text:"#F2F2F7", muted:"#8E8E93",
     shadow:"0 1px 1px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.45)",
     shadowMd:"0 1px 2px rgba(0,0,0,.5), 0 8px 20px rgba(0,0,0,.5)",
     shadowLg:"0 2px 6px rgba(0,0,0,.5), 0 22px 50px rgba(0,0,0,.65)",
-    ring:"rgba(61,123,255,.24)",
+    ring:"rgba(52,190,137,.24)",
     glass:"rgba(0,0,0,.90)",
     chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#6E6E73", chromeLine:"#1C1C1E",
-    s1:"#8DB8F2", s2:"#8DB8F2",
+    s1:"#B5BDCA", s2:"#B5BDCA",
     faint:"#636366", hair:"rgba(255,255,255,.08)", bar:"rgba(0,0,0,.88)",   // §7 : la barre reste la marche la PLUS sombre (rail < page < carte)
   },
 };
@@ -9082,16 +9082,16 @@ const trackUrl = (carrier, suivi, codePostal = '') => { const l = lienSuivi(carr
 // jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre : ni rouge ni violet, §3 et §7).
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
-  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#009BDE', fg: '#fff', retrait: 'qr'   },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#0F6B4C', fg: '#fff', retrait: 'qr'   },
   ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
-  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#009BDE', fg: '#fff', retrait: 'code' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#0F6B4C', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#0071E3', fg: '#FFD200', retrait: 'code' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#0F6B4C', fg: '#FFD200', retrait: 'code' },
   dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#1D1D1F', fg: '#FFFFFF', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
@@ -15720,7 +15720,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
   await pg.render({ canvasContext: c2, viewport: v }).promise;
   if (zone) {
     const H = v0.height;
-    c2.save(); c2.strokeStyle = '#0071E3'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.save(); c2.strokeStyle = '#0F6B4C'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
     c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
   }
   return d.numPages;
@@ -17189,7 +17189,7 @@ const comptesRecherche = (liste) => {
 const MARQUES_PLAT = {
   vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
   leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
-  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0071E3', bord: '#D1D1D6' },
+  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0F6B4C', bord: '#D1D1D6' },
   // (11 nov., « Publier partout ») Vestiaire, en neutre (aucune couleur de marque en plus, §7).
   vestiaire: { nom: 'Vestiaire', court: 'VC', bg: '#fff', fg: '#1d1d1f', bord: '#D1D1D6' },
 };
@@ -17220,7 +17220,7 @@ function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
     lbc:    { bg: LBC_ORANGE, t: 'leboncoin' },
-    ebay:   { bg: '#0071E3', t: 'eBay' },
+    ebay:   { bg: '#0F6B4C', t: 'eBay' },
   };
   const m = M[p]; if (!m) return null;
   return (
@@ -17562,7 +17562,7 @@ function CourbeVentes({ jours, hauteur = 70, surSombre = false, libDebut = null,
         {pts.map((p, i) => <rect key={i} x={p[0] - (W / n) / 2} y="0" width={W / n} height={H} fill="transparent"><title>{`${jours[i].long} · ${jours[i].n} vente${jours[i].n > 1 ? 's' : ''} · ${jours[i].eur.toFixed(0)}\u00a0€`}</title></rect>)}
       </svg>
       <div style={{position:'relative',height:0}}>
-        <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(143,178,255,.22)' : C.accent + '33'}`}}/>
+        <span aria-hidden="true" style={{position:'absolute',right:`${(pad / W) * 100}%`,top:-(H - last[1]) - 4,width:8,height:8,marginRight:-4,borderRadius:999,background:trait,boxShadow:`0 0 0 4px ${surSombre ? 'rgba(190,197,208,.22)' : C.accent + '33'}`}}/>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',marginTop:7,fontSize:11,color:texte,fontWeight:400}}>
         <span>{libDebut || court(jours[0])}</span><span>{libFin || "aujourd'hui"}</span>
@@ -21322,13 +21322,13 @@ const BrandMark = ({ id }) => id === 'apple' ? (
   </svg>
 ) : id === 'google' ? (
   <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true" style={{flexShrink:0}}>
-    <path fill="#8DB8F2" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
+    <path fill="#B5BDCA" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>
     <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/>
     <path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/>
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
   </svg>
 ) : (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="#3FD49A" aria-hidden="true" style={{flexShrink:0}}>
     <path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/>
   </svg>
 );
@@ -21801,7 +21801,7 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#0071E3;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#0F6B4C;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#6E6E73;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2C2C2E;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
@@ -23149,7 +23149,7 @@ function JourneeHorsLigne({ uid, tab }) {
   const quand = heurePhoto(photo.at, maintenant);
   const soir = listeDuSoir(photo, maintenant);
   const carte = { background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:'6px 14px', marginBottom:14 };
-  const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
+  const tete = (t, n) => <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,margin:'4px 2px 8px'}}>{t}{n != null ? ` · ${n}` : ''}</div>;
   const limiteTxt = (e) => {
     // (22 oct.) Une ligne qui porte sa limite exacte la dit comme Colis (l'heure
     // lue dans l'email, « en retard » passé l'heure) — `texteLimiteEnvoi`, §11.
@@ -23232,7 +23232,7 @@ function JourneeHorsLigne({ uid, tab }) {
       <LigneEtatHorsLigne at={photo.at} maintenant={maintenant}/>
       {soir && soir.n > 0 && (
         <div data-hl-soir="" data-hl-soir-n={soir.n} data-hl-soir-retard={soir.enRetard} data-hl-soir-verif={soir.aVerifier} data-hl-soir-demain={soir.demain} style={{...carte,padding:'12px 14px'}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,marginBottom:4}}>{tr('journee.listeSoir')}</div>
+          <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,marginBottom:4}}>{tr('journee.listeSoir')}</div>
           <div style={{fontSize:15,color:C.text,lineHeight:1.45}}>
             {tr('journee.demain')} <b>{trj('journee.colis4', { x: soir.n })}</b> {tr('journee.poster')}{soir.enRetard || soir.aVerifier || soir.demain ? ' — ' : ''}
             {[soir.enRetard ? `${soir.enRetard} déjà en retard` : '', soir.aVerifier ? `${soir.aVerifier} à vérifier sur Vinted (date estimée passée)` : '',
@@ -25452,7 +25452,7 @@ function VintedResume({ liveStats, baseKO, siAJour = true, sauf = null, sansMont
   const att = attV.valeur;
   const dAge = liveStats && liveStats.dataAgeJours != null ? liveStats.dataAgeJours : null;
   const box = { flex:'1 1 90px', minWidth:0 };
-  const eti = { fontSize:11, color:C.muted, textTransform:'uppercase', letterSpacing:0.7, fontWeight:600 };
+  const eti = { fontSize:11, color:C.muted, textTransform:'none', letterSpacing:0.7, fontWeight:600 };
   return (
     <>{/* (1er nov.) Sur Annonces, l'argent ne dit rien de la tâche (CA, porte-monnaie :
         Ventes, Statistiques) et poussait les annonces sous la ligne de flottaison ;
@@ -28842,7 +28842,7 @@ function ColisVestiaireBloc({ vc }) {
   // (9 nov., soir, lot AJ) La vente la plus récente en haut (src/ordreRecent.js) ; la limite reste sur la carte.
   const E = ordreRecent(vc.aEnvoyer || [], quandVestiaire), F = ordreRecent(vc.faits || [], quandVestiaire);
   if (!E.length && !F.length) return null;
-  const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
+  const titre = (t, n) => <span style={{ fontSize: 11, fontWeight: 600, letterSpacing:'normal', textTransform:'none', color: C.muted }}>{t} <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {n}</span></span>;
   return (
     <div data-colis-vestiaire={E.length} data-colis-vestiaire-faits={F.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
       {E.length > 0 && <>
@@ -28853,7 +28853,7 @@ function ColisVestiaireBloc({ vc }) {
         </div>
       </>}
       {F.length > 0 && <>
-        <span data-groupe="fait" style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted, marginTop: E.length ? 12 : 0 }}>Vestiaire · déjà postés</span>
+        <span data-groupe="fait" style={{ fontSize: 11, fontWeight: 600, letterSpacing:'normal', textTransform:'none', color: C.muted, marginTop: E.length ? 12 : 0 }}>Vestiaire · déjà postés</span>
         <div className="vrm-colis-grille" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {F.map((v) => <CarteColisVc key={v.id} v={v} imprime={!!loc.imprimes[v.id]} fait={loc.fait[v.id] || true}/>)}
         </div>
@@ -28871,7 +28871,7 @@ function AchatsVestiaireEnRoute({ vc, transporteurDe }) {
   if (!R.length) return null;
   return (
     <section className="vrm-colis-en-route" data-colis-vestiaire-route={R.length} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 18 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: C.muted }}>Achats Vestiaire en route <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {R.length}</span></span>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing:'normal', textTransform:'none', color: C.muted }}>Achats Vestiaire en route <span style={{ color: C.text, fontVariantNumeric: 'tabular-nums' }}>· {R.length}</span></span>
       {R.map((v) => { const tr = transporteurDe ? transporteurDe(v.transporteur, v.suivi) : transporteurDuColis({ declare: v.transporteur, suivi: v.suivi }); return (
         <div key={v.id} data-vc-route={v.id} data-colis-ident={'vcr:' + v.id} data-transporteur={cleStatTransporteur(tr)} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', background: C.card, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{v.nom || 'Article sans nom lu'}</div>
@@ -28988,7 +28988,7 @@ function Door({h}) {
       <rect x={4} y={4} width={W-8} height={H-4} rx={3} fill="#6a4828"/>
       <rect x={8} y={8} width={W-16} height={H-12} rx={2} fill="#c8a060"/>
       <rect x={13} y={14} width={W-26} height={H*0.28} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
-      <rect x={18} y={18} width={W-36} height={H*0.28-8} rx={1} fill="#8DB8F2" opacity="0.4"/>
+      <rect x={18} y={18} width={W-36} height={H*0.28-8} rx={1} fill="#B5BDCA" opacity="0.4"/>
       <rect x={13} y={14+H*0.28+8} width={W-26} height={H*0.42} rx={2} fill="#b08848" stroke="#B25000" strokeWidth="0.8"/>
       <circle cx={W-16} cy={H*0.56} r={5} fill="#d4a820" stroke="#B25000" strokeWidth="1"/>
       <circle cx={W-16} cy={H*0.56} r={2} fill="#ffe060"/>
@@ -29313,7 +29313,7 @@ const FURN_COLORS = ['#c8935f','#8E8E93','#8E8E93','#8E8E93','#c9a24b','#8E8E93'
 const GARAGE_AMBIANCES = [
   { id:'clair',  name:'Clair',        emoji:'☀️', bg:'#F2F2F7', sky:'#F2F2F7', ground:'#AEAEB2', hemi:0.92, ambient:0.20, sun:'#F2F2F7', sunI:1.05, fill:'#E5E5EA', fillI:0.32, wall:null,      floor:null,      exposure:1.12 },
   { id:'chaud',  name:'Chaleureux',   emoji:'🔥', bg:'#E5E5EA', sky:'#FFF4E5', ground:'#6E6E73', hemi:0.95, ambient:0.22, sun:'#ffd6a0', sunI:1.15, fill:'#E5E5EA', fillI:0.24, wall:'#E5E5EA', floor:'#FFF4E5', exposure:1.15 },
-  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#1C1C1E', sky:'#3a4a80', ground:'#000000', hemi:0.55, ambient:0.16, sun:'#8DB8F2', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#1C1C1E', floor:'#2C2C2E', exposure:1.28 },
+  { id:'nuit',   name:'Néon nuit',    emoji:'🌙', bg:'#1C1C1E', sky:'#3a4a80', ground:'#000000', hemi:0.55, ambient:0.16, sun:'#B5BDCA', sunI:0.85, fill:'#ff5fae', fillI:0.55, wall:'#1C1C1E', floor:'#2C2C2E', exposure:1.28 },
   { id:'luxe',   name:'Boutique luxe',emoji:'✨', bg:'#1C1C1E', sky:'#FFF4E5', ground:'#1C1C1E', hemi:0.50, ambient:0.20, sun:'#ffcf85', sunI:1.15, fill:'#FFF4E5', fillI:0.30, wall:'#1D1D1F', floor:'#48484A', exposure:1.20 },
   { id:'beton',  name:'Atelier béton',emoji:'🏗️', bg:'#D1D1D6', sky:'#E5E5EA', ground:'#8E8E93', hemi:0.90, ambient:0.26, sun:'#F2F2F7', sunI:1.00, fill:'#E5E5EA', fillI:0.32, wall:'#C7C7CC', floor:'#C7C7CC', exposure:1.08 },
 ];
@@ -32044,7 +32044,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
         
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}44`,borderRadius:12,padding:14}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📤 Exporter</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:4}}>📤 Exporter</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               <b>{catalog.length}</b> articles ·<b>{sales.length}</b> ventes
             </div>
@@ -32052,7 +32052,7 @@ function BackupModal({catalog,sales,garageGrid,blockedCells,onClose,onImport}) {
           </div>
 
           <div style={{background:`${C.warn}11`,border:`1px solid ${C.warn}44`,borderRadius:12,padding:14}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>📥 Restaurer</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:4}}>📥 Restaurer</div>
             <div style={{fontSize:12,color:C.text,marginBottom:10}}>
               ⚠️ Cela remplacera toutes tes données actuelles
             </div>
@@ -32220,7 +32220,7 @@ const INV_STATUS = {
   // sous un texte blanc : en sombre l'encre est presque blanche (les deux
   // endroits qui le faisaient prennent l'accent, `onAccent`).
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#0071E3', icon: '⏳' },
+  pending_sale: { label: 'Vente en cours', color: '#0F6B4C', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
   stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
 };
@@ -52460,7 +52460,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return (
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
-                <h1 className="vrm-fu-titre-tete sj-titre">{tr('reglages.ma-journee.lib')}</h1>
+                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » (celui de la coque). */}
                 {AF.alertes || null}
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
@@ -54334,7 +54334,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                           novice lise l'ADRESSE comme une destination, pas comme un
                           titre. Lieu inconnu → on ne ment pas, on renvoie à la
                           source (e-mail du transporteur). */}
-                      <div className="vrm-pickup-location-label" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{g.lieuInconnu?tr('achats.pointRelais'):tr('achats.va')}</div>
+                      <div className="vrm-pickup-location-label" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>{g.lieuInconnu?tr('achats.pointRelais'):tr('achats.va')}</div>
                       <div style={{fontSize:15,fontWeight:700,color:C.text,whiteSpace:g.lieuInconnu?'normal':'nowrap',overflow:'hidden',textOverflow:'ellipsis',lineHeight:1.25}}>{nom}</div>
                       {g.lieuInconnu && <div style={{fontSize:11,color:C.muted,marginTop:1}}>{tr('achats.adresseExacteDans')}</div>}
                     </div>
@@ -54570,7 +54570,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                           « Va à : … » ; lieu inconnu → on le DIT en clair (le lieu
                           ET le code sont dans la conversation Vinted), jamais un
                           libellé vague qu'un novice ne comprend pas. */}
-                      <div className="vrm-pickup-location-label" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.6}}>{pt.nom?tr('achats.va'):tr('achats.pointRelais')}</div>
+                      <div className="vrm-pickup-location-label" style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>{pt.nom?tr('achats.va'):tr('achats.pointRelais')}</div>
                       <div data-relais-nom="" style={{fontSize:15,fontWeight:700,color:C.text,lineHeight:1.25,overflowWrap:'anywhere'}}>{pt.nom || tr('achats.voirDansConversation')}</div>
                       {adresseSuite && <div data-relais-adresse="" style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.35,overflowWrap:'anywhere'}}>{adresseSuite}</div>}
                       {(transpUn || memeCompte) && <div data-relais-transporteur={transpUn||''} style={{fontSize:11,color:C.muted,marginTop:2}}>{[transpUn ? CARRIERS[transpUn].name : '', memeCompte].filter(Boolean).join(' · ')}</div>}
@@ -54642,8 +54642,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{tr('achats.identifiant')}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?tr('achats.ouverture'):tr('achats.code3')}</div><div className="vrm-sensible" data-stream-type="code" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:600}}>{tr('achats.identifiant')}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:'normal'}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:600}}>{id2?tr('achats.ouverture'):tr('achats.code3')}</div><div className="vrm-sensible" data-stream-type="code" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:'normal'}}>{cd}</div></div>}
                         </div>
                       )}
                       <Bouton variante="discret" onClick={()=>unmarkCollected(t)} title={tr('achats.annulerJeAi')} aria-label={tr('achats.annulerJeAi')} style={{flexShrink:0,marginLeft:'auto'}}>{tr('achats.remettre')}</Bouton>
@@ -54684,8 +54684,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       )}
                       {!qi && (cd||id2) && (
                         <div style={{flexShrink:0,display:'flex',gap:5}}>
-                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{tr('achats.identifiant')}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{id2}</div></div>}
-                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:600}}>{id2?tr('achats.ouverture'):tr('achats.code3')}</div><div className="vrm-sensible" data-stream-type="code" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:1}}>{cd}</div></div>}
+                          {id2 && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:600}}>{tr('achats.identifiant')}</div><div style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:'normal'}}>{id2}</div></div>}
+                          {cd && <div style={{textAlign:'center',border:`1px solid ${C.border}`,borderRadius:12,padding:'3px 8px'}}><div style={{fontSize:7.5,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:600}}>{id2?tr('achats.ouverture'):tr('achats.code3')}</div><div className="vrm-sensible" data-stream-type="code" style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:'monospace',letterSpacing:'normal'}}>{cd}</div></div>}
                         </div>
                       )}
                       <Bouton variante="discret" onClick={()=>unmarkPickupDone(o)} title={tr('achats.annulerJeAi')} aria-label={tr('achats.annulerJeAi')} style={{flexShrink:0,marginLeft:'auto'}}>{tr('achats.remettre')}</Bouton>
@@ -58427,7 +58427,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
                 // (14 nov., Studio) Les tuiles-filtres sont rendues dans la TÊTE de « À expédier » (sous le grand chiffre) : mêmes
                 // valeurs (`filtreEnvoyer`), même règle de repli (`filtrerEnvoyes`), ici seulement la liste filtrée.
-                const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
+                const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
                   if (e.__autre === 'eb') {
@@ -59645,12 +59645,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       return (
                       <div data-ia-etiquette={etq.pose?etq.place:(etq.refus?'refus':'aucune')} style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400,marginBottom:2}}>Titre proposé</div>
+                          <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400,marginBottom:2}}>Titre proposé</div>
                           <div style={{fontSize:13,color:C.text,fontWeight:600}}>{tIA}</div>
                           <button type="button" onClick={()=>copyText(tIA,'iat'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iat'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iat'+k?'✓ Copié':'Copier le titre'}</button>
                         </div>
                         <div style={{border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 10px',background:C.card2||C.card}}>
-                          <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400,marginBottom:2}}>Description proposée</div>
+                          <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400,marginBottom:2}}>Description proposée</div>
                           <div style={{fontSize:13,color:C.text,whiteSpace:'pre-wrap',lineHeight:1.45}}>{dIA}</div>
                           <button type="button" onClick={()=>copyText(dIA,'iad'+k)} style={{marginTop:6,border:`1px solid ${C.border}`,background:'transparent',color:copied==='iad'+k?C.accent:C.text,borderRadius:12,padding:'5px 10px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>{copied==='iad'+k?'✓ Copié':'Copier la description'}</button>
                         </div>
@@ -60053,7 +60053,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const cards = [];
         cards.push({ bg:FOND_ACCENT, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:2,textTransform:'uppercase'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:'normal',textTransform:'none'}}>{w.mode==='month'?'Ton mois':'Ton année'}</div>
             <div style={{fontSize:w.mode==='month'?52:76,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1.05}}>{w.mode==='month'?w.moisNoms[w.mo]:w.yr}</div>
             {w.mode==='month' && <div style={{fontSize:20,fontWeight:700,color:'rgba(255,255,255,0.9)'}}>{w.yr}</div>}
             <div style={{fontSize:15,color:'rgba(255,255,255,0.9)',fontWeight:600,marginTop:14}}>Prêt à revivre {w.mode==='month'?'ton mois':'ta saison'} ? 👉</div>
@@ -60075,21 +60075,21 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         )});
         if(w.topBrand) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta marque star</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:'normal',textTransform:'none'}}>Ta marque star</div>
             <div style={{fontSize:52,fontWeight:700,color:'#fff',letterSpacing:-1,lineHeight:1.05,marginTop:6}}>{w.topBrand[0]}</div>
             <div style={{fontSize:17,color:'#fff',fontWeight:600,marginTop:10}}><CountUp value={w.topBrand[1]}/> articles vendus</div>
           </div>
         )});
         if(w.bestMonth) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ton mois record</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:'normal',textTransform:'none'}}>Ton mois record</div>
             <div style={{fontSize:56,fontWeight:700,color:'#fff',letterSpacing:-1,lineHeight:1,marginTop:6}}>{w.bestMonth.nom}</div>
             <div style={{fontSize:20,color:'#fff',fontWeight:700,marginTop:10}}>{eur0(w.bestMonth.v)}</div>
           </div>
         )});
         if(w.bestPair) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>Article de l'année</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:700,letterSpacing:'normal',textTransform:'none'}}>Article de l'année</div>
             <div style={{width:130,height:130,borderRadius:12,overflow:'hidden',margin:'14px auto',background:'rgba(255,255,255,0.10)',display:'flex',alignItems:'center',justifyContent:'center'}}>{w.bestPair.photo?<PhotoVinted src={w.bestPair.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={40} style={{color:'rgba(255,255,255,0.6)'}}/>}</div>
             <div style={{fontSize:17,fontWeight:700,color:'#fff',padding:'0 20px',lineHeight:1.2}}>{w.bestPair.num?`N°${w.bestPair.num} · `:''}{w.bestPair.title}</div>
             <div style={{fontSize:20,fontWeight:700,color:'#fff',marginTop:8}}>+{eur0(w.bestPair.m)} de bénéfice</div>
@@ -60097,14 +60097,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         )});
         if(w.fastest) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Vente éclair</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:'normal',textTransform:'none'}}>Vente éclair</div>
             <div style={{fontSize:76,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.fastest.j}/> j</div>
             <div style={{fontSize:15,color:'#fff',fontWeight:600,marginTop:10,padding:'0 24px'}}>entre la mise en ligne et la vente{w.fastest.num?` · N°${w.fastest.num}`:''}</div>
           </div>
         )});
         if(w.streak>1) cards.push({ bg:FOND_ENCRE, body:(
           <div style={{textAlign:'center'}}>
-            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:1,textTransform:'uppercase'}}>Ta plus longue série</div>
+            <div style={{fontSize:15,color:'rgba(255,255,255,0.85)',fontWeight:600,letterSpacing:'normal',textTransform:'none'}}>Ta plus longue série</div>
             <div style={{fontSize:88,fontWeight:700,color:'#fff',letterSpacing:'-.03em',lineHeight:1,marginTop:6}}><CountUp value={w.streak}/></div>
             <div style={{fontSize:17,color:'#fff',fontWeight:600}}>jours d'affilée avec une vente</div>
           </div>
@@ -60230,12 +60230,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             </div>
             <div style={{display:'flex',gap:10,padding:'12px 16px',flexShrink:0}}>
               <div style={{flex:1,border:`1px solid ${C.danger}44`,background:`${C.danger}0e`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400}}>Manque à gagner</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400}}>Manque à gagner</div>
                 <div style={{fontSize:20,fontWeight:700,color:C.danger}} data-somme-partielle={disputes.lostS.partiel?'1':'0'}>{disputes.lostS.total==null?'—':<>{disputes.lostS.partiel?'au moins ':''}−{Math.round(disputes.lostS.total)}&nbsp;€</>}</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.salesLost.length} vente{disputes.salesLost.length>1?'s':''} perdue{disputes.salesLost.length>1?'s':''}</div>
               </div>
               <div style={{flex:1,border:`1px solid ${INV_STATUS.online.color}44`,background:`${INV_STATUS.online.color}0e`,borderRadius:12,padding:'10px 12px'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:400}}>Récupéré (achats)</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',fontWeight:400}}>Récupéré (achats)</div>
                 <div style={{fontSize:20,fontWeight:700,color:INV_STATUS.online.color}} data-somme-partielle={disputes.backS.partiel?'1':'0'}>{disputes.backS.total==null?'—':<>{disputes.backS.partiel?'au moins ':''}+{Math.round(disputes.backS.total)}&nbsp;€</>}</div>
                 <div style={{fontSize:11,color:C.muted}}>{disputes.buysBack.length} achat{disputes.buysBack.length>1?'s':''} remboursé{disputes.buysBack.length>1?'s':''}</div>
               </div>
@@ -63013,7 +63013,7 @@ function ColisEquipe({ vendeur, de, onPropre }) {
   const titreEcran = 'Colis à préparer';
   const sous = de ? `Pour ${de}` : null;
   const carte = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 10 };
-  const h3 = { fontSize: 13, fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '.04em', margin: '22px 0 10px' };
+  const h3 = { fontSize: 13, fontWeight: 700, color: C.muted, textTransform:'none', letterSpacing:'normal', margin: '22px 0 10px' };
   let corps;
   if (d === undefined) corps = <div data-equipe-etat="chargement" style={{ fontSize: 15, color: C.muted }}>Lecture des colis…</div>;
   else if (d === null) corps = <div data-equipe-etat="pas-su"><LignePanne>Je n'ai pas pu lire les colis — la base n'a pas répondu. Rien n'est perdu. <button type="button" onClick={charger} style={{ border: 'none', background: 'transparent', color: C.accentTexte, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Réessayer</button></LignePanne></div>;
@@ -68006,7 +68006,7 @@ function AppCoeur() {
               {ligneTexte(l.titre, [l.essentiel.slice(0, 2).join(' · '), jourCourt(em.sourceDate || em.at)].filter(Boolean).join(' · '))}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
-        const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
+        const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
         // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
         // (15 nov., vendre plus) + Stock et Retours ; les groupes suivent `ordre` (le plus probable d'abord).
@@ -69021,8 +69021,8 @@ function AppCoeur() {
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
         <ToastNumeros/>
-        {tab==='garage' ? <GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran> : null}
-        {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
+        {/* (21 nov., style Vintex) « À écrire sur tes cartons » passe SOUS le titre du Stock (`aEcrire`, posé par Garage / StockV2). */}
+        {tab==='garage'   &&<GardeEcran nom="garage"><Garage    aEcrire={<GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran>} catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
         {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}

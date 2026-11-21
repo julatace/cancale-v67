@@ -35,7 +35,7 @@ html body button.vrm-fc-rangee:active { background: var(--d-remplir, rgba(118,11
 .vrm-fc-val.is-vide { color: var(--d-gris, #6E6E73); }
 .vrm-fc-chevron { flex: 0 0 auto; color: var(--d-glyphe, #AEAEB2); font-size: 20px; line-height: 1; margin-left: -4px; }
 
-html body button.vrm-fc-repli, html body button.vrm-fc-fermer { align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: 600 15px/1.2 var(--vrm-police, inherit); color: var(--d-accent-texte, #0066CC); cursor: pointer; }
+html body button.vrm-fc-repli, html body button.vrm-fc-fermer { align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: transparent; font: 600 15px/1.2 var(--vrm-police, inherit); color: var(--d-accent-texte, #0B5139); cursor: pointer; }
 .vrm-fc-chev { font-weight: 400; margin-left: 2px; }
 .vrm-fc-expl { padding: 0 4px; }
 .vrm-fc-expl p { margin: 0 0 6px; font-size: 13px; line-height: 1.45; color: var(--d-gris, #6E6E73); }
@@ -53,7 +53,7 @@ html body button.vrm-cv-bulle { display: grid; place-items: center; padding: 0; 
 html body button.vrm-cv-bulle.vrm-cv-bulle { min-width: 0; min-height: 0; box-sizing: border-box; }
 @media (pointer: coarse) { html body button.vrm-cv-bulle::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border-radius: 50%; } }
 html body button.vrm-cv-bulle[data-cv-approx] { border-style: dashed; }
-html body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent, #0071E3); border-color: #fff; }
+html body button.vrm-cv-bulle[aria-pressed="true"] { background: var(--d-accent, #0F6B4C); border-color: #fff; }
 .vrm-cv-point { flex: 0 0 32px; display: grid; place-items: center; width: 32px; height: 32px; }
 .vrm-cv-point::after { content: ''; width: var(--r, 10px); height: var(--r, 10px); border-radius: 50%; background: var(--d-encre, #1D1D1F); opacity: .78; }
 .vrm-cv-detail-tete { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 4px; min-width: 0; }

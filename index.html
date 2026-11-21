@@ -138,7 +138,7 @@
     /* ⚠️ LE CHOIX DE L'APP GAGNE SUR LA PRÉFÉRENCE DU SYSTÈME. `data-theme` est
        posé par le script de démarrage ci-dessous (donc AVANT le premier
        rendu), et sa spécificité passe devant la règle `body` du média.
-       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#122329) : le média
+       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#1C1C1F) : le média
        utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
     html[data-theme="dark"]  body{ background:#000000; background-image:none; }
     html[data-theme="light"] body{ background:#FFFFFF; background-image:none; }
@@ -325,8 +325,8 @@
     .vrm-carrousel::-webkit-scrollbar{ display:none; }
     .vrm-carrousel > *{ scroll-snap-align:start; }
     @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){ .vrm-carrousel{ grid-auto-flow:row; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-columns:auto; overflow-x:visible; margin:0; padding:0; } }
-    :focus-visible{ outline:2px solid rgba(0,113,227,.65); outline-offset:2px; border-radius:8px; }
-    @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(10,132,255,.8); } }
+    :focus-visible{ outline:2px solid rgba(15,107,76,.65); outline-offset:2px; border-radius:8px; }
+    @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(15,107,76,.8); } }
 
     /* Bouton PRINCIPAL : un dégradé à peine perceptible + un liseré clair en
        haut. C'est ce qui fait qu'un bouton a l'air d'un objet posé sur la page
@@ -354,7 +354,7 @@
     ::-webkit-scrollbar-track{background:transparent;}
 
     /* 5) SÉLECTION de texte aux couleurs de la marque. */
-    ::selection{background:rgba(0,113,227,.18);}
+    ::selection{background:rgba(15,107,76,.18);}
 
     /* 6) CHAMPS DE SAISIE : jamais de zoom auto sur iOS (police >= 16px au focus)
           et un anneau propre — les champs trop petits font « site web », pas « app ». */
@@ -456,8 +456,8 @@
        (vu au rendu, panneau « règle d'offre » d'eBay). §7 : une seule couleur
        d'accent, le bleu de la marque — et le sombre suit le CHOIX (`data-theme`),
        pas la préférence du système. */
-    :focus-visible{outline:2px solid rgba(0,113,227,.7);outline-offset:2px;border-radius:8px;}
-    :root[data-theme="dark"] :focus-visible{outline-color:rgba(10,132,255,.8);}
+    :focus-visible{outline:2px solid rgba(15,107,76,.7);outline-offset:2px;border-radius:8px;}
+    :root[data-theme="dark"] :focus-visible{outline-color:rgba(15,107,76,.8);}
     button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
     /* Respect du réglage système « réduire les animations ». */
     @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
@@ -518,9 +518,9 @@
       --vrm-verre-uni:#F2F2F7;
       --vrm-verre-fond-nuit:none;
       --vrm-verre-uni-nuit:#000000;
-      --vrm-boot-encre:#111114;--vrm-boot-encre-2:#6C6C70;--vrm-boot-trait:rgb(60 60 67 / .18);--vrm-boot-accent:#0068D6;--vrm-boot-teinte:rgb(0 104 214 / .12);
+      --vrm-boot-encre:#111114;--vrm-boot-encre-2:#6C6C70;--vrm-boot-trait:rgb(60 60 67 / .18);--vrm-boot-accent:#0B5139;--vrm-boot-teinte:rgb(11 81 57 / .12);
     }
-    html[data-theme="dark"]{--vrm-boot-encre:#FFFFFF;--vrm-boot-encre-2:#98989F;--vrm-boot-trait:rgb(84 84 88 / .60);--vrm-boot-accent:#409CFF;--vrm-boot-teinte:rgb(64 156 255 / .20)}
+    html[data-theme="dark"]{--vrm-boot-encre:#FFFFFF;--vrm-boot-encre-2:#98989F;--vrm-boot-trait:rgb(84 84 88 / .60);--vrm-boot-accent:#3FD49A;--vrm-boot-teinte:rgb(63 212 154 / .20)}
     html[data-vrm-boot]{background:var(--vrm-verre-uni)}
     html[data-vrm-boot] body{background:var(--vrm-verre-fond) var(--vrm-verre-uni) fixed}
     html[data-vrm-boot][data-theme="dark"]{background:var(--vrm-verre-uni-nuit)}

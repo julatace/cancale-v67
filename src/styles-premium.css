@@ -48,14 +48,14 @@
   --p-gris: #6E6E73;
   --p-gris-2: #8A8A8E;     /* chevrons, icônes au repos (jamais un texte) */
   --p-filet: rgba(60,60,67,.14);
-  --p-accent: #0071E3;
-  --p-accent-texte: #0066CC;
+  --p-accent: #0F6B4C;
+  --p-accent-texte: #0B5139;
   --p-ambre-point: #FF9F0A;
   --p-ambre-texte: #B25000;
   /* Ombre : un seul niveau posé, presque rien — la surface blanche sur le gris suffit */ 
-  --p-ombre-sombre: 0 1px 2px rgba(0,0,0,.10), 0 12px 32px -14px rgba(16,24,40,.45);
+  --p-ombre-sombre: 0 1px 2px rgba(0,0,0,.10), 0 12px 32px -14px rgba(26,26,30,.45);
   /* La carte sombre : un bleu nuit, plus calme (moins de halo) */
-  --p-nuit: radial-gradient(120% 140% at 100% 0%, #213B5C 0%, #1B2433 46%, #18191C 100%);
+  --p-nuit: radial-gradient(120% 140% at 100% 0%, #3B3B42 0%, #252529 46%, #18191C 100%);
   --p-nuit-case: rgba(255,255,255,.08);
   --p-nuit-texte-2: rgba(255,255,255,.66);
   /* Mouvement */
@@ -70,12 +70,12 @@
   --p-gris: #98989D;
   --p-gris-2: #7C7C80;
   --p-filet: rgba(84,84,88,.55);
-  --p-accent: #0A84FF;
-  --p-accent-texte: #409CFF;
+  --p-accent: #0F6B4C;
+  --p-accent-texte: #3FD49A;
   --p-ambre-texte: #FFB340; 
   --p-ombre-sombre: 0 0 0 .5px rgba(255,255,255,.08);
   /* (9 nov.) En sombre, le bas de la carte ne finit plus au gris des cartes (#1C1C1E) : il reste bleu nuit (banc journee-coherence E4). */
-  --p-nuit: radial-gradient(120% 140% at 100% 0%, #24406A 0%, #1C2B42 50%, #1A2436 100%);
+  --p-nuit: radial-gradient(120% 140% at 100% 0%, #43434B 0%, #2C2C32 50%, #26262A 100%);
 }
 
 @layer vrm-premium {

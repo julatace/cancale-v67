@@ -28,7 +28,7 @@
   .n-rp-carte { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); overflow: hidden; scroll-margin-top: 96px; }
   .n-rp-tete { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px 12px; }
   .n-rp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
-  .n-rp-transp { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .04em; }
+  .n-rp-transp { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
   .n-rp-transp > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-rp-nom { margin: 0; font: var(--n-t-section); color: var(--n-encre); overflow-wrap: anywhere; }
   .n-rp-etiquette { display: inline-flex; align-items: center; flex: none; min-height: 24px; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2);

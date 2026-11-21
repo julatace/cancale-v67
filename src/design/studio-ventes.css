@@ -130,7 +130,7 @@ html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="v
   background: var(--sb-socle) !important; box-shadow: none, inset 0 0 0 .5px rgb(var(--sb-o) / .10) !important; position: relative !important;
 }
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .vrm-colis-carte .vrm-colis-photo img { border-radius: var(--sb-r-vignette) !important; }
-:root[data-theme="dark"] .vrm-tache[data-espace="ventes"] .vrm-colis-carte .vrm-colis-photo, html.vrm-dark .vrm-tache[data-espace="ventes"] .vrm-colis-carte .vrm-colis-photo { background: #1C2E46 !important; }
+:root[data-theme="dark"] .vrm-tache[data-espace="ventes"] .vrm-colis-carte .vrm-colis-photo, html.vrm-dark .vrm-tache[data-espace="ventes"] .vrm-colis-carte .vrm-colis-photo { background: #2E2E34 !important; }
 /* Le titre, et le N° en plaque gravée (le rouge reste au seul doublon : `Numero` le porte). */
 /* Le corps de la rangée prend toute la place ; le titre tient sur UNE ligne (points de suspension), l'échéance à droite. */
 html:root:root:root:root body .vrm-app-shell .vrm-main .vrm-tache[data-espace="ventes"] .vrm-colis-grille[data-colis-lignes] .vrm-colis-carte[data-bord-card] .vrm-colis-photo + div { flex: 1 1 auto !important; min-width: 0 !important; }

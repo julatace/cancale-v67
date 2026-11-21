@@ -37,8 +37,7 @@ html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outl
    index.html, HORS couche) passe devant la couche `vrm-natif` : dans CETTE feuille, les boutons du natif
    reprennent leurs mesures du contrat (plein 50, rangée 17/22, poignée sans plancher). Mesuré par la sonde du
    banc prix-sans-manuel le 19 nov. ; à reprendre une fois pour toutes dans la coque du natif. */
-.pp-feuille .n-bouton { font: var(--n-t-corps-fort); min-height: var(--n-cible); }
-.pp-feuille .n-bouton[data-n-variante="plein"] { min-height: var(--n-h-plein); }
+.pp-feuille .n-bouton { font: var(--n-t-controle); }
 .pp-feuille .n-rangee-corps { font: var(--n-t-corps); letter-spacing: normal; }
 .pp-feuille .n-feuille-poignee, .pp-feuille .n-feuille-croix { font: var(--n-t-corps); }
 .pp-feuille .n-feuille-poignee { min-height: 0; }

@@ -97,7 +97,7 @@ export const CHOIX_ETIQUETTE = [
 ];
 export const CHOIX_FORMAT_ETIQUETTE = FORMATS_ETIQUETTE.map((f) => ({ v: f.v, titre: f.planche ? 'Planche A4 · 24' : `${f.l} × ${f.h} mm`, sous: f.planche ? 'Une feuille, 3 × 8 étiquettes.' : 'Imprimante d’étiquettes.' }));
 // Les endroits où il l'écrit (plusieurs possibles, jamais aucun) : ceux de src/numeroEcrit.js.
-const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #123 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
+const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #202024 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
 export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_OU[v] || '' }));
 // (9 nov., soir, puis 11 nov.) Julien : « Cette étape n'est pas claire : "Simple ou complet ?
 // Tu pourras changer à tout moment." » DEUX grandes cartes (plus de « Laisser VRM choisir »,

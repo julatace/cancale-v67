@@ -152,7 +152,7 @@
  .vrm-main .vrm-set-ligne{min-height:49px;padding:10px 13px!important;gap:9px;}
  .vrm-main .vrm-set-lib{font-size:13px;min-width:0;}
  .vrm-main .vrm-set-val{font-size:11px;max-width:42%;overflow-wrap:anywhere;}
- .vrm-main .vrm-set-titre{font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:#6E6E73!important;}
+ .vrm-main .vrm-set-titre{font-size:11px;letter-spacing: normal;text-transform: none;color:#6E6E73!important;}
  .vrm-chat-panel{background:#F2F2F7!important;}
  .vrm-chat-panel .vrm-chat-head{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-color:#ffffff15!important;}
  .vrm-chat-panel .vrm-chat-head :is(button,.vrm-chat-head-n){color:#F2F2F7!important;}

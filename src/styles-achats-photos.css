@@ -225,7 +225,7 @@
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-modifier {
   position: absolute !important; top: -16px !important; right: 0 !important; height: 44px !important;
   min-height: 44px !important; padding: 0 0 0 12px !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
-  font-size: var(--d-t-15, 15px) !important; font-weight: 400 !important; color: var(--d-accent-texte, #0066CC) !important;
+  font-size: var(--d-t-15, 15px) !important; font-weight: 400 !important; color: var(--d-accent-texte, #0B5139) !important;
 }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous { grid-area: l1 !important; color: var(--d-gris, #6E6E73) !important; margin: 0 !important; padding: 2px 12px 0 0 !important; line-height: 1.3 !important; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-sous-nom { display: inline-flex !important; align-items: center !important; gap: 4px !important; font-size: var(--d-t-13, 13px) !important; font-weight: 400 !important; color: var(--d-gris, #6E6E73) !important; }
@@ -291,7 +291,7 @@
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > .vrm-seg > .vrm-seg-btn[aria-pressed="true"] { background-color: var(--d-encre, #1D1D1F) !important; color: var(--d-carte, #fff) !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > :is(.vrm-achats-selection, .vrm-achats-plus) { flex: none !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > :is(.vrm-achats-selection, .vrm-achats-plus):first-of-type { margin-left: auto !important; }
-:root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > .vrm-achats-selection { margin-left: auto !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > .vrm-achats-selection { margin-left: auto !important; color: var(--d-accent-texte, #0B5139) !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-barre > .vrm-achats-selection + .vrm-achats-plus { margin-left: 0 !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres :is(.vrm-achats-search) { min-height: 36px !important; height: 36px !important; }
 :root:root:root body .vrm-main .vrm-achats .vrm-achats-filtres [data-achats-calculette] { width: 44px !important; min-width: 44px !important; max-width: 44px !important; padding: 0 0 0 13px !important; justify-content: flex-start !important; flex: none !important; gap: 30px !important; overflow: hidden !important; white-space: nowrap !important; color: transparent !important; }
@@ -371,7 +371,7 @@
   :root:root:root body .vrm-achats-retirer-ligne:hover { background: var(--d-survol, #F5F5F7) !important; }
   :root:root:root body .vrm-ms-carte .vrm-ms-ligne:hover .vrm-ms-nom { text-decoration: underline; text-underline-offset: 3px; }
 }
-:root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-gc-compte, .vrm-ms-calcul > summary):focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-gc-compte, .vrm-ms-calcul > summary):focus-visible { outline: 2px solid var(--d-accent, #0F6B4C) !important; outline-offset: 2px !important; }
 :root:root:root body :is(.vrm-achats-retirer-ligne, .vrm-achats-selection, .vrm-ms-ligne, .vrm-gc-compte, .vrm-buy-row button) { touch-action: manipulation; }
 :root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero .vrm-fu-cases > .vrm-fu-case:nth-child(n):nth-last-child(n) > b { font-variant-numeric: tabular-nums !important; }
 } /* fin @layer vrm-premium — finitions */

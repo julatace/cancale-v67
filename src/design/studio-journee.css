@@ -22,24 +22,24 @@
    les pose sur :root (jour, nuit, système). Restent la touche posée, le creux, la plaque, le puits, le socle. */
 .sj-journee {
   /* touche posée, creux, plaque, socle de vignette (note.md §6) */
-  --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB) !important;
+  --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F6F7F8) !important;
   --sj-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .14), 0 1px 1.5px rgb(var(--sb-o) / .08), 0 4px 9px -5px rgb(var(--sb-o) / .26) !important;
   --sj-k-in: inset 0 1px 2px rgb(var(--sb-o) / .20), inset 0 0 0 .5px rgb(var(--sb-o) / .12) !important;
   --sj-pl-sh: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9) !important;
   --sj-puits: rgb(255 255 255 / .46) !important;
   --sj-puits-sh: inset 0 1px 2px rgb(var(--sb-o) / .13), inset 0 0 0 .5px rgb(var(--sb-o) / .08) !important;
-  --sj-socle: #F1F5F9 !important;
+  --sj-socle: #F3F5F7 !important;
   --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root[data-theme="dark"] .sj-journee {
-  --sj-k-bg: linear-gradient(180deg, #1D3049, #172840) !important;
+  --sj-k-bg: linear-gradient(180deg, #303036, #29292E) !important;
   --sj-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8) !important;
   --sj-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5) !important;
   --sj-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07) !important;
   --sj-puits: rgb(0 0 0 / .22) !important;
   --sj-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06) !important;
-  --sj-socle: #1C2E46 !important;
-  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
+  --sj-socle: #2E2E34 !important;
+  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
 }
 
 /* ── 2. (14 nov., version studio) La lumière du fond est celle de la coque (studio.css) : la copie « provisoire »

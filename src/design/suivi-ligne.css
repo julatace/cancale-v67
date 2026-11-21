@@ -11,7 +11,7 @@
 :root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus) { position: relative; flex: none; display: block; height: 22px !important; min-height: 0 !important; max-height: 22px !important; min-width: 0 !important; width: auto !important; padding: 0 2px !important; margin: 0; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sl-encre); font: inherit; font-weight: 400; font-variant-numeric: tabular-nums; text-decoration: none; cursor: pointer; line-height: 22px; border-radius: 6px; }
 :root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus)::after { content: ''; position: absolute; inset: -11px -4px; }
 :root:root:root body .vrm-suivi-ligne .vrm-sl-lien, :root:root:root body .vrm-suivi-ligne .vrm-sl-plus { color: var(--sl-gris); }
-:root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus):focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 1px; }
+:root:root:root body .vrm-suivi-ligne :is(.vrm-sl-n, .vrm-sl-lien, .vrm-sl-plus):focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: 1px; }
 :root:root:root body .vrm-suivi-ligne .vrm-sl-statut { flex: 0 1 auto; min-width: 2.5em; overflow: hidden; text-overflow: ellipsis; }
 :root:root:root body .vrm-suivi-ligne .vrm-sl-statut::before, :root:root:root body .vrm-suivi-ligne .vrm-sl-quand::before, :root:root:root body .vrm-suivi-ligne .vrm-sl-n::before { content: '·'; margin-right: 6px; color: var(--sl-gris); font-weight: 400; }
 :root:root:root body .vrm-suivi-ligne .vrm-sl-logo + .vrm-sl-n::before { content: none; }

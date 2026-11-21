@@ -13,7 +13,7 @@
 .vrm-rp-erreur { margin: 0; font-size: 13px; color: var(--vrm-warn, #b25000); }
 .vrm-rp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-rp-principal, .vrm-rp-second, .vrm-rp-ouvrir { min-height: 44px; padding: 0 16px; border-radius: 12px; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; }
-.vrm-rp-principal { border: 0; background: var(--vrm-accent, #0071e3); color: var(--vrm-on-accent, #fff); }
+.vrm-rp-principal { border: 0; background: var(--vrm-accent, #0F6B4C); color: var(--vrm-on-accent, #fff); }
 .vrm-rp-principal:disabled, .vrm-rp-ouvrir:disabled { opacity: .45; cursor: default; }
 .vrm-rp-second, .vrm-rp-ouvrir { border: 1px solid var(--vrm-line, #e5e5ea); background: transparent; color: var(--vrm-ink, #1d1d1f); }
 .vrm-rp-cartes { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }

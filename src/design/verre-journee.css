@@ -12,25 +12,25 @@
    RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun data-*, aucun geste ne change ici.
    ════════════════════════════════════════════════════════════════════════════ */
 :root {
-  --vj-plein: #0C1D30; --vj-plein-t: #FFFFFF; 
-  --vj-touche: rgb(255 255 255 / .72); --vj-touche-bord: rgb(12 29 48 / .12);
-  --vj-libre: rgb(255 255 255 / .34); --vj-libre-bord: rgb(12 29 48 / .24);
-  --vj-ac: #0060CC; --vj-ac-halo: rgb(0 96 204 / .25); --vj-ou: rgb(0 96 204 / .08); --vj-ou-bord: rgb(0 96 204 / .18);
-  --vj-pastille: rgb(12 29 48 / .07); --vj-site: rgb(255 255 255 / .94);
+  --vj-plein: #1C1C20; --vj-plein-t: #FFFFFF; 
+  --vj-touche: rgb(255 255 255 / .72); --vj-touche-bord: rgb(28 28 32 / .12);
+  --vj-libre: rgb(255 255 255 / .34); --vj-libre-bord: rgb(28 28 32 / .24);
+  --vj-ac: #0B5139; --vj-ac-halo: rgb(11 81 57 / .25); --vj-ou: rgb(11 81 57 / .08); --vj-ou-bord: rgb(11 81 57 / .18);
+  --vj-pastille: rgb(28 28 32 / .07); --vj-site: rgb(255 255 255 / .94);
 }
 :root[data-theme="dark"] {
-  --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; 
+  --vj-plein: #F3F4F6; --vj-plein-t: #1C1C20; 
   --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
   --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
-  --vj-ac: #6AABFF; --vj-ac-halo: rgb(106 171 255 / .3); --vj-ou: rgb(106 171 255 / .10); --vj-ou-bord: rgb(106 171 255 / .25);
+  --vj-ac: #3FD49A; --vj-ac-halo: rgb(63 212 154 / .3); --vj-ou: rgb(63 212 154 / .10); --vj-ou-bord: rgb(63 212 154 / .25);
   --vj-pastille: rgb(255 255 255 / .10);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --vj-plein: #EEF4FB; --vj-plein-t: #0C1D30; 
+    --vj-plein: #F3F4F6; --vj-plein-t: #1C1C20; 
     --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
     --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
-    --vj-ac: #6AABFF; --vj-ac-halo: rgb(106 171 255 / .3); --vj-ou: rgb(106 171 255 / .10); --vj-ou-bord: rgb(106 171 255 / .25);
+    --vj-ac: #3FD49A; --vj-ac-halo: rgb(63 212 154 / .3); --vj-ou: rgb(63 212 154 / .10); --vj-ou-bord: rgb(63 212 154 / .25);
     --vj-pastille: rgb(255 255 255 / .10);
   }
 }
@@ -106,7 +106,7 @@
   display: flex !important; flex-direction: column !important; align-items: flex-start !important; padding: 0 10px 0 12px !important; margin: 0 !important; min-height: 44px !important;
   background: none !important; border: 0 !important; box-shadow: none !important; text-align: left !important; min-width: 0 !important;
 }
-:root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case + .vrm-fu-case { border-left: 1px solid var(--sv-ligne, rgb(12 29 48 / .10)) !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case + .vrm-fu-case { border-left: 1px solid var(--sv-ligne, rgb(28 28 32 / .10)) !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case[data-carte-chiffre="vendu"] { order: 1 !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case[data-carte-chiffre="recu"] { order: 2 !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case[data-carte-chiffre="benefice"] { order: 3 !important; padding-right: 30px !important; }
@@ -136,7 +136,7 @@
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-n-grand { display: none !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-face:not(:has(.sj-v-plaques)) .sj-n-grand { display: block !important; grid-area: pile !important; font: 750 34px/1 Inter, system-ui, sans-serif !important; margin: 0 !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile { grid-area: pile !important; position: static !important; inset: auto !important; display: flex !important; flex-direction: row !important; align-items: center !important; width: auto !important; height: auto !important; transform: none !important; }
-:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v { flex: none !important; min-width: 50px !important; position: relative !important; transform: none !important; width: 50px !important; height: 50px !important; border-radius: 13px !important; border: 2px solid #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .5) !important; overflow: hidden !important; margin: 0 !important; inset: auto !important; }
+:root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v { flex: none !important; min-width: 50px !important; position: relative !important; transform: none !important; width: 50px !important; height: 50px !important; border-radius: 13px !important; border: 2px solid #FFFFFF !important; box-shadow: 0 4px 10px -4px rgb(27 27 31 / .5) !important; overflow: hidden !important; margin: 0 !important; inset: auto !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v + .vrm-pile-v { margin-left: -22px !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-v img { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; }
 :root:root:root:root:root:root body .sj-journee .sj-t-envoyer .sj-pile .vrm-pile-plus { position: static !important; transform: none !important; margin-left: 6px !important; font: 750 12px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; background: none !important; box-shadow: none !important; padding: 0 !important; white-space: nowrap !important; width: auto !important; height: auto !important; inset: auto !important; }
@@ -227,7 +227,7 @@
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-carte:not(.vrm-so-d):not(.vrm-so-fin) {
     display: grid !important; grid-template-columns: 150px minmax(0, 1fr) !important; grid-template-areas: "ph m" "ph ou" "plein plein" "touche touche" !important; column-gap: 16px !important; align-items: start !important;
   }
-  :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { grid-area: ph !important; width: 150px !important; height: 150px !important; box-shadow: 0 10px 22px -10px rgb(8 26 50 / .55) !important; }
+  :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { grid-area: ph !important; width: 150px !important; height: 150px !important; box-shadow: 0 10px 22px -10px rgb(27 27 31 / .55) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-m { grid-area: m !important; padding: 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-m > b { font-size: 19px !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] :is(.vrm-so-ou, .vrm-so-inc) { grid-area: ou !important; margin-top: 10px !important; padding: 10px 12px !important; border-radius: 14px !important; }
@@ -235,7 +235,7 @@
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ou-t > em { font-size: 14px !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-plein { grid-area: plein !important; margin-top: 12px !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-touche { grid-area: touche !important; }
-  :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-suite { margin-top: 12px !important; padding-top: 10px !important; border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-suite { margin-top: 12px !important; padding-top: 10px !important; border-top: 1px solid rgb(28 28 32 / .10) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ss { padding: 4px 0 !important; min-height: 50px !important; }
   /* Le mois : la valeur 22/750, son libellé dessous. */
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col-c1 > .sj-t-mois { padding: 12px 4px !important; }
@@ -252,7 +252,7 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) > :not([data-jp-urgent]) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-lignes { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
-  :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne + .sj-v-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne + .sj-v-ligne { border-top: 1px solid rgb(28 28 32 / .10) !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-ph { width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; flex: none !important; display: grid !important; place-items: center !important; background: var(--vj-touche) !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-ph > img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-mid { flex: 1 !important; min-width: 0 !important; display: block !important; }
@@ -263,7 +263,7 @@
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne-prix { font: 750 15.5px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; flex: none !important; }
   /* À retirer : le code 24 px ; Messages et À faire en panneaux. */
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-retirer .sj-code .sb-plaque--grande { font-size: 24px !important; }
-  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-retirer .sj-code + .sj-code { border-top: 1px solid rgb(12 29 48 / .10) !important; padding-top: 8px !important; margin-top: 8px !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-retirer .sj-code + .sj-code { border-top: 1px solid rgb(28 28 32 / .10) !important; padding-top: 8px !important; margin-top: 8px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col-c3 > .vrm-fu-afaire { margin: 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) {
     display: flex !important; align-items: center !important; justify-content: space-between !important; min-height: 52px !important; padding: 0 16px !important; border-radius: 18px !important;
@@ -304,9 +304,9 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-pq.is-xl small { font: inherit !important; color: inherit !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-site {
   position: absolute !important; right: 10px !important; top: 10px !important; display: flex !important; align-items: center !important; gap: 6px !important; height: 28px !important; padding: 0 10px !important;
-  border-radius: 14px !important; background: var(--vj-site) !important; color: #0C1D30 !important; font: 700 12.5px/1 Inter, system-ui, sans-serif !important; box-shadow: 0 2px 6px rgb(8 26 50 / .3) !important;
+  border-radius: 14px !important; background: var(--vj-site) !important; color: #1C1C20 !important; font: 700 12.5px/1 Inter, system-ui, sans-serif !important; box-shadow: 0 2px 6px rgb(27 27 31 / .3) !important;
 }
-:root:root:root:root:root:root body .sj-journee .vrm-so-rang { position: absolute !important; left: 10px !important; top: 10px !important; height: 28px !important; display: flex !important; align-items: center !important; padding: 0 10px !important; border-radius: 14px !important; background: #0C1D30 !important; color: #FFFFFF !important; font: 750 12.5px/1 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-rang { position: absolute !important; left: 10px !important; top: 10px !important; height: 28px !important; display: flex !important; align-items: center !important; padding: 0 10px !important; border-radius: 14px !important; background: #1C1C20 !important; color: #FFFFFF !important; font: 750 12.5px/1 Inter, system-ui, sans-serif !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-m { padding: 10px 6px 0 !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-m > b { display: block !important; font: 750 18px/1.25 Inter, system-ui, sans-serif !important; letter-spacing: -.02em !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-m > span { display: flex !important; align-items: center !important; gap: 5px !important; font: 550 13px/1.35 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 2px !important; }
@@ -320,7 +320,7 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-pl-row > b.is-on { color: var(--vj-ac) !important; font-weight: 800 !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-pc { position: relative !important; display: block !important; width: var(--s) !important; height: var(--s) !important; border-radius: calc(var(--s) / 5) !important; overflow: hidden !important; flex: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-pc.is-vide { background: var(--vj-libre) !important; border: 1px dashed var(--vj-libre-bord) !important; opacity: .6 !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-so-pc.is-prise { background: #FFFFFF !important; box-shadow: 0 1px 2px rgb(8 26 50 / .22) !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-pc.is-prise { background: #FFFFFF !important; box-shadow: 0 1px 2px rgb(27 27 31 / .22) !important; }
 :root:root:root:root:root:root[data-theme="dark"] body .sj-journee .vrm-so-pc.is-prise { background: rgb(255 255 255 / .22) !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-pc.is-cible { z-index: 2 !important; overflow: visible !important; background: #FFFFFF !important; box-shadow: 0 0 0 2px var(--vj-ac), 0 0 0 5px var(--vj-ac-halo) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-pc.is-cible > img { display: block !important; width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: inherit !important; }
@@ -337,7 +337,7 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-touche { margin-top: 8px !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-suite { margin-top: 10px !important; padding: 0 !important; overflow: hidden !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss { display: flex !important; align-items: center !important; gap: 10px !important; min-height: 62px !important; padding: 8px 14px 8px 10px !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-so-ss + .vrm-so-ss { border-top: 1px solid var(--sv-ligne, rgb(12 29 48 / .10)) !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-ss + .vrm-so-ss { border-top: 1px solid var(--sv-ligne, rgb(28 28 32 / .10)) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss-n { width: 22px !important; height: 22px !important; border-radius: 7px !important; display: grid !important; place-items: center !important; font: 750 12px/1 Inter, system-ui, sans-serif !important; background: var(--vj-pastille) !important; color: var(--sv-encre) !important; flex: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss-ph { width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; flex: none !important; display: grid !important; place-items: center !important; background: var(--vj-touche) !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss-ph > img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
@@ -349,7 +349,7 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss-end > b { display: block !important; font: 700 13.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ss-plus { justify-content: center !important; min-height: 44px !important; font: 600 13px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ok3 { display: flex !important; gap: 4px !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-so-ok3 > i { width: 18px !important; height: 18px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: rgb(255 255 255 / .3) !important; color: #0C1D30 !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-ok3 > i { width: 18px !important; height: 18px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: rgb(255 255 255 / .3) !important; color: #1C1C20 !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-ok3 > i.is-ok { background: #FFFFFF !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d { padding: 14px !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-h { display: flex !important; align-items: center !important; gap: 12px !important; }
@@ -364,11 +364,11 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-mb {
   position: relative !important; width: 96px !important; height: 26px !important; border-radius: 6px !important; display: grid !important; place-items: center !important;
   font: 750 12px/1 Inter, system-ui, sans-serif !important; font-variant-numeric: tabular-nums !important; color: #3B2A10 !important;
-  background: linear-gradient(#F6EAD2, #E6D0A6) !important; border-top: 3px solid #C9A86C !important; box-shadow: 0 2px 4px -2px rgb(8 26 50 / .4) !important;
+  background: linear-gradient(#F6EAD2, #E6D0A6) !important; border-top: 3px solid #C9A86C !important; box-shadow: 0 2px 4px -2px rgb(27 27 31 / .4) !important;
 }
 :root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-vide { background: transparent !important; border: 1px dashed var(--vj-libre-bord) !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-on { box-shadow: 0 0 0 2px var(--vj-ac), 0 0 0 5px var(--vj-ac-halo) !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-fl > i { position: absolute !important; right: -26px !important; top: 50% !important; transform: translateY(-50%) !important; width: 20px !important; height: 20px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; color: #0060CC !important; box-shadow: 0 1px 3px rgb(8 26 50 / .3) !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-fl > i { position: absolute !important; right: -26px !important; top: 50% !important; transform: translateY(-50%) !important; width: 20px !important; height: 20px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; color: #0B5139 !important; box-shadow: 0 1px 3px rgb(27 27 31 / .3) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-t { font: 550 13.5px/1.4 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin: 12px 0 0 !important; text-align: center !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-a { display: flex !important; justify-content: center !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-a .sb-lien { min-height: 44px !important; color: var(--sv-lien) !important; font: 650 14.5px/1 Inter, system-ui, sans-serif !important; background: none !important; border: 0 !important; box-shadow: none !important; }
@@ -391,7 +391,7 @@
 :root:root:root:root:root:root body .sj-journee .vrm-rl-h2 { font: 750 16px/1.25 Inter, system-ui, sans-serif !important; letter-spacing: -.015em !important; color: var(--sv-encre) !important; margin: 0 0 4px !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-rl-h2 > span { color: var(--sv-encre) !important; font-weight: 750 !important; }
 :root:root:root:root:root:root body :is(.sj-journee, .vrm-main) :is(.vrm-rl-ligne, .vrm-ret-verif-ligne) { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-rl-ligne + .vrm-rl-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-rl-ligne + .vrm-rl-ligne { border-top: 1px solid rgb(28 28 32 / .10) !important; }
 :root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-ph { width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; flex: none !important; background: var(--vj-touche) !important; }
 :root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-ph > img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
 :root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-mid { flex: 1 !important; min-width: 0 !important; display: block !important; }

@@ -51,7 +51,7 @@
 
   /* ── LA LISTE ─────────────────────────────────────────────────────────────────────────────────── */
   .n-mail-jour + .n-mail-jour { margin-top: 18px; }
-  .n-mail-jour-titre { margin: 0 16px 6px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .n-mail-jour-titre { margin: 0 16px 6px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
   .n-mail-jour > ul, .n-mail-ranges > ul { list-style: none; margin: 0; padding: 0; border-radius: 12px; background: var(--n-carte); overflow: hidden; }
   .n-mail-item { position: relative; display: flex; align-items: center; min-width: 0; background: var(--n-carte); }
   .n-mail-item + .n-mail-item::before { content: ""; position: absolute; top: 0; left: 62px; right: 0; height: 1px; background: var(--n-trait); transform: scaleY(.5); transform-origin: top; z-index: 1; pointer-events: none; }
@@ -149,7 +149,7 @@
   .n-mail-entete-txt > span { font: var(--n-t-legende); color: var(--n-encre-2); }
   /* « Ce que VRM a compris » */
   .n-mail-compris-carte { display: grid; gap: 14px; margin: 16px 0 20px; padding: 16px; border-radius: 12px; background: var(--n-carte-2); }
-  .n-mail-compris-sur, .n-mail-section-titre { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .n-mail-compris-sur, .n-mail-section-titre { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
   .n-mail-compris-tete { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
   .n-mail-compris-photo { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--n-carte); }
   .n-mail-compris-txt { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
@@ -186,7 +186,7 @@
   .n-mail-msg a { color: var(--n-accent); text-decoration: underline; text-underline-offset: 2px; }
   .n-mail-msg-liste { margin: 0; padding: 0 0 0 20px; display: grid; gap: 6px; }
   .n-mail-msg-n { margin-right: 6px; color: var(--n-encre-2); }
-  .n-mail-msg-etiq { font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; }
+  .n-mail-msg-etiq { font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; }
   .n-mail-msg-note, .n-mail-doux { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
   .n-mail-msg-pied summary { min-height: 44px; display: flex; align-items: center; font: var(--n-t-second); color: var(--n-encre-2); cursor: pointer; }
   .n-mail-msg-pied p { font: var(--n-t-legende); color: var(--n-encre-2); }

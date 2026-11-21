@@ -2,14 +2,14 @@
    (opaque, fixe) ; la marque, les liens des documents et le pied en BLANC sur le bleu ; le document
    sur une plaque de VERRE où le texte est à l'encre (la nuit : verre sombre, texte clair).
    Contraste AA mesuré (banc verre-extension-site). Sans flou ou transparence réduite : verre opaque. */
-:root{--bleu:#174C88;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
-  --verre:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);--verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);
-  --sur:#FFFFFF;--sur-2:#EEF4FB;
-  --card:rgb(255 255 255 / .6);--text:#0C1D30;--muted:#3F5468;--border:rgb(18 52 96 / .14);--accent:#0055B8;--todo:#FFF4D6;--todoText:#764300}
-@media (prefers-color-scheme: dark){:root{--bleu:#0C2848;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
-  --verre:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);--verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
-  --sur-2:#D6E4F3;
-  --card:rgb(255 255 255 / .05);--text:#EAF2FB;--muted:#A9BBCF;--border:rgb(255 255 255 / .12);--accent:#6CB4FF;--todo:#3A2E0B;--todoText:#F2B65E}}
+:root{--bleu:#0B5139;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(63 212 154 / .16) 0%,rgb(63 212 154 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(52 190 137 / .16) 0%,rgb(52 190 137 / 0) 70%),linear-gradient(170deg,#0B5139 0%,#0B5139 45%,#303036 100%);
+  --verre:rgb(249 250 251 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);--verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(27 27 31 / .55);
+  --sur:#FFFFFF;--sur-2:#F3F4F6;
+  --card:rgb(255 255 255 / .6);--text:#1C1C20;--muted:#3F5468;--border:rgb(54 54 60 / .14);--accent:#0B5139;--todo:#FFF4D6;--todoText:#764300}
+@media (prefers-color-scheme: dark){:root{--bleu:#27272D;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(52 190 137 / .14) 0%,rgb(52 190 137 / 0) 60%),linear-gradient(170deg,#3A3A41 0%,#27272D 50%,#171719 100%);
+  --verre:rgb(19 19 22 / .72);--verre-o:#212126;--verre-bord:rgb(255 255 255 / .12);--verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
+  --sur-2:#E0E4E9;
+  --card:rgb(255 255 255 / .05);--text:#F1F2F4;--muted:#A9BBCF;--border:rgb(255 255 255 / .12);--accent:#3FD49A;--todo:#3A2E0B;--todoText:#F2B65E}}
 *{box-sizing:border-box}
 html{background:var(--bleu)}
 body{margin:0;background:var(--bleu);color:var(--sur);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;isolation:isolate}
