@@ -47,7 +47,11 @@ des gestes, pas des écrans ; « Langue » ouvre la rubrique Apparence et langue
   place de la barre, chaque tuile, la carte du compte, « ‹ Menu », chaque entrée de la latérale et vérifie l'écran monté
   (`data-ecran`) et l'onglet allumé ; O9 un seul titre / ≤ 1 action / une recherche ; O10 pastilles identiques sur 11
   écrans ; O11 titre au même endroit ; O12 « ‹ Menu ».
-- Échoue sur origin/main (`BANC_DIST=<dist d'avant>`) : voir le rapport de la session (chiffres ci-dessous).
+- Après : **106 verts, 0 rouge** (un ⚠️ dit pour Stock, voir plus bas). Sur origin/main (`git archive`, build, `BANC_DIST=`) :
+  **30 verts, 58 rouges** — O1, O2, O3, O4, O5, O6, O8, O9, O11, O12 rouges. O7 et O10 restent verts sur l'ancien code :
+  sur la base inventée, l'ancienne barre ne variait pas (les « à régler » de l'écran courant ne sont pas publiés dans la
+  fixture) — O10 ne prouve donc la règle que sur une vraie base ; la correction se lit dans le code (`badgesStables`).
+- Captures regardées (390 clair/sombre, 1512) : Menu (haut et bas), Publier, Achats, Argent, Stock, Paramètres, Aujourd'hui.
 - Audits verts : traduction, quoi-de-neuf, coherence, icones, barre-achats, coque-tablette, onglets-a, onglets-d,
   onglets-rapides. `audit-coque-parametres` : 1 rouge (« icône search » dans Réglages), déjà rouge sur origin/main.
 
