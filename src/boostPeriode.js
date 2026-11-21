@@ -76,9 +76,9 @@ export function verdictBoost({ serie, periode, venteAt = null, offres = null, co
   const p = periode;
   const base = { verdict: 'pas-assez', pendant: null, avant: null, semblables: null, vendue: false, offres: offres && typeof offres === 'object' ? offres : null, cout: Number(cout) > 0 ? Math.round(Number(cout) * 100) / 100 : null, raison: '' };
   if (!p || !Number.isFinite(p.debut) || !Number.isFinite(p.fin)) return { ...base, raison: 'aucun boost relevé' };
-  const n = Math.max(1, Math.round((p.fin - p.debut) / JOUR));
-  // Pendant : du relevé juste avant le début (veille) jusqu'au dernier jour boosté ; avant : la même durée, juste avant.
+  // Pendant : du relevé de la veille du début jusqu'au dernier jour boosté ; avant : la MÊME durée (`n`, en ms), juste avant.
   const debut0 = p.debut - JOUR;
+  const n = p.fin - debut0;
   const vendue = Number.isFinite(venteAt) && venteAt >= p.debut && venteAt < p.fin + JOUR;
   const pv = taux(S, debut0, p.fin, 'v'), pf = taux(S, debut0, p.fin, 'f');
   const av = taux(S, debut0 - n, debut0, 'v'), af = taux(S, debut0 - n, debut0, 'f');
